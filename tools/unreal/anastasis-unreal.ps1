@@ -1,6 +1,6 @@
 param([ValidateSet('status','build','verify','editor')][string]$Command='status')
 $ErrorActionPreference='Stop'
-$Canonical='C:\Users\alex_\OneDrive\Documents\Unreal Projects\Anastasis_UnrealV2 5.8'
+$Canonical='C:\dev\ANASTASIS_UNREAL'
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 if($Root -ne $Canonical){throw 'FAIL: operator must reside in the canonical root'}
 $cwdPath=(Get-Location).Path

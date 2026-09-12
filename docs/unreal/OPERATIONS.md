@@ -1,13 +1,11 @@
 # Local operations and recovery
 
-From the canonical root: `powershell -ExecutionPolicy Bypass -File tools/unreal/anastasis-unreal.ps1 status|build|verify|editor` (select one command).
+CANONICAL_ROOT: C:\dev\ANASTASIS_UNREAL
+From this root: `powershell -ExecutionPolicy Bypass -File tools/unreal/anastasis-unreal.ps1 status|build|verify|editor` (select one command).
+`verify` builds incrementally, opens a dedicated Editor, loads FirstPerson, runs PIE, checks DEBUG markers, source/config fingerprints and DLL origins, then closes its session. Output: Saved/CanonicalVerification/latest.json. This does not implement PLAYER or certify all tests. Culture-sensitive engine smoke failures are classified in AUTOMATION_TRIAGE.md.
 
-`verify` runs UBT's incremental check, starts its own Editor, loads FirstPerson, requests real PIE, checks current DEBUG markers, source/config fingerprint and module origins, then closes only its session. Logs and current hashes: Saved/CanonicalVerification/latest.json. It is a smoke gate, not a complete test suite or PLAYER acceptance. `editor` only requests opening; it does not certify launch. Scripts refuse any working directory outside the canonical root.
+Git history and all 542 LFS assets are local; no remote, alternate object directory, linked worktree or cloud placeholder is required. Preserve .git/lfs/objects with Git history for recovery; a Git bundle alone omits LFS payloads. Source/Config/Content were hash-compared before infrastructure edits. Local .cursor settings and workspace file were copied unchanged but remain untracked; they are not part of the build/PIE operator contract. Historical reports retain their original paths as provenance.
 
-Local Git includes Source, Config, uproject, docs, tools and Content. Unreal binary assets use locally installed Git LFS. No remote exists. `.git/lfs/objects` is essential to recovery: a Git bundle alone does not contain LFS payloads. Preserve a complete verified local repository copy before any future relocation; do not move during this mission. Generated Binaries, Intermediate, Saved, DerivedDataCache and IDE/Python caches are excluded. Preexisting .cursor settings and workspace file are left outside the baseline; they remain on disk.
+Previous OneDrive project remains present, marked PREVIOUS_CANONICAL / READ_ONLY_BACKUP_CANDIDATE / DO_NOT_DEVELOP. Its Source/Content/Config were not changed. It is not a current backup of future local commits. No relocation by deletion was performed.
 
-Git author for infrastructure baseline: Codex <codex@localhost>, repository-local only. The baseline contains preexisting project work; authorship of that work is not attributed to Codex.
-
-ONEDRIVE_RISK: HIGH (operational exposure; no demonstrated data corruption).
-Observed before Git initialization: Intermediate 3.488 GB; .vs 2.012 GB; Binaries 84.8 MB; Content 155.4 MB. All 553 Content files expose reparse attributes. Existing sibling copies required an explicit authority ruling. No conflict-named Content files found; sync status and active locks are not established. Gitignore does not exclude files from OneDrive syncing. Generated-file churn and the new local LFS/Git store remain in the sync-managed tree.
-Future recommendation: separately authorize a verified copy to a dedicated local development root, update the root guard, verify LFS objects and source hashes, rerun verify, then change authority. No relocation or cleanup was executed.
+ONEDRIVE_DEPENDENCY: NONE for the canonical Git/LFS/build/Editor/PIE path. Generated state is regenerated locally. Dedicated independent backup remains future work.

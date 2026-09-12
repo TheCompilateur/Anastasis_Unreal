@@ -1,4 +1,4 @@
-CANONICAL_ROOT: C:\Users\alex_\OneDrive\Documents\Unreal Projects\Anastasis_UnrealV2 5.8
+CANONICAL_ROOT: C:\dev\ANASTASIS_UNREAL
 UPROJECT: Anastasis_UnrealV2.uproject
 ENGINE: Unreal Engine 5.8.2
 ENGINE_CL: 56702186
@@ -10,6 +10,6 @@ EDITOR_STATUS: PASS; dedicated fresh process
 PIE_STATUS: PASS; /Game/FirstPerson/Lvl_FirstPerson
 PLAYER_STATUS: NOT_IMPLEMENTED
 LAST_VERIFIED_DATE: 2026-09-12; see Saved/CanonicalVerification/latest.json and docs/unreal/evidence
-PREDECESSOR_PROJECT: sibling Anastasis_UnrealV2; no development
-LEGACY_PROJECT: sibling Anastasis_Unreal; no development
-TEMPLATE_PROJECT: sibling Final_AnastasisUR; no development
+PREDECESSOR_PROJECT: C:\Users\alex_\OneDrive\Documents\Unreal Projects\Anastasis_UnrealV2; no development
+LEGACY_PROJECT: C:\Users\alex_\OneDrive\Documents\Unreal Projects\Anastasis_Unreal; no development
+TEMPLATE_PROJECT: C:\Users\alex_\OneDrive\Documents\Unreal Projects\Final_AnastasisUR; no development

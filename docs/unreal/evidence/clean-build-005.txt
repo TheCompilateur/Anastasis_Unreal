@@ -1,0 +1,48 @@
+Using bundled DotNet SDK version: 10.0 win-x64
+Running UnrealBuildTool: dotnet "..\..\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.dll" Anastasis_UnrealV2Editor Win64 Development -Project=C:\dev\ANASTASIS_UNREAL\Anastasis_UnrealV2.uproject -WaitMutex -NoHotReloadFromIDE
+Log file: C:\Users\alex_\AppData\Local\UnrealBuildTool\Log.txt
+Determining max actions to execute in parallel (6 physical cores, 12 logical cores)
+  Executing up to 6 processes, one per physical core
+Using 'git status' to determine working set for adaptive non-unity build (C:\dev\ANASTASIS_UNREAL).
+Creating makefile for Anastasis_UnrealV2Editor (no existing makefile)
+UbaServer - Listening on 0.0.0.0:1345
+UHT compiled-in object format Default
+Building Anastasis_UnrealV2Editor...
+===== Toolchain Information =====
+Using ISPC compiler (C:\Program Files\Epic Games\UE_5.8\Engine\Source\ThirdParty\Intel\ISPC\bin\Windows\ispc.exe)
+  Intel(r) Implicit SPMD Program Compiler (Intel(r) ISPC), 1.24.0 (build commit  @ 20250404, LLVM 18.1.2)
+Using Visual Studio 14.44.35222 toolchain (C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207) and Windows 10.0.22621.0 SDK (C:\Program Files (x86)\Windows Kits\10).
+=================================
+Using Unreal Build Accelerator local executor to run 20 action(s)
+  CPU 6 physical cores, 12 logical cores
+  Memory 15.9 GB physical, 32.18 GB/49.9 GB committed
+  UBA Storage capacity 40 GB
+[1/20] Compile Resource [x64] Default.rc2
+[2/20] Compile Resource [x64] Default.rc2
+[3/20] Compile [x64] SharedPCH.CoreUObject.Project.ValApi.ValExpApi.Cpp20.cpp
+[4/20] Compile [x64] AnastasisRng.cpp
+[5/20] Compile [x64] AnastasisSimClock.cpp
+[6/20] Compile [x64] AnastasisSimMath.cpp
+[7/20] Compile [x64] AnastasisHydrology.cpp
+[8/20] Compile [x64] AnastasisParityTests.cpp
+[9/20] Compile [x64] AnastasisSimModule.cpp
+[10/20] Compile [x64] AnastasisSpatialGrid.cpp
+[11/20] Compile [x64] AnastasisWorldArchetype.cpp
+[12/20] Compile [x64] AnastasisWorld.cpp
+[13/20] Compile [x64] PerModuleInline.gen.cpp
+[14/20] Link [x64] UnrealEditor-AnastasisSim.lib
+   Création de la bibliothèque C:/dev/ANASTASIS_UNREAL/Intermediate/Build/Win64/x64/UnrealEditor/Development/AnastasisSim/UnrealEditor-AnastasisSim.lib et de l'objet C:/dev/ANASTASIS_UNREAL/Intermediate/Build/Win64/x64/UnrealEditor/Development/AnastasisSim/UnrealEditor-AnastasisSim.exp
+[15/20] Link [x64] UnrealEditor-AnastasisSim.dll
+[16/20] Compile [x64] SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.cpp
+[17/20] Compile [x64] Module.Anastasis_UnrealV2.cpp
+[18/20] Link [x64] UnrealEditor-Anastasis_UnrealV2.lib
+   Création de la bibliothèque C:/dev/ANASTASIS_UNREAL/Intermediate/Build/Win64/x64/UnrealEditor/Development/Anastasis_UnrealV2/UnrealEditor-Anastasis_UnrealV2.lib et de l'objet C:/dev/ANASTASIS_UNREAL/Intermediate/Build/Win64/x64/UnrealEditor/Development/Anastasis_UnrealV2/UnrealEditor-Anastasis_UnrealV2.exp
+[19/20] Link [x64] UnrealEditor-Anastasis_UnrealV2.dll
+[20/20] WriteMetadata Anastasis_UnrealV2Editor.target [NoUba]
+
+Total time in Unreal Build Accelerator local executor: 56.68 seconds
+Output binary: C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
+
+Result: Succeeded
+Total execution time: 69.67 seconds
+Trace written to file C:\Users\alex_\AppData\Local\UnrealBuildTool\Trace.uba with size 14.8kb

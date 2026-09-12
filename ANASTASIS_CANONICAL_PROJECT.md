@@ -1,7 +1,9 @@
 # ANÁSTASIS — CANONICAL UNREAL PROJECT
 
+CANONICAL_ROOT: C:\dev\ANASTASIS_UNREAL
 THIS IS THE CANONICAL ANÁSTASIS UNREAL PROJECT.
 DO NOT DEVELOP IN THE OTHER COPIES.
 
-Engine: UE 5.8.2 / CL 56702186. Operator: tools/unreal/anastasis-unreal.ps1.
-See docs/unreal/UNREAL_CANONICAL_STATE.md. PLAYER is not implemented.
+UE 5.8.2 / CL 56702186. Promoted after independent clean build and Editor/PIE verification on 2026-09-12.
+Operator: tools/unreal/anastasis-unreal.ps1. PLAYER remains NOT_IMPLEMENTED.
+Previous OneDrive root: PREVIOUS_CANONICAL / READ_ONLY_BACKUP_CANDIDATE / DO_NOT_DEVELOP.

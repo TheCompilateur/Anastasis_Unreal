@@ -1,0 +1,18 @@
+{
+  "VerifiedAt": "2026-09-12T11:15:49.3037385-04:00",
+  "Result": "PASS",
+  "SourceSHA256": "15EE261853A4A9CE2D415C4D11039DBC559641E42D385A08B685D31BDC1DE9AE",
+  "Engine": "5.8.2 CL 56702186",
+  "EditorLog": "C:\\dev\\ANASTASIS_UNREAL\\Saved\\CanonicalVerification\\editor-20260912-111457.log",
+  "Modules": [
+    {
+      "Path": "C:\\dev\\ANASTASIS_UNREAL\\Binaries\\Win64\\UnrealEditor-AnastasisSim.dll",
+      "SHA256": "CB966EE535C936192355D3E812D26DE31A4C5A39D797DAE31B93699842E81CCE"
+    },
+    {
+      "Path": "C:\\dev\\ANASTASIS_UNREAL\\Binaries\\Win64\\UnrealEditor-Anastasis_UnrealV2.dll",
+      "SHA256": "B69A70C879BBC149D89BB216D85400E33D14B71C8C91317E0D39EB1A127C5781"
+    }
+  ],
+  "Scope": "Editor map PIE DEBUG; PLAYER unimplemented; not full test suite"
+}
