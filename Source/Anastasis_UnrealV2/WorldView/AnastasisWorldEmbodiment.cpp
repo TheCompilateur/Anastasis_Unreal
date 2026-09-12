@@ -194,20 +194,67 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 ExperimentalSurface->SetupAttachment(GetRootComponent());
                 ExperimentalSurface->SetCollisionEnabled(ECollisionEnabled::NoCollision);
                 ExperimentalSurface->SetCanEverAffectNavigation(false);
+                ExperimentalSurface->SetCastShadow(true);
                 ExperimentalSurface->RegisterComponent();
             }
+            // Section 0 : relief. La couleur de sommet porte toute la semantique du sol.
             ExperimentalSurface->CreateMeshSection_LinearColor(0, Geometry.Vertices, Geometry.Triangles,
-                Geometry.Normals, TArray<FVector2D>{}, TArray<FLinearColor>{}, TArray<FProcMeshTangent>{}, false);
-            if (BaseShapeMaterial) ExperimentalSurface->SetMaterial(0, BaseShapeMaterial);
+                Geometry.Normals, TArray<FVector2D>{}, Geometry.Colors, TArray<FProcMeshTangent>{}, false);
+            // Section 1 : nappe d'eau plate au niveau de la mer, encastree dans le relief.
+            ExperimentalSurface->ClearMeshSection(1);
+            if (Geometry.WaterTriangles.Num() > 0)
+            {
+                TArray<FLinearColor> WaterColors;
+                WaterColors.Init(FLinearColor(0.043f, 0.176f, 0.290f, 1.0f), Geometry.WaterVertices.Num());
+                ExperimentalSurface->CreateMeshSection_LinearColor(1, Geometry.WaterVertices, Geometry.WaterTriangles,
+                    Geometry.WaterNormals, TArray<FVector2D>{}, WaterColors, TArray<FProcMeshTangent>{}, false);
+            }
+            if (UMaterialInterface* SurfaceMaterial = ResolveSliceMaterial())
+            {
+                ExperimentalSurface->SetMaterial(0, SurfaceMaterial);
+                ExperimentalSurface->SetMaterial(1, SurfaceMaterial);
+            }
             ExperimentalSurface->SetVisibility(true);
             for (auto& Mesh : TerrainMeshes) if (Mesh) Mesh->SetVisibility(false);
-            UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN source=96x96 crop=(0,0) 32x32 tiles=1024 vertices=%d triangles=%d boundary=tile_centers legacy_visible=0"), Geometry.Vertices.Num(), Geometry.Triangles.Num()/3);
+            UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN source=96x96 crop=(0,0) 32x32 tiles=1024 vertices=%d triangles=%d water_triangles=%d material=%s boundary=tile_centers legacy_visible=0"),
+                Geometry.Vertices.Num(), Geometry.Triangles.Num()/3, Geometry.WaterTriangles.Num()/3,
+                SliceMaterial ? TEXT("slice") : TEXT("fallback"));
         }
         else UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_TERRAIN rejected crop; legacy DEBUG retained"));
     }
     else UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN disabled legacy_visible=1"));
     LogEmbodiment();
     return GetInstanceCount() == Plan.TileCount;
+}
+
+bool AAnastasisWorldEmbodiment::EmbodyCanonical(int32 Seed)
+{
+	return Embody(
+		static_cast<uint32>(FMath::Max(0, Seed)),
+		AnastasisWorldView::ReferenceWidth,
+		AnastasisWorldView::ReferenceHeight);
+}
+
+UMaterialInterface* AAnastasisWorldEmbodiment::ResolveSliceMaterial()
+{
+	if (!SliceMaterial)
+	{
+		SliceMaterial = LoadObject<UMaterialInterface>(
+			nullptr, TEXT("/Game/Anastasis/Materials/M_AnastasisSlice.M_AnastasisSlice"));
+	}
+	return SliceMaterial ? SliceMaterial.Get() : BaseShapeMaterial.Get();
+}
+
+void AAnastasisWorldEmbodiment::ShowSliceSurface()
+{
+	CVarTerrainSurface->Set(1, ECVF_SetByCode);
+	EmbodyCanonical(static_cast<int32>(AnastasisWorldView::ReferenceSeed));
+}
+
+void AAnastasisWorldEmbodiment::ShowLegacyDebug()
+{
+	CVarTerrainSurface->Set(0, ECVF_SetByCode);
+	EmbodyCanonical(static_cast<int32>(AnastasisWorldView::ReferenceSeed));
 }
 
 int32 AAnastasisWorldEmbodiment::GetInstanceCount() const
