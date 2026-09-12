@@ -23,16 +23,33 @@ Ne jamais ouvrir, lire, builder ni modifier les copies sous
 
 Si un chemin de travail contient `OneDrive`, **s'arrêter et le signaler** : la session est dans la mauvaise racine.
 
-## Pourquoi les copies se multiplient
+## Pourquoi les copies se multiplient (cause racine corrigée le 2026-09-12)
 
 `EngineAssociation` dans le `.uproject` doit rester exactement `"5.8"`.
 
-Les copies OneDrive ont une association non résoluble — `Anastasis_UnrealV2` porte le GUID
-`{2C7D17E4-42D1-2935-EB7E-098AE6DEDC25}`, orphelin (`HKCU\Software\Epic Games\Unreal Engine\Builds`
-est vide). Unreal ne peut pas la résoudre, affiche donc la boîte de conversion **à chaque ouverture**,
-et l'option « Open a copy » duplique tout le dossier en `<Projet> <Version>`, puis ` - 2`, ` - 3`…
+Historique : les copies OneDrive avaient une association non résoluble — `Anastasis_UnrealV2` porte
+le GUID `{2C7D17E4-42D1-2935-EB7E-098AE6DEDC25}`, qui était orphelin
+(`HKCU\Software\Epic Games\Unreal Engine\Builds` vide). Unreal ne pouvait pas la résoudre, affichait
+donc la boîte de conversion **à chaque ouverture**, et l'option « Open a copy » dupliquait tout le
+dossier en `<Projet> <Version>`, puis ` - 2`, ` - 3`… C'est ce mécanisme précis qui a produit les 4
+copies mortes listées ci-dessus.
 
-- Ne jamais proposer « Open a copy ». Si la boîte apparaît : « Convert in place » ou « Skip conversion ».
+**Fix appliqué (HKCU, sans élévation) :** ce GUID est maintenant enregistré dans
+`HKCU\Software\Epic Games\Unreal Engine\Builds` → `C:\Program Files\Epic Games\UE_5.8`. La boîte de
+conversion ne devrait plus apparaître sur cette copie précise. Ça ne change rien à la règle n°1 : la
+copie reste `DO_NOT_DEVELOP`, seul le mécanisme de duplication accidentelle est neutralisé.
+
+**Fix distinct, toujours en attente (HKLM, élévation admin requise) :** `HKLM\SOFTWARE\EpicGames\Unreal Engine\`
+a des clés `4.0` et `5.7` mais pas `5.8` — l'association `"5.8"` du projet **canonique** lui-même n'est
+résoluble aujourd'hui que parce que `tools/unreal/anastasis-unreal.ps1` code en dur le chemin du moteur.
+Si ce `.uproject` est un jour ouvert autrement (double-clic Explorateur), le même type de boîte apparaîtra
+sur le canonique. Fix, à lancer en PowerShell admin :
+```powershell
+New-Item -Path 'HKLM:\SOFTWARE\EpicGames\Unreal Engine\5.8' -Force | Out-Null
+New-ItemProperty -Path 'HKLM:\SOFTWARE\EpicGames\Unreal Engine\5.8' -Name 'InstalledDirectory' -Value 'C:\Program Files\Epic Games\UE_5.8' -PropertyType String -Force | Out-Null
+```
+
+- Ne jamais proposer « Open a copy ». Si la boîte apparaît malgré tout : « Convert in place » ou « Skip conversion ».
 - Ne jamais réécrire `EngineAssociation`.
 - Une copie recompile toujours de zéro : le cache UBT (`Intermediate/Build/**/Makefile.bin`) et les
   `.target` gravent le chemin absolu du projet. Chemin différent = cache invalide. Le rebuild ne produit
