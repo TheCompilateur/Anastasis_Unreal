@@ -154,11 +154,22 @@ switch ($Command) {
     Require-Mission
     $branch = Branch-Of $Mission
     $state = Canonical-State
-    if ($state.Dirty.Count -gt 0) {
-      Write-Output 'FAIL: la racine canonique porte des modifications non commitees.'
-      Write-Output 'L integrateur est le seul ecrivain : fais atterrir ou range ce travail d abord.'
-      $state.Dirty | ForEach-Object { Write-Output ('    ' + $_) }
+    # L integrateur ne doit jamais perturber le travail en vol d un autre agent.
+    # Un refus systematique des que la racine est sale bloquerait le protocole
+    # lui-meme, donc on refuse precisement : seulement si l integration touche un
+    # fichier actuellement modifie dans la racine canonique.
+    $incoming = @(& git -C $Canonical diff --name-only HEAD..$branch)
+    $localPaths = @($state.Dirty | ForEach-Object { $_.Substring(3).Trim('"') })
+    $overlap = @($incoming | Where-Object { $localPaths -contains $_ })
+    if ($overlap.Count -gt 0) {
+      Write-Output 'FAIL: l integration ecraserait du travail en cours dans la racine canonique.'
+      $overlap | ForEach-Object { Write-Output ('    ' + $_) }
+      Write-Output 'Fais atterrir ce travail (commit) avant d integrer.'
       exit 1
+    }
+    if ($state.Dirty.Count -gt 0) {
+      Write-Output 'NOTE: la racine canonique est sale, mais sans recouvrement avec cette integration :'
+      $state.Dirty | ForEach-Object { Write-Output ('    ' + $_) }
     }
     & git -C $Canonical merge --ff-only $branch
     if ($LASTEXITCODE -ne 0) {
