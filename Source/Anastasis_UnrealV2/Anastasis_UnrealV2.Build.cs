@@ -22,7 +22,7 @@ public class Anastasis_UnrealV2 : ModuleRules
 			"AnastasisSim"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "ProceduralMeshComponent" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "ProceduralMeshComponent", "Json", "NavigationSystem" });
 
 		PublicIncludePaths.AddRange(new string[] {
 			"Anastasis_UnrealV2",

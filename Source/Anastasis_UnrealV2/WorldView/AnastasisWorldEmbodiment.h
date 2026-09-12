@@ -51,6 +51,8 @@ public:
 	const AnastasisWorldView::FWorldVisualSnapshot& GetSnapshot() const { return Snapshot; }
 	/** True once EmbodyCrop has built a flat sea-level water section (ANASTASIS_TERRAIN surface mode). */
 	bool HasWaterSurface() const { return bWaterSurfaceBuilt; }
+	/** The actually rendered/collidable footprint (see ActiveFootprintBounds below) — not Plan, which can be larger. */
+	const FBox& GetActiveFootprintBounds() const { return ActiveFootprintBounds; }
 	void LogEmbodiment() const;
 
 protected:
