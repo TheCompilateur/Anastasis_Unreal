@@ -42,8 +42,15 @@ public:
 	void ShowLegacyDebug();
 	FVector GetEmbodiedLocation(int32 TileIndex) const;
 	bool GetInstanceWorldTransform(int32 TileIndex, FTransform& OutTransform) const;
+
+	/** Position sure au-dessus du centre du terrain incarne, pour un reset de position debug. */
+	UFUNCTION(BlueprintCallable, Category = "Anastasis|Debug")
+	FVector GetSafeRespawnLocation() const;
+
 	const AnastasisWorldView::FPlan& GetPlan() const { return Plan; }
 	const AnastasisWorldView::FWorldVisualSnapshot& GetSnapshot() const { return Snapshot; }
+	/** True once EmbodyCrop has built a flat sea-level water section (ANASTASIS_TERRAIN surface mode). */
+	bool HasWaterSurface() const { return bWaterSurfaceBuilt; }
 	void LogEmbodiment() const;
 
 protected:
@@ -64,5 +71,15 @@ protected:
 	AnastasisWorldView::FWorldVisualSnapshot Snapshot;
 	AnastasisWorldView::FPlan Plan;
 	TArray<int32> LocalInstanceIndex;
+	bool bWaterSurfaceBuilt = false;
+
+	/**
+	 * Emprise reellement visible/solide de l'embodiment courant. En mode
+	 * surface (anastasis.Terrain.Surface=1), c'est le crop 32x32 fixe, PAS
+	 * Plan (qui peut couvrir tout le monde 96x96 demande par BeginPlay) :
+	 * les deux divergent des que Width/Height > 32, sinon GetSafeRespawnLocation
+	 * vise un point hors de tout ce qui est visible ou solide.
+	 */
+	FBox ActiveFootprintBounds = FBox(ForceInit);
 };
 

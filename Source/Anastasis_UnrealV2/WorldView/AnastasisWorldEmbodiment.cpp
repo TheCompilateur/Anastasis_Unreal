@@ -79,7 +79,8 @@ AAnastasisWorldEmbodiment::AAnastasisWorldEmbodiment()
 		UHierarchicalInstancedStaticMeshComponent* Mesh = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(
 			TerrainComponentName(TypeIndex));
 		Mesh->SetupAttachment(Root);
-		Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		Mesh->SetCollisionProfileName(TEXT("BlockAll"));
 		Mesh->SetGenerateOverlapEvents(false);
 		Mesh->SetCastShadow(false);
 		Mesh->SetMobility(EComponentMobility::Movable);
@@ -192,17 +193,20 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             {
                 ExperimentalSurface = NewObject<UProceduralMeshComponent>(this, TEXT("ExperimentalTerrain"));
                 ExperimentalSurface->SetupAttachment(GetRootComponent());
-                ExperimentalSurface->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+                ExperimentalSurface->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+                ExperimentalSurface->SetCollisionProfileName(TEXT("BlockAll"));
                 ExperimentalSurface->SetCanEverAffectNavigation(false);
                 ExperimentalSurface->SetCastShadow(true);
                 ExperimentalSurface->RegisterComponent();
             }
             // Section 0 : relief. La couleur de sommet porte toute la semantique du sol.
+            // bCreateCollision=true : c'est ce qui empeche le pawn de tomber a travers.
             ExperimentalSurface->CreateMeshSection_LinearColor(0, Geometry.Vertices, Geometry.Triangles,
-                Geometry.Normals, TArray<FVector2D>{}, Geometry.Colors, TArray<FProcMeshTangent>{}, false);
+                Geometry.Normals, TArray<FVector2D>{}, Geometry.Colors, TArray<FProcMeshTangent>{}, true);
             // Section 1 : nappe d'eau plate au niveau de la mer, encastree dans le relief.
             ExperimentalSurface->ClearMeshSection(1);
-            if (Geometry.WaterTriangles.Num() > 0)
+            bWaterSurfaceBuilt = Geometry.WaterTriangles.Num() > 0;
+            if (bWaterSurfaceBuilt)
             {
                 TArray<FLinearColor> WaterColors;
                 WaterColors.Init(FLinearColor(0.043f, 0.176f, 0.290f, 1.0f), Geometry.WaterVertices.Num());
@@ -216,13 +220,25 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             }
             ExperimentalSurface->SetVisibility(true);
             for (auto& Mesh : TerrainMeshes) if (Mesh) Mesh->SetVisibility(false);
+            // Emprise reelle = le crop 32x32 rendu, pas Plan (qui peut couvrir tout le monde demande).
+            ActiveFootprintBounds = AnastasisWorldView::SnapshotBounds(Crop);
             UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN source=96x96 crop=(0,0) 32x32 tiles=1024 vertices=%d triangles=%d water_triangles=%d material=%s boundary=tile_centers legacy_visible=0"),
                 Geometry.Vertices.Num(), Geometry.Triangles.Num()/3, Geometry.WaterTriangles.Num()/3,
                 SliceMaterial ? TEXT("slice") : TEXT("fallback"));
         }
-        else UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_TERRAIN rejected crop; legacy DEBUG retained"));
+        else
+        {
+            bWaterSurfaceBuilt = false;
+            ActiveFootprintBounds = AnastasisWorldView::PlanBounds(Plan);
+            UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_TERRAIN rejected crop; legacy DEBUG retained"));
+        }
     }
-    else UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN disabled legacy_visible=1"));
+    else
+    {
+        bWaterSurfaceBuilt = false;
+        ActiveFootprintBounds = AnastasisWorldView::PlanBounds(Plan);
+        UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN disabled legacy_visible=1"));
+    }
     LogEmbodiment();
     return GetInstanceCount() == Plan.TileCount;
 }
@@ -277,6 +293,22 @@ FVector AAnastasisWorldEmbodiment::GetEmbodiedLocation(int32 TileIndex) const
 		return FVector::ZeroVector;
 	}
 	return Plan.Locations[TileIndex];
+}
+
+FVector AAnastasisWorldEmbodiment::GetSafeRespawnLocation() const
+{
+	// ActiveFootprintBounds, PAS PlanBounds(Plan) : en mode surface le rendu
+	// visible/solide est le crop 32x32 fixe, qui peut etre bien plus petit que
+	// le Plan complet demande par BeginPlay (jusqu'a 96x96). Viser Plan atterrit
+	// hors de tout ce qui existe.
+	const FBox& Bounds = ActiveFootprintBounds;
+	if (!Bounds.IsValid)
+	{
+		return GetActorLocation();
+	}
+	const FVector Center = Bounds.GetCenter();
+	// Assez haut au-dessus du relief le plus eleve pour ne jamais reapparaitre encastre dedans.
+	return FVector(Center.X, Center.Y, Bounds.Max.Z + 300.0);
 }
 
 bool AAnastasisWorldEmbodiment::GetInstanceWorldTransform(int32 TileIndex, FTransform& OutTransform) const

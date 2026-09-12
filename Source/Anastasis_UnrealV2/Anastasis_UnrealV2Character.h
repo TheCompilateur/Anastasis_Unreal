@@ -76,6 +76,10 @@ protected:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
 
+	/** Debug : touche R, teleporte au-dessus du centre du terrain WorldView courant (sans effet si absent de la map). */
+	UFUNCTION(BlueprintCallable, Category="Input")
+	void ResetPosition();
+
 protected:
 
 	/** Set up input action bindings */

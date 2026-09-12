@@ -8,6 +8,8 @@
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "WorldView/AnastasisWorldEmbodiment.h"
 #include "Anastasis_UnrealV2.h"
 
 AAnastasis_UnrealV2Character::AAnastasis_UnrealV2Character()
@@ -64,6 +66,22 @@ void AAnastasis_UnrealV2Character::SetupPlayerInputComponent(UInputComponent* Pl
 	{
 		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("'%s' Failed to find an Enhanced Input Component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
 	}
+
+	// Debug : touche brute R, pas d'Input Action a assigner dans un asset binaire.
+	PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &AAnastasis_UnrealV2Character::ResetPosition);
+}
+
+void AAnastasis_UnrealV2Character::ResetPosition()
+{
+	AAnastasisWorldEmbodiment* Embodiment = Cast<AAnastasisWorldEmbodiment>(
+		UGameplayStatics::GetActorOfClass(GetWorld(), AAnastasisWorldEmbodiment::StaticClass()));
+	if (!Embodiment)
+	{
+		return;
+	}
+
+	GetCharacterMovement()->StopMovementImmediately();
+	SetActorLocation(Embodiment->GetSafeRespawnLocation(), false, nullptr, ETeleportType::TeleportPhysics);
 }
 
 
