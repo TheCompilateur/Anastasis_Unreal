@@ -1,0 +1,9 @@
+#!/bin/sh
+# Pre-push gate: refuse the push if the canonical incremental build fails.
+# Installed via: git config core.hooksPath tools/git-hooks
+# Scope: compile gate only (BUILD::PASS). Full editor/PIE verification is
+# heavier (~4+ min) and runs separately — see tools/unreal/scheduled-verify.ps1.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+echo "pre-push: anastasis-unreal.ps1 build ..."
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/unreal/anastasis-unreal.ps1 build
