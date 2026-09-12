@@ -22,10 +22,14 @@ Two tiers, matched to how slow each check is:
   ```
   Already set in this working copy. Re-run after a fresh clone.
 
-- **Scheduled full verify (slow, non-blocking).** `tools/unreal/scheduled-verify.ps1` runs the full `verify` (build + dedicated Editor + PIE smoke, ~4+ min) and appends one `PASS`/`FAIL` line per run to `Saved/CanonicalVerification/scheduled-verify.log` (`latest.json` is overwritten each run, not history). Not wired to a Task Scheduler entry yet — register one to run it periodically, e.g.:
+- **Scheduled full verify (slow, non-blocking).** Registered as the `Anastasis-ScheduledVerify` Task Scheduler entry, daily at 3am:
   ```powershell
   $Action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File "C:\dev\ANASTASIS_UNREAL\tools\unreal\scheduled-verify.ps1"'
   $Trigger = New-ScheduledTaskTrigger -Daily -At 3am
-  Register-ScheduledTask -TaskName 'Anastasis-ScheduledVerify' -Action $Action -Trigger $Trigger -Description 'Nightly full canonical verify (build + Editor + PIE smoke)'
+  Register-ScheduledTask -TaskName 'Anastasis-ScheduledVerify' -Action $Action -Trigger $Trigger -Description 'Nightly full canonical verify (build + Editor + PIE smoke) and classified Automation suite'
   ```
-  A pre-existing failure recorded in AUTOMATION_TRIAGE.md is not caught by either gate — `verify` checks DEBUG markers and module origin, not the full Automation test suite.
+  `tools/unreal/scheduled-verify.ps1` runs two independent checks, neither skipped because the other failed, both appended to `Saved/CanonicalVerification/scheduled-verify.log` (`latest.json` is overwritten each verify run by `anastasis-unreal.ps1` and is not history; this log is):
+  1. `verify` (build + dedicated Editor + PIE smoke, DEBUG markers, module origin) — `VERIFY_PASS`/`VERIFY_FAIL`.
+  2. `report-tests.ps1` (the full `Anastasis` Automation suite, ~15 min budget) — cross-references `tools/unreal/known-expected-failures.txt` and reports three categories, not two: `PASS`, `KNOWN_EXPECTED_FAILURE`, `FAIL`. A bare Unreal "Success" is never counted as a real pass when the test is a marked known divergence. Logged as `TESTS_PASS`/`TESTS_FAIL` plus the full per-test breakdown.
+
+  Both checks now run nightly; before this, only #1 ran, so the classified Automation suite (and any regression among the 4 marked known-failure tests going quietly unmarked) was never actually checked on a schedule.
