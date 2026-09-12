@@ -1,0 +1,7 @@
+# ANÁSTASIS — CANONICAL UNREAL PROJECT
+
+THIS IS THE CANONICAL ANÁSTASIS UNREAL PROJECT.
+DO NOT DEVELOP IN THE OTHER COPIES.
+
+Engine: UE 5.8.2 / CL 56702186. Operator: tools/unreal/anastasis-unreal.ps1.
+See docs/unreal/UNREAL_CANONICAL_STATE.md. PLAYER is not implemented.

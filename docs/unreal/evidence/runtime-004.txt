@@ -1,0 +1,14 @@
+LogInit: Engine Version: 5.8.2-56702186+++UE5+Release-5.8
+LogInit: Compatible Engine Version: 5.8.0-55116800+++UE5+Release-5.8
+[2026.09.12-15.04.22:139][  0]LogAutomationTest: FUnifiedErrorTest_CreateErrorMessage: Échec (0.78ms)
+[2026.09.12-15.04.22:139][  0]LogAutomationTest: FUnifiedErrorTest_CreateErrorMessageWithContext: Échec (0.12ms)
+[2026.09.12-15.04.22:140][  0]LogAutomationTest: FStructuredLogFormatTest: Échec (2.28ms)
+[2026.09.12-15.04.30:335][  0]LogPython: CANONICAL_EDITOR_BOOT
+[2026.09.12-15.04.30:635][  0]LogPython: CANONICAL_MAP_LOAD=True
+[2026.09.12-15.04.33:647][ 71]LogPython: CANONICAL_PIE_REQUESTED
+[2026.09.12-15.04.33:905][ 72]LogAnastasis_UnrealV2: Display: ANASTASIS_VISUAL_MODE DEBUG
+[2026.09.12-15.04.33:951][ 72]LogAnastasis_UnrealV2: Display: ANASTASIS_WORLDVIEW seed=12345 source=96x96 crop=(0,0) 96x96 tiles=9216 instances=9216 minAlt=0.184000 maxAlt=0.907000 counts=3249,1198,1396,462,716,725,1470
+[2026.09.12-15.04.34:044][ 72]LogPython: CANONICAL_PIE_ACTIVE
+[2026.09.12-15.04.45:641][998]LogPython: CANONICAL_PIE_END_REQUESTED
+[2026.09.12-15.04.45:799][999]LogPython: CANONICAL_COMPLETE
+[2026.09.12-15.04.49:446][  0]LogExit: Exiting.

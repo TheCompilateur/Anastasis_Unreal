@@ -1,0 +1,439 @@
+// GENERE AUTOMATIQUEMENT - ne pas editer a la main.
+// Source: tools/unreal/gen-parity-vectors.mjs dans le depot du simulateur JS.
+// Regenerer apres toute modification de src/sim/rng.js, src/sim/util.js,
+// src/runtime/simClock.js, src/runtime/gameLoop.js, src/sim/spatialGrid.js,
+// src/sim/world.js, src/sim/worldArchetypes.js, src/sim/hydrology.js,
+// src/sim/fieldCrops.js.
+//
+// TOUS les doubles - entrees comme sorties - sont donnes par leur motif
+// binaire, jamais en decimal: un litteral decimal perdrait le dernier bit au
+// passage, et c'est exactement ce bit que le test verifie. Le C++ les relit
+// avec FromBits().
+
+// clang-format off
+
+struct FRngVector { uint32 Seed; uint32 DrawCount; uint64 ExpectedBits; uint32 ExpectedState; };
+static const FRngVector RngVectors[] = {
+	{ 0u, 1u, 0x3fd10d2d18800000ull, 1831565813u },
+	{ 0u, 2u, 0x3f359c3700000000ull, 3663131626u },
+	{ 0u, 3u, 0x3fcc942d84000000ull, 1199730143u },
+	{ 0u, 4u, 0x3fc2b6c082000000ull, 3031295956u },
+	{ 0u, 5u, 0x3fdde8b2f5000000ull, 567894473u },
+	{ 0u, 6u, 0x3fe1710ac6200000ull, 2399460286u },
+	{ 0u, 7u, 0x3fe3b023abe00000ull, 4231026099u },
+	{ 0u, 8u, 0x3fe4c47cfcc00000ull, 1767624616u },
+	{ 1u, 1u, 0x3fe410fd5e600000ull, 1831565814u },
+	{ 1u, 2u, 0x3f66693920000000ull, 3663131627u },
+	{ 1u, 3u, 0x3fe0e0d89d600000ull, 1199730144u },
+	{ 1u, 4u, 0x3fef64c4ffa00000ull, 3031295957u },
+	{ 1u, 5u, 0x3feefcf3a5600000ull, 567894474u },
+	{ 1u, 6u, 0x3fd1fd998c000000ull, 2399460287u },
+	{ 1u, 7u, 0x3fe39c603e000000ull, 4231026100u },
+	{ 1u, 8u, 0x3fe71053eb800000ull, 1767624617u },
+	{ 42u, 1u, 0x3fe33c3def800000ull, 1831565855u },
+	{ 42u, 2u, 0x3fdcb0cae2800000ull, 3663131668u },
+	{ 42u, 3u, 0x3feb476658000000ull, 1199730185u },
+	{ 42u, 4u, 0x3fe56e7615a00000ull, 3031295998u },
+	{ 42u, 5u, 0x3fc6604d45000000ull, 567894515u },
+	{ 42u, 6u, 0x3fe0d9d89a600000ull, 2399460328u },
+	{ 42u, 7u, 0x3fd17c9145000000ull, 4231026141u },
+	{ 42u, 8u, 0x3fe3fde880200000ull, 1767624658u },
+	{ 1337u, 1u, 0x3fc79ace93000000ull, 1831567150u },
+	{ 1337u, 2u, 0x3fc851915a800000ull, 3663132963u },
+	{ 1337u, 3u, 0x3fe9ef62f5a00000ull, 1199731480u },
+	{ 1337u, 4u, 0x3fe4999721400000ull, 3031297293u },
+	{ 1337u, 5u, 0x3fdb91cfb1800000ull, 567895810u },
+	{ 1337u, 6u, 0x3fd8630e54800000ull, 2399461623u },
+	{ 1337u, 7u, 0x3fe0d999e9800000ull, 4231027436u },
+	{ 1337u, 8u, 0x3fe18e0501e00000ull, 1767625953u },
+	{ 2654435761u, 1u, 0x3fe17c9173c00000ull, 191034278u },
+	{ 2654435761u, 2u, 0x3fdd695ec9800000ull, 2022600091u },
+	{ 2654435761u, 3u, 0x3fcf9f0ff5800000ull, 3854165904u },
+	{ 2654435761u, 4u, 0x3fe09e1ae7000000ull, 1390764421u },
+	{ 2654435761u, 5u, 0x3fec750cfca00000ull, 3222330234u },
+	{ 2654435761u, 6u, 0x3fe67a6735a00000ull, 758928751u },
+	{ 2654435761u, 7u, 0x3fdb3b4a92c00000ull, 2590494564u },
+	{ 2654435761u, 8u, 0x3fde1ccdff800000ull, 127093081u },
+	{ 4294967295u, 1u, 0x3fecaf7e7a600000ull, 1831565812u },
+	{ 4294967295u, 2u, 0x3fc840d2d2000000ull, 3663131625u },
+	{ 4294967295u, 3u, 0x3fe6e6a072000000ull, 1199730142u },
+	{ 4294967295u, 4u, 0x3fee35bd20800000ull, 3031295955u },
+	{ 4294967295u, 5u, 0x3feb0c2d45e00000ull, 567894472u },
+	{ 4294967295u, 6u, 0x3fe140a286e00000ull, 2399460285u },
+	{ 4294967295u, 7u, 0x3fe5c6a331a00000ull, 4231026098u },
+	{ 4294967295u, 8u, 0x3fde6fc5f2400000ull, 1767624615u },
+	{ 2147483647u, 1u, 0x3fdb7657d4400000ull, 3979049460u },
+	{ 2147483647u, 2u, 0x3fc045f7c6000000ull, 1515647977u },
+	{ 2147483647u, 3u, 0x3fd8a862f3c00000ull, 3347213790u },
+	{ 2147483647u, 4u, 0x3fd95e7c17400000ull, 883812307u },
+	{ 2147483647u, 5u, 0x3fbe9fe7d9000000ull, 2715378120u },
+	{ 2147483647u, 6u, 0x3fee808346800000ull, 251976637u },
+	{ 2147483647u, 7u, 0x3fe5c827cba00000ull, 2083542450u },
+	{ 2147483647u, 8u, 0x3fefdd6f12000000ull, 3915108263u },
+};
+
+struct FRngRangeVector { uint32 Seed; uint64 MinBits; uint64 MaxBits; uint64 ExpectedBits; };
+static const FRngRangeVector RngRangeVectors[] = {
+	{ 7u, 0x0000000000000000ull, 0x3ff0000000000000ull, 0x3f87f8a960000000ull },
+	{ 7u, 0x0000000000000000ull, 0x3ff0000000000000ull, 0x3fafb8fe24000000ull },
+	{ 7u, 0x0000000000000000ull, 0x3ff0000000000000ull, 0x3fef42d3cbc00000ull },
+	{ 7u, 0x0000000000000000ull, 0x3ff0000000000000ull, 0x3fe65e7172c00000ull },
+	{ 7u, 0xc014000000000000ull, 0x4014000000000000ull, 0xc0138824b1200000ull },
+	{ 7u, 0xc014000000000000ull, 0x4014000000000000ull, 0xc011858c25300000ull },
+	{ 7u, 0xc014000000000000ull, 0x4014000000000000ull, 0x40131388beb00000ull },
+	{ 7u, 0xc014000000000000ull, 0x4014000000000000ull, 0x3fffd8373dc00000ull },
+	{ 99u, 0x4004000000000000ull, 0x400c000000000000ull, 0x4006156f19900000ull },
+	{ 99u, 0x4004000000000000ull, 0x400c000000000000ull, 0x400a7046eb080000ull },
+	{ 99u, 0x4004000000000000ull, 0x400c000000000000ull, 0x400853b474900000ull },
+	{ 99u, 0x4004000000000000ull, 0x400c000000000000ull, 0x4009859e58600000ull },
+	{ 1234u, 0xc059000000000000ull, 0xc024000000000000ull, 0xc05759d228350000ull },
+	{ 1234u, 0xc059000000000000ull, 0xc024000000000000ull, 0xc04258b1a1ec0000ull },
+	{ 1234u, 0xc059000000000000ull, 0xc024000000000000ull, 0xc032be3283920000ull },
+	{ 1234u, 0xc059000000000000ull, 0xc024000000000000ull, 0xc0294d15d0040000ull },
+};
+
+struct FRngIntVector { uint32 Seed; int32 Min; int32 Max; int32 Expected; };
+static const FRngIntVector RngIntVectors[] = {
+	{ 7u, 0, 9, 0 },
+	{ 7u, 0, 9, 0 },
+	{ 7u, 0, 9, 9 },
+	{ 7u, 0, 9, 6 },
+	{ 7u, 0, 9, 5 },
+	{ 7u, 0, 9, 4 },
+	{ 7u, -3, 3, -3 },
+	{ 7u, -3, 3, -3 },
+	{ 7u, -3, 3, 3 },
+	{ 7u, -3, 3, 1 },
+	{ 7u, -3, 3, 0 },
+	{ 7u, -3, 3, -1 },
+	{ 42u, 1, 1, 1 },
+	{ 42u, 1, 1, 1 },
+	{ 42u, 1, 1, 1 },
+	{ 42u, 1, 1, 1 },
+	{ 42u, 1, 1, 1 },
+	{ 42u, 1, 1, 1 },
+	{ 2026u, -10, 10, -1 },
+	{ 2026u, -10, 10, -4 },
+	{ 2026u, -10, 10, 3 },
+	{ 2026u, -10, 10, 2 },
+	{ 2026u, -10, 10, -7 },
+	{ 2026u, -10, 10, -6 },
+};
+
+struct FHash2dVector { uint64 XBits; uint64 YBits; int32 Channel; uint64 ExpectedBits; };
+static const FHash2dVector Hash2dVectors[] = {
+	{ 0x0000000000000000ull, 0x0000000000000000ull, 0, 0x0000000000000000ull },
+	{ 0x0000000000000000ull, 0x0000000000000000ull, 1, 0x3fdf74cd969f74ceull },
+	{ 0x0000000000000000ull, 0x0000000000000000ull, 7, 0x3fda7a1d175a7a1dull },
+	{ 0x0000000000000000ull, 0x0000000000000000ull, 255, 0x3fd5ed48d255ed49ull },
+	{ 0x3ff0000000000000ull, 0x0000000000000000ull, 0, 0x3fe0428e3ad0428eull },
+	{ 0x3ff0000000000000ull, 0x0000000000000000ull, 1, 0x3fed5a34c91d5a35ull },
+	{ 0x3ff0000000000000ull, 0x0000000000000000ull, 7, 0x3fed0722b59d0723ull },
+	{ 0x3ff0000000000000ull, 0x0000000000000000ull, 255, 0x3fc3e54ecc13e54full },
+	{ 0x0000000000000000ull, 0x3ff0000000000000ull, 0, 0x3fe895b484b895b5ull },
+	{ 0x0000000000000000ull, 0x3ff0000000000000ull, 1, 0x3fd0354d4590354dull },
+	{ 0x0000000000000000ull, 0x3ff0000000000000ull, 7, 0x3fe491897cf49189ull },
+	{ 0x0000000000000000ull, 0x3ff0000000000000ull, 255, 0x3fefdedbaa5fdedcull },
+	{ 0x4031000000000000ull, 0x4037000000000000ull, 0, 0x3feaec08355aec08ull },
+	{ 0x4031000000000000ull, 0x4037000000000000ull, 1, 0x3fd879fe4e1879feull },
+	{ 0x4031000000000000ull, 0x4037000000000000ull, 7, 0x3fe615cc1e3615ccull },
+	{ 0x4031000000000000ull, 0x4037000000000000ull, 255, 0x3febf654429bf654ull },
+	{ 0xc010000000000000ull, 0x4022000000000000ull, 0, 0x3fe3a25dc493a25eull },
+	{ 0xc010000000000000ull, 0x4022000000000000ull, 1, 0x3fadd8c0ca1dd8c1ull },
+	{ 0xc010000000000000ull, 0x4022000000000000ull, 7, 0x3fe78487e9378488ull },
+	{ 0xc010000000000000ull, 0x4022000000000000ull, 255, 0x3fe779562d977956ull },
+	{ 0xc03f000000000000ull, 0xc053400000000000ull, 0, 0x3fd9e14c4f99e14cull },
+	{ 0xc03f000000000000ull, 0xc053400000000000ull, 1, 0x3fe9aa66d4b9aa67ull },
+	{ 0xc03f000000000000ull, 0xc053400000000000ull, 7, 0x3fc75eba6d975ebaull },
+	{ 0xc03f000000000000ull, 0xc053400000000000ull, 255, 0x3fd0a0d087d0a0d1ull },
+	{ 0x400c000000000000ull, 0x4002000000000000ull, 0, 0x3fddb2c15d5db2c1ull },
+	{ 0x400c000000000000ull, 0x4002000000000000ull, 1, 0x3fee91c5611e91c5ull },
+	{ 0x400c000000000000ull, 0x4002000000000000ull, 7, 0x3fd0cd3ea890cd3full },
+	{ 0x400c000000000000ull, 0x4002000000000000ull, 255, 0x3fe8f9c42a38f9c4ull },
+	{ 0x3fb999999999999aull, 0x3fc999999999999aull, 0, 0x3fa99d0de0199d0eull },
+	{ 0x3fb999999999999aull, 0x3fc999999999999aull, 1, 0x3fd269c0b05269c1ull },
+	{ 0x3fb999999999999aull, 0x3fc999999999999aull, 7, 0x3feb47d63f1b47d6ull },
+	{ 0x3fb999999999999aull, 0x3fc999999999999aull, 255, 0x3fe4b23e71d4b23eull },
+	{ 0xbfe0000000000000ull, 0x4029800000000000ull, 0, 0x3fe603dbd39603dcull },
+	{ 0xbfe0000000000000ull, 0x4029800000000000ull, 1, 0x3fd08c59af908c5aull },
+	{ 0xbfe0000000000000ull, 0x4029800000000000ull, 7, 0x3fe55659e7b5565aull },
+	{ 0xbfe0000000000000ull, 0x4029800000000000ull, 255, 0x3faf06adea1f06aeull },
+	{ 0x412e848000000000ull, 0x412e848000000000ull, 0, 0x3fdfff92535fff92ull },
+	{ 0x412e848000000000ull, 0x412e848000000000ull, 1, 0x3fe5892885958929ull },
+	{ 0x412e848000000000ull, 0x412e848000000000ull, 7, 0x3fb338c6f11338c7ull },
+	{ 0x412e848000000000ull, 0x412e848000000000ull, 255, 0x3fd90d064d190d06ull },
+	{ 0x40fe240c9fbe76c9ull, 0xc0f81cd6e9e1b08aull, 0, 0x3fc5a2758395a276ull },
+	{ 0x40fe240c9fbe76c9ull, 0xc0f81cd6e9e1b08aull, 1, 0x3fe2550e42d2550eull },
+	{ 0x40fe240c9fbe76c9ull, 0xc0f81cd6e9e1b08aull, 7, 0x3fee95a2227e95a2ull },
+	{ 0x40fe240c9fbe76c9ull, 0xc0f81cd6e9e1b08aull, 255, 0x3fe5def780d5def8ull },
+};
+
+struct FHashTextVector { const TCHAR* Text; int32 Channel; uint64 ExpectedBits; };
+static const FHashTextVector HashTextVectors[] = {
+	{ TEXT(""), 0, 0x0000000000000000ull },
+	{ TEXT(""), 3, 0x3feb54d6f6bb54d7ull },
+	{ TEXT(""), 128, 0x3fbbbcc33c1bbcc3ull },
+	{ TEXT("a"), 0, 0x3fd8403e6cd8403eull },
+	{ TEXT("a"), 3, 0x3fe4bfddf114bfdeull },
+	{ TEXT("a"), 128, 0x3fe1693c2f51693cull },
+	{ TEXT("npc-0042"), 0, 0x3fe898f7dc7898f8ull },
+	{ TEXT("npc-0042"), 3, 0x3fce7b41ba9e7b42ull },
+	{ TEXT("npc-0042"), 128, 0x3fee9ec2ca5e9ec3ull },
+	{ TEXT("Valmire"), 0, 0x3fece2c047dce2c0ull },
+	{ TEXT("Valmire"), 3, 0x3fe16f3900916f39ull },
+	{ TEXT("Valmire"), 128, 0x3feb31be64bb31beull },
+	{ TEXT("maison_du_forgeron"), 0, 0x3fe045b78b7045b8ull },
+	{ TEXT("maison_du_forgeron"), 3, 0x3fcf2b46339f2b46ull },
+	{ TEXT("maison_du_forgeron"), 128, 0x3fe2d3778db2d378ull },
+	{ TEXT("eau"), 0, 0x3fdfc501325fc501ull },
+	{ TEXT("eau"), 3, 0x3fb2035187120352ull },
+	{ TEXT("eau"), 128, 0x3fc6e4a24a16e4a2ull },
+	{ TEXT("Kosmos 1204"), 0, 0x3fb92de7ae192de8ull },
+	{ TEXT("Kosmos 1204"), 3, 0x3fd8850148988501ull },
+	{ TEXT("Kosmos 1204"), 128, 0x3fd008d7081008d7ull },
+};
+
+struct FSmoothstepVector { uint64 Edge0Bits; uint64 Edge1Bits; uint64 ValueBits; uint64 ExpectedBits; };
+static const FSmoothstepVector SmoothstepVectors[] = {
+	{ 0x0000000000000000ull, 0x3ff0000000000000ull, 0xbfe0000000000000ull, 0x0000000000000000ull },
+	{ 0x0000000000000000ull, 0x3ff0000000000000ull, 0x0000000000000000ull, 0x0000000000000000ull },
+	{ 0x0000000000000000ull, 0x3ff0000000000000ull, 0x3fd0000000000000ull, 0x3fc4000000000000ull },
+	{ 0x0000000000000000ull, 0x3ff0000000000000ull, 0x3fe0000000000000ull, 0x3fe0000000000000ull },
+	{ 0x0000000000000000ull, 0x3ff0000000000000ull, 0x3ff0000000000000ull, 0x3ff0000000000000ull },
+	{ 0x0000000000000000ull, 0x3ff0000000000000ull, 0x4000000000000000ull, 0x3ff0000000000000ull },
+	{ 0x4000000000000000ull, 0x4020000000000000ull, 0x4014000000000000ull, 0x3fe0000000000000ull },
+	{ 0xbff0000000000000ull, 0x3ff0000000000000ull, 0x3fd3333333333333ull, 0x3fe6fbe76c8b4396ull },
+	{ 0x0000000000000000ull, 0x0000000000000000ull, 0x3fe0000000000000ull, 0x3ff0000000000000ull },
+	{ 0x0000000000000000ull, 0x3eb0c6f7a0b5ed8dull, 0x3ea0c6f7a0b5ed8dull, 0x3f13986338b47c72ull },
+	{ 0x0000000000000000ull, 0x3ee4f8b588e368f1ull, 0x3ed4f8b588e368f1ull, 0x3f7db22d0e56041aull },
+};
+
+struct FUnaryVector { uint64 InputBits; uint64 ExpectedBits; };
+static const FUnaryVector Smoothstep01Vectors[] = {
+	{ 0xbff0000000000000ull, 0x0000000000000000ull },
+	{ 0x0000000000000000ull, 0x0000000000000000ull },
+	{ 0x3fb999999999999aull, 0x3f9cac083126e97aull },
+	{ 0x3fd5555555553de1ull, 0x3fd097b425ecea36ull },
+	{ 0x3fe0000000000000ull, 0x3fe0000000000000ull },
+	{ 0x3fe8000000000000ull, 0x3feb000000000000ull },
+	{ 0x3ff0000000000000ull, 0x3ff0000000000000ull },
+	{ 0x4000000000000000ull, 0x3ff0000000000000ull },
+};
+
+static const FUnaryVector Clamp01CoerceVectors[] = {
+	{ 0xbff0000000000000ull, 0x0000000000000000ull },
+	{ 0x0000000000000000ull, 0x0000000000000000ull },
+	{ 0x3fe0000000000000ull, 0x3fe0000000000000ull },
+	{ 0x3ff0000000000000ull, 0x3ff0000000000000ull },
+	{ 0x4000000000000000ull, 0x3ff0000000000000ull },
+	{ 0x7ff8000000000000ull, 0x0000000000000000ull },
+	{ 0x7ff0000000000000ull, 0x3ff0000000000000ull },
+	{ 0xfff0000000000000ull, 0x0000000000000000ull },
+};
+
+struct FLerpVector { uint64 ABits; uint64 BBits; uint64 TBits; uint64 ExpectedBits; };
+static const FLerpVector LerpVectors[] = {
+	{ 0x0000000000000000ull, 0x3ff0000000000000ull, 0x3fe0000000000000ull, 0x3fe0000000000000ull },
+	{ 0x3ff0000000000000ull, 0x0000000000000000ull, 0x3fe0000000000000ull, 0x3fe0000000000000ull },
+	{ 0xc014000000000000ull, 0x4014000000000000ull, 0x3fb999999999999aull, 0xc010000000000000ull },
+	{ 0x3fb999999999999aull, 0x3fc999999999999aull, 0x3fd3333333333333ull, 0x3fc0a3d70a3d70a4ull },
+	{ 0x41cdcd6500000000ull, 0x3e112e0be826d695ull, 0x3fe6666666666666ull, 0x41b1e1a300000000ull },
+};
+
+struct FDistVector { uint64 AXBits; uint64 AYBits; uint64 BXBits; uint64 BYBits; uint64 ExpectedBits; };
+static const FDistVector DistVectors[] = {
+	{ 0x0000000000000000ull, 0x0000000000000000ull, 0x4008000000000000ull, 0x4010000000000000ull, 0x4014000000000000ull },
+	{ 0x0000000000000000ull, 0x0000000000000000ull, 0x0000000000000000ull, 0x0000000000000000ull, 0x0000000000000000ull },
+	{ 0x3ff8000000000000ull, 0x4004000000000000ull, 0xc00a000000000000ull, 0x401c800000000000ull, 0x401a84d416a2373cull },
+	{ 0x1eb67e9c127b6e74ull, 0x1eb67e9c127b6e74ull, 0x0000000000000000ull, 0x0000000000000000ull, 0x1ebfcfe76481c4b3ull },
+	{ 0x6126c2d4256ffcc3ull, 0x6126c2d4256ffcc3ull, 0x0000000000000000ull, 0x0000000000000000ull, 0x61301830a9572a89ull },
+	{ 0x3fb999999999999aull, 0x3fc999999999999aull, 0x3fd3333333333333ull, 0x3fd999999999999aull, 0x3fd21a1851ff630aull },
+	{ 0x3ff0000000000000ull, 0x3ff0000000000000ull, 0x4000000000000000ull, 0x4000000000000000ull, 0x3ff6a09e667f3bcdull },
+	{ 0xc01ecccccccccccdull, 0x400a666666666666ull, 0x401ecccccccccccdull, 0xc00a666666666666ull, 0x4030c13412e39271ull },
+};
+
+struct FStepPlanVector { uint64 ScaleBits; uint64 StepDtBits; int32 TargetSteps; uint64 TimePerFrameBits; uint64 TimeGainBits; };
+static const FStepPlanVector StepPlanVectors[] = {
+	{ 0x0000000000000000ull, 0x3f91111111111111ull, 1, 0x3f91111111111111ull, 0x3ff0000000000000ull },
+	{ 0x3fe0000000000000ull, 0x3f91111111111111ull, 1, 0x3f91111111111111ull, 0x3ff0000000000000ull },
+	{ 0x3ff0000000000000ull, 0x3f91111111111111ull, 1, 0x3f91111111111111ull, 0x3ff0000000000000ull },
+	{ 0x3ff8000000000000ull, 0x3f9999999999999aull, 1, 0x3f9999999999999aull, 0x3ff8000000000000ull },
+	{ 0x4000000000000000ull, 0x3fa1111111111111ull, 1, 0x3fa1111111111111ull, 0x4000000000000000ull },
+	{ 0x4008000000000000ull, 0x3fa999999999999aull, 1, 0x3fa999999999999aull, 0x4008000000000000ull },
+	{ 0x4014000000000000ull, 0x3fb5555555555555ull, 1, 0x3fb5555555555555ull, 0x4014000000000000ull },
+	{ 0x4020000000000000ull, 0x3fc1111111111111ull, 1, 0x3fc1111111111111ull, 0x4020000000000000ull },
+	{ 0x4024000000000000ull, 0x3fc5555555555555ull, 1, 0x3fc5555555555555ull, 0x4024000000000000ull },
+	{ 0x402e000000000000ull, 0x3fc5555555555555ull, 2, 0x3fd5555555555555ull, 0x4034000000000000ull },
+	{ 0x4059000000000000ull, 0x3fc5555555555555ull, 2, 0x3fd5555555555555ull, 0x4034000000000000ull },
+	{ 0x7ff8000000000000ull, 0x3f91111111111111ull, 1, 0x3f91111111111111ull, 0x3ff0000000000000ull },
+};
+
+struct FWallBudgetVector { uint64 ScaleBits; uint64 WallFrameMsBits; bool bWorldBuilding; uint64 ExpectedBits; };
+static const FWallBudgetVector WallBudgetVectors[] = {
+	{ 0x3ff0000000000000ull, 0x4030aaa64c2f837bull, false, 0x401a000000000000ull },
+	{ 0x3ff0000000000000ull, 0x4030aaa64c2f837bull, true, 0x4010000000000000ull },
+	{ 0x3ff0000000000000ull, 0x403e000000000000ull, false, 0x4010e66666666667ull },
+	{ 0x3ff0000000000000ull, 0x403e000000000000ull, true, 0x4010000000000000ull },
+	{ 0x3ff0000000000000ull, 0x4046800000000000ull, false, 0x4010e66666666667ull },
+	{ 0x3ff0000000000000ull, 0x4046800000000000ull, true, 0x4010000000000000ull },
+	{ 0x4000000000000000ull, 0x4030aaa64c2f837bull, false, 0x401a000000000000ull },
+	{ 0x4000000000000000ull, 0x4030aaa64c2f837bull, true, 0x4010000000000000ull },
+	{ 0x4000000000000000ull, 0x403e000000000000ull, false, 0x4010e66666666667ull },
+	{ 0x4000000000000000ull, 0x403e000000000000ull, true, 0x4010000000000000ull },
+	{ 0x4000000000000000ull, 0x4046800000000000ull, false, 0x4010e66666666667ull },
+	{ 0x4000000000000000ull, 0x4046800000000000ull, true, 0x4010000000000000ull },
+	{ 0x4014000000000000ull, 0x4030aaa64c2f837bull, false, 0x401a000000000000ull },
+	{ 0x4014000000000000ull, 0x4030aaa64c2f837bull, true, 0x4010000000000000ull },
+	{ 0x4014000000000000ull, 0x403e000000000000ull, false, 0x4010e66666666667ull },
+	{ 0x4014000000000000ull, 0x403e000000000000ull, true, 0x4010000000000000ull },
+	{ 0x4014000000000000ull, 0x4046800000000000ull, false, 0x4010e66666666667ull },
+	{ 0x4014000000000000ull, 0x4046800000000000ull, true, 0x4010000000000000ull },
+	{ 0x4024000000000000ull, 0x4030aaa64c2f837bull, false, 0x401a000000000000ull },
+	{ 0x4024000000000000ull, 0x4030aaa64c2f837bull, true, 0x4010000000000000ull },
+	{ 0x4024000000000000ull, 0x403e000000000000ull, false, 0x4010e66666666667ull },
+	{ 0x4024000000000000ull, 0x403e000000000000ull, true, 0x4010000000000000ull },
+	{ 0x4024000000000000ull, 0x4046800000000000ull, false, 0x4010e66666666667ull },
+	{ 0x4024000000000000ull, 0x4046800000000000ull, true, 0x4010000000000000ull },
+};
+
+static const FUnaryVector KeepLagVectors[] = {
+	{ 0x3ff0000000000000ull, 0x3f91111111111111ull },
+	{ 0x4000000000000000ull, 0x3fa1111111111111ull },
+	{ 0x4014000000000000ull, 0x3fb5555555555555ull },
+	{ 0x4024000000000000ull, 0x3fc5555555555555ull },
+	{ 0x402e000000000000ull, 0x3fd5555555555555ull },
+};
+
+struct FFrameDeltaVector { uint64 WallMsBits; uint64 DtBits; uint64 LastWallFrameMsBits; };
+static const FFrameDeltaVector FrameDeltaVectors[] = {
+	{ 0x0000000000000000ull, 0x0000000000000000ull, 0x3ff0000000000000ull },
+	{ 0x3fd999999999999aull, 0x3f3a36e2eb1c432dull, 0x3ff0000000000000ull },
+	{ 0x4030aaa64c2f837bull, 0x3f91110c97bdf747ull, 0x4030aaa64c2f837bull },
+	{ 0x4040a66666666666ull, 0x3fa10cb295e9e1b0ull, 0x4040a66666666666ull },
+	{ 0x406f400000000000ull, 0x3fb999999999999aull, 0x406f400000000000ull },
+	{ 0x408c200000000000ull, 0x3fb999999999999aull, 0x406f400000000000ull },
+	{ 0x40b3880000000000ull, 0x3fb999999999999aull, 0x406f400000000000ull },
+};
+
+struct FCellKeyVector { int32 CellX; int32 CellY; uint32 Expected; };
+static const FCellKeyVector CellKeyVectors[] = {
+	{ 0, 0, 268439552u },
+	{ 1, 1, 268505089u },
+	{ -1, -1, 268374015u },
+	{ 12, -37, 269225947u },
+	{ -4096, -4096, 0u },
+	{ 4095, 4095, 536813567u },
+	{ 1000, -1000, 333974552u },
+};
+
+struct FArchetypeVector { uint32 Seed; uint32 Id; uint64 SeaLowFracBits; uint64 ForestTBits; uint64 FieldTBits; uint64 MoistBiasBits; int32 ClearRadius; int32 ExtentW; int32 ExtentH; };
+static const FArchetypeVector ArchetypeVectors[] = {
+	{ 0u, 0u, 0x3fb936773d595688ull, 0x3fe377ee05ee1ae1ull, 0x3fd6456ca86cdcccull, 0x3f926b4568157ae1ull, 9, 96, 96 },
+	{ 1u, 4u, 0x3fb023032b8189baull, 0x3fe28f959dbeeccdull, 0x3fd59a293d908333ull, 0xbf97014331353d71ull, 10, 104, 104 },
+	{ 42u, 3u, 0x3fb3f04e8dc21ba7ull, 0x3fe3de7b5cd1ab85ull, 0x3fd597b986c47eb9ull, 0xbfa5d18ff2d1cccdull, 10, 88, 96 },
+	{ 12345u, 2u, 0x3f9ba613d199cac1ull, 0x3fe3c84c9423a3d7ull, 0x3fd722d3ed3a6148ull, 0xbfb418875553eb86ull, 9, 112, 112 },
+	{ 777u, 1u, 0x3fc5e3548d0f7be7ull, 0x3fe3eab3857ab333ull, 0x3fd9a1cb0b2363d7ull, 0xbf8374b31674cccdull, 8, 112, 96 },
+	{ 333u, 2u, 0x3f99e927cdf3645bull, 0x3fe3bd2d140c47aeull, 0x3fd707052cfffae1ull, 0xbfb487c2563d851full, 9, 112, 112 },
+	{ 185431u, 1u, 0x3fc5f8e5ea4a5580ull, 0x3fe3ef03cb53451full, 0x3fd9ac93b9c0d0a3ull, 0xbf821b9d42c73333ull, 8, 112, 96 },
+	{ 2654435761u, 3u, 0x3fb215459af22873ull, 0x3fe3aefa77bce000ull, 0x3fd520f74a1081ecull, 0xbfa987a1d871b334ull, 9, 88, 96 },
+};
+
+struct FFbmVector { uint64 XBits; uint64 YBits; uint64 SeedBits; uint64 ExpectedBits; };
+static const FFbmVector FbmVectors[] = {
+	{ 0x0000000000000000ull, 0x0000000000000000ull, 0x3ff0000000000000ull, 0x3fec5c8bd8215d21ull },
+	{ 0x400c000000000000ull, 0x4002000000000000ull, 0x4045000000000000ull, 0x3fe3f7665f732a14ull },
+	{ 0x3fd6db6db6db6db7ull, 0x3fc2492492492492ull, 0x401c000000000000ull, 0x3fe4b11cec39b55full },
+	{ 0x3fb999999999999aull, 0x3fc999999999999aull, 0x40c81c8000000000ull, 0x3fd25f9cb5eff8a2ull },
+	{ 0x4031000000000000ull, 0x4037000000000000ull, 0x0000000000000000ull, 0x3fe1cdcfef82bb33ull },
+};
+
+struct FLibmUnaryVector { uint64 InputBits; uint64 ExpectedBits; };
+static const FLibmUnaryVector SinVectors[] = {
+	{ 0x0000000000000000ull, 0x0000000000000000ull },
+	{ 0x3ff0000000000000ull, 0x3feaed548f090ceeull },
+	{ 0x400921fb54442d18ull, 0x3ca1a62633145c07ull },
+	{ 0x3f916872b020c49cull, 0x3f91683bbce1b89bull },
+	{ 0x40332b851eb851ecull, 0x3fd428c3b3028ba2ull },
+	{ 0x405fc66666666666ull, 0x3fefb602e1d949a7ull },
+	{ 0x3f532b55ef1fddecull, 0x3f532b55a5bff3c7ull },
+	{ 0x4091eb8e56041893ull, 0xbfca647d7ea163bfull },
+};
+
+static const FLibmUnaryVector LogVectors[] = {
+	{ 0x3ff0000000000000ull, 0x0000000000000000ull },
+	{ 0x3ff004189374bc6aull, 0x3f5060354f8c3cc4ull },
+	{ 0x4005bf0a8b145769ull, 0x3ff0000000000000ull },
+	{ 0x403c000000000000ull, 0x400aa85ad6964a23ull },
+	{ 0x4059000000000000ull, 0x40126bb1bbb55516ull },
+	{ 0x4090000000000000ull, 0x401bb9d3beb8c86bull },
+};
+
+static const FLibmUnaryVector TanhVectors[] = {
+	{ 0x0000000000000000ull, 0x0000000000000000ull },
+	{ 0x3fe0000000000000ull, 0x3fdd9353d7568af3ull },
+	{ 0xbfe0000000000000ull, 0xbfdd9353d7568af3ull },
+	{ 0x3ff8000000000000ull, 0x3fecf6f9786df577ull },
+	{ 0x4022000000000000ull, 0x3fefffffefa59d78ull },
+	{ 0xc000000000000000ull, 0xbfeed9505e1bc3d4ull },
+};
+
+struct FLibmPowVector { uint64 BaseBits; uint64 ExpBits; uint64 ExpectedBits; };
+static const FLibmPowVector PowVectors[] = {
+	{ 0x3fe0000000000000ull, 0x3ff7333333333333ull, 0x3fd76ce51f6a0bb8ull },
+	{ 0x3fd3333333333333ull, 0x4004cccccccccccdull, 0x3fa6604ae3876c7bull },
+	{ 0x3fc999999999999aull, 0x3fea3d70a3d70a3dull, 0x3fd119e30a9e4c0bull },
+	{ 0x3fe70a3d70a3d70aull, 0x4004cccccccccccdull, 0x3fdb3e0a39484cb5ull },
+	{ 0x3fd999999999999aull, 0x3ff7333333333333ull, 0x3fd0f32c3053f3f8ull },
+};
+
+struct FWorldMapVector { uint32 Seed; int32 W; int32 H; uint32 Counts[7]; uint32 Fingerprint; uint32 OriginType; int32 OriginAmount; uint64 OriginAltBits; uint32 ForestCap; };
+static const FWorldMapVector WorldMapVectors[] = {
+	{ 0u, 32, 32, { 277u, 255u, 147u, 24u, 136u, 99u, 86u }, 1008112183u, 3u, 8, 0x3fd21cac083126e9ull, 143u },
+	{ 1u, 32, 32, { 376u, 181u, 182u, 35u, 49u, 57u, 144u }, 2871974834u, 3u, 8, 0x3fe90e5604189375ull, 143u },
+	{ 42u, 32, 32, { 161u, 241u, 460u, 35u, 62u, 53u, 12u }, 3983308658u, 0u, 0, 0x3fd2e147ae147ae1ull, 143u },
+	{ 12345u, 32, 32, { 281u, 128u, 309u, 31u, 37u, 31u, 207u }, 3997506139u, 1u, 0, 0x3fced916872b020cull, 143u },
+	{ 777u, 32, 32, { 304u, 313u, 202u, 6u, 84u, 46u, 69u }, 1427331980u, 4u, 38, 0x3fe7d70a3d70a3d7ull, 143u },
+	{ 333u, 32, 32, { 400u, 134u, 252u, 41u, 61u, 69u, 67u }, 3727293627u, 2u, 45, 0x3feb020c49ba5e35ull, 143u },
+	{ 185431u, 32, 32, { 179u, 323u, 50u, 67u, 143u, 189u, 73u }, 2392515796u, 1u, 0, 0x3fc872b020c49ba6ull, 143u },
+	{ 2654435761u, 32, 32, { 392u, 177u, 364u, 36u, 2u, 19u, 34u }, 3751547387u, 2u, 36, 0x3fec28f5c28f5c29ull, 143u },
+	{ 12345u, 96, 96, { 3249u, 1198u, 1396u, 462u, 716u, 725u, 1470u }, 3069094496u, 1u, 0, 0x3fc7ef9db22d0e56ull, 1290u },
+};
+
+struct FWorldSampleVector { uint32 Seed; int32 W; int32 H; int32 X; int32 Y; uint32 Type; int32 Amount; uint64 AltBits; uint64 ShadeBits; uint32 Crop; };
+static const FWorldSampleVector WorldSampleVectors[] = {
+	{ 42u, 32, 32, 0, 0, 0u, 0, 0x3fd2e147ae147ae1ull, 0xbfeb4395810624ddull, 0u },
+	{ 42u, 32, 32, 1, 1, 2u, 45, 0x3fe322d0e5604189ull, 0x3fd3126e978d4fdfull, 0u },
+	{ 42u, 32, 32, 3, 7, 2u, 28, 0x3fe2b020c49ba5e3ull, 0x3fddc28f5c28f5c3ull, 0u },
+	{ 42u, 32, 32, 10, 20, 1u, 0, 0x3fce5604189374bcull, 0x3fd2c083126e978dull, 0u },
+	{ 42u, 32, 32, 15, 15, 1u, 0, 0x3fcd70a3d70a3d71ull, 0x3fce76c8b4395810ull, 0u },
+	{ 42u, 32, 32, 31, 31, 1u, 0, 0x3fcdb22d0e560419ull, 0x3fd0624dd2f1a9fcull, 0u },
+	{ 42u, 32, 32, 30, 4, 1u, 0, 0x3fc7ef9db22d0e56ull, 0xbfba1cac083126e9ull, 0u },
+	{ 42u, 32, 32, 8, 29, 5u, 16, 0x3fe428f5c28f5c29ull, 0xbfcbe76c8b439581ull, 0u },
+	{ 12345u, 32, 32, 0, 0, 1u, 0, 0x3fced916872b020cull, 0x3fd50e5604189375ull, 0u },
+	{ 12345u, 32, 32, 1, 1, 1u, 0, 0x3fcfbe76c8b43958ull, 0x3fd8624dd2f1a9fcull, 0u },
+	{ 12345u, 32, 32, 3, 7, 6u, 11, 0x3fe449ba5e353f7dull, 0xbfa89374bc6a7efaull, 1u },
+	{ 12345u, 32, 32, 10, 20, 1u, 0, 0x3fcbc6a7ef9db22dull, 0x3fc10624dd2f1aa0ull, 0u },
+	{ 12345u, 32, 32, 15, 15, 1u, 0, 0x3fd020c49ba5e354ull, 0x3fdae147ae147ae1ull, 0u },
+	{ 12345u, 32, 32, 31, 31, 2u, 21, 0x3fe9c28f5c28f5c3ull, 0x3fa374bc6a7ef9dbull, 0u },
+	{ 12345u, 32, 32, 30, 4, 2u, 22, 0x3fe8624dd2f1a9fcull, 0xbfda8f5c28f5c28full, 0u },
+	{ 12345u, 32, 32, 8, 29, 6u, 11, 0x3fe9c28f5c28f5c3ull, 0xbfce5604189374bcull, 1u },
+	{ 777u, 32, 32, 0, 0, 4u, 38, 0x3fe7d70a3d70a3d7ull, 0xbfd4ac083126e979ull, 0u },
+	{ 777u, 32, 32, 1, 1, 4u, 36, 0x3fe86a7ef9db22d1ull, 0x3fc916872b020c4aull, 0u },
+	{ 777u, 32, 32, 3, 7, 4u, 26, 0x3fe420c49ba5e354ull, 0x3fe3ae147ae147aeull, 0u },
+	{ 777u, 32, 32, 10, 20, 1u, 0, 0x3fd04189374bc6a8ull, 0x3fdb74bc6a7ef9dbull, 0u },
+	{ 777u, 32, 32, 15, 15, 1u, 0, 0x3fd116872b020c4aull, 0x3fe11eb851eb851full, 0u },
+	{ 777u, 32, 32, 31, 31, 5u, 20, 0x3fd2e147ae147ae1ull, 0xbfd4fdf3b645a1cbull, 0u },
+	{ 777u, 32, 32, 30, 4, 2u, 28, 0x3fe9b22d0e560419ull, 0xbfc9db22d0e56042ull, 0u },
+	{ 777u, 32, 32, 8, 29, 1u, 0, 0x3fcef9db22d0e560ull, 0x3fd5c28f5c28f5c3ull, 0u },
+};
+
+struct FCropVector { int32 X; int32 Y; uint32 Salt; uint32 Crop; };
+static const FCropVector CropVectors[] = {
+	{ 0, 0, 47u, 1u },
+	{ 3, 9, 12345u, 3u },
+	{ 10, 10, 42u, 3u },
+	{ -2, 4, 7u, 2u },
+};
+
+// clang-format on
+
