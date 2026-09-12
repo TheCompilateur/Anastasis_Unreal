@@ -22,7 +22,7 @@ public class Anastasis_UnrealV2 : ModuleRules
 			"AnastasisSim"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "ProceduralMeshComponent" });
 
 		PublicIncludePaths.AddRange(new string[] {
 			"Anastasis_UnrealV2",
@@ -43,3 +43,4 @@ public class Anastasis_UnrealV2 : ModuleRules
 		// To include OnlineSubsystemSteam, add it to the plugins section in your uproject file with the Enabled attribute set to true
 	}
 }
+

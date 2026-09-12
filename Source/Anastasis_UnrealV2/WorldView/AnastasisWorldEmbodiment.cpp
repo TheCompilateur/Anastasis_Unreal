@@ -1,4 +1,7 @@
 #include "WorldView/AnastasisWorldEmbodiment.h"
+#include "ProceduralMeshComponent.h"
+#include "WorldView/AnastasisTerrainSurface.h"
+
 
 #include "Anastasis_UnrealV2.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
@@ -8,6 +11,8 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldView/AnastasisWorldDebugVisual.h"
+
+static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 0, TEXT("Experimental center-sampled terrain. 0=legacy DEBUG, 1=32x32 surface; applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarWorldViewSeed(
 	TEXT("anastasis.WorldView.Seed"),
@@ -175,8 +180,34 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
 		}
 	}
 
-	LogEmbodiment();
-	return GetInstanceCount() == Plan.TileCount;
+    if (ExperimentalSurface) ExperimentalSurface->SetVisibility(false);
+    for (auto& Mesh : TerrainMeshes) if (Mesh) Mesh->SetVisibility(true);
+    if (CVarTerrainSurface.GetValueOnGameThread() == 1)
+    {
+        const auto Crop = AnastasisWorldView::CropSnapshot(Snapshot, 0, 0, 32, 32);
+        AnastasisTerrainSurface::FGeometry Geometry;
+        if (AnastasisTerrainSurface::Build(Crop, Geometry))
+        {
+            if (!ExperimentalSurface)
+            {
+                ExperimentalSurface = NewObject<UProceduralMeshComponent>(this, TEXT("ExperimentalTerrain"));
+                ExperimentalSurface->SetupAttachment(GetRootComponent());
+                ExperimentalSurface->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+                ExperimentalSurface->SetCanEverAffectNavigation(false);
+                ExperimentalSurface->RegisterComponent();
+            }
+            ExperimentalSurface->CreateMeshSection_LinearColor(0, Geometry.Vertices, Geometry.Triangles,
+                Geometry.Normals, TArray<FVector2D>{}, TArray<FLinearColor>{}, TArray<FProcMeshTangent>{}, false);
+            if (BaseShapeMaterial) ExperimentalSurface->SetMaterial(0, BaseShapeMaterial);
+            ExperimentalSurface->SetVisibility(true);
+            for (auto& Mesh : TerrainMeshes) if (Mesh) Mesh->SetVisibility(false);
+            UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN source=96x96 crop=(0,0) 32x32 tiles=1024 vertices=%d triangles=%d boundary=tile_centers legacy_visible=0"), Geometry.Vertices.Num(), Geometry.Triangles.Num()/3);
+        }
+        else UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_TERRAIN rejected crop; legacy DEBUG retained"));
+    }
+    else UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN disabled legacy_visible=1"));
+    LogEmbodiment();
+    return GetInstanceCount() == Plan.TileCount;
 }
 
 int32 AAnastasisWorldEmbodiment::GetInstanceCount() const
@@ -272,3 +303,6 @@ void AAnastasisWorldEmbodiment::LogEmbodiment() const
 			InstanceLocation.Z);
 	}
 }
+
+
+

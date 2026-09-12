@@ -6,6 +6,7 @@
 #include "AnastasisWorldEmbodiment.generated.h"
 
 class UHierarchicalInstancedStaticMeshComponent;
+class UProceduralMeshComponent;
 
 /**
  * DEBUG / METROLOGY OWNER.
@@ -34,6 +35,8 @@ public:
 
 protected:
 	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> ExperimentalSurface;
+	UPROPERTY()
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> TerrainMeshes[7];
 
 	UPROPERTY()
@@ -43,3 +46,4 @@ protected:
 	AnastasisWorldView::FPlan Plan;
 	TArray<int32> LocalInstanceIndex;
 };
+
