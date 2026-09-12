@@ -1,0 +1,15 @@
+---
+description: Python Unreal MCP toolset conventions for 5.8.2
+globs: Content/Python/**/*.py
+alwaysApply: false
+---
+
+# Python toolsets
+
+- `@unreal.uclass()` class inheriting `unreal.ToolsetDefinition`.
+- Tools: `@toolset_registry.tool_call` then `@staticmethod`, with Python type annotations.
+- Register in `init_unreal.py` via `toolset_registry.registration.Registration`.
+- Raise on failure. Do not return error strings.
+- Docstrings are the MCP schema. Do not restate types.
+- Read-only tools stay read-only. No save, spawn, delete, or property writes in `AnastasisInspectTools`.
+---

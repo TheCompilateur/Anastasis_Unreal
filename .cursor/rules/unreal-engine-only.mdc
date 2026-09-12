@@ -1,0 +1,16 @@
+---
+description: Anastasis is an Unreal Engine 5.8.2-only agent workspace
+alwaysApply: true
+---
+
+# Unreal 5.8.2 only
+
+This workspace is **AnastasisUR** on Unreal Engine **5.8.2** (working folder `Anastasis_UnrealV2`). Stay inside Unreal: C++, Python editor scripts, Blueprints via MCP, StateTree, UMG. Do not introduce web, Unity, Godot, or generic fullstack stacks. Product name is AnastasisUR; `Final_AnastasisUR` is a template probe, not the game.
+
+- Workspace root is the `.uproject` folder. Never treat `Intermediate/`, `Saved/`, or `Binaries/` as source.
+- `.uasset` / `.umap` are binary. Inspect and mutate them through a running editor (Unreal MCP), never as text.
+- Prefer Epic toolsets (`list_toolsets` → `describe_toolset` → `call_tool`) when the editor MCP is connected.
+- Use `AnastasisInspectTools` first (read-only). Do not add mutating tools unless Alexandre asks.
+- MCP has no auth and runs on the game thread. Local editor only. No parallel spam. No `execute_python` dump unless a typed tool is missing.
+- Engine version is 5.8.2. Do not suggest 5.4/5.5 APIs when 5.8 replacements exist (subsystems over deprecated `EditorLevelLibrary` when both work).
+---

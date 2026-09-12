@@ -1,4 +1,4 @@
-param([ValidateSet('0','1')][string]$Mode='1',[Parameter(Mandatory=$true)][string]$Out,[string]$RebuildMaterial='0',[string]$Exposure='12.0')
+param([ValidateSet('0','1')][string]$Mode='1',[Parameter(Mandatory=$true)][string]$Out,[string]$RebuildMaterial='0')
 $ErrorActionPreference='Stop'
 $Root='C:\dev\ANASTASIS_UNREAL'
 $Editor='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
@@ -11,7 +11,6 @@ if(Test-Path $log){Remove-Item $log}
 $env:ANASTASIS_SLICE_SHOT=$shot
 $env:ANASTASIS_SLICE_MODE=$Mode
 $env:ANASTASIS_SLICE_REBUILD_MATERIAL=$RebuildMaterial
-$env:ANASTASIS_SLICE_EV=$Exposure
 $launchArgs=@(
  '"C:\dev\ANASTASIS_UNREAL\Anastasis_UnrealV2.uproject"',
  '-windowed','-resx=1280','-resy=720','-nosplash','-NoLiveCoding',

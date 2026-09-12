@@ -60,17 +60,18 @@ FLinearColor TileColor(const AnastasisWorldView::FVisualTile& T, double MinAlt, 
 bool AnastasisTerrainSurface::Build(const AnastasisWorldView::FWorldVisualSnapshot& Crop, FGeometry& Out)
 {
     Out = FGeometry{};
-    if (Crop.W != 32 || Crop.H != 32 || Crop.SourceW != 96 || Crop.SourceH != 96
-        || Crop.OriginX < 0 || Crop.OriginY < 0 || Crop.OriginX + 32 > 96 || Crop.OriginY + 32 > 96
-        || Crop.Tiles.Num() != 1024) return false;
+    if (Crop.W != CropW || Crop.H != CropH || Crop.SourceW != SourceW || Crop.SourceH != SourceH
+        || Crop.OriginX < 0 || Crop.OriginY < 0
+        || Crop.OriginX + CropW > SourceW || Crop.OriginY + CropH > SourceH
+        || Crop.Tiles.Num() != VertexCount) return false;
     FGeometry Result;
     TArray<bool> IsWater;
-    IsWater.Reserve(1024);
+    IsWater.Reserve(VertexCount);
     for (int32 I = 0; I < Crop.Tiles.Num(); ++I)
     {
         const auto& T = Crop.Tiles[I];
-        const int32 X = Crop.OriginX + I % 32, Y = Crop.OriginY + I / 32;
-        if (T.X != X || T.Y != Y || T.SourceIndex != Y * 96 + X || !FMath::IsFinite(T.Alt)) return false;
+        const int32 X = Crop.OriginX + I % CropW, Y = Crop.OriginY + I / CropW;
+        if (T.X != X || T.Y != Y || T.SourceIndex != Y * SourceW + X || !FMath::IsFinite(T.Alt)) return false;
         if (!FMath::IsFinite(T.Shore) || !FMath::IsFinite(T.Shade)) return false;
         const FVector P = AnastasisWorldView::TileToUnreal(X, Y, T.Alt);
         if (!FMath::IsFinite(P.X) || !FMath::IsFinite(P.Y) || !FMath::IsFinite(P.Z)) return false;
@@ -80,12 +81,12 @@ bool AnastasisTerrainSurface::Build(const AnastasisWorldView::FWorldVisualSnapsh
         Result.WaterVertices.Add(FVector(P.X, P.Y, WaterPlaneZ));
         IsWater.Add(T.Type == AnastasisWorld::ETileType::Water);
     }
-    Result.Normals.Init(FVector::ZeroVector, 1024);
-    Result.WaterNormals.Init(FVector::UpVector, 1024);
-    for (int32 Y = 0; Y < 31; ++Y)
-        for (int32 X = 0; X < 31; ++X)
+    Result.Normals.Init(FVector::ZeroVector, VertexCount);
+    Result.WaterNormals.Init(FVector::UpVector, VertexCount);
+    for (int32 Y = 0; Y < CropH - 1; ++Y)
+        for (int32 X = 0; X < CropW - 1; ++X)
         {
-            const int32 A = Y * 32 + X, B = A + 1, C = A + 32, D = C + 1;
+            const int32 A = Y * CropW + X, B = A + 1, C = A + CropW, D = C + 1;
             // Unreal front faces use clockwise winding viewed from above.
             Result.Triangles.Append({A, C, B, B, C, D});
             // Une cellule porte de l'eau des qu'une de ses quatre tuiles source est de l'eau :

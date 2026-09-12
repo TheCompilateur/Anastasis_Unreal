@@ -1,0 +1,39 @@
+{
+	"folders": [
+		{
+			"name": "Anastasis Unreal",
+			"path": "."
+		},
+		{
+			"name": "Jeux IV Kingdoms (sim)",
+			"path": "C:/dev/Jeux IV Kingdoms"
+		}
+	],
+	"settings": {
+		"files.exclude": {
+			"**/Intermediate": true,
+			"**/Saved": true,
+			"**/Binaries": true,
+			"**/DerivedDataCache": true,
+			"**/Build": true,
+			"**/src/render3d": true,
+			"**/node_modules": true
+		},
+		"search.exclude": {
+			"**/Intermediate": true,
+			"**/Saved": true,
+			"**/Binaries": true,
+			"**/DerivedDataCache": true,
+			"**/src/render3d": true,
+			"**/node_modules": true
+		},
+		"files.watcherExclude": {
+			"**/Intermediate/**": true,
+			"**/Saved/**": true,
+			"**/Binaries/**": true,
+			"**/DerivedDataCache/**": true,
+			"**/src/render3d/**": true,
+			"**/node_modules/**": true
+		}
+	}
+}

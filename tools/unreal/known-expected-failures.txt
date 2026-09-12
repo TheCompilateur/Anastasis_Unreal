@@ -1,0 +1,19 @@
+# Registre des echecs connus et attendus de la suite d'automation ANASTASIS.
+#
+# KNOWN_EXPECTED_FAILURE n'est PAS un PASS.
+#
+# Ces tests sont marques dans leur framework (AddExpectedError cote C++,
+# @unittest.expectedFailure cote Python) : le lanceur d'automation les rapporte
+# donc "Success". Ce fichier existe pour que ce Success ne soit jamais confondu
+# avec un test qui verifie reellement ce qu'il annonce.
+#
+# Un marqueur reste honnete : si la divergence disparait, le test marque
+# echoue, ce qui force a retirer l'entree ici. Ne jamais ajouter une ligne pour
+# faire taire une regression nouvelle.
+#
+# Format : <chemin complet du test> | <mecanisme> | <cause>
+
+Anastasis.Sim.Parite.Fbm | AddExpectedError | Divergence de 1 ULP contre le vecteur de reference JS sur fbm(0.1, 0.2, 12345). Parite libm, hors mandat.
+Anastasis.Sim.Parite.SemantiqueJs | AddExpectedError | ToUint32(1e21) ne reproduit pas la semantique JS. Portage entier, hors mandat.
+AI.Toolsets.AnastasisInspect.anastasis_toolset.tests.test_inspect.AnastasisInspectToolsTestCase.test_list_level_actors_raises_on_non_positive_max_count | unittest.expectedFailure | @toolset_registry.tool_call convertit l'exception en script error au lieu de lever ValueError.
+AI.Toolsets.AnastasisInspect.anastasis_toolset.tests.test_inspect.AnastasisInspectToolsTestCase.test_list_selected_actors_returns_list | unittest.expectedFailure | @toolset_registry.tool_call marshalle le retour en unreal.Array, pas en list native.

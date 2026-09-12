@@ -21,6 +21,12 @@ Ne jamais ouvrir, lire, builder ni modifier les copies sous
 | `Anastasis_Unreal`, `Anastasis_Unreal 5.8` | legacy UE 5.7, module `AnastasisCore` |
 | `Final_AnastasisUR` | sonde template, jamais le jeu |
 
+**État au 2026-09-12 : ces six copies ont été supprimées** (29,67 Go), après vérification fichier par
+fichier qu'elles ne contenaient rien d'absent du canonique. Le seul contenu unique, le module
+`AnastasisCore` du legacy 5.7, est archivé dans `archive/legacy-AnastasisCore/`. Il ne subsiste que deux
+squelettes de dossiers vides, sans `.uproject`. Le tableau reste ici comme interdit permanent : ne pas
+les recréer, ne pas les restaurer.
+
 Si un chemin de travail contient `OneDrive`, **s'arrêter et le signaler** : la session est dans la mauvaise racine.
 
 ## Pourquoi les copies se multiplient (cause racine corrigée le 2026-09-12)
@@ -34,10 +40,14 @@ donc la boîte de conversion **à chaque ouverture**, et l'option « Open a copy
 dossier en `<Projet> <Version>`, puis ` - 2`, ` - 3`… C'est ce mécanisme précis qui a produit les 4
 copies mortes listées ci-dessus.
 
-**Fix appliqué (HKCU, sans élévation) :** ce GUID est maintenant enregistré dans
-`HKCU\Software\Epic Games\Unreal Engine\Builds` → `C:\Program Files\Epic Games\UE_5.8`. La boîte de
-conversion ne devrait plus apparaître sur cette copie précise. Ça ne change rien à la règle n°1 : la
-copie reste `DO_NOT_DEVELOP`, seul le mécanisme de duplication accidentelle est neutralisé.
+**Correction du 2026-09-12 (vérifiée) :** une version antérieure de ce document affirmait que ce GUID
+avait été enregistré dans `HKCU\Software\Epic Games\Unreal Engine\Builds`. **C'est faux.** Cette clé
+existe mais ne contient aucune valeur — vérifier avec :
+```powershell
+(Get-Item 'HKCU:\Software\Epic Games\Unreal Engine\Builds').GetValueNames()
+```
+Le point est désormais sans objet : les copies porteuses de ce GUID ont été supprimées. Ne pas
+réenregistrer ce GUID — cela ne servirait qu'à faire revivre une copie morte.
 
 **Fix distinct, toujours en attente (HKLM, élévation admin requise) :** `HKLM\SOFTWARE\EpicGames\Unreal Engine\`
 a des clés `4.0` et `5.7` mais pas `5.8` — l'association `"5.8"` du projet **canonique** lui-même n'est
@@ -97,7 +107,29 @@ UnrealEditor-Cmd.exe "<uproject>" -unattended -nopause -nosplash -NoLiveCoding `
 - `AI.Toolsets.AnastasisInspect…test_list_selected_actors_returns_list` — l'API renvoie `Array`, pas `list` (le décorateur `@toolset_registry.tool_call` marshalle le retour). Marqué `@unittest.expectedFailure` dans `test_inspect.py`. Rapportée `Success`.
 - `AI.Toolsets.AnastasisInspect…test_list_level_actors_raises_on_non_positive_max_count` — `ValueError` converti en script error par le même décorateur, sauf sous `toolset_registry.tool_raising_exceptions()`. Idem, marqué `@unittest.expectedFailure`. Rapportée `Success`.
 
-Ces 4 cas ne doivent plus apparaître comme des échecs dans `verify`/`RunTests` : si l'un d'eux redevient `Fail`, c'est soit une vraie régression, soit le marqueur qui a été retiré sans mandat — dans les deux cas, investiguer avant de toucher au marqueur. Voir `docs/unreal/AUTOMATION_TRIAGE.md` : une campagne de tests complète reste hors du seal.
+### KNOWN_EXPECTED_FAILURE n'est pas PASS
+
+Un test marqué rapporte `Success`. **Ne jamais agréger ces `Success` avec les vrais `PASS`** : une suite
+« 29/29 verte » est un mensonge si quatre de ces tests ne vérifient pas ce qu'ils annoncent.
+
+Tout rapport de tests de ce projet doit distinguer trois catégories :
+
+```
+PASS                    le test vérifie ce qu'il annonce, et il passe
+KNOWN_EXPECTED_FAILURE  divergence connue, marquée, inscrite au registre
+FAIL                    tout le reste
+```
+
+Le registre fait autorité : `tools/unreal/known-expected-failures.txt`. Le rapporteur croise les
+résultats avec lui et refuse de les confondre :
+
+```powershell
+tools\unreal\report-tests.ps1
+```
+
+N'ajouter une entrée au registre que sur mandat explicite, jamais pour faire taire une régression
+nouvelle. Si un test marqué redevient `Fail`, c'est soit une vraie régression, soit le marqueur retiré —
+dans les deux cas, investiguer avant de toucher au marqueur. Voir `docs/unreal/AUTOMATION_TRIAGE.md` : une campagne de tests complète reste hors du seal.
 Le bruit `Condition failed` au démarrage est sensible à la culture de l'éditeur, pas un échec ANÁSTASIS.
 
 ## Preuve

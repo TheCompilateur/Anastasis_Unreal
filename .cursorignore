@@ -1,0 +1,17 @@
+﻿Intermediate/
+Saved/
+Binaries/
+DerivedDataCache/
+Build/
+.vs/
+*.pdb
+*.ilk
+*.exp
+*.obj
+*.lib
+*.dll
+*.exe
+*.target
+*.modules
+*.sarif
+*.dep.json

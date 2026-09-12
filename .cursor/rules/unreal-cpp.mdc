@@ -1,0 +1,13 @@
+---
+description: C++ conventions for Anastasis Unreal 5.8.2
+globs: **/*.{h,cpp}
+alwaysApply: false
+---
+
+# C++ gameplay
+
+- Module is `Anastasis_UnrealV2`. Match existing First Person / Horror / Shooter variant layout.
+- Prefer `UCLASS`/`UFUNCTION` reflection for anything an agent or Blueprint must see.
+- New AI-callable editor tools belong in Python toolsets unless the API is missing from Python stubs (`Intermediate/PythonStub/unreal.py` after Developer Mode).
+- Do not generate Live Coding / Intermediate build noise as “fixes”.
+---

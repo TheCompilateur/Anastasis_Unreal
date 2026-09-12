@@ -16,6 +16,14 @@ namespace AnastasisTerrainSurface
 /** Niveau de la mer en unites Unreal. */
 inline constexpr double WaterPlaneZ = AnastasisWorld::SeaLevel * AnastasisWorldView::AltitudeScale;
 
+// Cette surface ne traite QUE le crop canonique. Les dimensions ne sont pas
+// redefinies ici : elles sont reprises de WorldView, seul proprietaire.
+inline constexpr int32 SourceW = AnastasisWorldView::ReferenceWidth;
+inline constexpr int32 SourceH = AnastasisWorldView::ReferenceHeight;
+inline constexpr int32 CropW = AnastasisWorldView::CanonicalCropWidth;
+inline constexpr int32 CropH = AnastasisWorldView::CanonicalCropHeight;
+inline constexpr int32 VertexCount = CropW * CropH;
+
 struct FGeometry
 {
     TArray<FVector> Vertices;

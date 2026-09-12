@@ -1,0 +1,24 @@
+---
+description: Jeux IV Kingdoms is sim reference only. Three.js render3d is obsolete.
+alwaysApply: true
+---
+
+# Simulateur JS = référence, pas le jeu
+
+Le second dossier du workspace (`C:\dev\Jeux IV Kingdoms`) est la **référence du simulateur**. Le jeu Unreal s’appelle **AnastasisUR** et se construit dans le dossier de travail `Anastasis_UnrealV2`.
+
+## Lire
+
+- `src/sim/`
+- `src/life/`
+- `src/ai/`
+- `src/lang/`
+- `src/runtime/`
+- `tools/unreal/` (vecteurs de parité)
+
+## Ne pas lire, porter, ni « améliorer »
+
+- `src/render3d/` — graphisme Three.js obsolète (~137k). Le rendu se réécrit dans Unreal (Landscape, Nanite, ISM, World Partition).
+- Ne pas ouvrir `Intermediate/`, `Saved/`, `Binaries/` du projet Unreal.
+
+Ne modifier le dépôt JS que pour régénérer des vecteurs de parité. Tout le C++ vit dans `Source/AnastasisSim/` et `Source/Anastasis_UnrealV2/`.

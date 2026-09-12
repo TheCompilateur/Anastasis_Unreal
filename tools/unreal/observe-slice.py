@@ -1,11 +1,16 @@
 """Observation de la tranche canonique 32x32 dans une scene dediee.
 
-Cree si besoin /Game/Anastasis/Maps/Lvl_AnastasisSlice (jour simple + camera
-d'observation + acteur d'incarnation), puis capture la tranche.
+PROPRIETE DES ASSETS. Ce script est la SOURCE D'AUTORITE de deux assets
+versionnes : /Game/Anastasis/Materials/M_AnastasisSlice et
+/Game/Anastasis/Maps/Lvl_AnastasisSlice. Ils sont crees ici, puis committes.
+Une fois crees, ce script ne les modifie plus : il les charge et les verifie.
+Les regenerer se fait explicitement (ANASTASIS_SLICE_REBUILD_MATERIAL=1) et
+ecrase toute retouche faite a la main dans l'editeur.
 
 Variables d'environnement :
-  ANASTASIS_SLICE_SHOT  chemin PNG de sortie (requis)
-  ANASTASIS_SLICE_MODE  "0" terrain DEBUG legacy, "1" surface continue (defaut 1)
+  ANASTASIS_SLICE_SHOT              chemin PNG de sortie (requis)
+  ANASTASIS_SLICE_MODE              "0" terrain DEBUG legacy, "1" surface continue (defaut 1)
+  ANASTASIS_SLICE_REBUILD_MATERIAL  "1" regenere le materiau (chemin d'edition, pas de capture)
 """
 import os, shutil, time, unreal
 
@@ -19,6 +24,9 @@ SLICE_SPAN = 3200.0
 CENTER = unreal.Vector(SLICE_SPAN * 0.5, SLICE_SPAN * 0.5, 400.0)
 CAM_LOC = unreal.Vector(-1800.0, -1800.0, 3500.0)
 CAM_ROT = unreal.Rotator(0.0, -32.8, 45.0)
+# Jour physique fige : les captures doivent etre comparables d'un lancement a l'autre.
+SUN_LUX = 75000.0
+EV100 = 14.0
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
@@ -69,11 +77,30 @@ if not unreal.EditorAssetLibrary.does_asset_exist(MATERIAL):
 if not unreal.EditorAssetLibrary.does_asset_exist(LEVEL):
     unreal.log('SLICE_LEVEL_CREATE ' + LEVEL)
     les.new_level(LEVEL)
-    # Jour simple : soleil rasant pour que le relief se lise, ciel pour l'ambiante.
+    # Jour physique : soleil rasant pour que le relief se lise, ciel pour l'ambiante.
     sun = spawn('/Script/Engine.DirectionalLight', unreal.Vector(0, 0, 4000), unreal.Rotator(0.0, -38.0, -55.0))
     sun.set_actor_label('Sun_SliceObservation')
+    sun_comp = sun.get_component_by_class(unreal.DirectionalLightComponent)
+    sun_comp.set_intensity(SUN_LUX)
+    # Sans ce drapeau SkyAtmosphere n'est pas eclairee : ciel noir, et l'eau lisse le reflete.
+    sun_comp.set_editor_property('atmosphere_sun_light', True)
     spawn('/Script/Engine.SkyAtmosphere', unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0)).set_actor_label('SkyAtmosphere_Slice')
-    spawn('/Script/Engine.SkyLight', unreal.Vector(0, 0, 2000), unreal.Rotator(0, 0, 0)).set_actor_label('SkyLight_Slice')
+    sky = spawn('/Script/Engine.SkyLight', unreal.Vector(0, 0, 2000), unreal.Rotator(0, 0, 0))
+    sky.set_actor_label('SkyLight_Slice')
+    sky.get_component_by_class(unreal.SkyLightComponent).set_editor_property('real_time_capture', True)
+    # Exposition figee en EV100 (le projet a ExtendDefaultLuminanceRange=True) :
+    # sans cela l'exposition automatique rend deux captures incomparables.
+    ppv = spawn('/Script/Engine.PostProcessVolume', unreal.Vector(1600, 1600, 1000), unreal.Rotator(0, 0, 0))
+    ppv.set_actor_label('PP_SliceExposure')
+    ppv.set_editor_property('unbound', True)
+    st = ppv.get_editor_property('settings')
+    st.set_editor_property('override_auto_exposure_method', True)
+    st.set_editor_property('auto_exposure_method', unreal.AutoExposureMethod.AEM_HISTOGRAM)
+    st.set_editor_property('override_auto_exposure_min_brightness', True)
+    st.set_editor_property('auto_exposure_min_brightness', EV100)
+    st.set_editor_property('override_auto_exposure_max_brightness', True)
+    st.set_editor_property('auto_exposure_max_brightness', EV100)
+    ppv.set_editor_property('settings', st)
     cam = spawn('/Script/Engine.CameraActor', CAM_LOC, CAM_ROT)
     cam.set_actor_label('Cam_SliceObservation')
     spawn('/Script/Anastasis_UnrealV2.AnastasisWorldEmbodiment', unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0)).set_actor_label('AnastasisWorldEmbodiment')
@@ -83,58 +110,27 @@ if not unreal.EditorAssetLibrary.does_asset_exist(LEVEL):
 unreal.log('SLICE_MAP_LOAD=' + str(les.load_level(LEVEL)))
 world = ues.get_editor_world()
 
-def ensure_daylight():
-    """Jour physique + exposition figee : les captures doivent etre comparables."""
-    changed = False
-    for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.load_class(None, '/Script/Engine.DirectionalLight')):
-        comp = a.get_component_by_class(unreal.DirectionalLightComponent)
-        if comp and abs(comp.get_editor_property('intensity') - 75000.0) > 1.0:
-            comp.set_intensity(75000.0)   # plein soleil, en lux
-            changed = True
-        # Sans ce drapeau, SkyAtmosphere n'est pas eclairee : ciel noir, et l'eau
-        # lisse reflete ce noir en plaques.
-        if comp and not comp.get_editor_property('atmosphere_sun_light'):
-            comp.set_editor_property('atmosphere_sun_light', True)
-            changed = True
-    for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.load_class(None, '/Script/Engine.SkyLight')):
-        comp = a.get_component_by_class(unreal.SkyLightComponent)
-        if comp and not comp.get_editor_property('real_time_capture'):
-            comp.set_editor_property('real_time_capture', True)
-            changed = True
-    # EV100 fige : le projet a ExtendDefaultLuminanceRange=True. Une valeur trop
-    # haute expose bien le sol mais ecrase le ciel, que l'eau lisse reflete ensuite.
-    EV = float(os.environ.get('ANASTASIS_SLICE_EV', '12.0'))
-    ppvs = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.load_class(None, '/Script/Engine.PostProcessVolume'))
-    if not ppvs:
-        ppv = spawn('/Script/Engine.PostProcessVolume', unreal.Vector(1600, 1600, 1000), unreal.Rotator(0, 0, 0))
-        ppv.set_actor_label('PP_SliceExposure')
-        ppv.set_editor_property('unbound', True)
-        ppvs = [ppv]
-        changed = True
-    for ppv in ppvs:
-        st = ppv.get_editor_property('settings')
-        if abs(st.get_editor_property('auto_exposure_min_brightness') - EV) > 0.01:
-            st.set_editor_property('override_auto_exposure_method', True)
-            st.set_editor_property('auto_exposure_method', unreal.AutoExposureMethod.AEM_HISTOGRAM)
-            st.set_editor_property('override_auto_exposure_min_brightness', True)
-            st.set_editor_property('auto_exposure_min_brightness', EV)
-            st.set_editor_property('override_auto_exposure_max_brightness', True)
-            st.set_editor_property('auto_exposure_max_brightness', EV)
-            ppv.set_editor_property('settings', st)
-            changed = True
-    if not unreal.GameplayStatics.get_all_actors_of_class(world, unreal.load_class(None, '/Script/Engine.SkyAtmosphere')):
-        spawn('/Script/Engine.SkyAtmosphere', unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0)).set_actor_label('SkyAtmosphere_Slice')
-        changed = True
-    if changed:
-        les.save_current_level()
+def verify_scene():
+    """Lecture seule. La scene committee est canonique : ce script ne la modifie pas."""
     inventory = {}
     for path in ('/Script/Engine.DirectionalLight', '/Script/Engine.SkyLight', '/Script/Engine.SkyAtmosphere',
                  '/Script/Engine.PostProcessVolume', '/Script/Engine.CameraActor'):
         inventory[path.split('.')[-1]] = len(unreal.GameplayStatics.get_all_actors_of_class(world, unreal.load_class(None, path)))
-    unreal.log('SLICE_DAYLIGHT changed=%s inventory=%s' % (changed, inventory))
+    lux = None
+    for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.load_class(None, '/Script/Engine.DirectionalLight')):
+        comp = a.get_component_by_class(unreal.DirectionalLightComponent)
+        if comp:
+            lux = comp.get_editor_property('intensity')
+    ev = None
+    for ppv in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.load_class(None, '/Script/Engine.PostProcessVolume')):
+        ev = ppv.get_editor_property('settings').get_editor_property('auto_exposure_min_brightness')
+    unreal.log('SLICE_SCENE inventory=%s sun_lux=%s ev100=%s' % (inventory, lux, ev))
+    if lux is None or abs(lux - SUN_LUX) > 1.0 or ev is None or abs(ev - EV100) > 0.01:
+        unreal.log_error('SLICE_SCENE_DRIFT attendu sun_lux=%s ev100=%s' % (SUN_LUX, EV100))
+    return inventory
 
 
-ensure_daylight()
+verify_scene()
 unreal.SystemLibrary.execute_console_command(world, 'ShowFlag.Sprites 0')
 unreal.SystemLibrary.execute_console_command(world, 'ShowFlag.Grid 0')
 unreal.SystemLibrary.execute_console_command(world, 'anastasis.Terrain.Surface ' + MODE)
@@ -162,6 +158,13 @@ def newest_png(after):
 
 
 def aim():
+    # Le mode d'affichage du viewport persiste entre sessions d'editeur : un
+    # precedent "lighting only" rend tout en gris neutre et fait disparaitre
+    # toute la semantique. On le force a chaque visee, sinon deux captures ne
+    # sont pas comparables.
+    unreal.SystemLibrary.execute_console_command(world, 'viewmode lit')
+    unreal.SystemLibrary.execute_console_command(world, 'ShowFlag.Sprites 0')
+    unreal.SystemLibrary.execute_console_command(world, 'ShowFlag.Grid 0')
     ues.set_level_viewport_camera_info(CAM_LOC, CAM_ROT)
     loc, rot = ues.get_level_viewport_camera_info()
     unreal.log('SLICE_CAMERA_APPLIED loc=(%.0f,%.0f,%.0f) pitch=%.1f yaw=%.1f'
