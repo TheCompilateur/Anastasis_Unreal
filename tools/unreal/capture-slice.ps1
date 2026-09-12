@@ -1,6 +1,6 @@
 param([ValidateSet('0','1')][string]$Mode='1',[Parameter(Mandatory=$true)][string]$Out,[string]$RebuildMaterial='0')
 $ErrorActionPreference='Stop'
-$Root='C:\dev\ANASTASIS_UNREAL'
+$Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 $Editor='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $dir=Join-Path $Root 'Saved\SliceEvidence'
 New-Item -ItemType Directory -Force $dir | Out-Null
@@ -11,11 +11,12 @@ if(Test-Path $log){Remove-Item $log}
 $env:ANASTASIS_SLICE_SHOT=$shot
 $env:ANASTASIS_SLICE_MODE=$Mode
 $env:ANASTASIS_SLICE_REBUILD_MATERIAL=$RebuildMaterial
+$py=(Join-Path $Root 'tools\unreal\observe-slice.py').Replace('\','/')
 $launchArgs=@(
- '"C:\dev\ANASTASIS_UNREAL\Anastasis_UnrealV2.uproject"',
+ ('"'+(Join-Path $Root 'Anastasis_UnrealV2.uproject')+'"'),
  '-windowed','-resx=1280','-resy=720','-nosplash','-NoLiveCoding',
  ('-abslog="'+$log+'"'),
- '-ExecCmds="py C:/dev/ANASTASIS_UNREAL/tools/unreal/observe-slice.py"'
+ ('-ExecCmds="py '+$py+'"')
 )
 $p=Start-Process $Editor -ArgumentList $launchArgs -PassThru
 $p | Wait-Process -Timeout 300 -ErrorAction SilentlyContinue

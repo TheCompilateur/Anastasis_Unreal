@@ -1,8 +1,14 @@
 param([ValidateSet('status','build','verify','editor')][string]$Command='status')
 $ErrorActionPreference='Stop'
 $Canonical='C:\dev\ANASTASIS_UNREAL'
+$WorktreeRoot='C:\dev\ANASTASIS_WORKTREES'
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
-if($Root -ne $Canonical){throw 'FAIL: operator must reside in the canonical root'}
+# La racine canonique n'est plus le seul lieu legitime : un agent build et teste
+# dans son propre worktree sous ANASTASIS_WORKTREES. Tout autre emplacement (une
+# copie OneDrive, un dossier ad hoc) reste refuse.
+$isCanonical = ($Root -eq $Canonical)
+$isWorktree  = $Root.StartsWith($WorktreeRoot + '\', [StringComparison]::OrdinalIgnoreCase)
+if(-not ($isCanonical -or $isWorktree)){throw "FAIL: operator must run from $Canonical or a worktree under $WorktreeRoot (got $Root)"}
 $cwdPath=(Get-Location).Path
 if($cwdPath -ne $Root -and !$cwdPath.StartsWith($Root+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'FAIL: invoke from the canonical root or its subdirectories'}
 $Project=Join-Path $Root 'Anastasis_UnrealV2.uproject'
@@ -29,7 +35,8 @@ function BuildCanonical {
 }
 try {
  if($Command -eq 'status') {
-  Write-Output "CANONICAL_ROOT::$Root`nUPROJECT::$Project`nENGINE::5.8.2 CL 56702186`nSOURCE_SHA256::$(Fingerprint)"
+  if($isCanonical){$roleLabel='CANONICAL_ROOT'}else{$roleLabel='AGENT_WORKTREE'}
+  Write-Output "$roleLabel::$Root`nUPROJECT::$Project`nENGINE::5.8.2 CL 56702186`nSOURCE_SHA256::$(Fingerprint)"
   & git -C $Root branch --show-current
   & git -C $Root rev-parse --verify HEAD
   & git -C $Root status --short

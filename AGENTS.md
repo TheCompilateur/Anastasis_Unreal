@@ -2,6 +2,77 @@
 
 Projet **Unreal Engine 5.8.2** (CL 56702186). Pas une app web, pas Unity, pas Godot.
 
+## Ne développe pas dans la racine canonique — règle n°0
+
+**DO NOT IMPLEMENT FEATURES DIRECTLY IN THE CANONICAL ROOT.**
+
+`C:\dev\ANASTASIS_UNREAL` est un **poste d'intégration**, pas un plan de travail.
+Plusieurs agents travaillent en parallèle sur ANÁSTASIS : si deux d'entre eux écrivent
+dans cette racine pendant qu'un troisième build, teste ou scelle, la preuve produite ne
+porte plus sur ce qui est réellement sur le disque. C'est arrivé, et ça a invalidé un
+`VERIFY::PASS`.
+
+Dans la racine canonique, un agent peut :
+
+| Action | Autorisé |
+|---|---|
+| lire, chercher, inspecter l'historique | ✅ |
+| `build`, `verify`, lancer l'éditeur, PIE | ✅ |
+| intégrer une branche d'agent, **s'il tient le rôle d'intégrateur** | ✅ |
+| créer, éditer ou supprimer des fichiers de développement | ❌ |
+
+Ton développement vit dans **ton** worktree :
+
+```powershell
+tools\unreal\agent-worktree.ps1 create -Mission <ma-mission>
+cd C:\dev\ANASTASIS_WORKTREES\<ma-mission>
+```
+
+Si ton répertoire de travail est `C:\dev\ANASTASIS_UNREAL` et que tu t'apprêtes à écrire
+un fichier de feature, **arrête-toi et crée ton worktree d'abord**.
+
+## Protocole multi-agent
+
+```
+CANONICAL_MAIN   C:\dev\ANASTASIS_UNREAL        intégration seulement
+AGENT_WORK       agent/<mission> + worktree dédié
+COMMIT           unité de passation
+INTEGRATOR       seul écrivain pendant l'intégration
+VERIFY / SEAL    exigent une racine canonique quiescente
+```
+
+Conventions, sans exception :
+
+- branche : `agent/<mission>`
+- worktree : `C:\dev\ANASTASIS_WORKTREES\<mission>`
+- mission en minuscules, chiffres, `.` `_` `-`
+
+Cycle de vie, un outil unique : `tools\unreal\agent-worktree.ps1`
+
+| Commande | Rôle |
+|---|---|
+| `create -Mission <m>` | branche + worktree depuis `main` |
+| `status` | tous les worktrees : modifications, avance/retard sur `main`, branches non intégrées |
+| `finish -Mission <m>` | portail de fin : build + `report-tests`, refuse de passer la main si du travail n'est pas commité |
+| `integrate -Mission <m>` | rôle intégrateur : refuse si le canonique est sale, puis avance rapide de `main` |
+| `preflight` | avant un `verify`/seal : dit ce qui bloque et **ouvre une fenêtre** d'observation |
+| `postflight` | après : échoue si source, config ou `HEAD` ont bougé pendant la fenêtre |
+
+Un `verify` ou un seal dont le `postflight` échoue ne prouve rien. Ne jamais le rapporter
+comme une réussite.
+
+Chaque worktree a ses propres `Binaries/` et `Intermediate/` : le premier build y est
+complet, c'est normal et c'est le prix de l'isolation.
+
+`core.hooksPath` pointe vers `tools/git-hooks`, qui est **suivi**. git-lfs y installe donc
+ses propres `post-checkout`, `post-commit`, `post-merge` : ils sont versionnes, ce qui les
+empeche de reapparaitre en non-suivis dans chaque nouveau worktree, et garantit que LFS
+fonctionne apres un clone. Ne pas les supprimer. A configurer une fois par clone :
+
+```powershell
+git config core.hooksPath tools/git-hooks
+```
+
 ## Racine canonique — règle n°1
 
 ```
