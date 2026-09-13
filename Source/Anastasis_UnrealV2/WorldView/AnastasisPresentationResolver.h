@@ -30,7 +30,12 @@ namespace AnastasisPresentation
 		Count = 3,
 	};
 
-	inline constexpr const TCHAR* TreeMeshPath = TEXT("/Engine/BasicShapes/Cone.Cone");
+	/** First real (non-engine-primitive) Anastasis asset: trunk cylinder + tapered canopy
+	 * cone, merged into one mesh, centered on origin spanning [-50,+50] on Z so it drops
+	 * into the EngineBasicShapeSize=100uu convention below unchanged. See
+	 * tools/unreal/create_tree_asset.py (ANASTASIS_ASSET_AGENT_001) for how it was built;
+	 * still a placeholder silhouette, not final art direction. */
+	inline constexpr const TCHAR* TreeMeshPath = TEXT("/Game/Anastasis/Vegetation/SM_Tree_Generic_01.SM_Tree_Generic_01");
 	inline constexpr const TCHAR* RuinMeshPath = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
 
 	/** UE BasicShapes (Cube/Cone/Cylinder/...) share this bounding size by convention; see AnastasisWorldDebugVisual::CubeMeshSize for the cube case this mirrors. */
