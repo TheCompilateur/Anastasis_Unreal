@@ -163,3 +163,155 @@ static FAutoConsoleCommandWithWorld CmdAnastasisInspectVisualSceneState(
 			Probe->InspectVisualSceneState();
 		}
 	}));
+
+static FAutoConsoleCommandWithWorld CmdAnastasisVerifyWorldContract(
+	TEXT("Anastasis.Verify.WorldContract"),
+	TEXT("Writes PASS/FAIL/UNKNOWN verification JSON for core Anastasis world invariants."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		if (UAnastasisWorldProbeSubsystem* Probe = ResolveProbe(World))
+		{
+			Probe->VerifyWorldContract();
+		}
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVerifySettlementContract(
+	TEXT("Anastasis.Verify.SettlementContract"),
+	TEXT("Anastasis.Verify.SettlementContract [id] — writes honest settlement verification JSON; UNKNOWN until implemented."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		if (UAnastasisWorldProbeSubsystem* Probe = ResolveProbe(World))
+		{
+			Probe->VerifySettlementContract(Args.Num() > 0 ? Args[0] : FString());
+		}
+	}));
+
+static FAutoConsoleCommandWithWorld CmdAnastasisVerifyNavigationContract(
+	TEXT("Anastasis.Verify.NavigationContract"),
+	TEXT("Writes PASS/FAIL/UNKNOWN verification JSON for NavigationSystem/NavData/build state."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		if (UAnastasisWorldProbeSubsystem* Probe = ResolveProbe(World))
+		{
+			Probe->VerifyNavigationContract();
+		}
+	}));
+
+static FAutoConsoleCommandWithWorld CmdAnastasisVerifyVisualDelivery(
+	TEXT("Anastasis.Verify.VisualDelivery"),
+	TEXT("Writes verification JSON that separates MEC terrain delivery from SCN/PLY evidence."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		if (UAnastasisWorldProbeSubsystem* Probe = ResolveProbe(World))
+		{
+			Probe->VerifyVisualDelivery();
+		}
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVerifySemanticSlice(
+	TEXT("Anastasis.Verify.SemanticSlice"),
+	TEXT("Anastasis.Verify.SemanticSlice [x y size] — verifies semantic slice richness as PASS/FAIL/UNKNOWN."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		int32 OriginX = 0;
+		int32 OriginY = 0;
+		int32 Size = 32;
+		if (Args.Num() > 0)
+		{
+			OriginX = FCString::Atoi(*Args[0]);
+		}
+		if (Args.Num() > 1)
+		{
+			OriginY = FCString::Atoi(*Args[1]);
+		}
+		if (Args.Num() > 2)
+		{
+			Size = FCString::Atoi(*Args[2]);
+		}
+		if (UAnastasisWorldProbeSubsystem* Probe = ResolveProbe(World))
+		{
+			Probe->VerifySemanticSlice(OriginX, OriginY, Size);
+		}
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisProbeWorldgen(
+	TEXT("Anastasis.Probe.Worldgen"),
+	TEXT("Anastasis.Probe.Worldgen [seed sourceW sourceH hour profile] - deterministic worldgen probe JSON."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		uint32 Seed = 12345u;
+		int32 SourceW = 96;
+		int32 SourceH = 96;
+		double Hour = 12.0;
+		FString Profile = TEXT("canonical");
+		if (Args.Num() > 0) { Seed = static_cast<uint32>(FCString::Atoi(*Args[0])); }
+		if (Args.Num() > 1) { SourceW = FCString::Atoi(*Args[1]); }
+		if (Args.Num() > 2) { SourceH = FCString::Atoi(*Args[2]); }
+		if (Args.Num() > 3) { Hour = FCString::Atod(*Args[3]); }
+		if (Args.Num() > 4) { Profile = Args[4]; }
+		if (UAnastasisWorldProbeSubsystem* Probe = ResolveProbe(World))
+		{
+			Probe->RunWorldgenProbe(Seed, SourceW, SourceH, Hour, Profile);
+		}
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisProbeFindSemanticSlice(
+	TEXT("Anastasis.Probe.FindSemanticSlice"),
+	TEXT("Anastasis.Probe.FindSemanticSlice [seed size profile] - deterministic best semantic slice search."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		uint32 Seed = 12345u;
+		int32 Size = 32;
+		FString Profile = TEXT("canonical");
+		if (Args.Num() > 0) { Seed = static_cast<uint32>(FCString::Atoi(*Args[0])); }
+		if (Args.Num() > 1) { Size = FCString::Atoi(*Args[1]); }
+		if (Args.Num() > 2) { Profile = Args[2]; }
+		if (UAnastasisWorldProbeSubsystem* Probe = ResolveProbe(World))
+		{
+			Probe->FindSemanticSlice(Seed, Size, Profile);
+		}
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisProbeCompareSliceCandidates(
+	TEXT("Anastasis.Probe.CompareSliceCandidates"),
+	TEXT("Anastasis.Probe.CompareSliceCandidates [seed size x,y;x,y profile] - compare deterministic slice candidates."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		uint32 Seed = 12345u;
+		int32 Size = 32;
+		FString CandidateSpec = TEXT("0,0");
+		FString Profile = TEXT("canonical");
+		if (Args.Num() > 0) { Seed = static_cast<uint32>(FCString::Atoi(*Args[0])); }
+		if (Args.Num() > 1) { Size = FCString::Atoi(*Args[1]); }
+		if (Args.Num() > 2) { CandidateSpec = Args[2]; }
+		if (Args.Num() > 3) { Profile = Args[3]; }
+		if (UAnastasisWorldProbeSubsystem* Probe = ResolveProbe(World))
+		{
+			Probe->CompareSliceCandidates(Seed, Size, CandidateSpec, Profile);
+		}
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisProbeCaptureFixedView(
+	TEXT("Anastasis.Probe.CaptureFixedView"),
+	TEXT("Anastasis.Probe.CaptureFixedView [seed x y size hour camera profile] - request fixed camera proof without claiming PLY."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		uint32 Seed = 12345u;
+		int32 OriginX = 0;
+		int32 OriginY = 0;
+		int32 Size = 32;
+		double Hour = 12.0;
+		FString Camera = TEXT("OVERVIEW");
+		FString Profile = TEXT("canonical");
+		if (Args.Num() > 0) { Seed = static_cast<uint32>(FCString::Atoi(*Args[0])); }
+		if (Args.Num() > 1) { OriginX = FCString::Atoi(*Args[1]); }
+		if (Args.Num() > 2) { OriginY = FCString::Atoi(*Args[2]); }
+		if (Args.Num() > 3) { Size = FCString::Atoi(*Args[3]); }
+		if (Args.Num() > 4) { Hour = FCString::Atod(*Args[4]); }
+		if (Args.Num() > 5) { Camera = Args[5]; }
+		if (Args.Num() > 6) { Profile = Args[6]; }
+		if (UAnastasisWorldProbeSubsystem* Probe = ResolveProbe(World))
+		{
+			Probe->CaptureFixedViewProbe(Seed, OriginX, OriginY, Size, Hour, Camera, Profile);
+		}
+	}));

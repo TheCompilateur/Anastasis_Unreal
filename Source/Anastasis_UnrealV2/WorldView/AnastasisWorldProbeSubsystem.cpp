@@ -240,6 +240,125 @@ namespace
 		}
 		return DefaultValue;
 	}
+
+	TSharedRef<FJsonObject> VerificationScopeObject(const TCHAR* ToolName)
+	{
+		TSharedRef<FJsonObject> Scope = MakeShared<FJsonObject>();
+		Scope->SetStringField(TEXT("tool"), ToolName);
+		Scope->SetStringField(TEXT("mode"), TEXT("VERIFY_READ_ONLY"));
+		Scope->SetStringField(TEXT("modifies_world"), TEXT("false"));
+		Scope->SetStringField(TEXT("status_domain"), TEXT("PASS|FAIL|UNKNOWN"));
+		Scope->SetStringField(TEXT("mec"), TEXT("explicit"));
+		Scope->SetStringField(TEXT("scn"), TEXT("explicit"));
+		Scope->SetStringField(TEXT("ply"), TEXT("explicit"));
+		return Scope;
+	}
+
+	void AddCheck(TArray<TSharedPtr<FJsonValue>>& Checks, const TCHAR* Code, const TCHAR* Status, const FString& Detail)
+	{
+		TSharedRef<FJsonObject> Check = MakeShared<FJsonObject>();
+		Check->SetStringField(TEXT("code"), Code);
+		Check->SetStringField(TEXT("status"), Status);
+		Check->SetStringField(TEXT("detail"), Detail);
+		Checks.Add(MakeShared<FJsonValueObject>(Check));
+	}
+
+	const TCHAR* VerificationStatus(int32 FailCount, int32 UnknownCount)
+	{
+		if (FailCount > 0)
+		{
+			return TEXT("FAIL");
+		}
+		if (UnknownCount > 0)
+		{
+			return TEXT("UNKNOWN");
+		}
+		return TEXT("PASS");
+	}
+
+	void SetCounts(TSharedRef<FJsonObject> Root, int32 PassCount, int32 FailCount, int32 UnknownCount)
+	{
+		TSharedRef<FJsonObject> Counts = MakeShared<FJsonObject>();
+		Counts->SetNumberField(TEXT("pass"), PassCount);
+		Counts->SetNumberField(TEXT("fail"), FailCount);
+		Counts->SetNumberField(TEXT("unknown"), UnknownCount);
+		Root->SetObjectField(TEXT("counts"), Counts);
+		Root->SetStringField(TEXT("status"), VerificationStatus(FailCount, UnknownCount));
+	}
+
+	bool IsFiniteVector(const FVector& Value)
+	{
+		return FMath::IsFinite(Value.X) && FMath::IsFinite(Value.Y) && FMath::IsFinite(Value.Z);
+	}
+
+	bool HasAnyCaptureArtifact()
+	{
+		const FString CaptureDir = FPaths::ProjectSavedDir() / TEXT("Anastasis/Captures");
+		if (!IFileManager::Get().DirectoryExists(*CaptureDir))
+		{
+			return false;
+		}
+
+		TArray<FString> Files;
+		IFileManager::Get().FindFilesRecursive(Files, *CaptureDir, TEXT("*.png"), true, false);
+		if (Files.Num() > 0)
+		{
+			return true;
+		}
+		IFileManager::Get().FindFilesRecursive(Files, *CaptureDir, TEXT("*.json"), true, false);
+		return Files.Num() > 0;
+	}
+
+	bool IsInsideSnapshot(const AnastasisWorldView::FWorldVisualSnapshot& Snapshot, int32 X, int32 Y)
+	{
+		return X >= Snapshot.OriginX
+			&& Y >= Snapshot.OriginY
+			&& X < Snapshot.OriginX + Snapshot.W
+			&& Y < Snapshot.OriginY + Snapshot.H;
+	}
+
+	bool IsSemanticLandClearance(AnastasisWorld::ETileType Type)
+	{
+		return Type == AnastasisWorld::ETileType::Grass || Type == AnastasisWorld::ETileType::Scrub;
+	}
+
+	void CountSemanticSlice(
+		const AnastasisWorldView::FWorldVisualSnapshot& Snapshot,
+		int32 OriginX,
+		int32 OriginY,
+		int32 Size,
+		int32& OutWater,
+		int32& OutForest,
+		int32& OutField,
+		int32& OutClearing,
+		int32& OutShoreContacts)
+	{
+		for (int32 Y = OriginY; Y < OriginY + Size; ++Y)
+		{
+			for (int32 X = OriginX; X < OriginX + Size; ++X)
+			{
+				const AnastasisWorldView::FVisualTile* Tile = AnastasisWorldView::FindTile(Snapshot, X, Y);
+				if (!Tile)
+				{
+					continue;
+				}
+				OutWater += Tile->Type == AnastasisWorld::ETileType::Water ? 1 : 0;
+				OutForest += Tile->Type == AnastasisWorld::ETileType::Forest ? 1 : 0;
+				OutField += Tile->Type == AnastasisWorld::ETileType::Field ? 1 : 0;
+				OutClearing += IsSemanticLandClearance(Tile->Type) ? 1 : 0;
+
+				const int32 Offsets[4][2] = { {-1, 0}, {1, 0}, {0, -1}, {0, 1} };
+				for (const auto& Offset : Offsets)
+				{
+					const AnastasisWorldView::FVisualTile* Neighbour = AnastasisWorldView::FindTile(Snapshot, X + Offset[0], Y + Offset[1]);
+					if (Neighbour && Tile->Type == AnastasisWorld::ETileType::Water && Neighbour->Type != AnastasisWorld::ETileType::Water)
+					{
+						++OutShoreContacts;
+					}
+				}
+			}
+		}
+	}
 }
 
 void UAnastasisWorldProbeSubsystem::OnWorldBeginPlay(UWorld& InWorld)
@@ -891,6 +1010,40 @@ FString UAnastasisWorldProbeSubsystem::WriteInspectionObject(const FString& Slug
 	return Path;
 }
 
+FString UAnastasisWorldProbeSubsystem::WriteVerificationObject(const FString& Slug, const TSharedRef<FJsonObject>& Root) const
+{
+	Root->SetStringField(TEXT("written_at_utc"), FDateTime::UtcNow().ToIso8601());
+
+	const FString Json = WriteJson(Root);
+	const FString Dir = FPaths::ProjectSavedDir() / TEXT("Anastasis/Diagnostics/verifications");
+	IFileManager::Get().MakeDirectory(*Dir, true);
+
+	const FString SafeSlug = FPaths::MakeValidFileName(Slug.IsEmpty() ? TEXT("verification") : Slug);
+	const FString Timestamp = FDateTime::Now().ToString(TEXT("%Y%m%d-%H%M%S"));
+	const FString Path = FPaths::ConvertRelativePathToFull(Dir / (Timestamp + TEXT("-") + SafeSlug + TEXT(".json")));
+	const FString LatestPath = FPaths::ConvertRelativePathToFull(Dir / (TEXT("latest-") + SafeSlug + TEXT(".json")));
+
+	if (!FFileHelper::SaveStringToFile(Json, *Path))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_VERIFY write failed path=%s"), *Path);
+		return FString();
+	}
+	FFileHelper::SaveStringToFile(Json, *LatestPath);
+
+	FString Schema;
+	FString Status;
+	Root->TryGetStringField(TEXT("schema"), Schema);
+	Root->TryGetStringField(TEXT("status"), Status);
+	UE_LOG(
+		LogAnastasis_UnrealV2,
+		Display,
+		TEXT("ANASTASIS_VERIFY path=%s schema=%s status=%s"),
+		*Path,
+		*Schema,
+		*Status);
+	return Path;
+}
+
 FString UAnastasisWorldProbeSubsystem::InspectWorld()
 {
 	TSharedRef<FJsonObject> Root = BuildSnapshotObject();
@@ -1172,6 +1325,329 @@ FString UAnastasisWorldProbeSubsystem::InspectVisualSceneState()
 	Root->SetStringField(TEXT("status"), TEXT("OBSERVED"));
 	Root->SetArrayField(TEXT("errors"), Errors);
 	return WriteInspectionObject(TEXT("inspect_visual_scene_state"), Root);
+}
+
+FString UAnastasisWorldProbeSubsystem::VerifyWorldContract()
+{
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	TArray<TSharedPtr<FJsonValue>> Checks;
+	Root->SetStringField(TEXT("schema"), TEXT("anastasis.verify_world_contract.v1"));
+	Root->SetStringField(TEXT("operation"), TEXT("verify_world_contract"));
+	Root->SetObjectField(TEXT("evidence_scope"), VerificationScopeObject(TEXT("verify_world_contract")));
+
+	int32 PassCount = 0;
+	int32 FailCount = 0;
+	int32 UnknownCount = 0;
+	auto Record = [&Checks, &PassCount, &FailCount, &UnknownCount](const TCHAR* Code, const TCHAR* Status, const FString& Detail)
+	{
+		AddCheck(Checks, Code, Status, Detail);
+		if (FCString::Strcmp(Status, TEXT("PASS")) == 0) { ++PassCount; }
+		else if (FCString::Strcmp(Status, TEXT("FAIL")) == 0) { ++FailCount; }
+		else { ++UnknownCount; }
+	};
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		Record(TEXT("world_context"), TEXT("UNKNOWN"), TEXT("No UWorld is available."));
+		Root->SetArrayField(TEXT("checks"), Checks);
+		SetCounts(Root, PassCount, FailCount, UnknownCount);
+		return WriteVerificationObject(TEXT("verify_world_contract"), Root);
+	}
+	Record(TEXT("world_context"), TEXT("PASS"), FString::Printf(TEXT("World '%s' is available."), *World->GetMapName()));
+
+	AAnastasisWorldEmbodiment* Embodiment = FindEmbodiment();
+	if (!Embodiment)
+	{
+		Record(TEXT("world_embodiment"), TEXT("UNKNOWN"), TEXT("No AAnastasisWorldEmbodiment is present; worldgen delivery cannot be verified."));
+		Root->SetArrayField(TEXT("checks"), Checks);
+		SetCounts(Root, PassCount, FailCount, UnknownCount);
+		return WriteVerificationObject(TEXT("verify_world_contract"), Root);
+	}
+	Record(TEXT("world_embodiment"), TEXT("PASS"), TEXT("AAnastasisWorldEmbodiment is present."));
+
+	const AnastasisWorldView::FPlan& Plan = Embodiment->GetPlan();
+	const bool bPositiveDimensions = Plan.W > 0 && Plan.H > 0 && Plan.SourceW > 0 && Plan.SourceH > 0;
+	Record(TEXT("positive_dimensions"), bPositiveDimensions ? TEXT("PASS") : TEXT("FAIL"),
+		FString::Printf(TEXT("source=%dx%d crop=%dx%d"), Plan.SourceW, Plan.SourceH, Plan.W, Plan.H));
+
+	const int32 ExpectedTileCount = Plan.W * Plan.H;
+	const bool bTileCountMatches = Plan.TileCount > 0
+		&& Plan.TileCount == ExpectedTileCount
+		&& Plan.Locations.Num() == Plan.TileCount
+		&& Plan.Types.Num() == Plan.TileCount
+		&& Plan.Alts.Num() == Plan.TileCount;
+	Record(TEXT("tile_arrays_consistent"), bTileCountMatches ? TEXT("PASS") : TEXT("FAIL"),
+		FString::Printf(TEXT("tiles=%d expected=%d locations=%d types=%d alts=%d"),
+			Plan.TileCount, ExpectedTileCount, Plan.Locations.Num(), Plan.Types.Num(), Plan.Alts.Num()));
+
+	int32 CountSum = 0;
+	for (int32 TypeIndex = 0; TypeIndex < AnastasisWorld::TileTypeCount; ++TypeIndex)
+	{
+		CountSum += Plan.TerrainCounts[TypeIndex];
+	}
+	Record(TEXT("terrain_counts_sum"), CountSum == Plan.TileCount ? TEXT("PASS") : TEXT("FAIL"),
+		FString::Printf(TEXT("sum=%d tiles=%d"), CountSum, Plan.TileCount));
+
+	bool bFinite = FMath::IsFinite(Plan.MinAlt) && FMath::IsFinite(Plan.MaxAlt);
+	for (const FVector& Location : Plan.Locations)
+	{
+		if (!IsFiniteVector(Location))
+		{
+			bFinite = false;
+			break;
+		}
+	}
+	for (const double Alt : Plan.Alts)
+	{
+		if (!FMath::IsFinite(Alt))
+		{
+			bFinite = false;
+			break;
+		}
+	}
+	Record(TEXT("finite_coordinates"), bFinite ? TEXT("PASS") : TEXT("FAIL"), TEXT("Plan altitudes and Unreal locations are finite."));
+
+	const bool bHasLand = Plan.TerrainCounts[static_cast<uint8>(AnastasisWorld::ETileType::Grass)] > 0
+		|| Plan.TerrainCounts[static_cast<uint8>(AnastasisWorld::ETileType::Forest)] > 0
+		|| Plan.TerrainCounts[static_cast<uint8>(AnastasisWorld::ETileType::Field)] > 0
+		|| Plan.TerrainCounts[static_cast<uint8>(AnastasisWorld::ETileType::Scrub)] > 0
+		|| Plan.TerrainCounts[static_cast<uint8>(AnastasisWorld::ETileType::Stone)] > 0
+		|| Plan.TerrainCounts[static_cast<uint8>(AnastasisWorld::ETileType::Ruin)] > 0;
+	Record(TEXT("has_land_material"), bHasLand ? TEXT("PASS") : TEXT("FAIL"), TEXT("World contains at least one non-water terrain category."));
+
+	const FBox& Bounds = Embodiment->GetActiveFootprintBounds();
+	Record(TEXT("active_visual_bounds"), Bounds.IsValid ? TEXT("PASS") : TEXT("FAIL"), Bounds.IsValid ? TEXT("Active footprint bounds are valid.") : TEXT("Active footprint bounds are invalid."));
+
+	Root->SetArrayField(TEXT("checks"), Checks);
+	SetCounts(Root, PassCount, FailCount, UnknownCount);
+	return WriteVerificationObject(TEXT("verify_world_contract"), Root);
+}
+
+FString UAnastasisWorldProbeSubsystem::VerifySettlementContract(const FString& SettlementId)
+{
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	TArray<TSharedPtr<FJsonValue>> Checks;
+	Root->SetStringField(TEXT("schema"), TEXT("anastasis.verify_settlement_contract.v1"));
+	Root->SetStringField(TEXT("operation"), TEXT("verify_settlement_contract"));
+	Root->SetStringField(TEXT("settlement_id"), SettlementId);
+	Root->SetObjectField(TEXT("evidence_scope"), VerificationScopeObject(TEXT("verify_settlement_contract")));
+
+	int32 PassCount = 0;
+	int32 FailCount = 0;
+	int32 UnknownCount = 0;
+	auto Record = [&Checks, &PassCount, &FailCount, &UnknownCount](const TCHAR* Code, const TCHAR* Status, const FString& Detail)
+	{
+		AddCheck(Checks, Code, Status, Detail);
+		if (FCString::Strcmp(Status, TEXT("PASS")) == 0) { ++PassCount; }
+		else if (FCString::Strcmp(Status, TEXT("FAIL")) == 0) { ++FailCount; }
+		else { ++UnknownCount; }
+	};
+
+	Record(TEXT("canonical_settlement_runtime"), TEXT("UNKNOWN"), TEXT("No canonical settlement/building runtime model is implemented in Unreal yet."));
+	Record(TEXT("housing_population_resource_contract"), TEXT("UNKNOWN"), TEXT("Settlement causal fields are unavailable in this Unreal module."));
+	Record(TEXT("visual_delivery"), TEXT("UNKNOWN"), TEXT("Actor candidates, if any, do not prove a canonical settlement."));
+	Root->SetStringField(TEXT("claim_boundary"), TEXT("UNKNOWN is intentional: settlement verification cannot pass until a canonical Unreal settlement owner exists."));
+
+	Root->SetArrayField(TEXT("checks"), Checks);
+	SetCounts(Root, PassCount, FailCount, UnknownCount);
+	return WriteVerificationObject(TEXT("verify_settlement_contract"), Root);
+}
+
+FString UAnastasisWorldProbeSubsystem::VerifyNavigationContract()
+{
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	TArray<TSharedPtr<FJsonValue>> Checks;
+	Root->SetStringField(TEXT("schema"), TEXT("anastasis.verify_navigation_contract.v1"));
+	Root->SetStringField(TEXT("operation"), TEXT("verify_navigation_contract"));
+	Root->SetObjectField(TEXT("evidence_scope"), VerificationScopeObject(TEXT("verify_navigation_contract")));
+
+	int32 PassCount = 0;
+	int32 FailCount = 0;
+	int32 UnknownCount = 0;
+	auto Record = [&Checks, &PassCount, &FailCount, &UnknownCount](const TCHAR* Code, const TCHAR* Status, const FString& Detail)
+	{
+		AddCheck(Checks, Code, Status, Detail);
+		if (FCString::Strcmp(Status, TEXT("PASS")) == 0) { ++PassCount; }
+		else if (FCString::Strcmp(Status, TEXT("FAIL")) == 0) { ++FailCount; }
+		else { ++UnknownCount; }
+	};
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		Record(TEXT("world_context"), TEXT("UNKNOWN"), TEXT("No UWorld is available."));
+		Root->SetArrayField(TEXT("checks"), Checks);
+		SetCounts(Root, PassCount, FailCount, UnknownCount);
+		return WriteVerificationObject(TEXT("verify_navigation_contract"), Root);
+	}
+	Record(TEXT("world_context"), TEXT("PASS"), FString::Printf(TEXT("World '%s' is available."), *World->GetMapName()));
+
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	if (!NavSys)
+	{
+		Record(TEXT("navigation_system"), TEXT("UNKNOWN"), TEXT("NavigationSystem is not present in this world context."));
+		Root->SetArrayField(TEXT("checks"), Checks);
+		SetCounts(Root, PassCount, FailCount, UnknownCount);
+		return WriteVerificationObject(TEXT("verify_navigation_contract"), Root);
+	}
+	Record(TEXT("navigation_system"), TEXT("PASS"), TEXT("NavigationSystem is present."));
+
+	const ANavigationData* NavData = NavSys->GetDefaultNavDataInstance(FNavigationSystem::DontCreate);
+	Record(TEXT("nav_data"), NavData ? TEXT("PASS") : TEXT("FAIL"), NavData ? TEXT("Default nav data exists.") : TEXT("Default nav data is missing."));
+
+	if (!NavData)
+	{
+		Record(TEXT("nav_built"), TEXT("UNKNOWN"), TEXT("Navigation build state is not meaningful without default nav data."));
+	}
+	else
+	{
+		const AWorldSettings* Settings = World->GetWorldSettings();
+		if (!Settings)
+		{
+			Record(TEXT("world_settings"), TEXT("UNKNOWN"), TEXT("WorldSettings unavailable; nav build state cannot be verified."));
+		}
+		else
+		{
+			const bool bBuilt = NavSys->IsNavigationBuilt(Settings);
+			Record(TEXT("nav_built"), bBuilt ? TEXT("PASS") : TEXT("FAIL"), bBuilt ? TEXT("Navigation is built.") : TEXT("Navigation is present but not built."));
+		}
+	}
+
+	Root->SetArrayField(TEXT("checks"), Checks);
+	SetCounts(Root, PassCount, FailCount, UnknownCount);
+	return WriteVerificationObject(TEXT("verify_navigation_contract"), Root);
+}
+
+FString UAnastasisWorldProbeSubsystem::VerifyVisualDelivery()
+{
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	TArray<TSharedPtr<FJsonValue>> Checks;
+	Root->SetStringField(TEXT("schema"), TEXT("anastasis.verify_visual_delivery.v1"));
+	Root->SetStringField(TEXT("operation"), TEXT("verify_visual_delivery"));
+	Root->SetObjectField(TEXT("evidence_scope"), VerificationScopeObject(TEXT("verify_visual_delivery")));
+
+	int32 PassCount = 0;
+	int32 FailCount = 0;
+	int32 UnknownCount = 0;
+	auto Record = [&Checks, &PassCount, &FailCount, &UnknownCount](const TCHAR* Code, const TCHAR* Status, const FString& Detail)
+	{
+		AddCheck(Checks, Code, Status, Detail);
+		if (FCString::Strcmp(Status, TEXT("PASS")) == 0) { ++PassCount; }
+		else if (FCString::Strcmp(Status, TEXT("FAIL")) == 0) { ++FailCount; }
+		else { ++UnknownCount; }
+	};
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		Record(TEXT("mec_world_context"), TEXT("UNKNOWN"), TEXT("No UWorld is available."));
+		Root->SetArrayField(TEXT("checks"), Checks);
+		SetCounts(Root, PassCount, FailCount, UnknownCount);
+		return WriteVerificationObject(TEXT("verify_visual_delivery"), Root);
+	}
+	Record(TEXT("mec_world_context"), TEXT("PASS"), FString::Printf(TEXT("World '%s' is available."), *World->GetMapName()));
+
+	AAnastasisWorldEmbodiment* Embodiment = FindEmbodiment();
+	const bool bHasMechanicalTerrain = Embodiment && Embodiment->GetPlan().TileCount > 0 && (Embodiment->GetInstanceCount() > 0 || Embodiment->HasWaterSurface());
+	Record(TEXT("mec_terrain_component_delivery"), bHasMechanicalTerrain ? TEXT("PASS") : TEXT("FAIL"),
+		bHasMechanicalTerrain ? TEXT("Embodiment has a non-empty delivered terrain representation.") : TEXT("No non-empty terrain representation is delivered."));
+
+	const bool bCanRender = FApp::CanEverRender();
+	Record(TEXT("scn_render_context"), bCanRender ? TEXT("PASS") : TEXT("UNKNOWN"),
+		bCanRender ? TEXT("Engine can render in this process.") : TEXT("Current process cannot render, e.g. -nullrhi/headless."));
+
+	const bool bCapturePresent = HasAnyCaptureArtifact();
+	Record(TEXT("scn_capture_artifact"), bCapturePresent ? TEXT("PASS") : TEXT("UNKNOWN"),
+		bCapturePresent ? TEXT("At least one capture artifact exists under Saved/Anastasis/Captures.") : TEXT("No paired capture artifact found."));
+
+	Record(TEXT("ply_player_verdict"), TEXT("UNKNOWN"), TEXT("No human/player acceptance verdict is encoded by this verifier."));
+
+	Root->SetArrayField(TEXT("checks"), Checks);
+	SetCounts(Root, PassCount, FailCount, UnknownCount);
+	return WriteVerificationObject(TEXT("verify_visual_delivery"), Root);
+}
+
+FString UAnastasisWorldProbeSubsystem::VerifySemanticSlice(int32 OriginX, int32 OriginY, int32 Size)
+{
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	TArray<TSharedPtr<FJsonValue>> Checks;
+	Root->SetStringField(TEXT("schema"), TEXT("anastasis.verify_semantic_slice.v1"));
+	Root->SetStringField(TEXT("operation"), TEXT("verify_semantic_slice"));
+	Root->SetObjectField(TEXT("evidence_scope"), VerificationScopeObject(TEXT("verify_semantic_slice")));
+
+	TSharedRef<FJsonObject> Query = MakeShared<FJsonObject>();
+	Query->SetNumberField(TEXT("origin_x"), OriginX);
+	Query->SetNumberField(TEXT("origin_y"), OriginY);
+	Query->SetNumberField(TEXT("size"), Size);
+	Root->SetObjectField(TEXT("query"), Query);
+
+	int32 PassCount = 0;
+	int32 FailCount = 0;
+	int32 UnknownCount = 0;
+	auto Record = [&Checks, &PassCount, &FailCount, &UnknownCount](const TCHAR* Code, const TCHAR* Status, const FString& Detail)
+	{
+		AddCheck(Checks, Code, Status, Detail);
+		if (FCString::Strcmp(Status, TEXT("PASS")) == 0) { ++PassCount; }
+		else if (FCString::Strcmp(Status, TEXT("FAIL")) == 0) { ++FailCount; }
+		else { ++UnknownCount; }
+	};
+
+	if (Size <= 0)
+	{
+		Record(TEXT("valid_size"), TEXT("FAIL"), FString::Printf(TEXT("Invalid size=%d."), Size));
+		Root->SetArrayField(TEXT("checks"), Checks);
+		SetCounts(Root, PassCount, FailCount, UnknownCount);
+		return WriteVerificationObject(TEXT("verify_semantic_slice"), Root);
+	}
+	Record(TEXT("valid_size"), TEXT("PASS"), FString::Printf(TEXT("size=%d"), Size));
+
+	AAnastasisWorldEmbodiment* Embodiment = FindEmbodiment();
+	if (!Embodiment)
+	{
+		Record(TEXT("world_embodiment"), TEXT("UNKNOWN"), TEXT("No AAnastasisWorldEmbodiment is present; no embodied slice can be checked."));
+		Root->SetArrayField(TEXT("checks"), Checks);
+		SetCounts(Root, PassCount, FailCount, UnknownCount);
+		return WriteVerificationObject(TEXT("verify_semantic_slice"), Root);
+	}
+	Record(TEXT("world_embodiment"), TEXT("PASS"), TEXT("AAnastasisWorldEmbodiment is present."));
+
+	const AnastasisWorldView::FWorldVisualSnapshot& Snapshot = Embodiment->GetSnapshot();
+	const bool bInside = IsInsideSnapshot(Snapshot, OriginX, OriginY)
+		&& IsInsideSnapshot(Snapshot, OriginX + Size - 1, OriginY + Size - 1);
+	Record(TEXT("inside_embodied_snapshot"), bInside ? TEXT("PASS") : TEXT("FAIL"),
+		FString::Printf(TEXT("snapshot origin=(%d,%d) size=%dx%d"), Snapshot.OriginX, Snapshot.OriginY, Snapshot.W, Snapshot.H));
+
+	int32 Water = 0;
+	int32 Forest = 0;
+	int32 Field = 0;
+	int32 Clearing = 0;
+	int32 ShoreContacts = 0;
+	if (bInside)
+	{
+		CountSemanticSlice(Snapshot, OriginX, OriginY, Size, Water, Forest, Field, Clearing, ShoreContacts);
+	}
+
+	TSharedRef<FJsonObject> Metrics = MakeShared<FJsonObject>();
+	Metrics->SetNumberField(TEXT("water"), Water);
+	Metrics->SetNumberField(TEXT("forest"), Forest);
+	Metrics->SetNumberField(TEXT("field"), Field);
+	Metrics->SetNumberField(TEXT("clearing"), Clearing);
+	Metrics->SetNumberField(TEXT("shore_contacts"), ShoreContacts);
+	Root->SetObjectField(TEXT("metrics"), Metrics);
+
+	if (bInside)
+	{
+		Record(TEXT("has_water"), Water > 0 ? TEXT("PASS") : TEXT("FAIL"), FString::Printf(TEXT("water=%d"), Water));
+		Record(TEXT("has_forest"), Forest > 0 ? TEXT("PASS") : TEXT("FAIL"), FString::Printf(TEXT("forest=%d"), Forest));
+		Record(TEXT("has_field"), Field > 0 ? TEXT("PASS") : TEXT("FAIL"), FString::Printf(TEXT("field=%d"), Field));
+		Record(TEXT("has_clearing"), Clearing > 0 ? TEXT("PASS") : TEXT("FAIL"), FString::Printf(TEXT("clearing=%d"), Clearing));
+		Record(TEXT("has_shore_contact"), ShoreContacts > 0 ? TEXT("PASS") : TEXT("FAIL"), FString::Printf(TEXT("shore_contacts=%d"), ShoreContacts));
+	}
+
+	Root->SetArrayField(TEXT("checks"), Checks);
+	SetCounts(Root, PassCount, FailCount, UnknownCount);
+	return WriteVerificationObject(TEXT("verify_semantic_slice"), Root);
 }
 
 FString UAnastasisWorldProbeSubsystem::WriteSnapshot()

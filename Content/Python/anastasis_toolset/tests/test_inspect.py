@@ -3,8 +3,12 @@ import unittest
 from anastasis_toolset.toolsets.inspect import (
     AnastasisInspectTools,
     AnastasisInspectionResult,
+    AnastasisProbeResult,
+    AnastasisVerificationResult,
     _actor_line,
     _failure_result,
+    _probe_failure_result,
+    _verification_failure_result,
 )
 
 
@@ -55,5 +59,44 @@ class AnastasisInspectToolsTestCase(unittest.TestCase):
             "inspect_settlement",
             "inspect_actor",
             "inspect_visual_scene_state",
+        ):
+            self.assertTrue(callable(getattr(AnastasisInspectTools, name)))
+
+    def test_verification_failure_result_is_structured(self):
+        result = _verification_failure_result(
+            "anastasis.verify_world_contract.v1", "synthetic verification failure"
+        )
+        self.assertIsInstance(result, AnastasisVerificationResult)
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "ERROR")
+        self.assertEqual(result.schema, "anastasis.verify_world_contract.v1")
+        self.assertIn("synthetic verification failure", result.json)
+
+    def test_phase2_tool_methods_are_available(self):
+        for name in (
+            "verify_world_contract",
+            "verify_settlement_contract",
+            "verify_navigation_contract",
+            "verify_visual_delivery",
+            "verify_semantic_slice",
+        ):
+            self.assertTrue(callable(getattr(AnastasisInspectTools, name)))
+
+    def test_probe_failure_result_is_structured(self):
+        result = _probe_failure_result(
+            "anastasis.probe_worldgen.v1", "synthetic probe failure"
+        )
+        self.assertIsInstance(result, AnastasisProbeResult)
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "ERROR")
+        self.assertEqual(result.schema, "anastasis.probe_worldgen.v1")
+        self.assertIn("synthetic probe failure", result.json)
+
+    def test_phase3_tool_methods_are_available(self):
+        for name in (
+            "run_worldgen_probe",
+            "find_semantic_slice",
+            "compare_slice_candidates",
+            "capture_fixed_view_probe",
         ):
             self.assertTrue(callable(getattr(AnastasisInspectTools, name)))
