@@ -5,6 +5,8 @@
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Containers/Ticker.h"
+#include "Components/PrimitiveComponent.h"
+#include "Components/SceneComponent.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "EngineUtils.h"
@@ -12,18 +14,22 @@
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/WorldSettings.h"
 #include "HAL/FileManager.h"
+#include "HAL/IConsoleManager.h"
 #include "Misc/App.h"
 #include "Misc/DateTime.h"
 #include "Misc/EngineVersion.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "NavigationSystem.h"
+#include "ProceduralMeshComponent.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "UnrealClient.h"
 #include "WorldPartition/DataLayer/DataLayerManager.h"
 #include "WorldPartition/WorldPartition.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
+#include "WorldView/AnastasisVisualMode.h"
 #include "WorldView/AnastasisWorldView.h"
 
 namespace
@@ -52,6 +58,187 @@ namespace
 		const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
 		FJsonSerializer::Serialize(Root, Writer);
 		return Out;
+	}
+
+	const TCHAR* ResourceName(AnastasisWorld::EResource Resource)
+	{
+		switch (Resource)
+		{
+		case AnastasisWorld::EResource::None: return TEXT("None");
+		case AnastasisWorld::EResource::Stone: return TEXT("Stone");
+		case AnastasisWorld::EResource::Wood: return TEXT("Wood");
+		case AnastasisWorld::EResource::Food: return TEXT("Food");
+		}
+		return TEXT("Unknown");
+	}
+
+	const TCHAR* CropName(AnastasisWorld::ECropId Crop)
+	{
+		switch (Crop)
+		{
+		case AnastasisWorld::ECropId::None: return TEXT("None");
+		case AnastasisWorld::ECropId::Grain: return TEXT("Grain");
+		case AnastasisWorld::ECropId::Greens: return TEXT("Greens");
+		case AnastasisWorld::ECropId::Fruit: return TEXT("Fruit");
+		case AnastasisWorld::ECropId::Fallow: return TEXT("Fallow");
+		}
+		return TEXT("Unknown");
+	}
+
+	void SetVec3Object(TSharedRef<FJsonObject> Obj, const TCHAR* Field, const FVector& V)
+	{
+		TSharedRef<FJsonObject> Vec = MakeShared<FJsonObject>();
+		Vec->SetNumberField(TEXT("x"), V.X);
+		Vec->SetNumberField(TEXT("y"), V.Y);
+		Vec->SetNumberField(TEXT("z"), V.Z);
+		Obj->SetObjectField(Field, Vec);
+	}
+
+	void SetRotObject(TSharedRef<FJsonObject> Obj, const TCHAR* Field, const FRotator& R)
+	{
+		TSharedRef<FJsonObject> Rot = MakeShared<FJsonObject>();
+		Rot->SetNumberField(TEXT("pitch"), R.Pitch);
+		Rot->SetNumberField(TEXT("yaw"), R.Yaw);
+		Rot->SetNumberField(TEXT("roll"), R.Roll);
+		Obj->SetObjectField(Field, Rot);
+	}
+
+	TSharedRef<FJsonObject> EvidenceScopeObject(const TCHAR* ToolName)
+	{
+		TSharedRef<FJsonObject> Scope = MakeShared<FJsonObject>();
+		Scope->SetStringField(TEXT("tool"), ToolName);
+		Scope->SetStringField(TEXT("mode"), TEXT("READ_ONLY"));
+		Scope->SetStringField(TEXT("modifies_world"), TEXT("false"));
+		Scope->SetStringField(TEXT("mec"), TEXT("observation_only"));
+		Scope->SetStringField(TEXT("scn"), TEXT("UNKNOWN unless paired capture exists"));
+		Scope->SetStringField(TEXT("ply"), TEXT("UNKNOWN"));
+		return Scope;
+	}
+
+	TArray<TSharedPtr<FJsonValue>> TagsArray(const AActor* Actor)
+	{
+		TArray<TSharedPtr<FJsonValue>> Values;
+		if (!Actor)
+		{
+			return Values;
+		}
+		for (const FName& Tag : Actor->Tags)
+		{
+			Values.Add(MakeShared<FJsonValueString>(Tag.ToString()));
+		}
+		return Values;
+	}
+
+	FString ActorLabelOrName(const AActor* Actor)
+	{
+		if (!Actor)
+		{
+			return FString();
+		}
+#if WITH_EDITOR
+		return Actor->GetActorLabel();
+#else
+		return Actor->GetName();
+#endif
+	}
+
+	bool ActorMatchesQuery(const AActor* Actor, const FString& LowerQuery)
+	{
+		if (!Actor || LowerQuery.IsEmpty())
+		{
+			return false;
+		}
+
+		if (Actor->GetName().ToLower().Contains(LowerQuery)
+			|| ActorLabelOrName(Actor).ToLower().Contains(LowerQuery)
+			|| Actor->GetClass()->GetName().ToLower().Contains(LowerQuery))
+		{
+			return true;
+		}
+
+		for (const FName& Tag : Actor->Tags)
+		{
+			if (Tag.ToString().ToLower().Contains(LowerQuery))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	TSharedRef<FJsonObject> ActorObject(const AActor* Actor)
+	{
+		TSharedRef<FJsonObject> Obj = MakeShared<FJsonObject>();
+		if (!Actor)
+		{
+			Obj->SetBoolField(TEXT("present"), false);
+			return Obj;
+		}
+
+		Obj->SetBoolField(TEXT("present"), true);
+		Obj->SetStringField(TEXT("name"), Actor->GetName());
+		Obj->SetStringField(TEXT("label"), ActorLabelOrName(Actor));
+		Obj->SetStringField(TEXT("class"), Actor->GetClass()->GetName());
+		Obj->SetArrayField(TEXT("tags"), TagsArray(Actor));
+		Obj->SetBoolField(TEXT("hidden"), Actor->IsHidden());
+		Obj->SetBoolField(TEXT("pending_kill_or_unreachable"), !IsValid(Actor));
+		SetVec3Object(Obj, TEXT("location"), Actor->GetActorLocation());
+		SetRotObject(Obj, TEXT("rotation"), Actor->GetActorRotation());
+		SetVec3Object(Obj, TEXT("scale"), Actor->GetActorScale3D());
+
+		FVector Origin = FVector::ZeroVector;
+		FVector Extent = FVector::ZeroVector;
+		Actor->GetActorBounds(false, Origin, Extent);
+		TSharedRef<FJsonObject> BoundsObj = MakeShared<FJsonObject>();
+		SetVec3Object(BoundsObj, TEXT("origin"), Origin);
+		SetVec3Object(BoundsObj, TEXT("extent"), Extent);
+		BoundsObj->SetBoolField(TEXT("non_zero"), !Extent.IsNearlyZero());
+		Obj->SetObjectField(TEXT("bounds"), BoundsObj);
+
+		TArray<UActorComponent*> Components;
+		Actor->GetComponents(Components);
+		int32 SceneComponentCount = 0;
+		int32 PrimitiveComponentCount = 0;
+		int32 VisiblePrimitiveCount = 0;
+		int32 CollisionEnabledPrimitiveCount = 0;
+		for (const UActorComponent* Component : Components)
+		{
+			if (Cast<USceneComponent>(Component))
+			{
+				++SceneComponentCount;
+			}
+			if (const UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
+			{
+				++PrimitiveComponentCount;
+				if (Primitive->IsVisible())
+				{
+					++VisiblePrimitiveCount;
+				}
+				if (Primitive->GetCollisionEnabled() != ECollisionEnabled::NoCollision)
+				{
+					++CollisionEnabledPrimitiveCount;
+				}
+			}
+		}
+
+		TSharedRef<FJsonObject> ComponentObj = MakeShared<FJsonObject>();
+		ComponentObj->SetNumberField(TEXT("total"), Components.Num());
+		ComponentObj->SetNumberField(TEXT("scene"), SceneComponentCount);
+		ComponentObj->SetNumberField(TEXT("primitive"), PrimitiveComponentCount);
+		ComponentObj->SetNumberField(TEXT("visible_primitives"), VisiblePrimitiveCount);
+		ComponentObj->SetNumberField(TEXT("collision_enabled_primitives"), CollisionEnabledPrimitiveCount);
+		Obj->SetObjectField(TEXT("components"), ComponentObj);
+
+		return Obj;
+	}
+
+	int32 CVarIntValue(const TCHAR* Name, int32 DefaultValue)
+	{
+		if (const IConsoleVariable* Var = IConsoleManager::Get().FindConsoleVariable(Name))
+		{
+			return Var->GetInt();
+		}
+		return DefaultValue;
 	}
 }
 
@@ -676,6 +863,315 @@ TSharedRef<FJsonObject> UAnastasisWorldProbeSubsystem::BuildSnapshotObject() con
 	Root->SetArrayField(TEXT("errors"), Errors);
 
 	return Root;
+}
+
+FString UAnastasisWorldProbeSubsystem::WriteInspectionObject(const FString& Slug, const TSharedRef<FJsonObject>& Root) const
+{
+	Root->SetStringField(TEXT("written_at_utc"), FDateTime::UtcNow().ToIso8601());
+
+	const FString Json = WriteJson(Root);
+	const FString Dir = FPaths::ProjectSavedDir() / TEXT("Anastasis/Diagnostics/inspections");
+	IFileManager::Get().MakeDirectory(*Dir, true);
+
+	const FString SafeSlug = FPaths::MakeValidFileName(Slug.IsEmpty() ? TEXT("inspection") : Slug);
+	const FString Timestamp = FDateTime::Now().ToString(TEXT("%Y%m%d-%H%M%S"));
+	const FString Path = FPaths::ConvertRelativePathToFull(Dir / (Timestamp + TEXT("-") + SafeSlug + TEXT(".json")));
+	const FString LatestPath = FPaths::ConvertRelativePathToFull(Dir / (TEXT("latest-") + SafeSlug + TEXT(".json")));
+
+	if (!FFileHelper::SaveStringToFile(Json, *Path))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_INSPECT write failed path=%s"), *Path);
+		return FString();
+	}
+	FFileHelper::SaveStringToFile(Json, *LatestPath);
+
+	FString Schema;
+	Root->TryGetStringField(TEXT("schema"), Schema);
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_INSPECT path=%s schema=%s"), *Path, *Schema);
+	return Path;
+}
+
+FString UAnastasisWorldProbeSubsystem::InspectWorld()
+{
+	TSharedRef<FJsonObject> Root = BuildSnapshotObject();
+	Root->SetStringField(TEXT("schema"), TEXT("anastasis.inspect_world.v1"));
+	Root->SetStringField(TEXT("status"), TEXT("OBSERVED"));
+	Root->SetStringField(TEXT("operation"), TEXT("inspect_anastasis_world"));
+	Root->SetObjectField(TEXT("evidence_scope"), EvidenceScopeObject(TEXT("inspect_anastasis_world")));
+	return WriteInspectionObject(TEXT("inspect_world"), Root);
+}
+
+FString UAnastasisWorldProbeSubsystem::InspectTile(int32 TileX, int32 TileY)
+{
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	TArray<TSharedPtr<FJsonValue>> Errors;
+	Root->SetStringField(TEXT("schema"), TEXT("anastasis.inspect_tile.v1"));
+	Root->SetStringField(TEXT("operation"), TEXT("inspect_tile"));
+	Root->SetObjectField(TEXT("evidence_scope"), EvidenceScopeObject(TEXT("inspect_tile")));
+
+	TSharedRef<FJsonObject> QueryObj = MakeShared<FJsonObject>();
+	QueryObj->SetNumberField(TEXT("x"), TileX);
+	QueryObj->SetNumberField(TEXT("y"), TileY);
+	QueryObj->SetStringField(TEXT("coordinate_space"), TEXT("canonical/source tile coordinates"));
+	Root->SetObjectField(TEXT("query"), QueryObj);
+
+	AAnastasisWorldEmbodiment* Embodiment = FindEmbodiment();
+	Root->SetBoolField(TEXT("embodiment_present"), Embodiment != nullptr);
+	if (!Embodiment)
+	{
+		Root->SetStringField(TEXT("status"), TEXT("UNKNOWN"));
+		Errors.Add(MakeShared<FJsonValueString>(TEXT("TERRAIN_NOT_PRESENT")));
+		Root->SetArrayField(TEXT("errors"), Errors);
+		return WriteInspectionObject(TEXT("inspect_tile"), Root);
+	}
+
+	const AnastasisWorldView::FWorldVisualSnapshot& Snapshot = Embodiment->GetSnapshot();
+	TSharedRef<FJsonObject> SnapshotObj = MakeShared<FJsonObject>();
+	SnapshotObj->SetNumberField(TEXT("seed"), Snapshot.Seed);
+	SnapshotObj->SetNumberField(TEXT("source_w"), Snapshot.SourceW);
+	SnapshotObj->SetNumberField(TEXT("source_h"), Snapshot.SourceH);
+	SnapshotObj->SetNumberField(TEXT("origin_x"), Snapshot.OriginX);
+	SnapshotObj->SetNumberField(TEXT("origin_y"), Snapshot.OriginY);
+	SnapshotObj->SetNumberField(TEXT("w"), Snapshot.W);
+	SnapshotObj->SetNumberField(TEXT("h"), Snapshot.H);
+	Root->SetObjectField(TEXT("snapshot"), SnapshotObj);
+
+	const AnastasisWorldView::FVisualTile* Tile = AnastasisWorldView::FindTile(Snapshot, TileX, TileY);
+	if (!Tile)
+	{
+		Root->SetStringField(TEXT("status"), TEXT("UNKNOWN"));
+		Errors.Add(MakeShared<FJsonValueString>(TEXT("TILE_OUTSIDE_EMBODIED_SNAPSHOT")));
+		Root->SetArrayField(TEXT("errors"), Errors);
+		return WriteInspectionObject(TEXT("inspect_tile"), Root);
+	}
+
+	const FVector UnrealLocation = AnastasisWorldView::TileToUnreal(Tile->X, Tile->Y, Tile->Alt);
+	const FBox& ActiveBounds = Embodiment->GetActiveFootprintBounds();
+
+	TSharedRef<FJsonObject> TileObj = MakeShared<FJsonObject>();
+	TileObj->SetNumberField(TEXT("source_index"), Tile->SourceIndex);
+	TileObj->SetNumberField(TEXT("x"), Tile->X);
+	TileObj->SetNumberField(TEXT("y"), Tile->Y);
+	TileObj->SetStringField(TEXT("type"), AnastasisWorld::TileTypeName(Tile->Type));
+	TileObj->SetStringField(TEXT("resource"), ResourceName(Tile->Resource));
+	TileObj->SetNumberField(TEXT("amount"), Tile->Amount);
+	TileObj->SetNumberField(TEXT("alt"), Tile->Alt);
+	TileObj->SetNumberField(TEXT("alt_uu"), Tile->Alt * AnastasisWorldView::AltitudeScale);
+	TileObj->SetNumberField(TEXT("shade"), Tile->Shade);
+	TileObj->SetNumberField(TEXT("shore"), Tile->Shore);
+	TileObj->SetNumberField(TEXT("wetness"), Tile->Wetness);
+	TileObj->SetNumberField(TEXT("flow_x"), Tile->FlowX);
+	TileObj->SetNumberField(TEXT("flow_z"), Tile->FlowZ);
+	TileObj->SetNumberField(TEXT("flow_amt"), Tile->FlowAmt);
+	TileObj->SetStringField(TEXT("crop_id"), CropName(Tile->CropId));
+	TileObj->SetNumberField(TEXT("fertility"), Tile->Fertility);
+	TileObj->SetNumberField(TEXT("forest_margin"), Tile->ForestMargin);
+	TileObj->SetBoolField(TEXT("has_forest_margin"), Tile->bHasForestMargin);
+	TileObj->SetBoolField(TEXT("inside_active_visual_footprint"), ActiveBounds.IsValid && ActiveBounds.IsInsideXY(UnrealLocation));
+	SetVec3Object(TileObj, TEXT("unreal_location"), UnrealLocation);
+	Root->SetObjectField(TEXT("tile"), TileObj);
+
+	TArray<TSharedPtr<FJsonValue>> Neighbours;
+	const int32 NeighbourOffsets[4][2] = { {-1, 0}, {1, 0}, {0, -1}, {0, 1} };
+	for (const auto& Offset : NeighbourOffsets)
+	{
+		const AnastasisWorldView::FVisualTile* Neighbour = AnastasisWorldView::FindTile(Snapshot, TileX + Offset[0], TileY + Offset[1]);
+		if (!Neighbour)
+		{
+			continue;
+		}
+		TSharedRef<FJsonObject> NeighbourObj = MakeShared<FJsonObject>();
+		NeighbourObj->SetNumberField(TEXT("x"), Neighbour->X);
+		NeighbourObj->SetNumberField(TEXT("y"), Neighbour->Y);
+		NeighbourObj->SetStringField(TEXT("type"), AnastasisWorld::TileTypeName(Neighbour->Type));
+		NeighbourObj->SetNumberField(TEXT("shore"), Neighbour->Shore);
+		NeighbourObj->SetNumberField(TEXT("wetness"), Neighbour->Wetness);
+		Neighbours.Add(MakeShared<FJsonValueObject>(NeighbourObj));
+	}
+	Root->SetArrayField(TEXT("cardinal_neighbours"), Neighbours);
+	Root->SetStringField(TEXT("status"), TEXT("OBSERVED"));
+	Root->SetArrayField(TEXT("errors"), Errors);
+	return WriteInspectionObject(TEXT("inspect_tile"), Root);
+}
+
+FString UAnastasisWorldProbeSubsystem::InspectSettlement(const FString& SettlementId)
+{
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	Root->SetStringField(TEXT("schema"), TEXT("anastasis.inspect_settlement.v1"));
+	Root->SetStringField(TEXT("operation"), TEXT("inspect_settlement"));
+	Root->SetStringField(TEXT("status"), TEXT("NOT_IMPLEMENTED"));
+	Root->SetStringField(TEXT("settlement_id"), SettlementId);
+	Root->SetObjectField(TEXT("evidence_scope"), EvidenceScopeObject(TEXT("inspect_settlement")));
+	Root->SetStringField(TEXT("reason"), TEXT("No canonical Unreal settlement/building runtime model is implemented in this module yet."));
+
+	TArray<TSharedPtr<FJsonValue>> Candidates;
+	UWorld* World = GetWorld();
+	const FString LowerId = SettlementId.ToLower();
+	if (World)
+	{
+		for (TActorIterator<AActor> It(World); It; ++It)
+		{
+			const AActor* Actor = *It;
+			const bool bSettlementLike = ActorMatchesQuery(Actor, TEXT("settlement"))
+				|| ActorMatchesQuery(Actor, TEXT("building"))
+				|| (!LowerId.IsEmpty() && ActorMatchesQuery(Actor, LowerId));
+			if (bSettlementLike)
+			{
+				Candidates.Add(MakeShared<FJsonValueObject>(ActorObject(Actor)));
+			}
+			if (Candidates.Num() >= 20)
+			{
+				break;
+			}
+		}
+	}
+	Root->SetArrayField(TEXT("runtime_actor_candidates"), Candidates);
+	Root->SetStringField(TEXT("claim_boundary"), TEXT("Actor candidates do not prove a canonical settlement system."));
+	return WriteInspectionObject(TEXT("inspect_settlement"), Root);
+}
+
+FString UAnastasisWorldProbeSubsystem::InspectActor(const FString& ActorQuery)
+{
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	TArray<TSharedPtr<FJsonValue>> Errors;
+	Root->SetStringField(TEXT("schema"), TEXT("anastasis.inspect_actor.v1"));
+	Root->SetStringField(TEXT("operation"), TEXT("inspect_actor"));
+	Root->SetStringField(TEXT("query"), ActorQuery);
+	Root->SetObjectField(TEXT("evidence_scope"), EvidenceScopeObject(TEXT("inspect_actor")));
+
+	if (ActorQuery.TrimStartAndEnd().IsEmpty())
+	{
+		Root->SetStringField(TEXT("status"), TEXT("UNKNOWN"));
+		Errors.Add(MakeShared<FJsonValueString>(TEXT("EMPTY_QUERY")));
+		Root->SetArrayField(TEXT("errors"), Errors);
+		return WriteInspectionObject(TEXT("inspect_actor"), Root);
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		Root->SetStringField(TEXT("status"), TEXT("UNKNOWN"));
+		Errors.Add(MakeShared<FJsonValueString>(TEXT("NO_WORLD")));
+		Root->SetArrayField(TEXT("errors"), Errors);
+		return WriteInspectionObject(TEXT("inspect_actor"), Root);
+	}
+
+	TArray<TSharedPtr<FJsonValue>> Matches;
+	const FString LowerQuery = ActorQuery.ToLower();
+	int32 TotalMatches = 0;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		const AActor* Actor = *It;
+		if (!ActorMatchesQuery(Actor, LowerQuery))
+		{
+			continue;
+		}
+		++TotalMatches;
+		if (Matches.Num() < 20)
+		{
+			Matches.Add(MakeShared<FJsonValueObject>(ActorObject(Actor)));
+		}
+	}
+
+	Root->SetNumberField(TEXT("match_count"), TotalMatches);
+	Root->SetArrayField(TEXT("matches"), Matches);
+	Root->SetStringField(TEXT("status"), TotalMatches > 0 ? TEXT("OBSERVED") : TEXT("UNKNOWN"));
+	if (TotalMatches == 0)
+	{
+		Errors.Add(MakeShared<FJsonValueString>(TEXT("NO_ACTOR_MATCH")));
+	}
+	Root->SetArrayField(TEXT("errors"), Errors);
+	return WriteInspectionObject(TEXT("inspect_actor"), Root);
+}
+
+FString UAnastasisWorldProbeSubsystem::InspectVisualSceneState()
+{
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	TArray<TSharedPtr<FJsonValue>> Errors;
+	Root->SetStringField(TEXT("schema"), TEXT("anastasis.inspect_visual_scene_state.v1"));
+	Root->SetStringField(TEXT("operation"), TEXT("inspect_visual_scene_state"));
+	Root->SetObjectField(TEXT("evidence_scope"), EvidenceScopeObject(TEXT("inspect_visual_scene_state")));
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		Root->SetStringField(TEXT("status"), TEXT("UNKNOWN"));
+		Errors.Add(MakeShared<FJsonValueString>(TEXT("NO_WORLD")));
+		Root->SetArrayField(TEXT("errors"), Errors);
+		return WriteInspectionObject(TEXT("inspect_visual_scene_state"), Root);
+	}
+
+	const EAnastasisVisualMode VisualMode = AnastasisVisualMode::Get();
+	TSharedRef<FJsonObject> ModeObj = MakeShared<FJsonObject>();
+	ModeObj->SetStringField(TEXT("visual_mode"), AnastasisVisualMode::Name(VisualMode));
+	ModeObj->SetNumberField(TEXT("anastasis_visual_mode_cvar"), CVarIntValue(TEXT("anastasis.Visual.Mode"), 1));
+	ModeObj->SetNumberField(TEXT("terrain_surface_cvar"), CVarIntValue(TEXT("anastasis.Terrain.Surface"), 0));
+	ModeObj->SetNumberField(TEXT("worldview_seed_cvar"), CVarIntValue(TEXT("anastasis.WorldView.Seed"), 12345));
+	ModeObj->SetNumberField(TEXT("worldview_crop_x_cvar"), CVarIntValue(TEXT("anastasis.WorldView.CropX"), 0));
+	ModeObj->SetNumberField(TEXT("worldview_crop_y_cvar"), CVarIntValue(TEXT("anastasis.WorldView.CropY"), 0));
+	ModeObj->SetNumberField(TEXT("worldview_width_cvar"), CVarIntValue(TEXT("anastasis.WorldView.Width"), 96));
+	ModeObj->SetNumberField(TEXT("worldview_height_cvar"), CVarIntValue(TEXT("anastasis.WorldView.Height"), 96));
+	Root->SetObjectField(TEXT("mode"), ModeObj);
+
+	AAnastasisWorldEmbodiment* Embodiment = FindEmbodiment();
+	TSharedRef<FJsonObject> EmbodimentObj = MakeShared<FJsonObject>();
+	EmbodimentObj->SetBoolField(TEXT("present"), Embodiment != nullptr);
+	if (Embodiment)
+	{
+		const AnastasisWorldView::FPlan& Plan = Embodiment->GetPlan();
+		EmbodimentObj->SetObjectField(TEXT("actor"), ActorObject(Embodiment));
+		EmbodimentObj->SetNumberField(TEXT("plan_tile_count"), Plan.TileCount);
+		EmbodimentObj->SetNumberField(TEXT("instance_count"), Embodiment->GetInstanceCount());
+		EmbodimentObj->SetBoolField(TEXT("custom_water_surface_present"), Embodiment->HasWaterSurface());
+	}
+	else
+	{
+		Errors.Add(MakeShared<FJsonValueString>(TEXT("TERRAIN_NOT_PRESENT")));
+	}
+	Root->SetObjectField(TEXT("embodiment"), EmbodimentObj);
+
+	int32 ActorCount = 0;
+	int32 PrimitiveComponentCount = 0;
+	int32 VisiblePrimitiveComponentCount = 0;
+	int32 ProceduralMeshComponentCount = 0;
+	int32 HismComponentCount = 0;
+	int32 HismInstanceCount = 0;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		++ActorCount;
+		TArray<UPrimitiveComponent*> PrimitiveComponents;
+		It->GetComponents(PrimitiveComponents);
+		for (const UPrimitiveComponent* Primitive : PrimitiveComponents)
+		{
+			++PrimitiveComponentCount;
+			if (Primitive->IsVisible())
+			{
+				++VisiblePrimitiveComponentCount;
+			}
+			if (const UHierarchicalInstancedStaticMeshComponent* Hism = Cast<UHierarchicalInstancedStaticMeshComponent>(Primitive))
+			{
+				++HismComponentCount;
+				HismInstanceCount += Hism->GetInstanceCount();
+			}
+			if (Cast<UProceduralMeshComponent>(Primitive))
+			{
+				++ProceduralMeshComponentCount;
+			}
+		}
+	}
+
+	TSharedRef<FJsonObject> ComponentsObj = MakeShared<FJsonObject>();
+	ComponentsObj->SetNumberField(TEXT("actors"), ActorCount);
+	ComponentsObj->SetNumberField(TEXT("primitive_components"), PrimitiveComponentCount);
+	ComponentsObj->SetNumberField(TEXT("visible_primitive_components"), VisiblePrimitiveComponentCount);
+	ComponentsObj->SetNumberField(TEXT("procedural_mesh_components"), ProceduralMeshComponentCount);
+	ComponentsObj->SetNumberField(TEXT("hism_components"), HismComponentCount);
+	ComponentsObj->SetNumberField(TEXT("hism_instances"), HismInstanceCount);
+	Root->SetObjectField(TEXT("component_summary"), ComponentsObj);
+
+	Root->SetStringField(TEXT("status"), TEXT("OBSERVED"));
+	Root->SetArrayField(TEXT("errors"), Errors);
+	return WriteInspectionObject(TEXT("inspect_visual_scene_state"), Root);
 }
 
 FString UAnastasisWorldProbeSubsystem::WriteSnapshot()

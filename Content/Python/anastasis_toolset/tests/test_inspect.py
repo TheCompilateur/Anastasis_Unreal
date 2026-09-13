@@ -1,6 +1,11 @@
 import unittest
 
-from anastasis_toolset.toolsets.inspect import AnastasisInspectTools, _actor_line
+from anastasis_toolset.toolsets.inspect import (
+    AnastasisInspectTools,
+    AnastasisInspectionResult,
+    _actor_line,
+    _failure_result,
+)
 
 
 class AnastasisInspectToolsTestCase(unittest.TestCase):
@@ -34,3 +39,21 @@ class AnastasisInspectToolsTestCase(unittest.TestCase):
 
     def test_actor_line_helper_shape(self):
         self.assertTrue(callable(_actor_line))
+
+    def test_failure_result_is_structured(self):
+        result = _failure_result("anastasis.inspect_world.v1", "synthetic failure")
+        self.assertIsInstance(result, AnastasisInspectionResult)
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "ERROR")
+        self.assertEqual(result.schema, "anastasis.inspect_world.v1")
+        self.assertIn("synthetic failure", result.json)
+
+    def test_phase1_tool_methods_are_available(self):
+        for name in (
+            "inspect_anastasis_world",
+            "inspect_tile",
+            "inspect_settlement",
+            "inspect_actor",
+            "inspect_visual_scene_state",
+        ):
+            self.assertTrue(callable(getattr(AnastasisInspectTools, name)))

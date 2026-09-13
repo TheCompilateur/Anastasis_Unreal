@@ -5,6 +5,7 @@
 #include "Engine/World.h"
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
@@ -44,6 +45,23 @@ namespace
 			Embodiment->EmbodyCanonical(static_cast<int32>(AnastasisWorldView::ReferenceSeed));
 		}
 		return Embodiment;
+	}
+
+	TSharedPtr<FJsonObject> LoadJsonObjectFromPath(const FString& Path)
+	{
+		FString Json;
+		if (!FFileHelper::LoadFileToString(Json, *Path))
+		{
+			return nullptr;
+		}
+
+		TSharedPtr<FJsonObject> Root;
+		const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Json);
+		if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
+		{
+			return nullptr;
+		}
+		return Root;
 	}
 }
 
@@ -164,6 +182,90 @@ bool FAnastasisWorldProbeBookmarkTest::RunTest(const FString&)
 	const bool bOverviewMoved = Probe->GotoBookmark(TEXT("OVERVIEW"), Reason);
 	TestEqual(TEXT("OVERVIEW move outcome matches PlayerController availability"), bOverviewMoved, bHasController);
 
+	Embodiment->Destroy();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAnastasisWorldProbePhase1InspectorsTest,
+	"Anastasis.WorldProbe.Phase1Inspectors",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAnastasisWorldProbePhase1InspectorsTest::RunTest(const FString&)
+{
+	UWorld* World = FindProbeAutomationWorld();
+	if (!TestNotNull(TEXT("world"), World))
+	{
+		return false;
+	}
+
+	UAnastasisWorldProbeSubsystem* Probe = World->GetSubsystem<UAnastasisWorldProbeSubsystem>();
+	if (!TestNotNull(TEXT("probe subsystem"), Probe))
+	{
+		return false;
+	}
+
+	AAnastasisWorldEmbodiment* Embodiment = SpawnCanonicalEmbodiment(World);
+	if (!TestNotNull(TEXT("embodiment"), Embodiment))
+	{
+		return false;
+	}
+
+	TArray<FString> Paths;
+	Paths.Add(Probe->InspectWorld());
+	Paths.Add(Probe->InspectTile(0, 0));
+	Paths.Add(Probe->InspectSettlement(TEXT("canonical")));
+	Paths.Add(Probe->InspectActor(TEXT("AnastasisWorldEmbodiment")));
+	Paths.Add(Probe->InspectVisualSceneState());
+
+	for (const FString& Path : Paths)
+	{
+		TestTrue(TEXT("inspection path non-empty"), !Path.IsEmpty());
+		TestTrue(TEXT("inspection file exists"), FPaths::FileExists(Path));
+	}
+
+	const TSharedPtr<FJsonObject> WorldInspect = LoadJsonObjectFromPath(Paths[0]);
+	if (TestTrue(TEXT("world inspection parses"), WorldInspect.IsValid()))
+	{
+		TestEqual(TEXT("world inspect schema"), WorldInspect->GetStringField(TEXT("schema")), FString(TEXT("anastasis.inspect_world.v1")));
+		TestEqual(TEXT("world inspect status"), WorldInspect->GetStringField(TEXT("status")), FString(TEXT("OBSERVED")));
+	}
+
+	const TSharedPtr<FJsonObject> TileInspect = LoadJsonObjectFromPath(Paths[1]);
+	if (TestTrue(TEXT("tile inspection parses"), TileInspect.IsValid()))
+	{
+		TestEqual(TEXT("tile inspect schema"), TileInspect->GetStringField(TEXT("schema")), FString(TEXT("anastasis.inspect_tile.v1")));
+		TestEqual(TEXT("tile inspect status"), TileInspect->GetStringField(TEXT("status")), FString(TEXT("OBSERVED")));
+		TestTrue(TEXT("tile object present"), TileInspect->HasTypedField<EJson::Object>(TEXT("tile")));
+	}
+
+	const TSharedPtr<FJsonObject> SettlementInspect = LoadJsonObjectFromPath(Paths[2]);
+	if (TestTrue(TEXT("settlement inspection parses"), SettlementInspect.IsValid()))
+	{
+		TestEqual(TEXT("settlement inspect schema"), SettlementInspect->GetStringField(TEXT("schema")), FString(TEXT("anastasis.inspect_settlement.v1")));
+		TestEqual(TEXT("settlement honest status"), SettlementInspect->GetStringField(TEXT("status")), FString(TEXT("NOT_IMPLEMENTED")));
+	}
+
+	const TSharedPtr<FJsonObject> ActorInspect = LoadJsonObjectFromPath(Paths[3]);
+	if (TestTrue(TEXT("actor inspection parses"), ActorInspect.IsValid()))
+	{
+		TestEqual(TEXT("actor inspect schema"), ActorInspect->GetStringField(TEXT("schema")), FString(TEXT("anastasis.inspect_actor.v1")));
+		TestEqual(TEXT("actor inspect status"), ActorInspect->GetStringField(TEXT("status")), FString(TEXT("OBSERVED")));
+		TestTrue(TEXT("actor match count > 0"), ActorInspect->GetIntegerField(TEXT("match_count")) > 0);
+	}
+
+	const TSharedPtr<FJsonObject> VisualInspect = LoadJsonObjectFromPath(Paths[4]);
+	if (TestTrue(TEXT("visual scene inspection parses"), VisualInspect.IsValid()))
+	{
+		TestEqual(TEXT("visual inspect schema"), VisualInspect->GetStringField(TEXT("schema")), FString(TEXT("anastasis.inspect_visual_scene_state.v1")));
+		TestEqual(TEXT("visual inspect status"), VisualInspect->GetStringField(TEXT("status")), FString(TEXT("OBSERVED")));
+		TestTrue(TEXT("component summary present"), VisualInspect->HasTypedField<EJson::Object>(TEXT("component_summary")));
+	}
+
+	for (const FString& Path : Paths)
+	{
+		IFileManager::Get().Delete(*Path);
+	}
 	Embodiment->Destroy();
 	return true;
 }
