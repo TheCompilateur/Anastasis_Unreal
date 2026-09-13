@@ -1,4 +1,4 @@
-param([ValidateSet('status','build','verify','editor')][string]$Command='status')
+param([ValidateSet('status','build','verify','editor','health','build-game')][string]$Command='status')
 $ErrorActionPreference='Stop'
 $Canonical='C:\dev\ANASTASIS_UNREAL'
 $WorktreeRoot='C:\dev\ANASTASIS_WORKTREES'
@@ -9,8 +9,10 @@ $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 $isCanonical = ($Root -eq $Canonical)
 $isWorktree  = $Root.StartsWith($WorktreeRoot + '\', [StringComparison]::OrdinalIgnoreCase)
 if(-not ($isCanonical -or $isWorktree)){throw "FAIL: operator must run from $Canonical or a worktree under $WorktreeRoot (got $Root)"}
-$cwdPath=(Get-Location).Path
-if($cwdPath -ne $Root -and !$cwdPath.StartsWith($Root+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'FAIL: invoke from the canonical root or its subdirectories'}
+# Task Scheduler (Anastasis-ScheduledVerify) starts in System32. Root is derived
+# from this script's path, not cwd; cd so verify/build work unattended. 2026-09-13
+# 03:00 VERIFY_FAIL with TESTS_PASS and no editor-03*.log was this cwd check.
+Set-Location -LiteralPath $Root
 $Project=Join-Path $Root 'Anastasis_UnrealV2.uproject'
 $Engine='C:\Program Files\Epic Games\UE_5.8'
 $up=Get-Content $Project -Raw | ConvertFrom-Json
@@ -33,6 +35,14 @@ function BuildCanonical {
  $before | Set-Content "$Evidence/built-source.sha256"
  Write-Output 'BUILD::PASS'
 }
+function BuildGame {
+ $before=Fingerprint
+ & "$Engine/Engine/Build/BatchFiles/Build.bat" Anastasis_UnrealV2 Win64 Development "-Project=$Project" -WaitMutex -NoHotReloadFromIDE 2>&1 | Tee-Object "$Evidence/build-game.log" | Out-Host
+ if($LASTEXITCODE -ne 0){throw 'GAME_BUILD::FAIL'}
+ if((Fingerprint) -ne $before){throw 'FAIL: source/config changed during game build'}
+ $before | Set-Content "$Evidence/built-game-source.sha256"
+ Write-Output 'GAME_BUILD::PASS'
+}
 try {
  if($Command -eq 'status') {
   if($isCanonical){$roleLabel='CANONICAL_ROOT'}else{$roleLabel='AGENT_WORKTREE'}
@@ -43,6 +53,11 @@ try {
   exit 0
  }
  if($Command -eq 'build'){BuildCanonical; exit 0}
+ if($Command -eq 'build-game'){BuildGame; exit 0}
+ if($Command -eq 'health'){
+  & (Join-Path $PSScriptRoot 'project-health.ps1')
+  exit $LASTEXITCODE
+ }
  if($Command -eq 'editor'){
   Start-Process "$Engine/Engine/Binaries/Win64/UnrealEditor.exe" -ArgumentList ('"'+$Project+'"') -WindowStyle Hidden | Out-Null
   Write-Output 'EDITOR::START_REQUESTED (not a verification)'; exit 0
@@ -53,8 +68,16 @@ try {
  $log=Join-Path $Evidence "editor-$stamp.log"
  $py=(Join-Path $PSScriptRoot 'smoke-pie.py').Replace('\','/')
  $launchArgs=@(('"'+$Project+'"'),'-unattended','-nosplash','-NoLiveCoding',('-abslog="'+$log+'"'),'-LogCmds="LogAutomationTest Log"',('-ExecCmds="py '+$py+'"'))
+ $busy=@(Get-Process UnrealEditor,UnrealEditor-Cmd -ErrorAction SilentlyContinue)
+ if($busy.Count){
+  Write-Output ('VERIFY::NOTE concurrent editors pids=' + (($busy | ForEach-Object Id) -join ','))
+ }
  $proc=Start-Process "$Engine/Engine/Binaries/Win64/UnrealEditor.exe" -ArgumentList $launchArgs -WindowStyle Hidden -PassThru
- $deadline=(Get-Date).AddMinutes(4)
+ # 4 minutes was enough on a warm canonical DDC (01:28 PASS ~30s session). Cold
+ # worktree DDC plus concurrent unattended editors on this machine timed out
+ # still loading modules at 4:00 (2026-09-13 worktree verify). 12 minutes
+ # covers first-boot shader/DDC without treating load as a project failure.
+ $deadline=(Get-Date).AddMinutes(12)
  $modules=@()
  while(!$proc.HasExited -and (Get-Date) -lt $deadline){
   try {$modules=@($proc.Modules | Where-Object ModuleName -in @('UnrealEditor-AnastasisSim.dll','UnrealEditor-Anastasis_UnrealV2.dll') | Select-Object ModuleName,FileName)} catch {}
