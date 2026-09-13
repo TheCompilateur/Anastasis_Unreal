@@ -16,13 +16,22 @@ namespace AnastasisTerrainSurface
 /** Niveau de la mer en unites Unreal. */
 inline constexpr double WaterPlaneZ = AnastasisWorld::SeaLevel * AnastasisWorldView::AltitudeScale;
 
-// Cette surface ne traite QUE le crop canonique. Les dimensions ne sont pas
+// Le MONDE source reste le 96x96 canonique : Build refuse toute autre taille de
+// monde. L'EMPRISE, elle, est libre -- d'une cellule unique (2x2 sommets) au monde
+// entier -- pourvu qu'elle tienne dans ce monde. Les dimensions ne sont pas
 // redefinies ici : elles sont reprises de WorldView, seul proprietaire.
 inline constexpr int32 SourceW = AnastasisWorldView::ReferenceWidth;
 inline constexpr int32 SourceH = AnastasisWorldView::ReferenceHeight;
+
+// Tranche scellee WORLD_SLICE_006. Desormais une reference de non-regression
+// (1024 sommets / 1922 triangles), plus une limite de ce que Build accepte.
 inline constexpr int32 CropW = AnastasisWorldView::CanonicalCropWidth;
 inline constexpr int32 CropH = AnastasisWorldView::CanonicalCropHeight;
 inline constexpr int32 VertexCount = CropW * CropH;
+
+/** Sommets et triangles produits par une emprise W x H. Une cellule = 2 triangles. */
+inline constexpr int32 VerticesFor(int32 W, int32 H) { return W * H; }
+inline constexpr int32 TrianglesFor(int32 W, int32 H) { return 2 * (W - 1) * (H - 1); }
 
 struct FGeometry
 {
@@ -34,7 +43,7 @@ struct FGeometry
     /** RGB = lecture semantique du sol ; A = 1 sur l'eau, 0 sur la terre. */
     TArray<FLinearColor> Colors;
 
-    /** Nappe d'eau plate : memes 1024 sommets, Z fige a WaterPlaneZ. */
+    /** Nappe d'eau plate : les memes sommets que le relief, Z fige a WaterPlaneZ. */
     TArray<FVector> WaterVertices;
     TArray<int32> WaterTriangles;
     TArray<FVector> WaterNormals;

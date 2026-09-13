@@ -151,6 +151,21 @@ bool FAnastasisTerrainFallback::RunTest(const FString&)
     Var->Set(1,ECVF_SetByCode); Actor->Embody(12345,96,96);
     auto* Surface=Actor->FindComponentByClass<UProceduralMeshComponent>();
     TestTrue(TEXT("surface visible"),Surface && Surface->IsVisible() && Surface->GetProcMeshSection(0));
+    if (Surface && Surface->GetProcMeshSection(0))
+    {
+        // Mode 1 reste la tranche scellee meme quand l'emprise incarnee est le monde entier.
+        TestEqual(TEXT("mode 1 = 1024 sommets (tranche scellee)"), Surface->GetProcMeshSection(0)->ProcVertexBuffer.Num(), 1024);
+        // Mode 2 : la meme surface, batie sur les 96x96 reellement incarnes.
+        Var->Set(2,ECVF_SetByCode); Actor->Embody(12345,96,96);
+        TestTrue(TEXT("surface monde visible"), Surface->IsVisible() && Surface->GetProcMeshSection(0) != nullptr);
+        if (Surface->GetProcMeshSection(0))
+        {
+            TestEqual(TEXT("mode 2 = 9216 sommets"), Surface->GetProcMeshSection(0)->ProcVertexBuffer.Num(), 9216);
+            TestEqual(TEXT("mode 2 = 18050 triangles"), Surface->GetProcMeshSection(0)->ProcIndexBuffer.Num()/3, 18050);
+        }
+        TArray<UHierarchicalInstancedStaticMeshComponent*> HiddenCheck; Actor->GetComponents(HiddenCheck);
+        for (auto* Mesh : HiddenCheck) { if (Mesh->GetName().StartsWith(TEXT("Tiles_"))) TestFalse(TEXT("dalles DEBUG masquees en mode 2"), Mesh->IsVisible()); }
+    }
     Var->Set(0,ECVF_SetByCode); Actor->Embody(12345,96,96);
     TestTrue(TEXT("surface disabled"),Surface && !Surface->IsVisible());
     // GetComponents(UHierarchicalInstancedStaticMeshComponent) also finds the
@@ -165,6 +180,93 @@ bool FAnastasisTerrainFallback::RunTest(const FString&)
     for(auto* Mesh:Legacy) TestTrue(TEXT("legacy restored"),Mesh->IsVisible());
     TestEqual(TEXT("9216 legacy instances"),Actor->GetInstanceCount(),9216);
     Actor->Destroy(); Var->Set(Previous,ECVF_SetByCode);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainWorldExtent, "Anastasis.Terrain.WorldExtent", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainWorldExtent::RunTest(const FString&)
+{
+    const auto Full = AnastasisWorldView::CaptureCanonicalWorld(12345);
+
+    // 1. NON-REGRESSION. La tranche scellee doit sortir de Build exactement comme avant
+    //    la generalisation : c'est ce qui rend WORLD_SLICE_006 encore prouvable.
+    const auto Canonical = AnastasisWorldView::CropSnapshot(Full, 0, 0, 32, 32);
+    AnastasisTerrainSurface::FGeometry Sealed;
+    if (!TestTrue(TEXT("la tranche canonique se batit toujours"), AnastasisTerrainSurface::Build(Canonical, Sealed))) return false;
+    TestEqual(TEXT("TERRAIN_CONTRACT vertices=1024 inchange"), Sealed.Vertices.Num(), 1024);
+    TestEqual(TEXT("TERRAIN_CONTRACT triangles=1922 inchange"), Sealed.Triangles.Num() / 3, 1922);
+
+    // 2. Le monde entier, d'un seul tenant.
+    AnastasisTerrainSurface::FGeometry World;
+    if (!TestTrue(TEXT("le monde 96x96 se batit"), AnastasisTerrainSurface::Build(Full, World))) return false;
+    TestEqual(TEXT("9216 sommets"), World.Vertices.Num(), AnastasisTerrainSurface::VerticesFor(96, 96));
+    TestEqual(TEXT("18050 triangles"), World.Triangles.Num() / 3, AnastasisTerrainSurface::TrianglesFor(96, 96));
+    TestEqual(TEXT("une couleur par sommet"), World.Colors.Num(), 9216);
+    TestEqual(TEXT("une nappe d'eau par sommet"), World.WaterVertices.Num(), 9216);
+
+    // La tranche scellee est le coin (0,0) du monde : memes sommets, memes index source.
+    // La couleur, elle, est volontairement relative a l'emprise (MinAlt/MaxAlt du crop),
+    // donc elle n'est PAS comparee ici -- voir AddInfo.
+    for (int32 I = 0; I < 1024; ++I)
+    {
+        const int32 WorldIndex = (I / 32) * 96 + I % 32;
+        TestEqual(TEXT("sommet partage avec la tranche scellee"), World.Vertices[WorldIndex], Sealed.Vertices[I]);
+        TestEqual(TEXT("index source partage"), World.SourceIndices[WorldIndex], Sealed.SourceIndices[I]);
+    }
+
+    // 3. Pas une seule fissure interne sur toute l'emprise : chaque arete interieure
+    //    est partagee par exactement deux triangles, les aretes uniques sont le perimetre.
+    TMap<uint64, int32> Edges;
+    for (int32 I = 0; I < World.Triangles.Num(); I += 3)
+    {
+        const int32 A = World.Triangles[I], B = World.Triangles[I+1], C = World.Triangles[I+2];
+        TestTrue(TEXT("face avant non degeneree"), FVector::CrossProduct(World.Vertices[C]-World.Vertices[A], World.Vertices[B]-World.Vertices[A]).Z > 0);
+        const int32 V[3] = {A, B, C};
+        for (int32 J = 0; J < 3; ++J) { const uint32 Lo = FMath::Min(V[J], V[(J+1)%3]), Hi = FMath::Max(V[J], V[(J+1)%3]); ++Edges.FindOrAdd((uint64(Lo)<<32)|Hi); }
+    }
+    int32 Boundary = 0;
+    for (const auto& E : Edges) { TestTrue(TEXT("maillage manifold"), E.Value == 1 || E.Value == 2); if (E.Value == 1) ++Boundary; }
+    TestEqual(TEXT("380 aretes de perimetre, aucune fissure interne"), Boundary, 2*(96-1) + 2*(96-1));
+
+    // 4. Une emprise quelconque, ni canonique ni a l'origine : la generalisation n'est
+    //    pas le cas canonique deguise. Les sommets doivent coincider avec ceux du monde.
+    const auto Offset = AnastasisWorldView::CropSnapshot(Full, 33, 7, 16, 24);
+    AnastasisTerrainSurface::FGeometry Off;
+    if (!TestTrue(TEXT("emprise decalee 16x24 batie"), AnastasisTerrainSurface::Build(Offset, Off))) return false;
+    TestEqual(TEXT("384 sommets"), Off.Vertices.Num(), AnastasisTerrainSurface::VerticesFor(16, 24));
+    TestEqual(TEXT("690 triangles"), Off.Triangles.Num() / 3, AnastasisTerrainSurface::TrianglesFor(16, 24));
+    for (int32 I = 0; I < Off.Vertices.Num(); ++I)
+    {
+        const int32 X = 33 + I % 16, Y = 7 + I / 16;
+        TestEqual(TEXT("index source absolu"), Off.SourceIndices[I], Y * 96 + X);
+        TestEqual(TEXT("sommet a la place monde de sa tuile"), Off.Vertices[I], AnastasisWorldView::TileToUnreal(X, Y, Full.Tiles[Y*96+X].Alt));
+        TestEqual(TEXT("meme sommet que dans le monde entier"), Off.Vertices[I], World.Vertices[Y*96+X]);
+    }
+
+    // 5. Determinisme a l'echelle du monde.
+    AnastasisTerrainSurface::FGeometry Again;
+    TestTrue(TEXT("reconstruction"), AnastasisTerrainSurface::Build(AnastasisWorldView::CaptureCanonicalWorld(12345), Again));
+    TestTrue(TEXT("geometrie et semantique deterministes"),
+        World.Vertices == Again.Vertices && World.Triangles == Again.Triangles
+        && World.Normals == Again.Normals && World.Colors == Again.Colors
+        && World.WaterVertices == Again.WaterVertices && World.WaterTriangles == Again.WaterTriangles);
+
+    // 6. Refus. L'emprise reste bornee par le monde, et une bande d'une tuile de large
+    //    ne porte aucune cellule : ce n'est pas une surface.
+    AnastasisTerrainSurface::FGeometry Rejected;
+    auto Overflow = AnastasisWorldView::CropSnapshot(Full, 80, 0, 16, 16);
+    Overflow.OriginX = 90;
+    TestFalse(TEXT("refus d'une emprise qui deborde du monde"), AnastasisTerrainSurface::Build(Overflow, Rejected));
+    TestFalse(TEXT("refus d'une emprise large d'une tuile"), AnastasisTerrainSurface::Build(AnastasisWorldView::CropSnapshot(Full, 0, 0, 1, 32), Rejected));
+    TestEqual(TEXT("aucune geometrie partielle"), Rejected.Vertices.Num(), 0);
+
+    // Un monde qui n'est pas le 96x96 canonique reste refuse : la surface est adossee
+    // a la verite de simulation, pas a une taille arbitraire.
+    auto AlienWorld = Full; AlienWorld.SourceW = 64;
+    TestFalse(TEXT("refus d'un monde non canonique"), AnastasisTerrainSurface::Build(AlienWorld, Rejected));
+
+    AddInfo(FString::Printf(TEXT("TERRAIN_EXTENT world=96x96 vertices=%d triangles=%d boundary_edges=%d sealed_crop=32x32/1024/1922 palette=crop_relative(MinAlt=%.6f MaxAlt=%.6f)"),
+        World.Vertices.Num(), World.Triangles.Num()/3, Boundary, Full.MinAlt, Full.MaxAlt));
     return true;
 }
 #endif

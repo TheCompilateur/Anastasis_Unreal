@@ -9,7 +9,8 @@ ecrase toute retouche faite a la main dans l'editeur.
 
 Variables d'environnement :
   ANASTASIS_SLICE_SHOT              chemin PNG de sortie (requis)
-  ANASTASIS_SLICE_MODE              "0" terrain DEBUG legacy, "1" surface continue (defaut 1)
+  ANASTASIS_SLICE_MODE              "0" terrain DEBUG legacy, "1" surface de la tranche
+                                    scellee 32x32, "2" surface du monde 96x96 (defaut 1)
   ANASTASIS_SLICE_REBUILD_MATERIAL  "1" regenere le materiau (chemin d'edition, pas de capture)
 """
 import os, shutil, time, unreal
@@ -24,6 +25,23 @@ SLICE_SPAN = 3200.0
 CENTER = unreal.Vector(SLICE_SPAN * 0.5, SLICE_SPAN * 0.5, 400.0)
 CAM_LOC = unreal.Vector(-1800.0, -1800.0, 3500.0)
 CAM_ROT = unreal.Rotator(0.0, -32.8, 45.0)
+# Mode 2 : le monde entier occupe [0,9600]x[0,9600], trois fois la tranche. La camera
+# garde EXACTEMENT le meme angle (pitch -32.8, yaw 45) et recule du meme facteur 3 :
+# les deux captures sont alors le meme point de vue a deux echelles, pas deux cadrages
+# choisis a la main -- sans quoi la comparaison ne prouverait rien.
+# ANASTASIS_SLICE_CAM=world force ce recul quel que soit le mode : c'est ce qui permet
+# de comparer le mode 0 et le mode 2 sur la MEME emprise incarnee (96x96 dans les deux
+# cas) depuis le MEME point de vue. Par defaut la camera reste celle de la tranche, pour
+# que les captures scellees de WORLD_SLICE_006 restent reproductibles telles quelles.
+WORLD_SPAN_FACTOR = 3.0
+# A 3x de distance, les instances HISM du chemin DEBUG rendent en gris neutre : la
+# comparaison n'y est plus honnete. ANASTASIS_SLICE_CAM=slice force donc la camera
+# de la tranche meme en mode 2, ce qui donne le seul A/B ou les deux modes rendent
+# correctement -- meme camera, meme emprise incarnee, seule la CVar change.
+CAM_CHOICE = os.environ.get('ANASTASIS_SLICE_CAM', '')
+if CAM_CHOICE != 'slice' and (MODE == '2' or CAM_CHOICE == 'world'):
+    CENTER = unreal.Vector(SLICE_SPAN * WORLD_SPAN_FACTOR * 0.5, SLICE_SPAN * WORLD_SPAN_FACTOR * 0.5, 400.0)
+    CAM_LOC = unreal.Vector(CAM_LOC.x * WORLD_SPAN_FACTOR, CAM_LOC.y * WORLD_SPAN_FACTOR, CAM_LOC.z * WORLD_SPAN_FACTOR)
 # Jour physique fige : les captures doivent etre comparables d'un lancement a l'autre.
 SUN_LUX = 75000.0
 EV100 = 14.0

@@ -60,18 +60,23 @@ FLinearColor TileColor(const AnastasisWorldView::FVisualTile& T, double MinAlt, 
 bool AnastasisTerrainSurface::Build(const AnastasisWorldView::FWorldVisualSnapshot& Crop, FGeometry& Out)
 {
     Out = FGeometry{};
-    if (Crop.W != CropW || Crop.H != CropH || Crop.SourceW != SourceW || Crop.SourceH != SourceH
+    // L'emprise est libre, le monde ne l'est pas : une surface batie sur autre chose
+    // que le 96x96 canonique ne serait plus adossee a la verite de simulation.
+    // Il faut deux sommets par axe pour former une seule cellule.
+    const int32 W = Crop.W, H = Crop.H;
+    if (W < 2 || H < 2 || Crop.SourceW != SourceW || Crop.SourceH != SourceH
         || Crop.OriginX < 0 || Crop.OriginY < 0
-        || Crop.OriginX + CropW > SourceW || Crop.OriginY + CropH > SourceH
-        || Crop.Tiles.Num() != VertexCount) return false;
+        || Crop.OriginX + W > SourceW || Crop.OriginY + H > SourceH
+        || Crop.Tiles.Num() != VerticesFor(W, H)) return false;
+    const int32 Vertices = VerticesFor(W, H);
     FGeometry Result;
     TArray<bool> IsWater;
-    IsWater.Reserve(VertexCount);
+    IsWater.Reserve(Vertices);
     for (int32 I = 0; I < Crop.Tiles.Num(); ++I)
     {
         const auto& T = Crop.Tiles[I];
-        const int32 X = Crop.OriginX + I % CropW, Y = Crop.OriginY + I / CropW;
-        if (T.X != X || T.Y != Y || T.SourceIndex != Y * SourceW + X || !FMath::IsFinite(T.Alt)) return false;
+        const int32 X = Crop.OriginX + I % W, Y = Crop.OriginY + I / W;
+        if (T.X != X || T.Y != Y || T.SourceIndex != Y * Crop.SourceW + X || !FMath::IsFinite(T.Alt)) return false;
         if (!FMath::IsFinite(T.Shore) || !FMath::IsFinite(T.Shade)) return false;
         const FVector P = AnastasisWorldView::TileToUnreal(X, Y, T.Alt);
         if (!FMath::IsFinite(P.X) || !FMath::IsFinite(P.Y) || !FMath::IsFinite(P.Z)) return false;
@@ -81,12 +86,12 @@ bool AnastasisTerrainSurface::Build(const AnastasisWorldView::FWorldVisualSnapsh
         Result.WaterVertices.Add(FVector(P.X, P.Y, WaterPlaneZ));
         IsWater.Add(T.Type == AnastasisWorld::ETileType::Water);
     }
-    Result.Normals.Init(FVector::ZeroVector, VertexCount);
-    Result.WaterNormals.Init(FVector::UpVector, VertexCount);
-    for (int32 Y = 0; Y < CropH - 1; ++Y)
-        for (int32 X = 0; X < CropW - 1; ++X)
+    Result.Normals.Init(FVector::ZeroVector, Vertices);
+    Result.WaterNormals.Init(FVector::UpVector, Vertices);
+    for (int32 Y = 0; Y < H - 1; ++Y)
+        for (int32 X = 0; X < W - 1; ++X)
         {
-            const int32 A = Y * CropW + X, B = A + 1, C = A + CropW, D = C + 1;
+            const int32 A = Y * W + X, B = A + 1, C = A + W, D = C + 1;
             // Unreal front faces use clockwise winding viewed from above.
             Result.Triangles.Append({A, C, B, B, C, D});
             // Une cellule porte de l'eau des qu'une de ses quatre tuiles source est de l'eau :

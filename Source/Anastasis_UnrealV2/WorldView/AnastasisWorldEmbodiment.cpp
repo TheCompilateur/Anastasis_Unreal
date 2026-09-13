@@ -13,7 +13,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "WorldView/AnastasisWorldDebugVisual.h"
 
-static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 0, TEXT("Experimental center-sampled terrain. 0=legacy DEBUG, 1=32x32 surface; applied on embodiment."), ECVF_Default);
+static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 0, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop; applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarWorldViewSeed(
 	TEXT("anastasis.WorldView.Seed"),
@@ -267,9 +267,19 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
 
     if (ExperimentalSurface) ExperimentalSurface->SetVisibility(false);
     for (auto& Mesh : TerrainMeshes) if (Mesh) Mesh->SetVisibility(true);
-    if (CVarTerrainSurface.GetValueOnGameThread() == 1)
+    const int32 SurfaceMode = CVarTerrainSurface.GetValueOnGameThread();
+    if (SurfaceMode == 1 || SurfaceMode == 2)
     {
-        const auto Crop = AnastasisWorldView::CropSnapshot(Snapshot, 0, 0, 32, 32);
+        // Mode 1 : la tranche scellee WORLD_SLICE_006, inchangee, seule emprise dont
+        // le TERRAIN_CONTRACT (1024 sommets / 1922 triangles) fait foi.
+        // Mode 2 : la meme surface, la meme couleur de sommet, sur toute l'emprise
+        // incarnee -- c'est ce mode qui donne une carte au lieu d'une eprouvette.
+        const auto Crop = (SurfaceMode == 2)
+            ? Snapshot
+            : AnastasisWorldView::CropSnapshot(
+                Snapshot, 0, 0,
+                AnastasisWorldView::CanonicalCropWidth,
+                AnastasisWorldView::CanonicalCropHeight);
         AnastasisTerrainSurface::FGeometry Geometry;
         if (AnastasisTerrainSurface::Build(Crop, Geometry))
         {
@@ -304,9 +314,13 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             }
             ExperimentalSurface->SetVisibility(true);
             for (auto& Mesh : TerrainMeshes) if (Mesh) Mesh->SetVisibility(false);
-            // Emprise reelle = le crop 32x32 rendu, pas Plan (qui peut couvrir tout le monde demande).
+            // Emprise reelle = ce qui est reellement rendu, pas Plan : en mode 1 la tranche
+            // canonique meme si Plan couvre le monde, en mode 2 l emprise incarnee entiere.
             ActiveFootprintBounds = AnastasisWorldView::SnapshotBounds(Crop);
-            UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN source=96x96 crop=(0,0) 32x32 tiles=1024 vertices=%d triangles=%d water_triangles=%d material=%s boundary=tile_centers legacy_visible=0"),
+            // Emprise reportee telle qu'elle est batie : en mode 1 cette ligne imprime
+            // exactement la chaine scellee (source=96x96 crop=(0,0) 32x32 tiles=1024).
+            UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN source=%dx%d crop=(%d,%d) %dx%d tiles=%d vertices=%d triangles=%d water_triangles=%d material=%s boundary=tile_centers legacy_visible=0"),
+                Crop.SourceW, Crop.SourceH, Crop.OriginX, Crop.OriginY, Crop.W, Crop.H, Crop.Tiles.Num(),
                 Geometry.Vertices.Num(), Geometry.Triangles.Num()/3, Geometry.WaterTriangles.Num()/3,
                 SliceMaterial ? TEXT("slice") : TEXT("fallback"));
         }
