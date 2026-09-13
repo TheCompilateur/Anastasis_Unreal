@@ -7,9 +7,6 @@ documentent l'intention visuelle que la tranche 32×32 commence à approcher.
 
 | Planche | Sujet |
 |---|---|
-| `pontique-vallee-lac-ambiance.png` | ambiance générale — vallée, lac, brume, relief boisé |
-| `pontique-anatomie-du-sol-materiau.png` | gradient de sol terre sèche → humus → boue → saturation → rive → eau peu profonde |
-| `pontique-foret-ecologie-verticale.png` | strates forestières, écologie verticale, cibles PCG |
 | `pontique-camp-installation-rive.png` | ambiance camp établi en rive — feu commun, icône, séchage du poisson, quai |
 | `pontique-lisiere-defrichement-pcg.png` | logique de lisière forêt → coupe → souches → clairière → camp naissant, cible PCG |
 | `pontique-hydrologie-systeme-eau.png` | coupe hydrologique — eau profonde/peu profonde, rive saturée, vase, roseaux, zone inondable |
@@ -30,14 +27,14 @@ documentent l'intention visuelle que la tranche 32×32 commence à approcher.
 État Zéro (2026-09-13) : série numérotée 1 à 6, dont seuls 1 à 5 ont été fournis — le 6/6
 n'existe pas encore, ne pas supposer son sujet. Elle reprend systématiquement (coupe +
 carte en plan + checklist « à extraire pour Unreal ») le même terrain que trois planches
-plus anciennes : `pontique-vallee-lac-ambiance.png` (biome fondateur), `pontique-anatomie-
-du-sol-materiau.png` (anatomie du sol) et `pontique-foret-ecologie-verticale.png`
-(stratification forestière). Les anciennes ne sont pas supprimées — elles restent comme
-premières passes — mais pour ces trois sujets, la planche État Zéro correspondante est la
-référence à jour. Quatre doublons exacts (mêmes fichiers déposés deux fois sous des noms
-GUID différents, `... (1).png`) ont été supprimés plutôt que classés une deuxième fois.
+plus anciennes (`pontique-vallee-lac-ambiance.png` — biome fondateur, `pontique-anatomie-
+du-sol-materiau.png` — anatomie du sol, `pontique-foret-ecologie-verticale.png` —
+stratification forestière), en plus développé. Les trois anciennes ont été retirées : État
+Zéro 1/2/3 est désormais la seule référence pour ces trois sujets. Quatre doublons exacts
+(mêmes fichiers déposés deux fois sous des noms GUID différents, `... (1).png`) ont été
+supprimés plutôt que classés une deuxième fois.
 
-Lien avec le travail en cours : `pontique-anatomie-du-sol-materiau.png` décrit exactement
+Lien avec le travail en cours : `pontique-etat-zero-2-anatomie-sol.png` décrit exactement
 la transition que `AnastasisTerrainSurface` approxime aujourd'hui avec un seul degré de
 liberté — la bande `Shore` entre la terre et l'eau. Le reste du gradient reste à faire et
 n'est pas planifié.
