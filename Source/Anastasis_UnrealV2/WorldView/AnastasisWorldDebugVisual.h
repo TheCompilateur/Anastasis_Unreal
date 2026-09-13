@@ -16,6 +16,13 @@ namespace AnastasisWorldDebugVisual
 	inline constexpr double CubeMeshSize = 100.0;
 	inline constexpr double TileSlabScaleZ = 0.2;
 
+	/**
+	 * Hauteur du DESSUS d'une dalle au-dessus de l'altitude de sa tuile. La dalle est
+	 * centree sur Alt, donc sa face superieure -- celle sur laquelle on marche et sur
+	 * laquelle on pose des choses -- est une demi-epaisseur plus haut.
+	 */
+	inline constexpr double SlabTopOffsetZ = CubeMeshSize * TileSlabScaleZ * 0.5;
+
 	inline FVector TileScale()
 	{
 		const double XY = AnastasisWorldView::TileWorldSize / CubeMeshSize;

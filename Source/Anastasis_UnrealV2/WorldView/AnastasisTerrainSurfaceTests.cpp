@@ -1,6 +1,8 @@
 #include <limits>
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
+#include "WorldView/AnastasisPresentationResolver.h"
+#include "WorldView/AnastasisWorldDebugVisual.h"
 #include "Misc/AutomationTest.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -352,6 +354,113 @@ bool FAnastasisTerrainSampleHeight::RunTest(const FString&)
 
     AddInfo(FString::Printf(TEXT("TERRAIN_SAMPLE vertex_error=%.9f face_error=%.9f seam_error=%.9f crop_world_error=%.9f noncoplanar_cells=%d/961"),
         MaxVertexError, MaxFaceError, MaxSeamError, MaxCropAgreement, NonCoplanarCells));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisDressingOnGround, "Anastasis.Terrain.DressingOnGround", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisDressingOnGround::RunTest(const FString&)
+{
+    UWorld* World = nullptr;
+    for (const auto& Context : GEngine->GetWorldContexts()) if (Context.WorldType == EWorldType::Editor) { World = Context.World(); break; }
+    if (!World) { AddError(TEXT("No Editor world")); return false; }
+    auto* Var = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Terrain.Surface"));
+    const int32 Previous = Var->GetInt();
+    FActorSpawnParameters Params; Params.ObjectFlags |= RF_Transient;
+    auto* Actor = World->SpawnActor<AAnastasisWorldEmbodiment>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
+    if (!Actor) { AddError(TEXT("Spawn failed")); return false; }
+
+    // Le dressing est reparti sur plusieurs HISM (un par archetype) ; les sept HISM de sol
+    // portent le prefixe "Tiles_" et ne sont pas du dressing.
+    auto DressingTransforms = [Actor]()
+    {
+        TArray<FTransform> Out;
+        TArray<UHierarchicalInstancedStaticMeshComponent*> All; Actor->GetComponents(All);
+        for (auto* Mesh : All)
+        {
+            if (Mesh->GetName().StartsWith(TEXT("Tiles_"))) continue;
+            for (int32 I = 0; I < Mesh->GetInstanceCount(); ++I)
+            {
+                FTransform T;
+                if (Mesh->GetInstanceTransform(I, T, true)) Out.Add(T);
+            }
+        }
+        return Out;
+    };
+
+    const auto Full = AnastasisWorldView::CaptureCanonicalWorld(12345);
+    const double Tolerance = 1.e-3;
+
+    // --- Mode 2 : la surface couvre le monde. Chaque instance doit poser sa BASE sur la
+    //     hauteur echantillonnee SOUS SA POSITION JITTEE, pas sur l'altitude de sa tuile.
+    Var->Set(2, ECVF_SetByCode);
+    Actor->Embody(12345, 96, 96);
+    const TArray<FTransform> OnSurface = DressingTransforms();
+    TestEqual(TEXT("le compteur suit les instances reellement posees"), OnSurface.Num(), Actor->GetDressingInstanceCount());
+    TestTrue(TEXT("la carte porte du dressing"), OnSurface.Num() > 0);
+
+    double MaxGroundError = 0.0, MaxTileAltError = 0.0;
+    int32 OffTileAlt = 0;
+    for (const FTransform& T : OnSurface)
+    {
+        const FVector L = T.GetLocation();
+        const double Scale = T.GetScale3D().X;
+        const double Lift = 0.5 * AnastasisPresentation::EngineBasicShapeSize * Scale;
+        double GroundZ = 0.0;
+        if (!TestTrue(TEXT("chaque instance a du sol sous elle"), AnastasisTerrainSurface::SampleHeight(Full, L.X, L.Y, GroundZ))) return false;
+        MaxGroundError = FMath::Max(MaxGroundError, FMath::Abs(L.Z - Lift - GroundZ));
+
+        // Et la preuve que le correctif sert a quelque chose : sur une pente, la hauteur
+        // de la tuile n'est PAS la hauteur du sol sous l'instance jittee. Si les deux
+        // coincidaient partout, ce test ne prouverait rien.
+        const int32 TileX = FMath::Clamp(static_cast<int32>(L.X / AnastasisWorldView::TileWorldSize), 0, 95);
+        const int32 TileY = FMath::Clamp(static_cast<int32>(L.Y / AnastasisWorldView::TileWorldSize), 0, 95);
+        const double TileZ = Full.Tiles[TileY * 96 + TileX].Alt * AnastasisWorldView::AltitudeScale;
+        const double Delta = FMath::Abs(GroundZ - TileZ);
+        MaxTileAltError = FMath::Max(MaxTileAltError, Delta);
+        if (Delta > 1.0) ++OffTileAlt;
+    }
+    TestTrue(TEXT("chaque base repose exactement sur le sol rendu"), MaxGroundError <= Tolerance);
+    TestTrue(TEXT("le correctif deplace reellement des instances"), OffTileAlt > 0);
+
+    // --- Mode 1 : la surface ne couvre que la tranche 32x32. Les tuiles hors emprise
+    //     n'ont pas de sol : elles doivent etre REFUSEES, pas suspendues dans le vide.
+    Var->Set(1, ECVF_SetByCode);
+    Actor->Embody(12345, 96, 96);
+    const TArray<FTransform> OnSlice = DressingTransforms();
+    TestTrue(TEXT("mode 1 pose moins d'instances que mode 2"), OnSlice.Num() < OnSurface.Num());
+    TestTrue(TEXT("mode 1 pose quand meme quelque chose"), OnSlice.Num() > 0);
+    for (const FTransform& T : OnSlice)
+    {
+        const FVector L = T.GetLocation();
+        TestTrue(TEXT("aucune instance hors de la tranche rendue"),
+            L.X >= 0.0 && L.X <= 32.0 * AnastasisWorldView::TileWorldSize
+            && L.Y >= 0.0 && L.Y <= 32.0 * AnastasisWorldView::TileWorldSize);
+    }
+
+    // --- Mode 0 : pas de surface. Le sol est le DESSUS de la dalle, pas son centre --
+    //     sinon l'instance s'enfonce d'une demi-epaisseur dans la dalle.
+    Var->Set(0, ECVF_SetByCode);
+    Actor->Embody(12345, 96, 96);
+    const TArray<FTransform> OnSlab = DressingTransforms();
+    TestEqual(TEXT("mode 0 pose sur tout le monde"), OnSlab.Num(), OnSurface.Num());
+    double MaxSlabError = 0.0;
+    for (const FTransform& T : OnSlab)
+    {
+        const FVector L = T.GetLocation();
+        const double Lift = 0.5 * AnastasisPresentation::EngineBasicShapeSize * T.GetScale3D().X;
+        const int32 TileX = FMath::Clamp(static_cast<int32>(L.X / AnastasisWorldView::TileWorldSize), 0, 95);
+        const int32 TileY = FMath::Clamp(static_cast<int32>(L.Y / AnastasisWorldView::TileWorldSize), 0, 95);
+        const double SlabTop = Full.Tiles[TileY * 96 + TileX].Alt * AnastasisWorldView::AltitudeScale
+            + AnastasisWorldDebugVisual::SlabTopOffsetZ;
+        MaxSlabError = FMath::Max(MaxSlabError, FMath::Abs(L.Z - Lift - SlabTop));
+    }
+    TestTrue(TEXT("chaque base repose sur le dessus de sa dalle"), MaxSlabError <= Tolerance);
+
+    AddInfo(FString::Printf(TEXT("DRESSING_ON_GROUND surface=%d slice=%d slab=%d refused_by_slice=%d ground_error=%.9f slab_error=%.9f moved_by_fix=%d max_tile_alt_delta=%.3f"),
+        OnSurface.Num(), OnSlice.Num(), OnSlab.Num(), OnSurface.Num() - OnSlice.Num(),
+        MaxGroundError, MaxSlabError, OffTileAlt, MaxTileAltError));
+
+    Actor->Destroy(); Var->Set(Previous, ECVF_SetByCode);
     return true;
 }
 #endif
