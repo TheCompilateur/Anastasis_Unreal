@@ -21,6 +21,21 @@ documentent l'intention visuelle que la tranche 32×32 commence à approcher.
 | `pontique-usure-materiaux-vieillissement.png` | vieillissement procédural par matériau (bois/pierre/torchis/textile/métal/tuile/corde) sur un même lieu |
 | `pontique-synthese-lumiere-meteo-canonique.png` | planche de synthèse — récapitule tiers/grammaire/props/usure, ajoute 6 états lumière/météo canoniques sur une même géométrie |
 | `pontique-production-frame-test-integration.png` | frame de production Unreal 5.8.2 (Lumen/Nanite/Foliage/World Partition ON) — scène neutre pour valider terrain+forêt+eau+bâtiments+PNJ avant tout habillage spectaculaire |
+| `pontique-etat-zero-1-biome-fondateur.png` | État Zéro 1/6 — macro-territoire avant l'homme : coupe topographique sommet→rive, carte des biomes en plan |
+| `pontique-etat-zero-2-anatomie-sol.png` | État Zéro 2/6 — anatomie du sol du sec au saturé, coupe de transition, palette matériaux |
+| `pontique-etat-zero-3-stratification-forestiere.png` | État Zéro 3/6 — strates forestières (canopée → litière), coupe écologique, checklist PCG forestier |
+| `pontique-etat-zero-4-hydrologie-territoire.png` | État Zéro 4/6 — hydrologie du relief au plan d'eau, coupe hydrologique, gradient de profondeur en plan |
+| `pontique-etat-zero-5-lisieres-transitions.png` | État Zéro 5/6 — continuum forêt dense → lisière → clairière → prairie → rive, vue aérienne des transitions |
+
+État Zéro (2026-09-13) : série numérotée 1 à 6, dont seuls 1 à 5 ont été fournis — le 6/6
+n'existe pas encore, ne pas supposer son sujet. Elle reprend systématiquement (coupe +
+carte en plan + checklist « à extraire pour Unreal ») le même terrain que trois planches
+plus anciennes : `pontique-vallee-lac-ambiance.png` (biome fondateur), `pontique-anatomie-
+du-sol-materiau.png` (anatomie du sol) et `pontique-foret-ecologie-verticale.png`
+(stratification forestière). Les anciennes ne sont pas supprimées — elles restent comme
+premières passes — mais pour ces trois sujets, la planche État Zéro correspondante est la
+référence à jour. Quatre doublons exacts (mêmes fichiers déposés deux fois sous des noms
+GUID différents, `... (1).png`) ont été supprimés plutôt que classés une deuxième fois.
 
 Lien avec le travail en cours : `pontique-anatomie-du-sol-materiau.png` décrit exactement
 la transition que `AnastasisTerrainSurface` approxime aujourd'hui avec un seul degré de
