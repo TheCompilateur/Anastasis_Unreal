@@ -66,9 +66,20 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> TerrainMeshes[7];
 
-	/** One HISM per AnastasisPresentation::EArchetype, indexed by static_cast<int32>(Archetype). Slot 0 (None) is unused. Literal bound (not EArchetype::Count) because UHT requires a literal array size on a UPROPERTY; see the matching static_assert in the .cpp. */
+	/**
+	 * One HISM per (archetype, variant) actually used by the current embodiment. Built on
+	 * demand from the presentation registry instead of in the constructor: the mesh set is
+	 * data now, so it is not known until EmbodyCrop reads it.
+	 */
 	UPROPERTY()
-	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> DressingMeshes[3];
+	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> DressingMeshes;
+
+	/** "<ArchetypeId>_v<VariantIndex>" -> index into DressingMeshes. */
+	TMap<FName, int32> DressingSlotByKey;
+
+	/** The HISM for one resolved look, created and registered on first use. */
+	UHierarchicalInstancedStaticMeshComponent* GetOrCreateDressingMesh(
+		const AnastasisPresentation::FResolvedPresentation& Resolved);
 
 	int32 DressingInstanceCount = 0;
 

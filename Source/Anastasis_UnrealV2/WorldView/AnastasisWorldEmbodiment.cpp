@@ -1,5 +1,6 @@
 #include "WorldView/AnastasisWorldEmbodiment.h"
 #include "ProceduralMeshComponent.h"
+#include "WorldView/AnastasisPresentationRegistry.h"
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisTerrainSurface.h"
 
@@ -74,7 +75,6 @@ AAnastasisWorldEmbodiment::AAnastasisWorldEmbodiment()
 	}
 
 	static_assert(AnastasisWorld::TileTypeCount == 7, "TerrainMeshes[7] must match ETileType");
-	static_assert(static_cast<int32>(AnastasisPresentation::EArchetype::Count) == 3, "DressingMeshes[3] must match EArchetype");
 
 	for (int32 TypeIndex = 0; TypeIndex < AnastasisWorld::TileTypeCount; ++TypeIndex)
 	{
@@ -93,35 +93,34 @@ AAnastasisWorldEmbodiment::AAnastasisWorldEmbodiment()
 		}
 		TerrainMeshes[TypeIndex] = Mesh;
 	}
+	// Dressing components are NOT created here: which meshes exist is presentation data
+	// (see UAnastasisPresentationRegistry), read at EmbodyCrop time, not compile time.
+}
 
-	// Dressing (Tree/Ruin): two explicit finders, not a loop, because
-	// ConstructorHelpers::FObjectFinder relies on `static` to resolve its asset exactly
-	// once per translation unit -- a static local inside a loop would only ever resolve
-	// the first iteration's path.
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> TreeMesh(AnastasisPresentation::TreeMeshPath);
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> RuinMesh(AnastasisPresentation::RuinMeshPath);
-	UStaticMesh* ArchetypeMesh[static_cast<int32>(AnastasisPresentation::EArchetype::Count)] = {};
-	ArchetypeMesh[static_cast<int32>(AnastasisPresentation::EArchetype::Tree)] = TreeMesh.Succeeded() ? TreeMesh.Object : nullptr;
-	ArchetypeMesh[static_cast<int32>(AnastasisPresentation::EArchetype::Ruin)] = RuinMesh.Succeeded() ? RuinMesh.Object : nullptr;
+UHierarchicalInstancedStaticMeshComponent* AAnastasisWorldEmbodiment::GetOrCreateDressingMesh(
+	const AnastasisPresentation::FResolvedPresentation& Resolved)
+{
+	const FName Key(*FString::Printf(TEXT("Dressing_%s_v%d"),
+		*Resolved.Entry->ArchetypeId.ToString(), Resolved.VariantIndex));
 
-	for (const AnastasisPresentation::FRenderableDefinition& Definition : AnastasisPresentation::AllArchetypes())
+	if (const int32* Existing = DressingSlotByKey.Find(Key))
 	{
-		const int32 SlotIndex = static_cast<int32>(Definition.Archetype);
-		UHierarchicalInstancedStaticMeshComponent* Mesh = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(
-			FName(*FString::Printf(TEXT("Dressing_%s"), *Definition.ArchetypeId.ToString())));
-		Mesh->SetupAttachment(Root);
-		Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		Mesh->SetCollisionProfileName(TEXT("BlockAll"));
-		Mesh->SetGenerateOverlapEvents(false);
-		Mesh->SetCastShadow(true);
-		Mesh->SetMobility(EComponentMobility::Movable);
-		Mesh->SetCanEverAffectNavigation(false);
-		if (ArchetypeMesh[SlotIndex])
-		{
-			Mesh->SetStaticMesh(ArchetypeMesh[SlotIndex]);
-		}
-		DressingMeshes[SlotIndex] = Mesh;
+		return DressingMeshes.IsValidIndex(*Existing) ? DressingMeshes[*Existing].Get() : nullptr;
 	}
+
+	UHierarchicalInstancedStaticMeshComponent* Mesh =
+		NewObject<UHierarchicalInstancedStaticMeshComponent>(this, Key);
+	Mesh->SetupAttachment(GetRootComponent());
+	Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	Mesh->SetCollisionProfileName(TEXT("BlockAll"));
+	Mesh->SetGenerateOverlapEvents(false);
+	Mesh->SetCastShadow(true);
+	Mesh->SetMobility(EComponentMobility::Movable);
+	Mesh->SetCanEverAffectNavigation(false);
+	Mesh->RegisterComponent();
+
+	DressingSlotByKey.Add(Key, DressingMeshes.Add(Mesh));
+	return Mesh;
 }
 
 void AAnastasisWorldEmbodiment::BeginPlay()
@@ -212,48 +211,52 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
 		}
 	}
 
-	// Dressing: discrete instances (trees, ruins) resolved from tile type via
-	// AnastasisPresentationResolver. Orthogonal to the DEBUG/Surface ground toggle below --
-	// presence is decided entirely by Plan.Types (simulation truth), never by which ground
-	// representation is currently active.
+	// Dressing: discrete instances (trees, ruins) whose look comes from the presentation
+	// registry, not from this file. Orthogonal to the DEBUG/Surface ground toggle below --
+	// presence is decided by Plan.Types (simulation truth) plus the data entry's bEnabled
+	// flag, never by which ground representation is currently active.
 	for (UHierarchicalInstancedStaticMeshComponent* Mesh : DressingMeshes)
 	{
 		if (Mesh)
 		{
 			Mesh->ClearInstances();
-			if (BaseShapeMaterial)
-			{
-				Mesh->SetMaterial(0, BaseShapeMaterial);
-			}
-		}
-	}
-	for (const AnastasisPresentation::FRenderableDefinition& Definition : AnastasisPresentation::AllArchetypes())
-	{
-		UHierarchicalInstancedStaticMeshComponent* Mesh = DressingMeshes[static_cast<int32>(Definition.Archetype)];
-		if (Mesh && BaseShapeMaterial)
-		{
-			UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
-			Mid->SetVectorParameterValue(TEXT("Color"), Definition.Tint);
-			Mesh->SetMaterial(0, Mid);
 		}
 	}
 
 	DressingInstanceCount = 0;
 	for (int32 Index = 0; Index < Plan.TileCount; ++Index)
 	{
-		const AnastasisPresentation::FRenderableDefinition* Definition = AnastasisPresentation::Resolve(Plan.Types[Index]);
-		if (!Definition)
-		{
-			continue;
-		}
-		UHierarchicalInstancedStaticMeshComponent* Mesh = DressingMeshes[static_cast<int32>(Definition->Archetype)];
-		if (!Mesh || !Mesh->GetStaticMesh())
-		{
-			continue;
-		}
 		const AnastasisWorldView::FVisualTile& SourceTile = Snapshot.Tiles[Index];
+		AnastasisPresentation::FResolvedPresentation Resolved;
+		if (!AnastasisPresentation::ResolvePresentation(
+				Plan.Types[Index], Seed, SourceTile.X, SourceTile.Y, Resolved))
+		{
+			continue;
+		}
+
+		UHierarchicalInstancedStaticMeshComponent* Mesh = GetOrCreateDressingMesh(Resolved);
+		if (!Mesh)
+		{
+			continue;
+		}
+		// Re-applied every embodiment: the data asset may have changed since the last one.
+		if (Mesh->GetStaticMesh() != Resolved.Mesh)
+		{
+			Mesh->SetStaticMesh(Resolved.Mesh);
+		}
+		if (Resolved.MaterialOverride)
+		{
+			Mesh->SetMaterial(0, Resolved.MaterialOverride);
+		}
+		else if (BaseShapeMaterial)
+		{
+			UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
+			Mid->SetVectorParameterValue(TEXT("Color"), Resolved.Entry->Tint);
+			Mesh->SetMaterial(0, Mid);
+		}
+
 		const FTransform InstanceTransform = AnastasisPresentation::ResolveInstanceTransform(
-			*Definition, Seed, SourceTile.X, SourceTile.Y, Plan.Alts[Index]);
+			*Resolved.Entry, Seed, SourceTile.X, SourceTile.Y, Plan.Alts[Index]);
 		Mesh->AddInstance(InstanceTransform, false);
 		++DressingInstanceCount;
 	}
@@ -455,10 +458,12 @@ void AAnastasisWorldEmbodiment::LogEmbodiment() const
 	UE_LOG(
 		LogAnastasis_UnrealV2,
 		Display,
-		TEXT("ANASTASIS_PRESENTATION dressing_instances=%d tree_tiles=%d ruin_tiles=%d"),
+		TEXT("ANASTASIS_PRESENTATION dressing_instances=%d tree_tiles=%d ruin_tiles=%d source=%s components=%d"),
 		DressingInstanceCount,
 		Plan.TerrainCounts[static_cast<uint8>(AnastasisWorld::ETileType::Forest)],
-		Plan.TerrainCounts[static_cast<uint8>(AnastasisWorld::ETileType::Ruin)]);
+		Plan.TerrainCounts[static_cast<uint8>(AnastasisWorld::ETileType::Ruin)],
+		AnastasisPresentation::IsRegistryDataDriven() ? TEXT("asset") : TEXT("code_defaults"),
+		DressingMeshes.Num());
 
 	for (const int32* XY : SampleXY)
 	{

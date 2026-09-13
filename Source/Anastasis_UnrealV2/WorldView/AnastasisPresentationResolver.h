@@ -3,67 +3,77 @@
 #include "CoreMinimal.h"
 #include "World/AnastasisWorld.h"
 
+class UAnastasisPresentationRegistry;
+class UStaticMesh;
+class UMaterialInterface;
+struct FAnastasisPresentationEntry;
+
 /**
  * VISUAL TRANSLATION LAYER OWNER.
  *
- * WorldSemanticState (AnastasisWorld::ETileType) -> FRenderableDefinition -> deterministic
- * per-tile transform. A logical tile type never names a mesh directly: MeshPath/Tint here
- * are the one seam an asset-integration pass swaps later, without touching worldgen,
- * WorldView, or the placement math below.
+ * WorldSemanticState (AnastasisWorld::ETileType) -> presentation data -> deterministic
+ * variant + transform. The mapping itself now lives in a UAnastasisPresentationRegistry
+ * data asset (RegistryAssetPath); this file only reads it. No mesh path, tint or scale is
+ * decided in C++ any more except in the code-default fallback.
  *
- * REACHABLE IN THIS SLICE:: Forest -> Tree, Ruin -> Ruin. Every other ETileType resolves to
- * nullptr (ground color only; see AnastasisTerrainSurface, untouched by this file). Roads and
- * named building categories (House/Market/Workshop...) have no source tile/entity in
- * AnastasisWorld today: see docs/unreal/VISUAL_PIPELINE_AUDIT.md. Not invented here.
+ * REACHABLE IN THIS SLICE:: Forest and Ruin. Every other ETileType resolves to nothing
+ * (ground colour only; see AnastasisTerrainSurface, untouched). Roads and named building
+ * categories have no source in AnastasisWorld — see docs/unreal/VISUAL_PIPELINE_AUDIT.md.
  *
- * Presence of an instance is decided ENTIRELY by Resolve(Type) — i.e. by simulation truth.
- * ResolveInstanceTransform only jitters position/yaw/scale; it never decides whether a tile
- * gets an instance.
+ * Presence of an instance is decided ENTIRELY by simulation truth plus the data entry's
+ * bEnabled flag. SelectVariantIndex/ResolveInstanceTransform only choose *which* look and
+ * *where*; they never invent a tile.
  */
 namespace AnastasisPresentation
 {
-	enum class EArchetype : uint8
-	{
-		None = 0,
-		Tree = 1,
-		Ruin = 2,
-		Count = 3,
-	};
+	/** Fixed path + code fallback, the same convention AAnastasisWorldEmbodiment::ResolveSliceMaterial already uses for M_AnastasisSlice. */
+	inline constexpr const TCHAR* RegistryAssetPath = TEXT("/Game/Anastasis/Presentation/DA_AnastasisPresentation.DA_AnastasisPresentation");
 
-	inline constexpr const TCHAR* TreeMeshPath = TEXT("/Engine/BasicShapes/Cone.Cone");
-	inline constexpr const TCHAR* RuinMeshPath = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
-
-	/** UE BasicShapes (Cube/Cone/Cylinder/...) share this bounding size by convention; see AnastasisWorldDebugVisual::CubeMeshSize for the cube case this mirrors. */
+	/** UE BasicShapes (Cube/Cone/Cylinder/...) share this bounding size by convention. */
 	inline constexpr double EngineBasicShapeSize = 100.0;
 
-	struct FRenderableDefinition
+	/** One tile's fully resolved look: the data entry plus the variant deterministically chosen for it. */
+	struct FResolvedPresentation
 	{
-		EArchetype Archetype = EArchetype::None;
-		/** Stable id for logging / a future data-asset lookup key. Not a mesh path. */
-		FName ArchetypeId;
-		const TCHAR* MeshPath = nullptr;
-		/** Placeholder-only tint (matches AnastasisTerrainSurface's ground palette for the same ETileType so instance and ground read as one family). Ignored once a real material replaces BasicShapeMaterial. */
-		FLinearColor Tint = FLinearColor::White;
-		/** Scale factors applied to the ~100uu engine primitive (EngineBasicShapeSize convention). */
-		double MinUniformScale = 1.0;
-		double MaxUniformScale = 1.0;
-		/** Max XY jitter, as a fraction of AnastasisWorldView::TileWorldSize. */
-		double JitterRadiusFraction = 0.0;
+		const FAnastasisPresentationEntry* Entry = nullptr;
+		int32 VariantIndex = INDEX_NONE;
+		UStaticMesh* Mesh = nullptr;
+		UMaterialInterface* MaterialOverride = nullptr;
 	};
 
-	/** WorldSemanticState -> RenderableDefinition. nullptr = no discrete instance for this type in the current slice. */
-	const FRenderableDefinition* Resolve(AnastasisWorld::ETileType Type);
+	/** The live registry: the data asset when it loads, the code defaults otherwise. Never null. */
+	const UAnastasisPresentationRegistry& GetRegistry();
 
-	/** Every archetype this slice can instance, in stable EArchetype order. Drives the per-archetype HISM set in AAnastasisWorldEmbodiment. */
-	const TArray<FRenderableDefinition>& AllArchetypes();
+	/** True while GetRegistry() is serving the data asset rather than the code fallback. */
+	bool IsRegistryDataDriven();
+
+	/** Drops the cache so the next GetRegistry() re-resolves. For tests and for re-editing the asset in-editor. */
+	void InvalidateRegistryCache();
+
+	/** Enabled entry for this semantic type, or nullptr when the type renders no instance. */
+	const FAnastasisPresentationEntry* FindEntry(AnastasisWorld::ETileType Type);
 
 	/**
-	 * Deterministic placement for one tile: same (Seed, TileX, TileY, Definition) always
-	 * yields the same transform. Location.Z is lifted so the instance's BASE, not its
-	 * center, sits at Alt (engine primitives are center-pivoted).
+	 * Deterministic variant choice: same (Seed, TileX, TileY) and same entry always give the
+	 * same index. Only variants carrying a mesh are eligible. INDEX_NONE = nothing to draw.
+	 */
+	int32 SelectVariantIndex(const FAnastasisPresentationEntry& Entry, uint32 Seed, int32 TileX, int32 TileY);
+
+	/** Entry + variant + loaded assets for one tile. false = nothing renders here. Loads the variant's mesh synchronously. */
+	bool ResolvePresentation(
+		AnastasisWorld::ETileType Type,
+		uint32 Seed,
+		int32 TileX,
+		int32 TileY,
+		FResolvedPresentation& Out);
+
+	/**
+	 * Deterministic placement: same (Seed, TileX, TileY, Entry) always yields the same
+	 * transform. Location.Z is lifted so the instance's BASE, not its centre, sits at Alt
+	 * (engine primitives are centre-pivoted).
 	 */
 	FTransform ResolveInstanceTransform(
-		const FRenderableDefinition& Definition,
+		const FAnastasisPresentationEntry& Entry,
 		uint32 Seed,
 		int32 TileX,
 		int32 TileY,
