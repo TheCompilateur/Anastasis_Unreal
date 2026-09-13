@@ -479,6 +479,7 @@ TSharedRef<FJsonObject> UAnastasisWorldProbeSubsystem::BuildSnapshotObject() con
 		TerrainObj->SetNumberField(TEXT("crop_h"), Plan.H);
 		TerrainObj->SetNumberField(TEXT("tile_count"), Plan.TileCount);
 		TerrainObj->SetNumberField(TEXT("instance_count"), Embodiment->GetInstanceCount());
+		TerrainObj->SetNumberField(TEXT("dressing_instance_count"), Embodiment->GetDressingInstanceCount());
 		TerrainObj->SetNumberField(TEXT("min_alt_uu"), Plan.MinAlt * AnastasisWorldView::AltitudeScale);
 		TerrainObj->SetNumberField(TEXT("max_alt_uu"), Plan.MaxAlt * AnastasisWorldView::AltitudeScale);
 

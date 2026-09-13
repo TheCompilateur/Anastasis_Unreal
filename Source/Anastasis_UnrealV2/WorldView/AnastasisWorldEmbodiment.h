@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisWorldView.h"
 #include "AnastasisWorldEmbodiment.generated.h"
 
@@ -33,6 +34,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug")
 	int32 GetInstanceCount() const;
 
+	/** Discrete presentation instances (trees, ruins) placed by AnastasisPresentationResolver on top of the ground representation. Independent of GetInstanceCount(), which is legacy DEBUG cubes only. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug")
+	int32 GetDressingInstanceCount() const { return DressingInstanceCount; }
+
 	/** Bouton Details : surface continue coloree + nappe d'eau. */
 	UFUNCTION(CallInEditor, BlueprintCallable, Category = "Anastasis|Debug")
 	void ShowSliceSurface();
@@ -60,6 +65,12 @@ protected:
 	TObjectPtr<UProceduralMeshComponent> ExperimentalSurface;
 	UPROPERTY()
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> TerrainMeshes[7];
+
+	/** One HISM per AnastasisPresentation::EArchetype, indexed by static_cast<int32>(Archetype). Slot 0 (None) is unused. Literal bound (not EArchetype::Count) because UHT requires a literal array size on a UPROPERTY; see the matching static_assert in the .cpp. */
+	UPROPERTY()
+	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> DressingMeshes[3];
+
+	int32 DressingInstanceCount = 0;
 
 	UPROPERTY()
 	TObjectPtr<UMaterialInterface> BaseShapeMaterial;

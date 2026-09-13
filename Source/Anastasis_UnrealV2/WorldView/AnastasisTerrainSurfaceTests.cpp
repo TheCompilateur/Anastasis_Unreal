@@ -153,7 +153,14 @@ bool FAnastasisTerrainFallback::RunTest(const FString&)
     TestTrue(TEXT("surface visible"),Surface && Surface->IsVisible() && Surface->GetProcMeshSection(0));
     Var->Set(0,ECVF_SetByCode); Actor->Embody(12345,96,96);
     TestTrue(TEXT("surface disabled"),Surface && !Surface->IsVisible());
-    TArray<UHierarchicalInstancedStaticMeshComponent*> Legacy; Actor->GetComponents(Legacy);
+    // GetComponents(UHierarchicalInstancedStaticMeshComponent) also finds the
+    // presentation-resolver dressing meshes (Tree/Ruin) added alongside the 7 legacy
+    // per-ETileType meshes: same component class, orthogonal purpose. Filter by the
+    // legacy naming convention ("Tiles_<TypeName>", see TerrainComponentName in
+    // AnastasisWorldEmbodiment.cpp) so this test keeps checking exactly what it says.
+    TArray<UHierarchicalInstancedStaticMeshComponent*> AllHism; Actor->GetComponents(AllHism);
+    TArray<UHierarchicalInstancedStaticMeshComponent*> Legacy;
+    for (auto* Mesh : AllHism) { if (Mesh->GetName().StartsWith(TEXT("Tiles_"))) Legacy.Add(Mesh); }
     TestEqual(TEXT("7 legacy classes"),Legacy.Num(),7);
     for(auto* Mesh:Legacy) TestTrue(TEXT("legacy restored"),Mesh->IsVisible());
     TestEqual(TEXT("9216 legacy instances"),Actor->GetInstanceCount(),9216);
