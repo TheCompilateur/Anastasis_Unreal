@@ -269,5 +269,90 @@ bool FAnastasisTerrainWorldExtent::RunTest(const FString&)
         World.Vertices.Num(), World.Triangles.Num()/3, Boundary, Full.MinAlt, Full.MaxAlt));
     return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainSampleHeight, "Anastasis.Terrain.SampleHeight", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainSampleHeight::RunTest(const FString&)
+{
+    const auto Full = AnastasisWorldView::CaptureCanonicalWorld(12345);
+    const auto Crop = AnastasisWorldView::CropSnapshot(Full, 0, 0, 32, 32);
+    AnastasisTerrainSurface::FGeometry G;
+    if (!TestTrue(TEXT("build"), AnastasisTerrainSurface::Build(Crop, G))) return false;
+
+    const double Tolerance = 1.e-6;
+    double Z = 0.0;
+
+    // 1. Sur un sommet, l'echantillon EST le sommet. Si ca ne tient pas, tout ce qu'on
+    //    pose sur la carte est decale d'entree.
+    double MaxVertexError = 0.0;
+    for (int32 I = 0; I < G.Vertices.Num(); ++I)
+    {
+        if (!TestTrue(TEXT("echantillon valide sur un sommet"), AnastasisTerrainSurface::SampleHeight(Crop, G.Vertices[I].X, G.Vertices[I].Y, Z))) return false;
+        MaxVertexError = FMath::Max(MaxVertexError, FMath::Abs(Z - G.Vertices[I].Z));
+    }
+    TestTrue(TEXT("erreur nulle sur les 1024 sommets"), MaxVertexError <= Tolerance);
+
+    // 2. LE test qui compte : au centre de gravite d'un triangle, un plan vaut la moyenne
+    //    de ses trois sommets. Si l'echantillon suit vraiment la face rendue, il rend
+    //    exactement cette moyenne -- une bilineaire, elle, s'en ecarterait des que les
+    //    quatre coins de la cellule ne sont pas coplanaires.
+    double MaxFaceError = 0.0;
+    int32 NonCoplanarCells = 0;
+    for (int32 I = 0; I < G.Triangles.Num(); I += 3)
+    {
+        const FVector& VA = G.Vertices[G.Triangles[I]];
+        const FVector& VB = G.Vertices[G.Triangles[I+1]];
+        const FVector& VC = G.Vertices[G.Triangles[I+2]];
+        const FVector Centroid = (VA + VB + VC) / 3.0;
+        if (!TestTrue(TEXT("echantillon valide au centre d'une face"), AnastasisTerrainSurface::SampleHeight(Crop, Centroid.X, Centroid.Y, Z))) return false;
+        MaxFaceError = FMath::Max(MaxFaceError, FMath::Abs(Z - Centroid.Z));
+    }
+    TestTrue(TEXT("l'echantillon suit le plan de chaque face rendue"), MaxFaceError <= Tolerance);
+
+    // Le test precedent ne vaut que si la surface a du relief non coplanaire : sinon
+    // n'importe quelle interpolation passerait. On le prouve au lieu de le supposer.
+    for (int32 Y = 0; Y < 31; ++Y)
+        for (int32 X = 0; X < 31; ++X)
+        {
+            const int32 A = Y*32+X;
+            const double ZA = G.Vertices[A].Z, ZB = G.Vertices[A+1].Z, ZC = G.Vertices[A+32].Z, ZD = G.Vertices[A+33].Z;
+            if (FMath::Abs((ZA + ZD) - (ZB + ZC)) > 1.e-3) ++NonCoplanarCells;
+        }
+    TestTrue(TEXT("la tranche contient des cellules non coplanaires"), NonCoplanarCells > 0);
+
+    // 3. Continuite sur la diagonale B-C, la couture entre les deux triangles : les deux
+    //    branches doivent rendre la meme hauteur, sinon la carte a une arete fantome.
+    double MaxSeamError = 0.0;
+    for (int32 Y = 0; Y < 31; ++Y)
+        for (int32 X = 0; X < 31; ++X)
+        {
+            const int32 A = Y*32+X;
+            const FVector Mid = (G.Vertices[A+1] + G.Vertices[A+32]) * 0.5;
+            if (!TestTrue(TEXT("echantillon valide sur la diagonale"), AnastasisTerrainSurface::SampleHeight(Crop, Mid.X, Mid.Y, Z))) return false;
+            MaxSeamError = FMath::Max(MaxSeamError, FMath::Abs(Z - Mid.Z));
+        }
+    TestTrue(TEXT("pas de discontinuite sur la diagonale"), MaxSeamError <= Tolerance);
+
+    // 4. Refus hors emprise. Les sommets etant au CENTRE des tuiles, il n'y a pas de sol
+    //    dans la demi-tuile exterieure : y poser quoi que ce soit serait le poser sur rien.
+    TestFalse(TEXT("refus avant le premier sommet"), AnastasisTerrainSurface::SampleHeight(Crop, 10.0, 1600.0, Z));
+    TestFalse(TEXT("refus au-dela du dernier sommet"), AnastasisTerrainSurface::SampleHeight(Crop, 3190.0, 1600.0, Z));
+    TestFalse(TEXT("refus en Y hors emprise"), AnastasisTerrainSurface::SampleHeight(Crop, 1600.0, -50.0, Z));
+    TestFalse(TEXT("refus sur une coordonnee non finie"), AnastasisTerrainSurface::SampleHeight(Crop, std::numeric_limits<double>::quiet_NaN(), 1600.0, Z));
+
+    // 5. Le monde entier, et le decalage d'emprise : un point donne doit rendre la MEME
+    //    hauteur qu'on l'echantillonne dans la tranche ou dans le monde.
+    double MaxCropAgreement = 0.0;
+    double ZWorld = 0.0;
+    for (int32 I = 0; I < G.Vertices.Num(); ++I)
+    {
+        if (!TestTrue(TEXT("echantillon monde valide"), AnastasisTerrainSurface::SampleHeight(Full, G.Vertices[I].X, G.Vertices[I].Y, ZWorld))) return false;
+        MaxCropAgreement = FMath::Max(MaxCropAgreement, FMath::Abs(ZWorld - G.Vertices[I].Z));
+    }
+    TestTrue(TEXT("tranche et monde s'accordent sur la meme hauteur"), MaxCropAgreement <= Tolerance);
+
+    AddInfo(FString::Printf(TEXT("TERRAIN_SAMPLE vertex_error=%.9f face_error=%.9f seam_error=%.9f crop_world_error=%.9f noncoplanar_cells=%d/961"),
+        MaxVertexError, MaxFaceError, MaxSeamError, MaxCropAgreement, NonCoplanarCells));
+    return true;
+}
 #endif
 
