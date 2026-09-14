@@ -4,6 +4,7 @@
 
 #include "Anastasis_UnrealV2.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "WorldView/AnastasisVisualMode.h"
 #include "WorldView/AnastasisWorldAtmosphere.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
@@ -52,10 +53,34 @@ void AAnastasis_UnrealV2GameMode::BeginPlay()
 			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_ATMOSPHERE applied=0 reason=cvar_off"));
 		}
 
-		World->SpawnActor<AAnastasisWorldEmbodiment>(
-			AAnastasisWorldEmbodiment::StaticClass(),
-			FVector::ZeroVector,
-			FRotator::ZeroRotator,
-			Params);
+		if (ShouldSpawnEmbodiment(World))
+		{
+			World->SpawnActor<AAnastasisWorldEmbodiment>(
+				AAnastasisWorldEmbodiment::StaticClass(),
+				FVector::ZeroVector,
+				FRotator::ZeroRotator,
+				Params);
+		}
+		else
+		{
+			UE_LOG(
+				LogAnastasis_UnrealV2,
+				Display,
+				TEXT("ANASTASIS_VISUAL_MODE embodiment already placed in level; no spawn"));
+		}
 	}
+}
+
+bool AAnastasis_UnrealV2GameMode::ShouldSpawnEmbodiment(const UWorld* World)
+{
+	if (!World)
+	{
+		return false;
+	}
+
+	for (TActorIterator<AAnastasisWorldEmbodiment> It(const_cast<UWorld*>(World)); It; ++It)
+	{
+		return false;
+	}
+	return true;
 }

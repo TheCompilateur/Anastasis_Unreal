@@ -19,6 +19,14 @@ public:
 	AAnastasis_UnrealV2GameMode();
 
 	virtual void BeginPlay() override;
+
+	/**
+	 * True when this world carries no AAnastasisWorldEmbodiment yet and BeginPlay must spawn one.
+	 * A level-placed embodiment always wins: Lvl_AnastasisSlice places one at the origin, and
+	 * spawning a second there embodies the identical world twice, stacked and Z-fighting, with
+	 * every instance count doubled. Public and static so the rule is testable without PIE.
+	 */
+	static bool ShouldSpawnEmbodiment(const UWorld* World);
 };
 
 
