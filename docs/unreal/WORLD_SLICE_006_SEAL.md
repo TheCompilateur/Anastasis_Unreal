@@ -1,5 +1,15 @@
 # WORLD_SLICE_006 :: SEALED
 
+> **Note de supersession (2026-09-13, posterieure au sceau).** Ce document reste
+> le compte rendu verifie de `2c0b330` et n'est pas modifie. Une affirmation
+> qu'il contient ne decrit plus HEAD : « la surface ne traite que le crop
+> canonique **32x32** ». `AnastasisTerrainSurface::Build` accepte desormais tout
+> crop du monde canonique, l'embodiment surface le 96x96 complet, et
+> `anastasis.Terrain.Surface` vaut `1` par defaut. Le `TERRAIN_CONTRACT`
+> (vertices=1024, triangles=1922) reste vrai et verifie pour un crop 32x32.
+> Etat courant et preuves : `docs/visual/full-map-surface/`.
+
+
 Scellé le 2026-09-13 à 01:29 (UTC-4) par la session intégratrice
 `multi-agent-control-001-f9`, sous gel confirmé des trois autres sessions actives
 (`anastasis-unreal-45`, `anastasis-unreal-83`, `anastasis-unreal-dc`).

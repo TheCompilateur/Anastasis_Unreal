@@ -12,9 +12,17 @@ simulation file under `Source/AnastasisSim/` is touched.
 navigation as out of mandate pending explicit authorization from Alexandre.
 This mission brief is treated as that authorization for the presentation layer
 specifically — not for PCG, gameplay, navigation, or any `Source/AnastasisSim/`
-change, all of which remain untouched here. The work below is additive only:
-it does not alter `AnastasisTerrainSurface`'s sealed `TERRAIN_CONTRACT`
-(vertices=1024, triangles=1922) or any `AnastasisSim` file.
+change, all of which remain untouched here.
+
+**Amended 2026-09-13 (VISUAL_DEFAULT_PATH).** The work below was additive only.
+A later change in this same worktree is *not*: on Alexandre's explicit
+instruction in session, `AnastasisTerrainSurface::Build` was generalized from
+the fixed 32×32 canonical crop to any crop of the canonical world, and the
+embodiment now surfaces the full 96×96 by default. The `TERRAIN_CONTRACT`
+figures (vertices=1024, triangles=1922) still hold for a 32×32 crop and
+`Anastasis.Terrain.Contract` still verifies them — but they no longer describe
+what the project renders by default. See `docs/visual/full-map-surface/`.
+No `AnastasisSim` file is touched by either change.
 
 ## Current pipeline (Phase 1)
 
@@ -22,18 +30,21 @@ it does not alter `AnastasisTerrainSurface`'s sealed `TERRAIN_CONTRACT`
 AnastasisSim::AnastasisWorld::GenerateWorld(seed, 96, 96)   -- simulation truth
         -> FTile[] (Type, Alt, Shade, Shore, Wetness, Resource, ...)
 AnastasisWorldView::CaptureCanonicalWorld / CropSnapshot     -- adapter, no new data
-        -> FWorldVisualSnapshot (32x32 canonical crop) -> FPlan (Locations/Types/Alts)
+        -> FWorldVisualSnapshot (any crop; 96x96 full world by default)
+        -> FPlan (Locations/Types/Alts)
         |
         +-- AAnastasisWorldEmbodiment, mode DEBUG (anastasis.Terrain.Surface=0)
         |     7x UHierarchicalInstancedStaticMeshComponent, one per ETileType,
         |     Engine Cube mesh, flat AnastasisWorldDebugVisual::TerrainDebugColor tint.
         |     THIS is the "square/color placeholder" the mission's premise refers to.
         |
-        +-- AnastasisTerrainSurface::Build + AAnastasisWorldEmbodiment, mode Surface (=1)
-              UProceduralMeshComponent, 1024 shared vertices / 1922 triangles, per-vertex
+        +-- AnastasisTerrainSurface::Build + AAnastasisWorldEmbodiment, mode Surface (=1, DEFAULT)
+              UProceduralMeshComponent, one shared vertex per source tile, per-vertex
               FLinearColor from AnastasisTerrainSurface::TileColor (type + altitude +
               shore + water-depth blend) + a flat water section at AnastasisWorld::SeaLevel.
-              Sealed by WORLD_SLICE_006 (TERRAIN_CONTRACT / TERRAIN_SEMANTICS).
+              Full 96x96 world by default: 9216 vertices / 18050 triangles / 3544 water.
+              The 32x32 case (1024 / 1922) is what WORLD_SLICE_006 sealed and what
+              TERRAIN_CONTRACT still verifies; it is no longer the rendered extent.
 ```
 
 Lighting/atmosphere: no C++ owns this. `/Game/Anastasis/Maps/Lvl_AnastasisSlice`
@@ -45,7 +56,10 @@ observation rig, not the playable level. `/Game/FirstPerson/Lvl_FirstPerson`
 (PIE target per `UNREAL_CANONICAL_STATE.md`) uses the template's own lighting;
 `AAnastasis_UnrealV2GameMode::BeginPlay` spawns `AAnastasisWorldEmbodiment`
 into whichever level is loaded when `anastasis.Visual.Mode` resolves to
-`Debug` (`AnastasisVisualMode.cpp`; `Player` is `NOT_IMPLEMENTED`).
+`Debug` (`AnastasisVisualMode.cpp`; `Player` is `NOT_IMPLEMENTED`) — unless the
+level already places one, as `Lvl_AnastasisSlice` does, in which case it spawns
+nothing. Without that guard the slice level embodied the same world twice at
+the same origin, stacked and Z-fighting.
 
 Per-subsystem classification:
 
@@ -62,7 +76,7 @@ Per-subsystem classification:
 | Camera | IMPLEMENTED | Editor `CameraActor` (slice rig) + template first-person pawn |
 | Instancing | IMPLEMENTED | HISM already the pattern for all seven ground types; extended, not replaced |
 | Collision (visual) | IMPLEMENTED | `QueryAndPhysics` / `BlockAll` on ground; navigation deliberately off |
-| LOD/HLOD | NOT PRESENT | not justified at current scale (32x32 tiles = 32m x 32m) |
+| LOD/HLOD | NOT PRESENT | not justified at current scale (96x96 tiles = 96m x 96m, 9216 vertices) |
 | Streaming / World Partition | NOT PRESENT | not justified — single small level, no case made for it (COMPLEXITY_MUST_EARN_EXISTENCE) |
 | Presentation resolver (WorldSemanticState -> RenderableDefinition) | **MISSING → ADDED** | this mission's Phase 2/3 deliverable, see below |
 

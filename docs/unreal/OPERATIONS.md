@@ -12,6 +12,35 @@ ONEDRIVE_DEPENDENCY: NONE for the canonical Git/LFS/build/Editor/PIE path. Gener
 
 BACKUP: `origin` = https://github.com/TheCompilateur/Anastasis_Unreal (private), Git history + LFS objects pushed 2026-09-12. Push after future canonical commits to keep it current; nothing pushes automatically.
 
+## Observer le monde
+
+Ouvrir l'editeur suffit. `EditorStartupMap` et `GameDefaultMap` pointent sur
+`/Game/Anastasis/Maps/Lvl_AnastasisSlice`, et `LoadLevelAtStartup=ProjectDefault`
+est fige explicitement dans `Config/DefaultEditorPerProjectUserSettings.ini` --
+sans quoi l'editeur rouvre le dernier niveau ouvert et ignore ce defaut.
+
+Le niveau ne contient aucune verite de monde : il porte un
+`AAnastasisWorldEmbodiment` vide, plus la lumiere, la camera et le post-process.
+Le terrain est regenere depuis la seed a chaque chargement, par `OnConstruction`
+en monde editeur et par `BeginPlay` en jeu. Les composants qu'il remplit sont
+`RF_Transient` : sauvegarder le niveau ne fige jamais les 9216 instances dedans.
+
+Leviers, tous des CVars, aucune n'est necessaire pour voir la carte :
+
+| CVar | Defaut | Effet |
+|---|---|---|
+| `anastasis.Terrain.Surface` | `1` | `1` surface continue, `0` cubes DEBUG |
+| `anastasis.WorldView.Seed` | `12345` | seed de `GenerateWorld(seed, 96, 96)` |
+| `anastasis.WorldView.Width` / `.Height` | `96` | crop applique au monde canonique |
+| `anastasis.WorldView.CropX` / `.CropY` | `0` | origine du crop |
+| `anastasis.Visual.Mode` | `1` (DEBUG) | `0` n'incarne rien, `2` PLAYER non implemente |
+
+En PIE : `Anastasis.World.Status`, `Anastasis.World.Snapshot`,
+`Anastasis.World.Capture <bookmark>`. Le probe est un `UWorldSubsystem` amorce
+sur `OnWorldBeginPlay` -- hors PIE il ne sert a rien.
+
+Capture reproductible hors session : `tools/unreal/capture-slice.ps1 -Mode 1 -Out x.png`.
+
 ## Automated gates
 
 Two tiers, matched to how slow each check is:

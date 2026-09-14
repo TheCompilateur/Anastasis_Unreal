@@ -1,5 +1,12 @@
 # WORLD_SLICE_006 — preuve visuelle finale
 
+> **Superseded 2026-09-13 pour l'etat courant.** `AnastasisTerrainSurface` n'est
+> plus bornee au crop 32x32 : la surface couvre le monde 96x96 entier et est
+> devenue le mode par defaut. Les deux images ci-dessous restent le compte rendu
+> exact de la comparaison faite sur `2c0b330` et ne sont pas regenerees.
+> Etat courant : `docs/visual/full-map-surface/`.
+
+
 Comparaison contrôlée. **Tout est identique entre les deux images** : carte
 `/Game/Anastasis/Maps/Lvl_AnastasisSlice`, seed `12345`, monde canonique 96×96,
 caméra `(-1800,-1800,3500)` pitch `-32.8` yaw `45`, soleil 75 000 lux,
