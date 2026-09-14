@@ -34,8 +34,15 @@ OUT_DIR = os.environ.get(
 # 96 tuiles de 100 UU : le monde occupe [0, 9600] sur X et Y. AnastasisWorldView place
 # le niveau de la mer a 275 UU ; on vise legerement au-dessus pour que l'eau ne mange
 # pas le centre de l'image.
-WORLD_SPAN = 9600.0
+#
+# Le MODE change l'emprise reellement rendue, donc le cadrage doit suivre : en mode 1
+# seule la tranche scellee 32x32 ([0, 3200]) porte une surface, et viser le centre du
+# monde 96x96 cadrerait alors du vide. Le mode 1 est aussi le repli quand la machine ne
+# peut pas incarner 96x96 -- trois fois moins de terrain et beaucoup moins d'instances
+# posees, donc une capture qui aboutit au lieu de mourir en "editor hung".
+WORLD_SPAN = 3200.0 if MODE == '1' else 9600.0
 CENTER = (WORLD_SPAN * 0.5, WORLD_SPAN * 0.5, 450.0)
+SCALE = WORLD_SPAN / 9600.0
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
@@ -76,10 +83,17 @@ except Exception as exc:  # noqa: BLE001
 
 
 def rig(dist, height, pitch, yaw_deg=45.0):
+    """Distances exprimees pour le monde 96x96, remises a l'echelle de l'emprise rendue.
+
+    Les quatre vues gardent ainsi le meme cadrage relatif quel que soit le mode : la
+    vue carte cadre la carte, la vue ras du sol reste au ras du sol.
+    """
     yaw = math.radians(yaw_deg)
-    loc = unreal.Vector(CENTER[0] - math.cos(yaw) * dist,
-                        CENTER[1] - math.sin(yaw) * dist,
-                        CENTER[2] + height)
+    d = dist * SCALE
+    h = height * SCALE
+    loc = unreal.Vector(CENTER[0] - math.cos(yaw) * d,
+                        CENTER[1] - math.sin(yaw) * d,
+                        CENTER[2] + h)
     return loc, unreal.Rotator(0.0, pitch, yaw_deg)
 
 
