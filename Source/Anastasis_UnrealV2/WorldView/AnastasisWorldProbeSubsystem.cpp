@@ -22,6 +22,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/WorldSettings.h"
+#include "CollisionQueryParams.h"
 #include "Engine/GameViewportClient.h"
 #include "HAL/FileManager.h"
 #include "HighResScreenshot.h"
@@ -430,6 +431,41 @@ AAnastasisWorldEmbodiment* UAnastasisWorldProbeSubsystem::FindEmbodiment() const
 	return FirstFound;
 }
 
+/**
+ * Hauteur du sol REELLEMENT RENDU sous (X, Y), par trace de collision.
+ *
+ * Les signets calculaient leur hauteur d'oeil depuis AnastasisWorldView::TileToUnreal,
+ * c'est-a-dire depuis l'altitude de la TUILE. Depuis TERRAIN_FORGE ce n'est plus le sol :
+ * le forgeage exagere le relief, et la surface rendue passe largement au-dessus de
+ * l'altitude de tuile. Les cameras se retrouvaient donc DANS la colline -- cadre noir,
+ * capture inutilisable.
+ *
+ * Une trace descendante ne suppose rien de tout cela. Elle interroge la geometrie de
+ * collision de la surface effectivement construite, quelle que soit la CVar qui l'a
+ * produite (tuile brute, tranche scellee, ou maillage forge). C'est la meme verite que
+ * celle sur laquelle le dressing pose ses arbres.
+ *
+ * Renvoie false si rien n'est touche : l'appelant garde alors sa hauteur de tuile, ce
+ * qui est au moins l'ancien comportement et jamais pire.
+ */
+bool TraceRenderedGroundZ(const UWorld* World, const FBox& Bounds, double X, double Y, double& OutZ)
+{
+	if (!World || !Bounds.IsValid)
+	{
+		return false;
+	}
+	const FVector Start(X, Y, Bounds.Max.Z + 5000.0);
+	const FVector End(X, Y, Bounds.Min.Z - 5000.0);
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(AnastasisBookmarkGround), /*bTraceComplex*/ true);
+	if (!World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, Params))
+	{
+		return false;
+	}
+	OutZ = Hit.ImpactPoint.Z;
+	return true;
+}
+
 void UAnastasisWorldProbeSubsystem::EnsureDefaultBookmarks()
 {
 	AAnastasisWorldEmbodiment* Embodiment = FindEmbodiment();
@@ -508,7 +544,10 @@ void UAnastasisWorldProbeSubsystem::EnsureDefaultBookmarks()
 		}
 		if (BestIndex != INDEX_NONE)
 		{
-			Bookmark.Location = Plan.Locations[BestIndex] + FVector(0.0, 0.0, 180.0);
+			const FVector GroundTile = Plan.Locations[BestIndex];
+			double GroundZ = GroundTile.Z;
+			TraceRenderedGroundZ(GetWorld(), Bounds, GroundTile.X, GroundTile.Y, GroundZ);
+			Bookmark.Location = FVector(GroundTile.X, GroundTile.Y, GroundZ + 180.0);
 			Bookmark.Rotation = FRotator(-5.0, 45.0, 0.0);
 			Bookmark.FieldOfView = 90.0f;
 			Bookmark.bReachable = true;
@@ -548,7 +587,10 @@ void UAnastasisWorldProbeSubsystem::EnsureDefaultBookmarks()
 		if (BestIndex != INDEX_NONE)
 		{
 			const AnastasisWorldView::FVisualTile& Tile = Snapshot.Tiles[BestIndex];
-			const FVector TileLoc = AnastasisWorldView::TileToUnreal(Tile.X, Tile.Y, Tile.Alt);
+			FVector TileLoc = AnastasisWorldView::TileToUnreal(Tile.X, Tile.Y, Tile.Alt);
+			double ShoreZ = TileLoc.Z;
+			TraceRenderedGroundZ(GetWorld(), Bounds, TileLoc.X, TileLoc.Y, ShoreZ);
+			TileLoc.Z = ShoreZ;
 			Bookmark.Location = TileLoc + FVector(-300.0, -300.0, 250.0);
 			Bookmark.Rotation = (TileLoc - Bookmark.Location).Rotation();
 			Bookmark.FieldOfView = 85.0f;
@@ -670,8 +712,15 @@ void UAnastasisWorldProbeSubsystem::EnsureDefaultBookmarks()
 			const AnastasisWorldView::FVisualTile& Stand =
 				Snapshot.Tiles[bFromEdge ? StandIndex : CoreIndex];
 			const AnastasisWorldView::FVisualTile& Core = Snapshot.Tiles[CoreIndex];
-			const FVector CoreLoc = AnastasisWorldView::TileToUnreal(Core.X, Core.Y, Core.Alt);
-			const FVector StandLoc = AnastasisWorldView::TileToUnreal(Stand.X, Stand.Y, Stand.Alt);
+			FVector CoreLoc = AnastasisWorldView::TileToUnreal(Core.X, Core.Y, Core.Alt);
+			FVector StandLoc = AnastasisWorldView::TileToUnreal(Stand.X, Stand.Y, Stand.Alt);
+			// Le sol rendu, pas l'altitude de tuile : sinon la camera se retrouve dans la
+			// colline des que TERRAIN_FORGE exagere le relief.
+			double CoreZ = CoreLoc.Z, StandZ = StandLoc.Z;
+			TraceRenderedGroundZ(GetWorld(), Bounds, CoreLoc.X, CoreLoc.Y, CoreZ);
+			TraceRenderedGroundZ(GetWorld(), Bounds, StandLoc.X, StandLoc.Y, StandZ);
+			CoreLoc.Z = CoreZ;
+			StandLoc.Z = StandZ;
 
 			// Hauteur d'oeil, et visee sur le SOL du coeur, pas sur la canopee : le sujet
 			// de ce signet est le sol. Le regard plonge donc legerement.

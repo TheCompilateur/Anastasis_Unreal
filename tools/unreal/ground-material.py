@@ -356,8 +356,22 @@ def build_master():
     p_macro_amt = g.scalar('MacroContrast', 0.62, P + 'Macro', -1900, 160)
     p_meso_amt = g.scalar('MesoContrast', 0.30, P + 'Macro', -1900, 220)
     p_detail_amt = g.scalar('DetailContrast', 0.26, P + 'Detail', -1900, 280)
-    p_slope_lo = g.scalar('SlopeRockStart', 0.20, P + 'Rock', -1900, 340)
-    p_slope_hi = g.scalar('SlopeRockEnd', 0.52, P + 'Rock', -1900, 400)
+    # CES DEUX SEUILS SONT CALIBRES CONTRE L'EXAGERATION VERTICALE DU TERRAIN.
+    #
+    # La pente lue par le materiau est celle de la surface RENDUE, pas celle du
+    # simulateur. TERRAIN_FORGE multiplie le relief au-dessus de la mer par
+    # anastasis.Terrain.Forge.Exaggerate (3.6 par defaut) : une pente de 28 degres dans
+    # la simulation en fait 64 une fois forgee. Les valeurs d'origine (0.20 / 0.52),
+    # calibrees sur la surface non exageree, saturaient donc le masque presque partout
+    # et rendaient tout le sol en roche pale -- le A/B de docs/visual/ground-001 le
+    # montre : materiau eteint, la foret est verte ; allume, elle etait beige.
+    #
+    # 0.62 / 0.82 correspondent a une pente d'origine d'environ 35 a 45 degres, ce qui
+    # est le terrain qui expose reellement sa roche. Si quelqu'un change Exaggerate,
+    # ces deux nombres bougent avec lui -- c'est un couplage, et il est reglable depuis
+    # l'instance sans recompiler.
+    p_slope_lo = g.scalar('SlopeRockStart', 0.62, P + 'Rock', -1900, 340)
+    p_slope_hi = g.scalar('SlopeRockEnd', 0.82, P + 'Rock', -1900, 400)
     p_damp_lo = g.scalar('DampStart', 0.60, P + 'Wet', -1900, 460)
     p_damp_hi = g.scalar('DampEnd', 0.96, P + 'Wet', -1900, 520)
     p_damp_dark = g.scalar('DampDarken', 0.52, P + 'Wet', -1900, 580)
