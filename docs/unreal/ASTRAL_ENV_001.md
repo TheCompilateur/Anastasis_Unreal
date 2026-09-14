@@ -188,7 +188,13 @@ cycle de vie repris du canonique gardent leur provenance dans le commit de merge
 - 73ebc92 : combinaison isolée avec le canonique inspecté2cf1328.
 - fe1b665 : correction du type de plan des tests pour compilation Unity.
 - Commit de clôture : rapport et extension du diagnostic PIE uniquement.
-Aucun push, aucune intégration dans main.
+Aucun push ni intégration dans main effectué par ASTRAL.
+Après clôture, un intégrateur concurrent a intégré le code fe1b665 dans main :
+d3ebf67 puis main1cbeef680c3ce51f21cd2cd273d4771b56af9de3, également avec la
+brume8200206 et de la documentation migration. Cela a été constaté en lecture
+seule. Ce canonique combiné n'a PAS été validé par cette mission ; ne pas lui
+transférer les PASS du candidat. Le rapport final et le diagnostic Python ont
+été terminés ensuite sur la branche ASTRAL.
 
 ## REGRESSIONS
 
