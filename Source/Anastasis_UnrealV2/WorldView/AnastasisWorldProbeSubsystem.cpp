@@ -22,8 +22,12 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/WorldSettings.h"
+#include "Engine/GameViewportClient.h"
 #include "HAL/FileManager.h"
+#include "HighResScreenshot.h"
 #include "HAL/IConsoleManager.h"
+#include "ImageCore.h"
+#include "ImageUtils.h"
 #include "Misc/App.h"
 #include "Misc/DateTime.h"
 #include "Misc/EngineVersion.h"
@@ -791,7 +795,13 @@ bool UAnastasisWorldProbeSubsystem::GotoBookmark(FName Name, FString& OutReason)
 	{
 		Comp->SetFieldOfView(Bookmark->FieldOfView);
 	}
-	PC->SetViewTarget(Camera);
+	// Bascule INSTANTANEE et explicite. SetViewTarget sans parametres prend deja un
+	// BlendTime de 0, mais le dire evite qu'un reglage de projet ou une surcharge future
+	// n'introduise un fondu -- et un fondu, sur un chemin de preuve, veut dire qu'une
+	// capture peut photographier la camera du joueur en cours de route.
+	FViewTargetTransitionParams Instant;
+	Instant.BlendTime = 0.0f;
+	PC->SetViewTarget(Camera, Instant);
 
 	UE_LOG(LogAnastasis_UnrealV2, Display,
 		TEXT("ANASTASIS_WORLD_GOTO bookmark=%s loc=(%.1f,%.1f,%.1f) rot=(%.1f,%.1f,%.1f) fov=%.1f"),
@@ -1961,23 +1971,36 @@ void UAnastasisWorldProbeSubsystem::LogStatus()
 
 void UAnastasisWorldProbeSubsystem::CancelPendingCapture(const TCHAR* Reason)
 {
-	if (ScreenshotDelegateHandle.IsValid())
-	{
-		FScreenshotRequest::OnScreenshotRequestProcessed().Remove(ScreenshotDelegateHandle);
-		ScreenshotDelegateHandle.Reset();
-	}
 	UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("CAPTURE::FAIL bookmark=%s reason=%s"), *PendingCaptureBookmarkName, Reason);
 	bCaptureInFlight = false;
 }
 
-void UAnastasisWorldProbeSubsystem::HandleScreenshotProcessed()
+FViewport* UAnastasisWorldProbeSubsystem::ResolveGameViewport(FString& OutReason) const
 {
-	if (!bCaptureInFlight)
+	const UWorld* World = GetWorld();
+	if (!World)
 	{
-		return;
+		OutReason = TEXT("no world on the probe subsystem");
+		return nullptr;
 	}
-	FScreenshotRequest::OnScreenshotRequestProcessed().Remove(ScreenshotDelegateHandle);
-	ScreenshotDelegateHandle.Reset();
+	UGameViewportClient* Client = World->GetGameViewport();
+	if (!Client)
+	{
+		// Hors PIE il n'y a pas de viewport de jeu. On REFUSE plutot que de photographier
+		// le viewport de l'editeur : c'est precisement la confusion que ce chemin corrige.
+		OutReason = TEXT("no game viewport (not in PIE); this capture is a game verdict, the editor viewport is not the game");
+		return nullptr;
+	}
+	if (!Client->Viewport)
+	{
+		OutReason = TEXT("game viewport client has no FViewport yet");
+		return nullptr;
+	}
+	return Client->Viewport;
+}
+
+void UAnastasisWorldProbeSubsystem::FinishCapture()
+{
 	bCaptureInFlight = false;
 
 	if (!FPaths::FileExists(PendingCaptureShotPath))
@@ -2022,32 +2045,124 @@ void UAnastasisWorldProbeSubsystem::RequestCapture(FName BookmarkName, const FSt
 	PendingCaptureMissionName = Mission;
 	bCaptureInFlight = true;
 
-	ScreenshotDelegateHandle = FScreenshotRequest::OnScreenshotRequestProcessed().AddUObject(
-		this, &UAnastasisWorldProbeSubsystem::HandleScreenshotProcessed);
-
 	const TWeakObjectPtr<UAnastasisWorldProbeSubsystem> WeakThis(this);
 	const FString CaptureToken = PendingCaptureShotPath;
 
-	// Give the view target blend / streaming a moment to settle before the shot is taken.
-	FTSTicker::GetCoreTicker().AddTicker(TEXT("AnastasisCaptureSettle"), 0.5f, [WeakThis, CaptureToken](float) -> bool
+	// Le gestionnaire de camera applique SetViewTarget a sa prochaine mise a jour, pas
+	// dans l'appel : avant cela le viewport rend encore la vue du joueur. Une seconde
+	// couvre largement cette bascule, plus le streaming et la convergence du TAA.
+	FTSTicker::GetCoreTicker().AddTicker(TEXT("AnastasisCaptureSettle"), 1.0f, [WeakThis, CaptureToken](float) -> bool
 	{
 		UAnastasisWorldProbeSubsystem* Self = WeakThis.Get();
-		if (Self && Self->bCaptureInFlight && Self->PendingCaptureShotPath == CaptureToken)
+		if (!Self || !Self->bCaptureInFlight || Self->PendingCaptureShotPath != CaptureToken)
 		{
-			FScreenshotRequest::RequestScreenshot(Self->PendingCaptureShotPath, /*bInShowUI*/ false, /*bAddFilenameSuffix*/ false);
-			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_WORLD_CAPTURE_REQUESTED shot=%s"), *Self->PendingCaptureShotPath);
+			return false;
 		}
+		Self->CaptureGameViewportNow();
 		return false;
 	});
+}
 
-	// Fallback in case the screenshot pipeline never fires the processed delegate (e.g. no viewport).
-	FTSTicker::GetCoreTicker().AddTicker(TEXT("AnastasisCaptureTimeout"), 8.0f, [WeakThis, CaptureToken](float) -> bool
+void UAnastasisWorldProbeSubsystem::CaptureGameViewportNow()
+{
+	// ON LIT LE VIEWPORT DU JEU, on ne "demande pas une capture d'ecran".
+	//
+	// L'ancien chemin appelait FScreenshotRequest::RequestScreenshot, qui pose un
+	// drapeau GLOBAL au moteur. En PIE, deux clients de viewport dessinent chaque
+	// frame -- celui de l'editeur et celui du jeu -- et le PREMIER qui passe dans
+	// ProcessScreenShots consomme la demande et ecrit le fichier. Le resultat depend
+	// donc de l'ordre de dessin, pas de ce qu'on a demande : une capture sur trois
+	// environ rendait le viewport de l'editeur, terrain absent, geometrie de
+	// prototypage a la place, pendant que le JSON apparie restait correct.
+	//
+	// Le garde-fou prevu par le moteur pour ca, FScreenshotRequest::ShouldRestrictToGameViewport,
+	// n'est consulte que dans la branche bShowUI == true de
+	// UGameViewportClient::ProcessScreenShots (GameViewportClient.cpp, UE 5.8) ; ce
+	// chemin demande bShowUI = false, donc le drapeau y est du code mort. Le poser ne
+	// corrige rien -- cela avait ete tente et documente dans ATMOSPHERE_002.
+	//
+	// GetViewportScreenShot prend un FViewport* en parametre : la cible n'est plus une
+	// intention, c'est un argument. Il n'y a plus de course, donc plus rien a re-essayer.
+	FString Reason;
+	FViewport* Viewport = ResolveGameViewport(Reason);
+	if (!Viewport)
+	{
+		CancelPendingCapture(*Reason);
+		return;
+	}
+
+	const FIntPoint Size = Viewport->GetSizeXY();
+	if (Size.X <= 0 || Size.Y <= 0)
+	{
+		CancelPendingCapture(TEXT("game viewport has no size yet"));
+		return;
+	}
+
+	// On ne LIT PAS le back buffer courant, on demande au viewport de redessiner et de
+	// capturer lui-meme.
+	//
+	// Lire directement (GetViewportScreenShot) cible bien le bon viewport, mais au
+	// mauvais MOMENT : la lecture rendait la vue du JOUEUR, encore au PlayerStart dans
+	// la geometrie du template, parce que le SetViewTarget vers la camera de sonde
+	// n'est applique qu'a la prochaine mise a jour du gestionnaire de camera. L'ancien
+	// chemin global y echappait par accident -- sa demande etait consommee quelques
+	// frames plus tard, quand la bascule avait eu lieu.
+	//
+	// TakeHighResScreenShot pose un drapeau SUR CE VIEWPORT, force un redessin, rend des
+	// frames de chauffe et capture dans sa propre cible. Donc : bon viewport ET frame
+	// complete, avec le flou de mouvement desactive par le moteur pendant la prise.
+	// C'est le meme mecanisme que HighResShot, celui qu'utilise observe-slice.py, et qui
+	// n'a jamais rendu une image fausse sur ce projet.
+	FHighResScreenshotConfig& Config = GetHighResScreenshotConfig();
+	Config.SetFilename(PendingCaptureShotPath);
+	Config.SetMaskEnabled(false);
+	Config.SetHDRCapture(false);
+	// Resolution native : un verdict se lit a la taille ou il a ete rendu, et un
+	// multiplicateur rendrait la comparaison A/B dependante du materiel.
+	Config.SetResolution(Size.X, Size.Y, 1.0f);
+
+	if (!Viewport->TakeHighResScreenShot())
+	{
+		CancelPendingCapture(TEXT("TakeHighResScreenShot refused (resolution too large?)"));
+		return;
+	}
+
+	// GetMapName, pas GetName : seul le premier porte le prefixe UEDPIE_, et c'est ce
+	// prefixe qui distingue a la lecture du journal une capture de JEU d'une capture
+	// d'editeur. Un nom ambigu dans une ligne de preuve ne prouve rien.
+	const UWorld* CaptureWorld = GetWorld();
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_WORLD_CAPTURE_VIEWPORT source=game_viewport map=%s pie=%d size=%dx%d shot=%s"),
+		CaptureWorld ? *CaptureWorld->GetMapName() : TEXT("NONE"),
+		CaptureWorld && CaptureWorld->IsPlayInEditor() ? 1 : 0,
+		Size.X, Size.Y, *PendingCaptureShotPath);
+
+	// La capture aboutit dans le dessin du viewport, pas ici : on attend le fichier.
+	const TWeakObjectPtr<UAnastasisWorldProbeSubsystem> WeakThis(this);
+	const FString CaptureToken = PendingCaptureShotPath;
+	double* Waited = new double(0.0);
+	FTSTicker::GetCoreTicker().AddTicker(TEXT("AnastasisCaptureWait"), 0.25f,
+		[WeakThis, CaptureToken, Waited](float Delta) -> bool
 	{
 		UAnastasisWorldProbeSubsystem* Self = WeakThis.Get();
-		if (Self && Self->bCaptureInFlight && Self->PendingCaptureShotPath == CaptureToken)
+		if (!Self || !Self->bCaptureInFlight || Self->PendingCaptureShotPath != CaptureToken)
 		{
-			Self->CancelPendingCapture(TEXT("timeout waiting for OnScreenshotRequestProcessed"));
+			delete Waited;
+			return false;
 		}
-		return false;
+		*Waited += Delta;
+		if (FPaths::FileExists(CaptureToken))
+		{
+			delete Waited;
+			Self->FinishCapture();
+			return false;
+		}
+		if (*Waited > 15.0)
+		{
+			delete Waited;
+			Self->CancelPendingCapture(TEXT("timeout waiting for the high-res shot to reach disk"));
+			return false;
+		}
+		return true;
 	});
 }

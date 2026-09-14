@@ -102,7 +102,7 @@ ANASTASIS_WORLD_BOOKMARK FOREST core=(74,44) density=25/25 stand=(71,47) ring=3 
 masse, pas un arbre isolé.
 
 Les captures brutes et leurs journaux restent dans `Saved/SliceEvidence/` et
-`Saved/Anastasis/Captures/` (non versionnés). Ces cinq copies-ci sont versionnées
+`Saved/Anastasis/Captures/` (non versionnés). Ces sept copies-ci sont versionnées
 parce qu'elles étayent le rapport.
 
 ## L'outil de capture a encore photographié le mauvais viewport
@@ -113,9 +113,10 @@ d'être versée en preuve.** Ces sept-là l'ont été — et la règle a resserv
 
 Les deux premières tentatives sur `FOREST` ont rendu le viewport éditeur de
 `Lvl_FirstPerson` : géométrie de prototypage grise, plots jaunes, sprites d'éditeur,
-aucun terrain. **Deux fois de suite, image identique au bit près** — donc pas un
-tirage au sort, quoi qu'en laisse penser le mot « flake ». Les journaux des deux runs
-sont pourtant corrects et identiques à ceux qui réussissent :
+aucun terrain. Deux fois de suite, le même mauvais viewport — les fichiers ne sont pas
+identiques au bit près (1 256 683 et 1 256 981 octets ; les sprites d'éditeur bougent),
+mais ils montrent la même scène. Les journaux des deux runs sont pourtant corrects et
+identiques à ceux qui réussissent :
 
 ```
 PROBE_DEMO_PIE_ACTIVE
@@ -128,8 +129,12 @@ PIE tournait, le terrain était là, la caméra était au bon endroit, et `CAPTU
 a été rapporté. Seule l'image est fausse. Les deux tentatives suivantes, sans aucun
 changement, ont rendu le bon cadre.
 
-C'est le **défaut 1** déjà diagnostiqué dans `docs/unreal/ATMOSPHERE_002.md` : la
-requête de capture est globale et `bInRestrictToGameViewport` est du code mort sur ce
-chemin (`bShowUI = false`). Rien n'a été tenté ici pour le corriger — cette mission-là
-reste ouverte, et elle est la plus rentable du lot, puisque **un verdict de ce projet
-est une image**.
+C'est le **défaut 1** diagnostiqué dans `docs/unreal/ATMOSPHERE_002.md` : la requête de
+capture est globale et `bInRestrictToGameViewport` est du code mort sur ce chemin
+(`bShowUI = false`).
+
+Une signature utile en attendant : une capture d'éditeur pèse ici ~1,25 Mo, une capture
+de jeu ~0,9 Mo. `forest-off2`, écartée, faisait 1 257 559 octets.
+
+**Corrigé depuis** — voir `docs/unreal/CAPTURE_VIEWPORT_001.md`. Les images A–G
+ci-dessus ont été prises avant le correctif, et chacune a été regardée.
