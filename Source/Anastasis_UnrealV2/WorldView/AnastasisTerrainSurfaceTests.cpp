@@ -442,7 +442,20 @@ bool FAnastasisDressingOnGround::RunTest(const FString&)
     Var->Set(0, ECVF_SetByCode);
     Actor->Embody(12345, 96, 96);
     const TArray<FTransform> OnSlab = DressingTransforms();
-    TestEqual(TEXT("mode 0 pose sur tout le monde"), OnSlab.Num(), OnSurface.Num());
+    // Mode 0 pose STRICTEMENT plus que mode 2, et l'ecart n'est pas arbitraire : la
+    // surface n'existe qu'entre le premier et le dernier CENTRE de tuile, donc une
+    // instance jittee vers l'exterieur depuis une tuile de bordure tombe dans la
+    // demi-tuile sans face rendue. La dalle, elle, couvre sa tuile entiere et l'accepte.
+    // L'ecart doit valoir EXACTEMENT le nombre d'instances-dalle hors du domaine
+    // echantillonne : ni une de plus (on refuserait a tort), ni une de moins.
+    TestTrue(TEXT("mode 0 pose au moins autant que mode 2"), OnSlab.Num() >= OnSurface.Num());
+    int32 OutsideSampledDomain = 0;
+    for (const FTransform& T : OnSlab)
+    {
+        double Unused = 0.0;
+        if (!AnastasisTerrainSurface::SampleHeight(Full, T.GetLocation().X, T.GetLocation().Y, Unused)) ++OutsideSampledDomain;
+    }
+    TestEqual(TEXT("l'ecart est exactement la bordure sans sol rendu"), OnSlab.Num() - OnSurface.Num(), OutsideSampledDomain);
     double MaxSlabError = 0.0;
     for (const FTransform& T : OnSlab)
     {
@@ -459,6 +472,7 @@ bool FAnastasisDressingOnGround::RunTest(const FString&)
     AddInfo(FString::Printf(TEXT("DRESSING_ON_GROUND surface=%d slice=%d slab=%d refused_by_slice=%d ground_error=%.9f slab_error=%.9f moved_by_fix=%d max_tile_alt_delta=%.3f"),
         OnSurface.Num(), OnSlice.Num(), OnSlab.Num(), OnSurface.Num() - OnSlice.Num(),
         MaxGroundError, MaxSlabError, OffTileAlt, MaxTileAltError));
+    AddInfo(FString::Printf(TEXT("DRESSING_BORDER slab_only=%d (instances de bordure sans face rendue sous elles)"), OutsideSampledDomain));
 
     Actor->Destroy(); Var->Set(Previous, ECVF_SetByCode);
     return true;
