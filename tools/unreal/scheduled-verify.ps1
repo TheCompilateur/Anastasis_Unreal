@@ -13,20 +13,30 @@
 # Not a pre-push gate — see tools/git-hooks/pre-push for the fast compile-only
 # gate that runs on every push.
 #
-# Appends to Saved/CanonicalVerification/scheduled-verify.log: one VERIFY_*
-# line, the full report-tests.ps1 output, then one TESTS_* line, per run.
+# Appends to Saved/CanonicalVerification/scheduled-verify.log: start cwd/root,
+# verify output tail on failure (the inner VERIFY::FAIL/BUILD::FAIL reason),
+# one VERIFY_* line, the full report-tests.ps1 output, then one TESTS_* line.
 # (latest.json is overwritten each verify run by anastasis-unreal.ps1 and is
 # not history; this log is the append-only record across runs.)
+#
+# Task Scheduler starts this process in System32. Both this wrapper and
+# anastasis-unreal.ps1 Set-Location to the project root before work.
 $ErrorActionPreference = 'Stop'
 $Root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
+Set-Location -LiteralPath $Root
 $Log = Join-Path $Root 'Saved/CanonicalVerification/scheduled-verify.log'
 New-Item -ItemType Directory -Force (Split-Path $Log) | Out-Null
 
 $bVerifyOk = $true
 $stamp = Get-Date -Format 'o'
+"$stamp START cwd=$(Get-Location) root=$Root" | Add-Content $Log
 try {
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'anastasis-unreal.ps1') verify
-    if ($LASTEXITCODE -ne 0) { throw "verify exited $LASTEXITCODE" }
+    $verifyOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'anastasis-unreal.ps1') verify 2>&1
+    $verifyExit = $LASTEXITCODE
+    if ($verifyExit -ne 0) {
+        ($verifyOutput | Select-Object -Last 60 | Out-String) | Add-Content $Log
+        throw "verify exited $verifyExit"
+    }
     "$stamp VERIFY_PASS" | Add-Content $Log
 } catch {
     "$stamp VERIFY_FAIL $($_.Exception.Message)" | Add-Content $Log

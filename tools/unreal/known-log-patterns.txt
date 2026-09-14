@@ -1,0 +1,13 @@
+# Baseline des lignes de log Unreal deja identifiees. Ce n'est PAS un PASS.
+#
+# health.ps1 (via anastasis-unreal.ps1 health) classe chaque ligne Error:/Warning:
+# du dernier journal d'editeur contre ce fichier. Une ligne qui matche est
+# KNOWN ; une ligne qui ne matche pas est NEW.
+#
+# Ne jamais ajouter une ligne pour faire taire une regression nouvelle.
+# Format : <sous-chaine> | <classe> | <cause>
+# classe = ENGINE_NOISE | KNOWN_WARNING | KNOWN_ERROR
+
+LogAutomationTest: Error: Condition failed | ENGINE_NOISE | Tests moteur culture-sensibles (UnifiedErrorTests) ; voir docs/unreal/AUTOMATION_TRIAGE.md
+LogModelContextProtocol: Warning: Data transmitted via this plugin | KNOWN_WARNING | Avis EULA du plugin MCP au demarrage
+Console variable 'r.MotionVectorSimulation' used in the render thread | KNOWN_WARNING | CVar moteur non ECVF_RenderThreadSafe
