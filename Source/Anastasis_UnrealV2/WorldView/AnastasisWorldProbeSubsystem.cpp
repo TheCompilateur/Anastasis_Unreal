@@ -4,11 +4,19 @@
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Components/DirectionalLightComponent.h"
+#include "Components/ExponentialHeightFogComponent.h"
+#include "Components/SkyAtmosphereComponent.h"
+#include "Components/SkyLightComponent.h"
 #include "Containers/Ticker.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
+#include "Engine/DirectionalLight.h"
+#include "Engine/ExponentialHeightFog.h"
+#include "Engine/PostProcessVolume.h"
+#include "Engine/SkyLight.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
@@ -28,12 +36,27 @@
 #include "WorldPartition/DataLayer/DataLayerManager.h"
 #include "WorldPartition/WorldPartition.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "WorldView/AnastasisAtmosphereResolver.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
 #include "WorldView/AnastasisVisualMode.h"
 #include "WorldView/AnastasisWorldView.h"
 
 namespace
 {
+	/** First valid actor of this class in the level, or null. */
+	template <typename ActorType>
+	ActorType* FindFirstActor(UWorld* World)
+	{
+		for (TActorIterator<ActorType> It(World); It; ++It)
+		{
+			if (IsValid(*It))
+			{
+				return *It;
+			}
+		}
+		return nullptr;
+	}
+
 	TArray<TSharedPtr<FJsonValue>> Vec3Array(const FVector& V)
 	{
 		return {
@@ -848,6 +871,95 @@ TSharedRef<FJsonObject> UAnastasisWorldProbeSubsystem::BuildSnapshotObject() con
 	WaterObj->SetBoolField(TEXT("custom_water_surface_present"), bCustomWaterPresent);
 	WaterObj->SetNumberField(TEXT("sea_level_uu"), AnastasisWorld::SeaLevel * AnastasisWorldView::AltitudeScale);
 	Root->SetObjectField(TEXT("water"), WaterObj);
+
+	// --- Atmosphere ---
+	// Read from the level's actual actors, not from the profile: the snapshot's job is to
+	// say what is in the world, and "the profile asked for 75000 lux" is not evidence that
+	// anything is lit. Until ATMOSPHERE_001 this block did not exist, so a capture could not
+	// distinguish a lit world from an unlit one.
+	TSharedRef<FJsonObject> AtmosphereObj = MakeShared<FJsonObject>();
+	AtmosphereObj->SetStringField(TEXT("profile_source"),
+		AnastasisAtmosphere::IsProfileDataDriven() ? TEXT("asset") : TEXT("code_defaults"));
+
+	ADirectionalLight* ProbeSun = nullptr;
+	int32 DirectionalLightCount = 0;
+	for (TActorIterator<ADirectionalLight> It(World); It; ++It)
+	{
+		if (!IsValid(*It))
+		{
+			continue;
+		}
+		++DirectionalLightCount;
+		if (!ProbeSun)
+		{
+			ProbeSun = *It;
+		}
+	}
+	AtmosphereObj->SetNumberField(TEXT("directional_light_count"), DirectionalLightCount);
+	AtmosphereObj->SetBoolField(TEXT("sun_present"), ProbeSun != nullptr);
+	if (ProbeSun)
+	{
+		AtmosphereObj->SetArrayField(TEXT("sun_rotation_pitch_yaw_roll"), RotArray(ProbeSun->GetActorRotation()));
+		if (const UDirectionalLightComponent* SunComponent = Cast<UDirectionalLightComponent>(ProbeSun->GetLightComponent()))
+		{
+			AtmosphereObj->SetNumberField(TEXT("sun_intensity"), SunComponent->Intensity);
+			AtmosphereObj->SetBoolField(TEXT("sun_is_atmosphere_light"), SunComponent->IsUsedAsAtmosphereSunLight());
+			AtmosphereObj->SetBoolField(TEXT("sun_casts_shadows"), SunComponent->CastShadows != 0);
+		}
+	}
+
+	AtmosphereObj->SetBoolField(TEXT("sky_atmosphere_present"), FindFirstActor<ASkyAtmosphere>(World) != nullptr);
+
+	ASkyLight* ProbeSkyLight = FindFirstActor<ASkyLight>(World);
+	AtmosphereObj->SetBoolField(TEXT("sky_light_present"), ProbeSkyLight != nullptr);
+	if (ProbeSkyLight)
+	{
+		if (const USkyLightComponent* SkyComponent = ProbeSkyLight->GetLightComponent())
+		{
+			AtmosphereObj->SetNumberField(TEXT("sky_light_intensity"), SkyComponent->Intensity);
+			AtmosphereObj->SetBoolField(TEXT("sky_light_real_time_capture"), SkyComponent->IsRealTimeCaptureEnabled());
+		}
+	}
+
+	AExponentialHeightFog* ProbeFog = FindFirstActor<AExponentialHeightFog>(World);
+	AtmosphereObj->SetBoolField(TEXT("fog_present"), ProbeFog != nullptr);
+	if (ProbeFog)
+	{
+		if (const UExponentialHeightFogComponent* FogComponent = ProbeFog->GetComponent())
+		{
+			AtmosphereObj->SetNumberField(TEXT("fog_density"), FogComponent->FogDensity);
+			AtmosphereObj->SetNumberField(TEXT("fog_height_falloff"), FogComponent->FogHeightFalloff);
+			AtmosphereObj->SetNumberField(TEXT("fog_start_distance"), FogComponent->StartDistance);
+			AtmosphereObj->SetNumberField(TEXT("fog_max_opacity"), FogComponent->FogMaxOpacity);
+		}
+		AtmosphereObj->SetNumberField(TEXT("fog_height_z"), ProbeFog->GetActorLocation().Z);
+	}
+
+	// Exposure: only a volume that actually pins min = max makes two captures comparable, so
+	// report the pinned value rather than "a post process volume exists".
+	APostProcessVolume* ProbeExposure = nullptr;
+	for (TActorIterator<APostProcessVolume> It(World); It; ++It)
+	{
+		if (IsValid(*It) && It->Settings.bOverride_AutoExposureMinBrightness && It->Settings.bOverride_AutoExposureMaxBrightness)
+		{
+			ProbeExposure = *It;
+			break;
+		}
+	}
+	const bool bExposureFixed = ProbeExposure
+		&& FMath::IsNearlyEqual(ProbeExposure->Settings.AutoExposureMinBrightness, ProbeExposure->Settings.AutoExposureMaxBrightness);
+	AtmosphereObj->SetBoolField(TEXT("exposure_fixed"), bExposureFixed);
+	if (ProbeExposure)
+	{
+		AtmosphereObj->SetBoolField(TEXT("exposure_volume_unbound"), ProbeExposure->bUnbound);
+		AtmosphereObj->SetNumberField(TEXT("exposure_ev100"), ProbeExposure->Settings.AutoExposureMinBrightness);
+	}
+
+	if (!ProbeSun)
+	{
+		Errors.Add(MakeShared<FJsonValueString>(TEXT("ATMOSPHERE_NO_SUN")));
+	}
+	Root->SetObjectField(TEXT("atmosphere"), AtmosphereObj);
 
 	// --- Camera ---
 	TSharedRef<FJsonObject> CameraObj = MakeShared<FJsonObject>();

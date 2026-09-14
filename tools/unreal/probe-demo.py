@@ -10,6 +10,9 @@ import os, time, unreal
 LOG_PREFIX = 'PROBE_DEMO'
 MAP = '/Game/FirstPerson/Lvl_FirstPerson'
 MISSION = os.environ.get('ANASTASIS_PROBE_MISSION', 'phaseg')
+# Le point de vue est parametrable : une preuve de brume au sol ne se voit pas
+# depuis OVERVIEW, a 100 m au-dessus du monde.
+BOOKMARK = os.environ.get('ANASTASIS_PROBE_BOOKMARK', 'OVERVIEW')
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
@@ -53,7 +56,7 @@ def tick(dt):
         run_cmd('Anastasis.World.Status')
         run_cmd('Anastasis.World.Snapshot')
         run_cmd('Anastasis.World.NavStatus')
-        run_cmd('Anastasis.World.Capture OVERVIEW ' + MISSION)
+        run_cmd('Anastasis.World.Capture ' + BOOKMARK + ' ' + MISSION)
         unreal.log(LOG_PREFIX + '_COMMANDS_ISSUED')
     elif phase == 3 and elapsed > 14.0:
         phase = 4

@@ -5,6 +5,7 @@
 #include "Anastasis_UnrealV2.h"
 #include "Engine/World.h"
 #include "WorldView/AnastasisVisualMode.h"
+#include "WorldView/AnastasisWorldAtmosphere.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
 
 AAnastasis_UnrealV2GameMode::AAnastasis_UnrealV2GameMode()
@@ -34,6 +35,23 @@ void AAnastasis_UnrealV2GameMode::BeginPlay()
 	{
 		FActorSpawnParameters Params;
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+		// Light before geometry: the atmosphere adopts whatever the level already carries and
+		// spawns the rest, so the embodiment lands in an authored, reproducible exposure
+		// instead of whichever template lighting the map happens to have.
+		if (AAnastasisWorldAtmosphere::IsEnabledByCVar())
+		{
+			World->SpawnActor<AAnastasisWorldAtmosphere>(
+				AAnastasisWorldAtmosphere::StaticClass(),
+				FVector::ZeroVector,
+				FRotator::ZeroRotator,
+				Params);
+		}
+		else
+		{
+			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_ATMOSPHERE applied=0 reason=cvar_off"));
+		}
+
 		World->SpawnActor<AAnastasisWorldEmbodiment>(
 			AAnastasisWorldEmbodiment::StaticClass(),
 			FVector::ZeroVector,
