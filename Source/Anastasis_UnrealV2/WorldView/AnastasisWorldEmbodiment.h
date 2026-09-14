@@ -77,6 +77,12 @@ public:
 	const FBox& GetActiveFootprintBounds() const { return ActiveFootprintBounds; }
 	void LogEmbodiment() const;
 
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Terrain")
+	FVector GetTerrainForgeBasin() const { return ForgeBasin; }
+
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Terrain")
+	FVector GetTerrainForgeLandmark() const { return ForgeLandmark; }
+
 protected:
 	UPROPERTY()
 	TObjectPtr<UProceduralMeshComponent> ExperimentalSurface;
@@ -136,4 +142,6 @@ protected:
 	 * vise un point hors de tout ce qui est visible ou solide.
 	 */
 	FBox ActiveFootprintBounds = FBox(ForceInit);
+	FVector ForgeBasin = FVector::ZeroVector;
+	FVector ForgeLandmark = FVector::ZeroVector;
 };

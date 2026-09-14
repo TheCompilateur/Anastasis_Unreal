@@ -12,6 +12,8 @@ Variables d'environnement :
   ANASTASIS_SLICE_MODE              "0" terrain DEBUG legacy, "1" surface de la tranche
                                     scellee 32x32, "2" surface du monde 96x96 (defaut 1)
   ANASTASIS_SLICE_REBUILD_MATERIAL  "1" regenere le materiau (chemin d'edition, pas de capture)
+  ANASTASIS_SLICE_CAM_LOC           "x,y,z" surcharge la position de camera
+  ANASTASIS_SLICE_CAM_ROT           "pitch,yaw" surcharge l'orientation de camera
 """
 import os, shutil, time, unreal
 
@@ -42,6 +44,19 @@ CAM_CHOICE = os.environ.get('ANASTASIS_SLICE_CAM', '')
 if CAM_CHOICE != 'slice' and (MODE == '2' or CAM_CHOICE == 'world'):
     CENTER = unreal.Vector(SLICE_SPAN * WORLD_SPAN_FACTOR * 0.5, SLICE_SPAN * WORLD_SPAN_FACTOR * 0.5, 400.0)
     CAM_LOC = unreal.Vector(CAM_LOC.x * WORLD_SPAN_FACTOR, CAM_LOC.y * WORLD_SPAN_FACTOR, CAM_LOC.z * WORLD_SPAN_FACTOR)
+# Surcharge explicite du point de vue. Absentes, ces variables ne changent
+# strictement rien : les captures scellees restent reproductibles telles
+# quelles. Elles existent parce qu'une preuve de SILHOUETTE se juge de pres --
+# a la distance de la camera monde, un arbre fait dix pixels et aucun travail
+# de forme ne s'y voit. Format : "x,y,z" et "pitch,yaw".
+CAM_LOC_OVERRIDE = os.environ.get('ANASTASIS_SLICE_CAM_LOC', '')
+CAM_ROT_OVERRIDE = os.environ.get('ANASTASIS_SLICE_CAM_ROT', '')
+if CAM_LOC_OVERRIDE:
+    x, y, z = [float(v) for v in CAM_LOC_OVERRIDE.split(',')]
+    CAM_LOC = unreal.Vector(x, y, z)
+if CAM_ROT_OVERRIDE:
+    pitch, yaw = [float(v) for v in CAM_ROT_OVERRIDE.split(',')]
+    CAM_ROT = unreal.Rotator(0.0, pitch, yaw)
 # Jour physique fige : les captures doivent etre comparables d'un lancement a l'autre.
 SUN_LUX = 75000.0
 EV100 = 14.0

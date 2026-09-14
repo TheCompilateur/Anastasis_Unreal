@@ -3,6 +3,7 @@
 #include "WorldView/AnastasisPresentationRegistry.h"
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisTerrainSurface.h"
+#include "WorldView/AnastasisTerrainForge.h"
 
 
 #include "Anastasis_UnrealV2.h"
@@ -19,6 +20,12 @@ static TAutoConsoleVariable<int32> CVarEcologicalDressing(
     TEXT("0=legacy tile dressing, 1=forest grammar on continuous terrain; applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarTerrainForge(
+	TEXT("anastasis.Terrain.Forge"),
+	1,
+	TEXT("0=raw tile-center surface. 1=TERRAIN_FORGE tessellated morphology (default). Does not change simulation Alt."),
+	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarWorldViewSeed(
 	TEXT("anastasis.WorldView.Seed"),
@@ -61,6 +68,42 @@ namespace
 		return FName(*FString::Printf(
 			TEXT("Tiles_%s"),
 			AnastasisWorld::TileTypeName(static_cast<AnastasisWorld::ETileType>(TypeIndex))));
+	}
+
+	/**
+	 * Ecological layer -> stature the presentation should dress it as.
+	 *
+	 * AnastasisEcologicalDressing decides three layers because that is what its support and
+	 * clustering fields can justify. The reference plate names four strata, the fourth being
+	 * the emergents -- the few ancient trees that stand out of the canopy. They are not a
+	 * separate ecological decision, they are the oldest tail of the canopy itself, so they
+	 * are split off HERE, in presentation, from the same deterministic hash. Nothing about
+	 * where a tree grows changes; only how tall and how old the one already there looks.
+	 *
+	 * A canopy of uniform height reads as a hedge. This is what gives it a skyline.
+	 */
+	constexpr double EmergentShareOfCanopy = 0.18;
+
+	EAnastasisStatureClass StatureForLayer(
+		AnastasisEcologicalDressing::ELayer Layer, uint32 VisualSeed, int32 TileX, int32 TileY)
+	{
+		using AnastasisEcologicalDressing::ELayer;
+		switch (Layer)
+		{
+		case ELayer::Young:
+			return EAnastasisStatureClass::Understory;
+		case ELayer::Secondary:
+			return EAnastasisStatureClass::Subcanopy;
+		case ELayer::Canopy:
+		default:
+			break;
+		}
+		uint32 H = VisualSeed ^ 0x7F4A7C15u;
+		H = (H ^ static_cast<uint32>(TileX)) * 0x85EBCA6Bu;
+		H = (H ^ static_cast<uint32>(TileY)) * 0xC2B2AE35u;
+		H ^= H >> 15;
+		const double Unit = static_cast<double>(H) / static_cast<double>(MAX_uint32);
+		return Unit < EmergentShareOfCanopy ? EAnastasisStatureClass::Emergent : EAnastasisStatureClass::Canopy;
 	}
 }
 
@@ -263,7 +306,9 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 		double GroundZ = 0.0;
 		if (SurfaceCrop)
 		{
-			if (!AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, Placed.X, Placed.Y, GroundZ))
+			const bool bHit = AnastasisTerrainForge::SampleActive(Placed.X, Placed.Y, GroundZ)
+				|| AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, Placed.X, Placed.Y, GroundZ);
+			if (!bHit)
 			{
 				// Pas de sol rendu sous ce point : on ne pose rien. Une instance suspendue
 				// au-dessus du vide serait un mensonge visuel, pas un placeholder.
@@ -291,31 +336,90 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
         else
         {
             int32 ForestLayerCounts[3] = {};
+            int32 StatureCounts[5] = {};
+            int32 FamilyCounts[3] = {};
+            double TallestUU = 0.0;
+            double ShortestUU = TNumericLimits<double>::Max();
+            // The gradient's own inputs, gathered as they are actually sampled. The species
+            // weights in the resolver are only defensible against the distribution they
+            // actually see, so the distribution is reported rather than assumed.
+            TArray<double> SiteShade;
+            TArray<double> SiteWetness;
+            TArray<double> SiteConiferousness;
+            SiteShade.Reserve(ForestPlan.Instances.Num());
+            SiteWetness.Reserve(ForestPlan.Instances.Num());
+            SiteConiferousness.Reserve(ForestPlan.Instances.Num());
             for (const auto& P : ForestPlan.Instances)
             {
                 double GroundZ;
-                if (!AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, P.Ground.X, P.Ground.Y, GroundZ))
+                if (!(AnastasisTerrainForge::SampleActive(P.Ground.X, P.Ground.Y, GroundZ)
+                    || AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, P.Ground.X, P.Ground.Y, GroundZ)))
                     continue;
                 const auto& T = CanonicalSource.Tiles[P.SourceIndex];
+                const EAnastasisStatureClass Stature = StatureForLayer(P.Layer, P.VisualSeed, T.X, T.Y);
+                // Species comes from the site, not from a blind draw: Shade carries altitude
+                // and exposure, Wetness carries moisture, and both are simulation truth this
+                // layer only reads. Nothing here moves a tree.
+                const EAnastasisFoliageFamily Family = AnastasisPresentation::SelectFoliageFamily(
+                    T.Shade, T.Wetness, P.VisualSeed, T.X, T.Y);
+                SiteShade.Add(T.Shade);
+                SiteWetness.Add(T.Wetness);
+                SiteConiferousness.Add(AnastasisPresentation::Coniferousness(T.Shade, T.Wetness));
                 AnastasisPresentation::FResolvedPresentation R;
                 if (!AnastasisPresentation::ResolvePresentation(AnastasisWorld::ETileType::Forest,
-                    P.VisualSeed, T.X, T.Y, R)) continue;
+                    P.VisualSeed, T.X, T.Y, R, Stature, Family)) continue;
                 auto* M = Prepare(R);
                 if (!M) continue;
                 FTransform Pose = AnastasisPresentation::ResolveInstanceTransform(*R.Entry,
-                    P.VisualSeed, T.X, T.Y, T.Alt);
+                    P.VisualSeed, T.X, T.Y, T.Alt, R.ScaleBias);
                 Pose.SetScale3D(Pose.GetScale3D() * P.ScaleMultiplier);
                 // Actual mesh bounds, not the resolver's 100uu primitive pivot convention.
-                const double MinZ = R.Mesh->GetBoundingBox().Min.Z;
+                const FBox MeshBounds = R.Mesh->GetBoundingBox();
+                const double MinZ = MeshBounds.Min.Z;
                 Pose.SetLocation(FVector(P.Ground.X, P.Ground.Y, GroundZ - MinZ * Pose.GetScale3D().Z));
                 M->AddInstance(Pose, false);
                 ++ForestLayerCounts[static_cast<uint8>(P.Layer)];
+                ++StatureCounts[static_cast<uint8>(Stature)];
+                ++FamilyCounts[static_cast<uint8>(Family)];
+                const double HeightUU = (MeshBounds.Max.Z - MinZ) * Pose.GetScale3D().Z;
+                TallestUU = FMath::Max(TallestUU, HeightUU);
+                ShortestUU = FMath::Min(ShortestUU, HeightUU);
                 ++DressingInstanceCount;
             }
             UE_LOG(LogAnastasis_UnrealV2, Display,
                 TEXT("ANASTASIS_ECOLOGY young=%d secondary=%d canopy=%d full_plan=%d refused_water_or_footprint=%d refused_slope=%d refused_spacing=%d"),
                 ForestLayerCounts[0], ForestLayerCounts[1], ForestLayerCounts[2], ForestPlan.Instances.Num(),
                 ForestPlan.RejectedWaterOrFootprint, ForestPlan.RejectedSlope, ForestPlan.RejectedSpacing);
+            // The stature profile is the visual claim of this pass, so it is measured rather
+            // than asserted: a forest that has collapsed back onto one height says so here.
+            UE_LOG(LogAnastasis_UnrealV2, Display,
+                TEXT("ANASTASIS_TREE_STATURE understory=%d subcanopy=%d canopy=%d emergent=%d height_uu=[%.0f,%.0f]"),
+                StatureCounts[static_cast<uint8>(EAnastasisStatureClass::Understory)],
+                StatureCounts[static_cast<uint8>(EAnastasisStatureClass::Subcanopy)],
+                StatureCounts[static_cast<uint8>(EAnastasisStatureClass::Canopy)],
+                StatureCounts[static_cast<uint8>(EAnastasisStatureClass::Emergent)],
+                ShortestUU == TNumericLimits<double>::Max() ? 0.0 : ShortestUU, TallestUU);
+
+            // The species claim, measured the same way. A mix that has quietly collapsed to
+            // one family, or a gradient that has saturated, is visible in this one line.
+            SiteShade.Sort();
+            SiteWetness.Sort();
+            const auto At = [](const TArray<double>& V, double Q)
+            {
+                return V.Num() == 0 ? 0.0 : V[FMath::Clamp(FMath::FloorToInt(Q * (V.Num() - 1)), 0, V.Num() - 1)];
+            };
+            // p_conifer is the gradient as REAL SITES see it, not as its extreme corners
+            // would. Reporting Coniferousness(worst shade, worst wetness) described a
+            // combination that may exist nowhere on the map, and showed a clamp that no
+            // tree ever met -- a diagnostic that raises a false alarm is worse than none.
+            SiteConiferousness.Sort();
+            UE_LOG(LogAnastasis_UnrealV2, Display,
+                TEXT("ANASTASIS_TREE_SPECIES conifer=%d broadleaf=%d shade=[%.2f %.2f %.2f] wetness=[%.2f %.2f %.2f] p_conifer=[%.2f %.2f %.2f]"),
+                FamilyCounts[static_cast<uint8>(EAnastasisFoliageFamily::Conifer)],
+                FamilyCounts[static_cast<uint8>(EAnastasisFoliageFamily::Broadleaf)],
+                At(SiteShade, 0.0), At(SiteShade, 0.5), At(SiteShade, 1.0),
+                At(SiteWetness, 0.0), At(SiteWetness, 0.5), At(SiteWetness, 1.0),
+                At(SiteConiferousness, 0.0), At(SiteConiferousness, 0.5), At(SiteConiferousness, 1.0));
         }
     }
     UE_LOG(LogAnastasis_UnrealV2, Display,
@@ -433,6 +537,25 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
         AnastasisTerrainSurface::FGeometry Geometry;
         if (AnastasisTerrainSurface::Build(Crop, Geometry))
         {
+            AnastasisTerrainForge::FMesh ForgeMesh;
+            const bool bForged = CVarTerrainForge.GetValueOnGameThread() != 0
+                && AnastasisTerrainForge::Apply(Crop, Geometry, ForgeMesh);
+            if (!bForged)
+            {
+                AnastasisTerrainForge::ClearActive();
+            }
+            else
+            {
+                ForgeBasin = FVector(ForgeMesh.BasinX, ForgeMesh.BasinY, ForgeMesh.BasinZ);
+                ForgeLandmark = FVector(ForgeMesh.LandmarkX, ForgeMesh.LandmarkY, ForgeMesh.LandmarkZ);
+                UE_LOG(LogAnastasis_UnrealV2, Display,
+                    TEXT("ANASTASIS_TERRAIN_FORGE subdiv=%d fine=%dx%d vertices=%d triangles=%d z=[%.0f,%.0f] basin=(%.0f,%.0f,%.0f) landmark=(%.0f,%.0f,%.0f)"),
+                    ForgeMesh.Subdiv, ForgeMesh.FineW, ForgeMesh.FineH,
+                    ForgeMesh.Geometry.Vertices.Num(), ForgeMesh.Geometry.Triangles.Num() / 3,
+                    ForgeMesh.MinZ, ForgeMesh.MaxZ,
+                    ForgeMesh.BasinX, ForgeMesh.BasinY, ForgeMesh.BasinZ,
+                    ForgeMesh.LandmarkX, ForgeMesh.LandmarkY, ForgeMesh.LandmarkZ);
+            }
             // Section 0 : relief. La couleur de sommet porte toute la semantique du sol.
             // bCreateCollision=true : c'est ce qui empeche le pawn de tomber a travers.
             ExperimentalSurface->CreateMeshSection_LinearColor(0, Geometry.Vertices, Geometry.Triangles,
@@ -459,6 +582,19 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             // Emprise reelle = ce qui est reellement rendu, pas Plan : en mode 1 la tranche
             // canonique meme si Plan couvre le monde, en mode 2 l emprise incarnee entiere.
             ActiveFootprintBounds = AnastasisWorldView::SnapshotBounds(Crop);
+            if (bForged)
+            {
+                FBox ForgedBounds(ForceInit);
+                for (const FVector& V : Geometry.Vertices)
+                {
+                    ForgedBounds += V;
+                }
+                if (ForgedBounds.IsValid)
+                {
+                    ActiveFootprintBounds.Min.Z = ForgedBounds.Min.Z;
+                    ActiveFootprintBounds.Max.Z = ForgedBounds.Max.Z;
+                }
+            }
             // Emprise reportee telle qu'elle est batie : en mode 1 cette ligne imprime
             // exactement la chaine scellee (source=96x96 crop=(0,0) 32x32 tiles=1024).
             UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN source=%dx%d crop=(%d,%d) %dx%d tiles=%d vertices=%d triangles=%d water_triangles=%d material=%s boundary=tile_centers legacy_visible=0"),
@@ -470,6 +606,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
         {
             bWaterSurfaceBuilt = false;
             ActiveFootprintBounds = AnastasisWorldView::PlanBounds(Plan);
+            AnastasisTerrainForge::ClearActive();
             UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_TERRAIN rejected crop; legacy DEBUG retained"));
         }
     }
@@ -477,6 +614,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
     {
         bWaterSurfaceBuilt = false;
         ActiveFootprintBounds = AnastasisWorldView::PlanBounds(Plan);
+        AnastasisTerrainForge::ClearActive();
         UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN disabled legacy_visible=1"));
     }
     // Le dressing vient APRES la decision de terrain : on ne pose pas un objet sur un

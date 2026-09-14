@@ -1,4 +1,4 @@
-param([ValidateSet('0','1','2')][string]$Mode='1',[Parameter(Mandatory=$true)][string]$Out,[string]$RebuildMaterial='0',[ValidateSet('auto','world','slice')][string]$Cam='auto',[int]$TimeoutSec=300)
+param([ValidateSet('0','1','2')][string]$Mode='1',[Parameter(Mandatory=$true)][string]$Out,[string]$RebuildMaterial='0',[ValidateSet('auto','world','slice')][string]$Cam='auto',[string]$CamLoc='',[string]$CamRot='',[int]$TimeoutSec=300)
 $ErrorActionPreference='Stop'
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 $Editor='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
@@ -12,6 +12,9 @@ $env:ANASTASIS_SLICE_SHOT=$shot
 $env:ANASTASIS_SLICE_MODE=$Mode
 $env:ANASTASIS_SLICE_REBUILD_MATERIAL=$RebuildMaterial
 $env:ANASTASIS_SLICE_CAM=$Cam
+# Vide = comportement historique inchange. Renseigne = preuve rapprochee.
+$env:ANASTASIS_SLICE_CAM_LOC=$CamLoc
+$env:ANASTASIS_SLICE_CAM_ROT=$CamRot
 $py=(Join-Path $Root 'tools\unreal\observe-slice.py').Replace('\','/')
 $launchArgs=@(
  ('"'+(Join-Path $Root 'Anastasis_UnrealV2.uproject')+'"'),
