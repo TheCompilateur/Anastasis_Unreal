@@ -18,7 +18,7 @@ static TAutoConsoleVariable<int32> CVarEcologicalDressing(
     TEXT("anastasis.Dressing.Ecology"), 1,
     TEXT("0=legacy tile dressing, 1=forest grammar on continuous terrain; applied on embodiment."), ECVF_Default);
 
-static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 0, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop; applied on embodiment."), ECVF_Default);
+static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarWorldViewSeed(
 	TEXT("anastasis.WorldView.Seed"),
@@ -99,6 +99,26 @@ AAnastasisWorldEmbodiment::AAnastasisWorldEmbodiment()
 	}
 	// Dressing components are NOT created here: which meshes exist is presentation data
 	// (see UAnastasisPresentationRegistry), read at EmbodyCrop time, not compile time.
+
+	// Default subobject rather than a NewObject at embody time: OnConstruction reruns would
+	// otherwise create and register a component mid-construction, which the engine is free to
+	// tear down between runs.
+	ExperimentalSurface = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ExperimentalTerrain"));
+	ExperimentalSurface->SetupAttachment(Root);
+	ExperimentalSurface->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	ExperimentalSurface->SetCollisionProfileName(TEXT("BlockAll"));
+	ExperimentalSurface->SetCanEverAffectNavigation(false);
+	ExperimentalSurface->SetCastShadow(true);
+	ExperimentalSurface->SetVisibility(false);
+
+	// The level holds no world truth: every tile is regenerated from the seed at load. Transient
+	// keeps the instances OnConstruction builds in the editor out of the .umap, which would
+	// otherwise bake simulation output into the map the first time anyone saves it.
+	for (UHierarchicalInstancedStaticMeshComponent* Mesh : TerrainMeshes)
+	{
+		Mesh->SetFlags(RF_Transient);
+	}
+	ExperimentalSurface->SetFlags(RF_Transient);
 }
 
 UHierarchicalInstancedStaticMeshComponent* AAnastasisWorldEmbodiment::GetOrCreateDressingMesh(
@@ -107,13 +127,25 @@ UHierarchicalInstancedStaticMeshComponent* AAnastasisWorldEmbodiment::GetOrCreat
 	const FName Key(*FString::Printf(TEXT("Dressing_%s_v%d"),
 		*Resolved.Entry->ArchetypeId.ToString(), Resolved.VariantIndex));
 
-	if (const int32* Existing = DressingSlotByKey.Find(Key))
+	// The cached component can be stale: a construction-script rerun is free to destroy
+	// components an earlier run created, leaving this map pointing at nothing. Reuse only what
+	// is still valid, and fall through to rebuild otherwise instead of returning null dressing.
+	const int32* Existing = DressingSlotByKey.Find(Key);
+	if (Existing && DressingMeshes.IsValidIndex(*Existing))
 	{
-		return DressingMeshes.IsValidIndex(*Existing) ? DressingMeshes[*Existing].Get() : nullptr;
+		if (UHierarchicalInstancedStaticMeshComponent* Cached = DressingMeshes[*Existing].Get())
+		{
+			if (IsValid(Cached))
+			{
+				return Cached;
+			}
+		}
 	}
 
 	UHierarchicalInstancedStaticMeshComponent* Mesh =
 		NewObject<UHierarchicalInstancedStaticMeshComponent>(this, Key);
+	// Same reason as the ground meshes: never serialized into the level.
+	Mesh->SetFlags(RF_Transient);
 	Mesh->SetupAttachment(GetRootComponent());
 	Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	Mesh->SetCollisionProfileName(TEXT("BlockAll"));
@@ -123,14 +155,41 @@ UHierarchicalInstancedStaticMeshComponent* AAnastasisWorldEmbodiment::GetOrCreat
 	Mesh->SetCanEverAffectNavigation(false);
 	Mesh->RegisterComponent();
 
-	DressingSlotByKey.Add(Key, DressingMeshes.Add(Mesh));
+	if (Existing && DressingMeshes.IsValidIndex(*Existing))
+	{
+		DressingMeshes[*Existing] = Mesh;
+	}
+	else
+	{
+		DressingSlotByKey.Add(Key, DressingMeshes.Add(Mesh));
+	}
 	return Mesh;
 }
 
 void AAnastasisWorldEmbodiment::BeginPlay()
 {
 	Super::BeginPlay();
-	EmbodyCrop(
+	EmbodyFromConsoleVariables();
+}
+
+#if WITH_EDITOR
+void AAnastasisWorldEmbodiment::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	const UWorld* OwningWorld = GetWorld();
+	if (!OwningWorld || OwningWorld->IsGameWorld())
+	{
+		return;
+	}
+
+	EmbodyFromConsoleVariables();
+}
+#endif
+
+bool AAnastasisWorldEmbodiment::EmbodyFromConsoleVariables()
+{
+	return EmbodyCrop(
 		static_cast<uint32>(FMath::Max(0, CVarWorldViewSeed.GetValueOnGameThread())),
 		FMath::Max(0, CVarWorldViewCropX.GetValueOnGameThread()),
 		FMath::Max(0, CVarWorldViewCropY.GetValueOnGameThread()),
@@ -374,16 +433,6 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
         AnastasisTerrainSurface::FGeometry Geometry;
         if (AnastasisTerrainSurface::Build(Crop, Geometry))
         {
-            if (!ExperimentalSurface)
-            {
-                ExperimentalSurface = NewObject<UProceduralMeshComponent>(this, TEXT("ExperimentalTerrain"));
-                ExperimentalSurface->SetupAttachment(GetRootComponent());
-                ExperimentalSurface->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-                ExperimentalSurface->SetCollisionProfileName(TEXT("BlockAll"));
-                ExperimentalSurface->SetCanEverAffectNavigation(false);
-                ExperimentalSurface->SetCastShadow(true);
-                ExperimentalSurface->RegisterComponent();
-            }
             // Section 0 : relief. La couleur de sommet porte toute la semantique du sol.
             // bCreateCollision=true : c'est ce qui empeche le pawn de tomber a travers.
             ExperimentalSurface->CreateMeshSection_LinearColor(0, Geometry.Vertices, Geometry.Triangles,

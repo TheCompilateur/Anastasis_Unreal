@@ -29,6 +29,18 @@ public:
     UPROPERTY(EditAnywhere, Category="Anastasis|Ecology")
     FAnastasisForestDressingSettings ForestDressing;
 
+#if WITH_EDITOR
+	/**
+	 * Editor worlds only: rebuild the embodiment when the level loads or the actor changes, so
+	 * the map shows simulation truth in the viewport without entering PIE. Game worlds are
+	 * driven by BeginPlay -- running both would embody twice on every PIE start.
+	 */
+	virtual void OnConstruction(const FTransform& Transform) override;
+#endif
+
+	/** EmbodyCrop driven by the anastasis.WorldView.* console variables. One source for BeginPlay and OnConstruction. */
+	bool EmbodyFromConsoleVariables();
+
 	bool Embody(uint32 Seed, int32 Width, int32 Height);
 	bool EmbodyCrop(uint32 Seed, int32 OriginX, int32 OriginY, int32 Width, int32 Height);
 
