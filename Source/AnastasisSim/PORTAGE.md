@@ -100,6 +100,19 @@ Tests mesurés 2026-09-11 (`UnrealEditor-Cmd -nullrhi`) : `Monde` / `Archetype` 
   des réglages three.js (ombres, particules, pixel ratio). L'équivalent Unreal
   appartient à la couche de présentation.
 
+### Ce qu'il reste — l'inventaire
+
+`docs/migration/phase2/P2_INVENTAIRE_JS.md` classe les 234 modules du noyau JS en
+**porter / générer / jeter**, avec leur vague et leur chantier. Il se régénère, il ne
+s'édite pas :
+
+```bash
+node tools/migration/inventory-js-sim.mjs -out docs/migration/phase2/P2_INVENTAIRE_JS.md
+```
+
+Au 2026-09-13 (référence `fee66ae`) : 198 modules à porter — **63 492 lignes de code**,
+commentaires et lignes vides déduits — 4 tables à générer, 24 modules à ne pas porter.
+
 ### Suite proposée — dans cet ordre
 
 L'ordre suit les dépendances réelles, pas l'intérêt du gameplay. Chaque étape doit
