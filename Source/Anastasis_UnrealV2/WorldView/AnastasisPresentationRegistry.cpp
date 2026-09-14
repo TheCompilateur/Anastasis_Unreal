@@ -15,10 +15,13 @@ static_assert(AnastasisWorld::TileTypeCount == 7, "EAnastasisSemanticType must m
 
 namespace
 {
-	// Same placeholder primitives and envelope VISUAL_BUILD_001 hardcoded. Kept as the
-	// fallback so a missing data asset degrades to the previous, known-good look rather
-	// than to an empty world.
-	constexpr const TCHAR* DefaultTreeMeshPath = TEXT("/Engine/BasicShapes/Cone.Cone");
+	// Fallback look when the data asset is missing — never an empty world. Ruin stays the
+	// VISUAL_BUILD_001 engine primitive; Forest falls back to the first real Anastasis asset:
+	// trunk cylinder + tapered canopy cone merged into one mesh, centered on origin spanning
+	// [-50,+50] on Z, so it honours the EngineBasicShapeSize=100uu convention unchanged. Built
+	// by tools/unreal/create_tree_asset.py (ANASTASIS_ASSET_AGENT_001) — a placeholder
+	// silhouette, not final art direction.
+	constexpr const TCHAR* DefaultTreeMeshPath = TEXT("/Game/Anastasis/Vegetation/SM_Tree_Generic_01.SM_Tree_Generic_01");
 	constexpr const TCHAR* DefaultRuinMeshPath = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
 
 	FAnastasisPresentationEntry MakeDefaultEntry(

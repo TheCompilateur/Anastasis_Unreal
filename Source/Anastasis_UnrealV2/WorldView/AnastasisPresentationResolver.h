@@ -29,7 +29,7 @@ namespace AnastasisPresentation
 	/** Fixed path + code fallback, the same convention AAnastasisWorldEmbodiment::ResolveSliceMaterial already uses for M_AnastasisSlice. */
 	inline constexpr const TCHAR* RegistryAssetPath = TEXT("/Game/Anastasis/Presentation/DA_AnastasisPresentation.DA_AnastasisPresentation");
 
-	/** UE BasicShapes (Cube/Cone/Cylinder/...) share this bounding size by convention. */
+	/** UE BasicShapes (Cube/Cone/Cylinder/...) share this bounding size by convention; see AnastasisWorldDebugVisual::CubeMeshSize for the cube case this mirrors. */
 	inline constexpr double EngineBasicShapeSize = 100.0;
 
 	/** One tile's fully resolved look: the data entry plus the variant deterministically chosen for it. */
