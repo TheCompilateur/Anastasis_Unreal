@@ -1,17 +1,20 @@
 """
-ANASTASIS_ASSET_AGENT_001 -- Phase 4 verify.
+ANASTASIS_ASSET_AGENT_PROBE -- preuve PIE, partagee par les missions d'asset.
 
-Adapted from tools/unreal/probe-demo.py for this mission's own isolated
-worktree (no dependency on the canonical root's env/paths). Drives PIE on the
-default map, sets the canonical 32x32 surface-mode crop (matching the earlier
-visualbuild001-surface evidence so the two captures are directly comparable),
-then issues Anastasis.World.Capture. Read-only with respect to level content.
+Pilote PIE dans le mode surface 32x32 scelle et capture UN bookmark par run
+(OVERVIEW ou GROUND, via ANASTASIS_PROBE_BOOKMARK), pour que deux runs
+successifs ne fassent jamais courir Anastasis.World.Capture contre lui-meme :
+un run unique enchainant les deux a heurte CAPTURE::BUSY dans ASSET_AGENT_001.
+
+Ne depend pas de l'env/des chemins de la racine canonique : chaque mission le
+lance depuis son propre worktree. Lecture seule vis-a-vis du contenu du level.
 """
 import os, time, unreal
 
 LOG_PREFIX = 'ASSET_AGENT_PROBE'
 MAP = '/Game/FirstPerson/Lvl_FirstPerson'
-MISSION = os.environ.get('ANASTASIS_PROBE_MISSION', 'asset-agent-001')
+MISSION = os.environ.get('ANASTASIS_PROBE_MISSION', 'asset-agent-002')
+BOOKMARK = os.environ.get('ANASTASIS_PROBE_BOOKMARK', 'OVERVIEW')
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
@@ -52,14 +55,16 @@ def tick(dt):
         unreal.log(LOG_PREFIX + '_PIE_ACTIVE')
     elif phase == 2 and elapsed > 6.0:
         phase = 3
-        run_cmd('Anastasis.World.Capture GROUND ' + MISSION)
+        run_cmd('Anastasis.World.Capture ' + BOOKMARK + ' ' + MISSION)
         unreal.log(LOG_PREFIX + '_COMMANDS_ISSUED')
     elif phase == 3 and elapsed > 14.0:
         phase = 4
         les.editor_request_end_play()
         unreal.log(LOG_PREFIX + '_PIE_END_REQUESTED')
-    elif phase == 4 and not les.is_in_play_in_editor():
+    elif phase == 4 and elapsed > 17.0:
         finish(LOG_PREFIX + '_COMPLETE')
+    # Garde-fou repris d'ASSET_AGENT_001 : sans lui, un PIE bloque avant la phase 4
+    # ne signale rien et le run passerait pour reussi.
     elif elapsed > 60.0:
         finish(LOG_PREFIX + '_TIMEOUT phase=' + str(phase), True)
 

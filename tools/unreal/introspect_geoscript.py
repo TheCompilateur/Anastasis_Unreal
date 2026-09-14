@@ -5,6 +5,7 @@ def show_doc(owner, name):
     unreal.log("[doc] ==== %s ====" % name)
     unreal.log("[doc] %s" % (getattr(fn, "__doc__", "NO DOC")))
 
+show_doc(unreal.GeometryScript_Primitives, "append_box")
 show_doc(unreal.GeometryScript_Primitives, "append_cone")
 show_doc(unreal.GeometryScript_Primitives, "append_cylinder")
 show_doc(unreal.GeometryScript_MeshQueries, "get_mesh_bounding_box")
