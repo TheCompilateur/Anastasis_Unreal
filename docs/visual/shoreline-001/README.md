@@ -82,9 +82,17 @@ hauteur du point le plus haut du relief dans un rayon de 900 uu. Les deux sorten
 du marqueur `TERRAIN_SHORELINE_FORGED_SITE` à chaque exécution.
 
 Reste donc une seule inconnue, et elle est nommée : **le recul doit suivre la
-taille du sujet.** Un bassin large se cadre à 900 uu, un chenal de ravin demande
-d'être beaucoup plus près — et la vue rapprochée, elle, bute encore sur la
-capture. C'est la prochaine mesure à ajouter : la largeur locale du plan d'eau.
+taille du sujet.**
+
+Et le contournement evident ne marche pas — c'est verifie, pas suppose. La vue
+`CLOSE` avance sur le meme rayon : sur une berge abrupte (`flatness = 0.094`)
+elle vient se plaquer contre le talus et ne montre plus d'eau du tout. Avancer ne
+suffit donc pas ; il faut aussi **contourner**, donc connaitre la largeur locale
+du plan d'eau et s'ecarter de la berge. C'est la prochaine mesure a ajouter au
+marqueur, sur le modele de `water_yaw` et `clear_z`.
+
+Inutile de re-tenter `CLOSE` tel quel : il a ete essaye sur les deux sites de
+variante, et trois captures sur quatre n'ont meme pas produit de fichier.
 
 **Aucune image de variante n'est versée.** Les frames obtenues montrent du relief
 avec un filet d'eau ; les étiqueter « variantes de rive » serait une preuve
