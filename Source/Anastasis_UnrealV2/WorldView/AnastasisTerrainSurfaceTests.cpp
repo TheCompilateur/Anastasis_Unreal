@@ -132,7 +132,8 @@ bool FAnastasisTerrainSemantics::RunTest(const FString&)
     const auto Second = AnastasisWorldView::CropSnapshot(AnastasisWorldView::CaptureCanonicalWorld(12345), 0, 0, 32, 32);
     TestTrue(TEXT("reconstruction"), AnastasisTerrainSurface::Build(Second, Again));
     TestTrue(TEXT("classification semantique deterministe"),
-        G.Colors == Again.Colors && G.WaterVertices == Again.WaterVertices && G.WaterTriangles == Again.WaterTriangles);
+        G.Colors == Again.Colors && G.WaterVertices == Again.WaterVertices && G.WaterTriangles == Again.WaterTriangles
+        && G.UV0 == Again.UV0 && G.UV1 == Again.UV1);
 
     AddInfo(FString::Printf(TEXT("TERRAIN_SEMANTICS water_tiles=%d land_tiles=%d shore_tiles=%d water_quads=%d"),
         WaterTiles, LandTiles, ShoreTiles, G.WaterTriangles.Num() / 6));
@@ -488,4 +489,63 @@ bool FAnastasisDressingOnGround::RunTest(const FString&)
     if (ForgeVar) ForgeVar->Set(PreviousForge, ECVF_SetByCode);
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainMorphologyChannels, "Anastasis.Terrain.MorphologyChannels", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainMorphologyChannels::RunTest(const FString&)
+{
+    // Ce que le materiau de sol lit. Un canal muet ou deborde ne se voit pas a l'ecran
+    // comme une erreur : il se voit comme un sol fade, ce qu'aucun test de couleur
+    // n'attrape. On verifie donc a la fois la BORNE et la NON-VACUITE de chaque canal.
+    const auto Full = AnastasisWorldView::CaptureCanonicalWorld(12345);
+    AnastasisTerrainSurface::FGeometry G;
+    if (!TestTrue(TEXT("build monde"), AnastasisTerrainSurface::Build(Full, G))) return false;
+
+    TestEqual(TEXT("un UV0 par sommet"), G.UV0.Num(), G.Vertices.Num());
+    TestEqual(TEXT("un UV1 par sommet"), G.UV1.Num(), G.Vertices.Num());
+
+    int32 RockVerts = 0, LitterVerts = 0, WorkedVerts = 0, GrassVerts = 0, WetVerts = 0;
+    double MaxWetness = 0.0;
+    for (int32 I = 0; I < G.Vertices.Num(); ++I)
+    {
+        const double Rock = G.UV0[I].X, Litter = G.UV0[I].Y;
+        const double Worked = G.UV1[I].X, Wetness = G.UV1[I].Y;
+        const double Grass = 1.0 - Rock - Litter - Worked;
+
+        // Partition de l'unite : sans cela l'herbe, qui est le RESTE, deviendrait
+        // negative sur certaines tuiles et le materiau melangerait des poids qui ne
+        // somment plus a 1 -- un sol qui s'assombrit ou sature sans raison lisible.
+        TestTrue(TEXT("poids de famille dans [0,1]"),
+            Rock >= 0.0 && Rock <= 1.0 && Litter >= 0.0 && Litter <= 1.0
+            && Worked >= 0.0 && Worked <= 1.0 && Grass >= -KINDA_SMALL_NUMBER && Grass <= 1.0 + KINDA_SMALL_NUMBER);
+        TestTrue(TEXT("humidite dans [0,1]"), Wetness >= 0.0 && Wetness <= 1.0);
+
+        if (Rock > 0.5) ++RockVerts;
+        if (Litter > 0.5) ++LitterVerts;
+        if (Worked > 0.5) ++WorkedVerts;
+        if (Grass > 0.5) ++GrassVerts;
+        if (Wetness > 0.5) ++WetVerts;
+        MaxWetness = FMath::Max(MaxWetness, Wetness);
+    }
+
+    // Non-vacuite : les quatre familles existent reellement dans le monde canonique.
+    // Si l'une disparaissait, la grammaire de sol en revendiquerait une de trop.
+    TestTrue(TEXT("la roche existe dans le monde"), RockVerts > 0);
+    TestTrue(TEXT("la litiere existe dans le monde"), LitterVerts > 0);
+    TestTrue(TEXT("la terre travaillee existe dans le monde"), WorkedVerts > 0);
+    TestTrue(TEXT("l'herbe existe dans le monde"), GrassVerts > 0);
+    TestTrue(TEXT("l'humidite est un champ, pas une constante"), WetVerts > 0 && MaxWetness > 0.9);
+
+    // La correspondance canal <-> tuile source, verifiee sur la tuile, pas sur un total.
+    for (int32 I = 0; I < G.Vertices.Num(); ++I)
+    {
+        const auto Mix = AnastasisTerrainSurface::SurfaceMixFor(Full.Tiles[I].Type);
+        TestEqual(TEXT("UV0 = (Rock, Litter) de la tuile"), G.UV0[I], FVector2D(Mix.Rock, Mix.Litter));
+        TestEqual(TEXT("UV1.x = Worked de la tuile"), G.UV1[I].X, Mix.Worked);
+    }
+
+    AddInfo(FString::Printf(
+        TEXT("TERRAIN_MORPHOLOGY vertices=%d rock=%d litter=%d worked=%d grass=%d wet_gt_half=%d max_wetness=%.3f"),
+        G.Vertices.Num(), RockVerts, LitterVerts, WorkedVerts, GrassVerts, WetVerts, MaxWetness));
+    return true;
+}
+
 #endif

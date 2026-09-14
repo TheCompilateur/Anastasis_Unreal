@@ -4,24 +4,46 @@ namespace
 {
 using AnastasisWorld::ETileType;
 
-/** Palette de presentation de la tranche. Distincte de la palette DEBUG des cubes. */
+/**
+ * Palette de presentation de la tranche. Distincte de la palette DEBUG des cubes.
+ *
+ * CES VALEURS SONT DES ALBEDOS, pas des couleurs d'interface. Elles sont consommees
+ * comme Base Color d'un materiau PBR, sous un soleil de 75 000 lux et une exposition
+ * figee a EV100 = 14 (le rig de capture scelle). A cette exposition une surface
+ * d'albedo 0.5 sort a ~2 stops au-dessus du gris moyen : elle est blanche. C'est
+ * exactement ce que montrait docs/visual/terrain-extent/C_world_surface.png -- un
+ * monde de platre pastel, dont les zones les plus claires etaient precisement les
+ * deux teintes les plus hautes de cette palette (ShoreSand 0.69, HighlandRock 0.52),
+ * et qui sont aussi les deux appliquees le plus largement.
+ *
+ * Les valeurs ci-dessous sont donc ramenees dans la plage physique des sols reels :
+ * herbe humide 0.10-0.18, litiere forestiere 0.05-0.10, terre travaillee 0.10-0.20,
+ * roche mouillee 0.12-0.20, sediment de rive 0.18-0.28. Le monde pontique est humide,
+ * donc plutot le bas de chaque plage. La teinte (le rapport entre canaux) est conservee
+ * la ou elle etait juste ; seul le niveau descend.
+ */
 FLinearColor SurfaceTypeColor(ETileType Type)
 {
     switch (Type)
     {
-    case ETileType::Grass:  return FLinearColor(0.243f, 0.412f, 0.169f);
-    case ETileType::Forest: return FLinearColor(0.102f, 0.243f, 0.114f);
-    case ETileType::Scrub:  return FLinearColor(0.392f, 0.396f, 0.212f);
-    case ETileType::Field:  return FLinearColor(0.557f, 0.482f, 0.176f);
-    case ETileType::Stone:  return FLinearColor(0.400f, 0.396f, 0.380f);
-    case ETileType::Ruin:   return FLinearColor(0.353f, 0.302f, 0.318f);
+    case ETileType::Grass:  return FLinearColor(0.118f, 0.171f, 0.078f);
+    case ETileType::Forest: return FLinearColor(0.062f, 0.097f, 0.052f);
+    case ETileType::Scrub:  return FLinearColor(0.152f, 0.158f, 0.092f);
+    case ETileType::Field:  return FLinearColor(0.196f, 0.163f, 0.086f);
+    case ETileType::Stone:  return FLinearColor(0.149f, 0.147f, 0.141f);
+    case ETileType::Ruin:   return FLinearColor(0.146f, 0.131f, 0.120f);
+    // L'eau n'est pas du ressort de cette mission : valeur inchangee.
     case ETileType::Water:  return FLinearColor(0.055f, 0.220f, 0.353f);
     }
     return FLinearColor::White;
 }
 
-const FLinearColor ShoreSand(0.694f, 0.612f, 0.435f);
-const FLinearColor HighlandRock(0.518f, 0.490f, 0.463f);
+// Sediment de rive : un limon humide, pas du sable de carte postale. C'etait la
+// teinte qui dessinait le halo blanc autour du monde.
+const FLinearColor ShoreSand(0.251f, 0.216f, 0.159f);
+// Roche d'altitude : elle mineralise le sol en hauteur sans l'eclaircir en neige.
+const FLinearColor HighlandRock(0.171f, 0.163f, 0.152f);
+// Eau : hors perimetre, inchangee.
 const FLinearColor ShallowWater(0.102f, 0.361f, 0.427f);
 const FLinearColor DeepWater(0.016f, 0.063f, 0.204f);
 
@@ -55,6 +77,26 @@ FLinearColor TileColor(const AnastasisWorldView::FVisualTile& T, double MinAlt, 
     Color.A = 0.0f;
     return Color;
 }
+}
+
+AnastasisTerrainSurface::FSurfaceMix AnastasisTerrainSurface::SurfaceMixFor(ETileType Type)
+{
+    // Le reste (1 - Rock - Litter - Worked) est l'herbe. Aucune ligne ici n'invente une
+    // matiere : chaque poids dit de quoi la tuile du simulateur est faite.
+    switch (Type)
+    {
+    case ETileType::Stone:  return {1.00, 0.00, 0.00};
+    // Une ruine est de la pierre remaniee posee sur un sol remue, pas une septieme matiere.
+    case ETileType::Ruin:   return {0.85, 0.00, 0.10};
+    case ETileType::Forest: return {0.00, 1.00, 0.00};
+    // Le maquis n'est pas une matiere a part : c'est de l'herbe sous une litiere partielle.
+    case ETileType::Scrub:  return {0.00, 0.35, 0.00};
+    case ETileType::Field:  return {0.00, 0.00, 1.00};
+    case ETileType::Grass:  return {0.00, 0.00, 0.00};
+    // L'eau porte sa propre section de maillage : la famille de sol n'a pas de sens ici.
+    case ETileType::Water:  return {0.00, 0.00, 0.00};
+    }
+    return {0.00, 0.00, 0.00};
 }
 
 bool AnastasisTerrainSurface::SampleHeight(
@@ -117,6 +159,12 @@ bool AnastasisTerrainSurface::Build(const AnastasisWorldView::FWorldVisualSnapsh
         Result.Vertices.Add(P);
         Result.SourceIndices.Add(T.SourceIndex);
         Result.Colors.Add(TileColor(T, Crop.MinAlt, Crop.MaxAlt));
+        // Canaux morphologiques. Wetness sort telle quelle du simulateur -- deja bornee
+        // a [0,1] par AnastasisWorld -- et on la re-borne ici seulement parce qu'un
+        // canal de sommet qui deborde donne un materiau qui deborde, silencieusement.
+        const FSurfaceMix Mix = SurfaceMixFor(T.Type);
+        Result.UV0.Add(FVector2D(Mix.Rock, Mix.Litter));
+        Result.UV1.Add(FVector2D(Mix.Worked, FMath::Clamp(T.Wetness, 0.0, 1.0)));
         Result.WaterVertices.Add(FVector(P.X, P.Y, WaterPlaneZ));
         IsWater.Add(T.Type == AnastasisWorld::ETileType::Water);
     }

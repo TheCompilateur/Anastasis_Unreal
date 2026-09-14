@@ -27,6 +27,18 @@ static TAutoConsoleVariable<int32> CVarTerrainForge(
 	TEXT("0=raw tile-center surface. 1=TERRAIN_FORGE tessellated morphology (default). Does not change simulation Alt."),
 	ECVF_Default);
 
+// Le bouton qui rend la comparaison possible. Les deux chemins batissent EXACTEMENT
+// la meme geometrie et les memes canaux de sommet : seule change la fonction qui les
+// lit. Une capture A/B a camera, graine, soleil et exposition identiques ne mesure
+// donc que le materiau -- c'est la seule facon de prouver un gain de sol.
+//
+// Orthogonal a anastasis.Terrain.Forge : celle-ci decide de la FORME du sol, celle-la
+// de sa MATIERE. Les quatre combinaisons ont un sens et se capturent separement.
+static TAutoConsoleVariable<int32> CVarGroundMaterial(
+    TEXT("anastasis.Terrain.GroundMaterial"), 1,
+    TEXT("0=materiau de tranche historique (couleur de sommet plate), 1=sol morphologique MI_AnastasisGround (defaut); applique a l'incarnation."),
+    ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarWorldViewSeed(
 	TEXT("anastasis.WorldView.Seed"),
 	12345,
@@ -563,10 +575,18 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                     ForgeMesh.BasinX, ForgeMesh.BasinY, ForgeMesh.BasinZ,
                     ForgeMesh.LandmarkX, ForgeMesh.LandmarkY, ForgeMesh.LandmarkZ);
             }
-            // Section 0 : relief. La couleur de sommet porte toute la semantique du sol.
+            // Section 0 : relief. La couleur de sommet porte la TEINTE semantique du sol ;
+            // depuis GROUND_SURFACE_001 elle ne porte plus seule toute la semantique --
+            // les familles de surface et l'humidite passent par UV0/UV1. Le Forge ayant
+            // pu remplacer Geometry par un maillage tessele, ces canaux doivent avoir
+            // suivi la subdivision : c'est AnastasisTerrainForge::Apply qui s'en charge.
             // bCreateCollision=true : c'est ce qui empeche le pawn de tomber a travers.
+            // UV0/UV1 portent la morphologie lue par le materiau de sol (cf. FGeometry).
+            // La surcharge a quatre canaux est la seule qui les accepte ; UV2/UV3 restent
+            // vides parce que rien d'honnete ne reste a y mettre.
             ExperimentalSurface->CreateMeshSection_LinearColor(0, Geometry.Vertices, Geometry.Triangles,
-                Geometry.Normals, TArray<FVector2D>{}, Geometry.Colors, TArray<FProcMeshTangent>{}, true);
+                Geometry.Normals, Geometry.UV0, Geometry.UV1, TArray<FVector2D>{}, TArray<FVector2D>{},
+                Geometry.Colors, TArray<FProcMeshTangent>{}, true);
             // Section 1 : nappe d'eau plate au niveau de la mer, encastree dans le relief.
             ExperimentalSurface->ClearMeshSection(1);
             bWaterSurfaceBuilt = Geometry.WaterTriangles.Num() > 0;
@@ -577,10 +597,20 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 ExperimentalSurface->CreateMeshSection_LinearColor(1, Geometry.WaterVertices, Geometry.WaterTriangles,
                     Geometry.WaterNormals, TArray<FVector2D>{}, WaterColors, TArray<FProcMeshTangent>{}, false);
             }
-            if (UMaterialInterface* SurfaceMaterial = ResolveSliceMaterial())
+            // Section 0 = le sol, section 1 = la nappe d'eau. Elles ne portent PLUS le
+            // meme materiau : l'eau garde celui de la tranche, qui la rend depuis sa
+            // couleur de sommet comme avant. Le materiau de sol n'a alors aucune raison
+            // de lire un drapeau d'eau ni de payer les interpolations qui vont avec --
+            // la geometrie separe deja les deux, et l'eau n'est pas de cette mission.
+            UMaterialInterface* SurfaceMaterial = ResolveGroundMaterial();
+            UMaterialInterface* WaterMaterial = ResolveWaterMaterial();
+            if (SurfaceMaterial)
             {
                 ExperimentalSurface->SetMaterial(0, SurfaceMaterial);
-                ExperimentalSurface->SetMaterial(1, SurfaceMaterial);
+            }
+            if (WaterMaterial)
+            {
+                ExperimentalSurface->SetMaterial(1, WaterMaterial);
             }
             ExperimentalSurface->SetVisibility(true);
             for (auto& Mesh : TerrainMeshes) if (Mesh) Mesh->SetVisibility(false);
@@ -604,10 +634,11 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             }
             // Emprise reportee telle qu'elle est batie : en mode 1 cette ligne imprime
             // exactement la chaine scellee (source=96x96 crop=(0,0) 32x32 tiles=1024).
-            UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN source=%dx%d crop=(%d,%d) %dx%d tiles=%d vertices=%d triangles=%d water_triangles=%d material=%s boundary=tile_centers legacy_visible=0"),
+            UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN source=%dx%d crop=(%d,%d) %dx%d tiles=%d vertices=%d triangles=%d water_triangles=%d material=%s water_material=%s boundary=tile_centers legacy_visible=0"),
                 Crop.SourceW, Crop.SourceH, Crop.OriginX, Crop.OriginY, Crop.W, Crop.H, Crop.Tiles.Num(),
                 Geometry.Vertices.Num(), Geometry.Triangles.Num()/3, Geometry.WaterTriangles.Num()/3,
-                SliceMaterial ? TEXT("slice") : TEXT("fallback"));
+                SurfaceMaterial ? *SurfaceMaterial->GetName() : TEXT("none"),
+                WaterMaterial ? *WaterMaterial->GetName() : TEXT("none"));
         }
         else
         {
@@ -640,8 +671,36 @@ bool AAnastasisWorldEmbodiment::EmbodyCanonical(int32 Seed)
 		AnastasisWorldView::ReferenceHeight);
 }
 
-UMaterialInterface* AAnastasisWorldEmbodiment::ResolveSliceMaterial()
+UMaterialInterface* AAnastasisWorldEmbodiment::ResolveWaterMaterial()
 {
+	// L'eau n'a pas de mission en cours : elle garde le materiau de tranche, inchange.
+	if (!SliceMaterial)
+	{
+		SliceMaterial = LoadObject<UMaterialInterface>(
+			nullptr, TEXT("/Game/Anastasis/Materials/M_AnastasisSlice.M_AnastasisSlice"));
+	}
+	return SliceMaterial ? SliceMaterial.Get() : BaseShapeMaterial.Get();
+}
+
+UMaterialInterface* AAnastasisWorldEmbodiment::ResolveGroundMaterial()
+{
+	// L'INSTANCE d'abord, pas le materiau maitre : ce sont ses parametres qui portent
+	// les valeurs artistiques du sol (teintes, echelles de variation, rugosites). Une
+	// retouche de sol se fait donc dans l'instance, sans recompiler ce fichier.
+	if (CVarGroundMaterial.GetValueOnGameThread() != 0)
+	{
+		if (!GroundMaterial)
+		{
+			GroundMaterial = LoadObject<UMaterialInterface>(
+				nullptr, TEXT("/Game/Anastasis/Materials/MI_AnastasisGround.MI_AnastasisGround"));
+		}
+		if (GroundMaterial)
+		{
+			return GroundMaterial.Get();
+		}
+		// Absente : on retombe sur la tranche historique plutot que sur rien. Le nom du
+		// materiau reellement pose part dans ANASTASIS_TERRAIN, donc le repli se voit.
+	}
 	if (!SliceMaterial)
 	{
 		SliceMaterial = LoadObject<UMaterialInterface>(
