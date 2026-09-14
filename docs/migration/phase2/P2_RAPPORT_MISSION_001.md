@@ -12,7 +12,7 @@ Une déduction n'est pas une mesure, et rien ici ne prétend l'être.
 | Dépôt Git | `C:/dev/ANASTASIS_UNREAL/.git` (worktree partagé) |
 | Racine de travail | `C:/dev/ANASTASIS_WORKTREES/multi-agent-control-001` |
 | Branche | `agent/multi-agent-control-001` |
-| HEAD final | `e531cc4` |
+| HEAD final | `7de0b87` (+ ce rapport) |
 | Worktree | **propre** |
 | Position | 4 commits devant la base, `main` a avancé de **20 commits** pendant la session |
 | Référence JS | `C:/dev/Jeux IV Kingdoms` @ `fee66ae` — **lue seulement, jamais écrite** |
@@ -32,8 +32,9 @@ Sept worktrees agents actifs. Deux faits qui comptent :
   travail. Un merge antérieur de cette branche est déjà dans le trunk.
 - **`agent/sim-tick-day`** (`bbd46cc`) : collision **sémantique**, pas textuelle. Détail en §4.
 
-Six processus Unreal (4 éditeurs, 2 `UnrealEditor-Cmd`) tournaient en fin de session, lancés
-par d'autres agents. Non tués — ils ne m'appartiennent pas. Conséquence directe en §10.
+Jusqu'à six processus Unreal d'autres agents ont tenu Live Coding par intermittence, bloquant
+le build. Non tués — ils ne m'appartiennent pas ; la vérification a attendu qu'ils libèrent la
+chaîne plutôt que de la leur prendre.
 
 Aucun `reset --hard`, aucun `checkout .`, aucun nettoyage de travail concurrent. Le seul
 `git checkout --` de la session a restauré **mon propre** fichier muté.
@@ -227,9 +228,9 @@ appelle le vrai `tick`, et projette le vrai `serialize`. `gen-nav-vectors.mjs` a
 
 ## 8. PREUVE DE PARITÉ
 
-`EVD` Suite complète mesurée sur build frais, éditeurs fermés :
-**55 PASS · 4 KNOWN_EXPECTED_FAILURE (tous au registre) · 0 FAIL.**
-Suite `Anastasis.Sim` en fin de session : **19 PASS · 2 KEF · 0 FAIL**.
+`EVD` Suite complète mesurée sur build frais, chaîne libre :
+**57 PASS · 4 KNOWN_EXPECTED_FAILURE (tous au registre) · 0 FAIL.**
+Suite `Anastasis.Sim` : **19 PASS · 2 KEF · 0 FAIL**, recompilation des vecteurs confirmée.
 
 | Enveloppe | Couverture | Verdict |
 |---|---|---|
@@ -251,7 +252,7 @@ celui de la référence (`accum + 1e-6 < interval`) et il est documenté.
 | Échanger deux voisins de l'A\* | **non** | L'ordre des voisins **ne change aucun chemin** : le comparateur est un ordre total. **J'avais écrit le contraire** dans l'en-tête — corrigé, et il cite désormais la mesure |
 | Retirer le départage par `h` | oui | C'est lui qui rend le chemin reproductible |
 | `MoveCost` en `double` | oui | Le stockage f32 est bien testé |
-| `JsHypot` → `sqrt` naïf | `UNK` — voir §10 | |
+| `JsHypot` → `sqrt` naïf | **oui** | **Exactement 3 assertions**, et pas une de plus : `(18, 0.000353…)` near→medium, `(42, 0.000824…)` medium→far, `(84, 0.00164…)` far→invisible. La claim de l'en-tête est désormais mesurée, plus déduite |
 
 Trois erreurs corrigées en ma défaveur, pas en celle du portage : un commentaire faux ; une
 assertion de test trop stricte (l'epsilon de la référence) ; un `UTF8_TO_TCHAR` en
@@ -276,13 +277,6 @@ initialiseur statique rendant des chaînes vides, qui accusait le portage.
 
 ## 10. CE QUI N'EST PAS PROUVÉ
 
-- `UNK` **La mutation `JsHypot` → `sqrt` naïf n'a pas pu être mesurée.** Quatre éditeurs
-  Unreal d'autres agents tenaient Live Coding. `INF` Côté JS, les trois entrées ajoutées
-  rendent `near/medium/far` avec `hypot` et `medium/far/invisible` avec `sqrt` : le test
-  échouerait. **C'est une déduction, pas une mesure.**
-- `UNK` La compilation effective des 3 derniers vecteurs (119 au lieu de 116) n'a pas été
-  reconfirmée par un build frais, pour la même raison. Les 19 PASS ont été mesurés sur
-  l'arbre tel que commité.
 - `UNK` **Aucune trajectoire d'état complète JS↔C++ n'a été comparée.** Le harnais est
   complet d'un côté et prouvé des deux, mais le C++ n'a pas d'état à projeter tant que la
   genèse n'est pas portée. Aucune tranche n'est donc `CPP_AUTHORITY_CANDIDATE`.
@@ -322,5 +316,5 @@ d'accès dépendent de `urban/intent.js`, chantier urbanisme.
 | Commits de la session | 4 — harnais, modèle de données, navigation, budget + atelier |
 | Intégration | **non faite** — `agent-worktree.ps1 integrate` demande le rôle d'intégrateur et une racine quiescente ; six processus Unreal d'autres agents tournaient |
 | Dépôt JS | **non modifié** — vérifié |
-| Build en attente | une passe pour lever les deux `UNK` du §10, dès que Live Coding est libre |
+| Dernière mesure | suite complète `Anastasis` : 57 PASS · 4 KEF · 0 FAIL, binaires reconstruits depuis l'arbre propre |
 | Reste | 194 modules, ~62 000 lignes de code |
