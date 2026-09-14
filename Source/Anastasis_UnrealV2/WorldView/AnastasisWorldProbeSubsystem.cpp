@@ -437,7 +437,7 @@ void UAnastasisWorldProbeSubsystem::EnsureDefaultBookmarks()
 
 	if (!Embodiment)
 	{
-		for (const TCHAR* Name : {TEXT("OVERVIEW"), TEXT("GROUND"), TEXT("SHORE"), TEXT("SETTLEMENT")})
+		for (const TCHAR* Name : {TEXT("OVERVIEW"), TEXT("GROUND"), TEXT("FOREST"), TEXT("SHORE"), TEXT("SETTLEMENT")})
 		{
 			FAnastasisCameraBookmark Bookmark;
 			Bookmark.Name = FName(Name);
@@ -553,6 +553,132 @@ void UAnastasisWorldProbeSubsystem::EnsureDefaultBookmarks()
 		else
 		{
 			Bookmark.UnreachableReason = TEXT("no shoreline tile in the embodied crop (no land/water boundary)");
+		}
+		Bookmarks.Add(Bookmark.Name, Bookmark);
+	}
+
+	// FOREST: la lisiere. On se tient dans la clairiere et on REGARDE la foret.
+	//
+	// Pourquoi pas simplement une tuile Forest : le dressing ecologique pose les troncs
+	// avec un jitter a l'interieur de leur tuile, donc une camera posee sur une tuile
+	// forestiere a de bonnes chances de se retrouver dans un tronc. C'est precisement ce
+	// qui rend le signet GROUND inexploitable -- un cone vert occupe la moitie du cadre.
+	//
+	// Depuis la lisiere, le cadre porte les deux choses qu'on veut voir du sol : la
+	// litiere sous le couvert, et la transition vers l'herbe ouverte. C'est la vue que
+	// la direction artistique appelle « lisiere », et la seule qui prouve qu'une foret
+	// emerge d'un sol compatible avec elle plutot que d'etre posee dessus.
+	{
+		FAnastasisCameraBookmark Bookmark;
+		Bookmark.Name = TEXT("FOREST");
+		const AnastasisWorldView::FWorldVisualSnapshot& Snapshot = Embodiment->GetSnapshot();
+		const int32 SnapW = Snapshot.W;
+		const int32 SnapH = Snapshot.H;
+
+		// Densite de foret sur 5x5. Une tuile Forest isolee n'est pas une foret : viser
+		// le point le plus couvert donne une masse dans le cadre, pas un arbre seul.
+		auto ForestDensity = [&](int32 LocalX, int32 LocalY) -> int32
+		{
+			int32 Count = 0;
+			for (int32 DY = -2; DY <= 2; ++DY)
+			{
+				for (int32 DX = -2; DX <= 2; ++DX)
+				{
+					const int32 X = LocalX + DX;
+					const int32 Y = LocalY + DY;
+					if (X < 0 || Y < 0 || X >= SnapW || Y >= SnapH)
+					{
+						continue;
+					}
+					if (Snapshot.Tiles[Y * SnapW + X].Type == AnastasisWorld::ETileType::Forest)
+					{
+						++Count;
+					}
+				}
+			}
+			return Count;
+		};
+
+		int32 CoreIndex = INDEX_NONE;
+		int32 BestDensity = 0;
+		for (int32 Index = 0; Index < Snapshot.Tiles.Num(); ++Index)
+		{
+			const AnastasisWorldView::FVisualTile& Tile = Snapshot.Tiles[Index];
+			if (Tile.Type != AnastasisWorld::ETileType::Forest)
+			{
+				continue;
+			}
+			if (Bounds.IsValid && !Bounds.IsInsideXY(AnastasisWorldView::TileToUnreal(Tile.X, Tile.Y, Tile.Alt)))
+			{
+				continue;
+			}
+			const int32 Density = ForestDensity(Index % SnapW, Index / SnapW);
+			if (Density > BestDensity)
+			{
+				BestDensity = Density;
+				CoreIndex = Index;
+			}
+		}
+
+		if (CoreIndex == INDEX_NONE)
+		{
+			Bookmark.UnreachableReason = TEXT("no forest tile in the embodied crop");
+		}
+		else
+		{
+			// Le poste d'observation : une tuile NON forestiere, entre 3 et 6 tuiles du
+			// coeur. Plus pres, on est sous le couvert et un tronc masque le cadre ; plus
+			// loin, la litiere n'occupe plus assez de pixels pour prouver quoi que ce soit.
+			const int32 CoreX = CoreIndex % SnapW;
+			const int32 CoreY = CoreIndex / SnapW;
+			int32 StandIndex = INDEX_NONE;
+			int32 BestSpread = TNumericLimits<int32>::Max();
+			for (int32 Index = 0; Index < Snapshot.Tiles.Num(); ++Index)
+			{
+				const AnastasisWorldView::FVisualTile& Tile = Snapshot.Tiles[Index];
+				if (Tile.Type == AnastasisWorld::ETileType::Forest || Tile.Type == AnastasisWorld::ETileType::Water)
+				{
+					continue;
+				}
+				if (Bounds.IsValid && !Bounds.IsInsideXY(AnastasisWorldView::TileToUnreal(Tile.X, Tile.Y, Tile.Alt)))
+				{
+					continue;
+				}
+				const int32 Spread = FMath::Max(
+					FMath::Abs(Index % SnapW - CoreX), FMath::Abs(Index / SnapW - CoreY));
+				if (Spread < 3 || Spread > 6)
+				{
+					continue;
+				}
+				// A egalite d'anneau, la tuile la plus degagee autour d'elle.
+				if (Spread < BestSpread
+					|| (Spread == BestSpread && StandIndex != INDEX_NONE
+						&& ForestDensity(Index % SnapW, Index / SnapW)
+							< ForestDensity(StandIndex % SnapW, StandIndex / SnapW)))
+				{
+					BestSpread = Spread;
+					StandIndex = Index;
+				}
+			}
+			// Aucune clairiere a bonne distance : on se rabat sur le coeur et on le dit.
+			// Mieux vaut un signet utilisable avec un tronc qu'un signet absent.
+			const bool bFromEdge = StandIndex != INDEX_NONE;
+			const AnastasisWorldView::FVisualTile& Stand =
+				Snapshot.Tiles[bFromEdge ? StandIndex : CoreIndex];
+			const AnastasisWorldView::FVisualTile& Core = Snapshot.Tiles[CoreIndex];
+			const FVector CoreLoc = AnastasisWorldView::TileToUnreal(Core.X, Core.Y, Core.Alt);
+			const FVector StandLoc = AnastasisWorldView::TileToUnreal(Stand.X, Stand.Y, Stand.Alt);
+
+			// Hauteur d'oeil, et visee sur le SOL du coeur, pas sur la canopee : le sujet
+			// de ce signet est le sol. Le regard plonge donc legerement.
+			Bookmark.Location = StandLoc + FVector(0.0, 0.0, 170.0);
+			Bookmark.Rotation = (CoreLoc - Bookmark.Location).Rotation();
+			Bookmark.FieldOfView = 85.0f;
+			Bookmark.bReachable = true;
+			UE_LOG(LogAnastasis_UnrealV2, Display,
+				TEXT("ANASTASIS_WORLD_BOOKMARK FOREST core=(%d,%d) density=%d/25 stand=(%d,%d) ring=%d from_edge=%d"),
+				Core.X, Core.Y, BestDensity, Stand.X, Stand.Y,
+				bFromEdge ? BestSpread : 0, bFromEdge ? 1 : 0);
 		}
 		Bookmarks.Add(Bookmark.Name, Bookmark);
 	}
