@@ -51,6 +51,12 @@ export function bits(valeur) {
  * et accusaient le portage. La table porte donc les octets, et la conversion se
  * fait au point d'usage, dans le corps du test, ou le temporaire vit assez
  * longtemps.
+ *
+ * Corollaire, paye une seconde fois: dans un CORPS DE FONCTION, il faut au
+ * contraire envelopper — `UTF8_TO_TCHAR(chaineCpp(v))`. Sans cela `FString`
+ * relit les octets comme de l'ANSI et tout le non-ASCII devient du charabia.
+ * La regle tient en une phrase: `chaineCpp` rend des OCTETS, et c'est au point
+ * d'usage de dire comment les relire.
  */
 export function chaineCpp(texte) {
   const utf8 = new TextEncoder().encode(String(texte));

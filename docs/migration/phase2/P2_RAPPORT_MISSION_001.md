@@ -101,6 +101,7 @@ Statuts : `JS_ONLY` · `PARTIAL_PARITY` · `PARITY_TESTED` · `UNMAPPED`.
 | A\* | `sim/pathfinding.js` | `World/AnastasisPathfinding` | **PARITY_TESTED** |
 | Budget de simulation (causal) | `sim/simulationBudget.js` | `Core/AnastasisSimBudget` | **PARITY_TESTED** |
 | Empreinte d'état canonique | `sim/save.js` (projection) | `Core/AnastasisStateDigest` | **PARITY_TESTED** |
+| Émetteur de trace du harnais | `emit-state-digests.mjs` | `Core/AnastasisStateTrace` | **PARITY_TESTED** (état synthétique) |
 | Table d'entités (ordre JS) | `simulation.js` (`actors`) | `World/AnastasisEntityTable` | testé, sans vecteurs JS |
 | Horloge jour / rollover | `simulation.js` (tick) | `Sim/AnastasisSimulation` *(branche concurrente)* | hors de cette branche |
 | Cache et file de chemins | `sim/navService.js` | — | UNMAPPED |
@@ -239,6 +240,7 @@ Suite `Anastasis.Sim` : **19 PASS · 2 KEF · 0 FAIL**, recompilation des vecteu
 | Budget causal | 119 vecteurs : palier, multiplicateurs, intervalle, bande | **EXACT** |
 | Empreinte JS↔C++ | 32 vecteurs, scalaires et composés | **EXACT** |
 | Harnais, autotest | 4 cas / 4 | **EXACT** |
+| Trace Unreal ↔ trace JS | 3 échantillons × 3 sections, verdict du comparateur du harnais | **EXACT** |
 | `fbm` | 1 vecteur sur N | **DIVERGENT_EXPLAINED** (~2.5 ulp, `sin` fdlibm) |
 | `ToUint32(1e21)` | 1 cas | **DIVERGENT_EXPLAINED** (portage entier) |
 
@@ -292,10 +294,11 @@ Le JavaScript **reste l'autorité comportementale** sur l'intégralité du simul
 
 ## 11. TROIS TRANCHES SUIVANTES, DANS L'ORDRE CAUSAL
 
-1. **Souder l'empreinte à l'hôte de `agent/sim-tick-day`.** `FAnastasisSimulation` projette
-   par `FStateWriter`, `TileFingerprint()` disparaît, l'émetteur Unreal écrit le même JSONL.
-   Le harnais compare alors sa première trajectoire réelle — sur `time`, `day`, `seed`, le
-   terrain. Petit, et c'est le seul geste qui allume l'instrument.
+1. **Souder `FAnastasisSimulation` à l'émetteur.** `Core/AnastasisStateTrace` existe et est
+   prouvé sur état synthétique ; il ne manque que l'adaptateur qui projette `time`, `day`,
+   `seed` et le terrain — et `TileFingerprint()` disparaît alors. Cette tranche **ne peut pas
+   être faite ici** : `agent/sim-tick-day` n'est pas intégrée, et fusionner du travail
+   concurrent sans audit est interdit. À faire par son auteur ou par l'intégrateur.
 2. **La genèse** — `resetWorldBase` → site, fondateurs, camp, index. Grosse et séquentielle,
    mais chaque section qu'elle ajoute devient immédiatement comparable grâce à (1). La
    couverture du harnais (*n* sections sur 35) devient la mesure d'avancement de la migration.

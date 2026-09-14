@@ -1,0 +1,4 @@
+{"kind":"header","spec":1,"source":"js","ref":"(synthetique)","refHead":"synthetique","seed":33344,"dt":0.03333333333333333,"ticks":2700,"every":1,"dayLength":90,"emittedAt":"2026-09-14T16:47:33.858Z"}
+{"t":0,"day":1,"time":37.8,"g":"223324cc9dc1424e","s":{"clock":"43ace8281a4595b3","counters":"19531d2a69b9a8ba","village":"6cb0f202c4fa449f"}}
+{"t":1,"day":1,"time":37.83333333333333,"g":"02f3d86d3c5d14c3","s":{"clock":"72939a006aa81f4b","counters":"f0db60d775221db3","village":"d0890273f74ea41c"}}
+{"t":2700,"day":2,"time":90.00000000000003,"g":"818368de6a59a5bd","s":{"clock":"a52f46c806c92698","counters":"84bcd1fcfb9b55be","village":"83f43ba264adc74d"}}

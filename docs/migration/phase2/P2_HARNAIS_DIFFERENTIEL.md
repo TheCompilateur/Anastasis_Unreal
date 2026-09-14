@@ -98,13 +98,37 @@ aucune transcription à la main entre les deux.
 node tools/migration/gen-digest-vectors.mjs   # régénère le .inl
 ```
 
+## L'émetteur Unreal existe, et il est prouvé
+
+`Core/AnastasisStateTrace.h` écrit le JSONL que `compare-digests.mjs` relit. Il ne connaît
+aucune simulation : on lui décrit un état section par section, il produit la trace.
+
+La preuve est de bout en bout et se rejoue d'une commande :
+
+```powershell
+tools\migrationerify-trace-parity.ps1
+```
+
+Le test `Anastasis.Sim.Parite.Trace` bâtit trois échantillons synthétiques et écrit sa
+trace ; le comparateur — **l'outil du harnais, pas un comparateur écrit pour l'occasion** —
+la confronte à la trace JS des mêmes échantillons. Mesuré le 2026-09-14 :
+`IDENTIQUES sur les 3 ticks comparés, 3 sections suivies, aucune n'a dévié`.
+
+Deux détails que cette preuve a réglés :
+
+- **L'ordre de description ne compte pas.** Le test décrit ses sections dans l'ordre
+  inverse des noms ; l'écrivain trie, comme le fait le `.sort()` du JS. Deux portages
+  peuvent donc décrire leurs champs comme ils veulent.
+- **`dt` s'écrit différemment des deux côtés et c'est sans conséquence.** Le C++ rend
+  `0.033333333333333333`, le JS `0.03333333333333333` — le comparateur relit des doubles,
+  pas des chaînes, et `%.17g` garantit l'aller-retour. Un `%f` aurait tronqué en silence et
+  fait refuser la comparaison en accusant des conditions différentes.
+
 ## Ce qui n'est pas encore là
 
-**Il n'y a pas d'émetteur Unreal.** Le C++ sait calculer l'empreinte d'un état ; il n'a
-pas encore d'état à décrire — `serialize` n'a pas de contrepartie tant que la vague 4
-(état du monde et sauvegarde) n'est pas portée. Le harnais est donc aujourd'hui complet
-d'un côté et prouvé des deux : dès que le C++ aura un état, `FStateWriter` le décrit, la
-trace sort au même format, et le comparateur marche sans changer une ligne.
+**Aucune trajectoire de simulation réelle n'a été comparée.** L'émetteur attend un état
+C++ à projeter, et la genèse n'est pas portée. Brancher une simulation dessus est désormais
+un câblage — il n'y a plus de second format à inventer.
 
 En attendant, il sert déjà à comparer deux états du dépôt JS entre eux — une refonte qui
 ne devait rien changer, une sauvegarde rechargée qui doit reprendre à l'identique.
@@ -130,4 +154,7 @@ pour lancer chaque trace dans son propre processus.
 | `tools/migration/selftest-harness.mjs` | autotest de la chaîne entière |
 | `tools/migration/gen-digest-vectors.mjs` | vecteurs de parité de l'empreinte, JS → C++ |
 | `Source/AnastasisSim/Public/Core/AnastasisStateDigest.h` | l'empreinte côté C++ |
+| `Source/AnastasisSim/Public/Core/AnastasisStateTrace.h` | l'émetteur de trace côté Unreal |
+| `tools/migration/gen-trace-vectors.mjs` | vecteurs de trace + trace JS de référence |
+| `tools/migration/verify-trace-parity.ps1` | la preuve de bout en bout, rejouable |
 | `Source/AnastasisSim/Private/Tests/AnastasisDigestTests.cpp` | la preuve que les deux côtés hachent pareil |
