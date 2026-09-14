@@ -215,7 +215,11 @@ lignesJsonl.push(JSON.stringify({
   ticks: ECHANTILLONS[ECHANTILLONS.length - 1].t,
   every: 1,
   dayLength: DAY_LENGTH,
-  emittedAt: new Date().toISOString(),
+  // Horodatage FIXE, et volontairement: cette trace est un temoin versionne.
+  // Avec `new Date()`, chaque regeneration produirait un diff, et une preuve
+  // qui change toute seule cesse d'etre une preuve. Le comparateur ne lit pas
+  // ce champ.
+  emittedAt: "1204-04-13T00:00:00.000Z",
 }));
 
 const nomsSections = [...new Set(ECHANTILLONS.flatMap((e) => Object.keys(e.sections)))].sort();
