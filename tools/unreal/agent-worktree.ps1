@@ -38,6 +38,7 @@ function Require-Mission {
 
 function Branch-Of($m) { return "agent/$m" }
 function Path-Of($m) { return (Join-Path $WorktreeRoot $m) }
+function Handoff-Path($m) { return (Join-Path (Path-Of $m) "docs\unreal\handoffs\$m.md") }
 
 # Fichiers dont une modification pendant une fenetre de verify invalide la preuve.
 function Source-Fingerprint {
@@ -95,6 +96,9 @@ switch ($Command) {
     Write-Output 'Developpe ici, jamais dans la racine canonique. Premier build :'
     Write-Output "  cd `"$path`""
     Write-Output '  tools\unreal\anastasis-unreal.ps1 build'
+    Write-Output ''
+    Write-Output 'Fiche de passation requise avant finish :'
+    Write-Output "  Copy-Item docs\unreal\handoffs\_TEMPLATE.md docs\unreal\handoffs\$Mission.md"
   }
 
   'status' {
@@ -132,6 +136,13 @@ switch ($Command) {
     Require-Mission
     $path = Path-Of $Mission
     if (-not (Test-Path $path)) { Fail "FAIL: worktree introuvable -> $path" }
+    $handoff = Handoff-Path $Mission
+    if (-not (Test-Path $handoff)) {
+      Write-Output "FAIL: fiche de passation manquante -> $handoff"
+      Write-Output "Copie puis remplis : docs\unreal\handoffs\_TEMPLATE.md"
+      Write-Output "Champs requis : MISSION, FILES_OWNED, COMMIT, MEC, SCN, PLY, INTEGRATION_RISK"
+      exit 1
+    }
     Write-Output "=== Portail de fin de mission : $Mission ==="
     & (Join-Path $path 'tools\unreal\anastasis-unreal.ps1') build
     if ($LASTEXITCODE -ne 0) { Fail 'FAIL: build' }

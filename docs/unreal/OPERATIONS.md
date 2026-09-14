@@ -123,3 +123,23 @@ un vrai changement de source demande toujours la racine libre.
 
 `origin` n'est jamais automatique. Le 2026-09-13 il avait pris 16 commits de retard : une journee entiere de
 travail n'existant que sur un seul disque. Pousser apres chaque passe d'integration, pas quand on y pense.
+
+## Passation agent
+
+Avant qu'une branche agent soit candidate a l'integration, elle doit contenir
+une fiche courte:
+
+```text
+docs/unreal/handoffs/<mission>.md
+```
+
+Le contrat complet et le template vivent dans:
+
+```text
+docs/unreal/AGENT_HANDOFF_CONTRACT.md
+docs/unreal/handoffs/_TEMPLATE.md
+```
+
+Cette fiche separe obligatoirement `MEC`, `SCN` et `PLY`. Elle ne declare pas
+que la branche est integree; elle declare seulement ce que l'agent remet a
+l'integrateur, avec les fichiers possedes et les risques d'assemblage.
