@@ -105,6 +105,20 @@ l'assemblage n'etait l'affaire de personne.
    conflitent, sans rien muter.
 3. **Compiler.** `anastasis-unreal.ps1 build` depuis le worktree d'integration. Une fusion textuelle propre
    ne prouve rien : c'est cette etape, et elle seule, qui a attrape `WriteJson`.
+
+   **Attention : ce build-la ne suffit pas.** UBT passe en non-unity les fichiers que `git status` voit
+   sales, et dans un worktree d'integration qui vient de fusionner, les fichiers fusionnes sont
+   precisement ceux-la. Ils compilent donc ISOLEMENT, et une collision entre deux d'entre eux reste
+   invisible -- la meme faille que celle qui a laisse passer `WriteJson`, deplacee d'un cran.
+
+   Le 2026-09-14, une passe a verse un `main` qui ne compilait pas : une locale `DeepWater` d'un test
+   masquait une constante de namespace anonyme d'un autre `.cpp` (C4459, erreur ici). Le build du
+   worktree d'integration l'a manque ; le gate pre-push, qui compile la racine canonique sur un arbre
+   PROPRE donc en unity, l'a attrape. Il a fallu un correctif et un second versement.
+
+   Donc : apres le versement (etape 4) et **avant** de pousser, relancer `anastasis-unreal.ps1 build`
+   dans la racine canonique, dont l'arbre est propre. C'est le seul build qui voie vraiment l'assemblage.
+   Le gate pre-push le fait deja -- mais le savoir evite de decouvrir l'echec au moment de pousser.
 4. Verser : `ANASTASIS_INTEGRATION=1 git -C <racine-canonique> merge --ff-only agent/trunk-integration`. Refuser si ce n'est pas un
    fast-forward — sinon quelqu'un a bouge `main` pendant la passe et il faut la refaire.
 5. Pousser immediatement (voir ci-dessous).
