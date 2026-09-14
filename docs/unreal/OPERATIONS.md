@@ -18,7 +18,7 @@ BACKUP: `origin` = https://github.com/TheCompilateur/Anastasis_Unreal (private),
 
 Two tiers, matched to how slow each check is:
 
-- **Pre-push gate (fast, blocking).** `tools/git-hooks/pre-push` runs `anastasis-unreal.ps1 build` (incremental compile, no editor) and refuses the push on `BUILD::FAIL`. Enabled per-clone via a local git config (`core.hooksPath` is not itself versioned):
+- **Pre-push gate (fast, blocking).** `tools/git-hooks/pre-push` runs `anastasis-unreal.ps1 build` (incremental compile, no editor) and refuses the push on `BUILD::FAIL`, **puis passe la main a `git lfs pre-push`**. Ce second appel n'est pas optionnel : `core.hooksPath` masque `.git/hooks`, donc le pre-push que Git LFS installe lui-meme ne tourne plus. Il avait ete omis a la creation de ce dossier — tout push referencait alors des objets LFS que le remote n'avait jamais recus et GitHub le refusait (`GH008`, `pre-receive hook declined`). Le 2026-09-13, 570 objets / 219 Mo ont du etre remis a la main par `git lfs push --all origin main`. Enabled per-clone via a local git config (`core.hooksPath` is not itself versioned):
   ```
   git config core.hooksPath tools/git-hooks
   ```
@@ -35,3 +35,43 @@ Two tiers, matched to how slow each check is:
   2. `report-tests.ps1` (the full `Anastasis` Automation suite, ~15 min budget) — cross-references `tools/unreal/known-expected-failures.txt` and reports three categories, not two: `PASS`, `KNOWN_EXPECTED_FAILURE`, `FAIL`. A bare Unreal "Success" is never counted as a real pass when the test is a marked known divergence. Logged as `TESTS_PASS`/`TESTS_FAIL` plus the full per-test breakdown.
 
   Both checks now run nightly; before this, only #1 ran, so the classified Automation suite (and any regression among the 4 marked known-failure tests going quietly unmarked) was never actually checked on a schedule.
+
+## Integration — qui a le droit de deplacer `main`
+
+**Regle : aucun agent ne deplace `main` depuis sa propre branche. Seule une passe d'integration le fait.**
+
+Le 2026-09-13, quatre acteurs differents ont fast-forwarde `main` depuis leur branche (`multi-agent-control-001`,
+`terrain-surface-world`, `visual-build-002`, `dressing-on-surface`). Personne n'a compile la combinaison. Un
+`WriteJson` defini a l'identique dans `AnastasisWorldProbePhase3.cpp` et `AnastasisWorldProbeSubsystem.cpp` a
+survecu a ces quatre fast-forwards : chaque agent compilait sa branche dans son worktree, ou UBT passe en
+non-unity les fichiers que `git status` voit sales. La collision n'existait que dans l'assemblage — et
+l'assemblage n'etait l'affaire de personne.
+
+### La passe
+
+1. Worktree neuf, que personne n'occupe, depuis `main` :
+   ```
+   git worktree add C:/dev/ANASTASIS_WORKTREES/trunk-integration -b agent/trunk-integration main
+   ```
+2. Fusionner chaque branche vivante. `git merge-tree --write-tree main <branche>` dit a sec lesquelles
+   conflitent, sans rien muter.
+3. **Compiler.** `anastasis-unreal.ps1 build` depuis le worktree d'integration. Une fusion textuelle propre
+   ne prouve rien : c'est cette etape, et elle seule, qui a attrape `WriteJson`.
+4. Verser : `git -C <racine-canonique> merge --ff-only agent/trunk-integration`. Refuser si ce n'est pas un
+   fast-forward — sinon quelqu'un a bouge `main` pendant la passe et il faut la refaire.
+5. Pousser immediatement (voir ci-dessous).
+6. Elaguer branches et worktrees dont tous les commits sont dans `main` :
+   `git rev-list --count main..<branche>` == 0 et `git -C <worktree> status --porcelain` vide.
+
+### Avant de compiler ou de verser
+
+Aucun editeur Unreal ouvert sur la racine canonique : il tient
+`Binaries/Win64/UnrealEditor-Anastasis_UnrealV2.dll` en verrou d'ecriture, le link echoue en `LNK1104` et le
+gate refuse le push. Un worktree d'agent a ses propres `Binaries` et ne gene pas. Depuis 2026-09-13,
+`BuildCanonical` court-circuite quand sources et DLL sont inchangees, ce qui evite le relink inutile — mais
+un vrai changement de source demande toujours la racine libre.
+
+### Push
+
+`origin` n'est jamais automatique. Le 2026-09-13 il avait pris 16 commits de retard : une journee entiere de
+travail n'existant que sur un seul disque. Pousser apres chaque passe d'integration, pas quand on y pense.

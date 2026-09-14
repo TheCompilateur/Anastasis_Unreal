@@ -1,9 +1,33 @@
 #!/bin/sh
-# Pre-push gate: refuse the push if the canonical incremental build fails.
-# Installed via: git config core.hooksPath tools/git-hooks
-# Scope: compile gate only (BUILD::PASS). Full editor/PIE verification is
-# heavier (~4+ min) and runs separately — see tools/unreal/scheduled-verify.ps1.
+# Pre-push gate, deux responsabilites qui doivent coexister :
+#   1. refuser le push si le build canonique incremental echoue (BUILD::PASS) ;
+#   2. remettre les objets LFS au remote.
+#
+# core.hooksPath=tools/git-hooks masque .git/hooks, donc le pre-push que Git LFS
+# installe lui-meme ne tourne plus. Ce dossier a bien recopie l'appel LFS dans
+# post-checkout / post-commit / post-merge, mais pre-push a ete ecrit a neuf pour
+# le gate de build et l'a perdu. Resultat : tout push referencait des objets LFS
+# que le remote n'avait jamais recus, et GitHub le refusait — GH008, pre-receive
+# hook declined. Observe le 2026-09-13 sur main ; 570 objets, 219 Mo, ont du etre
+# remis a la main par 'git lfs push --all origin main'.
+#
+# Scope du gate : compile only (BUILD::PASS). La verification editeur/PIE est
+# plus lourde (~4+ min) et tourne separement — voir tools/unreal/scheduled-verify.ps1.
 set -e
 cd "$(git rev-parse --show-toplevel)"
+
+# git lfs pre-push lit les refs sur stdin, que le build consommerait. Mises de cote.
+REFS=$(mktemp)
+trap 'rm -f "$REFS"' EXIT
+cat > "$REFS"
+
 echo "pre-push: anastasis-unreal.ps1 build ..."
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/unreal/anastasis-unreal.ps1 build
+
+command -v git-lfs >/dev/null 2>&1 || {
+	printf >&2 "\n%s\n\n" "This repository is configured for Git LFS but 'git-lfs' was not found on your path. Install it before pushing: the remote refuses any push whose LFS objects it never received."
+	exit 2
+}
+
+echo "pre-push: git lfs pre-push ..."
+git lfs pre-push "$@" < "$REFS"
