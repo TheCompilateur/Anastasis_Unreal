@@ -242,6 +242,36 @@ printed `TESTS::PASS 2/2` on an earlier run where the editor crashed after 2 of 
 It parses only `Test Completed` lines and never compares against the
 `Found N automation tests` count or the launcher exit code.
 
+## Integration state
+
+`main` was merged into this branch at `8e05631` (three commits: `8060b2a`, `3a98b8b`
+vegetation, `ea87acc` terrain forge). `main` moved from `3a98b8b` to `ea87acc` between the
+divergence check and the merge itself — the multi-agent race AGENTS.md describes. Collision
+was re-checked across the full `1cbeef68..ea87acc` range before continuing: no file
+overlap, and nothing under `Village/` references `TerrainForge`, `WorldEmbodiment`,
+`WorldAtmosphere` or the presentation registry.
+
+Merged tree, what IS proven: build `Result: Succeeded`, exit 0, zero warnings, the whole
+`Anastasis_UnrealV2` unity module recompiled and linked — so the village foundation and the
+newly merged `AnastasisTerrainForge` compile together, not merely side by side.
+
+Merged tree, what is NOT proven: the automation suite. The run died during editor startup
+with `Ran out of memory allocating 4.0 MiB / Le fichier de pagination est insuffisant`
+(AvailablePhysical 0.08 GiB, AvailableVirtual 0.10 GiB) — four Unreal processes from other
+worktrees were live (canonical editor, tree-visuals and ground-materials capture sessions,
+a headless shoreline run) on a 15.9 GiB host. **Zero tests executed.** This is a host
+resource condition, not a verdict on the merge, and it was NOT retried: an editor boot here
+costs ~2 GiB and could have been the allocation that killed another agent's capture.
+
+The suite re-verification therefore belongs to the integration window, which AGENTS.md
+already requires to be quiescent — the same condition that makes the run succeed. Until it
+is run, the proof of record for this work is the one taken on `1cbeef68` + the two village
+commits, reported above.
+
+Second sighting of the reporter hole: on this run `report-tests.ps1` printed `TESTS::PASS`
+with `TOTAL : 0`. Zero tests ran, two fatal errors were in the log, and it still reported
+green. See the finding at the end of the Verification section.
+
 ## Limitations
 
 - `DebugAddSlot()` is the load-bearing engine call for runtime slot construction. Public
