@@ -17,6 +17,8 @@ public class Anastasis_UnrealV2 : ModuleRules
 			"AIModule",
 			"StateTreeModule",
 			"GameplayStateTreeModule",
+			"GameplayTags",
+			"SmartObjectsModule",
 			"UMG",
 			"Slate",
 			"AnastasisSim"
