@@ -106,7 +106,7 @@ aucune simulation : on lui décrit un état section par section, il produit la t
 La preuve est de bout en bout et se rejoue d'une commande :
 
 ```powershell
-tools\migrationerify-trace-parity.ps1
+tools/migration/verify-trace-parity.ps1
 ```
 
 Le test `Anastasis.Sim.Parite.Trace` bâtit trois échantillons synthétiques et écrit sa
