@@ -4,6 +4,7 @@
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisTerrainForge.h"
+#include "WorldView/AnastasisRuinDressing.h"
 
 
 #include "Anastasis_UnrealV2.h"
@@ -284,6 +285,14 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	DressingInstanceCount = 0;
 	int32 UngroundedTiles = 0;
     const double DressingStart = FPlatformTime::Seconds();
+    // Declared here rather than in the CVar block at the top of the file on purpose: that
+    // block is being edited on a concurrent branch, and this pass has no reason to widen
+    // the conflict surface for the sake of tidiness.
+    static TAutoConsoleVariable<int32> CVarRuinDressing(
+        TEXT("anastasis.Ruin.SiteDressing"), 1,
+        TEXT("Group Ruin tiles into oriented sites (1, default) instead of one random-yaw piece per tile (0)."),
+        ECVF_Default);
+    const bool bRuinSites = SurfaceCrop && CVarRuinDressing.GetValueOnGameThread() != 0;
     const bool bEcology = SurfaceCrop && ForestDressing.bEnabled && CVarEcologicalDressing.GetValueOnGameThread() != 0;
     TSet<UHierarchicalInstancedStaticMeshComponent*> Prepared;
     auto Prepare = [&](const AnastasisPresentation::FResolvedPresentation& R)
@@ -312,6 +321,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	{
 		const AnastasisWorldView::FVisualTile& SourceTile = Snapshot.Tiles[Index];
         if (bEcology && SourceTile.Type == AnastasisWorld::ETileType::Forest) continue;
+        if (bRuinSites && SourceTile.Type == AnastasisWorld::ETileType::Ruin) continue;
 		AnastasisPresentation::FResolvedPresentation Resolved;
 		if (!AnastasisPresentation::ResolvePresentation(
 				Plan.Types[Index], Seed, SourceTile.X, SourceTile.Y, Resolved))
@@ -451,6 +461,95 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 At(SiteShade, 0.0), At(SiteShade, 0.5), At(SiteShade, 1.0),
                 At(SiteWetness, 0.0), At(SiteWetness, 0.5), At(SiteWetness, 1.0),
                 At(SiteConiferousness, 0.0), At(SiteConiferousness, 0.5), At(SiteConiferousness, 1.0));
+        }
+    }
+    if (bRuinSites)
+    {
+        AnastasisRuinDressing::FPlan RuinPlan;
+        FString RuinError;
+        if (!AnastasisRuinDressing::Build(CanonicalSource, RuinPlan, RuinError))
+        {
+            UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_RUIN rejected=%s"), *RuinError);
+        }
+        else if (const FAnastasisPresentationEntry* RuinEntry =
+            AnastasisPresentation::FindEntry(AnastasisWorld::ETileType::Ruin))
+        {
+            // Piece -> the variants that depict it, matched on the mesh NAME. The registry
+            // could have been reordered or half-filled by an art pass; matching on order
+            // would then silently draw a hearth where a wall belongs. A name cannot drift
+            // without someone noticing.
+            TArray<int32> ByPiece[static_cast<uint8>(AnastasisRuinDressing::EPiece::Count)];
+            for (int32 V = 0; V < RuinEntry->Variants.Num(); ++V)
+            {
+                const FString MeshName = RuinEntry->Variants[V].Mesh.GetAssetName();
+                for (uint8 P = 0; P < static_cast<uint8>(AnastasisRuinDressing::EPiece::Count); ++P)
+                {
+                    if (MeshName.Contains(AnastasisRuinDressing::PieceName(
+                        static_cast<AnastasisRuinDressing::EPiece>(P))))
+                    {
+                        ByPiece[P].Add(V);
+                        break;
+                    }
+                }
+            }
+
+            int32 PieceCounts[static_cast<uint8>(AnastasisRuinDressing::EPiece::Count)] = {};
+            int32 RuinUngrounded = 0;
+            for (const AnastasisRuinDressing::FPlacement& P : RuinPlan.Instances)
+            {
+                const uint8 PieceIndex = static_cast<uint8>(P.Piece);
+                // No art for this piece yet: fall back to whatever the entry does have,
+                // so a partially filled registry still draws a ruin instead of a hole.
+                const TArray<int32>& Pool = ByPiece[PieceIndex].Num() > 0
+                    ? ByPiece[PieceIndex] : ByPiece[static_cast<uint8>(AnastasisRuinDressing::EPiece::Reemploi)];
+                if (Pool.Num() == 0) continue;
+                const int32 VariantIndex = Pool[P.VisualSeed % static_cast<uint32>(Pool.Num())];
+                const FAnastasisPresentationVariant& Variant = RuinEntry->Variants[VariantIndex];
+
+                AnastasisPresentation::FResolvedPresentation R;
+                R.Entry = RuinEntry;
+                R.VariantIndex = VariantIndex;
+                R.Mesh = Variant.Mesh.LoadSynchronous();
+                R.MaterialOverride = Variant.MaterialOverride.LoadSynchronous();
+                R.ScaleBias = Variant.ScaleBias;
+                if (!R.Mesh) continue;
+                auto* M = Prepare(R);
+                if (!M) continue;
+
+                const AnastasisWorldView::FVisualTile& T = CanonicalSource.Tiles[P.SourceIndex];
+                FTransform Pose = AnastasisPresentation::ResolveInstanceTransform(
+                    *R.Entry, P.VisualSeed, T.X, T.Y, T.Alt, R.ScaleBias);
+                Pose.SetScale3D(Pose.GetScale3D() * P.ScaleMultiplier);
+                // THE one line this whole pass exists for: every piece of a site takes the
+                // site's yaw, not its own. A building has one axis; a per-piece random yaw
+                // is exactly what stopped 448 ruins from reading as anything built.
+                Pose.SetRotation(FQuat(FRotator(0.0, P.YawDegrees, 0.0)));
+
+                // Contact-plane convention, NOT the forest pass's mesh-bottom rule: these
+                // meshes deliberately continue below local Z = -50 so the base course sits
+                // IN the ground ("drainage, contact terrain"). Rebasing on the mesh bottom
+                // would lift that buried course back into the air.
+                const FVector Placed = Pose.GetLocation();
+                const double TileGroundZ = T.Alt * AnastasisWorldView::AltitudeScale;
+                const double PivotLift = Placed.Z - TileGroundZ;
+                double GroundZ = 0.0;
+                if (!AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, Placed.X, Placed.Y, GroundZ))
+                {
+                    ++RuinUngrounded;
+                    continue;
+                }
+                Pose.SetLocation(FVector(Placed.X, Placed.Y, GroundZ + PivotLift));
+                M->AddInstance(Pose, false);
+                ++PieceCounts[PieceIndex];
+                ++DressingInstanceCount;
+            }
+            UE_LOG(LogAnastasis_UnrealV2, Display,
+                TEXT("ANASTASIS_RUIN sites=%d isolated=%d largest_site=%d planned=%d ungrounded=%d "
+                     "soubassement=%d angle=%d mur=%d foyer=%d enclos=%d reemploi=%d"),
+                RuinPlan.SiteCount, RuinPlan.IsolatedSites, RuinPlan.LargestSiteTiles,
+                RuinPlan.Instances.Num(), RuinUngrounded,
+                PieceCounts[0], PieceCounts[1], PieceCounts[2],
+                PieceCounts[3], PieceCounts[4], PieceCounts[5]);
         }
     }
     UE_LOG(LogAnastasis_UnrealV2, Display,
