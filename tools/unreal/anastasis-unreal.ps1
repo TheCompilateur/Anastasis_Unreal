@@ -1,4 +1,4 @@
-param([ValidateSet('status','build','verify','editor','health','build-game')][string]$Command='status')
+param([ValidateSet('status','build','verify','editor','health','build-game')][string]$Command='status',[switch]$Force)
 $ErrorActionPreference='Stop'
 $Canonical='C:\dev\ANASTASIS_UNREAL'
 $WorktreeRoot='C:\dev\ANASTASIS_WORKTREES'
@@ -21,18 +21,40 @@ if($up.EngineAssociation -ne '5.8' -or $v.MajorVersion -ne 5 -or $v.MinorVersion
 foreach($module in @('AnastasisSim','Anastasis_UnrealV2')){if($module -notin $up.Modules.Name){throw "FAIL: missing module $module"}}
 $Evidence=Join-Path $Root 'Saved/CanonicalVerification'
 New-Item -ItemType Directory -Force $Evidence | Out-Null
+$ModuleDlls=@('UnrealEditor-AnastasisSim.dll','UnrealEditor-Anastasis_UnrealV2.dll') | ForEach-Object { Join-Path $Root "Binaries\Win64\$_" }
 function Fingerprint {
  $paths=@(Get-ChildItem "$Root/Source","$Root/Config" -Recurse -File)+@(Get-Item $Project)
  $lines=$paths | Sort-Object FullName | ForEach-Object { $_.FullName.Substring($Root.Length)+':'+(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
  $sha=[Security.Cryptography.SHA256]::Create()
  try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($lines -join "`n")))).Replace('-','') } finally {$sha.Dispose()}
 }
+# Empreinte des binaires produits. $null si un module manque : on ne peut alors
+# rien affirmer et le build reel doit tourner.
+function ModuleStamp {
+ if(@($ModuleDlls | Where-Object {!(Test-Path -LiteralPath $_)}).Count){return $null}
+ return (($ModuleDlls | Sort-Object | ForEach-Object { [IO.Path]::GetFileName($_)+':'+(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash }) -join "`n")
+}
 function BuildCanonical {
  $before=Fingerprint
+ $srcStamp=Join-Path $Evidence 'built-source.sha256'
+ $modStamp=Join-Path $Evidence 'built-modules.sha256'
+ # Court-circuit : si ni les sources ni les binaires n'ont bouge depuis le dernier
+ # build reussi, relinker produirait les memes DLL. Evite que le gate pre-push echoue
+ # sur LNK1104 quand un editeur tient la DLL en verrou d'ecriture. -Force force le build.
+ if(-not $Force -and (Test-Path $srcStamp) -and (Test-Path $modStamp)){
+  $nowMod=ModuleStamp
+  if($null -ne $nowMod -and (Get-Content $srcStamp -Raw).Trim() -eq $before -and (Get-Content $modStamp -Raw).Trim() -eq $nowMod.Trim()){
+   Write-Output 'BUILD::PASS::CACHED (source and module binaries unchanged since last successful build)'
+   return
+  }
+ }
  & "$Engine/Engine/Build/BatchFiles/Build.bat" Anastasis_UnrealV2Editor Win64 Development "-Project=$Project" -WaitMutex -NoHotReloadFromIDE 2>&1 | Tee-Object "$Evidence/build.log" | Out-Host
  if($LASTEXITCODE -ne 0){throw 'BUILD::FAIL'}
  if((Fingerprint) -ne $before){throw 'FAIL: source/config changed during build'}
- $before | Set-Content "$Evidence/built-source.sha256"
+ $afterMod=ModuleStamp
+ if($null -eq $afterMod){throw 'BUILD::FAIL missing module binaries after a successful build'}
+ $before | Set-Content $srcStamp
+ $afterMod | Set-Content $modStamp
  Write-Output 'BUILD::PASS'
 }
 function BuildGame {
