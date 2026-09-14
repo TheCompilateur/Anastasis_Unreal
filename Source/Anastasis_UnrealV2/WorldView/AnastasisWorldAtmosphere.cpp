@@ -18,6 +18,7 @@
 #include "WorldView/AnastasisAtmosphereResolver.h"
 #include "WorldView/AnastasisMistField.h"
 #include "WorldView/AnastasisTerrainSurface.h"
+#include "WorldView/AnastasisTerrainForge.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
 
 static TAutoConsoleVariable<int32> CVarMist(
@@ -321,7 +322,8 @@ int32 AAnastasisWorldAtmosphere::ApplyMist()
 		// falls back to the tile altitude it was born with rather than being dropped, since
 		// the DEBUG slab mode has no continuous surface at all.
 		double GroundZ = 0.0;
-		if (AnastasisTerrainSurface::SampleHeight(Snapshot, Location.X, Location.Y, GroundZ))
+		if (AnastasisTerrainForge::SampleActive(Location.X, Location.Y, GroundZ)
+			|| AnastasisTerrainSurface::SampleHeight(Snapshot, Location.X, Location.Y, GroundZ))
 		{
 			Location.Z = GroundZ;
 			++GroundSampled;

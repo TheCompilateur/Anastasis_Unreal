@@ -3,6 +3,7 @@
 #include "WorldView/AnastasisPresentationRegistry.h"
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisTerrainSurface.h"
+#include "WorldView/AnastasisTerrainForge.h"
 
 
 #include "Anastasis_UnrealV2.h"
@@ -19,6 +20,12 @@ static TAutoConsoleVariable<int32> CVarEcologicalDressing(
     TEXT("0=legacy tile dressing, 1=forest grammar on continuous terrain; applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarTerrainForge(
+	TEXT("anastasis.Terrain.Forge"),
+	1,
+	TEXT("0=raw tile-center surface. 1=TERRAIN_FORGE tessellated morphology (default). Does not change simulation Alt."),
+	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarWorldViewSeed(
 	TEXT("anastasis.WorldView.Seed"),
@@ -299,7 +306,9 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 		double GroundZ = 0.0;
 		if (SurfaceCrop)
 		{
-			if (!AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, Placed.X, Placed.Y, GroundZ))
+			const bool bHit = AnastasisTerrainForge::SampleActive(Placed.X, Placed.Y, GroundZ)
+				|| AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, Placed.X, Placed.Y, GroundZ);
+			if (!bHit)
 			{
 				// Pas de sol rendu sous ce point : on ne pose rien. Une instance suspendue
 				// au-dessus du vide serait un mensonge visuel, pas un placeholder.
@@ -343,7 +352,8 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
             for (const auto& P : ForestPlan.Instances)
             {
                 double GroundZ;
-                if (!AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, P.Ground.X, P.Ground.Y, GroundZ))
+                if (!(AnastasisTerrainForge::SampleActive(P.Ground.X, P.Ground.Y, GroundZ)
+                    || AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, P.Ground.X, P.Ground.Y, GroundZ)))
                     continue;
                 const auto& T = CanonicalSource.Tiles[P.SourceIndex];
                 const EAnastasisStatureClass Stature = StatureForLayer(P.Layer, P.VisualSeed, T.X, T.Y);
@@ -527,6 +537,25 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
         AnastasisTerrainSurface::FGeometry Geometry;
         if (AnastasisTerrainSurface::Build(Crop, Geometry))
         {
+            AnastasisTerrainForge::FMesh ForgeMesh;
+            const bool bForged = CVarTerrainForge.GetValueOnGameThread() != 0
+                && AnastasisTerrainForge::Apply(Crop, Geometry, ForgeMesh);
+            if (!bForged)
+            {
+                AnastasisTerrainForge::ClearActive();
+            }
+            else
+            {
+                ForgeBasin = FVector(ForgeMesh.BasinX, ForgeMesh.BasinY, ForgeMesh.BasinZ);
+                ForgeLandmark = FVector(ForgeMesh.LandmarkX, ForgeMesh.LandmarkY, ForgeMesh.LandmarkZ);
+                UE_LOG(LogAnastasis_UnrealV2, Display,
+                    TEXT("ANASTASIS_TERRAIN_FORGE subdiv=%d fine=%dx%d vertices=%d triangles=%d z=[%.0f,%.0f] basin=(%.0f,%.0f,%.0f) landmark=(%.0f,%.0f,%.0f)"),
+                    ForgeMesh.Subdiv, ForgeMesh.FineW, ForgeMesh.FineH,
+                    ForgeMesh.Geometry.Vertices.Num(), ForgeMesh.Geometry.Triangles.Num() / 3,
+                    ForgeMesh.MinZ, ForgeMesh.MaxZ,
+                    ForgeMesh.BasinX, ForgeMesh.BasinY, ForgeMesh.BasinZ,
+                    ForgeMesh.LandmarkX, ForgeMesh.LandmarkY, ForgeMesh.LandmarkZ);
+            }
             // Section 0 : relief. La couleur de sommet porte toute la semantique du sol.
             // bCreateCollision=true : c'est ce qui empeche le pawn de tomber a travers.
             ExperimentalSurface->CreateMeshSection_LinearColor(0, Geometry.Vertices, Geometry.Triangles,
@@ -553,6 +582,19 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             // Emprise reelle = ce qui est reellement rendu, pas Plan : en mode 1 la tranche
             // canonique meme si Plan couvre le monde, en mode 2 l emprise incarnee entiere.
             ActiveFootprintBounds = AnastasisWorldView::SnapshotBounds(Crop);
+            if (bForged)
+            {
+                FBox ForgedBounds(ForceInit);
+                for (const FVector& V : Geometry.Vertices)
+                {
+                    ForgedBounds += V;
+                }
+                if (ForgedBounds.IsValid)
+                {
+                    ActiveFootprintBounds.Min.Z = ForgedBounds.Min.Z;
+                    ActiveFootprintBounds.Max.Z = ForgedBounds.Max.Z;
+                }
+            }
             // Emprise reportee telle qu'elle est batie : en mode 1 cette ligne imprime
             // exactement la chaine scellee (source=96x96 crop=(0,0) 32x32 tiles=1024).
             UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN source=%dx%d crop=(%d,%d) %dx%d tiles=%d vertices=%d triangles=%d water_triangles=%d material=%s boundary=tile_centers legacy_visible=0"),
@@ -564,6 +606,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
         {
             bWaterSurfaceBuilt = false;
             ActiveFootprintBounds = AnastasisWorldView::PlanBounds(Plan);
+            AnastasisTerrainForge::ClearActive();
             UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_TERRAIN rejected crop; legacy DEBUG retained"));
         }
     }
@@ -571,6 +614,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
     {
         bWaterSurfaceBuilt = false;
         ActiveFootprintBounds = AnastasisWorldView::PlanBounds(Plan);
+        AnastasisTerrainForge::ClearActive();
         UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN disabled legacy_visible=1"));
     }
     // Le dressing vient APRES la decision de terrain : on ne pose pas un objet sur un

@@ -147,6 +147,9 @@ bool FAnastasisTerrainFallback::RunTest(const FString&)
     if(!World){AddError(TEXT("No Editor world"));return false;}
     auto* Var=IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Terrain.Surface"));
     const int32 Previous=Var->GetInt();
+    auto* ForgeVar=IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Terrain.Forge"));
+    const int32 PreviousForge = ForgeVar ? ForgeVar->GetInt() : 0;
+    if (ForgeVar) ForgeVar->Set(0, ECVF_SetByCode);
     FActorSpawnParameters Params; Params.ObjectFlags |= RF_Transient;
     auto* Actor=World->SpawnActor<AAnastasisWorldEmbodiment>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
     if(!Actor){AddError(TEXT("Spawn failed"));return false;}
@@ -182,6 +185,7 @@ bool FAnastasisTerrainFallback::RunTest(const FString&)
     for(auto* Mesh:Legacy) TestTrue(TEXT("legacy restored"),Mesh->IsVisible());
     TestEqual(TEXT("9216 legacy instances"),Actor->GetInstanceCount(),9216);
     Actor->Destroy(); Var->Set(Previous,ECVF_SetByCode);
+    if (ForgeVar) ForgeVar->Set(PreviousForge, ECVF_SetByCode);
     return true;
 }
 
@@ -365,6 +369,9 @@ bool FAnastasisDressingOnGround::RunTest(const FString&)
     if (!World) { AddError(TEXT("No Editor world")); return false; }
     auto* Var = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Terrain.Surface"));
     const int32 Previous = Var->GetInt();
+    auto* ForgeVar = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Terrain.Forge"));
+    const int32 PreviousForge = ForgeVar ? ForgeVar->GetInt() : 0;
+    if (ForgeVar) ForgeVar->Set(0, ECVF_SetByCode);
     FActorSpawnParameters Params; Params.ObjectFlags |= RF_Transient;
     auto* Actor = World->SpawnActor<AAnastasisWorldEmbodiment>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
     if (!Actor) { AddError(TEXT("Spawn failed")); return false; }
@@ -478,6 +485,7 @@ bool FAnastasisDressingOnGround::RunTest(const FString&)
     AddInfo(FString::Printf(TEXT("DRESSING_BORDER slab_only=%d (instances de bordure sans face rendue sous elles)"), OutsideSampledDomain));
 
     Actor->Destroy(); Var->Set(Previous, ECVF_SetByCode);
+    if (ForgeVar) ForgeVar->Set(PreviousForge, ECVF_SetByCode);
     return true;
 }
 #endif
