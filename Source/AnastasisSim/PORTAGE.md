@@ -18,7 +18,9 @@ Corollaire : le module de jeu peut dépendre de `AnastasisSim`, jamais l'inverse
 Le simulateur JS est la référence. Le portage doit rendre **exactement** les mêmes
 doubles, pas des valeurs proches. Deux raisons concrètes :
 
-1. Une sauvegarde JS doit pouvoir se rejouer dans Unreal et donner le même village.
+1. Un état JS doit pouvoir se rejouer dans Unreal et donner le même village. C'est le
+   **harnais** qui relit cet état, pas le jeu : le format de sauvegarde joueur est natif
+   Unreal, décision prise dans `docs/migration/phase2/P2_MODELE_DONNEES.md`.
 2. Un bug reproduit avec une graine doit se reproduire des deux côtés.
 
 Un écart d'un ulp n'est pas cosmétique : `Math.floor(hash2d(...) * n)` bascule de
@@ -137,9 +139,12 @@ arriver avec ses vecteurs de parité avant qu'on empile la suivante.
 3. **Budget et LOD logique** — `src/sim/simulationBudget.js`, `logicalLod.js`.
    Attention : la pression est déclarée `deterministic-only` côté JS ; ne jamais la
    dériver du temps mur réel sous peine de rendre la simulation non reproductible.
-4. **État du monde et sauvegarde** — `src/sim/save.js`, `saveStore.js`,
-   `world.js` (structures). C'est ici qu'on décide si Unreal relit les sauvegardes
-   JS existantes ou repart d'un format propre — décision à prendre explicitement.
+4. **État du monde et sauvegarde** — `src/sim/save.js`, `world.js` (structures).
+   La décision est prise : `docs/migration/phase2/P2_MODELE_DONNEES.md`. Tableau de
+   structures et non SoA, table ordonnée à la sémantique JS (`World/AnastasisEntityTable.h`),
+   références par identifiant, format de sauvegarde natif Unreal — le format JS est lu par
+   le harnais, jamais écrit, et ne promet rien au joueur. `saveStore.js` n'est pas porté
+   (`localStorage`).
 5. **Boucle de simulation** — `src/sim/simulation.js` (8 663 lignes). À découper,
    pas à traduire d'un bloc.
 6. **Vie et IA** — `src/life/*` (66 fichiers), `src/ai/*` (39 fichiers). La masse
