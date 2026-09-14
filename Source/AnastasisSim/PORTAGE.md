@@ -113,6 +113,18 @@ node tools/migration/inventory-js-sim.mjs -out docs/migration/phase2/P2_INVENTAI
 Au 2026-09-13 (référence `fee66ae`) : 198 modules à porter — **63 492 lignes de code**,
 commentaires et lignes vides déduits — 4 tables à générer, 24 modules à ne pas porter.
 
+### Comment la parité se vérifiera au-delà des fonctions pures
+
+Les vecteurs bit à bit ne montent pas jusqu'à `simulation.js` : on ne fabrique pas un
+vecteur pour « le tick de minuit ». Au-delà de la couche 1, la preuve est un **harnais
+différentiel** — même graine, une empreinte de l'état à chaque tick des deux côtés, et un
+rapport qui nomme le premier tick divergent et la section fautive.
+
+`docs/migration/phase2/P2_HARNAIS_DIFFERENTIEL.md`. L'empreinte C++
+(`Core/AnastasisStateDigest.h`) est déjà prouvée identique à la spécification JS
+(`Anastasis.Sim.Empreinte.*`) ; l'émetteur Unreal arrivera avec la couche 4, quand il y
+aura un état à décrire.
+
 ### Suite proposée — dans cet ordre
 
 L'ordre suit les dépendances réelles, pas l'intérêt du gameplay. Chaque étape doit
