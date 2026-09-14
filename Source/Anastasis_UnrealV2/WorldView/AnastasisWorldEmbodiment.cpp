@@ -13,7 +13,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "WorldView/AnastasisWorldDebugVisual.h"
 
-static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 0, TEXT("Experimental center-sampled terrain. 0=legacy DEBUG, 1=32x32 surface; applied on embodiment."), ECVF_Default);
+static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 1, TEXT("Center-sampled terrain surface. 1=32x32 surface (default), 0=legacy DEBUG cubes over the full requested crop; applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarWorldViewSeed(
 	TEXT("anastasis.WorldView.Seed"),
@@ -122,12 +122,59 @@ AAnastasisWorldEmbodiment::AAnastasisWorldEmbodiment()
 		}
 		DressingMeshes[SlotIndex] = Mesh;
 	}
+
+	// Default subobject, not NewObject at embody time: OnConstruction reruns would otherwise
+	// have to create and register a component mid-construction, which the engine is free to
+	// tear down between runs.
+	ExperimentalSurface = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ExperimentalTerrain"));
+	ExperimentalSurface->SetupAttachment(Root);
+	ExperimentalSurface->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	ExperimentalSurface->SetCollisionProfileName(TEXT("BlockAll"));
+	ExperimentalSurface->SetCanEverAffectNavigation(false);
+	ExperimentalSurface->SetCastShadow(true);
+	ExperimentalSurface->SetVisibility(false);
+
+	// The level holds no world truth: every tile here is regenerated from the seed at load.
+	// Transient keeps the 9216 instances OnConstruction builds in the editor out of the .umap,
+	// which would otherwise bake simulation output into the map the first time it is saved.
+	for (UHierarchicalInstancedStaticMeshComponent* Mesh : TerrainMeshes)
+	{
+		Mesh->SetFlags(RF_Transient);
+	}
+	for (UHierarchicalInstancedStaticMeshComponent* Mesh : DressingMeshes)
+	{
+		if (Mesh)
+		{
+			Mesh->SetFlags(RF_Transient);
+		}
+	}
+	ExperimentalSurface->SetFlags(RF_Transient);
 }
 
 void AAnastasisWorldEmbodiment::BeginPlay()
 {
 	Super::BeginPlay();
-	EmbodyCrop(
+	EmbodyFromConsoleVariables();
+}
+
+#if WITH_EDITOR
+void AAnastasisWorldEmbodiment::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	const UWorld* OwningWorld = GetWorld();
+	if (!OwningWorld || OwningWorld->IsGameWorld())
+	{
+		return;
+	}
+
+	EmbodyFromConsoleVariables();
+}
+#endif
+
+bool AAnastasisWorldEmbodiment::EmbodyFromConsoleVariables()
+{
+	return EmbodyCrop(
 		static_cast<uint32>(FMath::Max(0, CVarWorldViewSeed.GetValueOnGameThread())),
 		FMath::Max(0, CVarWorldViewCropX.GetValueOnGameThread()),
 		FMath::Max(0, CVarWorldViewCropY.GetValueOnGameThread()),
@@ -238,6 +285,10 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
 		}
 	}
 
+	// Ground and dressing share one footprint -- the whole Plan -- in both modes, so no tree
+	// can be resolved onto a tile that has no ground under it.
+	const bool bSurfaceMode = CVarTerrainSurface.GetValueOnGameThread() == 1;
+
 	DressingInstanceCount = 0;
 	for (int32 Index = 0; Index < Plan.TileCount; ++Index)
 	{
@@ -267,22 +318,13 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
 
     if (ExperimentalSurface) ExperimentalSurface->SetVisibility(false);
     for (auto& Mesh : TerrainMeshes) if (Mesh) Mesh->SetVisibility(true);
-    if (CVarTerrainSurface.GetValueOnGameThread() == 1)
+    if (bSurfaceMode)
     {
-        const auto Crop = AnastasisWorldView::CropSnapshot(Snapshot, 0, 0, 32, 32);
+        // The whole embodied snapshot, not a fixed corner of it: the surface is the map's
+        // representation now, so its extent is whatever was embodied.
         AnastasisTerrainSurface::FGeometry Geometry;
-        if (AnastasisTerrainSurface::Build(Crop, Geometry))
+        if (ExperimentalSurface && AnastasisTerrainSurface::Build(Snapshot, Geometry))
         {
-            if (!ExperimentalSurface)
-            {
-                ExperimentalSurface = NewObject<UProceduralMeshComponent>(this, TEXT("ExperimentalTerrain"));
-                ExperimentalSurface->SetupAttachment(GetRootComponent());
-                ExperimentalSurface->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-                ExperimentalSurface->SetCollisionProfileName(TEXT("BlockAll"));
-                ExperimentalSurface->SetCanEverAffectNavigation(false);
-                ExperimentalSurface->SetCastShadow(true);
-                ExperimentalSurface->RegisterComponent();
-            }
             // Section 0 : relief. La couleur de sommet porte toute la semantique du sol.
             // bCreateCollision=true : c'est ce qui empeche le pawn de tomber a travers.
             ExperimentalSurface->CreateMeshSection_LinearColor(0, Geometry.Vertices, Geometry.Triangles,
@@ -304,9 +346,11 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             }
             ExperimentalSurface->SetVisibility(true);
             for (auto& Mesh : TerrainMeshes) if (Mesh) Mesh->SetVisibility(false);
-            // Emprise reelle = le crop 32x32 rendu, pas Plan (qui peut couvrir tout le monde demande).
-            ActiveFootprintBounds = AnastasisWorldView::SnapshotBounds(Crop);
-            UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN source=96x96 crop=(0,0) 32x32 tiles=1024 vertices=%d triangles=%d water_triangles=%d material=%s boundary=tile_centers legacy_visible=0"),
+            // Surface and Plan now describe the same tiles, so the footprint is simply the plan.
+            ActiveFootprintBounds = AnastasisWorldView::SnapshotBounds(Snapshot);
+            UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN source=%dx%d crop=(%d,%d) %dx%d tiles=%d vertices=%d triangles=%d water_triangles=%d material=%s boundary=tile_centers legacy_visible=0"),
+                Snapshot.SourceW, Snapshot.SourceH, Snapshot.OriginX, Snapshot.OriginY,
+                Snapshot.W, Snapshot.H, Snapshot.Tiles.Num(),
                 Geometry.Vertices.Num(), Geometry.Triangles.Num()/3, Geometry.WaterTriangles.Num()/3,
                 SliceMaterial ? TEXT("slice") : TEXT("fallback"));
         }

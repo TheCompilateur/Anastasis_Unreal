@@ -24,6 +24,18 @@ public:
 
 	virtual void BeginPlay() override;
 
+#if WITH_EDITOR
+	/**
+	 * Editor worlds only: rebuild the embodiment when the level loads or the actor changes,
+	 * so the map shows simulation truth in the viewport without entering PIE. Game worlds
+	 * are driven by BeginPlay instead -- running both would embody twice on every PIE start.
+	 */
+	virtual void OnConstruction(const FTransform& Transform) override;
+#endif
+
+	/** EmbodyCrop driven by the anastasis.WorldView.* console variables. Single source for BeginPlay and OnConstruction. */
+	bool EmbodyFromConsoleVariables();
+
 	bool Embody(uint32 Seed, int32 Width, int32 Height);
 	bool EmbodyCrop(uint32 Seed, int32 OriginX, int32 OriginY, int32 Width, int32 Height);
 
@@ -87,11 +99,12 @@ protected:
 	bool bWaterSurfaceBuilt = false;
 
 	/**
-	 * Emprise reellement visible/solide de l'embodiment courant. En mode
-	 * surface (anastasis.Terrain.Surface=1), c'est le crop 32x32 fixe, PAS
-	 * Plan (qui peut couvrir tout le monde 96x96 demande par BeginPlay) :
-	 * les deux divergent des que Width/Height > 32, sinon GetSafeRespawnLocation
-	 * vise un point hors de tout ce qui est visible ou solide.
+	 * Emprise reellement visible/solide de l'embodiment courant. Les deux modes
+	 * couvrent desormais tout le crop demande -- la surface n'est plus bornee au
+	 * 32x32 canonique -- donc cette emprise suit Plan. Elle reste un champ distinct
+	 * parce que c'est ce que GetSafeRespawnLocation vise : si un mode futur rend
+	 * moins que le Plan, c'est ici que la divergence doit etre enregistree, pas
+	 * dans un appelant qui supposerait Plan solide.
 	 */
 	FBox ActiveFootprintBounds = FBox(ForceInit);
 };

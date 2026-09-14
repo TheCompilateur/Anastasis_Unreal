@@ -4,6 +4,7 @@
 
 #include "Anastasis_UnrealV2.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "WorldView/AnastasisVisualMode.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
 
@@ -32,6 +33,20 @@ void AAnastasis_UnrealV2GameMode::BeginPlay()
 
 	if (UWorld* World = GetWorld())
 	{
+		// Lvl_AnastasisSlice places its own AnastasisWorldEmbodiment at the origin. Spawning a
+		// second one there embodies the identical world twice, stacked and Z-fighting, with every
+		// instance count doubled. The level's actor wins; this spawn is only the fallback for
+		// maps that carry no embodiment of their own.
+		for (TActorIterator<AAnastasisWorldEmbodiment> It(World); It; ++It)
+		{
+			UE_LOG(
+				LogAnastasis_UnrealV2,
+				Display,
+				TEXT("ANASTASIS_VISUAL_MODE embodiment already placed in level (%s); no spawn"),
+				*It->GetName());
+			return;
+		}
+
 		FActorSpawnParameters Params;
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		World->SpawnActor<AAnastasisWorldEmbodiment>(

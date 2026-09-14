@@ -16,7 +16,9 @@ namespace AnastasisTerrainSurface
 /** Niveau de la mer en unites Unreal. */
 inline constexpr double WaterPlaneZ = AnastasisWorld::SeaLevel * AnastasisWorldView::AltitudeScale;
 
-// Cette surface ne traite QUE le crop canonique. Les dimensions ne sont pas
+// Build accepte n'importe quel crop du monde canonique, du 32x32 historique au
+// 96x96 complet. Les dimensions ci-dessous decrivent la tranche canonique de
+// reference (seals, tests) ; elles ne bornent plus Build. Elles ne sont pas
 // redefinies ici : elles sont reprises de WorldView, seul proprietaire.
 inline constexpr int32 SourceW = AnastasisWorldView::ReferenceWidth;
 inline constexpr int32 SourceH = AnastasisWorldView::ReferenceHeight;

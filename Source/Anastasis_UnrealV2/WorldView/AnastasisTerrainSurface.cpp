@@ -60,17 +60,21 @@ FLinearColor TileColor(const AnastasisWorldView::FVisualTile& T, double MinAlt, 
 bool AnastasisTerrainSurface::Build(const AnastasisWorldView::FWorldVisualSnapshot& Crop, FGeometry& Out)
 {
     Out = FGeometry{};
-    if (Crop.W != CropW || Crop.H != CropH || Crop.SourceW != SourceW || Crop.SourceH != SourceH
+    // Any crop of the canonical world, not just the 32x32 slice: the grid below is written in
+    // terms of W/H, so a 96x96 crop surfaces the whole map exactly like a 32x32 one surfaced
+    // a corner of it. Under 2 tiles on an axis there is no quad to triangulate.
+    const int32 W = Crop.W, H = Crop.H, Count = W * H;
+    if (W < 2 || H < 2 || Crop.SourceW != SourceW || Crop.SourceH != SourceH
         || Crop.OriginX < 0 || Crop.OriginY < 0
-        || Crop.OriginX + CropW > SourceW || Crop.OriginY + CropH > SourceH
-        || Crop.Tiles.Num() != VertexCount) return false;
+        || Crop.OriginX + W > SourceW || Crop.OriginY + H > SourceH
+        || Crop.Tiles.Num() != Count) return false;
     FGeometry Result;
     TArray<bool> IsWater;
-    IsWater.Reserve(VertexCount);
+    IsWater.Reserve(Count);
     for (int32 I = 0; I < Crop.Tiles.Num(); ++I)
     {
         const auto& T = Crop.Tiles[I];
-        const int32 X = Crop.OriginX + I % CropW, Y = Crop.OriginY + I / CropW;
+        const int32 X = Crop.OriginX + I % W, Y = Crop.OriginY + I / W;
         if (T.X != X || T.Y != Y || T.SourceIndex != Y * SourceW + X || !FMath::IsFinite(T.Alt)) return false;
         if (!FMath::IsFinite(T.Shore) || !FMath::IsFinite(T.Shade)) return false;
         const FVector P = AnastasisWorldView::TileToUnreal(X, Y, T.Alt);
@@ -81,12 +85,12 @@ bool AnastasisTerrainSurface::Build(const AnastasisWorldView::FWorldVisualSnapsh
         Result.WaterVertices.Add(FVector(P.X, P.Y, WaterPlaneZ));
         IsWater.Add(T.Type == AnastasisWorld::ETileType::Water);
     }
-    Result.Normals.Init(FVector::ZeroVector, VertexCount);
-    Result.WaterNormals.Init(FVector::UpVector, VertexCount);
-    for (int32 Y = 0; Y < CropH - 1; ++Y)
-        for (int32 X = 0; X < CropW - 1; ++X)
+    Result.Normals.Init(FVector::ZeroVector, Count);
+    Result.WaterNormals.Init(FVector::UpVector, Count);
+    for (int32 Y = 0; Y < H - 1; ++Y)
+        for (int32 X = 0; X < W - 1; ++X)
         {
-            const int32 A = Y * CropW + X, B = A + 1, C = A + CropW, D = C + 1;
+            const int32 A = Y * W + X, B = A + 1, C = A + W, D = C + 1;
             // Unreal front faces use clockwise winding viewed from above.
             Result.Triangles.Append({A, C, B, B, C, D});
             // Une cellule porte de l'eau des qu'une de ses quatre tuiles source est de l'eau :
