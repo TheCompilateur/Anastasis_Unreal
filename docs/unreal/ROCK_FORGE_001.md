@@ -12,9 +12,14 @@ Grammaire rocheuse paramétrique native Unreal, produite par Geometry Script.
 | Racine de travail | `C:\dev\Jeux IV Kingdoms\ANASTASIS_UNREAL\anastasis-rock-grammar-e67075` (worktree) |
 | Branche | `claude/anastasis-rock-grammar-e67075` |
 | HEAD au départ | `1cbeef6` (= `main` à ce moment) |
-| `main` à la fin | `ea87acc` — **a avancé de 3 commits pendant la mission** |
+| Base après rebase (2e passe) | `ea87acc` — rebase **sans conflit** |
+| `main` au moment d'écrire | `e2f7382` — a avancé **4 fois** pendant la mission |
 | Moteur | UE 5.8.2, CL 56702186 |
-| Build | `BUILD::PASS` — `Result: Succeeded`, 20/20 actions, 135 s |
+| Build | `BUILD::PASS` ×2 — `Result: Succeeded` (135 s à froid, 83 s après rebase) |
+
+La mission s'est faite en deux passes. La première livre la grammaire **sans toucher un
+seul fichier suivi** ; la seconde, sur autorisation explicite et une fois `tree-visuals`
+intégrée, déclare l'entrée `Stone` pour de bon. Voir CÂBLAGE PERMANENT.
 
 Le script opérateur `tools\unreal\anastasis-unreal.ps1` refuse ce chemin (il n'accepte
 que la racine canonique ou `C:\dev\ANASTASIS_WORKTREES\`). Build lancé directement via
@@ -340,9 +345,19 @@ hauteur les uns aux autres.
 
 19 `.uasset` dans `Content/Anastasis/Rock/` (27–80 ko, couverts par `*.uasset` LFS).
 
+## ASSETS_MODIFIED
+
+`Content/Anastasis/Presentation/DA_AnastasisPresentation.uasset` — entrée `Stone`
+ajoutée en 2e passe (voir CÂBLAGE PERMANENT). Forest et Ruin recopiées intactes.
+
 ## CODE_MODIFIED
 
-**Aucun.** Zéro `.h`, zéro `.cpp`, zéro `.uasset` existant, zéro `.umap`.
+`Source/Anastasis_UnrealV2/WorldView/AnastasisPresentationRegistry.cpp` — l'entrée
+`Stone` ajoutée à `CreateCodeDefaults`, pour que le repli code dise la même chose que
+le data asset. C'est le seul `.cpp` touché ; aucun `.h`, aucun `.umap`.
+
+La première passe ne modifiait **rien** de suivi. C'est ce qui lui a permis de survivre
+sans conflit à deux avancées de `main`.
 
 ## FICHIERS AJOUTÉS
 
@@ -457,24 +472,83 @@ Distribution : 163 instances de dressing (dont **72 rochers**) sur la tranche 32
 
 ---
 
+## CÂBLAGE PERMANENT — fait (2e passe, sur autorisation)
+
+`tree-visuals` ayant atterri sur `main`, la fenêtre annoncée s'est ouverte : plus aucune
+branche ne détenait `DA_AnastasisPresentation`. Vérifié avant d'écrire, branche par
+branche. La branche a donc été **rebasée sur `main` (`ea87acc`, 0 conflit)** puis l'entrée
+`Stone` déclarée pour de bon.
+
+`tools/unreal/set_rock_presentation.py` — nouveau, sur le patron maison de
+`set_tree_grammar.py` et `set_presentation_meshes.py`. Portée : l'entrée STONE, et rien
+d'autre ; les autres entrées sont recopiées telles quelles. Le piège UE-Python que ces
+scripts documentent est repris : `get_editor_property` sur un struct rend une **copie**,
+donc le tableau doit être réécrit dans son propriétaire avant de sauver.
+
+```
+PASSE 1  registre chargé : 2 entrées
+         STONE entry AJOUTÉE en position 2 (elle n'existait pas)
+         SAVED -- 3 entrées
+         VERIFY FOREST archetype=Tree_Generic     variants=8
+         VERIFY RUIN   archetype=Ruin_Generic     variants=1
+         VERIFY STONE  archetype=Rock_Grammar_V1  variants=19
+
+PASSE 2  (process neuf)  STONE entry[2] déjà conforme -- rien à faire
+```
+
+La seconde passe dans un process neuf est la preuve forte exigée par le patron maison :
+**idempotence relue depuis le disque**, et Forest/Ruin intacts.
+
+`AnastasisPresentationRegistry::CreateCodeDefaults` reçoit la même entrée, parce que la
+règle maison est explicite : « le data asset fait autorité quand il se charge, le repli
+code ne sert que s'il manque ; les deux doivent dire la même chose ».
+
+Le A/B a été **refait après câblage**, et la capture le dit elle-même :
+
+```
+ROCK_VIEW STONE_SOURCE data asset (entry is committed)
+ROCK_VIEW ROCK_INSTANCES n=72
+```
+
+Le CANDIDATE n'est donc plus une entrée synthétisée en mémoire : c'est l'asset tel qu'il
+sera livré. Les captures de `docs/visual/rock-forge-001/` sont celles-là.
+
+`MaxLeanDegrees = 9` est la seule valeur ajoutée à cette passe. La ruine est à 0 parce
+qu'un pan de mur est fabriqué et se tient d'aplomb ; un rocher s'est posé comme il est
+tombé. L'inclinaison remonte le pied de `(1-cos L) × 50 × Scale` ≈ 0,4 UU — sans commune
+mesure avec les 27 à 76 UU de jupe enfouie, donc le contact au sol n'en souffre pas.
+
+### Conflit ouvert, et sa résolution
+
+`agent/sim-tick-day` (2 commits, **non intégrée**) modifie le même
+`DA_AnastasisPresentation.uasset` et le même `PresentationRegistry.cpp` — elle refait
+l'échelle des arbres (enveloppe Forest `3.6–5.0` → `15.0–21.0`, canopée à 15–25 m au lieu
+d'une hauteur d'homme). Le `.uasset` étant binaire, les deux ne fusionneront pas.
+
+**Ce n'est pas un blocage, et la résolution est déterministe** — c'est précisément
+pourquoi le projet câble le registre par des scripts plutôt qu'à la main :
+
+> garder l'un OU l'autre `.uasset` au choix, puis **relancer les deux scripts**
+> (`set_tree_grammar.py` / celui de sim-tick-day, puis `set_rock_presentation.py`).
+> Les deux sont idempotents et additifs : chacun ne touche que son entrée et recopie les
+> autres. L'ordre n'a pas d'importance.
+
+Le C++ de `CreateCodeDefaults`, lui, fusionne normalement : les deux changements portent
+sur des entrées différentes.
+
+Note d'échelle : sous l'enveloppe de sim-tick-day (canopée 15–25 m), des rochers de
+0,45 à 2,1 m restent justes — ce sont des blocs, pas des affleurements. Aucune
+re-calibration n'est nécessaire si cette branche atterrit.
+
+---
+
 ## NEXT_RECOMMENDED_STEP
 
-Un seul geste, minimal, et à faire **après** l'intégration de `tree-visuals` :
-
-> déclarer l'entrée `Stone` dans `DA_AnastasisPresentation` — archétype
-> `Rock_Grammar_V1`, les 19 meshes en variantes, `Tint` = `(0.150, 0.142, 0.134)`,
-> `MinUniformScale` **0,30**, `MaxUniformScale` **0,70**,
-> `JitterRadiusFraction` 0,34, `bRandomYaw` vrai.
-
-Ce sont exactement les valeurs que `capture-rock-views.py` applique en mémoire : le A/B
-en est la preuve, pas une proposition.
-
-Ensuite, dans l'ordre de rendement décroissant :
-
-1. tirer parti de `ScaleBias` et `MaxLeanDegrees` arrivés sur `main` — un
-   `ROCK_CLIFF_FRAGMENT` incliné est presque gratuit et très payant ;
-2. corréler l'archétype à l'altitude et à la pente plutôt qu'au seul hasard de tuile
-   (le socle bas en plaine, le fragment anguleux sur les ruptures) ;
+1. corréler l'archétype à l'altitude et à la pente plutôt qu'au seul hasard de tuile
+   (le socle bas en plaine, le fragment anguleux sur les ruptures) — c'est le gain
+   suivant le plus net, et `SelectVariantIndex` sait déjà router sur des axes ;
+2. se servir de `ScaleBias` par variante pour qu'un même archétype couvre le bloc et
+   l'affleurement, au lieu d'une seule enveloppe pour les dix-neuf ;
 3. UV + matériau roche, seulement si la direction artistique le demande.
 
 ---

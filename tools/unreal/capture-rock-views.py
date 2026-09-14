@@ -129,29 +129,47 @@ def make_stone_entry(meshes):
 
 
 class StoneToggle(object):
-    """Adds/removes the Stone entry on the LOADED registry. Never saves."""
+    """Turns the Stone entry on and off on the LOADED registry. Never saves.
+
+    Once tools/unreal/set_rock_presentation.py has wired Stone into the committed data
+    asset, the CANDIDATE half is the asset AS SHIPPED -- the entry is not synthesized
+    here any more, so the A/B tests the thing that will actually run. BASELINE is that
+    same list minus Stone, which is what the world looked like before this mission.
+
+    The synthesized path is kept only as a fallback for running this before the wiring
+    exists. Either way nothing is saved: the registry object is restored on the way out.
+    """
 
     def __init__(self):
         self.registry = unreal.load_asset(REGISTRY_PATH)
         if self.registry is None:
             raise RuntimeError('registry not loadable: ' + REGISTRY_PATH)
-        self.baseline = list(self.registry.get_editor_property('entries'))
-        self.meshes = rock_meshes()
-        log('ROCK_MESHES n=%d %s' % (
-            len(self.meshes), ','.join(m.get_name() for m in self.meshes)))
-        if not self.meshes:
-            raise RuntimeError('no rock meshes under ' + ROCK_DIR)
+        self.committed = list(self.registry.get_editor_property('entries'))
+
+        stone = unreal.AnastasisSemanticType.STONE
+        self.without_stone = [e for e in self.committed
+                              if e.get_editor_property('semantic_type') != stone]
+        self.from_asset = len(self.without_stone) != len(self.committed)
+
+        if self.from_asset:
+            log('STONE_SOURCE data asset (entry is committed)')
+            self.with_stone = self.committed
+        else:
+            log('STONE_SOURCE synthesized (data asset has no Stone entry yet)')
+            meshes = rock_meshes()
+            if not meshes:
+                raise RuntimeError('no rock meshes under ' + ROCK_DIR)
+            log('ROCK_MESHES n=%d' % len(meshes))
+            self.with_stone = self.without_stone + [make_stone_entry(meshes)]
 
     def set_enabled(self, enabled):
-        entries = list(self.baseline)
-        if enabled:
-            entries.append(make_stone_entry(self.meshes))
+        entries = self.with_stone if enabled else self.without_stone
         self.registry.set_editor_property('entries', entries)
         log('STONE_ENTRY enabled=%s registry_entries=%d' % (enabled, len(entries)))
 
     def restore(self):
-        self.registry.set_editor_property('entries', self.baseline)
-        log('STONE_ENTRY restored to %d entries (nothing saved)' % len(self.baseline))
+        self.registry.set_editor_property('entries', self.committed)
+        log('STONE_ENTRY restored to %d entries (nothing saved)' % len(self.committed))
 
 
 # ----------------------------------------------------------------------------------

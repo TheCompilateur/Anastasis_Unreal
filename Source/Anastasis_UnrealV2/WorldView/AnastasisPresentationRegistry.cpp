@@ -38,6 +38,38 @@ namespace
 	constexpr const TCHAR* DefaultRuinMeshPath = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
 
 	/**
+	 * ANASTASIS_ROCK_GRAMMAR_V1 -- six archetypes x three bounded variants, plus one
+	 * composed cluster. Built by tools/unreal/create_rock_assets.py from a parametric
+	 * genome, and wired into the data asset by tools/unreal/set_rock_presentation.py;
+	 * these paths are the code fallback for the same set. See docs/unreal/ROCK_FORGE_001.md.
+	 *
+	 * Before this grammar existed, Stone had NO entry at all: ResolvePresentation returned
+	 * false for every Stone tile and PlaceDressing drew nothing, so 1396 of the world's
+	 * 9216 tiles were a ground colour and no geometry.
+	 */
+	constexpr const TCHAR* RockMeshPaths[] = {
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Massive_01.SM_Rock_Massive_01"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Massive_02.SM_Rock_Massive_02"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Massive_03.SM_Rock_Massive_03"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Low_01.SM_Rock_Low_01"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Low_02.SM_Rock_Low_02"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Low_03.SM_Rock_Low_03"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Vertical_01.SM_Rock_Vertical_01"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Vertical_02.SM_Rock_Vertical_02"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Vertical_03.SM_Rock_Vertical_03"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Split_01.SM_Rock_Split_01"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Split_02.SM_Rock_Split_02"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Split_03.SM_Rock_Split_03"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Boulder_01.SM_Rock_Boulder_01"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Boulder_02.SM_Rock_Boulder_02"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Boulder_03.SM_Rock_Boulder_03"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_CliffFragment_01.SM_Rock_CliffFragment_01"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_CliffFragment_02.SM_Rock_CliffFragment_02"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_CliffFragment_03.SM_Rock_CliffFragment_03"),
+		TEXT("/Game/Anastasis/Rock/SM_Rock_Cluster_01.SM_Rock_Cluster_01"),
+	};
+
+	/**
 	 * Bark and foliage are vertex colours baked into the mesh; this material is what reads
 	 * them. Without it the archetype's single Tint would paint the trunk green too, and the
 	 * trunk -- the thing this grammar exists to make visible -- would stop existing.
@@ -149,6 +181,34 @@ UAnastasisPresentationRegistry* UAnastasisPresentationRegistry::CreateCodeDefaul
 		EAnastasisSemanticType::Ruin, TEXT("Ruin_Generic"),
 		FLinearColor(0.353f, 0.302f, 0.318f), 0.6f, 1.1f, 0.20f, 0.0f,
 		{MakeVariant(DefaultRuinMeshPath, EAnastasisStatureClass::Any, EAnastasisFoliageFamily::Any, 1.0f, nullptr)}));
+
+	// STONE. Read against the same metre-per-tile ruler as the forest above: these meshes
+	// stand 150-300uu at scale 1, so this envelope gives blocks of 0.45m to 2.1m -- the
+	// ruin's size family, and well under the canopy. A rock is not a hill. An envelope of
+	// 0.85-1.85 was tried first and the captures rejected it: from above the whole
+	// formation read as a single pale blob instead of distinct mineral masses.
+	//
+	// Lean is 9 degrees where the ruin's is 0, and that contrast is the point: a wall stub
+	// was built plumb, a boulder came to rest however it fell. The lean lifts the foot by
+	// (1 - cos L) * 50 * Scale -- about 0.4uu here, against 27-76uu of buried skirt, so
+	// ground contact is untouched.
+	//
+	// No variant carries a stature or family: those axes describe a stand of trees, not an
+	// outcrop. SelectVariantIndex reads Any/Any as "no opinion" and fails open, so all
+	// nineteen stay eligible.
+	{
+		TArray<FAnastasisPresentationVariant> RockVariants;
+		RockVariants.Reserve(UE_ARRAY_COUNT(RockMeshPaths));
+		for (const TCHAR* RockMeshPath : RockMeshPaths)
+		{
+			RockVariants.Add(MakeVariant(RockMeshPath, EAnastasisStatureClass::Any,
+				EAnastasisFoliageFamily::Any, 1.0f, nullptr));
+		}
+		Registry->Entries.Add(MakeDefaultEntry(
+			EAnastasisSemanticType::Stone, TEXT("Rock_Grammar_V1"),
+			FLinearColor(0.150f, 0.142f, 0.134f), 0.30f, 0.70f, 0.34f, 9.0f,
+			MoveTemp(RockVariants)));
+	}
 
 	return Registry;
 }
