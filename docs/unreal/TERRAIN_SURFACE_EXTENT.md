@@ -39,7 +39,13 @@ La CVar gagne une valeur, elle n'en change aucune :
 |---|---|---|
 | `0` | — | dalles DEBUG, inchangé |
 | `1` | crop canonique `32×32` | **tranche scellée WORLD_SLICE_006, inchangée** |
-| `2` | toute l'emprise incarnée (`96×96` au spawn) | nouveau |
+| `2` | toute l'emprise incarnée (`96×96` au spawn) | **défaut depuis VISUAL_DEFAULT_PATH** |
+
+Amendement `VISUAL_DEFAULT_PATH` (2026-09-13) : la CVar vaut désormais `2` par
+défaut et non plus `0`. Le mode qui donne une carte est celui qu'on obtient sans
+rien taper. Les modes `0` et `1` restent atteignables et inchangés ; `1` continue
+d'imprimer la chaîne scellée caractère pour caractère. Voir
+`docs/visual/editor-default-path/`.
 
 ## Pourquoi le sceau tient toujours
 
