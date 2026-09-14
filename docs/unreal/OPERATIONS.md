@@ -75,6 +75,19 @@ Two tiers, matched to how slow each check is:
 
 **Regle : aucun agent ne deplace `main` depuis sa propre branche. Seule une passe d'integration le fait.**
 
+Cette regle est **appliquee par un hook**, pas seulement ecrite ici :
+`tools/git-hooks/reference-transaction` refuse toute mise a jour de
+`refs/heads/main` — commit, `merge --ff-only`, `reset` — sauf si
+`ANASTASIS_INTEGRATION=1` est dans l'environnement. Il a fallu en arriver la :
+la regle a ete ecrite le 2026-09-13 a 20h56, et quinze minutes plus tard un
+agent fast-forwardait `main` directement. Un paragraphe n'est pas une
+contrainte.
+
+Le hook laisse volontairement passer la creation de la ref (clone,
+`worktree add`), sa suppression, et toute ligne qu'il ne sait pas lire : mieux
+vaut un blocage manque qu'un depot coince. Il ne voit pas `refs/remotes/*`,
+donc `fetch` et `push` ne sont jamais genes.
+
 Le 2026-09-13, quatre acteurs differents ont fast-forwarde `main` depuis leur branche (`multi-agent-control-001`,
 `terrain-surface-world`, `visual-build-002`, `dressing-on-surface`). Personne n'a compile la combinaison. Un
 `WriteJson` defini a l'identique dans `AnastasisWorldProbePhase3.cpp` et `AnastasisWorldProbeSubsystem.cpp` a
@@ -92,7 +105,7 @@ l'assemblage n'etait l'affaire de personne.
    conflitent, sans rien muter.
 3. **Compiler.** `anastasis-unreal.ps1 build` depuis le worktree d'integration. Une fusion textuelle propre
    ne prouve rien : c'est cette etape, et elle seule, qui a attrape `WriteJson`.
-4. Verser : `git -C <racine-canonique> merge --ff-only agent/trunk-integration`. Refuser si ce n'est pas un
+4. Verser : `ANASTASIS_INTEGRATION=1 git -C <racine-canonique> merge --ff-only agent/trunk-integration`. Refuser si ce n'est pas un
    fast-forward — sinon quelqu'un a bouge `main` pendant la passe et il faut la refaire.
 5. Pousser immediatement (voir ci-dessous).
 6. Elaguer branches et worktrees dont tous les commits sont dans `main` :

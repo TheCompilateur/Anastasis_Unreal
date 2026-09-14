@@ -1,0 +1,69 @@
+#!/bin/sh
+# refs/heads/main ne bouge que par une passe d'integration.
+#
+# Le 2026-09-13, quatre agents ont fast-forwarde main depuis leur propre branche
+# sans que personne ne compile la combinaison. Un WriteJson defini a l'identique
+# dans deux .cpp a traverse ces quatre versements : chaque agent compilait sa
+# branche dans son worktree, ou UBT passe en non-unity les fichiers que
+# 'git status' voit sales. La collision n'existait que dans l'assemblage.
+# La regle a ete ecrite dans docs/unreal/OPERATIONS.md ; quinze minutes plus tard
+# un agent fast-forwardait main directement. Un paragraphe n'est pas une
+# contrainte : ce hook en est une.
+#
+# Le point d'application est ici et pas dans pre-push, parce que les agents ne
+# poussent pas — ils deplacent main en local.
+#
+# Passe d'integration :
+#   ANASTASIS_INTEGRATION=1 git -C <racine> merge --ff-only <branche-integration>
+#
+# Failles volontaires, pour ne jamais coincer le depot :
+#   - creation de la ref (clone, worktree add) : laissee passer
+#   - suppression de la ref : laissee passer
+#   - toute ligne illisible : laissee passer (fail-open assume — mieux vaut un
+#     blocage manque qu'un depot inutilisable)
+
+# Trois phases : prepared, committed, aborted. Seul 'prepared' peut refuser.
+[ "$1" = "prepared" ] || exit 0
+
+# Echappatoire explicite de la passe d'integration.
+[ "$ANASTASIS_INTEGRATION" = "1" ] && exit 0
+
+# Vrai si l'argument est non vide et entierement compose de zeros, quelle que
+# soit la longueur du hash (SHA-1 comme SHA-256).
+all_zero() {
+	[ -n "$1" ] || return 1
+	case "$1" in
+		*[!0]*) return 1 ;;
+		*) return 0 ;;
+	esac
+}
+
+blocked_old=''
+blocked_new=''
+while read -r old new ref rest; do
+	[ "$ref" = "refs/heads/main" ] || continue
+	[ -n "$old" ] && [ -n "$new" ] || continue   # ligne illisible : on laisse passer
+	all_zero "$old" && continue                  # creation
+	all_zero "$new" && continue                  # suppression
+	blocked_old="$old"
+	blocked_new="$new"
+done
+
+[ -n "$blocked_new" ] || exit 0
+
+cat >&2 <<EOF
+
+REFUS: refs/heads/main ne se deplace que par une passe d'integration.
+  tentative : $blocked_old -> $blocked_new
+
+  Une branche d'agent ne verse pas dans le tronc directement. La passe est :
+    1. worktree neuf depuis main, que personne n'occupe
+    2. fusionner les branches vivantes
+    3. COMPILER : anastasis-unreal.ps1 build
+    4. ANASTASIS_INTEGRATION=1 git -C <racine> merge --ff-only <branche>
+    5. pousser
+
+  Details : docs/unreal/OPERATIONS.md, section Integration.
+
+EOF
+exit 1
