@@ -94,6 +94,19 @@ struct FAnastasisPresentationVariant
 	TSoftObjectPtr<UMaterialInterface> MaterialOverride;
 
 	/**
+	 * Material slots 1..N, when the mesh carries more than one.
+	 *
+	 * A tree is two materials, not one: wood is opaque and matte, foliage is two-sided and
+	 * lets light through. Rendering the bark with a foliage shading model was semantically
+	 * wrong and showed -- the trunks lifted in value against a bright ground.
+	 *
+	 * Slot 0 keeps its own field and its own meaning, so data written before this existed
+	 * resolves exactly as it did. An entry that names no extra slot simply has none.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Presentation")
+	TArray<TSoftObjectPtr<UMaterialInterface>> AdditionalMaterialOverrides;
+
+	/**
 	 * Stature this look is drawn for. A young tree and a dominant one are not the same
 	 * mesh at two scales: they differ in trunk fraction, crown width and tier count, so
 	 * the mesh, not the scale, has to change with the age class.

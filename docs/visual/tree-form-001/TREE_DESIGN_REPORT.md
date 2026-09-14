@@ -16,6 +16,9 @@ Deux passes :
   familles. C'était le NEXT TARGET de la passe 1.
 - **Passe 2.5 — ombrage.** La géométrie faisait son travail, le rendu non. Feuillage deux
   faces + normales fractionnées. Aucun sommet déplacé, aucune ligne de C++ touchée.
+- **Passe 2.6 — deux matériaux.** Le bois cesse d'être déclaré comme du feuillage. Correction
+  de structure, **pas** d'apparence : mesurée, elle ne change presque rien à l'image, et le
+  diagnostic qui l'avait motivée était faux.
 
 ---
 
@@ -376,6 +379,67 @@ se posera la même question.
 Aucun C++ modifié : `BUILD` inchangé, et la suite reste à 60 PASS / 4 KNOWN_EXPECTED_FAILURE
 / 0 FAIL, `TREE_PIVOT variants_checked=8`, `ground_error=0.000000000`.
 
+## 7quater. Passe 2.6 — deux slots de matériau, et un diagnostic démenti
+
+La limite n°9 de la passe 2.5 disait : *« `MSM_TWO_SIDED_FOLIAGE` change la réponse diffuse
+de tous les pixels du matériau, écorce comprise ; sur la planche neutre les fûts remontent en
+valeur. »* Le correctif annoncé était de séparer les matériaux. Il a été fait — et **la mesure
+a démenti le diagnostic**.
+
+### Ce qui a été fait
+
+Chaque primitive porte désormais un `material_id` à la construction : **0 = feuillage,
+1 = bois**. Les identifiants survivent à `append_mesh` (vérifié sur ce build : deux
+`material_id` donnent `static_materials = 2`), donc les 9 meshes ont deux slots.
+
+- `M_AnastasisVegetation` (slot 0) — `MSM_TWO_SIDED_FOLIAGE`, deux faces, rugosité 0,82.
+- `M_AnastasisBark` (slot 1) — **`MSM_DEFAULT_LIT`, une seule face**, rugosité 0,93,
+  spéculaire 0,10 : une écorce humide n'accroche pas la lumière comme une feuille cireuse.
+
+Côté moteur, `FAnastasisPresentationVariant` gagne `AdditionalMaterialOverrides` (slots 1..N).
+Le slot 0 garde son champ et son sens, donc la donnée écrite avant cette passe résout
+exactement comme avant. `PlaceDressing` pose maintenant les slots supplémentaires — il
+n'écrivait que le slot 0, et un slot laissé vide rend en damier gris, ce qui est pire qu'un
+tronc mal ombré.
+
+### La mesure, qui dit non
+
+Même planche, mêmes fenêtres de pixels, avant et après la séparation :
+
+| fenêtre | luma avant | luma après | delta |
+|---|---|---|---|
+| fût émergent conifère | 112,3 | 111,0 | **−1,3** |
+| fût émergent feuillu | 122,9 | 121,4 | **−1,4** |
+| couronne conifère | 140,2 | 140,2 | 0,0 |
+| sol neutre (témoin) | 177,8 | 177,7 | −0,1 |
+
+**−1,3 sur ~112, avec un témoin à −0,1 : c'est du bruit.** Le modèle d'ombrage n'était donc
+pas ce qui rendait les fûts clairs. Ils sont clairs parce que `BARK_OLD` vaut 0,090 en
+linéaire, soit ~0,33 en sRGB — un beige moyen. **C'est une couleur que j'ai choisie, pas un
+artefact de rendu**, et le diagnostic de la limite n°9 était une hypothèse que je n'avais pas
+vérifiée avant de l'écrire.
+
+La couleur n'est pas retouchée pour autant : dans la scène réelle (`E_bark_slot_after.png`)
+les fûts lisent sombres et solides contre l'herbe. Le beige n'apparaît que sur la planche, dont
+le sol neutre clair est un banc d'essai, pas une cible. Régler une couleur pour flatter un banc
+serait exactement l'inverse du test anti-arnaque.
+
+### Ce que la passe achète réellement
+
+Rien sur l'image, et c'est correct de le dire. Ce qu'elle achète est structurel :
+
+- le bois n'a **plus du tout** de chemin de transmission — avant il en avait un, annulé par le
+  masque alpha ; c'est la différence entre « à zéro » et « absent » ;
+- l'écorce a sa propre rugosité et son propre spéculaire, impossibles à régler quand un seul
+  matériau servait les deux matières ;
+- le bois est **une seule face** : les fûts ne paient plus le rendu de leurs faces arrière ;
+- et tout travail futur spécifique à l'écorce (texture, poids de vent différent du feuillage)
+  devient possible — il ne l'était pas avec un slot unique.
+
+`Anastasis.Presentation.TreeMaterialSlots` verrouille les deux moitiés : le mesh déclare deux
+slots, la donnée en nomme autant, et le résolveur rend bien deux matériaux distincts et
+chargés (`TREE_SLOTS variants_checked=8`).
+
 ## 8. Intégration Unreal
 
 L'architecture n'a **pas** été réécrite. HISM reste le motif ; il y a maintenant un
@@ -446,6 +510,7 @@ monde 96×96, mode surface. Aucun fog, aucun coucher de soleil, aucun étalonnag
 | `C_close_after.png` | **identique** | passes 1+2, **terrain post-forge** — le « avant » de la passe .5 |
 | `B_stature_board.png` | banc dédié, arc | les 8 silhouettes par paires strate×famille + ruine 0,9 m + repère 1,8 m |
 | `D_shading_after.png` | **identique à C close** | après .5a/.5b, terrain post-forge — feuillage deux faces, normales fractionnées |
+| `E_bark_slot_after.png` | **identique** | après 2.6 — bois et feuillage sur deux matériaux |
 | `A_before_cone.png` | caméra monde scellée | avant, lecture macro |
 | `C_wide_after.png` | **identique** | après, lecture macro |
 
@@ -508,15 +573,16 @@ Constatées, pas corrigées — elles sortent du mandat ou méritent leur propre
    corrigée.
 8. **Le sol reste pâle et lavé** sous le soleil du banc, ce qui affaiblit le contraste des
    troncs. `M_AnastasisSlice` appartient au chantier matériaux en cours.
-9. **L'écorce est rendue par un modèle d'ombrage de feuillage.** Le masque alpha annule bien
-   sa transmission, mais `MSM_TWO_SIDED_FOLIAGE` change la réponse diffuse de *tous* les
-   pixels du matériau : sur la planche neutre, à fond clair et ciel ouvert, les fûts
-   remontent en valeur par rapport à la passe 2. Dans la vraie scène ils restent sombres et
-   lisibles, donc ce n'est pas bloquant — mais c'est sémantiquement faux. Le correctif propre
-   est deux slots de matériau (écorce en Default Lit, feuillage en deux faces), ce qui
-   demande un `material_id` par sous-partie dans le générateur **et** que
-   `AAnastasisWorldEmbodiment::PlaceDressing` pose aussi le slot 1 — il n'écrit que le slot 0
-   aujourd'hui. C'est la prochaine consolidation, pas un correctif de cette passe.
+9. ~~L'écorce est rendue par un modèle d'ombrage de feuillage.~~ **Corrigé en passe 2.6**
+   (deux slots), mais le diagnostic associé était faux : la mesure montre que le modèle
+   d'ombrage ne pesait que −1,3 de luma sur les fûts. Voir §7quater.
+10. **La valeur de l'écorce reste une question ouverte.** Sur un fond neutre clair les fûts
+    lisent beige moyen. C'est la couleur choisie (`BARK_OLD` ≈ 0,33 sRGB), pas un défaut de
+    rendu, et dans la scène réelle elle fonctionne. À rouvrir seulement si un cadrage réel la
+    met en défaut — pas pour flatter le banc d'essai.
+11. **Aucune mesure de coût.** Toujours pas de compte de triangles, de draw calls ni de LOD.
+    `create_new_static_mesh_asset_from_mesh` ne produit que le LOD0. À 438 instances ça ne
+    mord pas ; c'est le point .5f, non fait.
 
 ## 13. NEXT TARGET recommandé — non exécuté
 
@@ -547,6 +613,7 @@ stature.
 [x] l'espèce répond au terrain                         p_conifer 0,06 -> 0,86 selon Shade/Wetness
 [x] la lumière traverse le feuillage                   MSM_TWO_SIDED_FOLIAGE, transmission masquée par l'alpha
 [x] les décrochements d'étage survivent au rendu       normales fractionnées a 45 deg, build ne recalcule plus
+[x] le bois n'est plus declare comme du feuillage      2 slots, M_AnastasisBark en Default Lit, une seule face
 [x] lecture claire à distance                          C_wide_after.png, caméra scellée
 [x] résultat stylisé                                   pas de photoréalisme, pas de Nanite
 [x] aucune refonte terrain                             AnastasisTerrainSurface intact

@@ -382,6 +382,68 @@ bool FAnastasisTreePivotConvention::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTreeMaterialSlots, "Anastasis.Presentation.TreeMaterialSlots", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTreeMaterialSlots::RunTest(const FString&)
+{
+	using namespace AnastasisPresentation;
+
+	// Wood and foliage are two different materials on two different slots. If the mesh loses
+	// a slot, or the data stops naming one, the trunk silently falls back to the engine's
+	// default material -- a grey checkerboard, which no capture would let through, but which
+	// only shows up at runtime. Lock both halves here instead.
+	const FAnastasisPresentationEntry* Forest = FindEntry(AnastasisWorld::ETileType::Forest);
+	if (!TestNotNull(TEXT("forest entry"), Forest))
+	{
+		return false;
+	}
+
+	int32 Checked = 0;
+	for (const FAnastasisPresentationVariant& Variant : Forest->Variants)
+	{
+		if (Variant.Mesh.IsNull())
+		{
+			continue;
+		}
+		UStaticMesh* Mesh = Variant.Mesh.LoadSynchronous();
+		if (!Mesh)
+		{
+			continue;
+		}
+		const int32 MeshSlots = Mesh->GetStaticMaterials().Num();
+		TestEqual(*FString::Printf(TEXT("%s carries a wood slot and a foliage slot"), *Mesh->GetName()),
+			MeshSlots, 2);
+
+		// The data must name a material for every slot the mesh declares: slot 0 through
+		// MaterialOverride, the rest through AdditionalMaterialOverrides.
+		const int32 DataSlots = 1 + Variant.AdditionalMaterialOverrides.Num();
+		TestEqual(*FString::Printf(TEXT("%s: the registry names every slot the mesh has"), *Mesh->GetName()),
+			DataSlots, MeshSlots);
+		for (const TSoftObjectPtr<UMaterialInterface>& Slot : Variant.AdditionalMaterialOverrides)
+		{
+			TestFalse(TEXT("no extra slot is left unnamed"), Slot.IsNull());
+		}
+		++Checked;
+	}
+	TestTrue(TEXT("at least one forest mesh was checked"), Checked > 0);
+
+	// And the resolver must actually hand those materials back, loaded.
+	FResolvedPresentation R;
+	if (TestTrue(TEXT("forest resolves"),
+		ResolvePresentation(AnastasisWorld::ETileType::Forest, 12345u, 4, 4, R, EAnastasisStatureClass::Canopy)))
+	{
+		TestNotNull(TEXT("slot 0 material is loaded"), R.MaterialOverride);
+		if (TestEqual(TEXT("one extra slot resolved"), R.AdditionalMaterials.Num(), 1))
+		{
+			TestNotNull(TEXT("slot 1 material is loaded"), R.AdditionalMaterials[0]);
+			TestTrue(TEXT("wood and foliage are not the same material"),
+				R.AdditionalMaterials[0] != R.MaterialOverride);
+		}
+	}
+
+	AddInfo(FString::Printf(TEXT("TREE_SLOTS variants_checked=%d"), Checked));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisPresentationSpecies, "Anastasis.Presentation.Species", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnastasisPresentationSpecies::RunTest(const FString&)
 {

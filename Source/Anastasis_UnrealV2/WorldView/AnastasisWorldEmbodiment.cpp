@@ -275,6 +275,13 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
             Mid->SetVectorParameterValue(TEXT("Color"), R.Entry->Tint);
             M->SetMaterial(0, Mid);
         }
+        // Slots 1..N. A tree mesh carries two: foliage on 0, wood on 1. Left unset, slot 1
+        // would fall back to the engine's default material -- a grey checkerboard trunk,
+        // which is worse than a badly shaded one.
+        for (int32 Slot = 0; Slot < R.AdditionalMaterials.Num(); ++Slot)
+        {
+            if (R.AdditionalMaterials[Slot]) M->SetMaterial(Slot + 1, R.AdditionalMaterials[Slot]);
+        }
         return M;
     };
 	for (int32 Index = 0; Index < Plan.TileCount; ++Index)

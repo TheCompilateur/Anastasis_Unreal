@@ -53,6 +53,8 @@ PACKAGE_PATH = "/Game/Anastasis/Vegetation"
 MATERIAL_DIR = "/Game/Anastasis/Materials"
 MATERIAL_NAME = "M_AnastasisVegetation"
 MATERIAL_PATH = MATERIAL_DIR + "/" + MATERIAL_NAME
+BARK_MATERIAL_NAME = "M_AnastasisBark"
+BARK_MATERIAL_PATH = MATERIAL_DIR + "/" + BARK_MATERIAL_NAME
 
 # Hauteur de la boite englobante imposee a chaque mesh, et ou elle est centree.
 NORMALISED_HEIGHT = 100.0
@@ -96,7 +98,30 @@ def color_flags():
 
 
 FLAGS = color_flags()
-PRIM = unreal.GeometryScriptPrimitiveOptions()
+
+
+def prim_options(material_id):
+    options = unreal.GeometryScriptPrimitiveOptions()
+    options.set_editor_property('material_id', material_id)
+    return options
+
+
+# DEUX SLOTS DE MATERIAU, ET C'EST LE POINT DE CETTE PASSE.
+#
+# Jusqu'ici tout l'arbre etait rendu par un seul materiau. Quand celui-ci est
+# passe en MSM_TWO_SIDED_FOLIAGE, l'ecorce a herite d'un modele d'ombrage de
+# feuillage : le masque alpha annulait bien sa transmission, mais la reponse
+# diffuse du modele s'applique a TOUS les pixels du materiau, et sur fond clair
+# les futs remontaient en valeur. C'etait semantiquement faux -- du bois n'est
+# pas une feuille.
+#
+# Les identifiants survivent a append_mesh (verifie sur ce build : deux
+# material_id donnent bien static_materials = 2), donc il suffit de marquer
+# chaque primitive a la construction.
+SLOT_FOLIAGE = 0
+SLOT_WOOD = 1
+PRIM = prim_options(SLOT_FOLIAGE)
+PRIM_WOOD = prim_options(SLOT_WOOD)
 
 
 def coloured(mesh, color):
@@ -108,7 +133,7 @@ def merge(target, part):
     return unreal.GeometryScript_MeshEdits.append_mesh(target, part, unreal.Transform())
 
 
-def taper(mesh, base_radius, top_radius, z0, z1, steps=9, location=None, rotator=None):
+def taper(mesh, base_radius, top_radius, z0, z1, steps=9, location=None, rotator=None, prim=None):
     """Un troncon conique, base en z0, sommet en z1. Le tronc et chaque etage de
     couronne sont le meme primitif : seuls les rayons changent. Un cone parfait
     n'est jamais utilise seul -- c'est precisement la silhouette qu'on retire."""
@@ -116,7 +141,7 @@ def taper(mesh, base_radius, top_radius, z0, z1, steps=9, location=None, rotator
         location=location if location is not None else unreal.Vector(0.0, 0.0, z0),
         rotation=rotator if rotator is not None else unreal.Rotator(0.0, 0.0, 0.0))
     return unreal.GeometryScript_Primitives.append_cone(
-        mesh, PRIM, xf,
+        mesh, prim if prim is not None else PRIM, xf,
         base_radius=base_radius, top_radius=max(top_radius, 0.05), height=(z1 - z0),
         radial_steps=steps, height_steps=1, capped=True,
         origin=unreal.GeometryScriptPrimitiveOriginMode.BASE)
@@ -150,7 +175,7 @@ def build_trunk(segments, color):
         return None
     mesh = unreal.DynamicMesh()
     for seg in segments:
-        mesh = taper(mesh, *seg[:4], steps=seg[4] if len(seg) > 4 else 9)
+        mesh = taper(mesh, *seg[:4], steps=seg[4] if len(seg) > 4 else 9, prim=PRIM_WOOD)
     return coloured(mesh, color)
 
 
@@ -164,7 +189,7 @@ def build_limbs(limbs, color):
         mesh = taper(
             mesh, base_r, top_r, 0.0, length, steps=7,
             location=unreal.Vector(0.0, 0.0, z),
-            rotator=unreal.Rotator(roll=0.0, pitch=pitch, yaw=yaw))
+            rotator=unreal.Rotator(roll=0.0, pitch=pitch, yaw=yaw), prim=PRIM_WOOD)
     return coloured(mesh, color)
 
 
@@ -435,15 +460,27 @@ def save_static_mesh(mesh, asset_path):
         raise Exception("%s: create_new_static_mesh_asset_from_mesh a rendu None (%s)"
                         % (asset_path, outcome))
 
-    material = unreal.EditorAssetLibrary.load_asset(MATERIAL_PATH)
-    if material is not None:
+    # Les materiaux poses sur l'ASSET sont le repli : le registre les surcharge
+    # sur le composant HISM. Mais un slot laisse vide rendrait en damier gris si
+    # la donnee venait a manquer -- et un tronc en damier est pire qu'un tronc
+    # mal ombre. On cable donc les deux ici aussi.
+    for slot, path in ((SLOT_FOLIAGE, MATERIAL_PATH), (SLOT_WOOD, BARK_MATERIAL_PATH)):
+        material = unreal.EditorAssetLibrary.load_asset(path)
+        if material is None:
+            continue
         try:
-            asset.set_material(0, material)
+            asset.set_material(slot, material)
         except Exception as exc:  # noqa: BLE001
-            # Pas bloquant : le registre pose de toute facon le materiau sur le
-            # composant HISM (MaterialOverride). Ceci ne sert qu'a rendre le
-            # mesh correct quand on l'ouvre seul dans l'editeur.
-            log("WARN materiau par defaut non pose sur %s: %s" % (asset_path, exc))
+            log("WARN slot %d non pose sur %s: %s" % (slot, asset_path, exc))
+
+    try:
+        slots = len(asset.get_editor_property('static_materials'))
+        if slots != 2:
+            raise Exception("%s: %d slot(s) de materiau au lieu de 2 -- le bois et le "
+                            "feuillage ne sont plus separes" % (asset_path, slots))
+        log("  slots=%d (0=feuillage, 1=bois)" % slots)
+    except Exception as exc:
+        raise Exception(str(exc))
 
     try:
         unreal.EditorStaticMeshLibrary.add_simple_collisions(
@@ -547,9 +584,59 @@ def ensure_material():
     return mat
 
 
+def ensure_bark_material():
+    """Default Lit. Du bois : opaque, mat, sans transmission.
+
+    C'est tout l'interet de la passe -- l'ecorce cesse d'etre rendue par un
+    modele d'ombrage de feuillage. Meme langage que le reste du projet : la
+    couleur de sommet EST la semantique, aucune texture.
+    """
+    if unreal.EditorAssetLibrary.does_asset_exist(BARK_MATERIAL_PATH):
+        unreal.EditorAssetLibrary.delete_asset(BARK_MATERIAL_PATH)
+
+    mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+        BARK_MATERIAL_NAME, MATERIAL_DIR, unreal.Material, unreal.MaterialFactoryNew())
+    mel = unreal.MaterialEditingLibrary
+
+    vc = mel.create_material_expression(mat, unreal.MaterialExpressionVertexColor, -600, 0)
+    wired = False
+    for out_name in ('', 'RGB', 'Color'):
+        if mel.connect_material_property(vc, out_name, unreal.MaterialProperty.MP_BASE_COLOR):
+            wired = 'output=' + repr(out_name)
+            break
+
+    # Plus rugueux et moins speculaire que le feuillage : une ecorce humide
+    # n'accroche pas la lumiere comme une feuille cireuse.
+    rough = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -350, 260)
+    rough.set_editor_property('r', 0.93)
+    r_rough = mel.connect_material_property(rough, '', unreal.MaterialProperty.MP_ROUGHNESS)
+    spec = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -350, 460)
+    spec.set_editor_property('r', 0.10)
+    r_spec = mel.connect_material_property(spec, '', unreal.MaterialProperty.MP_SPECULAR)
+
+    # Le bois est un volume ferme : une seule face suffit, et ca evite de payer
+    # le rendu des faces arriere sur chaque fut.
+    mat.set_editor_property('two_sided', False)
+
+    shading = 'ABSENT'
+    try:
+        mat.set_editor_property('shading_model', unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
+        shading = str(mat.get_editor_property('shading_model'))
+    except Exception as exc:  # noqa: BLE001
+        log('WARN modele d ombrage ecorce non pose: %s' % exc)
+
+    log("BARK_MATERIAL wiring base_color=%s roughness=%s specular=%s shading=%s"
+        % (wired, r_rough, r_spec, shading))
+    mel.recompile_material(mat)
+    unreal.EditorAssetLibrary.save_asset(BARK_MATERIAL_PATH)
+    log("BARK_MATERIAL saved " + BARK_MATERIAL_PATH)
+    return mat
+
+
 def main():
     log("start")
     ensure_material()
+    ensure_bark_material()
 
     built = {}
     for spec in FAMILIES:

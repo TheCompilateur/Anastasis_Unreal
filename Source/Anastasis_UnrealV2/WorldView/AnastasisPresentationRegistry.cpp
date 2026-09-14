@@ -45,12 +45,20 @@ namespace
 	 */
 	constexpr const TCHAR* VegetationMaterialPath = TEXT("/Game/Anastasis/Materials/M_AnastasisVegetation.M_AnastasisVegetation");
 
+	/**
+	 * Slot 1 of every tree mesh. Default Lit, opaque, matte: wood is not a leaf, and giving
+	 * it the foliage shading model lifted every trunk in value against a bright ground.
+	 * Owned by the same generator as the meshes and the foliage material.
+	 */
+	constexpr const TCHAR* BarkMaterialPath = TEXT("/Game/Anastasis/Materials/M_AnastasisBark.M_AnastasisBark");
+
 	FAnastasisPresentationVariant MakeVariant(
 		const TCHAR* MeshPath,
 		EAnastasisStatureClass Stature,
 		EAnastasisFoliageFamily Family,
 		float ScaleBias,
-		const TCHAR* MaterialPath)
+		const TCHAR* MaterialPath,
+		const TCHAR* Slot1MaterialPath = nullptr)
 	{
 		FAnastasisPresentationVariant Variant;
 		Variant.Mesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(MeshPath));
@@ -60,6 +68,11 @@ namespace
 		if (MaterialPath)
 		{
 			Variant.MaterialOverride = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(MaterialPath));
+		}
+		if (Slot1MaterialPath)
+		{
+			Variant.AdditionalMaterialOverrides.Add(
+				TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(Slot1MaterialPath)));
 		}
 		return Variant;
 	}
@@ -121,14 +134,14 @@ UAnastasisPresentationRegistry* UAnastasisPresentationRegistry::CreateCodeDefaul
 			// Four statures x two families: the grid the reference plate authorises, filled.
 			// Broadleaves carry a bias below 1: hornbeam and beech sit under the spruce in a
 			// Pontic stand, and their wide dome needs less height to read than a spire does.
-			MakeVariant(TreeMeshUnderstory, EAnastasisStatureClass::Understory, EAnastasisFoliageFamily::Conifer, 1.00f, VegetationMaterialPath),
-			MakeVariant(TreeMeshBroadleafUnder, EAnastasisStatureClass::Understory, EAnastasisFoliageFamily::Broadleaf, 0.90f, VegetationMaterialPath),
-			MakeVariant(TreeMeshSubcanopy, EAnastasisStatureClass::Subcanopy, EAnastasisFoliageFamily::Conifer, 1.00f, VegetationMaterialPath),
-			MakeVariant(TreeMeshBroadleafSub, EAnastasisStatureClass::Subcanopy, EAnastasisFoliageFamily::Broadleaf, 0.92f, VegetationMaterialPath),
-			MakeVariant(TreeMeshCanopy, EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Conifer, 1.00f, VegetationMaterialPath),
-			MakeVariant(TreeMeshBroadleafCanopy, EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Broadleaf, 0.85f, VegetationMaterialPath),
-			MakeVariant(TreeMeshEmergent, EAnastasisStatureClass::Emergent, EAnastasisFoliageFamily::Conifer, 1.35f, VegetationMaterialPath),
-			MakeVariant(TreeMeshBroadleafEmergent, EAnastasisStatureClass::Emergent, EAnastasisFoliageFamily::Broadleaf, 1.12f, VegetationMaterialPath),
+			MakeVariant(TreeMeshUnderstory, EAnastasisStatureClass::Understory, EAnastasisFoliageFamily::Conifer, 1.00f, VegetationMaterialPath, BarkMaterialPath),
+			MakeVariant(TreeMeshBroadleafUnder, EAnastasisStatureClass::Understory, EAnastasisFoliageFamily::Broadleaf, 0.90f, VegetationMaterialPath, BarkMaterialPath),
+			MakeVariant(TreeMeshSubcanopy, EAnastasisStatureClass::Subcanopy, EAnastasisFoliageFamily::Conifer, 1.00f, VegetationMaterialPath, BarkMaterialPath),
+			MakeVariant(TreeMeshBroadleafSub, EAnastasisStatureClass::Subcanopy, EAnastasisFoliageFamily::Broadleaf, 0.92f, VegetationMaterialPath, BarkMaterialPath),
+			MakeVariant(TreeMeshCanopy, EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Conifer, 1.00f, VegetationMaterialPath, BarkMaterialPath),
+			MakeVariant(TreeMeshBroadleafCanopy, EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Broadleaf, 0.85f, VegetationMaterialPath, BarkMaterialPath),
+			MakeVariant(TreeMeshEmergent, EAnastasisStatureClass::Emergent, EAnastasisFoliageFamily::Conifer, 1.35f, VegetationMaterialPath, BarkMaterialPath),
+			MakeVariant(TreeMeshBroadleafEmergent, EAnastasisStatureClass::Emergent, EAnastasisFoliageFamily::Broadleaf, 1.12f, VegetationMaterialPath, BarkMaterialPath),
 		}));
 
 	// Ruin is unchanged, lean included: a wall stub is a manufactured thing and stands plumb.

@@ -236,6 +236,13 @@ bool ResolvePresentation(
 	Out.VariantIndex = VariantIndex;
 	Out.Mesh = Mesh;
 	Out.MaterialOverride = Variant.MaterialOverride.IsNull() ? nullptr : Variant.MaterialOverride.LoadSynchronous();
+	Out.AdditionalMaterials.Reset(Variant.AdditionalMaterialOverrides.Num());
+	for (const TSoftObjectPtr<UMaterialInterface>& Slot : Variant.AdditionalMaterialOverrides)
+	{
+		// A null entry is kept, not skipped: the index IS the slot number, so dropping one
+		// would silently shift every material after it onto the wrong part of the mesh.
+		Out.AdditionalMaterials.Add(Slot.IsNull() ? nullptr : Slot.LoadSynchronous());
+	}
 	Out.ScaleBias = FMath::IsFinite(Variant.ScaleBias) && Variant.ScaleBias > 0.0f ? Variant.ScaleBias : 1.0f;
 	return true;
 }

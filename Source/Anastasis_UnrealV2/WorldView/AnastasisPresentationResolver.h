@@ -41,6 +41,8 @@ namespace AnastasisPresentation
 		int32 VariantIndex = INDEX_NONE;
 		UStaticMesh* Mesh = nullptr;
 		UMaterialInterface* MaterialOverride = nullptr;
+		/** Loaded materials for slots 1..N. Empty for a single-slot mesh. */
+		TArray<UMaterialInterface*> AdditionalMaterials;
 		/** The chosen variant's ScaleBias, to be handed back to ResolveInstanceTransform. */
 		float ScaleBias = 1.0f;
 	};

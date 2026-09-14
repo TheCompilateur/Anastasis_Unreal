@@ -25,6 +25,9 @@ import unreal
 
 REGISTRY_PATH = "/Game/Anastasis/Presentation/DA_AnastasisPresentation"
 VEGETATION_MATERIAL = "/Game/Anastasis/Materials/M_AnastasisVegetation"
+# Slot 1 de chaque mesh d'arbre. Le bois n'est pas une feuille : Default Lit,
+# opaque, mat -- distinct du feuillage deux faces du slot 0.
+BARK_MATERIAL = "/Game/Anastasis/Materials/M_AnastasisBark"
 MESH_DIR = "/Game/Anastasis/Vegetation/"
 
 # Enveloppe d'echelle de l'entree. Multipliee par les facteurs de strate de
@@ -86,6 +89,10 @@ def build_variants():
     if material is None:
         raise Exception("materiau introuvable %s -- lancer d'abord "
                         "tools/unreal/create_tree_asset.py" % VEGETATION_MATERIAL)
+    bark = unreal.EditorAssetLibrary.load_asset(BARK_MATERIAL)
+    if bark is None:
+        raise Exception("materiau introuvable %s -- lancer d'abord "
+                        "tools/unreal/create_tree_asset.py" % BARK_MATERIAL)
     out = []
     for mesh_name, stature_name, family_name, bias in VARIANTS:
         path = MESH_DIR + mesh_name
@@ -96,6 +103,7 @@ def build_variants():
         variant = unreal.AnastasisPresentationVariant()
         variant.set_editor_property("mesh", mesh)
         variant.set_editor_property("material_override", material)
+        variant.set_editor_property("additional_material_overrides", [bark])
         variant.set_editor_property("stature", enum_value("AnastasisStatureClass", stature_name))
         variant.set_editor_property("family", enum_value("AnastasisFoliageFamily", family_name))
         variant.set_editor_property("scale_bias", bias)
@@ -114,7 +122,11 @@ def describe(entry):
             bias = round(float(variant.get_editor_property("scale_bias")), 4)
         except Exception:
             st, fam, bias = "<absent>", "<absent>", None
-        rows.append("%s/%s/%s/%s" % (mesh.get_name() if mesh else "NONE", st, fam, bias))
+        try:
+            extra = len(variant.get_editor_property("additional_material_overrides"))
+        except Exception:
+            extra = "<absent>"
+        rows.append("%s/%s/%s/%s/+%s" % (mesh.get_name() if mesh else "NONE", st, fam, bias, extra))
     try:
         lean = round(float(entry.get_editor_property("max_lean_degrees")), 3)
     except Exception:
@@ -182,9 +194,13 @@ def verify():
         log("VERIFY FOREST %s" % describe(entry))
         statures = {str(v.get_editor_property("stature")) for v in variants}
         families = {str(v.get_editor_property("family")) for v in variants}
-        ok = len(variants) == len(VARIANTS) and len(statures) == 4 and len(families) == 2
-        log("VERIFY variants=%d attendu=%d statures=%d attendu=4 familles=%d attendu=2 -> %s"
-            % (len(variants), len(VARIANTS), len(statures), len(families), "OK" if ok else "MAUVAIS"))
+        slots = {len(v.get_editor_property("additional_material_overrides")) for v in variants}
+        ok = (len(variants) == len(VARIANTS) and len(statures) == 4 and len(families) == 2
+              and slots == {1})
+        log("VERIFY variants=%d attendu=%d statures=%d attendu=4 familles=%d attendu=2 "
+            "slots_supplementaires=%s attendu={1} -> %s"
+            % (len(variants), len(VARIANTS), len(statures), len(families),
+               sorted(slots), "OK" if ok else "MAUVAIS"))
         return ok
     log("VERIFY::FAIL entree FOREST disparue")
     return False
