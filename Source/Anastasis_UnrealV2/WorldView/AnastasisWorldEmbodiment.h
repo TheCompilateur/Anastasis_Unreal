@@ -126,8 +126,19 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UMaterialInterface> SliceMaterial;
 
-	/** Materiau de tranche s'il est present dans Content, sinon repli sur BaseShapeMaterial. */
-	UMaterialInterface* ResolveSliceMaterial();
+	/** Instance de sol morphologique (MI_AnastasisGround) : porte les valeurs artistiques. */
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> GroundMaterial;
+
+	/**
+	 * Materiau pose sur la surface. Ordre : instance de sol (anastasis.Terrain.GroundMaterial 1),
+	 * puis materiau de tranche historique, puis BaseShapeMaterial. Le nom retenu est journalise
+	 * dans ANASTASIS_TERRAIN : un repli silencieux n'existe pas.
+	 */
+	UMaterialInterface* ResolveGroundMaterial();
+
+	/** Materiau de la nappe d'eau : toujours celui de la tranche. L'eau est hors perimetre. */
+	UMaterialInterface* ResolveWaterMaterial();
 
 	AnastasisWorldView::FWorldVisualSnapshot Snapshot;
 	AnastasisWorldView::FPlan Plan;

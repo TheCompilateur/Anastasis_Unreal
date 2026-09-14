@@ -28,7 +28,7 @@ struct FAnastasisPresentationEntry;
  */
 namespace AnastasisPresentation
 {
-	/** Fixed path + code fallback, the same convention AAnastasisWorldEmbodiment::ResolveSliceMaterial already uses for M_AnastasisSlice. */
+	/** Fixed path + code fallback, the same convention AAnastasisWorldEmbodiment::ResolveGroundMaterial already uses for the ground material. */
 	inline constexpr const TCHAR* RegistryAssetPath = TEXT("/Game/Anastasis/Presentation/DA_AnastasisPresentation.DA_AnastasisPresentation");
 
 	/** UE BasicShapes (Cube/Cone/Cylinder/...) share this bounding size by convention; see AnastasisWorldDebugVisual::CubeMeshSize for the cube case this mirrors. */
