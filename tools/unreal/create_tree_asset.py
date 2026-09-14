@@ -62,18 +62,24 @@ NORMALISE_TOLERANCE = 0.01
 # Palette. Pontique humide : ecorce sombre et mouillee, aiguilles froides et
 # desaturees, feuillage plus clair et plus jaune -- c'est ce contraste qui fait
 # lire conifere contre feuillu a distance, pas la forme seule.
+#
+# L'ALPHA N'EST PAS DE LA COULEUR : c'est le masque de feuillage. 0 sur le bois,
+# 1 sur les masses foliaires. M_AnastasisVegetation s'en sert pour ne laisser la
+# lumiere traverser QUE le feuillage -- sans lui, le modele d'ombrage deux faces
+# rendrait aussi les troncs translucides, et un fut qui laisse passer le jour
+# cesse de peser.
 # L'ecorce est mesuree sur la planche anti-arnaque, pas choisie a l'estime : sous
 # le soleil neutre du banc (75000 lux, EV100 14), un lineaire de 0.13 remonte a
 # ~0.40 en sRGB, c'est-a-dire du beige. Un fut pontique est mouille et sombre, et
 # il doit rester lisible CONTRE le sol clair autant que contre le feuillage.
-BARK_DARK = unreal.LinearColor(0.062, 0.046, 0.035, 1.0)
-BARK_OLD = unreal.LinearColor(0.090, 0.076, 0.064, 1.0)
-NEEDLE_DARK = unreal.LinearColor(0.040, 0.094, 0.055, 1.0)
-NEEDLE_MID = unreal.LinearColor(0.058, 0.120, 0.066, 1.0)
+BARK_DARK = unreal.LinearColor(0.062, 0.046, 0.035, 0.0)   # alpha 0 : du bois, opaque
+BARK_OLD = unreal.LinearColor(0.090, 0.076, 0.064, 0.0)   # alpha 0 : du bois, opaque
+NEEDLE_DARK = unreal.LinearColor(0.040, 0.094, 0.055, 1.0)   # alpha 1 : du feuillage, traverse par la lumiere
+NEEDLE_MID = unreal.LinearColor(0.058, 0.120, 0.066, 1.0)   # alpha 1 : du feuillage, traverse par la lumiere
 # Olive, pas citron : la planche de reference donne le feuillu plus CLAIR que le
 # conifere, jamais plus vif. Un vert sature ferait un decor, pas une foret humide.
-LEAF_GREEN = unreal.LinearColor(0.105, 0.160, 0.068, 1.0)
-LEAF_PALE = unreal.LinearColor(0.132, 0.188, 0.082, 1.0)
+LEAF_GREEN = unreal.LinearColor(0.105, 0.160, 0.068, 1.0)   # alpha 1 : du feuillage, traverse par la lumiere
+LEAF_PALE = unreal.LinearColor(0.132, 0.188, 0.082, 1.0)   # alpha 1 : du feuillage, traverse par la lumiere
 
 
 def log(msg):
@@ -174,6 +180,33 @@ def build_crown_lobes(lobes, color):
     for radius, cx, cy, cz, squash in lobes:
         mesh = lobe(mesh, radius, cx, cy, cz, squash)
     return coloured(mesh, color)
+
+
+# Seuil de fracture des normales, en degres.
+#
+# Sous ce seuil les facettes voisines sont lissees, au-dessus l'arete reste
+# franche. 45 deg separe exactement ce qu'il faut : les facettes radiales d'un
+# troncon (360/11 = 33 deg) et celles d'un lobe (~36 deg) se lissent, donc une
+# couronne reste ronde ; les decrochements de jupe et les jonctions bois/feuille
+# (~90 deg) restent durs.
+#
+# C'est une CORRECTION. La version precedente laissait enable_recompute_normals
+# a True dans les options de build, ce qui moyennait tout : les decrochements
+# d'etage que cette grammaire construit expres etaient ensuite lisses au rendu,
+# et le fut prenait un aspect caoutchouteux. On authore donc les normales ici,
+# et on interdit au build de les recalculer.
+SPLIT_NORMAL_ANGLE_DEG = 45.0
+
+
+def shade(mesh):
+    split = unreal.GeometryScriptSplitNormalsOptions()
+    split.set_editor_property('split_by_opening_angle', True)
+    split.set_editor_property('opening_angle_deg', SPLIT_NORMAL_ANGLE_DEG)
+    split.set_editor_property('split_by_face_group', False)
+    calc = unreal.GeometryScriptCalculateNormalsOptions()
+    calc.set_editor_property('angle_weighted', True)
+    calc.set_editor_property('area_weighted', True)
+    return unreal.GeometryScript_Normals.compute_split_normals(mesh, split, calc)
 
 
 def normalise(mesh, name):
@@ -376,7 +409,10 @@ def build_family(spec):
     mesh = unreal.DynamicMesh()
     for part in parts:
         mesh = merge(mesh, part)
-    return normalise(mesh, spec["name"])
+    # Fractionner APRES la fusion : les aretes qui comptent le plus sont celles
+    # entre deux sous-parties (bois contre feuillage), et elles n'existent pas
+    # tant que les morceaux sont separes.
+    return shade(normalise(mesh, spec["name"]))
 
 
 def save_static_mesh(mesh, asset_path):
@@ -384,7 +420,10 @@ def save_static_mesh(mesh, asset_path):
         unreal.EditorAssetLibrary.delete_asset(asset_path)
 
     options = unreal.GeometryScriptCreateNewStaticMeshAssetOptions()
-    options.set_editor_property("enable_recompute_normals", True)
+    # FAUX AMI : a True, le build recalcule et JETTE les normales fractionnees
+    # authorees par shade(). Le mesh repartirait tout lisse et .5b n'aurait
+    # servi a rien -- sans la moindre erreur pour le signaler.
+    options.set_editor_property("enable_recompute_normals", False)
     options.set_editor_property("enable_recompute_tangents", True)
     # Nanite reste OFF : le pipeline est HISM + LOD, et la direction artistique
     # refuse une feature qui n'a pas gagne son existence.
@@ -418,8 +457,33 @@ def save_static_mesh(mesh, asset_path):
     return asset
 
 
+# Teinte de transmission. Une feuille a contre-jour vire au vert-jaune : la
+# lumiere qui la traverse perd le bleu. On multiplie donc la couleur de base par
+# ce facteur plutot que de peindre une seconde couleur a la main -- ainsi un
+# conifere sombre transmet sombre et un hetre clair transmet clair, sans avoir a
+# tenir deux palettes coherentes entre elles.
+#
+# CALIBRE, PAS CHOISI. Un premier jet a (2.6, 2.1, 0.8) faisait virer les
+# feuillus au citron et effacait la masse sombre des coniferes : la transmission
+# ne revelait plus le volume, elle eclaircissait tout. C'est precisement
+# l'oversaturation que la direction artistique refuse, et une passe qui gagne en
+# spectacle ce qu'elle perd en matiere n'est pas un gain. La chaleur reste donc
+# juste au-dessus de 1 : visible la ou la couronne est fine et a contre-jour,
+# invisible ailleurs.
+TRANSMISSION_WARMTH = unreal.LinearColor(1.5, 1.25, 0.55, 1.0)
+
+
 def ensure_material():
-    """VertexColor -> BaseColor, rugosite et specular fixes.
+    """VertexColor -> BaseColor, et surtout : feuillage deux faces.
+
+    Une masse de feuillage opaque lit comme du plastique, quelle que soit sa
+    silhouette. Le modele MSM_TWO_SIDED_FOLIAGE laisse la lumiere TRAVERSER la
+    couronne, ce que la planche de reference appelle "lumiere filtree" et
+    "volumetrie". C'est le seul changement qui transforme l'image sans toucher
+    un seul sommet.
+
+    L'alpha des sommets sert de masque : 0 sur le bois, 1 sur le feuillage. Sans
+    ce masque, les troncs deviendraient translucides eux aussi.
 
     Deliberement distinct de M_AnastasisSlice, qui appartient a observe-slice.py
     et sert le sol : partager un materiau entre le sol et la vegetation lierait
@@ -433,12 +497,25 @@ def ensure_material():
         MATERIAL_NAME, MATERIAL_DIR, unreal.Material, unreal.MaterialFactoryNew())
     mel = unreal.MaterialEditingLibrary
 
-    vc = mel.create_material_expression(mat, unreal.MaterialExpressionVertexColor, -600, 0)
+    vc = mel.create_material_expression(mat, unreal.MaterialExpressionVertexColor, -900, 0)
     wired = False
+    base_output = None
     for out_name in ('', 'RGB', 'Color'):
         if mel.connect_material_property(vc, out_name, unreal.MaterialProperty.MP_BASE_COLOR):
             wired = 'output=' + repr(out_name)
+            base_output = out_name
             break
+
+    # Transmission = couleur de base x chaleur x masque de feuillage.
+    warm = mel.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -900, 220)
+    warm.set_editor_property('constant', TRANSMISSION_WARMTH)
+    tinted = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -600, 140)
+    mel.connect_material_expressions(vc, base_output if base_output is not None else '', tinted, 'A')
+    mel.connect_material_expressions(warm, '', tinted, 'B')
+    masked = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -380, 140)
+    mel.connect_material_expressions(tinted, '', masked, 'A')
+    mel.connect_material_expressions(vc, 'A', masked, 'B')
+    r_sss = mel.connect_material_property(masked, '', unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
 
     rough = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -350, 260)
     rough.set_editor_property('r', 0.82)
@@ -449,10 +526,21 @@ def ensure_material():
     r_spec = mel.connect_material_property(spec, '', unreal.MaterialProperty.MP_SPECULAR)
 
     # Deux faces : les etages de couronne sont des troncons fins vus des deux
-    # cotes des qu'on entre sous le couvert.
+    # cotes des qu'on entre sous le couvert. Le modele feuillage l'exige de toute
+    # facon -- la transmission n'a de sens que si la face arriere est rendue.
     mat.set_editor_property('two_sided', True)
 
-    log("MATERIAL wiring base_color=%s roughness=%s specular=%s" % (wired, r_rough, r_spec))
+    shading = 'ABSENT'
+    try:
+        mat.set_editor_property('shading_model', unreal.MaterialShadingModel.MSM_TWO_SIDED_FOLIAGE)
+        shading = str(mat.get_editor_property('shading_model'))
+    except Exception as exc:  # noqa: BLE001
+        log('WARN modele d ombrage non pose: %s' % exc)
+
+    # Relu depuis l'asset, pas suppose : un set_editor_property qui echoue en
+    # silence laisserait un materiau opaque et .5a n'aurait servi a rien.
+    log("MATERIAL wiring base_color=%s subsurface=%s roughness=%s specular=%s shading=%s"
+        % (wired, r_sss, r_rough, r_spec, shading))
     mel.recompile_material(mat)
     unreal.EditorAssetLibrary.save_asset(MATERIAL_PATH)
     log("MATERIAL saved " + MATERIAL_PATH)

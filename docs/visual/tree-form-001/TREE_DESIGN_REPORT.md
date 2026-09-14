@@ -14,6 +14,8 @@ Deux passes :
 - **Passe 2 — espèce.** Le mélange conifère / feuillu cesse d'être un tirage aveugle et
   devient une lecture du site (`Shade`, `Wetness`). Huit silhouettes, quatre statures × deux
   familles. C'était le NEXT TARGET de la passe 1.
+- **Passe 2.5 — ombrage.** La géométrie faisait son travail, le rendu non. Feuillage deux
+  faces + normales fractionnées. Aucun sommet déplacé, aucune ligne de C++ touchée.
 
 ---
 
@@ -281,6 +283,99 @@ elle le fait de 6 % à 86 %.
 Tout est reproductible : même seed, même monde ⇒ même arbre au même endroit, à chaque
 lancement.
 
+## 7ter. Passe 2.5 — l'ombrage, sans toucher un sommet
+
+Constat avant : **les couronnes étaient des solides opaques à ombrage lissé**, éclairés par
+une seule constante de rugosité. Une masse de feuillage qui ne laisse pas passer la lumière
+lit comme du plastique, quelle que soit sa silhouette — et c'était l'écart le plus net au
+canon pontique (« lumière filtrée », « jeux d'ombres, volumétrie »).
+
+### .5a — Modèle d'ombrage : `MSM_TWO_SIDED_FOLIAGE`
+
+`M_AnastasisVegetation` passe du Default Lit au feuillage deux faces. La lumière traverse
+désormais la couronne : les étages bas reçoivent ce que les étages hauts laissent passer.
+
+La transmission n'est pas une seconde couleur peinte à la main — elle est **dérivée** de la
+couleur de base :
+
+```
+SubsurfaceColor = VertexColor.rgb x TRANSMISSION_WARMTH x VertexColor.a
+```
+
+Un conifère sombre transmet sombre, un hêtre clair transmet clair, sans avoir à tenir deux
+palettes cohérentes entre elles. Une feuille à contre-jour perd le bleu, d'où la chaleur.
+
+**L'alpha des sommets devient un masque de feuillage** : 0 sur le bois, 1 sur les masses
+foliaires. Sans lui, le modèle deux faces rendrait aussi les troncs translucides — et un fût
+qui laisse passer le jour cesse de peser exactement autant que le tronc invisible que la
+passe 1 avait corrigé. Le canal était libre : la palette l'écrivait à 1 partout.
+
+**Calibré, pas choisi.** Un premier jet à `TRANSMISSION_WARMTH = (2.6, 2.1, 0.8)` faisait
+virer les feuillus au citron et effaçait la masse sombre des conifères : la transmission
+n'y révélait plus le volume, elle éclaircissait tout. C'est l'oversaturation que
+`P1_6_PONTIC_BYZANTINE_ART_DIRECTION.md` refuse nommément, et une passe qui gagne en
+spectacle ce qu'elle perd en matière n'est pas un gain. Ramené à `(1.5, 1.25, 0.55)` :
+visible là où la couronne est fine et à contre-jour, invisible ailleurs.
+
+### .5b — Normales : dures où la forme décroche, douces où elle tourne
+
+C'est une **correction d'un défaut introduit en passe 1**, pas une amélioration. Les options
+de build portaient `enable_recompute_normals = True`, qui moyenne tout : les décrochements
+de jupe que la grammaire construit exprès étaient ensuite lissés au rendu, et le fût prenait
+un aspect caoutchouteux.
+
+```
+compute_split_normals(opening_angle_deg = 45)
+enable_recompute_normals = False      <-- sans ça, le build jette le travail ci-dessus
+```
+
+45° sépare exactement ce qu'il faut : les facettes radiales d'un tronçon (360/11 = 33°) et
+celles d'un lobe (~36°) se lissent, donc une couronne reste ronde ; les décrochements
+d'étage et les jonctions bois/feuille (~90°) restent francs.
+
+Le faux ami mérite d'être nommé : à `True`, l'option de build aurait **jeté en silence** les
+normales authorées — aucune erreur, aucun avertissement, et .5b n'aurait servi à rien. C'est
+la sonde d'API qui l'a montré, pas la lecture du code.
+
+### Preuve — refaite, pas recopiée
+
+`main` a bougé pendant cette passe : `ea87acc`
+(*le relief se lit — tessellation et morphologie*) a landé un terrain entièrement neuf sous
+mes arbres. La preuve prise avant ce commit ne décrivait donc plus ce qui est sur le disque.
+
+Branche rebasée sur `ea87acc`, puis **les deux captures refaites sur le terrain courant** :
+
+- `C_close_after.png` — assets de la passe 2, terrain post-forge
+- `D_shading_after.png` — assets .5a/.5b, **même terrain, même caméra, même seed**
+
+Les assets « avant » ont été restitués depuis git (`git checkout ea87acc -- …`) puis rendus,
+et l'état .5 restauré depuis git également — jamais par régénération, pour qu'aucune dérive
+d'octets ne puisse s'glisser entre la capture et ce qui est committé.
+
+Les captures `A_*` et `C_wide_after.png` datent d'avant le forge de terrain : elles
+documentent les passes 1 et 2, déjà scellées dans `main`, et ne sont **pas** comparables à
+`D`. Elles sont conservées comme historique, pas comme référence.
+
+Sur `B_stature_board.png` (banc neutre, sol plat, insensible au forge), .5b est sans
+ambiguïté : chaque étage est une bande nette à arête franche, l'intérieur des couronnes reste
+lisse.
+
+Après rebase : **62 PASS / 4 KNOWN_EXPECTED_FAILURE / 0 FAIL** (2 tests de plus, apportés par
+le forge), `TREE_PIVOT variants_checked=8`, et surtout `ground_error=0.000000000` — les
+arbres reposent exactement sur le sol tessellé neuf, sans que rien n'ait eu à changer côté
+végétation.
+
+### Un défaut cherché et non trouvé
+
+Des entailles sombres apparaissaient dans la surface au premier plan de `D_shading_after.png`.
+Vérification à courte distance (caméra `3500,4700,880`, pitch −28) : ce sont des **ombres dans
+des plis concaves**, pas des trous — la surface est continue. Noté ici parce qu'un défaut
+supposé et non vérifié vaut moins que rien, et parce que le prochain à regarder cette capture
+se posera la même question.
+
+Aucun C++ modifié : `BUILD` inchangé, et la suite reste à 60 PASS / 4 KNOWN_EXPECTED_FAILURE
+/ 0 FAIL, `TREE_PIVOT variants_checked=8`, `ground_error=0.000000000`.
+
 ## 8. Intégration Unreal
 
 L'architecture n'a **pas** été réécrite. HISM reste le motif ; il y a maintenant un
@@ -347,9 +442,10 @@ monde 96×96, mode surface. Aucun fog, aucun coucher de soleil, aucun étalonnag
 
 | Fichier | Caméra | Contenu |
 |---|---|---|
-| `A_close_before.png` | `(3050,4250,1100)` pitch −15 yaw 45 | **AVANT** — cônes identiques, aucun tronc |
-| `C_close_after.png` | **identique** | **APRÈS** — même monde, même caméra |
+| `A_close_before.png` | `(3050,4250,1100)` pitch −15 yaw 45 | **AVANT** passe 1 — cônes identiques, aucun tronc (terrain pré-forge) |
+| `C_close_after.png` | **identique** | passes 1+2, **terrain post-forge** — le « avant » de la passe .5 |
 | `B_stature_board.png` | banc dédié, arc | les 8 silhouettes par paires strate×famille + ruine 0,9 m + repère 1,8 m |
+| `D_shading_after.png` | **identique à C close** | après .5a/.5b, terrain post-forge — feuillage deux faces, normales fractionnées |
 | `A_before_cone.png` | caméra monde scellée | avant, lecture macro |
 | `C_wide_after.png` | **identique** | après, lecture macro |
 
@@ -412,6 +508,15 @@ Constatées, pas corrigées — elles sortent du mandat ou méritent leur propre
    corrigée.
 8. **Le sol reste pâle et lavé** sous le soleil du banc, ce qui affaiblit le contraste des
    troncs. `M_AnastasisSlice` appartient au chantier matériaux en cours.
+9. **L'écorce est rendue par un modèle d'ombrage de feuillage.** Le masque alpha annule bien
+   sa transmission, mais `MSM_TWO_SIDED_FOLIAGE` change la réponse diffuse de *tous* les
+   pixels du matériau : sur la planche neutre, à fond clair et ciel ouvert, les fûts
+   remontent en valeur par rapport à la passe 2. Dans la vraie scène ils restent sombres et
+   lisibles, donc ce n'est pas bloquant — mais c'est sémantiquement faux. Le correctif propre
+   est deux slots de matériau (écorce en Default Lit, feuillage en deux faces), ce qui
+   demande un `material_id` par sous-partie dans le générateur **et** que
+   `AAnastasisWorldEmbodiment::PlaceDressing` pose aussi le slot 1 — il n'écrit que le slot 0
+   aujourd'hui. C'est la prochaine consolidation, pas un correctif de cette passe.
 
 ## 13. NEXT TARGET recommandé — non exécuté
 
@@ -440,6 +545,8 @@ stature.
 [x] hauteur cohérente avec l'échelle du monde          97–627 uu contre 91 uu de ruine
 [x] les arbres ne paraissent pas clonés                8 meshes x biais x inclinaison, déterministes
 [x] l'espèce répond au terrain                         p_conifer 0,06 -> 0,86 selon Shade/Wetness
+[x] la lumière traverse le feuillage                   MSM_TWO_SIDED_FOLIAGE, transmission masquée par l'alpha
+[x] les décrochements d'étage survivent au rendu       normales fractionnées a 45 deg, build ne recalcule plus
 [x] lecture claire à distance                          C_wide_after.png, caméra scellée
 [x] résultat stylisé                                   pas de photoréalisme, pas de Nanite
 [x] aucune refonte terrain                             AnastasisTerrainSurface intact
