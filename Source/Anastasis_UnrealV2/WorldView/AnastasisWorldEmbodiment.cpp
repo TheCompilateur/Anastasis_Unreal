@@ -139,6 +139,94 @@ bool AAnastasisWorldEmbodiment::Embody(uint32 Seed, int32 Width, int32 Height)
 	return EmbodyCrop(Seed, 0, 0, Width, Height);
 }
 
+void AAnastasisWorldEmbodiment::PlaceDressing(
+	uint32 Seed, const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop)
+{
+	for (UHierarchicalInstancedStaticMeshComponent* Mesh : DressingMeshes)
+	{
+		if (Mesh)
+		{
+			Mesh->ClearInstances();
+		}
+	}
+
+	DressingInstanceCount = 0;
+	int32 UngroundedTiles = 0;
+	for (int32 Index = 0; Index < Plan.TileCount; ++Index)
+	{
+		const AnastasisWorldView::FVisualTile& SourceTile = Snapshot.Tiles[Index];
+		AnastasisPresentation::FResolvedPresentation Resolved;
+		if (!AnastasisPresentation::ResolvePresentation(
+				Plan.Types[Index], Seed, SourceTile.X, SourceTile.Y, Resolved))
+		{
+			continue;
+		}
+
+		UHierarchicalInstancedStaticMeshComponent* Mesh = GetOrCreateDressingMesh(Resolved);
+		if (!Mesh)
+		{
+			continue;
+		}
+		// Re-applied every embodiment: the data asset may have changed since the last one.
+		if (Mesh->GetStaticMesh() != Resolved.Mesh)
+		{
+			Mesh->SetStaticMesh(Resolved.Mesh);
+		}
+		if (Resolved.MaterialOverride)
+		{
+			Mesh->SetMaterial(0, Resolved.MaterialOverride);
+		}
+		else if (BaseShapeMaterial)
+		{
+			UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
+			Mid->SetVectorParameterValue(TEXT("Color"), Resolved.Entry->Tint);
+			Mesh->SetMaterial(0, Mid);
+		}
+
+		FTransform InstanceTransform = AnastasisPresentation::ResolveInstanceTransform(
+			*Resolved.Entry, Seed, SourceTile.X, SourceTile.Y, Plan.Alts[Index]);
+
+		// Le resolver a place l'instance a l'altitude de la TUILE, plus son lift de pivot.
+		// Le jitter XY, lui, l'a deplacee jusqu'a 30 UU sur une tuile de 100 : sur une pente
+		// elle n'est donc plus au-dessus du sol qu'elle vise. On releve le lift depuis la
+		// transform du resolver -- on ne le recalcule pas, pour ne pas creer une deuxieme
+		// source de verite sur le pivot -- et on rebase ce lift sur le sol reel.
+		const FVector Placed = InstanceTransform.GetLocation();
+		const double TileGroundZ = Plan.Alts[Index] * AnastasisWorldView::AltitudeScale;
+		const double PivotLift = Placed.Z - TileGroundZ;
+
+		double GroundZ = 0.0;
+		if (SurfaceCrop)
+		{
+			if (!AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, Placed.X, Placed.Y, GroundZ))
+			{
+				// Pas de sol rendu sous ce point : on ne pose rien. Une instance suspendue
+				// au-dessus du vide serait un mensonge visuel, pas un placeholder.
+				++UngroundedTiles;
+				continue;
+			}
+		}
+		else
+		{
+			GroundZ = TileGroundZ + AnastasisWorldDebugVisual::SlabTopOffsetZ;
+		}
+
+		InstanceTransform.SetLocation(FVector(Placed.X, Placed.Y, GroundZ + PivotLift));
+		Mesh->AddInstance(InstanceTransform, false);
+		++DressingInstanceCount;
+	}
+	for (UHierarchicalInstancedStaticMeshComponent* Mesh : DressingMeshes)
+	{
+		if (Mesh)
+		{
+			Mesh->MarkRenderStateDirty();
+		}
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_DRESSING ground=%s instances=%d refused_ungrounded=%d"),
+		SurfaceCrop ? TEXT("surface") : TEXT("slab"), DressingInstanceCount, UngroundedTiles);
+}
+
 bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 OriginY, int32 Width, int32 Height)
 {
 	if (Width <= 0 || Height <= 0)
@@ -215,58 +303,10 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
 	// registry, not from this file. Orthogonal to the DEBUG/Surface ground toggle below --
 	// presence is decided by Plan.Types (simulation truth) plus the data entry's bEnabled
 	// flag, never by which ground representation is currently active.
-	for (UHierarchicalInstancedStaticMeshComponent* Mesh : DressingMeshes)
-	{
-		if (Mesh)
-		{
-			Mesh->ClearInstances();
-		}
-	}
-
-	DressingInstanceCount = 0;
-	for (int32 Index = 0; Index < Plan.TileCount; ++Index)
-	{
-		const AnastasisWorldView::FVisualTile& SourceTile = Snapshot.Tiles[Index];
-		AnastasisPresentation::FResolvedPresentation Resolved;
-		if (!AnastasisPresentation::ResolvePresentation(
-				Plan.Types[Index], Seed, SourceTile.X, SourceTile.Y, Resolved))
-		{
-			continue;
-		}
-
-		UHierarchicalInstancedStaticMeshComponent* Mesh = GetOrCreateDressingMesh(Resolved);
-		if (!Mesh)
-		{
-			continue;
-		}
-		// Re-applied every embodiment: the data asset may have changed since the last one.
-		if (Mesh->GetStaticMesh() != Resolved.Mesh)
-		{
-			Mesh->SetStaticMesh(Resolved.Mesh);
-		}
-		if (Resolved.MaterialOverride)
-		{
-			Mesh->SetMaterial(0, Resolved.MaterialOverride);
-		}
-		else if (BaseShapeMaterial)
-		{
-			UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
-			Mid->SetVectorParameterValue(TEXT("Color"), Resolved.Entry->Tint);
-			Mesh->SetMaterial(0, Mid);
-		}
-
-		const FTransform InstanceTransform = AnastasisPresentation::ResolveInstanceTransform(
-			*Resolved.Entry, Seed, SourceTile.X, SourceTile.Y, Plan.Alts[Index]);
-		Mesh->AddInstance(InstanceTransform, false);
-		++DressingInstanceCount;
-	}
-	for (UHierarchicalInstancedStaticMeshComponent* Mesh : DressingMeshes)
-	{
-		if (Mesh)
-		{
-			Mesh->MarkRenderStateDirty();
-		}
-	}
+    // L'emprise sur laquelle la surface est REELLEMENT batie, s'il y en a une : c'est
+    // elle qui dit ou se trouve le sol, donc ce sur quoi le dressing sera pose.
+    AnastasisWorldView::FWorldVisualSnapshot BuiltSurfaceCrop;
+    bool bSurfaceBuilt = false;
 
     if (ExperimentalSurface) ExperimentalSurface->SetVisibility(false);
     for (auto& Mesh : TerrainMeshes) if (Mesh) Mesh->SetVisibility(true);
@@ -317,6 +357,8 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             }
             ExperimentalSurface->SetVisibility(true);
             for (auto& Mesh : TerrainMeshes) if (Mesh) Mesh->SetVisibility(false);
+            BuiltSurfaceCrop = Crop;
+            bSurfaceBuilt = true;
             // Emprise reelle = ce qui est reellement rendu, pas Plan : en mode 1 la tranche
             // canonique meme si Plan couvre le monde, en mode 2 l emprise incarnee entiere.
             ActiveFootprintBounds = AnastasisWorldView::SnapshotBounds(Crop);
@@ -340,6 +382,10 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
         ActiveFootprintBounds = AnastasisWorldView::PlanBounds(Plan);
         UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN disabled legacy_visible=1"));
     }
+    // Le dressing vient APRES la decision de terrain : on ne pose pas un objet sur un
+    // sol dont on ignore encore la forme.
+    PlaceDressing(Seed, bSurfaceBuilt ? &BuiltSurfaceCrop : nullptr);
+
     LogEmbodiment();
     return GetInstanceCount() == Plan.TileCount;
 }

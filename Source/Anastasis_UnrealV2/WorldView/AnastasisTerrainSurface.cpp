@@ -57,6 +57,40 @@ FLinearColor TileColor(const AnastasisWorldView::FVisualTile& T, double MinAlt, 
 }
 }
 
+bool AnastasisTerrainSurface::SampleHeight(
+    const AnastasisWorldView::FWorldVisualSnapshot& Crop, double WorldX, double WorldY, double& OutZ)
+{
+    OutZ = 0.0;
+    const int32 W = Crop.W, H = Crop.H;
+    if (W < 2 || H < 2 || Crop.Tiles.Num() != VerticesFor(W, H)) return false;
+    if (!FMath::IsFinite(WorldX) || !FMath::IsFinite(WorldY)) return false;
+
+    // Les sommets sont au CENTRE des tuiles (TileToUnreal ajoute 0.5) : le champ de
+    // hauteur ne commence donc qu'a un demi-tuile du bord de l'emprise. Au-dela il n'y
+    // a pas de face rendue -- Build n'extrapole deliberement aucune bande exterieure.
+    const double U = WorldX / AnastasisWorldView::TileWorldSize - 0.5 - static_cast<double>(Crop.OriginX);
+    const double V = WorldY / AnastasisWorldView::TileWorldSize - 0.5 - static_cast<double>(Crop.OriginY);
+    if (U < 0.0 || V < 0.0 || U > static_cast<double>(W - 1) || V > static_cast<double>(H - 1)) return false;
+
+    const int32 X = FMath::Clamp(static_cast<int32>(FMath::FloorToDouble(U)), 0, W - 2);
+    const int32 Y = FMath::Clamp(static_cast<int32>(FMath::FloorToDouble(V)), 0, H - 2);
+    const double Fx = U - static_cast<double>(X), Fy = V - static_cast<double>(Y);
+
+    const int32 A = Y * W + X, B = A + 1, C = A + W, D = C + 1;
+    const double ZA = Crop.Tiles[A].Alt * AnastasisWorldView::AltitudeScale;
+    const double ZB = Crop.Tiles[B].Alt * AnastasisWorldView::AltitudeScale;
+    const double ZC = Crop.Tiles[C].Alt * AnastasisWorldView::AltitudeScale;
+    const double ZD = Crop.Tiles[D].Alt * AnastasisWorldView::AltitudeScale;
+    if (!FMath::IsFinite(ZA) || !FMath::IsFinite(ZB) || !FMath::IsFinite(ZC) || !FMath::IsFinite(ZD)) return false;
+
+    // Build emet {A,C,B} puis {B,C,D} : la diagonale est B-C. Fx+Fy <= 1 tombe dans le
+    // premier triangle, le reste dans le second. Chaque branche evalue le plan de sa face.
+    OutZ = (Fx + Fy <= 1.0)
+        ? ZA + Fx * (ZB - ZA) + Fy * (ZC - ZA)
+        : ZD + (1.0 - Fx) * (ZC - ZD) + (1.0 - Fy) * (ZB - ZD);
+    return FMath::IsFinite(OutZ);
+}
+
 bool AnastasisTerrainSurface::Build(const AnastasisWorldView::FWorldVisualSnapshot& Crop, FGeometry& Out)
 {
     Out = FGeometry{};

@@ -78,6 +78,19 @@ protected:
 	TMap<FName, int32> DressingSlotByKey;
 
 	/** The HISM for one resolved look, created and registered on first use. */
+	/**
+	 * Pose les instances de dressing sur le sol REELLEMENT rendu.
+	 *
+	 * SurfaceCrop non nul = la surface continue est batie sur cette emprise : chaque
+	 * instance lit la hauteur interpolee sous sa position jittee, et une tuile hors de
+	 * l'emprise rendue ne recoit rien -- elle n'a pas de sol.
+	 * SurfaceCrop nul = chemin DEBUG : le sol est le dessus de la dalle de la tuile.
+	 *
+	 * Appelee APRES la decision de terrain, pas avant : on ne peut pas poser un objet
+	 * sur un sol dont on ignore encore la forme.
+	 */
+	void PlaceDressing(uint32 Seed, const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop);
+
 	UHierarchicalInstancedStaticMeshComponent* GetOrCreateDressingMesh(
 		const AnastasisPresentation::FResolvedPresentation& Resolved);
 

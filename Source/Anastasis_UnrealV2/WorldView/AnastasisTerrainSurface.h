@@ -50,4 +50,21 @@ struct FGeometry
 };
 
 bool Build(const AnastasisWorldView::FWorldVisualSnapshot& Crop, FGeometry& Out);
+
+/**
+ * Hauteur du sol REELLEMENT RENDU au point monde (X,Y), en unites Unreal.
+ *
+ * Pas l'altitude de la tuile : la surface est triangulee, donc entre deux sommets
+ * le sol est un plan incline, pas une marche. Tout ce qu'on pose dessus -- arbres,
+ * ruines, plus tard un pion -- doit lire CETTE hauteur, sinon l'objet flotte ou
+ * s'enfonce d'autant que la pente locale.
+ *
+ * L'echantillon suit exactement la triangulation de Build : la cellule est coupee
+ * sur la diagonale B-C, donc le point est evalue sur le plan du triangle qui le
+ * contient, pas sur une bilineaire qui ne correspondrait a aucune face rendue.
+ *
+ * Renvoie false hors de l'emprise -- il n'y a alors pas de sol, et rien ne doit y
+ * etre pose. C'est un refus, pas un zero.
+ */
+bool SampleHeight(const AnastasisWorldView::FWorldVisualSnapshot& Crop, double WorldX, double WorldY, double& OutZ);
 }
