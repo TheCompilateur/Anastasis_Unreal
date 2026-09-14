@@ -140,6 +140,35 @@ multiplicateurs, bande de cadence, intervalle.
 `logicalLod.js`, l'autre moitié de la vague 3, n'est pas porté : il agrège l'état du
 village (habitants, bâtiments) et suivra ses systèmes.
 
+### Fait — percolation du monde
+
+| Unreal | Source JS |
+| --- | --- |
+| `World/AnastasisPercolation.h/.cpp` | `src/sim/percolation.js` |
+
+Répond à une question que l'A* répondait mal : cette case est-elle dans le **même monde
+piétonnier** que le hameau. La référence raconte la mesure qui l'a fait naître — des
+chantiers ouvraient au cœur d'un massif, cernés d'arbres debout, matériaux livrés, et pas
+une pièce posée pendant 55 jours.
+
+La connexité est **strictement celle de l'A*** : huit voisins, diagonale refusée si elle
+coupe un coin bloqué. La référence prévient qu'« un champ qui mentirait sur ce point serait
+pire que pas de champ du tout ».
+
+D'où un second test qui ne compare pas deux portages mais deux **systèmes portés** :
+`Parite.PercolationAccordA` vérifie sur trois vrais mondes que deux cases d'une même
+composante se rejoignent par l'A*, et que deux cases de composantes différentes ne se
+rejoignent jamais. Il attrape une classe d'erreur que les vecteurs laissent passer : un
+portage où les deux côtés auraient la **même** règle de coin fausse resterait vert en
+parité, et faux.
+
+Tests mesurés 2026-09-14 : `Parite.Percolation` / `Parite.PercolationAccordA` **PASS**
+(suite `Anastasis.Sim` : 22 PASS, 2 KNOWN_EXPECTED_FAILURE, 0 FAIL). Vecteurs :
+`tools/migration/gen-percolation-vectors.mjs` — 3 mondes, 38 composantes, 270 sondes.
+
+Non porté : le cache `sim._walkComponents`, invalidé par `navVersion`. C'est une question de
+coût, pas de causalité, et le C++ n'a pas encore le compteur qui porte l'invalidation.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules
