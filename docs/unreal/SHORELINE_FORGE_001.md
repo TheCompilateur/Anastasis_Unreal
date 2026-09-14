@@ -281,14 +281,15 @@ Anastasis.Terrain.WorldExtent      Success
 ...Automation Test Queue Empty 7 tests performed.
 ```
 
-La suite `Anastasis` complète, cette fois, et rapportée en **trois catégories**
-comme `AGENTS.md` l'exige — un `Success` sur un test marqué n'est pas un `PASS` :
+La suite `Anastasis` complète sur `main` à `ce537ff`, rapportée en **trois
+catégories** comme `AGENTS.md` l'exige — un `Success` sur un test marqué n'est
+pas un `PASS` :
 
 ```
-PASS                  : 58
+PASS                  : 68
 KNOWN_EXPECTED_FAILURE: 2      Anastasis.Sim.Parite.Fbm, Anastasis.Sim.Parite.SemantiqueJs
 FAIL                  : 0
-TOTAL                 : 60
+TOTAL                 : 70
 ```
 
 Les deux entrées connues sont celles du registre `known-expected-failures.txt`,
@@ -338,6 +339,26 @@ pas une divergence à corriger, c'est ce qu'une emprise veut dire — même clas
 fait que « la palette est relative à l'emprise » dans `TERRAIN_SURFACE_EXTENT`.
 La **profondeur** et le **courant**, eux, sont identiques dans les deux emprises,
 et le test l'exige.
+
+## Défauts de capture trouvés et corrigés ici
+
+Quatre, tous découverts **en regardant les images**, aucun deviné :
+
+1. **`HighResShot 1920x1080` sur un viewport 1280×720 force le rendu en tuiles**,
+   et sur le maillage forgé (288 800 triangles) n'écrit **aucun fichier et aucune
+   erreur**. C'est trait pour trait le `KNOWN_DEBT` n°1 de
+   `TERRAIN_SURFACE_EXTENT.md` (« HighResShot ne rend rien en mode 2 »), resté
+   sans cause depuis. La capture se demande désormais à la taille du viewport.
+   **Cette cause vaut pour tout le projet, pas seulement pour cette mission.**
+2. **Le matériau de rive est translucide : ses shaders compilent au premier rendu
+   qui l'utilise**, et pendant ce temps la demande de capture est perdue
+   silencieusement. Symptôme : toutes les captures `Mode 0` passent, toutes les
+   `Mode 1` échouent. Attente portée de 9 s à 45 s, fenêtre à 300 s.
+3. **Une caméra posée sur l'altitude tuilée se retrouve enterrée** sous le sol
+   forgé. Elle se réfère désormais au niveau de la mer, seule cote que la forge ne
+   déplace pas — et même ainsi, elle doit dépasser le relief local (cf. GATE 7).
+4. **Le piqué de caméra se déduit** de `atan(up/back)` au lieu d'être choisi : un
+   piqué à la main visait 650 uu derrière le site.
 
 ## Défaut trouvé dans l'outillage partagé, signalé et NON corrigé
 
@@ -424,13 +445,19 @@ sous le même soleil, à la même exposition ; seule change
 Le gain n'est donc **pas uniforme selon la distance**, et le dire fait partie du
 résultat.
 
-**GATE 7 n'est pas re-démontrée visuellement après le rebasage.** Les trois
-familles existent et sont mesurées sur le maillage forgé
-(`soft=677 steep=1751 flowing=992`, sites imprimés par le test), et le test échoue
-si l'une disparaît. Mais la pose de cadrage `_W` dépasse le site et cadre une
-crête : les paires obtenues ne montrent pas d'eau, et elles ne sont **pas**
-versées. Une image de coteau étiquetée « variante de rive » serait une preuve
-fausse. Le correctif est de cadrage, pas de rive.
+**GATE 7 n'est pas démontrée visuellement, et la cause est identifiée.** Les
+trois familles existent et sont mesurées sur le maillage forgé
+(`soft=677 steep=1751 flowing=992`, sites imprimés, test bloquant). Mais quatre
+cadrages successifs ont échoué, et le dernier a livré le diagnostic : **le yaw de
+la caméra est figé à 45°**, alors que l'eau peut être dans n'importe quelle
+direction depuis un site donné. La diagonale convient au site TYPE_A, qui borde
+un bassin large, et échoue sur un chenal encaissé en pays haut.
+
+Le correctif n'est pas un réglage de plus : le test doit émettre, avec chaque
+site, la **direction locale de l'eau**, et la caméra s'orienter dessus. C'est une
+mesure, comme les sites. Détail des quatre tentatives dans le README des
+captures. Aucune image de variante n'est versée : étiqueter du relief
+« variante de rive » serait une preuve fausse.
 
 **Aucun élément décoratif n'a été ajouté.** Pas une plante, pas une pierre. Le
 gain visible vient entièrement de la forme lue et de la matière, ce que la

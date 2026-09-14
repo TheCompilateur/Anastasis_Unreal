@@ -106,29 +106,42 @@ def register(name, loc, pitch, yaw=45.0, fov=75.0):
 #       MID       la bande de rive dans son contexte de terrain
 #       CLOSE     la meme rive, 620 uu plus pres : la coupure se voit ou pas
 #       GAMEPLAY  la meme rive, ramenee a hauteur d'oeil au-dessus de l'eau
-def register_family(name, site, back=900.0, up=760.0, pitch=-27.0):
+def register_family(name, site, back=900.0, up=760.0):
+    """Pose les trois vues d'un site. Le PIQUE SE CALCULE, il ne se choisit pas.
+
+    Un recul `back` et une hauteur `up` determinent entierement l'angle qui vise
+    le site : atan(up / back). Passer le pique en parametre a ete l'erreur qui a
+    coute les deux paires de variantes -- avec back=1700, up=1700 et un pique de
+    -40 choisi a la main, le rayon de visee touchait le sol 650 uu DERRIERE le
+    site et cadrait une crete. Un cadrage ne se regle pas a l'oeil quand il peut
+    se deduire.
+
+    La hauteur est reference au NIVEAU DE LA MER, pas a l'altitude de la tuile :
+    TERRAIN_FORGE exagere le relief, et une camera posee sur l'altitude tuilee se
+    retrouvait enterree sous le sol forge. Le plan d'eau, lui, reste a SeaLevel
+    quoi qu'il arrive.
+    """
     d = back * 0.70710678
-    # La hauteur est reference au NIVEAU DE LA MER, pas a l'altitude de la tuile.
-    # TERRAIN_FORGE exagere le relief (jusqu'a z=1667 sur ce monde) : une camera
-    # posee sur l'altitude tuilee du site se retrouvait ENTERREE sous le relief
-    # forge, et photographiait l'envers de la geometrie. Le plan d'eau, lui, reste
-    # a SeaLevel quoi qu'il arrive -- c'est la seule cote stable a laquelle une
-    # camera de rive puisse s'accrocher.
     loc = (site[0] - d, site[1] - d, WATER_PLANE_Z + up)
+    # Le site est a `back` uu a l'horizontale et `up` uu plus bas que la camera.
+    pitch = -math.degrees(math.atan2(up, back))
     register(name + '_MID', loc, pitch)
 
-    # Avance sur le rayon de visee de MID. Aucun cadrage nouveau.
+    # CLOSE et GAMEPLAY avancent sur CE rayon. On s'arrete avant le site, donc il
+    # reste au centre du cadre : aucune vue n'est cadree independamment.
     p = math.radians(pitch)
     fwd = (math.cos(p) * 0.70710678, math.cos(p) * 0.70710678, math.sin(p))
 
     def advance(metres):
         return (loc[0] + fwd[0] * metres, loc[1] + fwd[1] * metres, loc[2] + fwd[2] * metres)
 
-    register(name + '_CLOSE', advance(700.0), pitch)
-    # A hauteur d'oeil : 170 uu au-dessus du NIVEAU DE LA MER, pas au-dessus du
-    # fond -- c'est la hauteur qu'aurait un personnage debout au bord de l'eau.
-    g = advance(380.0)
-    register(name + '_GAMEPLAY', (g[0], g[1], WATER_PLANE_Z + 170.0), -9.0, fov=85.0)
+    register(name + '_CLOSE', advance(back * 0.55), pitch)
+    # A hauteur d'oeil : 170 uu au-dessus du niveau de la mer, ce qu'aurait un
+    # personnage debout au bord de l'eau. Le pique se recalcule pour cette hauteur.
+    g = advance(back * 0.35)
+    remaining = back * 0.65
+    register(name + '_GAMEPLAY', (g[0], g[1], WATER_PLANE_Z + 170.0),
+             -math.degrees(math.atan2(170.0, remaining)), fov=85.0)
 
 
 for _name, _site in SITES.items():
@@ -136,15 +149,19 @@ for _name, _site in SITES.items():
 for _name, _site in SITES_CROP.items():
     register_family(_name, _site)
 
-# Cadrage de repli, recule et plus haut. Le recul de 900 uu a 460 uu de hauteur
-# convient au site TYPE_A, qui borde un lac ouvert ; sur TYPE_B et TYPE_C, qui
-# sont des tuiles de CHENAL encaissees pres du bord est du monde, la meme regle
-# met la camera derriere une crete et photographie un talus. Ce n'est pas un
-# defaut de la rive, c'est un defaut de la regle de cadrage : une seule regle ne
-# peut pas cadrer trois topographies. Le repli monte assez haut pour qu'aucun
-# relief intermediaire ne puisse masquer le site.
+# Cadrage HAUT, pour les sites que le relief forge domine.
+#
+# TERRAIN_FORGE etale le monde sur z=[-339, 1667]. Une hauteur de camera fixe ne
+# peut donc PAS convenir partout : 760 uu au-dessus du niveau de la mer suffit
+# au-dessus d'un bassin, et enterre la camera dans une crete en pays haut -- la
+# capture rend alors l'envers de la geometrie, presque toute noire. C'est ce qui
+# est arrive aux deux sites de variante, qui sont en hauteur.
+#
+# 1900 uu passe au-dessus du point le plus haut du monde forge (1667), donc aucun
+# relief ne peut s'interposer, quel que soit le site. Le pique reste deduit, donc
+# le site reste au centre du cadre.
 for _name, _site in SITES.items():
-    register_family(_name + '_W', _site, back=1700.0, up=1700.0, pitch=-40.0)
+    register_family(_name + '_HI', _site, back=1600.0, up=1900.0)
 
 VIEWS['AERIAL'] = (-5400.0, -5400.0, 10500.0, -32.8, 45.0, 90.0)
 
@@ -207,6 +224,20 @@ unreal.log('SHORE_EMBODY=%s' % actor.call_method('EmbodyCanonical', args=(SEED,)
 # n'est jamais ecrite.
 SHOT_W, SHOT_H = 1280, 720
 
+# DELAIS. Le materiau de rive est TRANSLUCIDE : ses shaders compilent au premier
+# rendu qui l'utilise. Tant qu'ils compilent, HighResShot ne produit AUCUN fichier
+# et AUCUNE erreur -- la demande est simplement perdue. Le symptome est une
+# alternance nette : toutes les captures `Mode 0` passent, toutes les `Mode 1`
+# echouent, parce que seul le mode 1 charge ce materiau. C'est ce qui est arrive
+# apres un rebasage qui avait ajoute des materiaux de vegetation : la file de
+# compilation etait encore pleine.
+#
+# 45 s d'attente et une fenetre de 300 s ne sont pas de la prudence : c'est le
+# temps qu'il faut a cette machine, quand trois autres agents y tiennent leurs
+# editeurs ouverts.
+SETTLE_SECONDS = 45.0
+WINDOW_SECONDS = 300.0
+
 SHOT_DIR = os.path.join(unreal.Paths.project_saved_dir(), 'Screenshots')
 
 
@@ -261,7 +292,7 @@ def tick(dt):
     if phase == 0 and elapsed > 3.0:
         phase = 1
         aim()
-    elif phase == 1 and elapsed > 18.0:
+    elif phase == 1 and elapsed > SETTLE_SECONDS:
         # 18 s, pas 9. Le SkyLight de Lvl_AnastasisSlice est en capture temps reel :
         # tant qu'il n'a pas capture, les instances HISM rendent en gris neutre. Une
         # capture prise trop tot donne donc une image correctement cadree mais
@@ -283,14 +314,14 @@ def tick(dt):
             shutil.copyfile(found_png, SHOT)
             unreal.log('SHORE_SHOT_OK bytes=%d' % os.path.getsize(SHOT))
             finish('SHORE_COMPLETE')
-        elif elapsed - last_request > 12.0 and elapsed < 120.0:
+        elif elapsed - last_request > 15.0 and elapsed < WINDOW_SECONDS:
             aim()
             unreal.SystemLibrary.execute_console_command(world, 'HighResShot %dx%d' % (SHOT_W, SHOT_H))
             last_request = elapsed
             unreal.log('SHORE_SHOT_RETRY t=%.0f' % elapsed)
-        elif elapsed >= 120.0:
+        elif elapsed >= WINDOW_SECONDS:
             finish('SHORE_SHOT_MISSING dir=' + SHOT_DIR, True)
-    elif elapsed > 150.0:
+    elif elapsed > WINDOW_SECONDS + 40.0:
         finish('SHORE_TIMEOUT phase=%d' % phase, True)
 
 

@@ -2,7 +2,7 @@
 
 Preuve vivante de `docs/unreal/SHORELINE_FORGE_001.md`.
 
-**Prises sur le relief forgé** (`main` à `ea87acc`, TERRAIN_FORGE actif par
+**Prises sur le relief forgé** (`main` à `ce537ff`, TERRAIN_FORGE actif par
 défaut, 381×381 = 145 161 sommets). Les captures faites avant ce rebasage
 montraient un monde qui n'existe plus ; elles ont toutes été refaites, aucune
 n'a été recopiée.
@@ -25,12 +25,12 @@ reperdre.
 
 | Fichier | Octets | SHA-256 (16) |
 |---|---:|---|
-| `A_close_off.png` | 1 051 028 | `C75F36BCEEB592F6` |
-| `A_close_on.png` | 1 032 722 | `CBB8AA98E8E5CFC6` |
-| `B_mid_off.png` | 1 238 964 | `DFB7CD3A7FE98A6C` |
-| `B_mid_on.png` | 1 245 023 | `887CC09119838E5E` |
-| `C_aerial_off.png` | 679 931 | `6536824867A344B1` |
-| `C_aerial_on.png` | 680 919 | `DA770FB66889D304` |
+| `A_close_off.png` | 974 466 | `E592BBB5176B1FC9` |
+| `A_close_on.png` | 980 864 | `787A31A04B6E9A7F` |
+| `B_mid_off.png` | 1 101 509 | `EA2E9A833B435F35` |
+| `B_mid_on.png` | 1 100 320 | `BADD72B2E66CCA72` |
+| `C_aerial_off.png` | 678 514 | `92ED5EB6983FA5A7` |
+| `C_aerial_on.png` | 679 755 | `98D9F1DE2BA1EEFD` |
 
 ## Caméras
 
@@ -65,8 +65,9 @@ ajouté : la carte n'est pas devenue plus bruyante.
 
 ## Ce qui n'est PAS dans ce dossier, et pourquoi
 
-**Les variantes de rive (GATE 7) ne sont pas re-démontrées visuellement.** Les
-trois familles sont **mesurées** sur le maillage forgé et le test les exige :
+**Les variantes de rive (GATE 7) ne sont pas démontrées visuellement.** Les trois
+familles sont **mesurées** sur le maillage forgé, et le test échoue si l'une
+disparaît :
 
 ```
 TERRAIN_SHORELINE_FORGED_FAMILIES soft=677 steep=1751 flowing=992
@@ -75,14 +76,30 @@ TERRAIN_SHORELINE_FORGED_SITE TYPE_B_flowing_edge   (8200,1200)  flatness=0.738 
 TERRAIN_SHORELINE_FORGED_SITE TYPE_C_steep_bank     (7350,1625)  flatness=0.083 flow=0.000
 ```
 
-Mais la pose de cadrage `_W` (recul 1700, hauteur 1700, pitch −40) **dépasse le
-site** et cadre une crête : les deux paires obtenues ne montrent pas d'eau. Elles
-ne sont pas versées ici — une image de coteau étiquetée « variante de rive »
-serait une preuve fausse, et c'est pire qu'une preuve absente.
+Mais **aucun cadrage n'a réussi à les photographier**, en quatre tentatives, et
+la cause est maintenant identifiée — ce n'est pas un défaut de la rive :
 
-Le correctif est de cadrage, pas de rive : la pose doit se dériver du site forgé
-comme le font `A_close` / `B_mid`, au lieu d'un recul fixe. C'est la première
-chose à refaire.
+| Tentative | Pose | Ce qu'elle a rendu | Cause |
+|---|---|---|---|
+| 1 | recul fixe, hauteur fixe, pique choisi | un talus | le rayon tombait 650 uu derrière le site |
+| 2 | pique **déduit** de `atan(up/back)` | presque noir | caméra **enterrée** : ce site est en pays haut, le relief forgé y monte à 1667 |
+| 3 | hauteur 1900, au-dessus du point le plus haut du monde | une pente nue | l'eau n'est pas dans la direction regardée |
+| 4 | — | — | **le yaw est figé à 45°** |
+
+Le fond du problème est là : **un yaw fixe ne peut pas cadrer un site de rive
+quelconque.** L'eau peut être dans n'importe quelle direction depuis la caméra.
+Un yaw diagonal convient au site TYPE_A, qui borde un bassin large, et échoue sur
+un chenal étroit encaissé.
+
+Le correctif n'est pas un réglage de plus : il faut que le test émette, avec
+chaque site, la **direction locale de l'eau** — par exemple la direction moyenne
+vers les sommets immergés voisins — et que la caméra s'oriente dessus au lieu de
+prendre la diagonale. C'est une mesure, comme les sites eux-mêmes ; c'est ce qui
+manque, et c'est petit.
+
+En attendant, **aucune image de variante n'est versée ici.** Les quatre paires
+obtenues montrent du relief, pas de la rive : les étiqueter « variantes de rive »
+serait une preuve fausse, ce qui est pire qu'une preuve absente.
 
 ## Reproduire
 
