@@ -65,41 +65,30 @@ ajouté : la carte n'est pas devenue plus bruyante.
 
 ## Ce qui n'est PAS dans ce dossier, et pourquoi
 
-**Les variantes de rive (GATE 7) ne sont pas démontrées visuellement.** Les trois
-familles sont **mesurées** sur le maillage forgé, et le test échoue si l'une
-disparaît :
+**Les variantes de rive (GATE 7) ne sont toujours pas photographiées.** Les trois
+familles sont mesurées sur le maillage forgé et le test échoue si l'une
+disparaît. Ce qui manquait était le **cadrage**, et trois des quatre inconnues
+ont été résolues — en les mesurant, pas en les réglant :
 
-```
-TERRAIN_SHORELINE_FORGED_FAMILIES soft=677 steep=1751 flowing=992
-TERRAIN_SHORELINE_FORGED_SITE TYPE_A_soft_wet_bank  (6200,6350)  flatness=1.000 flow=0.000
-TERRAIN_SHORELINE_FORGED_SITE TYPE_B_flowing_edge   (8200,1200)  flatness=0.738 flow=0.945
-TERRAIN_SHORELINE_FORGED_SITE TYPE_C_steep_bank     (7350,1625)  flatness=0.083 flow=0.000
-```
-
-Mais **aucun cadrage n'a réussi à les photographier**, en quatre tentatives, et
-la cause est maintenant identifiée — ce n'est pas un défaut de la rive :
-
-| Tentative | Pose | Ce qu'elle a rendu | Cause |
+| Inconnue | Avant | Maintenant | Ce que la mesure a révélé |
 |---|---|---|---|
-| 1 | recul fixe, hauteur fixe, pique choisi | un talus | le rayon tombait 650 uu derrière le site |
-| 2 | pique **déduit** de `atan(up/back)` | presque noir | caméra **enterrée** : ce site est en pays haut, le relief forgé y monte à 1667 |
-| 3 | hauteur 1900, au-dessus du point le plus haut du monde | une pente nue | l'eau n'est pas dans la direction regardée |
-| 4 | — | — | **le yaw est figé à 45°** |
+| **direction** de l'eau | yaw figé à 45° | `water_yaw` mesuré par site | TYPE_A est à 41.2° — la diagonale marchait **par accident** ; les autres sites étaient à 50° près |
+| **hauteur** de dégagement | 760 uu fixes | `clear_z` mesuré par site | il faut 891 uu ici, 1527 là : une hauteur fixe enterre la caméra |
+| **bordure** du monde | ignorée | sites à < 2500 uu du bord écartés | la caméra recule autant qu'elle monte et **sortait de la carte** (y = −560) |
+| **échelle** du sujet | recul unique | *non résolu* | les deux familles non-A sont des **chenaux étroits en ravin** : au recul MID ils ne font qu'un filet |
 
-Le fond du problème est là : **un yaw fixe ne peut pas cadrer un site de rive
-quelconque.** L'eau peut être dans n'importe quelle direction depuis la caméra.
-Un yaw diagonal convient au site TYPE_A, qui borde un bassin large, et échoue sur
-un chenal étroit encaissé.
+Le yaw se déduit du barycentre des sommets immergés moins celui des émergés ; la
+hauteur du point le plus haut du relief dans un rayon de 900 uu. Les deux sortent
+du marqueur `TERRAIN_SHORELINE_FORGED_SITE` à chaque exécution.
 
-Le correctif n'est pas un réglage de plus : il faut que le test émette, avec
-chaque site, la **direction locale de l'eau** — par exemple la direction moyenne
-vers les sommets immergés voisins — et que la caméra s'oriente dessus au lieu de
-prendre la diagonale. C'est une mesure, comme les sites eux-mêmes ; c'est ce qui
-manque, et c'est petit.
+Reste donc une seule inconnue, et elle est nommée : **le recul doit suivre la
+taille du sujet.** Un bassin large se cadre à 900 uu, un chenal de ravin demande
+d'être beaucoup plus près — et la vue rapprochée, elle, bute encore sur la
+capture. C'est la prochaine mesure à ajouter : la largeur locale du plan d'eau.
 
-En attendant, **aucune image de variante n'est versée ici.** Les quatre paires
-obtenues montrent du relief, pas de la rive : les étiqueter « variantes de rive »
-serait une preuve fausse, ce qui est pire qu'une preuve absente.
+**Aucune image de variante n'est versée.** Les frames obtenues montrent du relief
+avec un filet d'eau ; les étiqueter « variantes de rive » serait une preuve
+fausse, ce qui reste pire qu'une preuve absente.
 
 ## Reproduire
 

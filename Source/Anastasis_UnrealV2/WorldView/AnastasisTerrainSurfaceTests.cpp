@@ -797,6 +797,16 @@ bool FAnastasisTerrainShoreline::RunTest(const FString&)
                 const double D = Forged.WaterUV0[I].X;
                 if (D <= 0.0 || D >= 1.0) continue;              // hors marge
                 const int32 X = I % FW, Y = I / FW;
+                // Ecarter les rives de BORDURE. Un site a moins de 2500 uu du bord
+                // du monde n'est pas cadrable : la camera doit reculer d'autant
+                // qu'elle monte pour degager le relief, et elle sort alors de la
+                // carte -- elle photographie le vide et la tranche du maillage.
+                // C'est ce qui est arrive au site TYPE_B, a 1200 uu du bord sud.
+                // Ce n'est pas un defaut de rive : une rive de bordure est de
+                // toute facon contaminee par la coupe du monde.
+                const int32 MarginVerts = 100;                    // 2500 uu a 25 uu/sommet
+                if (X < MarginVerts || Y < MarginVerts
+                    || X >= FW - MarginVerts || Y >= Mesh.FineH - MarginVerts) continue;
                 // Un vrai bord d'eau : au moins un voisin emerge.
                 bool bEdge = false;
                 for (int32 DY = -1; DY <= 1 && !bEdge; ++DY)
@@ -814,13 +824,76 @@ bool FAnastasisTerrainShoreline::RunTest(const FString&)
                 if (F > BestSoft) { BestSoft = F; SoftI = I; }
                 if (F < BestSteep) { BestSteep = F; SteepI = I; }
             }
+            // DIRECTION LOCALE DE L'EAU.
+            //
+            // C'est la donnee qui manquait a la preuve visuelle. Un site suffit a
+            // dire OU regarder, pas DANS QUEL SENS : quatre cadrages ont echoue
+            // parce que la camera visait toujours la diagonale (yaw 45), alors que
+            // l'eau peut etre dans n'importe quelle direction depuis un site. Une
+            // diagonale convient a un bassin large et manque un chenal encaisse.
+            //
+            // On mesure donc, autour du site, le barycentre des sommets IMMERGES
+            // moins celui des sommets EMERGES : le vecteur va de la terre vers
+            // l'eau. La camera se posera a l'oppose et regardera le long de ce
+            // vecteur -- terre au premier plan, trait de cote au milieu, eau au
+            // fond. Le cadrage cesse d'etre un reglage et devient une mesure.
+            //
+            // Rayon 20 sommets fins = 500 uu : assez pour voir de quel cote est la
+            // masse d'eau, assez peu pour rester local a la rive.
+            auto WaterYawAt = [&](int32 Index) -> double
+            {
+                const int32 X = Index % FW, Y = Index / FW;
+                const int32 R = 20;
+                FVector2D Wet(0, 0), Dry(0, 0);
+                int32 NWet = 0, NDry = 0;
+                for (int32 DY = -R; DY <= R; ++DY)
+                    for (int32 DX = -R; DX <= R; ++DX)
+                    {
+                        const int32 NX = X + DX, NY = Y + DY;
+                        if (NX < 0 || NY < 0 || NX >= FW || NY >= Mesh.FineH) continue;
+                        const FVector& Q = Forged.Vertices[NY * FW + NX];
+                        if (Q.Z < AnastasisTerrainSurface::WaterPlaneZ) { Wet += FVector2D(Q.X, Q.Y); ++NWet; }
+                        else { Dry += FVector2D(Q.X, Q.Y); ++NDry; }
+                    }
+                if (NWet == 0 || NDry == 0) return 45.0;   // pas de contraste : on ne sait pas
+                const FVector2D D = Wet / static_cast<double>(NWet) - Dry / static_cast<double>(NDry);
+                if (D.IsNearlyZero()) return 45.0;
+                return FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X));
+            };
+            // HAUTEUR DE DEGAGEMENT.
+            //
+            // Le yaw mesure a mis l'eau dans le cadre, mais la camera restait
+            // ENTERREE sur les sites en pays haut : une hauteur fixe au-dessus du
+            // niveau de la mer ne peut pas convenir a un monde qui s'etale sur
+            // z=[-339,1667]. On mesure donc le point le plus haut du relief dans un
+            // disque de rayon `back` autour du site -- tout ce que la camera peut
+            // avoir a franchir en s'y posant. Le rig prendra le maximum entre sa
+            // hauteur nominale et celle-ci.
+            //
+            // Rayon 36 sommets fins = 900 uu = le recul de la vue MID.
+            auto ClearZAt = [&](int32 Index) -> double
+            {
+                const int32 X = Index % FW, Y = Index / FW;
+                const int32 R = 36;
+                double MaxZ = AnastasisTerrainSurface::WaterPlaneZ;
+                for (int32 DY = -R; DY <= R; ++DY)
+                    for (int32 DX = -R; DX <= R; ++DX)
+                    {
+                        if (DX * DX + DY * DY > R * R) continue;
+                        const int32 NX = X + DX, NY = Y + DY;
+                        if (NX < 0 || NY < 0 || NX >= FW || NY >= Mesh.FineH) continue;
+                        MaxZ = FMath::Max(MaxZ, Forged.Vertices[NY * FW + NX].Z);
+                    }
+                return MaxZ;
+            };
             auto ForgedSite = [&](const TCHAR* Label, int32 Index)
             {
                 if (Index == INDEX_NONE) { AddInfo(FString::Printf(TEXT("TERRAIN_SHORELINE_FORGED_SITE %s ABSENT"), Label)); return; }
                 const FVector& P = Forged.Vertices[Index];
                 AddInfo(FString::Printf(
-                    TEXT("TERRAIN_SHORELINE_FORGED_SITE %s world=(%.0f,%.0f,%.0f) depth=%.3f flatness=%.3f flow=%.3f"),
-                    Label, P.X, P.Y, P.Z, Forged.WaterUV0[Index].X, Forged.WaterUV0[Index].Y, Forged.WaterUV1[Index].X));
+                    TEXT("TERRAIN_SHORELINE_FORGED_SITE %s world=(%.0f,%.0f,%.0f) depth=%.3f flatness=%.3f flow=%.3f water_yaw=%.1f clear_z=%.0f"),
+                    Label, P.X, P.Y, P.Z, Forged.WaterUV0[Index].X, Forged.WaterUV0[Index].Y,
+                    Forged.WaterUV1[Index].X, WaterYawAt(Index), ClearZAt(Index)));
             };
             ForgedSite(TEXT("TYPE_A_soft_wet_bank"), SoftI);
             ForgedSite(TEXT("TYPE_B_flowing_edge"), FlowI);

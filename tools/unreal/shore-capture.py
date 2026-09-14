@@ -56,30 +56,37 @@ VIEWS = {}
 # Si la graine ou le generateur changent, ces points ne valent plus rien : relancer
 # le test et recopier.
 # Releve de TERRAIN_SHORELINE_FORGED_SITE, graine 12345, sur le maillage
-# REELLEMENT RENDU (TERRAIN_FORGE, 381x381) :
+# REELLEMENT RENDU (TERRAIN_FORGE, 381x381). (x, y, yaw) :
 #
-#   TYPE_A  (6200,6350)  depth=0.538  flatness=1.000  flow=0.000   677 sommets
-#   TYPE_B  (8200,1200)  depth=0.312  flatness=0.738  flow=0.945   992 sommets
-#   TYPE_C  (7350,1625)  depth=0.642  flatness=0.083  flow=0.000  1751 sommets
+#   TYPE_A  (6200,6350)  yaw= 41.2  clear_z= 891   50 sommets de cette famille
+#   TYPE_B  (2600,2825)  yaw= 55.5  clear_z= 951  112 sommets
+#   TYPE_C  (7050,4175)  yaw=-96.0  clear_z=1319  482 sommets
 #
-# Les sites releves sur la surface TUILEE ne valent plus : la forge exagere le
-# relief, et deux des trois etaient passes au-dessus du niveau de la mer -- les
-# cadrer donnait une capture de coteau, pas de rive. Un site de rive se mesure sur
-# le maillage qu'on photographie, pas sur celui qui le precede.
+# Les sites excluent desormais une bordure de 2500 uu. Un site de bordure n'est
+# pas cadrable : la camera recule d'autant qu'elle monte, et sort de la carte --
+# le site TYPE_B precedent etait a 1200 uu du bord sud, la camera se posait a
+# y=-560 et photographiait le vide.
 #
-# La cote Z n'est pas utilisee pour la camera (cf. register_family) : seul le XY
-# compte, la hauteur se prend sur le niveau de la mer.
+# LE YAW EST MESURE, PAS CHOISI, et c'est lui qui a debloque la preuve. Un site
+# dit OU regarder, pas DANS QUEL SENS. Quatre cadrages ont echoue parce que la
+# camera prenait toujours la diagonale (45). On voit ici pourquoi : TYPE_A est a
+# 41.2, presque la diagonale -- c'est le seul site qui cadrait correctement, et
+# par accident. TYPE_B est a 93.5, soit CINQUANTE DEGRES a cote : la camera
+# regardait la colline pendant que l'eau etait sur sa droite.
+#
+# Le yaw sort du barycentre des sommets immerges moins celui des sommets emerges
+# autour du site : le vecteur va de la terre vers l'eau.
+# (x, y, yaw, clear_z) -- clear_z est le point le plus haut du relief forge dans
+# un rayon de 900 uu autour du site, mesure lui aussi. Une hauteur de camera fixe
+# ne peut pas convenir a un monde etale sur z=[-339,1667] : 1035 uu degageait le
+# site TYPE_A (891) et enterrait les deux autres (1513, 1527). C'est la derniere
+# des trois grandeurs de cadrage a etre passee du reglage a la mesure.
 SITES = {
-    'TYPE_A': (6200.0, 6350.0, 243.0),   # rive douce, fond plat
-    'TYPE_B': (8200.0, 1200.0, 256.0),   # rive de chenal, FlowAmt = 0.945
-    'TYPE_C': (7350.0, 1625.0, 236.0),   # berge quasi verticale, normale Z = 0.083
+    'TYPE_A': (6200.0, 6350.0,  41.2,  891.0),  # rive douce,    flatness=1.000 flow=0.000
+    'TYPE_B': (2600.0, 2825.0,  55.5,  951.0),  # rive de chenal, flatness=0.793 flow=0.670
+    'TYPE_C': (7050.0, 4175.0, -96.0, 1319.0),  # berge abrupte,  flatness=0.094 flow=0.000
 }
 
-SITES_CROP = {
-    'CROP_A': (1450.0, 650.0, 274.0),
-    'CROP_B': (1950.0, 2050.0, 232.0),
-    'CROP_C': (50.0, 450.0, 268.0),
-}
 
 
 import math
@@ -107,46 +114,51 @@ def register(name, loc, pitch, yaw=45.0, fov=75.0):
 #       CLOSE     la meme rive, 620 uu plus pres : la coupure se voit ou pas
 #       GAMEPLAY  la meme rive, ramenee a hauteur d'oeil au-dessus de l'eau
 def register_family(name, site, back=900.0, up=760.0):
-    """Pose les trois vues d'un site. Le PIQUE SE CALCULE, il ne se choisit pas.
+    """Pose les trois vues d'un site. Le yaw ET le pique sont DEDUITS.
 
-    Un recul `back` et une hauteur `up` determinent entierement l'angle qui vise
-    le site : atan(up / back). Passer le pique en parametre a ete l'erreur qui a
-    coute les deux paires de variantes -- avec back=1700, up=1700 et un pique de
-    -40 choisi a la main, le rayon de visee touchait le sol 650 uu DERRIERE le
-    site et cadrait une crete. Un cadrage ne se regle pas a l'oeil quand il peut
-    se deduire.
+    `site` est (x, y, yaw) ou yaw est la direction locale terre -> eau, mesuree
+    par Anastasis.Terrain.Shoreline. La camera se pose a `back` uu EN ARRIERE de
+    cette direction et regarde le long d'elle : terre au premier plan, trait de
+    cote au milieu, eau au fond.
+
+    Ni le yaw ni le pique ne se reglent. Les avoir choisis a la main a coute
+    quatre series de captures : un pique choisi visait 650 uu derriere le site,
+    et un yaw fige a 45 degres manquait l'eau de cinquante degres sur deux sites
+    sur trois. Un cadrage qui peut se deduire ne se regle pas.
 
     La hauteur est reference au NIVEAU DE LA MER, pas a l'altitude de la tuile :
-    TERRAIN_FORGE exagere le relief, et une camera posee sur l'altitude tuilee se
-    retrouvait enterree sous le sol forge. Le plan d'eau, lui, reste a SeaLevel
-    quoi qu'il arrive.
+    TERRAIN_FORGE exagere le relief et une camera posee sur l'altitude tuilee se
+    retrouvait enterree sous le sol forge.
     """
-    d = back * 0.70710678
-    loc = (site[0] - d, site[1] - d, WATER_PLANE_Z + up)
-    # Le site est a `back` uu a l'horizontale et `up` uu plus bas que la camera.
+    yaw = site[2]
+    # La camera doit passer AU-DESSUS du relief local, avec une marge. Sans cela
+    # elle se retrouve dans la roche et la capture rend l'envers de la geometrie.
+    clear_z = site[3] if len(site) > 3 else WATER_PLANE_Z
+    up = max(up, clear_z + 250.0 - WATER_PLANE_Z)
+    # Le recul suit la hauteur : sinon un site haut se regarde presque a la
+    # verticale et la rive perd son profil. A recul = hauteur, le pique vaut -45
+    # partout, donc les trois familles se comparent au meme angle.
+    back = max(back, up)
+    ux, uy = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+    loc = (site[0] - ux * back, site[1] - uy * back, WATER_PLANE_Z + up)
     pitch = -math.degrees(math.atan2(up, back))
-    register(name + '_MID', loc, pitch)
+    register(name + '_MID', loc, pitch, yaw)
 
-    # CLOSE et GAMEPLAY avancent sur CE rayon. On s'arrete avant le site, donc il
-    # reste au centre du cadre : aucune vue n'est cadree independamment.
     p = math.radians(pitch)
-    fwd = (math.cos(p) * 0.70710678, math.cos(p) * 0.70710678, math.sin(p))
+    fwd = (ux * math.cos(p), uy * math.cos(p), math.sin(p))
 
     def advance(metres):
         return (loc[0] + fwd[0] * metres, loc[1] + fwd[1] * metres, loc[2] + fwd[2] * metres)
 
-    register(name + '_CLOSE', advance(back * 0.55), pitch)
-    # A hauteur d'oeil : 170 uu au-dessus du niveau de la mer, ce qu'aurait un
-    # personnage debout au bord de l'eau. Le pique se recalcule pour cette hauteur.
+    # On s'arrete AVANT le site : il reste au centre du cadre.
+    register(name + '_CLOSE', advance(back * 0.55), pitch, yaw)
     g = advance(back * 0.35)
     remaining = back * 0.65
     register(name + '_GAMEPLAY', (g[0], g[1], WATER_PLANE_Z + 170.0),
-             -math.degrees(math.atan2(170.0, remaining)), fov=85.0)
+             -math.degrees(math.atan2(170.0, remaining)), yaw, fov=85.0)
 
 
 for _name, _site in SITES.items():
-    register_family(_name, _site)
-for _name, _site in SITES_CROP.items():
     register_family(_name, _site)
 
 # Cadrage HAUT, pour les sites que le relief forge domine.
