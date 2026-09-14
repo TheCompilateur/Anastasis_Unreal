@@ -4,6 +4,7 @@
 #include "WorldView/AnastasisWorldEmbodiment.h"
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisWorldDebugVisual.h"
+#include "World/AnastasisHydrology.h"
 #include "Misc/AutomationTest.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -133,7 +134,8 @@ bool FAnastasisTerrainSemantics::RunTest(const FString&)
     const auto Second = AnastasisWorldView::CropSnapshot(AnastasisWorldView::CaptureCanonicalWorld(12345), 0, 0, 32, 32);
     TestTrue(TEXT("reconstruction"), AnastasisTerrainSurface::Build(Second, Again));
     TestTrue(TEXT("classification semantique deterministe"),
-        G.Colors == Again.Colors && G.WaterVertices == Again.WaterVertices && G.WaterTriangles == Again.WaterTriangles);
+        G.Colors == Again.Colors && G.WaterVertices == Again.WaterVertices && G.WaterTriangles == Again.WaterTriangles
+        && G.UV0 == Again.UV0 && G.UV1 == Again.UV1);
 
     AddInfo(FString::Printf(TEXT("TERRAIN_SEMANTICS water_tiles=%d land_tiles=%d shore_tiles=%d water_quads=%d"),
         WaterTiles, LandTiles, ShoreTiles, G.WaterTriangles.Num() / 6));
@@ -836,4 +838,240 @@ bool FAnastasisTerrainShoreline::RunTest(const FString&)
     TestTrue(TEXT("TYPE_C rive abrupte trouvee dans le monde"), WorldSites.Z != INDEX_NONE);
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainMorphologyChannels, "Anastasis.Terrain.MorphologyChannels", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainMorphologyChannels::RunTest(const FString&)
+{
+    // Ce que le materiau de sol lit. Un canal muet ou deborde ne se voit pas a l'ecran
+    // comme une erreur : il se voit comme un sol fade, ce qu'aucun test de couleur
+    // n'attrape. On verifie donc a la fois la BORNE et la NON-VACUITE de chaque canal.
+    const auto Full = AnastasisWorldView::CaptureCanonicalWorld(12345);
+    AnastasisTerrainSurface::FGeometry G;
+    if (!TestTrue(TEXT("build monde"), AnastasisTerrainSurface::Build(Full, G))) return false;
+
+    TestEqual(TEXT("un UV0 par sommet"), G.UV0.Num(), G.Vertices.Num());
+    TestEqual(TEXT("un UV1 par sommet"), G.UV1.Num(), G.Vertices.Num());
+
+    int32 RockVerts = 0, LitterVerts = 0, WorkedVerts = 0, GrassVerts = 0, WetVerts = 0;
+    double MaxWetness = 0.0;
+    for (int32 I = 0; I < G.Vertices.Num(); ++I)
+    {
+        const double Rock = G.UV0[I].X, Litter = G.UV0[I].Y;
+        const double Worked = G.UV1[I].X, Wetness = G.UV1[I].Y;
+        const double Grass = 1.0 - Rock - Litter - Worked;
+
+        // Partition de l'unite : sans cela l'herbe, qui est le RESTE, deviendrait
+        // negative sur certaines tuiles et le materiau melangerait des poids qui ne
+        // somment plus a 1 -- un sol qui s'assombrit ou sature sans raison lisible.
+        TestTrue(TEXT("poids de famille dans [0,1]"),
+            Rock >= 0.0 && Rock <= 1.0 && Litter >= 0.0 && Litter <= 1.0
+            && Worked >= 0.0 && Worked <= 1.0 && Grass >= -KINDA_SMALL_NUMBER && Grass <= 1.0 + KINDA_SMALL_NUMBER);
+        TestTrue(TEXT("humidite dans [0,1]"), Wetness >= 0.0 && Wetness <= 1.0);
+
+        if (Rock > 0.5) ++RockVerts;
+        if (Litter > 0.5) ++LitterVerts;
+        if (Worked > 0.5) ++WorkedVerts;
+        if (Grass > 0.5) ++GrassVerts;
+        if (Wetness > 0.5) ++WetVerts;
+        MaxWetness = FMath::Max(MaxWetness, Wetness);
+    }
+
+    // Non-vacuite : les quatre familles existent reellement dans le monde canonique.
+    // Si l'une disparaissait, la grammaire de sol en revendiquerait une de trop.
+    TestTrue(TEXT("la roche existe dans le monde"), RockVerts > 0);
+    TestTrue(TEXT("la litiere existe dans le monde"), LitterVerts > 0);
+    TestTrue(TEXT("la terre travaillee existe dans le monde"), WorkedVerts > 0);
+    TestTrue(TEXT("l'herbe existe dans le monde"), GrassVerts > 0);
+    TestTrue(TEXT("l'humidite est un champ, pas une constante"), WetVerts > 0 && MaxWetness > 0.9);
+
+    // La correspondance canal <-> tuile source, verifiee sur la tuile, pas sur un total.
+    for (int32 I = 0; I < G.Vertices.Num(); ++I)
+    {
+        const auto Mix = AnastasisTerrainSurface::SurfaceMixFor(Full.Tiles[I].Type);
+        TestEqual(TEXT("UV0 = (Rock, Litter) de la tuile"), G.UV0[I], FVector2D(Mix.Rock, Mix.Litter));
+        TestEqual(TEXT("UV1.x = Worked de la tuile"), G.UV1[I].X, Mix.Worked);
+    }
+
+    AddInfo(FString::Printf(
+        TEXT("TERRAIN_MORPHOLOGY vertices=%d rock=%d litter=%d worked=%d grass=%d wet_gt_half=%d max_wetness=%.3f"),
+        G.Vertices.Num(), RockVerts, LitterVerts, WorkedVerts, GrassVerts, WetVerts, MaxWetness));
+    return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainHydrologyGradient, "Anastasis.Terrain.HydrologyGradient", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainHydrologyGradient::RunTest(const FString&)
+{
+    using AnastasisWorld::ETileType;
+
+    auto Luma = [](const FLinearColor& C)
+    {
+        return 0.2126f * C.R + 0.7152f * C.G + 0.0722f * C.B;
+    };
+
+    AnastasisWorldView::FVisualTile Dry;
+    Dry.Type = ETileType::Grass;
+    Dry.Alt = AnastasisWorld::SeaLevel + 0.02;
+    Dry.Shore = 0.0;
+    Dry.Wetness = 0.0;
+    Dry.Shade = 0.0;
+    Dry.FlowAmt = 0.0;
+
+    AnastasisWorldView::FVisualTile Flood = Dry;
+    Flood.Wetness = 0.8;
+
+    AnastasisWorldView::FVisualTile Bank = Dry;
+    Bank.Shore = 0.9;
+    Bank.Wetness = 0.85;
+
+    const double MinAlt = 0.0, MaxAlt = 1.0;
+    const FLinearColor DryColor = AnastasisTerrainSurface::TileColor(Dry, MinAlt, MaxAlt);
+    const FLinearColor FloodColor = AnastasisTerrainSurface::TileColor(Flood, MinAlt, MaxAlt);
+    const FLinearColor BankColor = AnastasisTerrainSurface::TileColor(Bank, MinAlt, MaxAlt);
+
+    TestTrue(TEXT("Wetness change la couleur sans Shore"), DryColor != FloodColor);
+    TestTrue(TEXT("la crue assombrit le sol"), Luma(FloodColor) < Luma(DryColor));
+    TestTrue(TEXT("Shore change la couleur a Wetness egale"), BankColor != FloodColor);
+    TestTrue(TEXT("la berge n'est pas une plage seche"), BankColor.R < 0.45f);
+
+    AnastasisWorldView::FVisualTile Still;
+    Still.Type = ETileType::Water;
+    Still.Shade = 0.6 + 0.4 * (-1.6);
+    Still.FlowAmt = 0.0;
+    AnastasisWorldView::FVisualTile Channel = Still;
+    Channel.FlowAmt = 0.7;
+    const FLinearColor StillColor = AnastasisTerrainSurface::TileColor(Still, MinAlt, MaxAlt);
+    const FLinearColor ChannelColor = AnastasisTerrainSurface::TileColor(Channel, MinAlt, MaxAlt);
+    TestTrue(TEXT("FlowAmt change la couleur d'eau a Shade egal"), StillColor != ChannelColor);
+    TestTrue(TEXT("eau stagnante bleue dominante"), StillColor.B > StillColor.R && StillColor.B > StillColor.G);
+    TestTrue(TEXT("eau courante bleue dominante"), ChannelColor.B > ChannelColor.R && ChannelColor.B > ChannelColor.G);
+    TestEqual(TEXT("profondeur inversee"), AnastasisTerrainSurface::WaterDepthFromShade(Still.Shade), 0.4);
+
+    const auto Full = AnastasisWorldView::CaptureCanonicalWorld(12345);
+    const auto Before = Full;
+    const auto Crop = AnastasisWorldView::CropSnapshot(Full, 0, 0, 32, 32);
+    AnastasisTerrainSurface::FGeometry G;
+    if (!TestTrue(TEXT("build crop"), AnastasisTerrainSurface::Build(Crop, G))) return false;
+    TestEqual(TEXT("TERRAIN_CONTRACT vertices"), G.Vertices.Num(), 1024);
+    TestEqual(TEXT("TERRAIN_CONTRACT triangles"), G.Triangles.Num() / 3, 1922);
+
+    int32 InlandWet = 0, SaturatedShore = 0, CropFlowing = 0, StillWater = 0;
+    for (int32 I = 0; I < Crop.Tiles.Num(); ++I)
+    {
+        const auto& T = Crop.Tiles[I];
+        if (T.Type == ETileType::Water)
+        {
+            if (T.FlowAmt >= AnastasisHydrology::WaterFlowAmtGate) ++CropFlowing;
+            else ++StillWater;
+        }
+        else
+        {
+            if (T.Wetness > 0.10 && T.Shore < 0.08) ++InlandWet;
+            if (T.Shore > 0.5) ++SaturatedShore;
+            TestEqual(TEXT("terre porte la couleur du sommet"), G.Colors[I], AnastasisTerrainSurface::TileColor(T, Crop.MinAlt, Crop.MaxAlt));
+        }
+    }
+    TestTrue(TEXT("la tranche a une vase interieure (Wetness sans Shore)"), InlandWet > 0);
+    TestTrue(TEXT("la tranche a une berge saturee"), SaturatedShore > 0);
+
+    AnastasisTerrainSurface::FGeometry WorldGeom;
+    if (!TestTrue(TEXT("build monde"), AnastasisTerrainSurface::Build(Full, WorldGeom))) return false;
+    int32 WorldFlowing = 0;
+    for (const auto& T : Full.Tiles)
+    {
+        if (T.Type == ETileType::Water && T.FlowAmt >= AnastasisHydrology::WaterFlowAmtGate) ++WorldFlowing;
+    }
+    TestTrue(TEXT("le monde a des tuiles d'ecoulement"), WorldFlowing > 0);
+
+    for (int32 I = 0; I < Full.Tiles.Num(); ++I)
+    {
+        const auto& A = Full.Tiles[I];
+        const auto& B = Before.Tiles[I];
+        TestTrue(TEXT("aucune mutation de sim"),
+            A.Type == B.Type && A.Alt == B.Alt && A.Shade == B.Shade && A.Shore == B.Shore
+            && A.Wetness == B.Wetness && A.FlowAmt == B.FlowAmt && A.FlowX == B.FlowX && A.FlowZ == B.FlowZ);
+    }
+
+    auto Invalid = Crop;
+    Invalid.Tiles[0].Wetness = std::numeric_limits<double>::quiet_NaN();
+    AnastasisTerrainSurface::FGeometry Rejected;
+    TestFalse(TEXT("refus Wetness non finie"), AnastasisTerrainSurface::Build(Invalid, Rejected));
+    TestEqual(TEXT("aucune geometrie partielle"), Rejected.Vertices.Num(), 0);
+
+    AddInfo(FString::Printf(TEXT("HYDROLOGY_GRADIENT inland_wet=%d saturated_shore=%d world_flowing=%d crop_flowing=%d still_water_crop=%d"),
+        InlandWet, SaturatedShore, WorldFlowing, CropFlowing, StillWater));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainSlopeShade, "Anastasis.Terrain.SlopeShade", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainSlopeShade::RunTest(const FString&)
+{
+    using AnastasisWorld::ETileType;
+
+    auto Luma = [](const FLinearColor& C)
+    {
+        return 0.2126f * C.R + 0.7152f * C.G + 0.0722f * C.B;
+    };
+
+    AnastasisWorldView::FVisualTile Flat;
+    Flat.Type = ETileType::Grass;
+    Flat.Alt = AnastasisWorld::SeaLevel + 0.05;
+    Flat.Shade = 0.0;
+    Flat.Shore = 0.0;
+    Flat.Wetness = 0.0;
+
+    AnastasisWorldView::FVisualTile Lit = Flat;
+    Lit.Shade = 0.8;
+    AnastasisWorldView::FVisualTile Shadowed = Flat;
+    Shadowed.Shade = -0.8;
+
+    const double MinAlt = 0.0, MaxAlt = 1.0;
+    const FLinearColor FlatColor = AnastasisTerrainSurface::TileColor(Flat, MinAlt, MaxAlt);
+    const FLinearColor LitColor = AnastasisTerrainSurface::TileColor(Lit, MinAlt, MaxAlt);
+    const FLinearColor ShadowColor = AnastasisTerrainSurface::TileColor(Shadowed, MinAlt, MaxAlt);
+
+    TestTrue(TEXT("Shade pente change la couleur a materiau egal"), LitColor != ShadowColor);
+    TestTrue(TEXT("versant eclaire plus clair que versant oppose"), Luma(LitColor) > Luma(FlatColor));
+    TestTrue(TEXT("versant oppose plus sombre que le plat"), Luma(ShadowColor) < Luma(FlatColor));
+    TestTrue(TEXT("terre reste non bleue dominante"),
+        (LitColor.B <= LitColor.R || LitColor.B <= LitColor.G)
+        && (ShadowColor.B <= ShadowColor.R || ShadowColor.B <= ShadowColor.G));
+
+    AnastasisWorldView::FVisualTile DeepWater;
+    DeepWater.Type = ETileType::Water;
+    DeepWater.Shade = 0.6 + 1.0 * (-1.6);
+    DeepWater.FlowAmt = 0.0;
+    AnastasisWorldView::FVisualTile ShallowWaterTile;
+    ShallowWaterTile.Type = ETileType::Water;
+    ShallowWaterTile.Shade = 0.6;
+    ShallowWaterTile.FlowAmt = 0.0;
+    const FLinearColor DeepColor = AnastasisTerrainSurface::TileColor(DeepWater, MinAlt, MaxAlt);
+    const FLinearColor ShallowColor = AnastasisTerrainSurface::TileColor(ShallowWaterTile, MinAlt, MaxAlt);
+    TestTrue(TEXT("sur l'eau Shade reste la profondeur"), Luma(DeepColor) < Luma(ShallowColor));
+    TestTrue(TEXT("eau profonde bleue dominante"), DeepColor.B > DeepColor.R && DeepColor.B > DeepColor.G);
+
+    const auto Full = AnastasisWorldView::CaptureCanonicalWorld(12345);
+    const auto Crop = AnastasisWorldView::CropSnapshot(Full, 0, 0, 32, 32);
+    AnastasisTerrainSurface::FGeometry G;
+    if (!TestTrue(TEXT("build"), AnastasisTerrainSurface::Build(Crop, G))) return false;
+    TestEqual(TEXT("TERRAIN_CONTRACT vertices"), G.Vertices.Num(), 1024);
+
+    int32 LandShaded = 0;
+    double MinLandShade = 1.0, MaxLandShade = -1.0;
+    for (int32 I = 0; I < Crop.Tiles.Num(); ++I)
+    {
+        const auto& T = Crop.Tiles[I];
+        TestEqual(TEXT("sommet = projection"), G.Colors[I], AnastasisTerrainSurface::TileColor(T, Crop.MinAlt, Crop.MaxAlt));
+        if (T.Type == ETileType::Water) continue;
+        MinLandShade = FMath::Min(MinLandShade, T.Shade);
+        MaxLandShade = FMath::Max(MaxLandShade, T.Shade);
+        if (FMath::Abs(T.Shade) > 0.05) ++LandShaded;
+    }
+    TestTrue(TEXT("la tranche a un relief de Shade sur la terre"), MaxLandShade > MinLandShade);
+    TestTrue(TEXT("des tuiles terrestres portent une pente non nulle"), LandShaded > 0);
+
+    AddInfo(FString::Printf(TEXT("SLOPE_SHADE land_shaded=%d shade_range=[%.6f, %.6f]"),
+        LandShaded, MinLandShade, MaxLandShade));
+    return true;
+}
+
 #endif

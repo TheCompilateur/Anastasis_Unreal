@@ -126,7 +126,18 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UMaterialInterface> SliceMaterial;
 
-	/** Materiau de tranche s'il est present dans Content, sinon repli sur BaseShapeMaterial. */
+	/** Instance de sol morphologique (MI_AnastasisGround) : porte les valeurs artistiques. */
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> GroundMaterial;
+
+	/**
+	 * Materiau pose sur la surface. Ordre : instance de sol (anastasis.Terrain.GroundMaterial 1),
+	 * puis materiau de tranche historique, puis BaseShapeMaterial. Le nom retenu est journalise
+	 * dans ANASTASIS_TERRAIN : un repli silencieux n'existe pas.
+	 */
+	UMaterialInterface* ResolveGroundMaterial();
+
+	/** Materiau de tranche historique : le repli commun du sol et de la rive. */
 	UMaterialInterface* ResolveSliceMaterial();
 
 	UPROPERTY()

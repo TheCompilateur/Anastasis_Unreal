@@ -7,6 +7,7 @@
 class AAnastasisWorldEmbodiment;
 class ACameraActor;
 class FJsonObject;
+class FViewport;
 
 /** One deterministic observation viewpoint: position, rotation, FOV, stable name. */
 struct FAnastasisCameraBookmark
@@ -105,7 +106,20 @@ private:
 	FString WriteInspectionObject(const FString& Slug, const TSharedRef<FJsonObject>& Root) const;
 	FString WriteVerificationObject(const FString& Slug, const TSharedRef<FJsonObject>& Root) const;
 	FString WriteProbeObject(const FString& Slug, const TSharedRef<FJsonObject>& Root) const;
-	void HandleScreenshotProcessed();
+	/**
+	 * Le viewport du JEU, explicitement — jamais celui de l'editeur.
+	 *
+	 * Renvoie nullptr, avec une raison, hors PIE : une capture de ce systeme est un
+	 * verdict de jeu, et le viewport de l'editeur n'est pas le jeu. Refuser est la
+	 * bonne reponse ; photographier l'editeur en silence ne l'est pas.
+	 */
+	FViewport* ResolveGameViewport(FString& OutReason) const;
+
+	/** Lit le viewport de jeu et ecrit le PNG. Synchrone : il n'y a plus rien a attendre. */
+	void CaptureGameViewportNow();
+
+	/** Ecrit le JSON apparie et journalise CAPTURE::PASS. L'image est deja sur le disque. */
+	void FinishCapture();
 	void CancelPendingCapture(const TCHAR* Reason);
 
 	TMap<FName, FAnastasisCameraBookmark> Bookmarks;
@@ -115,7 +129,8 @@ private:
 	TObjectPtr<ACameraActor> ProbeCamera;
 
 	bool bCaptureInFlight = false;
-	FDelegateHandle ScreenshotDelegateHandle;
+	/** Etat des messages d'ecran avant la prise, restaure apres : cf. CaptureGameViewportNow. */
+	bool bScreenMessagesWereEnabled = true;
 	FString PendingCaptureShotPath;
 	FString PendingCaptureJsonPath;
 	FString PendingCaptureBookmarkName;

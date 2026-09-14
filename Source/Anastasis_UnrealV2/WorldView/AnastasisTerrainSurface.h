@@ -5,10 +5,13 @@
 // are deliberately NOT extrapolated. No border halo or new altitude is needed.
 //
 // Colors and the water plane are PROJECTIONS of the snapshot, never new simulation:
-//   terre/eau  <- FVisualTile::Type
-//   profondeur <- FVisualTile::Shade   (Lerp(0.6, -1.0, Depth) cote AnastasisSim)
-//   rive       <- FVisualTile::Shore   (0 sur l'eau, decroit sur ~5 tuiles)
-//   altitude   <- FVisualTile::Alt normalisee sur le crop
+//   terre/eau     <- FVisualTile::Type
+//   profondeur    <- FVisualTile::Shade    (Lerp(0.6, -1.0, Depth) cote AnastasisSim)
+//   rive saturee  <- FVisualTile::Shore    (0 sur l'eau, decroit sur ~5 tuiles)
+//   vase / crue   <- FVisualTile::Wetness  (1 au bord, decroit sur ~6.5 tuiles)
+//   ecoulement    <- FVisualTile::FlowAmt  (eau seulement, seuil hydrologique 0.06)
+//   pente (terre) <- FVisualTile::Shade    (tanh des diffs d'altitude, [-1, 1])
+//   altitude      <- FVisualTile::Alt normalisee sur le crop
 // Le plan d'eau est plat a AnastasisWorld::SeaLevel : c'est une constante du monde,
 // pas une hauteur inventee.
 namespace AnastasisTerrainSurface
@@ -119,6 +122,30 @@ inline double ShorelineDepthAt(double TerrainZ)
 {
     return FMath::Clamp((WaterPlaneZ - TerrainZ) / ShoreDepthSpan, 0.0, 1.0);
 }
+/**
+ * Poids de familles de surface pour UN sommet. PARTITION DE L'UNITE :
+ * Rock + Litter + Worked + Herbe = 1, l'herbe etant le reste implicite.
+ *
+ * Pourquoi des poids et pas l'index de ETileType : un index est categoriel. Interpole
+ * entre deux sommets il produit des valeurs qui ne designent aucune tuile -- entre
+ * Grass(0) et Forest(4) le milieu vaut 2, c'est-a-dire Stone. Une partition, elle,
+ * reste une partition apres interpolation lineaire : le triangle entre une tuile de
+ * foret et une tuile d'herbe porte un melange des deux, ce qui est exactement la
+ * transition que le sol doit montrer au lieu d'une frontiere de tuile.
+ *
+ * Quatre familles, pas sept : c'est ce que les sept ETileType portent reellement
+ * comme matiere distincte. Scrub n'est pas une matiere a part, c'est de l'herbe avec
+ * une part de litiere ; Ruin n'est pas une matiere a part, c'est de la pierre remaniee.
+ */
+struct FSurfaceMix
+{
+    double Rock = 0.0;    // Stone, Ruin
+    double Litter = 0.0;  // Forest, et partiellement Scrub
+    double Worked = 0.0;  // Field, et marginalement Ruin
+};
+
+/** Projection de ETileType en familles. Aucune donnee nouvelle : c'est une relecture du Type. */
+FSurfaceMix SurfaceMixFor(AnastasisWorld::ETileType Type);
 
 struct FGeometry
 {
@@ -144,6 +171,24 @@ struct FGeometry
      */
     TArray<FVector2D> WaterUV0;
     TArray<FVector2D> WaterUV1;
+
+    /**
+     * Canaux morphologiques lus par le materiau de sol. La couleur de sommet ne peut
+     * pas les porter : elle est deja une couleur, et un test scelle exige qu'elle en
+     * reste une (bleue sur l'eau, jamais bleue sur la terre).
+     *
+     *   UV0 = (Rock, Litter)      familles, cf. FSurfaceMix
+     *   UV1 = (Worked, Wetness)   famille + humidite [0,1] = proximite d'eau du simulateur
+     *
+     * Ce qui n'est PAS exporte, et pourquoi : la PENTE se lit dans la normale du sommet,
+     * l'ALTITUDE dans la position monde, les COORDONNEES DE TUILE dans la position monde
+     * aussi (un sommet est au centre de sa tuile). Les exporter serait dupliquer une
+     * verite que le materiau tient deja. Shore n'est pas exporte non plus : c'est le meme
+     * champ de distance a l'eau que Wetness a un rayon plus court, et il est deja peint
+     * dans la couleur de sommet.
+     */
+    TArray<FVector2D> UV0;
+    TArray<FVector2D> UV1;
 
     /** Nappe d'eau plate : les memes sommets que le relief, Z fige a WaterPlaneZ. */
     TArray<FVector> WaterVertices;
@@ -187,4 +232,15 @@ void FillShorelineChannels(const AnastasisWorldView::FWorldVisualSnapshot& Crop,
  * etre pose. C'est un refus, pas un zero.
  */
 bool SampleHeight(const AnastasisWorldView::FWorldVisualSnapshot& Crop, double WorldX, double WorldY, double& OutZ);
+
+/**
+ * Inverse de Shade = Lerp(0.6, -1.0, Depth) cote sim. Aucune donnee nouvelle.
+ */
+double WaterDepthFromShade(double Shade);
+
+/**
+ * Projection sommet : les champs deja presents sur la tuile, rien d'invente.
+ * Palette distincte des cubes DEBUG.
+ */
+FLinearColor TileColor(const AnastasisWorldView::FVisualTile& Tile, double MinAlt, double MaxAlt);
 }

@@ -22,8 +22,13 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/WorldSettings.h"
+#include "CollisionQueryParams.h"
+#include "Engine/GameViewportClient.h"
 #include "HAL/FileManager.h"
+#include "HighResScreenshot.h"
 #include "HAL/IConsoleManager.h"
+#include "ImageCore.h"
+#include "ImageUtils.h"
 #include "Misc/App.h"
 #include "Misc/DateTime.h"
 #include "Misc/EngineVersion.h"
@@ -426,6 +431,41 @@ AAnastasisWorldEmbodiment* UAnastasisWorldProbeSubsystem::FindEmbodiment() const
 	return FirstFound;
 }
 
+/**
+ * Hauteur du sol REELLEMENT RENDU sous (X, Y), par trace de collision.
+ *
+ * Les signets calculaient leur hauteur d'oeil depuis AnastasisWorldView::TileToUnreal,
+ * c'est-a-dire depuis l'altitude de la TUILE. Depuis TERRAIN_FORGE ce n'est plus le sol :
+ * le forgeage exagere le relief, et la surface rendue passe largement au-dessus de
+ * l'altitude de tuile. Les cameras se retrouvaient donc DANS la colline -- cadre noir,
+ * capture inutilisable.
+ *
+ * Une trace descendante ne suppose rien de tout cela. Elle interroge la geometrie de
+ * collision de la surface effectivement construite, quelle que soit la CVar qui l'a
+ * produite (tuile brute, tranche scellee, ou maillage forge). C'est la meme verite que
+ * celle sur laquelle le dressing pose ses arbres.
+ *
+ * Renvoie false si rien n'est touche : l'appelant garde alors sa hauteur de tuile, ce
+ * qui est au moins l'ancien comportement et jamais pire.
+ */
+bool TraceRenderedGroundZ(const UWorld* World, const FBox& Bounds, double X, double Y, double& OutZ)
+{
+	if (!World || !Bounds.IsValid)
+	{
+		return false;
+	}
+	const FVector Start(X, Y, Bounds.Max.Z + 5000.0);
+	const FVector End(X, Y, Bounds.Min.Z - 5000.0);
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(AnastasisBookmarkGround), /*bTraceComplex*/ true);
+	if (!World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, Params))
+	{
+		return false;
+	}
+	OutZ = Hit.ImpactPoint.Z;
+	return true;
+}
+
 void UAnastasisWorldProbeSubsystem::EnsureDefaultBookmarks()
 {
 	AAnastasisWorldEmbodiment* Embodiment = FindEmbodiment();
@@ -437,7 +477,7 @@ void UAnastasisWorldProbeSubsystem::EnsureDefaultBookmarks()
 
 	if (!Embodiment)
 	{
-		for (const TCHAR* Name : {TEXT("OVERVIEW"), TEXT("GROUND"), TEXT("SHORE"), TEXT("SETTLEMENT")})
+		for (const TCHAR* Name : {TEXT("OVERVIEW"), TEXT("GROUND"), TEXT("FOREST"), TEXT("SHORE"), TEXT("SETTLEMENT")})
 		{
 			FAnastasisCameraBookmark Bookmark;
 			Bookmark.Name = FName(Name);
@@ -504,7 +544,10 @@ void UAnastasisWorldProbeSubsystem::EnsureDefaultBookmarks()
 		}
 		if (BestIndex != INDEX_NONE)
 		{
-			Bookmark.Location = Plan.Locations[BestIndex] + FVector(0.0, 0.0, 180.0);
+			const FVector GroundTile = Plan.Locations[BestIndex];
+			double GroundZ = GroundTile.Z;
+			TraceRenderedGroundZ(GetWorld(), Bounds, GroundTile.X, GroundTile.Y, GroundZ);
+			Bookmark.Location = FVector(GroundTile.X, GroundTile.Y, GroundZ + 180.0);
 			Bookmark.Rotation = FRotator(-5.0, 45.0, 0.0);
 			Bookmark.FieldOfView = 90.0f;
 			Bookmark.bReachable = true;
@@ -544,7 +587,10 @@ void UAnastasisWorldProbeSubsystem::EnsureDefaultBookmarks()
 		if (BestIndex != INDEX_NONE)
 		{
 			const AnastasisWorldView::FVisualTile& Tile = Snapshot.Tiles[BestIndex];
-			const FVector TileLoc = AnastasisWorldView::TileToUnreal(Tile.X, Tile.Y, Tile.Alt);
+			FVector TileLoc = AnastasisWorldView::TileToUnreal(Tile.X, Tile.Y, Tile.Alt);
+			double ShoreZ = TileLoc.Z;
+			TraceRenderedGroundZ(GetWorld(), Bounds, TileLoc.X, TileLoc.Y, ShoreZ);
+			TileLoc.Z = ShoreZ;
 			Bookmark.Location = TileLoc + FVector(-300.0, -300.0, 250.0);
 			Bookmark.Rotation = (TileLoc - Bookmark.Location).Rotation();
 			Bookmark.FieldOfView = 85.0f;
@@ -553,6 +599,139 @@ void UAnastasisWorldProbeSubsystem::EnsureDefaultBookmarks()
 		else
 		{
 			Bookmark.UnreachableReason = TEXT("no shoreline tile in the embodied crop (no land/water boundary)");
+		}
+		Bookmarks.Add(Bookmark.Name, Bookmark);
+	}
+
+	// FOREST: la lisiere. On se tient dans la clairiere et on REGARDE la foret.
+	//
+	// Pourquoi pas simplement une tuile Forest : le dressing ecologique pose les troncs
+	// avec un jitter a l'interieur de leur tuile, donc une camera posee sur une tuile
+	// forestiere a de bonnes chances de se retrouver dans un tronc. C'est precisement ce
+	// qui rend le signet GROUND inexploitable -- un cone vert occupe la moitie du cadre.
+	//
+	// Depuis la lisiere, le cadre porte les deux choses qu'on veut voir du sol : la
+	// litiere sous le couvert, et la transition vers l'herbe ouverte. C'est la vue que
+	// la direction artistique appelle « lisiere », et la seule qui prouve qu'une foret
+	// emerge d'un sol compatible avec elle plutot que d'etre posee dessus.
+	{
+		FAnastasisCameraBookmark Bookmark;
+		Bookmark.Name = TEXT("FOREST");
+		const AnastasisWorldView::FWorldVisualSnapshot& Snapshot = Embodiment->GetSnapshot();
+		const int32 SnapW = Snapshot.W;
+		const int32 SnapH = Snapshot.H;
+
+		// Densite de foret sur 5x5. Une tuile Forest isolee n'est pas une foret : viser
+		// le point le plus couvert donne une masse dans le cadre, pas un arbre seul.
+		auto ForestDensity = [&](int32 LocalX, int32 LocalY) -> int32
+		{
+			int32 Count = 0;
+			for (int32 DY = -2; DY <= 2; ++DY)
+			{
+				for (int32 DX = -2; DX <= 2; ++DX)
+				{
+					const int32 X = LocalX + DX;
+					const int32 Y = LocalY + DY;
+					if (X < 0 || Y < 0 || X >= SnapW || Y >= SnapH)
+					{
+						continue;
+					}
+					if (Snapshot.Tiles[Y * SnapW + X].Type == AnastasisWorld::ETileType::Forest)
+					{
+						++Count;
+					}
+				}
+			}
+			return Count;
+		};
+
+		int32 CoreIndex = INDEX_NONE;
+		int32 BestDensity = 0;
+		for (int32 Index = 0; Index < Snapshot.Tiles.Num(); ++Index)
+		{
+			const AnastasisWorldView::FVisualTile& Tile = Snapshot.Tiles[Index];
+			if (Tile.Type != AnastasisWorld::ETileType::Forest)
+			{
+				continue;
+			}
+			if (Bounds.IsValid && !Bounds.IsInsideXY(AnastasisWorldView::TileToUnreal(Tile.X, Tile.Y, Tile.Alt)))
+			{
+				continue;
+			}
+			const int32 Density = ForestDensity(Index % SnapW, Index / SnapW);
+			if (Density > BestDensity)
+			{
+				BestDensity = Density;
+				CoreIndex = Index;
+			}
+		}
+
+		if (CoreIndex == INDEX_NONE)
+		{
+			Bookmark.UnreachableReason = TEXT("no forest tile in the embodied crop");
+		}
+		else
+		{
+			// Le poste d'observation : une tuile NON forestiere, entre 3 et 6 tuiles du
+			// coeur. Plus pres, on est sous le couvert et un tronc masque le cadre ; plus
+			// loin, la litiere n'occupe plus assez de pixels pour prouver quoi que ce soit.
+			const int32 CoreX = CoreIndex % SnapW;
+			const int32 CoreY = CoreIndex / SnapW;
+			int32 StandIndex = INDEX_NONE;
+			int32 BestSpread = TNumericLimits<int32>::Max();
+			for (int32 Index = 0; Index < Snapshot.Tiles.Num(); ++Index)
+			{
+				const AnastasisWorldView::FVisualTile& Tile = Snapshot.Tiles[Index];
+				if (Tile.Type == AnastasisWorld::ETileType::Forest || Tile.Type == AnastasisWorld::ETileType::Water)
+				{
+					continue;
+				}
+				if (Bounds.IsValid && !Bounds.IsInsideXY(AnastasisWorldView::TileToUnreal(Tile.X, Tile.Y, Tile.Alt)))
+				{
+					continue;
+				}
+				const int32 Spread = FMath::Max(
+					FMath::Abs(Index % SnapW - CoreX), FMath::Abs(Index / SnapW - CoreY));
+				if (Spread < 3 || Spread > 6)
+				{
+					continue;
+				}
+				// A egalite d'anneau, la tuile la plus degagee autour d'elle.
+				if (Spread < BestSpread
+					|| (Spread == BestSpread && StandIndex != INDEX_NONE
+						&& ForestDensity(Index % SnapW, Index / SnapW)
+							< ForestDensity(StandIndex % SnapW, StandIndex / SnapW)))
+				{
+					BestSpread = Spread;
+					StandIndex = Index;
+				}
+			}
+			// Aucune clairiere a bonne distance : on se rabat sur le coeur et on le dit.
+			// Mieux vaut un signet utilisable avec un tronc qu'un signet absent.
+			const bool bFromEdge = StandIndex != INDEX_NONE;
+			const AnastasisWorldView::FVisualTile& Stand =
+				Snapshot.Tiles[bFromEdge ? StandIndex : CoreIndex];
+			const AnastasisWorldView::FVisualTile& Core = Snapshot.Tiles[CoreIndex];
+			FVector CoreLoc = AnastasisWorldView::TileToUnreal(Core.X, Core.Y, Core.Alt);
+			FVector StandLoc = AnastasisWorldView::TileToUnreal(Stand.X, Stand.Y, Stand.Alt);
+			// Le sol rendu, pas l'altitude de tuile : sinon la camera se retrouve dans la
+			// colline des que TERRAIN_FORGE exagere le relief.
+			double CoreZ = CoreLoc.Z, StandZ = StandLoc.Z;
+			TraceRenderedGroundZ(GetWorld(), Bounds, CoreLoc.X, CoreLoc.Y, CoreZ);
+			TraceRenderedGroundZ(GetWorld(), Bounds, StandLoc.X, StandLoc.Y, StandZ);
+			CoreLoc.Z = CoreZ;
+			StandLoc.Z = StandZ;
+
+			// Hauteur d'oeil, et visee sur le SOL du coeur, pas sur la canopee : le sujet
+			// de ce signet est le sol. Le regard plonge donc legerement.
+			Bookmark.Location = StandLoc + FVector(0.0, 0.0, 170.0);
+			Bookmark.Rotation = (CoreLoc - Bookmark.Location).Rotation();
+			Bookmark.FieldOfView = 85.0f;
+			Bookmark.bReachable = true;
+			UE_LOG(LogAnastasis_UnrealV2, Display,
+				TEXT("ANASTASIS_WORLD_BOOKMARK FOREST core=(%d,%d) density=%d/25 stand=(%d,%d) ring=%d from_edge=%d"),
+				Core.X, Core.Y, BestDensity, Stand.X, Stand.Y,
+				bFromEdge ? BestSpread : 0, bFromEdge ? 1 : 0);
 		}
 		Bookmarks.Add(Bookmark.Name, Bookmark);
 	}
@@ -665,7 +844,13 @@ bool UAnastasisWorldProbeSubsystem::GotoBookmark(FName Name, FString& OutReason)
 	{
 		Comp->SetFieldOfView(Bookmark->FieldOfView);
 	}
-	PC->SetViewTarget(Camera);
+	// Bascule INSTANTANEE et explicite. SetViewTarget sans parametres prend deja un
+	// BlendTime de 0, mais le dire evite qu'un reglage de projet ou une surcharge future
+	// n'introduise un fondu -- et un fondu, sur un chemin de preuve, veut dire qu'une
+	// capture peut photographier la camera du joueur en cours de route.
+	FViewTargetTransitionParams Instant;
+	Instant.BlendTime = 0.0f;
+	PC->SetViewTarget(Camera, Instant);
 
 	UE_LOG(LogAnastasis_UnrealV2, Display,
 		TEXT("ANASTASIS_WORLD_GOTO bookmark=%s loc=(%.1f,%.1f,%.1f) rot=(%.1f,%.1f,%.1f) fov=%.1f"),
@@ -1835,23 +2020,36 @@ void UAnastasisWorldProbeSubsystem::LogStatus()
 
 void UAnastasisWorldProbeSubsystem::CancelPendingCapture(const TCHAR* Reason)
 {
-	if (ScreenshotDelegateHandle.IsValid())
-	{
-		FScreenshotRequest::OnScreenshotRequestProcessed().Remove(ScreenshotDelegateHandle);
-		ScreenshotDelegateHandle.Reset();
-	}
 	UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("CAPTURE::FAIL bookmark=%s reason=%s"), *PendingCaptureBookmarkName, Reason);
 	bCaptureInFlight = false;
 }
 
-void UAnastasisWorldProbeSubsystem::HandleScreenshotProcessed()
+FViewport* UAnastasisWorldProbeSubsystem::ResolveGameViewport(FString& OutReason) const
 {
-	if (!bCaptureInFlight)
+	const UWorld* World = GetWorld();
+	if (!World)
 	{
-		return;
+		OutReason = TEXT("no world on the probe subsystem");
+		return nullptr;
 	}
-	FScreenshotRequest::OnScreenshotRequestProcessed().Remove(ScreenshotDelegateHandle);
-	ScreenshotDelegateHandle.Reset();
+	UGameViewportClient* Client = World->GetGameViewport();
+	if (!Client)
+	{
+		// Hors PIE il n'y a pas de viewport de jeu. On REFUSE plutot que de photographier
+		// le viewport de l'editeur : c'est precisement la confusion que ce chemin corrige.
+		OutReason = TEXT("no game viewport (not in PIE); this capture is a game verdict, the editor viewport is not the game");
+		return nullptr;
+	}
+	if (!Client->Viewport)
+	{
+		OutReason = TEXT("game viewport client has no FViewport yet");
+		return nullptr;
+	}
+	return Client->Viewport;
+}
+
+void UAnastasisWorldProbeSubsystem::FinishCapture()
+{
 	bCaptureInFlight = false;
 
 	if (!FPaths::FileExists(PendingCaptureShotPath))
@@ -1896,32 +2094,140 @@ void UAnastasisWorldProbeSubsystem::RequestCapture(FName BookmarkName, const FSt
 	PendingCaptureMissionName = Mission;
 	bCaptureInFlight = true;
 
-	ScreenshotDelegateHandle = FScreenshotRequest::OnScreenshotRequestProcessed().AddUObject(
-		this, &UAnastasisWorldProbeSubsystem::HandleScreenshotProcessed);
-
 	const TWeakObjectPtr<UAnastasisWorldProbeSubsystem> WeakThis(this);
 	const FString CaptureToken = PendingCaptureShotPath;
 
-	// Give the view target blend / streaming a moment to settle before the shot is taken.
-	FTSTicker::GetCoreTicker().AddTicker(TEXT("AnastasisCaptureSettle"), 0.5f, [WeakThis, CaptureToken](float) -> bool
+	// Le gestionnaire de camera applique SetViewTarget a sa prochaine mise a jour, pas
+	// dans l'appel : avant cela le viewport rend encore la vue du joueur. Une seconde
+	// couvre largement cette bascule, plus le streaming et la convergence du TAA.
+	FTSTicker::GetCoreTicker().AddTicker(TEXT("AnastasisCaptureSettle"), 1.0f, [WeakThis, CaptureToken](float) -> bool
 	{
 		UAnastasisWorldProbeSubsystem* Self = WeakThis.Get();
-		if (Self && Self->bCaptureInFlight && Self->PendingCaptureShotPath == CaptureToken)
+		if (!Self || !Self->bCaptureInFlight || Self->PendingCaptureShotPath != CaptureToken)
 		{
-			FScreenshotRequest::RequestScreenshot(Self->PendingCaptureShotPath, /*bInShowUI*/ false, /*bAddFilenameSuffix*/ false);
-			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_WORLD_CAPTURE_REQUESTED shot=%s"), *Self->PendingCaptureShotPath);
+			return false;
 		}
+		Self->CaptureGameViewportNow();
 		return false;
 	});
+}
 
-	// Fallback in case the screenshot pipeline never fires the processed delegate (e.g. no viewport).
-	FTSTicker::GetCoreTicker().AddTicker(TEXT("AnastasisCaptureTimeout"), 8.0f, [WeakThis, CaptureToken](float) -> bool
+void UAnastasisWorldProbeSubsystem::CaptureGameViewportNow()
+{
+	// ON LIT LE VIEWPORT DU JEU, on ne "demande pas une capture d'ecran".
+	//
+	// L'ancien chemin appelait FScreenshotRequest::RequestScreenshot, qui pose un
+	// drapeau GLOBAL au moteur. En PIE, deux clients de viewport dessinent chaque
+	// frame -- celui de l'editeur et celui du jeu -- et le PREMIER qui passe dans
+	// ProcessScreenShots consomme la demande et ecrit le fichier. Le resultat depend
+	// donc de l'ordre de dessin, pas de ce qu'on a demande : une capture sur trois
+	// environ rendait le viewport de l'editeur, terrain absent, geometrie de
+	// prototypage a la place, pendant que le JSON apparie restait correct.
+	//
+	// Le garde-fou prevu par le moteur pour ca, FScreenshotRequest::ShouldRestrictToGameViewport,
+	// n'est consulte que dans la branche bShowUI == true de
+	// UGameViewportClient::ProcessScreenShots (GameViewportClient.cpp, UE 5.8) ; ce
+	// chemin demande bShowUI = false, donc le drapeau y est du code mort. Le poser ne
+	// corrige rien -- cela avait ete tente et documente dans ATMOSPHERE_002.
+	//
+	// GetViewportScreenShot prend un FViewport* en parametre : la cible n'est plus une
+	// intention, c'est un argument. Il n'y a plus de course, donc plus rien a re-essayer.
+	FString Reason;
+	FViewport* Viewport = ResolveGameViewport(Reason);
+	if (!Viewport)
+	{
+		CancelPendingCapture(*Reason);
+		return;
+	}
+
+	const FIntPoint Size = Viewport->GetSizeXY();
+	if (Size.X <= 0 || Size.Y <= 0)
+	{
+		CancelPendingCapture(TEXT("game viewport has no size yet"));
+		return;
+	}
+
+	// On ne LIT PAS le back buffer courant, on demande au viewport de redessiner et de
+	// capturer lui-meme.
+	//
+	// Lire directement (GetViewportScreenShot) cible bien le bon viewport, mais au
+	// mauvais MOMENT : la lecture rendait la vue du JOUEUR, encore au PlayerStart dans
+	// la geometrie du template, parce que le SetViewTarget vers la camera de sonde
+	// n'est applique qu'a la prochaine mise a jour du gestionnaire de camera. L'ancien
+	// chemin global y echappait par accident -- sa demande etait consommee quelques
+	// frames plus tard, quand la bascule avait eu lieu.
+	//
+	// TakeHighResScreenShot pose un drapeau SUR CE VIEWPORT, force un redessin, rend des
+	// frames de chauffe et capture dans sa propre cible. Donc : bon viewport ET frame
+	// complete, avec le flou de mouvement desactive par le moteur pendant la prise.
+	// C'est le meme mecanisme que HighResShot, celui qu'utilise observe-slice.py, et qui
+	// n'a jamais rendu une image fausse sur ce projet.
+	FHighResScreenshotConfig& Config = GetHighResScreenshotConfig();
+	Config.SetFilename(PendingCaptureShotPath);
+	Config.SetMaskEnabled(false);
+	Config.SetHDRCapture(false);
+	// Resolution native : un verdict se lit a la taille ou il a ete rendu, et un
+	// multiplicateur rendrait la comparaison A/B dependante du materiel.
+	Config.SetResolution(Size.X, Size.Y, 1.0f);
+
+	// Les messages d'ecran sont coupes PENDANT la prise.
+	//
+	// Le chemin haute resolution vide le debug canvas dans l'image (UnrealClient.cpp) :
+	// tout avertissement que le moteur affiche a l'ecran se retrouve donc GRAVE dans la
+	// capture. Observe ici avec « YOUR SCENE CONTAINS A SKYDOME MESH... » en travers de
+	// la rive. Ce n'est pas un defaut du rendu, c'est du texte d'editeur dans une piece
+	// a conviction -- et une piece a conviction annotee par l'outil n'en est plus une.
+	//
+	// On restaure l'etat precedent des que le fichier est la, y compris en cas d'echec :
+	// couper les messages est une mesure de prise de vue, pas un reglage de session.
+	bScreenMessagesWereEnabled = GAreScreenMessagesEnabled;
+	GAreScreenMessagesEnabled = false;
+
+	if (!Viewport->TakeHighResScreenShot())
+	{
+		GAreScreenMessagesEnabled = bScreenMessagesWereEnabled;
+		CancelPendingCapture(TEXT("TakeHighResScreenShot refused (resolution too large?)"));
+		return;
+	}
+
+	// GetMapName, pas GetName : seul le premier porte le prefixe UEDPIE_, et c'est ce
+	// prefixe qui distingue a la lecture du journal une capture de JEU d'une capture
+	// d'editeur. Un nom ambigu dans une ligne de preuve ne prouve rien.
+	const UWorld* CaptureWorld = GetWorld();
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_WORLD_CAPTURE_VIEWPORT source=game_viewport map=%s pie=%d size=%dx%d shot=%s"),
+		CaptureWorld ? *CaptureWorld->GetMapName() : TEXT("NONE"),
+		CaptureWorld && CaptureWorld->IsPlayInEditor() ? 1 : 0,
+		Size.X, Size.Y, *PendingCaptureShotPath);
+
+	// La capture aboutit dans le dessin du viewport, pas ici : on attend le fichier.
+	const TWeakObjectPtr<UAnastasisWorldProbeSubsystem> WeakThis(this);
+	const FString CaptureToken = PendingCaptureShotPath;
+	double* Waited = new double(0.0);
+	FTSTicker::GetCoreTicker().AddTicker(TEXT("AnastasisCaptureWait"), 0.25f,
+		[WeakThis, CaptureToken, Waited](float Delta) -> bool
 	{
 		UAnastasisWorldProbeSubsystem* Self = WeakThis.Get();
-		if (Self && Self->bCaptureInFlight && Self->PendingCaptureShotPath == CaptureToken)
+		if (!Self || !Self->bCaptureInFlight || Self->PendingCaptureShotPath != CaptureToken)
 		{
-			Self->CancelPendingCapture(TEXT("timeout waiting for OnScreenshotRequestProcessed"));
+			delete Waited;
+			return false;
 		}
-		return false;
+		*Waited += Delta;
+		if (FPaths::FileExists(CaptureToken))
+		{
+			delete Waited;
+			GAreScreenMessagesEnabled = Self->bScreenMessagesWereEnabled;
+			Self->FinishCapture();
+			return false;
+		}
+		if (*Waited > 15.0)
+		{
+			delete Waited;
+			GAreScreenMessagesEnabled = Self->bScreenMessagesWereEnabled;
+			Self->CancelPendingCapture(TEXT("timeout waiting for the high-res shot to reach disk"));
+			return false;
+		}
+		return true;
 	});
 }

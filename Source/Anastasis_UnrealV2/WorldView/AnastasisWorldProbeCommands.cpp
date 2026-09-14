@@ -65,7 +65,7 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisWorldBookmark(
 
 static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisWorldGotoBookmark(
 	TEXT("Anastasis.World.GotoBookmark"),
-	TEXT("Anastasis.World.GotoBookmark <name> — moves the probe camera to a bookmark (OVERVIEW, GROUND, SHORE, SETTLEMENT, or a custom one)."),
+	TEXT("Anastasis.World.GotoBookmark <name> — moves the probe camera to a bookmark (OVERVIEW, GROUND, FOREST, SHORE, SETTLEMENT, or a custom one)."),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 	{
 		if (Args.Num() < 1)
