@@ -1036,15 +1036,24 @@ bool FAnastasisTerrainSlopeShade::RunTest(const FString&)
         (LitColor.B <= LitColor.R || LitColor.B <= LitColor.G)
         && (ShadowColor.B <= ShadowColor.R || ShadowColor.B <= ShadowColor.G));
 
-    AnastasisWorldView::FVisualTile DeepWater;
-    DeepWater.Type = ETileType::Water;
-    DeepWater.Shade = 0.6 + 1.0 * (-1.6);
-    DeepWater.FlowAmt = 0.0;
+    // Suffixe Tile, comme ShallowWaterTile juste en dessous, et pour la meme raison :
+    // AnastasisTerrainSurface.cpp declare des constantes ShallowWater et DeepWater dans
+    // son namespace anonyme. En build UNITY les deux .cpp partagent une unite de
+    // traduction, la locale masque la constante, et C4459 est une erreur ici.
+    //
+    // Le piege est qu'un worktree d'agent ne le voit pas : UBT passe en non-unity les
+    // fichiers que 'git status' voit sales, donc chacun compile isolement. ShallowWater
+    // avait deja ete renomme ; DeepWater ne l'avait pas ete, et la collision n'est
+    // apparue qu'au gate pre-push de la racine canonique, ou l'arbre est propre.
+    AnastasisWorldView::FVisualTile DeepWaterTile;
+    DeepWaterTile.Type = ETileType::Water;
+    DeepWaterTile.Shade = 0.6 + 1.0 * (-1.6);
+    DeepWaterTile.FlowAmt = 0.0;
     AnastasisWorldView::FVisualTile ShallowWaterTile;
     ShallowWaterTile.Type = ETileType::Water;
     ShallowWaterTile.Shade = 0.6;
     ShallowWaterTile.FlowAmt = 0.0;
-    const FLinearColor DeepColor = AnastasisTerrainSurface::TileColor(DeepWater, MinAlt, MaxAlt);
+    const FLinearColor DeepColor = AnastasisTerrainSurface::TileColor(DeepWaterTile, MinAlt, MaxAlt);
     const FLinearColor ShallowColor = AnastasisTerrainSurface::TileColor(ShallowWaterTile, MinAlt, MaxAlt);
     TestTrue(TEXT("sur l'eau Shade reste la profondeur"), Luma(DeepColor) < Luma(ShallowColor));
     TestTrue(TEXT("eau profonde bleue dominante"), DeepColor.B > DeepColor.R && DeepColor.B > DeepColor.G);
