@@ -119,6 +119,53 @@ Pas encore porté de cette couche : `navService.js` (cache et file de requêtes)
 les points d'accès des bâtiments (dépendent de `src/sim/urban/intent.js`, chantier urbanisme),
 les métriques et l'anneau de trace. Ils suivront leurs systèmes.
 
+### Fait — couche 3, budget de simulation (noyau causal)
+
+| Unreal | Source JS |
+| --- | --- |
+| `Core/AnastasisSimBudget.h/.cpp` | noyau causal de `src/sim/simulationBudget.js` |
+
+**C'est la référence qui trace la ligne du portage.** Son en-tête porte une loi datée du
+10/08/2026 — « la machine peut changer la vitesse à laquelle le monde est calculé, elle ne
+doit pas changer le monde qui est calculé » — née d'un bug mesuré : `pressure` était une
+moyenne mobile du temps mur, et la pression décide quels PNJ pensent. Même graine, mêmes
+ticks : population 6 contre 5, trésor 328 contre 321.
+
+Depuis, tout ce qui touche au chronomètre (`ema`, `noteSimulationBudgetFrame`,
+`frameWallMs`, `simMs`, `observedTier`, le HUD) est déclaré observation seule et ne décide
+plus rien. Ce n'est donc pas du ressort d'un module dont le contrat est le déterminisme :
+non porté, à refaire dans la couche de présentation. Reste ici ce qui décide : palier,
+multiplicateurs, bande de cadence, intervalle.
+
+`logicalLod.js`, l'autre moitié de la vague 3, n'est pas porté : il agrège l'état du
+village (habitants, bâtiments) et suivra ses systèmes.
+
+### L'atelier de vecteurs — déclarer au lieu d'écrire
+
+Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules
+valent 198 générateurs. `tools/migration/parity-kit.mjs` rend la preuve déclarative pour
+les fonctions à arguments et retours scalaires — on dit quelle fonction appeler et sur
+quelles entrées, l'atelier exécute la référence et émet le `.inl`.
+
+```bash
+node tools/migration/gen-parity.mjs simulation-budget.mjs   # ou --tous
+```
+
+Les fonctions à état — un A*, un hacheur, une boucle de tick — gardent un générateur dédié :
+leur difficulté est ailleurs que dans la plomberie.
+
+Deux pièges payés une fois, corrigés dans l'atelier pour tous les modules à venir :
+
+- **`UTF8_TO_TCHAR` dans un initialiseur statique rend un pointeur pendouillant.** L'objet
+  de conversion est un temporaire ; la table ne gardait que des chaînes vides, et les
+  vecteurs accusaient le portage en comparant `""` à `"normal"`. Les tables portent
+  désormais des octets UTF-8, convertis au point d'usage.
+- **Une claim non testée est une claim fausse.** L'en-tête affirmait que `Math.hypot`
+  compte face à un `sqrt(dx²+dy²)`. Vérification : sur les 17 entrées de la batterie, deux
+  faisaient diverger les bits et **aucune ne changeait de bande**. Trois entrées ont été
+  cherchées exprès, où `hypot` rend exactement le rayon et `sqrt` le double juste
+  au-dessus — near contre medium, medium contre far, far contre invisible.
+
 Écarts assumés, documentés dans les en-têtes :
 
 - La grille spatiale stocke des **index** `int32`, pas des références d'acteurs :
@@ -162,9 +209,8 @@ arriver avec ses vecteurs de parité avant qu'on empile la suivante.
 1. **Génération du monde** — portée (Phase 1). `Anastasis.Sim.Parite.Monde` PASS 2026-09-11. `Fbm` 1 vecteur ~2.5 ulp (voir `docs/migration/phase1/P1_HANDOFF.md`).
 2. **Navigation** — terrain et A* portés (couche 2 ci-dessus). Restent `navService.js`,
    `crowdNav.js`, et les points d'accès une fois `urban/intent.js` porté.
-3. **Budget et LOD logique** — `src/sim/simulationBudget.js`, `logicalLod.js`.
-   Attention : la pression est déclarée `deterministic-only` côté JS ; ne jamais la
-   dériver du temps mur réel sous peine de rendre la simulation non reproductible.
+3. **Budget et LOD logique** — noyau causal du budget porté (couche 3 ci-dessus).
+   Reste `logicalLod.js`, qui agrège l'état du village et suivra ses systèmes.
 4. **État du monde et sauvegarde** — `src/sim/save.js`, `world.js` (structures).
    La décision est prise : `docs/migration/phase2/P2_MODELE_DONNEES.md`. Tableau de
    structures et non SoA, table ordonnée à la sémantique JS (`World/AnastasisEntityTable.h`),
