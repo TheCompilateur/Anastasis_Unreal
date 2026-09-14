@@ -205,3 +205,10 @@ guarantee; and motion blur is left on during a verdict capture.
 Until both are fixed: **look at every image before filing it as evidence.** Both
 A/B frames filed under `docs/visual/atmosphere-002/` were checked by eye, and the
 mist-on frame is a re-run after the first attempt photographed the editor.
+
+> **Both defects were fixed afterwards — see `docs/unreal/CAPTURE_VIEWPORT_001.md`.**
+> `Anastasis.World.Capture` no longer issues a global screenshot request; it asks the
+> game viewport to redraw and capture itself (`FViewport::TakeHighResScreenShot`), which
+> settles the target *and* the timing. The analysis above stands as written, including
+> the finding that `bInRestrictToGameViewport` is dead code on this path — that is why
+> the fix went elsewhere. The last line stands too: **look at every image.**
