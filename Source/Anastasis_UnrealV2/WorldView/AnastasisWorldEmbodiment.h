@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisWorldView.h"
+#include "WorldView/AnastasisEcologicalDressing.h"
 #include "AnastasisWorldEmbodiment.generated.h"
 
 class UHierarchicalInstancedStaticMeshComponent;
@@ -23,6 +24,10 @@ public:
 	AAnastasisWorldEmbodiment();
 
 	virtual void BeginPlay() override;
+
+    /** Forest grammar only; mesh references stay in the presentation registry. */
+    UPROPERTY(EditAnywhere, Category="Anastasis|Ecology")
+    FAnastasisForestDressingSettings ForestDressing;
 
 #if WITH_EDITOR
 	/**
@@ -101,7 +106,8 @@ protected:
 	 * Appelee APRES la decision de terrain, pas avant : on ne peut pas poser un objet
 	 * sur un sol dont on ignore encore la forme.
 	 */
-	void PlaceDressing(uint32 Seed, const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop);
+	void PlaceDressing(uint32 Seed, const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop,
+        const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource);
 
 	UHierarchicalInstancedStaticMeshComponent* GetOrCreateDressingMesh(
 		const AnastasisPresentation::FResolvedPresentation& Resolved);
@@ -131,4 +137,3 @@ protected:
 	 */
 	FBox ActiveFootprintBounds = FBox(ForceInit);
 };
-

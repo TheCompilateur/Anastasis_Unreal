@@ -14,6 +14,10 @@
 #include "UObject/ConstructorHelpers.h"
 #include "WorldView/AnastasisWorldDebugVisual.h"
 
+static TAutoConsoleVariable<int32> CVarEcologicalDressing(
+    TEXT("anastasis.Dressing.Ecology"), 1,
+    TEXT("0=legacy tile dressing, 1=forest grammar on continuous terrain; applied on embodiment."), ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarWorldViewSeed(
@@ -199,7 +203,8 @@ bool AAnastasisWorldEmbodiment::Embody(uint32 Seed, int32 Width, int32 Height)
 }
 
 void AAnastasisWorldEmbodiment::PlaceDressing(
-	uint32 Seed, const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop)
+	uint32 Seed, const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop,
+    const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource)
 {
 	for (UHierarchicalInstancedStaticMeshComponent* Mesh : DressingMeshes)
 	{
@@ -211,9 +216,28 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 
 	DressingInstanceCount = 0;
 	int32 UngroundedTiles = 0;
+    const double DressingStart = FPlatformTime::Seconds();
+    const bool bEcology = SurfaceCrop && ForestDressing.bEnabled && CVarEcologicalDressing.GetValueOnGameThread() != 0;
+    TSet<UHierarchicalInstancedStaticMeshComponent*> Prepared;
+    auto Prepare = [&](const AnastasisPresentation::FResolvedPresentation& R)
+    {
+        auto* M = GetOrCreateDressingMesh(R);
+        if (!M || Prepared.Contains(M)) return M;
+        Prepared.Add(M);
+        M->SetStaticMesh(R.Mesh);
+        if (R.MaterialOverride) M->SetMaterial(0, R.MaterialOverride);
+        else if (BaseShapeMaterial)
+        {
+            auto* Mid = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
+            Mid->SetVectorParameterValue(TEXT("Color"), R.Entry->Tint);
+            M->SetMaterial(0, Mid);
+        }
+        return M;
+    };
 	for (int32 Index = 0; Index < Plan.TileCount; ++Index)
 	{
 		const AnastasisWorldView::FVisualTile& SourceTile = Snapshot.Tiles[Index];
+        if (bEcology && SourceTile.Type == AnastasisWorld::ETileType::Forest) continue;
 		AnastasisPresentation::FResolvedPresentation Resolved;
 		if (!AnastasisPresentation::ResolvePresentation(
 				Plan.Types[Index], Seed, SourceTile.X, SourceTile.Y, Resolved))
@@ -221,26 +245,8 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 			continue;
 		}
 
-		UHierarchicalInstancedStaticMeshComponent* Mesh = GetOrCreateDressingMesh(Resolved);
-		if (!Mesh)
-		{
-			continue;
-		}
-		// Re-applied every embodiment: the data asset may have changed since the last one.
-		if (Mesh->GetStaticMesh() != Resolved.Mesh)
-		{
-			Mesh->SetStaticMesh(Resolved.Mesh);
-		}
-		if (Resolved.MaterialOverride)
-		{
-			Mesh->SetMaterial(0, Resolved.MaterialOverride);
-		}
-		else if (BaseShapeMaterial)
-		{
-			UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
-			Mid->SetVectorParameterValue(TEXT("Color"), Resolved.Entry->Tint);
-			Mesh->SetMaterial(0, Mid);
-		}
+		auto* Mesh = Prepare(Resolved);
+		if (!Mesh) continue;
 
 		FTransform InstanceTransform = AnastasisPresentation::ResolveInstanceTransform(
 			*Resolved.Entry, Seed, SourceTile.X, SourceTile.Y, Plan.Alts[Index]);
@@ -274,6 +280,47 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 		Mesh->AddInstance(InstanceTransform, false);
 		++DressingInstanceCount;
 	}
+    if (bEcology)
+    {
+        AnastasisEcologicalDressing::FPlan ForestPlan;
+        FString Error;
+        if (!AnastasisEcologicalDressing::Build(CanonicalSource, ForestDressing, ForestPlan, Error))
+        {
+            UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_ECOLOGY rejected=%s"), *Error);
+        }
+        else
+        {
+            int32 ForestLayerCounts[3] = {};
+            for (const auto& P : ForestPlan.Instances)
+            {
+                double GroundZ;
+                if (!AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, P.Ground.X, P.Ground.Y, GroundZ))
+                    continue;
+                const auto& T = CanonicalSource.Tiles[P.SourceIndex];
+                AnastasisPresentation::FResolvedPresentation R;
+                if (!AnastasisPresentation::ResolvePresentation(AnastasisWorld::ETileType::Forest,
+                    P.VisualSeed, T.X, T.Y, R)) continue;
+                auto* M = Prepare(R);
+                if (!M) continue;
+                FTransform Pose = AnastasisPresentation::ResolveInstanceTransform(*R.Entry,
+                    P.VisualSeed, T.X, T.Y, T.Alt);
+                Pose.SetScale3D(Pose.GetScale3D() * P.ScaleMultiplier);
+                // Actual mesh bounds, not the resolver's 100uu primitive pivot convention.
+                const double MinZ = R.Mesh->GetBoundingBox().Min.Z;
+                Pose.SetLocation(FVector(P.Ground.X, P.Ground.Y, GroundZ - MinZ * Pose.GetScale3D().Z));
+                M->AddInstance(Pose, false);
+                ++ForestLayerCounts[static_cast<uint8>(P.Layer)];
+                ++DressingInstanceCount;
+            }
+            UE_LOG(LogAnastasis_UnrealV2, Display,
+                TEXT("ANASTASIS_ECOLOGY young=%d secondary=%d canopy=%d full_plan=%d refused_water_or_footprint=%d refused_slope=%d refused_spacing=%d"),
+                ForestLayerCounts[0], ForestLayerCounts[1], ForestLayerCounts[2], ForestPlan.Instances.Num(),
+                ForestPlan.RejectedWaterOrFootprint, ForestPlan.RejectedSlope, ForestPlan.RejectedSpacing);
+        }
+    }
+    UE_LOG(LogAnastasis_UnrealV2, Display,
+        TEXT("ANASTASIS_ECOLOGY_COST enabled=%d generation_ms=%.3f components=%d instances=%d"),
+        bEcology, (FPlatformTime::Seconds() - DressingStart) * 1000.0, DressingMeshes.Num(), DressingInstanceCount);
 	for (UHierarchicalInstancedStaticMeshComponent* Mesh : DressingMeshes)
 	{
 		if (Mesh)
@@ -311,8 +358,9 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
 		}
 	}
 
+	const auto CanonicalSource = AnastasisWorldView::CaptureCanonicalWorld(Seed);
 	Snapshot = AnastasisWorldView::CropSnapshot(
-		AnastasisWorldView::CaptureCanonicalWorld(Seed),
+		CanonicalSource,
 		OriginX,
 		OriginY,
 		Width,
@@ -433,7 +481,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
     }
     // Le dressing vient APRES la decision de terrain : on ne pose pas un objet sur un
     // sol dont on ignore encore la forme.
-    PlaceDressing(Seed, bSurfaceBuilt ? &BuiltSurfaceCrop : nullptr);
+    PlaceDressing(Seed, bSurfaceBuilt ? &BuiltSurfaceCrop : nullptr, CanonicalSource);
 
     LogEmbodiment();
     return GetInstanceCount() == Plan.TileCount;
@@ -588,6 +636,3 @@ void AAnastasisWorldEmbodiment::LogEmbodiment() const
 			InstanceLocation.Z);
 	}
 }
-
-
-
