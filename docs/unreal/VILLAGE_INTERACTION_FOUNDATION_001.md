@@ -177,12 +177,16 @@ code — but once this branch reaches `main`, every agent's editor loads those p
 They ship prebuilt with UE 5.8 (no engine compilation was triggered; only the two project
 modules were rebuilt), so the cost is editor load time and memory, not build time.
 
-Side effect to watch: `USmartObjectSubsystem::OnWorldComponentsUpdated` spawns an
-`ASmartObjectSubsystemRenderingActor` into every world, including the editor world, under
-`UE_ENABLE_DEBUG_DRAWING`. It is spawned without `RF_Transient` in the engine code. The
-existing invariant `Anastasis.Level.HoldsNoWorldTruth` only inspects
-`AAnastasisWorldEmbodiment`, so it does not cover this; whether saving `Lvl_AnastasisSlice`
-would now bake an engine debug actor into the `.umap` was NOT verified in this mission.
+Side effect, checked and benign: `USmartObjectSubsystem::OnWorldComponentsUpdated` spawns
+an `ASmartObjectSubsystemRenderingActor` into every world, including the editor world,
+under `UE_ENABLE_DEBUG_DRAWING`. The engine passes no `RF_Transient` in its
+`FActorSpawnParameters`, but the flag is not needed there: the class is declared
+`UCLASS(MinimalAPI, Transient, NotBlueprintable, NotPlaceable)`, and
+`StaticAllocateObject` forces `RF_Transient` onto every non-CDO, non-archetype instance of
+a `CLASS_Transient` class (`UObjectGlobals.cpp`: "If class is transient, non-archetype
+objects must be transient"). It also overrides `ShouldExport()` to false and clears
+`bListedInSceneOutliner`. Saving `Lvl_AnastasisSlice` therefore cannot bake it into the
+`.umap`, and the `Anastasis.Level.HoldsNoWorldTruth` invariant needs no extension for it.
 
 ## Verification
 
