@@ -34,6 +34,25 @@ function ModuleStamp {
  if(@($ModuleDlls | Where-Object {!(Test-Path -LiteralPath $_)}).Count){return $null}
  return (($ModuleDlls | Sort-Object | ForEach-Object { [IO.Path]::GetFileName($_)+':'+(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash }) -join "`n")
 }
+# Deux agents peuvent compiler la meme racine en meme temps. UBT se serialise
+# lui-meme (-WaitMutex) ; Tee-Object non. Le second heurtait alors 'le fichier est
+# en cours d'utilisation par un autre processus' sur build.log et le gate rendait
+# BUILD::FAIL sans qu'aucune compilation ait echoue — un faux negatif qui refuse
+# un push parfaitement valide. Observe le 2026-09-13. Chaque run ecrit donc son
+# propre journal ; le nom canonique n'est qu'une copie, en meilleur effort, du
+# dernier. Effet de bord utile : les journaux de build deviennent un historique.
+function RunLog([string]$Name){
+ $dir=Join-Path $Evidence 'build-logs'
+ New-Item -ItemType Directory -Force $dir | Out-Null
+ Get-ChildItem $dir -Filter "$Name-*.log" -File -ErrorAction SilentlyContinue |
+  Sort-Object LastWriteTime -Descending | Select-Object -Skip 20 |
+  ForEach-Object { try{Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop}catch{} }
+ return (Join-Path $dir ('{0}-{1:yyyyMMdd-HHmmss}-{2}.log' -f $Name,(Get-Date),$PID))
+}
+function PublishLog([string]$RunPath,[string]$CanonicalName){
+ try { Copy-Item -LiteralPath $RunPath -Destination (Join-Path $Evidence $CanonicalName) -Force -ErrorAction Stop }
+ catch { Write-Output "NOTE: $CanonicalName occupe par un autre agent, non mis a jour. Journal de ce run : $RunPath" }
+}
 function BuildCanonical {
  $before=Fingerprint
  $srcStamp=Join-Path $Evidence 'built-source.sha256'
@@ -48,8 +67,11 @@ function BuildCanonical {
    return
   }
  }
- & "$Engine/Engine/Build/BatchFiles/Build.bat" Anastasis_UnrealV2Editor Win64 Development "-Project=$Project" -WaitMutex -NoHotReloadFromIDE 2>&1 | Tee-Object "$Evidence/build.log" | Out-Host
- if($LASTEXITCODE -ne 0){throw 'BUILD::FAIL'}
+ $runLog=RunLog 'build'
+ & "$Engine/Engine/Build/BatchFiles/Build.bat" Anastasis_UnrealV2Editor Win64 Development "-Project=$Project" -WaitMutex -NoHotReloadFromIDE 2>&1 | Tee-Object $runLog | Out-Host
+ $code=$LASTEXITCODE
+ PublishLog $runLog 'build.log'
+ if($code -ne 0){throw 'BUILD::FAIL'}
  if((Fingerprint) -ne $before){throw 'FAIL: source/config changed during build'}
  $afterMod=ModuleStamp
  if($null -eq $afterMod){throw 'BUILD::FAIL missing module binaries after a successful build'}
@@ -59,8 +81,11 @@ function BuildCanonical {
 }
 function BuildGame {
  $before=Fingerprint
- & "$Engine/Engine/Build/BatchFiles/Build.bat" Anastasis_UnrealV2 Win64 Development "-Project=$Project" -WaitMutex -NoHotReloadFromIDE 2>&1 | Tee-Object "$Evidence/build-game.log" | Out-Host
- if($LASTEXITCODE -ne 0){throw 'GAME_BUILD::FAIL'}
+ $runLog=RunLog 'build-game'
+ & "$Engine/Engine/Build/BatchFiles/Build.bat" Anastasis_UnrealV2 Win64 Development "-Project=$Project" -WaitMutex -NoHotReloadFromIDE 2>&1 | Tee-Object $runLog | Out-Host
+ $code=$LASTEXITCODE
+ PublishLog $runLog 'build-game.log'
+ if($code -ne 0){throw 'GAME_BUILD::FAIL'}
  if((Fingerprint) -ne $before){throw 'FAIL: source/config changed during game build'}
  $before | Set-Content "$Evidence/built-game-source.sha256"
  Write-Output 'GAME_BUILD::PASS'
