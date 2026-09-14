@@ -38,7 +38,10 @@ namespace
 		bool bValid = false;
 	};
 
-	FString WriteJson(const TSharedRef<FJsonObject>& Root)
+	// Meme corps que WriteJson dans AnastasisWorldProbeSubsystem.cpp. Les deux vivent dans
+	// un namespace anonyme, mais un build unity les reunit dans la meme unite de compilation
+	// et C2084 tombe. Nom distinct jusqu'a ce que l'helper soit mutualise.
+	FString WriteJsonPhase3(const TSharedRef<FJsonObject>& Root)
 	{
 		FString Out;
 		const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
@@ -353,7 +356,7 @@ FString UAnastasisWorldProbeSubsystem::WriteProbeObject(const FString& Slug, con
 {
 	Root->SetStringField(TEXT("written_at_utc"), FDateTime::UtcNow().ToIso8601());
 
-	const FString Json = WriteJson(Root);
+	const FString Json = WriteJsonPhase3(Root);
 	const FString Dir = FPaths::ProjectSavedDir() / TEXT("Anastasis/Diagnostics/probes");
 	IFileManager::Get().MakeDirectory(*Dir, true);
 
