@@ -1,4 +1,8 @@
-param([ValidateSet('0','1','2')][string]$Mode='1',[Parameter(Mandatory=$true)][string]$Out,[string]$RebuildMaterial='0',[ValidateSet('auto','world','slice')][string]$Cam='auto',[int]$TimeoutSec=300)
+# PreCmds : CVars a poser avant le script, comme probe-demo.ps1. C'est ce qui permet un
+# A/B ou SEULE la CVar change -- meme carte, meme graine, meme soleil, meme exposition,
+# meme camera. Sans cela, comparer deux materiaux de sol demanderait deux builds, et la
+# comparaison porterait alors sur deux binaires differents au lieu d'un seul reglage.
+param([ValidateSet('0','1','2')][string]$Mode='1',[Parameter(Mandatory=$true)][string]$Out,[string]$RebuildMaterial='0',[ValidateSet('auto','world','slice')][string]$Cam='auto',[string]$PreCmds='',[int]$TimeoutSec=300)
 $ErrorActionPreference='Stop'
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 $Editor='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
@@ -17,7 +21,7 @@ $launchArgs=@(
  ('"'+(Join-Path $Root 'Anastasis_UnrealV2.uproject')+'"'),
  '-windowed','-resx=1280','-resy=720','-nosplash','-NoLiveCoding',
  ('-abslog="'+$log+'"'),
- ('-ExecCmds="py '+$py+'"')
+ ('-ExecCmds="'+$(if($PreCmds){$PreCmds+','}else{''})+'py '+$py+'"')
 )
 $p=Start-Process $Editor -ArgumentList $launchArgs -PassThru
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
