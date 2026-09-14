@@ -5,6 +5,7 @@
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisWorldView.h"
 #include "WorldView/AnastasisEcologicalDressing.h"
+#include "WorldView/AnastasisEcotoneDressing.h"
 #include "AnastasisWorldEmbodiment.generated.h"
 
 class UHierarchicalInstancedStaticMeshComponent;
@@ -28,6 +29,10 @@ public:
     /** Forest grammar only; mesh references stay in the presentation registry. */
     UPROPERTY(EditAnywhere, Category="Anastasis|Ecology")
     FAnastasisForestDressingSettings ForestDressing;
+
+	/** Intermediate nature (0.2-3 m) on forest floor, fringe, shore and stone foot. */
+	UPROPERTY(EditAnywhere, Category = "Anastasis|Ecology")
+	FAnastasisEcotoneDressingSettings EcotoneDressing;
 
 #if WITH_EDITOR
 	/**
@@ -117,6 +122,11 @@ protected:
 
 	UHierarchicalInstancedStaticMeshComponent* GetOrCreateDressingMesh(
 		const AnastasisPresentation::FResolvedPresentation& Resolved);
+	UHierarchicalInstancedStaticMeshComponent* GetOrCreateDressingMesh(FName Key);
+
+	void PlaceEcotoneDressing(
+		const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop,
+		const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource);
 
 	int32 DressingInstanceCount = 0;
 

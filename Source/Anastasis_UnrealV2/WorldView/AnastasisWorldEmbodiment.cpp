@@ -4,6 +4,7 @@
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisTerrainForge.h"
+#include "WorldView/AnastasisEcotoneDressing.h"
 
 
 #include "Anastasis_UnrealV2.h"
@@ -18,6 +19,11 @@
 static TAutoConsoleVariable<int32> CVarEcologicalDressing(
     TEXT("anastasis.Dressing.Ecology"), 1,
     TEXT("0=legacy tile dressing, 1=forest grammar on continuous terrain; applied on embodiment."), ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarEcotoneDressing(
+	TEXT("anastasis.Dressing.Ecotone"), 1,
+	TEXT("0=no ground-ecology layer, 1=stumps, shrubs, reeds and stone fragments on continuous terrain."),
+	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
@@ -164,15 +170,8 @@ AAnastasisWorldEmbodiment::AAnastasisWorldEmbodiment()
 	ExperimentalSurface->SetFlags(RF_Transient);
 }
 
-UHierarchicalInstancedStaticMeshComponent* AAnastasisWorldEmbodiment::GetOrCreateDressingMesh(
-	const AnastasisPresentation::FResolvedPresentation& Resolved)
+UHierarchicalInstancedStaticMeshComponent* AAnastasisWorldEmbodiment::GetOrCreateDressingMesh(FName Key)
 {
-	const FName Key(*FString::Printf(TEXT("Dressing_%s_v%d"),
-		*Resolved.Entry->ArchetypeId.ToString(), Resolved.VariantIndex));
-
-	// The cached component can be stale: a construction-script rerun is free to destroy
-	// components an earlier run created, leaving this map pointing at nothing. Reuse only what
-	// is still valid, and fall through to rebuild otherwise instead of returning null dressing.
 	const int32* Existing = DressingSlotByKey.Find(Key);
 	if (Existing && DressingMeshes.IsValidIndex(*Existing))
 	{
@@ -187,7 +186,6 @@ UHierarchicalInstancedStaticMeshComponent* AAnastasisWorldEmbodiment::GetOrCreat
 
 	UHierarchicalInstancedStaticMeshComponent* Mesh =
 		NewObject<UHierarchicalInstancedStaticMeshComponent>(this, Key);
-	// Same reason as the ground meshes: never serialized into the level.
 	Mesh->SetFlags(RF_Transient);
 	Mesh->SetupAttachment(GetRootComponent());
 	Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -207,6 +205,173 @@ UHierarchicalInstancedStaticMeshComponent* AAnastasisWorldEmbodiment::GetOrCreat
 		DressingSlotByKey.Add(Key, DressingMeshes.Add(Mesh));
 	}
 	return Mesh;
+}
+
+UHierarchicalInstancedStaticMeshComponent* AAnastasisWorldEmbodiment::GetOrCreateDressingMesh(
+	const AnastasisPresentation::FResolvedPresentation& Resolved)
+{
+	const FName Key(*FString::Printf(TEXT("Dressing_%s_v%d"),
+		*Resolved.Entry->ArchetypeId.ToString(), Resolved.VariantIndex));
+	return GetOrCreateDressingMesh(Key);
+}
+
+namespace
+{
+	const TCHAR* EcotoneMeshPath(AnastasisEcotoneDressing::EAsset Asset)
+	{
+		using AnastasisEcotoneDressing::EAsset;
+		switch (Asset)
+		{
+		case EAsset::Stump:        return TEXT("/Game/Anastasis/Ecotone/SM_Ecotone_Stump_01.SM_Ecotone_Stump_01");
+		case EAsset::FallenLog:    return TEXT("/Game/Anastasis/Ecotone/SM_Ecotone_FallenLog_01.SM_Ecotone_FallenLog_01");
+		case EAsset::ExposedRoots: return TEXT("/Game/Anastasis/Ecotone/SM_Ecotone_ExposedRoots_01.SM_Ecotone_ExposedRoots_01");
+		case EAsset::BranchPile:   return TEXT("/Game/Anastasis/Ecotone/SM_Ecotone_BranchPile_01.SM_Ecotone_BranchPile_01");
+		case EAsset::Driftwood:    return TEXT("/Game/Anastasis/Ecotone/SM_Ecotone_Driftwood_01.SM_Ecotone_Driftwood_01");
+		case EAsset::BushLow:      return TEXT("/Game/Anastasis/Ecotone/SM_Ecotone_Bush_Low_01.SM_Ecotone_Bush_Low_01");
+		case EAsset::GrassTuft:    return TEXT("/Game/Anastasis/Ecotone/SM_Ecotone_GrassTuft_01.SM_Ecotone_GrassTuft_01");
+		case EAsset::Reed:         return TEXT("/Game/Anastasis/Ecotone/SM_Ecotone_Reed_01.SM_Ecotone_Reed_01");
+		case EAsset::ShoreTuft:    return TEXT("/Game/Anastasis/Ecotone/SM_Ecotone_ShoreTuft_01.SM_Ecotone_ShoreTuft_01");
+		case EAsset::Sapling:      return TEXT("/Game/Anastasis/Ecotone/SM_Ecotone_Sapling_01.SM_Ecotone_Sapling_01");
+		case EAsset::RockCluster:  return TEXT("/Game/Anastasis/Ecotone/SM_Ecotone_RockCluster_01.SM_Ecotone_RockCluster_01");
+		case EAsset::BuriedBlock:  return TEXT("/Game/Anastasis/Ecotone/SM_Ecotone_BuriedBlock_01.SM_Ecotone_BuriedBlock_01");
+		default:                   return TEXT("");
+		}
+	}
+
+	bool EcotoneIsSoft(AnastasisEcotoneDressing::EAsset Asset)
+	{
+		using AnastasisEcotoneDressing::EAsset;
+		return Asset == EAsset::GrassTuft || Asset == EAsset::Reed || Asset == EAsset::ShoreTuft;
+	}
+
+	float EcotoneSinkUU(AnastasisEcotoneDressing::EAsset Asset)
+	{
+		using AnastasisEcotoneDressing::EAsset;
+		switch (Asset)
+		{
+		case EAsset::BuriedBlock:  return 18.0f;
+		case EAsset::RockCluster:  return 6.0f;
+		case EAsset::Stump:        return 5.0f;
+		case EAsset::ExposedRoots: return 3.0f;
+		default:                   return 0.0f;
+		}
+	}
+}
+
+void AAnastasisWorldEmbodiment::PlaceEcotoneDressing(
+	const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop,
+	const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource)
+{
+	if (!SurfaceCrop || !EcotoneDressing.bEnabled || CVarEcotoneDressing.GetValueOnGameThread() == 0)
+	{
+		return;
+	}
+
+	AnastasisEcotoneDressing::FPlan EcotonePlan;
+	FString Error;
+	if (!AnastasisEcotoneDressing::Build(CanonicalSource, EcotoneDressing, EcotonePlan, Error))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_ECOTONE rejected=%s"), *Error);
+		return;
+	}
+
+	UMaterialInterface* Bark = LoadObject<UMaterialInterface>(nullptr,
+		TEXT("/Game/Anastasis/Materials/M_AnastasisBark.M_AnastasisBark"));
+	UMaterialInterface* Vegetation = LoadObject<UMaterialInterface>(nullptr,
+		TEXT("/Game/Anastasis/Materials/M_AnastasisVegetation.M_AnastasisVegetation"));
+	UMaterialInterface* Stone = LoadObject<UMaterialInterface>(nullptr,
+		TEXT("/Game/Anastasis/Materials/M_AnastasisStone.M_AnastasisStone"));
+
+	UStaticMesh* Meshes[AnastasisEcotoneDressing::AssetCount] = {};
+	int32 Missing = 0;
+	for (int32 I = 0; I < AnastasisEcotoneDressing::AssetCount; ++I)
+	{
+		const auto Asset = static_cast<AnastasisEcotoneDressing::EAsset>(I);
+		Meshes[I] = LoadObject<UStaticMesh>(nullptr, EcotoneMeshPath(Asset));
+		if (!Meshes[I])
+		{
+			++Missing;
+			UE_LOG(LogAnastasis_UnrealV2, Warning,
+				TEXT("ANASTASIS_ECOTONE mesh_missing path=%s"), EcotoneMeshPath(Asset));
+		}
+	}
+
+	TSet<UHierarchicalInstancedStaticMeshComponent*> Prepared;
+	int32 Placed = 0;
+	int32 Ungrounded = 0;
+	int32 ContextPlaced[AnastasisEcotoneDressing::ContextCount] = {};
+	for (const AnastasisEcotoneDressing::FPlacement& P : EcotonePlan.Instances)
+	{
+		const uint8 AssetIndex = static_cast<uint8>(P.Asset);
+		UStaticMesh* MeshAsset = Meshes[AssetIndex];
+		if (!MeshAsset)
+		{
+			continue;
+		}
+		double GroundZ = 0.0;
+		if (!(AnastasisTerrainForge::SampleActive(P.Ground.X, P.Ground.Y, GroundZ)
+			|| AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, P.Ground.X, P.Ground.Y, GroundZ)))
+		{
+			++Ungrounded;
+			continue;
+		}
+
+		const FName Key(*FString::Printf(TEXT("Ecotone_%s"), AnastasisEcotoneDressing::AssetName(P.Asset)));
+		UHierarchicalInstancedStaticMeshComponent* Comp = GetOrCreateDressingMesh(Key);
+		if (!Comp)
+		{
+			continue;
+		}
+		if (!Prepared.Contains(Comp))
+		{
+			Prepared.Add(Comp);
+			Comp->SetStaticMesh(MeshAsset);
+			using AnastasisEcotoneDressing::EAsset;
+			if (P.Asset == EAsset::RockCluster || P.Asset == EAsset::BuriedBlock)
+			{
+				if (Stone) Comp->SetMaterial(0, Stone);
+			}
+			else if (P.Asset == EAsset::BushLow || P.Asset == EAsset::Sapling)
+			{
+				if (Vegetation) Comp->SetMaterial(0, Vegetation);
+				if (Bark) Comp->SetMaterial(1, Bark);
+			}
+			else if (P.Asset == EAsset::GrassTuft || P.Asset == EAsset::Reed || P.Asset == EAsset::ShoreTuft)
+			{
+				if (Vegetation) Comp->SetMaterial(0, Vegetation);
+			}
+			else if (Bark)
+			{
+				Comp->SetMaterial(0, Bark);
+			}
+			if (EcotoneIsSoft(P.Asset))
+			{
+				Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				Comp->SetCastShadow(false);
+			}
+		}
+
+		const FBox Bounds = MeshAsset->GetBoundingBox();
+		const double Scale = P.ScaleMultiplier;
+		FTransform Pose;
+		Pose.SetScale3D(FVector(Scale));
+		Pose.SetRotation(FQuat(FRotator(0.0, P.YawDegrees, 0.0)));
+		Pose.SetLocation(FVector(
+			P.Ground.X,
+			P.Ground.Y,
+			GroundZ - Bounds.Min.Z * Scale - EcotoneSinkUU(P.Asset) * Scale));
+		Comp->AddInstance(Pose, false);
+		++Placed;
+		++ContextPlaced[static_cast<uint8>(P.Context)];
+		++DressingInstanceCount;
+	}
+
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_ECOTONE placed=%d planned=%d companions=%d understory=%d edge=%d shore=%d rock=%d missing_meshes=%d ungrounded=%d water=%d slope=%d spacing=%d"),
+		Placed, EcotonePlan.Instances.Num(), EcotonePlan.CompanionCount,
+		ContextPlaced[0], ContextPlaced[1], ContextPlaced[2], ContextPlaced[3],
+		Missing, Ungrounded,
+		EcotonePlan.RejectedWaterOrFootprint, EcotonePlan.RejectedSlope, EcotonePlan.RejectedSpacing);
 }
 
 void AAnastasisWorldEmbodiment::BeginPlay()
@@ -427,8 +592,12 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 At(SiteShade, 0.0), At(SiteShade, 0.5), At(SiteShade, 1.0),
                 At(SiteWetness, 0.0), At(SiteWetness, 0.5), At(SiteWetness, 1.0),
                 At(SiteConiferousness, 0.0), At(SiteConiferousness, 0.5), At(SiteConiferousness, 1.0));
-        }
+		}
     }
+	if (SurfaceCrop)
+	{
+		PlaceEcotoneDressing(SurfaceCrop, CanonicalSource);
+	}
     UE_LOG(LogAnastasis_UnrealV2, Display,
         TEXT("ANASTASIS_ECOLOGY_COST enabled=%d generation_ms=%.3f components=%d instances=%d"),
         bEcology, (FPlatformTime::Seconds() - DressingStart) * 1000.0, DressingMeshes.Num(), DressingInstanceCount);
