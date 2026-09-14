@@ -15,6 +15,8 @@ A/B ne mesure que la fonction qui les lit.
 | `B_world_ground_on.png` | `1` | `MI_AnastasisGround` | idem | 1 044 500 | `D07383C2CB76B571` |
 | `C_shore_ground_off.png` | `0` | `M_AnastasisSlice` | rive, PIE, signet `SHORE` | 864 651 | `0516BF307455A754` |
 | `D_shore_ground_on.png` | `1` | `MI_AnastasisGround` | idem | 1 046 790 | `BE0368CEDAB0F278` |
+| `F_forest_ground_off.png` | `0` | `M_AnastasisSlice` | lisière, PIE, signet `FOREST` | 883 444 | `3021A2C7CE5E3AB2` |
+| `G_forest_ground_on.png` | `1` | `MI_AnastasisGround` | idem | 978 775 | `9D171E595AD68C1E` |
 
 Les caméras aériennes portent l'angle scellé de `docs/visual/terrain-extent` :
 pitch `-32.8`, yaw `45`.
@@ -40,6 +42,20 @@ et rien d'autre — le symptôme « maquette » que la mission visait. En `D`, l
 porte un grain, une bande humide plus sombre et plus lisse près de l'eau, une prairie
 mouchetée de zones sèches, et une falaise dont la matière se distingue de l'herbe qui
 la surmonte.
+
+**`F` / `G` — la lisière.** La comparaison qui manquait au premier commit. En `F`, la
+forêt et la prairie partagent **exactement le même sol** : une nappe olive uniforme, sur
+laquelle les arbres sont simplement posés. En `G`, le peuplement a un sol à lui — plus
+sombre, plus brun, moucheté — et la clairière au premier plan reste plus claire et plus
+sèche. La transition entre les deux est continue, pas une frontière de tuile : c'est ce
+que la partition de l'unité produit à l'interpolation.
+
+C'est la démonstration du critère « les forêts émergent d'un sol compatible avec elles ».
+Elle était annoncée comme mécaniquement satisfaite mais visuellement non démontrée ; le
+signet `FOREST` la rend observable.
+
+Les arbres eux-mêmes restent les cônes de remplacement — ils appartiennent à la mission
+`anastasis-tree-visuals`, pas à celle-ci, et ils sont identiques dans les deux images.
 
 **Limite honnête de `C`/`D` :** la palette C++ a été retonée dans le même commit, et
 elle s'applique aux deux images. `C` n'est donc **pas** l'état d'avant la mission —
@@ -70,12 +86,50 @@ tools\unreal\capture-slice.ps1 -Mode 2 -Out A_world_ground_off.png -PreCmds 'ana
 tools\unreal\capture-slice.ps1 -Mode 2 -Out B_world_ground_on.png  -PreCmds 'anastasis.Terrain.GroundMaterial 1'
 tools\unreal\probe-demo.ps1 -Mission shore-ground-off -Bookmark SHORE -PreCmds 'anastasis.Terrain.GroundMaterial 0'
 tools\unreal\probe-demo.ps1 -Mission shore-ground-on  -Bookmark SHORE -PreCmds 'anastasis.Terrain.GroundMaterial 1'
+tools\unreal\probe-demo.ps1 -Mission forest-off -Bookmark FOREST -PreCmds 'anastasis.Terrain.GroundMaterial 0'
+tools\unreal\probe-demo.ps1 -Mission forest-on  -Bookmark FOREST -PreCmds 'anastasis.Terrain.GroundMaterial 1'
 ```
+
+Le signet `FOREST` se calcule, il n'est pas codé en dur : il cherche le point le plus
+couvert du monde sur un voisinage 5×5, puis une tuile non forestière à 3-6 tuiles de là.
+Sur la graine `12345` cela donne, et le journal l'imprime :
+
+```
+ANASTASIS_WORLD_BOOKMARK FOREST core=(74,44) density=25/25 stand=(71,47) ring=3 from_edge=1
+```
+
+`density=25/25` : les vingt-cinq cellules autour du cœur sont forestières. C'est une
+masse, pas un arbre isolé.
 
 Les captures brutes et leurs journaux restent dans `Saved/SliceEvidence/` et
 `Saved/Anastasis/Captures/` (non versionnés). Ces cinq copies-ci sont versionnées
 parce qu'elles étayent le rapport.
 
-Rappel de `docs/visual/atmosphere-002` : l'outil de capture a déjà photographié le
+## L'outil de capture a encore photographié le mauvais viewport
+
+Rappel de `docs/visual/atmosphere-002` : l'outil de capture peut photographier le
 viewport éditeur au lieu du PIE. **Toute image de ce projet doit être regardée avant
-d'être versée en preuve.** Ces cinq-là l'ont été.
+d'être versée en preuve.** Ces sept-là l'ont été — et la règle a resservi.
+
+Les deux premières tentatives sur `FOREST` ont rendu le viewport éditeur de
+`Lvl_FirstPerson` : géométrie de prototypage grise, plots jaunes, sprites d'éditeur,
+aucun terrain. **Deux fois de suite, image identique au bit près** — donc pas un
+tirage au sort, quoi qu'en laisse penser le mot « flake ». Les journaux des deux runs
+sont pourtant corrects et identiques à ceux qui réussissent :
+
+```
+PROBE_DEMO_PIE_ACTIVE
+ANASTASIS_WORLD_STATUS map=UEDPIE_0_Lvl_FirstPerson actors=153 terrain_present=1 tiles=9216 camera_active=1
+ANASTASIS_WORLD_GOTO bookmark=FOREST loc=(7150.0,4750.0,615.0) rot=(-22.6,-45.0,0.0) fov=85.0
+CAPTURE::PASS
+```
+
+PIE tournait, le terrain était là, la caméra était au bon endroit, et `CAPTURE::PASS`
+a été rapporté. Seule l'image est fausse. Les deux tentatives suivantes, sans aucun
+changement, ont rendu le bon cadre.
+
+C'est le **défaut 1** déjà diagnostiqué dans `docs/unreal/ATMOSPHERE_002.md` : la
+requête de capture est globale et `bInRestrictToGameViewport` est du code mort sur ce
+chemin (`bShowUI = false`). Rien n'a été tenté ici pour le corriger — cette mission-là
+reste ouverte, et elle est la plus rentable du lot, puisque **un verdict de ce projet
+est une image**.

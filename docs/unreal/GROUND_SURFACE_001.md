@@ -138,6 +138,31 @@ Trois échelles nettement séparées, jamais superposées : une fréquence uniqu
 Le bruit meso casse la bande de pente : sans lui, la roche dessinerait une courbe de
 niveau, ce qui se lit immédiatement comme une fonction mathématique.
 
+## Le signet `FOREST`
+
+Ajouté à `EnsureDefaultBookmarks` parce que la réponse « sol forestier » était le seul
+morceau du système qu'aucune image ne montrait.
+
+Il ne vise pas une tuile `Forest` : le dressing écologique pose les troncs avec un jitter
+à l'intérieur de leur tuile, donc une caméra posée sur une tuile forestière se retrouve
+volontiers **dans** un tronc — c'est exactement ce qui rend `GROUND` inexploitable, où un
+cône vert occupe la moitié du cadre.
+
+Il cherche donc le point le plus couvert du monde (densité de forêt sur un voisinage 5×5),
+puis une tuile **non** forestière à 3-6 tuiles de là, et regarde le sol du cœur depuis
+cette clairière. Plus près on est sous le couvert et un tronc masque le cadre ; plus loin
+la litière n'occupe plus assez de pixels pour prouver quoi que ce soit.
+
+Sur la graine canonique, imprimé au journal :
+
+```
+ANASTASIS_WORLD_BOOKMARK FOREST core=(74,44) density=25/25 stand=(71,47) ring=3 from_edge=1
+```
+
+Le repli est explicite : sans clairière à bonne distance, le signet se rabat sur le cœur
+et le dit (`from_edge=0`). Mieux vaut un signet utilisable avec un tronc qu'un signet
+absent — mais il ne ment pas sur ce qu'il a trouvé.
+
 ## L'atténuation de détail, et pourquoi elle a été nécessaire
 
 Le point de conception le moins évident de la mission.
@@ -199,6 +224,7 @@ résout les noms contre la liste réelle du nœud et **relit** chaque propriét�
 | `MEC` | PASS — matériau compile, 517 instructions, 0 erreur, paramètres répondent |
 | `TESTS` | PASS — 56 PASS / 4 KNOWN_EXPECTED_FAILURE / 0 FAIL |
 | `SCN` | PASS — monde 96×96, `vertices=9216 triangles=18050 water_triangles=3544`, inchangé |
+| `VISUEL` | PASS — trois A/B à CVar unique : aérien, rive, lisière (`docs/visual/ground-001`) |
 | `PLY` | **NON ATTEINT** — voir ci-dessous |
 
 Les 4 `KNOWN_EXPECTED_FAILURE` sont les quatre du registre, antérieures à cette mission.
@@ -223,12 +249,7 @@ voit comme un sol fade, ce qu'aucun test de couleur n'attrape.
    donc un petit crop se minéralise différemment du monde entier. Défaut préexistant,
    conservé pour ne pas élargir le diff ; la roche de **pente**, elle, est indépendante
    de l'emprise.
-4. **La réponse « sol forestier » n'est pas prouvée visuellement.** La famille `Litter`
-   est vérifiée par la donnée — 716 sommets la portent, mesurés par
-   `Anastasis.Terrain.MorphologyChannels` — et elle est bien câblée dans le matériau
-   (`LitterTint`). Mais aucune capture ne l'isole : le rig n'a pas de signet forêt, et
-   le signet `GROUND` cadre un tronc d'arbre qui occupe la moitié de l'image. Les
-   preuves au sol utilisent donc `SHORE`. Le critère « les forêts émergent d'un sol
-   compatible » est **mécaniquement satisfait, visuellement non démontré**.
+4. **Le signet `GROUND` cadre un tronc d'arbre** et ne donne pas de vue de sol
+   exploitable. Les preuves au sol utilisent `SHORE` et `FOREST`.
 5. **Le grain reste visible en bande moyenne** (15–70 m) sur les faces raides, où la
    normale de détail assombrit par plaques. Atténué, pas supprimé.
