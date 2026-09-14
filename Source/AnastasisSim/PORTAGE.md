@@ -92,6 +92,33 @@ mais *autre*, et toute sauvegarde JS deviendrait injouable.
 
 Tests mesurés 2026-09-11 (`UnrealEditor-Cmd -nullrhi`) : `Monde` / `Archetype` / `Culture` / `Libm` **PASS**. `Fbm` **FAIL** 1 vecteur (~2.5 ulp sur `fbm(0.1, 0.2, 12345)`) — le stockage tuile est f32+`round3`, les cartes vecteurs restent identiques. Si le bit-exact double de `fbm` devient requis : remplacer `AnastasisJs::Sin` (fdlibm), jamais les vecteurs `.inl`. `SemantiqueJs::ToUint32(1e21)` échoue (couche 0, hors worldgen).
 
+### Fait — couche 2, navigation (terrain + A*)
+
+| Unreal | Source JS |
+| --- | --- |
+| `World/AnastasisNavGrid.h/.cpp` | couche terrain de `src/sim/navGrid.js` + `blockedAt` / `footBlockedAt` / `tileTraversalCost` de `simulation.js` |
+| `World/AnastasisPathfinding.h/.cpp` | `src/sim/pathfinding.js` |
+
+Tests mesurés 2026-09-13 : `Parite.NavCout` / `Parite.NavChemin` / `Parite.NavInvariants` **PASS**
+(suite `Anastasis.Sim` : 17 PASS, 2 KNOWN_EXPECTED_FAILURE, 0 FAIL). Vecteurs générés par
+`tools/migration/gen-nav-vectors.mjs` — 32 chemins comparés point par point, motif binaire
+compris, plus 24 cases de coût.
+
+**Ce que la mutation a appris.** Trois mutations posées exprès pour vérifier que les vecteurs
+mordent :
+
+| Mutation | Détectée | Ce que ça dit |
+| --- | --- | --- |
+| échanger deux voisins dans `NEIGHBORS` | **non** | l'ordre des voisins ne change aucun chemin : le comparateur du tas est un ordre total, la suite des `pop` ne dépend pas de l'ordre des poussées |
+| retirer le départage par `h` du comparateur | oui (`NavChemin`) | c'est **lui** qui rend le chemin reproductible |
+| stocker `MoveCost` en `double` au lieu de `float` | oui (`NavCout`) | la référence stocke en `Float32Array` : un `double` est plus précis, donc faux |
+
+La première a corrigé un commentaire que j'avais écrit faux dans `AnastasisPathfinding.h`.
+
+Pas encore porté de cette couche : `navService.js` (cache et file de requêtes), `crowdNav.js`,
+les points d'accès des bâtiments (dépendent de `src/sim/urban/intent.js`, chantier urbanisme),
+les métriques et l'anneau de trace. Ils suivront leurs systèmes.
+
 Écarts assumés, documentés dans les en-têtes :
 
 - La grille spatiale stocke des **index** `int32`, pas des références d'acteurs :
@@ -133,9 +160,8 @@ L'ordre suit les dépendances réelles, pas l'intérêt du gameplay. Chaque éta
 arriver avec ses vecteurs de parité avant qu'on empile la suivante.
 
 1. **Génération du monde** — portée (Phase 1). `Anastasis.Sim.Parite.Monde` PASS 2026-09-11. `Fbm` 1 vecteur ~2.5 ulp (voir `docs/migration/phase1/P1_HANDOFF.md`).
-2. **Navigation** — `src/sim/navGrid.js`, `pathfinding.js`. L'ordre d'exploration
-   de l'A* doit être identique : deux chemins de même coût, et les PNJ ne prennent
-   pas la même rue.
+2. **Navigation** — terrain et A* portés (couche 2 ci-dessus). Restent `navService.js`,
+   `crowdNav.js`, et les points d'accès une fois `urban/intent.js` porté.
 3. **Budget et LOD logique** — `src/sim/simulationBudget.js`, `logicalLod.js`.
    Attention : la pression est déclarée `deterministic-only` côté JS ; ne jamais la
    dériver du temps mur réel sous peine de rendre la simulation non reproductible.
