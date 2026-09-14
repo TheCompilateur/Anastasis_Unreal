@@ -14,6 +14,10 @@ namespace AnastasisWorld
 		Forest = 4,
 		Scrub = 5,
 		Field = 6,
+		// La generation du monde ne pose pas de route: elles naissent du
+		// passage, plus tard. Le type existe ici parce que la navigation doit
+		// savoir les couter (`AnastasisNavGrid.h`).
+		Road = 7,
 	};
 
 	enum class EResource : uint8
@@ -33,6 +37,11 @@ namespace AnastasisWorld
 		Fallow = 4,
 	};
 
+	/**
+	 * Nombre de types qu'emet la GENERATION du monde — pas le nombre de valeurs
+	 * de `ETileType`. `Road` n'en fait pas partie: il apparait plus tard, sous
+	 * les pas. Les vecteurs de parite de worldgen comptent ces sept-la.
+	 */
 	inline constexpr int32 TileTypeCount = 7;
 
 	struct FTile
