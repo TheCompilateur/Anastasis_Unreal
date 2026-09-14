@@ -40,9 +40,10 @@ void AAnastasis_UnrealV2GameMode::BeginPlay()
 		// Light before geometry: the atmosphere adopts whatever the level already carries and
 		// spawns the rest, so the embodiment lands in an authored, reproducible exposure
 		// instead of whichever template lighting the map happens to have.
+		AAnastasisWorldAtmosphere* Atmosphere = nullptr;
 		if (AAnastasisWorldAtmosphere::IsEnabledByCVar())
 		{
-			World->SpawnActor<AAnastasisWorldAtmosphere>(
+			Atmosphere = World->SpawnActor<AAnastasisWorldAtmosphere>(
 				AAnastasisWorldAtmosphere::StaticClass(),
 				FVector::ZeroVector,
 				FRotator::ZeroRotator,
@@ -67,6 +68,15 @@ void AAnastasis_UnrealV2GameMode::BeginPlay()
 				LogAnastasis_UnrealV2,
 				Display,
 				TEXT("ANASTASIS_VISUAL_MODE embodiment already placed in level; no spawn"));
+		}
+
+		// Mist AFTER the world, because unlike sun and sky it is not a property of the level:
+		// it is read from the tiles' wetness, so there has to be a world to read. Outside the
+		// branches on purpose -- an embodiment already placed in the level is just as wet as
+		// one spawned here, and ApplyMist() finds it either way.
+		if (Atmosphere)
+		{
+			Atmosphere->ApplyMist();
 		}
 	}
 }

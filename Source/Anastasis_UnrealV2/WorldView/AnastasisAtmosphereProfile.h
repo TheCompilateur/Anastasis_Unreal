@@ -140,6 +140,55 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Atmosphere|Fog")
 	float FogHeightZ = 0.0f;
 
+	// --- Mist (local fog volumes driven by simulation wetness) -------------------------
+
+	/**
+	 * ATMOSPHERE_002. The global height fog above is uniform: it says "air has depth", not
+	 * "this valley is wet". These pockets are the part of the atmosphere the simulation
+	 * actually earns — one ALocalFogVolume per wet cell, placed from AnastasisWorld's
+	 * Wetness field, which is tile distance to water (see AnastasisMistField.h).
+	 *
+	 * False leaves the global fog untouched and places nothing.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|Mist")
+	bool bMistEnabled = true;
+
+	/** Side of one mist cell, in tiles. Mist is an area phenomenon; one volume per tile would be thousands of proxies. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|Mist", meta = (ClampMin = "1", ClampMax = "48"))
+	int32 MistCellTiles = 8;
+
+	/** Mean cell wetness required. Raise it and only the river bottoms keep fog; lower it and the shore band fills in. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|Mist", meta = (ClampMin = "0.0", ClampMax = "0.999"))
+	float MistWetnessThreshold = 0.35f;
+
+	/** Pocket radius as a fraction of the cell's world size. Above ~0.8 neighbouring pockets visibly merge. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|Mist", meta = (ClampMin = "0.1", ClampMax = "2.0"))
+	float MistVolumeRadiusFraction = 0.75f;
+
+	/** Hard ceiling. Reaching it truncates by wetness AND logs it — a silently shortened mist field reads as a data bug later. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|Mist", meta = (ClampMin = "0", ClampMax = "1024"))
+	int32 MistMaxVolumes = 192;
+
+	/** Centimetres above the rendered ground. Mist sits ON the surface; 0 buries half the volume in the terrain. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|Mist")
+	float MistGroundOffsetUU = 60.0f;
+
+	/** Extinction of the thickest pocket (Density01 = 1). Thinner pockets scale down from here, they are not all identical. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|Mist", meta = (ClampMin = "0.0", ClampMax = "2.0"))
+	float MistMaxExtinction = 0.65f;
+
+	/** Vertical falloff inside a pocket, centimetres. Low values keep the fog lying on the ground instead of ballooning. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|Mist", meta = (ClampMin = "1.0"))
+	float MistHeightFalloff = 220.0f;
+
+	/** Forward scattering. Mist lit from behind by a low sun is what makes a valley read as deep. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|Mist", meta = (ClampMin = "0.0", ClampMax = "0.999"))
+	float MistPhaseG = 0.35f;
+
+	/** Cool, slightly desaturated white — water fog, not a warm dust haze. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|Mist")
+	FLinearColor MistAlbedo = FLinearColor(0.86f, 0.90f, 0.94f);
+
 	// --- Exposure --------------------------------------------------------------------
 
 	/**

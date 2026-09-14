@@ -3,10 +3,12 @@
 #include "Anastasis_UnrealV2.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
+#include "Components/LocalFogVolumeComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/ExponentialHeightFog.h"
+#include "Engine/LocalFogVolume.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/SkyLight.h"
 #include "Engine/World.h"
@@ -14,6 +16,15 @@
 #include "HAL/IConsoleManager.h"
 #include "WorldView/AnastasisAtmosphereProfile.h"
 #include "WorldView/AnastasisAtmosphereResolver.h"
+#include "WorldView/AnastasisMistField.h"
+#include "WorldView/AnastasisTerrainSurface.h"
+#include "WorldView/AnastasisWorldEmbodiment.h"
+
+static TAutoConsoleVariable<int32> CVarMist(
+	TEXT("anastasis.Atmosphere.Mist"),
+	1,
+	TEXT("Wetness-driven mist pockets. 0=place none (the global atmosphere is untouched), 1=place them; read when the mist is applied."),
+	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarAtmosphere(
 	TEXT("anastasis.Atmosphere"),
@@ -229,4 +240,134 @@ bool AAnastasisWorldAtmosphere::Apply()
 	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("%s"), *LastSummary);
 
 	return true;
+}
+
+int32 AAnastasisWorldAtmosphere::ApplyMist()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return 0;
+	}
+
+	// Rebuild, never accumulate: a second pass must replace the field, not lay a second one
+	// over it. (The five singleton rig actors above are adopted instead — different problem.)
+	for (const TObjectPtr<ALocalFogVolume>& Volume : MistVolumes)
+	{
+		if (IsValid(Volume))
+		{
+			Volume->Destroy();
+		}
+	}
+	MistVolumes.Reset();
+
+	// The CVar is the A/B switch: without a way to turn the mist off from outside the data,
+	// "the mist changed this image" would be an assertion rather than a measurement.
+	if (CVarMist.GetValueOnAnyThread() == 0)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_MIST pockets=0 reason=cvar_off"));
+		return 0;
+	}
+
+	const UAnastasisAtmosphereProfile& Profile = AnastasisAtmosphere::GetProfile();
+	if (!Profile.bEnabled || !Profile.bMistEnabled)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Display,
+			TEXT("ANASTASIS_MIST pockets=0 reason=%s"),
+			Profile.bEnabled ? TEXT("mist_disabled") : TEXT("profile_disabled"));
+		return 0;
+	}
+
+	AAnastasisWorldEmbodiment* Embodiment = FindExisting<AAnastasisWorldEmbodiment>(World);
+	if (!Embodiment)
+	{
+		// A refusal with a reason, not a crash and not silence: mist is read from the world's
+		// tiles, so a world that was never embodied has nothing to be wet.
+		UE_LOG(LogAnastasis_UnrealV2, Warning,
+			TEXT("ANASTASIS_MIST pockets=0 reason=no_embodiment"));
+		return 0;
+	}
+
+	const AnastasisWorldView::FWorldVisualSnapshot& Snapshot = Embodiment->GetSnapshot();
+	if (Snapshot.Tiles.Num() == 0)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Warning,
+			TEXT("ANASTASIS_MIST pockets=0 reason=empty_snapshot"));
+		return 0;
+	}
+
+	AnastasisMist::FMistParams Params;
+	Params.CellTiles = Profile.MistCellTiles;
+	Params.WetnessThreshold = Profile.MistWetnessThreshold;
+	Params.VolumeRadiusFraction = Profile.MistVolumeRadiusFraction;
+	Params.MaxVolumes = Profile.MistMaxVolumes;
+
+	bool bTruncated = false;
+	const TArray<AnastasisMist::FMistPocket> Pockets =
+		AnastasisMist::BuildMistField(Snapshot, Params, &bTruncated);
+
+	FActorSpawnParameters Params2;
+	Params2.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	Params2.ObjectFlags |= RF_Transient;
+
+	int32 GroundSampled = 0;
+	for (const AnastasisMist::FMistPocket& Pocket : Pockets)
+	{
+		FVector Location = Pocket.Location;
+
+		// The tile altitude is a step; the rendered ground is a slope. Reuse the terrain
+		// lane's own sampler so the mist lies on exactly the surface the trees stand on. It
+		// refuses outside the built footprint, and that refusal is honoured: the pocket then
+		// falls back to the tile altitude it was born with rather than being dropped, since
+		// the DEBUG slab mode has no continuous surface at all.
+		double GroundZ = 0.0;
+		if (AnastasisTerrainSurface::SampleHeight(Snapshot, Location.X, Location.Y, GroundZ))
+		{
+			Location.Z = GroundZ;
+			++GroundSampled;
+		}
+		Location.Z += Profile.MistGroundOffsetUU;
+
+		ALocalFogVolume* Volume = World->SpawnActor<ALocalFogVolume>(Location, FRotator::ZeroRotator, Params2);
+		if (!Volume)
+		{
+			continue;
+		}
+
+		// ULocalFogVolumeComponent's volume is a unit sphere of GetBaseVolumeSize() uu scaled
+		// by the transform, so the radius we want has to go through that constant rather than
+		// be written as a world size.
+		const double Scale = Pocket.RadiusUU / static_cast<double>(ULocalFogVolumeComponent::GetBaseVolumeSize());
+		Volume->SetActorScale3D(FVector(Scale));
+
+		if (ULocalFogVolumeComponent* Component = Volume->GetComponent())
+		{
+			// Thickness follows wetness: the wettest cell gets MistMaxExtinction, a cell
+			// barely over the threshold gets almost nothing. Identical pockets everywhere
+			// would be decoration; this is the simulation showing through.
+			const float Extinction = static_cast<float>(Pocket.Density01) * Profile.MistMaxExtinction;
+			Component->SetRadialFogExtinction(Extinction);
+			Component->SetHeightFogExtinction(Extinction);
+			Component->SetHeightFogFalloff(Profile.MistHeightFalloff);
+			Component->SetFogPhaseG(Profile.MistPhaseG);
+			Component->SetFogAlbedo(Profile.MistAlbedo);
+		}
+
+		MistVolumes.Add(Volume);
+	}
+
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_MIST pockets=%d cell_tiles=%d threshold=%.3f crop=%dx%d ground_sampled=%d ")
+		TEXT("max_extinction=%.3f truncated=%d"),
+		MistVolumes.Num(), Params.CellTiles, Params.WetnessThreshold,
+		Snapshot.W, Snapshot.H, GroundSampled, Profile.MistMaxExtinction, bTruncated ? 1 : 0);
+
+	if (bTruncated)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Warning,
+			TEXT("ANASTASIS_MIST truncated at MistMaxVolumes=%d: the wettest cells were kept, the rest have no fog"),
+			Params.MaxVolumes);
+	}
+
+	return MistVolumes.Num();
 }

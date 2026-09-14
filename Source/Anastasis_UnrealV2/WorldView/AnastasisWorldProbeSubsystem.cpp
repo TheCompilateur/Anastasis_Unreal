@@ -15,6 +15,7 @@
 #include "Dom/JsonValue.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/ExponentialHeightFog.h"
+#include "Engine/LocalFogVolume.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/SkyLight.h"
 #include "EngineUtils.h"
@@ -934,6 +935,20 @@ TSharedRef<FJsonObject> UAnastasisWorldProbeSubsystem::BuildSnapshotObject() con
 		}
 		AtmosphereObj->SetNumberField(TEXT("fog_height_z"), ProbeFog->GetActorLocation().Z);
 	}
+
+	// Mist: counted from the level, like everything else in this block. The number is the point
+	// — it is simultaneously the visual claim ("this world has wet valleys") and the cost
+	// ("this many scene proxies"), and both belong in the snapshot rather than in a log nobody
+	// keeps.
+	int32 MistVolumeCount = 0;
+	for (TActorIterator<ALocalFogVolume> It(World); It; ++It)
+	{
+		if (IsValid(*It))
+		{
+			++MistVolumeCount;
+		}
+	}
+	AtmosphereObj->SetNumberField(TEXT("mist_volume_count"), MistVolumeCount);
 
 	// Exposure: only a volume that actually pins min = max makes two captures comparable, so
 	// report the pinned value rather than "a post process volume exists".

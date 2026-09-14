@@ -75,6 +75,20 @@ def seed(asset):
     asset.set_editor_property('fog_inscattering_color', unreal.LinearColor(0.42, 0.50, 0.56, 1.0))
     asset.set_editor_property('fog_height_z', 0.0)
 
+    # Brume locale pilotee par la simulation (ATMOSPHERE_002). Les poches naissent du
+    # champ Wetness d'AnastasisWorld, c'est-a-dire de la distance a l'eau : c'est de la
+    # brume de riviere et de rive, pas une meteo.
+    set_prop(asset, ('mist_enabled', 'b_mist_enabled'), True)
+    asset.set_editor_property('mist_cell_tiles', 8)
+    asset.set_editor_property('mist_wetness_threshold', 0.35)
+    asset.set_editor_property('mist_volume_radius_fraction', 0.75)
+    asset.set_editor_property('mist_max_volumes', 192)
+    asset.set_editor_property('mist_ground_offset_uu', 60.0)
+    asset.set_editor_property('mist_max_extinction', 0.65)
+    asset.set_editor_property('mist_height_falloff', 220.0)
+    asset.set_editor_property('mist_phase_g', 0.35)
+    asset.set_editor_property('mist_albedo', unreal.LinearColor(0.86, 0.90, 0.94, 1.0))
+
     # Exposition figee : deux captures doivent rester comparables.
     set_prop(asset, ('fixed_exposure', 'b_fixed_exposure'), True)
     asset.set_editor_property('exposure_ev100', 14.0)
@@ -124,6 +138,17 @@ else:
         asset.get_editor_property('fog_height_falloff'),
         asset.get_editor_property('fog_start_distance'),
         asset.get_editor_property('fog_max_opacity')))
+    log('VERIFY mist=%s cell_tiles=%d threshold=%.3f radius_frac=%.2f max_volumes=%d' % (
+        get(('mist_enabled', 'b_mist_enabled')),
+        asset.get_editor_property('mist_cell_tiles'),
+        asset.get_editor_property('mist_wetness_threshold'),
+        asset.get_editor_property('mist_volume_radius_fraction'),
+        asset.get_editor_property('mist_max_volumes')))
+    log('VERIFY mist_extinction=%.3f falloff=%.1f phase_g=%.2f ground_offset=%.1f' % (
+        asset.get_editor_property('mist_max_extinction'),
+        asset.get_editor_property('mist_height_falloff'),
+        asset.get_editor_property('mist_phase_g'),
+        asset.get_editor_property('mist_ground_offset_uu')))
     log('VERIFY fixed_exposure=%s ev100=%.2f sky_rtc=%s' % (
         get(('fixed_exposure', 'b_fixed_exposure')),
         asset.get_editor_property('exposure_ev100'),

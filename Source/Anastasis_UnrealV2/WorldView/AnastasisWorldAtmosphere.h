@@ -57,6 +57,24 @@ public:
 	UFUNCTION(CallInEditor, BlueprintCallable, Category = "Anastasis|Atmosphere")
 	bool Apply();
 
+	/**
+	 * Places the wetness-driven mist pockets (ATMOSPHERE_002).
+	 *
+	 * SEPARATE FROM Apply() ON PURPOSE: the global atmosphere is a property of the level and
+	 * can be set before anything exists, but mist is read from the world's own tiles, so it
+	 * needs AAnastasisWorldEmbodiment to have embodied first. Rather than hide that ordering
+	 * inside BeginPlay, the game mode calls this after spawning the embodiment, and this
+	 * function finds the embodiment itself so an editor button or a script works too.
+	 *
+	 * Returns the number of pockets placed. 0 with no embodiment is a logged refusal, not a
+	 * crash: a world with no tiles has no wet valleys to speak of.
+	 */
+	UFUNCTION(CallInEditor, BlueprintCallable, Category = "Anastasis|Atmosphere")
+	int32 ApplyMist();
+
+	/** Pockets placed by the last ApplyMist(). */
+	int32 GetMistVolumeCount() const { return MistVolumes.Num(); }
+
 	/** One line, the same shape the other WorldView diagnostics use. Written by Apply(). */
 	const FString& GetLastSummary() const { return LastSummary; }
 
@@ -106,6 +124,16 @@ protected:
 	/** Exactly what this instance created, in creation order. Adopted actors are never in here. */
 	UPROPERTY()
 	TArray<TObjectPtr<AActor>> SpawnedActors;
+
+	/**
+	 * The mist pockets, kept apart from SpawnedActors because they are rebuilt wholesale:
+	 * re-applying mist destroys the previous field rather than adopting it. Adoption is right
+	 * for the five singleton rig actors, wrong here — a second pass would otherwise stack a
+	 * new fog bank on every old one and double the extinction with nothing in the world
+	 * having changed.
+	 */
+	UPROPERTY()
+	TArray<TObjectPtr<class ALocalFogVolume>> MistVolumes;
 
 	int32 SpawnedCount = 0;
 	int32 AdoptedCount = 0;
