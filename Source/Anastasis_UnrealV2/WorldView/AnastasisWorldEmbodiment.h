@@ -129,6 +129,19 @@ protected:
 	/** Materiau de tranche s'il est present dans Content, sinon repli sur BaseShapeMaterial. */
 	UMaterialInterface* ResolveSliceMaterial();
 
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> WaterMaterial;
+
+	/**
+	 * Materiau de la NAPPE D'EAU (section 1) -- SHORELINE_FORGE_001.
+	 *
+	 * Section 0 (le sol) et section 1 (l'eau) ne portent plus le meme materiau : le
+	 * bord d'eau a besoin d'etre translucide et gradue, le sol non. Repli sur le
+	 * materiau de tranche si l'asset de rive est absent : un monde sans M_AnastasisShoreWater
+	 * rend alors exactement comme avant, ce qui est aussi le chemin A de la preuve A/B.
+	 */
+	UMaterialInterface* ResolveWaterMaterial();
+
 	AnastasisWorldView::FWorldVisualSnapshot Snapshot;
 	AnastasisWorldView::FPlan Plan;
 	TArray<int32> LocalInstanceIndex;

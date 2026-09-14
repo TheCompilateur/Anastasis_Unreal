@@ -27,6 +27,18 @@ static TAutoConsoleVariable<int32> CVarTerrainForge(
 	TEXT("0=raw tile-center surface. 1=TERRAIN_FORGE tessellated morphology (default). Does not change simulation Alt."),
 	ECVF_Default);
 
+// SHORELINE_FORGE_001. Le bouton qui rend la preuve possible : les deux chemins
+// batissent EXACTEMENT la meme geometrie -- memes sommets, memes triangles, meme
+// nappe plate au niveau de la mer -- et ne different que par ce que la nappe SAIT
+// d'elle-meme. A camera, graine, soleil et exposition identiques, une capture A/B
+// ne mesure donc que le traitement de rive.
+//   0 = nappe historique : une seule couleur opaque, aucun canal.
+//   1 = rive graduee : profondeur, platitude de berge, courant (defaut).
+static TAutoConsoleVariable<int32> CVarShoreline(
+    TEXT("anastasis.Terrain.Shoreline"), 1,
+    TEXT("0=nappe d'eau opaque historique, 1=rive graduee M_AnastasisShoreWater (defaut); applique a l'incarnation."),
+    ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarWorldViewSeed(
 	TEXT("anastasis.WorldView.Seed"),
 	12345,
@@ -553,6 +565,12 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             }
             else
             {
+                // TERRAIN_FORGE a remplace la geometrie entiere, canaux de rive compris :
+                // il rebatit la nappe a la resolution fine et n'a aucune raison de
+                // connaitre SHORELINE_FORGE_001. On les remplit donc ici, sur le maillage
+                // REELLEMENT rendu -- ce qui vaut mieux que l'ancien : la marge suit
+                // desormais le relief tessele, pas le pas de tuile de 100 uu.
+                AnastasisTerrainSurface::FillShorelineChannels(Crop, Geometry);
                 ForgeBasin = FVector(ForgeMesh.BasinX, ForgeMesh.BasinY, ForgeMesh.BasinZ);
                 ForgeLandmark = FVector(ForgeMesh.LandmarkX, ForgeMesh.LandmarkY, ForgeMesh.LandmarkZ);
                 UE_LOG(LogAnastasis_UnrealV2, Display,
@@ -570,17 +588,33 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             // Section 1 : nappe d'eau plate au niveau de la mer, encastree dans le relief.
             ExperimentalSurface->ClearMeshSection(1);
             bWaterSurfaceBuilt = Geometry.WaterTriangles.Num() > 0;
+            const bool bShoreline = CVarShoreline.GetValueOnGameThread() != 0;
             if (bWaterSurfaceBuilt)
             {
                 TArray<FLinearColor> WaterColors;
                 WaterColors.Init(FLinearColor(0.043f, 0.176f, 0.290f, 1.0f), Geometry.WaterVertices.Num());
+                // SHORELINE_FORGE_001 : UV0=(Depth,Flatness), UV1=(Flow,0). La couleur de
+                // sommet reste celle d'avant -- c'est le repli, et c'est ce que rend le
+                // mode 0. La geometrie est identique dans les deux cas : seuls les canaux
+                // et le materiau changent, sinon l'A/B ne prouverait rien.
                 ExperimentalSurface->CreateMeshSection_LinearColor(1, Geometry.WaterVertices, Geometry.WaterTriangles,
-                    Geometry.WaterNormals, TArray<FVector2D>{}, WaterColors, TArray<FProcMeshTangent>{}, false);
+                    Geometry.WaterNormals,
+                    bShoreline ? Geometry.WaterUV0 : TArray<FVector2D>{},
+                    bShoreline ? Geometry.WaterUV1 : TArray<FVector2D>{},
+                    TArray<FVector2D>{}, TArray<FVector2D>{},
+                    WaterColors, TArray<FProcMeshTangent>{}, false);
             }
-            if (UMaterialInterface* SurfaceMaterial = ResolveSliceMaterial())
+            UMaterialInterface* SurfaceMaterial = ResolveSliceMaterial();
+            // Section 0 = le sol, section 1 = la nappe d'eau. Le sol appartient a une
+            // autre mission (GROUND_SURFACE_001) et n'est pas touche ici.
+            UMaterialInterface* ShoreMaterial = bShoreline ? ResolveWaterMaterial() : SurfaceMaterial;
+            if (SurfaceMaterial)
             {
                 ExperimentalSurface->SetMaterial(0, SurfaceMaterial);
-                ExperimentalSurface->SetMaterial(1, SurfaceMaterial);
+            }
+            if (ShoreMaterial)
+            {
+                ExperimentalSurface->SetMaterial(1, ShoreMaterial);
             }
             ExperimentalSurface->SetVisibility(true);
             for (auto& Mesh : TerrainMeshes) if (Mesh) Mesh->SetVisibility(false);
@@ -608,6 +642,16 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 Crop.SourceW, Crop.SourceH, Crop.OriginX, Crop.OriginY, Crop.W, Crop.H, Crop.Tiles.Num(),
                 Geometry.Vertices.Num(), Geometry.Triangles.Num()/3, Geometry.WaterTriangles.Num()/3,
                 SliceMaterial ? TEXT("slice") : TEXT("fallback"));
+            // Ligne SEPAREE, deliberement : la ligne ANASTASIS_TERRAIN ci-dessus imprime en
+            // mode 1 la chaine scellee WORLD_SLICE_006 caractere pour caractere. Une mission
+            // de rive n'a pas a la reecrire pour se rapporter elle-meme.
+            UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_SHORELINE enabled=%d water_material=%s channels=%d water_vertices=%d span_uu=%.0f forged=%d"),
+                bShoreline ? 1 : 0,
+                ShoreMaterial ? *ShoreMaterial->GetName() : TEXT("none"),
+                bShoreline ? Geometry.WaterUV0.Num() : 0,
+                Geometry.WaterVertices.Num(),
+                AnastasisTerrainSurface::ShoreDepthSpan,
+                bForged ? 1 : 0);
         }
         else
         {
@@ -648,6 +692,19 @@ UMaterialInterface* AAnastasisWorldEmbodiment::ResolveSliceMaterial()
 			nullptr, TEXT("/Game/Anastasis/Materials/M_AnastasisSlice.M_AnastasisSlice"));
 	}
 	return SliceMaterial ? SliceMaterial.Get() : BaseShapeMaterial.Get();
+}
+
+UMaterialInterface* AAnastasisWorldEmbodiment::ResolveWaterMaterial()
+{
+	if (!WaterMaterial)
+	{
+		WaterMaterial = LoadObject<UMaterialInterface>(
+			nullptr, TEXT("/Game/Anastasis/Materials/M_AnastasisShoreWater.M_AnastasisShoreWater"));
+	}
+	// Repli explicite et non silencieux : sans l'asset de rive, la nappe reprend le
+	// materiau de tranche et le monde rend comme avant. Le log ANASTASIS_SHORELINE
+	// imprime le nom reellement applique, donc un repli se lit dans la preuve.
+	return WaterMaterial ? WaterMaterial.Get() : ResolveSliceMaterial();
 }
 
 void AAnastasisWorldEmbodiment::ShowSliceSurface()

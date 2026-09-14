@@ -1,5 +1,6 @@
 #include <limits>
 #include "WorldView/AnastasisTerrainSurface.h"
+#include "WorldView/AnastasisTerrainForge.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisWorldDebugVisual.h"
@@ -486,6 +487,353 @@ bool FAnastasisDressingOnGround::RunTest(const FString&)
 
     Actor->Destroy(); Var->Set(Previous, ECVF_SetByCode);
     if (ForgeVar) ForgeVar->Set(PreviousForge, ECVF_SetByCode);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// SHORELINE_FORGE_001
+//
+// Ce test ne verifie pas "que ca rend joli" : il verifie que les canaux de rive
+// sont une LECTURE du monde et rien d'autre. Trois affirmations tiennent toute la
+// mission, et chacune peut echouer :
+//
+//   1. Le trait de cote est exactement la ou le simulateur le met. Une tuile est
+//      d'eau si et seulement si son altitude est sous SeaLevel (AnastasisWorld.cpp).
+//      Donc Depth > 0 sur toute tuile d'eau, et Depth == 0 sur toute tuile emergee,
+//      sans exception et sans tolerance.
+//   2. Aucun canal ne sort de [0,1]. Un canal qui deborde donne un materiau qui
+//      deborde, silencieusement.
+//   3. La geometrie n'a pas bouge. C'est le point qui protege WORLD_SLICE_006 :
+//      la nappe reste plate au niveau de la mer, alignee sur le relief en XY.
+//
+// Le marqueur TERRAIN_SHORELINE sort les valeurs mesurees -- c'est de la que vient
+// le choix de ShoreDepthSpan, pas d'une intuition.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainShoreline, "Anastasis.Terrain.Shoreline", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainShoreline::RunTest(const FString&)
+{
+    const auto Full = AnastasisWorldView::CaptureCanonicalWorld(12345);
+    AnastasisTerrainSurface::FGeometry World, Again;
+    if (!TestTrue(TEXT("monde canonique bati"), AnastasisTerrainSurface::Build(Full, World))) return false;
+
+    const int32 N = World.Vertices.Num();
+    TestEqual(TEXT("9216 sommets"), N, 9216);
+    TestEqual(TEXT("un canal (Depth,Flatness) par sommet de nappe"), World.WaterUV0.Num(), N);
+    TestEqual(TEXT("un canal (Flow,_) par sommet de nappe"), World.WaterUV1.Num(), N);
+    TestEqual(TEXT("un sommet de nappe par sommet de relief"), World.WaterVertices.Num(), N);
+
+    int32 WaterTiles = 0, MarginVertices = 0, FullDepthVertices = 0, FlowingShore = 0;
+    int32 DepthOnLand = 0, NoDepthOnWater = 0, OutOfRange = 0, WaterAtSeaLevel = 0;
+    TArray<double> WaterDepths;
+    double MinDepthUU = TNumericLimits<double>::Max(), MaxDepthUU = 0.0;
+    double MaxFlow = 0.0;
+    for (int32 I = 0; I < N; ++I)
+    {
+        const auto& T = Full.Tiles[I];
+        const double Depth = World.WaterUV0[I].X, Flatness = World.WaterUV0[I].Y, Flow = World.WaterUV1[I].X;
+        if (!FMath::IsFinite(Depth) || !FMath::IsFinite(Flatness) || !FMath::IsFinite(Flow)
+            || Depth < 0.0 || Depth > 1.0 || Flatness < 0.0 || Flatness > 1.0 || Flow < 0.0 || Flow > 1.0
+            || World.WaterUV1[I].Y != 0.0)
+        {
+            ++OutOfRange;
+        }
+        // Le relief est scelle : la nappe ne le touche pas. On le reverifie ici parce que
+        // c'est precisement ce qu'une mission de rive serait tentee de deplacer.
+        if (World.WaterVertices[I].Z != AnastasisTerrainSurface::WaterPlaneZ
+            || FVector2D(World.WaterVertices[I]) != FVector2D(World.Vertices[I]))
+        {
+            ++OutOfRange;
+        }
+
+        const bool bWater = T.Type == AnastasisWorld::ETileType::Water;
+        if (bWater)
+        {
+            ++WaterTiles;
+            // Le TYPE est decide sur l'altitude brute (Alt < SeaLevel), l'ALTITUDE
+            // STOCKEE est arrondie a trois decimales (AnastasisWorld.cpp:414). Une tuile
+            // d'eau dont l'altitude brute vaut 0.2746 se range donc a 0.275 = SeaLevel
+            // exactement, et la nappe n'a plus aucune epaisseur au-dessus d'elle. Ce sont
+            // les seules tuiles d'eau legitimement sans profondeur, et elles sont comptees
+            // a part : confondre les deux cas masquerait une vraie regression.
+            if (Depth <= 0.0)
+            {
+                if (T.Alt >= AnastasisWorld::SeaLevel) ++WaterAtSeaLevel; else ++NoDepthOnWater;
+            }
+            const double DepthUU = AnastasisTerrainSurface::WaterPlaneZ - World.Vertices[I].Z;
+            MinDepthUU = FMath::Min(MinDepthUU, DepthUU);
+            MaxDepthUU = FMath::Max(MaxDepthUU, DepthUU);
+            WaterDepths.Add(DepthUU);
+            if (Depth >= 1.0) ++FullDepthVertices; else ++MarginVertices;
+            if (Flow > 0.0) { ++FlowingShore; MaxFlow = FMath::Max(MaxFlow, Flow); }
+        }
+        else if (Depth != 0.0)
+        {
+            ++DepthOnLand;
+        }
+    }
+
+    TestTrue(TEXT("le monde canonique contient de l'eau"), WaterTiles > 0);
+    // Les deux invariants qui font du trait de cote celui du simulateur, pas un reglage.
+    TestEqual(TEXT("aucune profondeur sur une tuile emergee"), DepthOnLand, 0);
+    TestEqual(TEXT("aucune tuile d'eau sans profondeur, hors arrondi d'altitude"), NoDepthOnWater, 0);
+    // Une poignee : si ce nombre explose, ce n'est plus un arrondi, c'est un decalage
+    // entre la classification du simulateur et l'altitude qu'il stocke.
+    TestTrue(TEXT("l'arrondi d'altitude reste marginal"), WaterAtSeaLevel * 100 < WaterTiles);
+    TestEqual(TEXT("aucun canal hors [0,1], aucune nappe deplacee"), OutOfRange, 0);
+    // Sans marge, la rive resterait binaire : c'est l'existence meme de la mission.
+    TestTrue(TEXT("la marge de rive n'est pas vide"), MarginVertices > 0);
+    TestTrue(TEXT("l'eau franche existe aussi"), FullDepthVertices > 0);
+    // Variante de rive gagnee sur le simulateur, pas ecrite a la main.
+    TestTrue(TEXT("au moins une rive de courant"), FlowingShore > 0);
+
+    if (!TestTrue(TEXT("reconstruction"), AnastasisTerrainSurface::Build(Full, Again))) return false;
+    TestTrue(TEXT("canaux de rive reproductibles"),
+        World.WaterUV0 == Again.WaterUV0 && World.WaterUV1 == Again.WaterUV1);
+    // La tranche scellee est un sous-ensemble exact du monde : memes canaux aux memes sommets.
+    const auto Crop = AnastasisWorldView::CropSnapshot(Full, 0, 0, 32, 32);
+    AnastasisTerrainSurface::FGeometry Sealed;
+    if (!TestTrue(TEXT("tranche scellee batie"), AnastasisTerrainSurface::Build(Crop, Sealed))) return false;
+    int32 CropMismatch = 0, CropDepthMismatch = 0, CropBorderFlatnessDiff = 0;
+    for (int32 I = 0; I < Sealed.WaterUV0.Num(); ++I)
+    {
+        const int32 CX = I % 32, CY = I / 32;
+        const int32 WorldIndex = CY * 96 + CX;
+        // La PROFONDEUR ne depend que du sommet lui-meme : elle doit etre identique
+        // partout, bord compris. Le COURANT aussi : il vient de la tuile source.
+        if (Sealed.WaterUV0[I].X != World.WaterUV0[WorldIndex].X
+            || Sealed.WaterUV1[I] != World.WaterUV1[WorldIndex])
+        {
+            ++CropDepthMismatch;
+        }
+        // La PLATITUDE, elle, se lit dans la normale, donc dans les FACES VOISINES.
+        // Au bord interieur de l'emprise (x=31, y=31) la tranche n'a pas les voisines
+        // que le monde a : sa normale est legitimement differente. C'est la meme classe
+        // de fait que "la palette est relative a l'emprise" dans TERRAIN_SURFACE_EXTENT,
+        // et ce n'est pas une divergence a corriger -- c'est ce qu'une emprise veut dire.
+        const bool bInterior = CX < 31 && CY < 31;
+        if (Sealed.WaterUV0[I].Y != World.WaterUV0[WorldIndex].Y)
+        {
+            if (bInterior) ++CropMismatch; else ++CropBorderFlatnessDiff;
+        }
+    }
+    TestEqual(TEXT("profondeur et courant identiques dans les deux emprises"), CropDepthMismatch, 0);
+    TestEqual(TEXT("platitude identique a l'interieur de la tranche"), CropMismatch, 0);
+    AddInfo(FString::Printf(
+        TEXT("TERRAIN_SHORELINE_CROP border_flatness_diff=%d (attendu : la normale de bord n'a pas les faces voisines du monde)"),
+        CropBorderFlatnessDiff));
+
+    // La distribution, pas seulement les extremes : c'est elle qui dit si ShoreDepthSpan
+    // decoupe le monde reel ou une plage imaginaire. C'est ce chiffre qui a condamne le
+    // span de 120 uu, et c'est lui qu'il faut relire avant d'en changer.
+    WaterDepths.Sort();
+    if (WaterDepths.Num() > 0)
+    {
+        FString Deciles;
+        for (int32 D = 1; D <= 9; ++D)
+        {
+            const int32 Idx = FMath::Clamp((WaterDepths.Num() * D) / 10, 0, WaterDepths.Num() - 1);
+            Deciles += FString::Printf(TEXT(" p%d0=%.1f"), D, WaterDepths[Idx]);
+        }
+        AddInfo(FString::Printf(TEXT("TERRAIN_SHORELINE_DEPTHS uu n=%d%s"), WaterDepths.Num(), *Deciles));
+    }
+
+    AddInfo(FString::Printf(
+        TEXT("TERRAIN_SHORELINE water_vertices=%d margin=%d full_depth=%d flowing=%d depth_uu_min=%.1f depth_uu_max=%.1f span_uu=%.0f max_flow=%.3f"),
+        WaterTiles, MarginVertices, FullDepthVertices, FlowingShore,
+        WaterTiles > 0 ? MinDepthUU : 0.0, MaxDepthUU, AnastasisTerrainSurface::ShoreDepthSpan, MaxFlow));
+    AddInfo(FString::Printf(
+        TEXT("TERRAIN_SHORELINE_ROUNDING water_tiles_at_sealevel=%d/%d (Tile.Alt arrondi a 3 decimales retombe sur SeaLevel)"),
+        WaterAtSeaLevel, WaterTiles));
+
+    // -----------------------------------------------------------------------
+    // GATE 7 -- les trois familles de rive, DESIGNEES PAR MESURE.
+    //
+    // Une rive n'est pas decidee ici : on parcourt le trait de cote et on demande
+    // au relief et a l'hydrologie ce qu'ils y mettent. Un site n'est retenu que
+    // s'il est vraiment un bord d'eau -- tuile d'eau dans la marge, touchant au
+    // moins une tuile emergee -- sinon la camera regarderait le milieu d'un lac.
+    //
+    // Deux emprises sont rapportees, et ce n'est pas de la redondance :
+    //   WORLD  le monde canonique entier, ce que la carte contient vraiment.
+    //   CROP   la tranche scellee 32x32, seule emprise ou la capture d'ecran est
+    //          un chemin eprouve (cf. KNOWN_DEBT n.1 de TERRAIN_SURFACE_EXTENT :
+    //          mode 2 a camera rapprochee n'ecrit aucun PNG). Les vues A/B/C de
+    //          la preuve visuelle se cadrent donc sur CROP, pas sur WORLD.
+    //
+    // Ce marqueur est l'instrument de cadrage de shore-capture.py : aucune capture
+    // de preuve n'est cadree a l'oeil.
+    // -----------------------------------------------------------------------
+    const int32 WW = Full.W;
+    auto Survey = [&](const TCHAR* Scope, int32 LimitW, int32 LimitH)
+    {
+        int32 FlatIdx = INDEX_NONE, SteepIdx = INDEX_NONE, FlowIdx = INDEX_NONE;
+        double BestFlat = -1.0, BestSteep = 2.0, BestFlow = 0.0;
+        int32 FlatFamily = 0, SteepFamily = 0, FlowFamily = 0;
+        for (int32 I = 0; I < N; ++I)
+        {
+            const int32 X = I % WW, Y = I / WW;
+            if (X >= LimitW || Y >= LimitH) continue;
+            if (Full.Tiles[I].Type != AnastasisWorld::ETileType::Water) continue;
+            const double Depth = World.WaterUV0[I].X;
+            if (Depth <= 0.0 || Depth >= 1.0) continue;   // hors marge : pas une rive
+            bool bTouchesLand = false;
+            for (int32 DY = -1; DY <= 1 && !bTouchesLand; ++DY)
+                for (int32 DX = -1; DX <= 1; ++DX)
+                {
+                    const int32 NX = X + DX, NY = Y + DY;
+                    if (NX < 0 || NY < 0 || NX >= WW || NY >= Full.H) continue;
+                    if (Full.Tiles[NY * WW + NX].Type != AnastasisWorld::ETileType::Water) { bTouchesLand = true; break; }
+                }
+            if (!bTouchesLand) continue;
+
+            const double Flatness = World.WaterUV0[I].Y, Flow = World.WaterUV1[I].X;
+            if (Flow > 0.0)
+            {
+                ++FlowFamily;
+                if (Flow > BestFlow) { BestFlow = Flow; FlowIdx = I; }
+                continue;   // une rive de chenal n'est pas une rive dormante
+            }
+            if (Flatness > 0.90) ++FlatFamily;
+            if (Flatness < 0.70) ++SteepFamily;
+            if (Flatness > BestFlat) { BestFlat = Flatness; FlatIdx = I; }
+            if (Flatness < BestSteep) { BestSteep = Flatness; SteepIdx = I; }
+        }
+        auto Site = [&](const TCHAR* Label, int32 Index)
+        {
+            if (Index == INDEX_NONE)
+            {
+                AddInfo(FString::Printf(TEXT("TERRAIN_SHORELINE_SITE %s %s ABSENT"), Scope, Label));
+                return;
+            }
+            const FVector P = World.Vertices[Index];
+            AddInfo(FString::Printf(
+                TEXT("TERRAIN_SHORELINE_SITE %s %s tile=(%d,%d) world=(%.0f,%.0f,%.0f) depth=%.3f flatness=%.3f flow=%.3f"),
+                Scope, Label, Index % WW, Index / WW, P.X, P.Y, P.Z,
+                World.WaterUV0[Index].X, World.WaterUV0[Index].Y, World.WaterUV1[Index].X));
+        };
+        Site(TEXT("TYPE_A_soft_wet_bank"), FlatIdx);
+        Site(TEXT("TYPE_B_flowing_edge"), FlowIdx);
+        Site(TEXT("TYPE_C_steep_bank"), SteepIdx);
+        AddInfo(FString::Printf(TEXT("TERRAIN_SHORELINE_FAMILIES %s soft=%d steep=%d flowing=%d"),
+            Scope, FlatFamily, SteepFamily, FlowFamily));
+        return FIntVector(FlatIdx, FlowIdx, SteepIdx);
+    };
+
+    // -----------------------------------------------------------------------
+    // LE CHEMIN REELLEMENT RENDU.
+    //
+    // Depuis TERRAIN_FORGE, `Build` n'est plus ce que le joueur voit : Apply
+    // REMPLACE la geometrie entiere -- nappe d'eau comprise, rebatie a la
+    // resolution fine -- et ne connait pas les canaux de rive. Tester seulement
+    // `Build` laisserait donc passer exactement la regression qui compte : des
+    // canaux vides sur le seul maillage qui soit affiche, donc Depth=0 partout,
+    // donc une nappe d'opacite nulle. Ce bloc teste le chemin par defaut.
+    // -----------------------------------------------------------------------
+    {
+        AnastasisTerrainSurface::FGeometry Forged;
+        AnastasisTerrainForge::FMesh Mesh;
+        if (TestTrue(TEXT("monde bati pour la forge"), AnastasisTerrainSurface::Build(Full, Forged))
+            && TestTrue(TEXT("forge appliquee"), AnastasisTerrainForge::Apply(Full, Forged, Mesh)))
+        {
+            AnastasisTerrainSurface::FillShorelineChannels(Full, Forged);
+            const int32 FN = Forged.Vertices.Num();
+            TestTrue(TEXT("la forge tessele vraiment"), FN > N);
+            TestEqual(TEXT("un canal par sommet forge"), Forged.WaterUV0.Num(), FN);
+            TestEqual(TEXT("un canal de courant par sommet forge"), Forged.WaterUV1.Num(), FN);
+            TestEqual(TEXT("une nappe par sommet forge"), Forged.WaterVertices.Num(), FN);
+
+            int32 BadRange = 0, Submerged = 0, ForgedMargin = 0, ForgedFull = 0, ForgedFlowing = 0;
+            double ForgedMaxDepthUU = 0.0;
+            TArray<double> ForgedDepths;
+            for (int32 I = 0; I < FN; ++I)
+            {
+                const double D = Forged.WaterUV0[I].X, F = Forged.WaterUV0[I].Y, Fl = Forged.WaterUV1[I].X;
+                if (!FMath::IsFinite(D) || !FMath::IsFinite(F) || !FMath::IsFinite(Fl)
+                    || D < 0.0 || D > 1.0 || F < 0.0 || F > 1.0 || Fl < 0.0 || Fl > 1.0) ++BadRange;
+                if (Forged.WaterVertices[I].Z != AnastasisTerrainSurface::WaterPlaneZ) ++BadRange;
+                const double DepthUU = AnastasisTerrainSurface::WaterPlaneZ - Forged.Vertices[I].Z;
+                if (DepthUU > 0.0)
+                {
+                    ++Submerged;
+                    ForgedDepths.Add(DepthUU);
+                    ForgedMaxDepthUU = FMath::Max(ForgedMaxDepthUU, DepthUU);
+                    if (D >= 1.0) ++ForgedFull; else ++ForgedMargin;
+                    if (Fl > 0.0) ++ForgedFlowing;
+                }
+            }
+            TestEqual(TEXT("aucun canal forge hors [0,1], nappe toujours plate"), BadRange, 0);
+            // Les trois assertions qui interdisent le retour de la regression.
+            TestTrue(TEXT("le maillage forge est immerge quelque part"), Submerged > 0);
+            TestTrue(TEXT("la marge existe sur le maillage forge"), ForgedMargin > 0);
+            TestTrue(TEXT("l'eau franche existe sur le maillage forge"), ForgedFull > 0);
+            TestTrue(TEXT("au moins une rive de courant forgee"), ForgedFlowing > 0);
+
+            ForgedDepths.Sort();
+            FString Dec;
+            for (int32 Dd = 1; Dd <= 9; ++Dd)
+            {
+                const int32 Idx = FMath::Clamp((ForgedDepths.Num() * Dd) / 10, 0, ForgedDepths.Num() - 1);
+                Dec += FString::Printf(TEXT(" p%d0=%.1f"), Dd, ForgedDepths[Idx]);
+            }
+            AddInfo(FString::Printf(
+                TEXT("TERRAIN_SHORELINE_FORGED vertices=%d submerged=%d margin=%d full_depth=%d flowing=%d depth_uu_max=%.1f span_uu=%.0f"),
+                FN, Submerged, ForgedMargin, ForgedFull, ForgedFlowing, ForgedMaxDepthUU,
+                AnastasisTerrainSurface::ShoreDepthSpan));
+            AddInfo(FString::Printf(TEXT("TERRAIN_SHORELINE_FORGED_DEPTHS uu n=%d%s"), ForgedDepths.Num(), *Dec));
+
+            // GATE 7 sur le maillage REELLEMENT rendu. Les sites releves sur la
+            // surface tuilee ne valent plus : la forge exagere le relief, et deux
+            // des trois sites coarse sont passes AU-DESSUS du niveau de la mer --
+            // les cadrer donnait une capture de coteau, pas de rive. Un site de
+            // rive doit etre mesure sur le maillage qu'on photographie.
+            const int32 FW = Mesh.FineW;
+            int32 SoftI = INDEX_NONE, SteepI = INDEX_NONE, FlowI = INDEX_NONE;
+            double BestSoft = -1.0, BestSteep = 2.0, BestFlow = 0.0;
+            int32 SoftN = 0, SteepN = 0, FlowN = 0;
+            for (int32 I = 0; I < FN; ++I)
+            {
+                const double D = Forged.WaterUV0[I].X;
+                if (D <= 0.0 || D >= 1.0) continue;              // hors marge
+                const int32 X = I % FW, Y = I / FW;
+                // Un vrai bord d'eau : au moins un voisin emerge.
+                bool bEdge = false;
+                for (int32 DY = -1; DY <= 1 && !bEdge; ++DY)
+                    for (int32 DX = -1; DX <= 1; ++DX)
+                    {
+                        const int32 NX = X + DX, NY = Y + DY;
+                        if (NX < 0 || NY < 0 || NX >= FW || NY >= Mesh.FineH) continue;
+                        if (Forged.Vertices[NY * FW + NX].Z >= AnastasisTerrainSurface::WaterPlaneZ) { bEdge = true; break; }
+                    }
+                if (!bEdge) continue;
+                const double F = Forged.WaterUV0[I].Y, Fl = Forged.WaterUV1[I].X;
+                if (Fl > 0.0) { ++FlowN; if (Fl > BestFlow) { BestFlow = Fl; FlowI = I; } continue; }
+                if (F > 0.90) ++SoftN;
+                if (F < 0.70) ++SteepN;
+                if (F > BestSoft) { BestSoft = F; SoftI = I; }
+                if (F < BestSteep) { BestSteep = F; SteepI = I; }
+            }
+            auto ForgedSite = [&](const TCHAR* Label, int32 Index)
+            {
+                if (Index == INDEX_NONE) { AddInfo(FString::Printf(TEXT("TERRAIN_SHORELINE_FORGED_SITE %s ABSENT"), Label)); return; }
+                const FVector& P = Forged.Vertices[Index];
+                AddInfo(FString::Printf(
+                    TEXT("TERRAIN_SHORELINE_FORGED_SITE %s world=(%.0f,%.0f,%.0f) depth=%.3f flatness=%.3f flow=%.3f"),
+                    Label, P.X, P.Y, P.Z, Forged.WaterUV0[Index].X, Forged.WaterUV0[Index].Y, Forged.WaterUV1[Index].X));
+            };
+            ForgedSite(TEXT("TYPE_A_soft_wet_bank"), SoftI);
+            ForgedSite(TEXT("TYPE_B_flowing_edge"), FlowI);
+            ForgedSite(TEXT("TYPE_C_steep_bank"), SteepI);
+            AddInfo(FString::Printf(TEXT("TERRAIN_SHORELINE_FORGED_FAMILIES soft=%d steep=%d flowing=%d"), SoftN, SteepN, FlowN));
+            TestTrue(TEXT("les trois familles existent sur le maillage forge"),
+                SoftI != INDEX_NONE && SteepI != INDEX_NONE && FlowI != INDEX_NONE);
+        }
+    }
+
+    const FIntVector WorldSites = Survey(TEXT("WORLD"), Full.W, Full.H);
+    Survey(TEXT("CROP"), 32, 32);
+    TestTrue(TEXT("TYPE_A rive douce trouvee dans le monde"), WorldSites.X != INDEX_NONE);
+    TestTrue(TEXT("TYPE_B rive de chenal trouvee dans le monde"), WorldSites.Y != INDEX_NONE);
+    TestTrue(TEXT("TYPE_C rive abrupte trouvee dans le monde"), WorldSites.Z != INDEX_NONE);
     return true;
 }
 #endif
