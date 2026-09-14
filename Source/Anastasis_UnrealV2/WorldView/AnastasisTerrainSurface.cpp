@@ -55,6 +55,30 @@ FLinearColor TileColor(const AnastasisWorldView::FVisualTile& T, double MinAlt, 
     Color.A = 0.0f;
     return Color;
 }
+
+/**
+ * SHORELINE_FORGE_001 -- lecture de rive pour UN sommet de la nappe d'eau.
+ *
+ * Rien n'est invente ici : TerrainZ est la hauteur du relief deja bati, Normal la
+ * normale deja accumulee, FlowAmt le champ que l'hydrologie a pose sur les tuiles
+ * d'eau. La fonction ne fait que les ramener dans [0,1] pour qu'un materiau les
+ * lise sans avoir a connaitre l'echelle du monde.
+ */
+AnastasisTerrainSurface::FShorelineVertex ShorelineAt(
+    const AnastasisWorldView::FVisualTile& T, double TerrainZ, const FVector& Normal)
+{
+    AnastasisTerrainSurface::FShorelineVertex S;
+    S.Depth = AnastasisTerrainSurface::ShorelineDepthAt(TerrainZ);
+    // Normale unitaire : Z vaut deja 1 sur un fond plat et tend vers 0 sur une paroi.
+    // Un sommet isole pourrait avoir une normale nulle (aucune face) : on le traite
+    // alors comme plat, ce qui donne la marge la plus douce et jamais un artefact.
+    S.Flatness = Normal.IsNearlyZero() ? 1.0 : FMath::Clamp(static_cast<double>(Normal.Z), 0.0, 1.0);
+    // FlowAmt est deja borne [0,1] cote AnastasisSim. On le re-borne sans REFUSER la
+    // construction : un courant aberrant doit degrader la rive, pas faire disparaitre
+    // le monde. Ce qui definit la geometrie, lui, est toujours rejete plus haut.
+    S.Flow = FMath::IsFinite(T.FlowAmt) ? FMath::Clamp(T.FlowAmt, 0.0, 1.0) : 0.0;
+    return S;
+}
 }
 
 bool AnastasisTerrainSurface::SampleHeight(
@@ -89,6 +113,32 @@ bool AnastasisTerrainSurface::SampleHeight(
         ? ZA + Fx * (ZB - ZA) + Fy * (ZC - ZA)
         : ZD + (1.0 - Fx) * (ZC - ZD) + (1.0 - Fy) * (ZB - ZD);
     return FMath::IsFinite(OutZ);
+}
+
+void AnastasisTerrainSurface::FillShorelineChannels(
+    const AnastasisWorldView::FWorldVisualSnapshot& Crop, FGeometry& InOut)
+{
+    const int32 N = InOut.Vertices.Num();
+    InOut.WaterUV0.SetNumUninitialized(N);
+    InOut.WaterUV1.SetNumUninitialized(N);
+    if (N == 0) return;
+    const bool bHaveNormals = InOut.Normals.Num() == N;
+    for (int32 I = 0; I < N; ++I)
+    {
+        // La tuile source se retrouve par la POSITION MONDE, pas par l'index : a la
+        // resolution fine de TERRAIN_FORGE il y a plusieurs sommets par tuile, et
+        // l'index ne designe plus une tuile. C'est la seule difference entre les deux
+        // chemins, et elle est ici.
+        const FVector& P = InOut.Vertices[I];
+        const int32 TileX = FMath::Clamp(
+            FMath::FloorToInt32(P.X / AnastasisWorldView::TileWorldSize) - Crop.OriginX, 0, Crop.W - 1);
+        const int32 TileY = FMath::Clamp(
+            FMath::FloorToInt32(P.Y / AnastasisWorldView::TileWorldSize) - Crop.OriginY, 0, Crop.H - 1);
+        const AnastasisWorldView::FVisualTile& T = Crop.Tiles[TileY * Crop.W + TileX];
+        const FShorelineVertex S = ShorelineAt(T, P.Z, bHaveNormals ? InOut.Normals[I] : FVector::UpVector);
+        InOut.WaterUV0[I] = FVector2D(S.Depth, S.Flatness);
+        InOut.WaterUV1[I] = FVector2D(S.Flow, 0.0);
+    }
 }
 
 bool AnastasisTerrainSurface::Build(const AnastasisWorldView::FWorldVisualSnapshot& Crop, FGeometry& Out)
@@ -142,6 +192,10 @@ bool AnastasisTerrainSurface::Build(const AnastasisWorldView::FWorldVisualSnapsh
         Result.Normals[A] += N; Result.Normals[B] += N; Result.Normals[C] += N;
     }
     for (FVector& N : Result.Normals) N = N.GetSafeNormal();
+    // Canaux de rive. Obligatoirement APRES la normalisation : la platitude de la
+    // berge se lit dans la normale du relief, qui n'existe qu'une fois les faces
+    // accumulees.
+    FillShorelineChannels(Crop, Result);
     Out = MoveTemp(Result);
     return true;
 }
