@@ -246,6 +246,20 @@ Anastasis.Terrain.WorldExtent      Success
 ...Automation Test Queue Empty 7 tests performed.
 ```
 
+La suite `Anastasis` complète, cette fois, et rapportée en **trois catégories**
+comme `AGENTS.md` l'exige — un `Success` sur un test marqué n'est pas un `PASS` :
+
+```
+PASS                  : 58
+KNOWN_EXPECTED_FAILURE: 2      Anastasis.Sim.Parite.Fbm, Anastasis.Sim.Parite.SemantiqueJs
+FAIL                  : 0
+TOTAL                 : 60
+```
+
+Les deux entrées connues sont celles du registre `known-expected-failures.txt`,
+inchangées, et sans rapport avec cette mission. Les deux entrées Python du
+registre ne sont pas dans ce filtre.
+
 **Les marqueurs scellés sont inchangés, caractère pour caractère** — c'est la
 preuve que la géométrie n'a pas bougé :
 
