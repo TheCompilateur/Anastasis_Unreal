@@ -1,92 +1,221 @@
-# ASTRAL ENV-001 — discovery / mission log
-GATE 0 completed before feature edits, 2026-09-13 (Toronto).
-Base: e96175f95afb753fa746ecce05f3d927baf7895a main.
-Canonical dirty: Config/DefaultEditor.ini; untracked .claude/. Preserved.
-Owned branch/worktree: agent/astral-env-001; C:/dev/ANASTASIS_WORKTREES/astral-env-001.
+# ASTRAL — ENV-001 REPORT
 
-Pipeline: AnastasisSim GenerateWorld(seed,96,96) -> WorldView snapshot/crop ->
-WorldEmbodiment -> TerrainSurface ProceduralMesh (ground+sea plane) +
-PresentationRegistry/Resolver -> HISM per archetype/variant.
-No PCG, Landscape, Foliage or material parameter collection consumer found.
-World signals: Type, Alt, Shore, Wetness, Flow, Fertility, Resource/Amount.
-ForestMargin is invalidated by ApplyForest cap; do not consume it.
-Slope can be derived from the existing triangle surface. No human influence data.
+## VERDICT
 
-Asset map (canonical paths, no external copies inspected):
-- Tree: Content/Anastasis/Vegetation/SM_Tree_Generic_01.uasset; live load passed,
-  centered bounds z +/-50, x +/-34, one LOD; primitive trunk+cone silhouette;
-  HISM-capable, usable for three size strata, not botanical diversity.
-- Forest/Ruin look: Content/Anastasis/Presentation/DA_AnastasisPresentation.uasset;
-  live load passed; references remain owned by the registry.
-- Ground/bank/water: Content/Anastasis/Materials/M_AnastasisSlice.uasset;
-  used by terrain; vertex color, shore transition, flat water.
-- Ruin: registry + engine cylinder stand-in; unchanged.
-- Shrubs, ferns, grasses, deadwood, wetland meshes, ecological rocks: none found.
-- LevelPrototyping basic meshes exist; unsuitable ecological art, not repurposed.
-- docs/visual/reference: reference images, not meshes or runtime proof.
+PARTIAL. Première grammaire forestière fonctionnelle, déterministe et observée dans
+Unreal. La lisière et les ouvertures progressent, mais une seule silhouette et
+l'absence de sous-bois/sol forestier laissent un paysage schématique. Aucun PASS
+global de crédibilité écologique ni de performance GPU.
 
-Concurrent worktrees observed:
-asset-agent-002: edits registry and ruin variant script, separate ruin mesh commit.
-atmosphere-mist-002: atmosphere/GameMode/probe files and new MistField files.
-atmosphere-light-001: clean when observed.
-multi-agent-control-001: older fork modifies WorldEmbodiment and TerrainSurface;
-textual and semantic intersection. No automatic integration permitted.
-One active Unreal commandlet was identified as atmosphere-mist-002; preserved.
+## BASELINE
 
-Architecture: pure deterministic forest plan on FULL canonical snapshot, emitted
-only inside actually rendered surface. Three size layers reuse the Forest registry.
-Local forest support + coherent presentation cluster field -> density/age gradient.
-Actual wetness, triangle slope, sea clearance and habitat exclusions condition it.
-Settings grouped on WorldEmbodiment, CVar A/B switch, HISM reused. No simulation edit.
-No new mesh/material/Blueprint/PCG. Missing botanical layers stay explicitly absent.
+- Canonique initial : C:/dev/ANASTASIS_UNREAL, main,
+  e96175f95afb753fa746ecce05f3d927baf7895a.
+- État initial : Config/DefaultEditor.ini modifié ; .claude/ non suivi. Préservés.
+- Travail : agent/astral-env-001, C:/dev/ANASTASIS_WORKTREES/astral-env-001.
+- Base canonique reprise après inspection : 2cf1328c5de4b5b0fdd880b3bf26f279753582a4.
+- Code final compilé/testé/capturé : fe1b665 ; le commit final de rapport et de
+  diagnostic Python ne change pas le C++ ni les assets.
+- Évolutions de main inspectées pendant la mission :
+  7ddae7b (ruine), 4531373 (construction éditeur/unicité), 2cf1328 (arbre branché).
+  Deux conflits résolus dans le seul worktree : conserver Ecology + Surface=2,
+  et ForestDressing + OnConstruction. Aucun écrasement ni écriture sur main.
+  Les mouvements suivants 5321a97 et 293efad concernent l'outillage, pas ce rendu.
+- Worktrees concurrents observés : asset-agent-002, atmosphere-light-001,
+  atmosphere-mist-002, multi-agent-control-001, puis trunk-integration/-002.
+  Intersection WorldEmbodiment avec multi-agent-control inspectée avant combinaison.
 
-KEEP only after build/tests and neutral fixed-camera A/B inspection. Aesthetic
-acceptance remains PARTIAL if geometry or ground coloring still exposes tile classes.
+## DISCOVERY
 
-Canonical HEAD changed during build to 7ddae7b00d7e26f7999e37a5d5ffbe9378f6b4a4.
-Mutation paused; inspected e96175f..7ddae7b: ruin mesh + six asset-related paths only,
-no intersection with ASTRAL source or consumed world data. Resumed on pinned e96175f,
-without merge/rebase/cherry-pick. Canonical DefaultEditor.ini edit had disappeared
-when rechecked; ASTRAL did not edit or restore it.
+Pipeline réel :
+AnastasisSim::GenerateWorld(seed,96,96) -> WorldView snapshot/crop ->
+AAnastasisWorldEmbodiment -> ProceduralMeshComponent (terre/eau) +
+PresentationRegistry/Resolver -> HISM par archétype/variante.
+Aucun consommateur PCG, Landscape, Foliage ou MPC trouvé dans ce pipeline.
 
-Second canonical movement: 7ddae7b -> 453137321b57380486d660abc1140705839fc86c.
-Inspected before resuming: data-asset ruin binding and editor construction path
-(default terrain mode 2, transient HISM, OnConstruction, GameMode/config/tests).
-WorldEmbodiment.h/.cpp overlap textually; runtime reconstruction and component
-lifetime overlap semantically. ASTRAL stays on e96175f; no integration performed.
-Any integration must preserve new transient component handling, constructor-owned
-terrain component and OnConstruction, then rerun reconstruction, grounding and A/B.
+Données : Type, Alt, Wetness, Shore, Flow, Fertility, Resource/Amount.
+ForestMargin est invalidé par le cap forestier du worldgen : non consommé.
+La pente provient du triangle rendu. Pas de donnée d'influence humaine inventée.
 
-Initial compile exposed C4458 (local Layers shadowed AActor::Layers), fixed to
-ForestLayerCounts. A subsequent compile succeeded, but the operator correctly
-rejected its source fingerprint because the legacy grounding test had been scoped
-during the build-lock wait. That run is NOT BUILD::PASS; stable rerun requested.
+| Catégorie | Emplacement / utilisation réelle | Qualité / rôle |
+|---|---|---|
+| Arbre | /Game/Anastasis/Vegetation/SM_Tree_Generic_01 | Chargé dans Unreal ; un LOD, Z -50..50, HISM ; silhouette tronc+cône, trois tailles de composition |
+| Présentation | /Game/Anastasis/Presentation/DA_AnastasisPresentation | Seule autorité des références ; audit live final confirme Tree et Ruin dédiés |
+| Ruine | /Game/Anastasis/Architecture/SM_Ruin_Generic_01 | Asset intégré par l'autre chantier ; placement ASTRAL inchangé |
+| Sol/berge/eau | /Game/Anastasis/Materials/M_AnastasisSlice | Matériau existant, couleurs de sommets, Shore et eau plane ; inchangé |
+| Arbustes/herbes/fougères/bois mort/roseaux/rochers écologiques | Aucun mesh dédié trouvé dans le canonique inspecté | Non créés, non simulés par des objets impropres |
+| Références | docs/visual/reference/ | Direction artistique, pas assets runtime ni instructions autonomes |
+| Prototypage | Content/LevelPrototyping/ | Primitives présentes, non détournées en assets écologiques |
 
-Pinned-base evidence (before updating from canonical):
-BUILD::PASS on frozen source; 49 PASS, 4 KNOWN_EXPECTED_FAILURE, 0 FAIL / 53.
-Ecology: seed12345 438 trees (180 young/129 secondary/129 canopy).
-Rejected: 28 water/footprint, 87 slope, 194 spacing.
-Synthetic edge: fringe40 vs equal-width interior181; dry2242 vs wet1289;
-submerged0, steep0. Three Ecology tests passed.
-Neutral editor A/B: 1162 -> 886 dressing instances, 2 HISM, 6 scene actors.
-Repeated numerical transform hash identical; PIE launched but 2 embodiments
-(the older GameMode duplicated the placed actor). Do not call this SCN PASS.
-Visual: more openings and graded sizes; still cone silhouettes, hard terrain colors.
-Live registry audit confirmed the pinned base still bound Cone/Cylinder; the
-dedicated SM_Tree_Generic_01 was loadable but not selected by that data asset.
+L'audit a distingué présence et branchement : sur e96175f, Tree_Generic était
+chargeable mais le registre rendait encore Cone. Les preuves finales utilisent
+les branchements effectivement intégrés dans 2cf1328.
 
-Canonical now at 2cf1328c5de4b5b0fdd880b3bf26f279753582a4, including both actual
-asset bindings and the single-embodiment fix. Decision: commit ASTRAL, then update
-ONLY this worktree from that exact canonical commit after collision inspection.
-Textual overlap: WorldEmbodiment header and constructor/placement neighborhood.
-Semantic requirements: retain canonical OnConstruction, transient components,
-constructor-owned terrain, ShouldSpawnEmbodiment, registry bindings; retain
-ASTRAL full-source plan and one-time-per-component material setup. No source
-simulation changes in either side. New evidence required after combination.
+## ARCHITECTURE IMPLEMENTED
 
-Combination completed in 73ebc92. Exactly two merge conflicts:
-- .cpp: kept Ecology CVar and canonical Terrain.Surface default=2.
-- .h: kept ForestDressing settings AND canonical OnConstruction/EmbodyFromConsoleVariables.
-Reviewed resulting diff against 2cf1328: only eight ASTRAL files differ.
-Canonical transient components, construction-owned terrain, single-embodiment guard,
-and existing asset bindings are preserved. No canonical file was written by ASTRAL.
+- FAnastasisForestDressingSettings : paramètres regroupés sur WorldEmbodiment,
+  éditables dans Details, aucun nouveau Data Asset ou Blueprint.
+- AnastasisEcologicalDressing::Build : plan pur sur le snapshot canonique complet ;
+  pas de RNG simulation, pas d'asset path, pas d'Actor, rejet avec chemin explicite
+  des entrées invalides.
+- WorldEmbodiment garde le snapshot complet pour le contexte, puis émet uniquement
+  dans l'emprise réellement rendue. Le crop et la caméra ne reconfigurent pas la forêt.
+- Plan forestier -> présentation Forest existante -> scale de strate -> ancrage sur
+  SampleHeight et minimum Z du mesh -> HISM existants.
+- Les matériaux sont préparés une fois par composant et reconstruction, au lieu
+  d'allouer un MID par tuile. Pas de Tick ajouté.
+- Mode historique conservé : anastasis.Dressing.Ecology 0, puis réincarner.
+  Mode candidat : anastasis.Dressing.Ecology 1 (défaut), sur terrain continu.
+  ForestDressing.bEnabled permet également le retour local au comportement ancien.
+- Aucun changement sémantique dans Source/AnastasisSim, worldgen ou ressources.
+  Les petites silhouettes sont des classes de présentation, pas des âges simulés.
+
+## VISUAL RESULT
+
+A/B final : même binaire, scène, seed 12345, emprise96x96, caméra et éclairage.
+Soleil75000 lux, EV10014, fog retiré de la scène temporaire, bloom/vignette/motion
+blur à zéro. Aucun asset/map sauvegardé par le script.
+
+Observé : disparition d'une partie du mur uniforme, grandes silhouettes regroupées,
+petits sujets vers les zones ouvertes, dégagement des berges/pentes.
+Limites : cœur encore sombre et compact, silhouette unique répétée, sol nu et
+couleurs sémantiques visibles, pas de véritables arbustes/litière/bois mort.
+Le cadrage overview est trop distant pour juger les détails ; la vue edge sert
+de preuve perceptuelle. Aucun changement de lumière destiné à masquer ces limites.
+
+Dossier de preuve absolu :
+C:/Users/alex_/.codex/visualizations/2026/09/14/01a09d80-2bbb-75f0-8f3f-b5b2b6ca6ef9/
+
+Captures finales : astral-env-001-current/A_edge.png, B_edge.png,
+A_overview.png, B_overview.png.
+Métadonnées : astral-env-001-current/observation.json.
+Logs : astral-observe-current.log, astral-tests-final.log, astral-build-final.log.
+Le dossier astral-env-001 initial documente une ancienne passe aux primitives :
+NE PAS le présenter comme le résultat final.
+Le premier diagnostic court astral-pie-audit compare accidentellement OFF à ON
+pour son champ de hash ; il est impropre comme preuve DET. Utiliser observation.json
+de la capture complète ou le diagnostic corrigé astral-pie-final.
+
+## ECOLOGICAL RULES
+
+1. Habitat admissible : Forest/Grass/Scrub ; exclusion Water/Stone/Field/Ruin.
+2. Support forestier pondéré par la distance aux centres Forest voisins.
+   Les jeunes sujets peuvent donc déborder la classe Forest sans créer de ressource.
+3. Champ de variation spatiale interpolé, indépendant de la RNG simulation :
+   ouvertures locales et densités cohérentes, pas seulement tirages indépendants.
+4. Probabilité = Density * sqrt(support) * patch * (1 - WetnessPenalty * Wetness).
+5. Gradient de maturité visuelle à partir du support ; trois enveloppes d'échelle.
+6. Rejet de la pente exacte du triangle, du sol sous le niveau d'eau + marge,
+   et des points sans support sous le centre et quatre points racinaires.
+7. Espacement minimal par index spatial ; ordre canonique déterministe.
+
+| Paramètre | Défaut |
+|---|---|
+| CandidatesPerTile | 4 maximum |
+| EdgeRadius | 2,5 tuiles |
+| Density | 0,72 |
+| ClusterSpan / ClearingThreshold | 4 tuiles / 0,28 |
+| MaxSlopeDegrees | 35 degrés |
+| WetnessPenalty | 0,55 |
+| WaterClearanceUU | 12 cm |
+| MinimumSpacing / RootRadius | 0,55 / 0,12 tuile |
+| YoungScale | 0,25–0,45 fois l'enveloppe du registre |
+| SecondaryScale | 0,50–0,78 |
+| CanopyScale | 0,95–1,20 |
+
+## PERFORMANCE
+
+- Éditeur A/B : 6 Actors de scène dans les deux cas, dont un embodiment.
+- Dressing : 1162 -> 886 instances = 438 arbres + 448 ruines.
+- Forêt : 180 jeunes, 129 secondaires, 129 dominants.
+- Deux HISM vivants en éditeur et en PIE (438 Tree, 448 Ruin), aucun Actor par arbre.
+- Le compteur interne DressingMeshes.Num() logge quatre slots en PIE ; l'inspection
+  get_components_by_class n'en trouve que deux vivants, total886. Dette de compteur/
+  références lors de duplication ; pas de double peuplement observé.
+- Génération CPU observée, session finale : OFF18,365–19,958ms ;
+  ON14,013–31,966ms. Peu d'échantillons, machine concurrente, coûts par reconstruction,
+  pas temps de frame ni preuve de gain.
+- Draw calls réels, frame GPU, VRAM, longues sessions et densités extrêmes : UNKNOWN.
+- Un seul LOD sur l'arbre ; aucune affirmation de gain Nanite ou de tenue à grande densité.
+
+## VALIDATION
+
+| Gate | Résultat et portée |
+|---|---|
+| BUILD | PASS : compilation Unity propre, puis cache de build contrôlé au portail finish |
+| LAUNCH | PASS : éditeur dédié, captures, PIE actif, sortie0 |
+| [SCN] | PASS borné : un embodiment PIE, deux HISM vivants,886 instances ; ancrage et exclusion testés |
+| [VIS] | FAIL pour la cible complète de paysage écologiquement crédible ; progrès A/B réel, encore schématique |
+| [PERF] | UNKNOWN pour le rendu GPU ; inventaire et coûts CPU ci-dessus seulement |
+| [DET] | PASS : plan répété et hash des transforms numériques identique |
+
+Portail finish sur fe1b665 : HANDOFF_READY::YES.
+Suite : 51 PASS / 4 KNOWN_EXPECTED_FAILURE / 0 FAIL, total55.
+Les quatre divergences du registre restent séparées :
+Fbm, SemantiqueJs et les deux expectedFailure Python AnastasisInspect.
+
+Tests significatifs :
+- Anastasis.Ecology.DeterminismAndAnchoring :438 instances ; même ordre, positions,
+  scale/strate/seed, ancrage, espacement, snapshot inchangé.
+- Anastasis.Ecology.EdgeAndConditioning : frange40 / intérieur de même largeur181 ;
+  sec2242 / humide1289 ; immergé0 / pente impossible0.
+- Anastasis.Ecology.RejectInvalidInput :NaN refusé à Source.Tiles[17],
+  configuration invalide et faux contexte crop refusés.
+- Anastasis.Terrain.DressingOnGround : contrat historique conservé explicitement,
+  erreur d'ancrage0 ; les tests terrain/parité restent verts ou attendus au registre.
+- Anastasis.Visual.SingleEmbodiment et Anastasis.Level.HoldsNoWorldTruth : PASS.
+- Hash final :4d22d7d9879c140cb3f922dc0b4ffe52f421547a0fad096ccc9a190d54452810.
+
+## FILES CHANGED
+
+Diff ASTRAL exact contre 2cf1328, racine C:/dev/ANASTASIS_WORKTREES/astral-env-001 :
+
+- Source/Anastasis_UnrealV2/WorldView/AnastasisEcologicalDressing.h
+- Source/Anastasis_UnrealV2/WorldView/AnastasisEcologicalDressing.cpp
+- Source/Anastasis_UnrealV2/WorldView/AnastasisEcologicalDressingTests.cpp
+- Source/Anastasis_UnrealV2/WorldView/AnastasisWorldEmbodiment.h
+- Source/Anastasis_UnrealV2/WorldView/AnastasisWorldEmbodiment.cpp
+- Source/Anastasis_UnrealV2/WorldView/AnastasisTerrainSurfaceTests.cpp
+- tools/unreal/astral-observe.py
+- docs/unreal/ASTRAL_ENV_001.md
+
+Aucun asset généré ou binaire commité par ASTRAL. Les assets et changements de
+cycle de vie repris du canonique gardent leur provenance dans le commit de merge.
+
+## COMMITS
+
+- bb883e6 : grammaire forestière, raccord HISM, tests et observation.
+- 73ebc92 : combinaison isolée avec le canonique inspecté2cf1328.
+- fe1b665 : correction du type de plan des tests pour compilation Unity.
+- Commit de clôture : rapport et extension du diagnostic PIE uniquement.
+Aucun push ni intégration dans main effectué par ASTRAL.
+Après clôture, un intégrateur concurrent a intégré le code fe1b665 dans main :
+d3ebf67 puis main1cbeef680c3ce51f21cd2cd273d4771b56af9de3, également avec la
+brume8200206 et de la documentation migration. Cela a été constaté en lecture
+seule. Ce canonique combiné n'a PAS été validé par cette mission ; ne pas lui
+transférer les PASS du candidat. Le rapport final et le diagnostic Python ont
+été terminés ensuite sur la branche ASTRAL.
+
+## REGRESSIONS
+
+Aucune régression détectée par la suite. Le défaut de double embodiment de
+l'ancienne base a été éliminé en reprenant le correctif canonique, confirmé en PIE.
+Les risques non tranchés ne sont pas des PASS : performances GPU, silhouettes
+répétées, lisibilité du sol et stabilité des compteurs sur de longues reconstructions.
+
+## FOLLOW-UP OPPORTUNITIES
+
+| Travail non réalisé | Bénéfice | Coût estimé | Dépendances | Priorité |
+|---|---|---|---|---|
+| Transition du sol forêt/lisière | Relier visuellement la végétation au terrain nu | 1 passe bornée | Propriété du matériau/terrain, même A/B | Haute |
+| Nettoyer/distinguer slots et HISM vivants | Métrologie exacte après duplication PIE | Petit correctif | Propriétaire cycle de construction | Moyenne |
+| Variantes botaniques/sous-bois | Réduire la répétition et matérialiser les strates basses | Moyen, disponibilité inconnue | Audit/import d'assets existants avant toute création | Moyenne |
+| Profil GPU à densité accrue | Décider culling/LOD sur mesure réelle | 1 campagne bornée | Scène figée, machine disponible | Moyenne |
+| Berges humides et bois mort | Élargir la grammaire écologique | Moyen | Assets réellement disponibles | Ultérieure |
+
+## NEXT RECOMMENDED MISSION
+
+ASTRAL-ENV-002 : une transition de sol forêt -> lisière sur la même zone, en
+réutilisant le matériau existant. Paramètres et caméra figés, aucun nouvel éclairage,
+aucune extension à l'hydrologie complète. Trancher par A/B si les strates végétales
+et leur sol commencent réellement à former un même milieu.
