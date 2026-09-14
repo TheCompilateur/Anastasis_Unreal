@@ -5,6 +5,7 @@
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisWorldView.h"
 #include "WorldView/AnastasisEcologicalDressing.h"
+#include "WorldView/AnastasisGeologicalDressing.h"
 #include "AnastasisWorldEmbodiment.generated.h"
 
 class UHierarchicalInstancedStaticMeshComponent;
@@ -28,6 +29,10 @@ public:
     /** Forest grammar only; mesh references stay in the presentation registry. */
     UPROPERTY(EditAnywhere, Category="Anastasis|Ecology")
     FAnastasisForestDressingSettings ForestDressing;
+
+	/** Cliff / outcrop / talus grammar. Meshes live in /Game/Anastasis/Lithos. */
+	UPROPERTY(EditAnywhere, Category="Anastasis|Lithos")
+	FAnastasisLithosDressingSettings LithosDressing;
 
 #if WITH_EDITOR
 	/**

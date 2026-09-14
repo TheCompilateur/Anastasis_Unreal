@@ -4,6 +4,7 @@
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisTerrainForge.h"
+#include "WorldView/AnastasisGeologicalDressing.h"
 
 
 #include "Anastasis_UnrealV2.h"
@@ -18,6 +19,11 @@
 static TAutoConsoleVariable<int32> CVarEcologicalDressing(
     TEXT("anastasis.Dressing.Ecology"), 1,
     TEXT("0=legacy tile dressing, 1=forest grammar on continuous terrain; applied on embodiment."), ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarLithosDressing(
+	TEXT("anastasis.Dressing.Lithos"), 1,
+	TEXT("0=no geological formations. 1=LITHOS_FORGE cliff/outcrop/talus grammar; applied on embodiment."),
+	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
@@ -105,6 +111,21 @@ namespace
 		const double Unit = static_cast<double>(H) / static_cast<double>(MAX_uint32);
 		return Unit < EmergentShareOfCanopy ? EAnastasisStatureClass::Emergent : EAnastasisStatureClass::Canopy;
 	}
+
+	constexpr const TCHAR* LithosMeshPaths[AnastasisGeologicalDressing::KindCount] = {
+		TEXT("/Game/Anastasis/Lithos/SM_Lithos_VerticalWall_01.SM_Lithos_VerticalWall_01"),
+		TEXT("/Game/Anastasis/Lithos/SM_Lithos_InclinedWall_01.SM_Lithos_InclinedWall_01"),
+		TEXT("/Game/Anastasis/Lithos/SM_Lithos_Stratum_01.SM_Lithos_Stratum_01"),
+		TEXT("/Game/Anastasis/Lithos/SM_Lithos_Cornice_01.SM_Lithos_Cornice_01"),
+		TEXT("/Game/Anastasis/Lithos/SM_Lithos_Outcrop_01.SM_Lithos_Outcrop_01"),
+		TEXT("/Game/Anastasis/Lithos/SM_Lithos_Fractured_01.SM_Lithos_Fractured_01"),
+		TEXT("/Game/Anastasis/Lithos/SM_Lithos_DetachedBlock_01.SM_Lithos_DetachedBlock_01"),
+		TEXT("/Game/Anastasis/Lithos/SM_Lithos_TalusCluster_01.SM_Lithos_TalusCluster_01"),
+		TEXT("/Game/Anastasis/Lithos/SM_Lithos_Transition_01.SM_Lithos_Transition_01"),
+		TEXT("/Game/Anastasis/Lithos/SM_Lithos_Summit_01.SM_Lithos_Summit_01"),
+	};
+	constexpr const TCHAR* LithosMaterialPath =
+		TEXT("/Game/Anastasis/Materials/M_AnastasisLithos.M_AnastasisLithos");
 }
 
 AAnastasisWorldEmbodiment::AAnastasisWorldEmbodiment()
@@ -429,6 +450,87 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 At(SiteConiferousness, 0.0), At(SiteConiferousness, 0.5), At(SiteConiferousness, 1.0));
         }
     }
+	const bool bLithos = SurfaceCrop && LithosDressing.bEnabled && CVarLithosDressing.GetValueOnGameThread() != 0;
+	if (bLithos)
+	{
+		AnastasisGeologicalDressing::FPlan LithosPlan;
+		FString LithosError;
+		if (!AnastasisGeologicalDressing::Build(CanonicalSource, LithosDressing, LithosPlan, LithosError))
+		{
+			UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_LITHOS rejected=%s"), *LithosError);
+		}
+		else
+		{
+			static FAnastasisPresentationEntry LithosEntries[AnastasisGeologicalDressing::KindCount];
+			static bool bLithosEntriesReady = false;
+			if (!bLithosEntriesReady)
+			{
+				for (int32 K = 0; K < AnastasisGeologicalDressing::KindCount; ++K)
+				{
+					LithosEntries[K].ArchetypeId = FName(*FString::Printf(
+						TEXT("Lithos_%s"), AnastasisGeologicalDressing::KindName(
+							static_cast<AnastasisGeologicalDressing::EKind>(K))));
+					LithosEntries[K].bEnabled = true;
+				}
+				bLithosEntriesReady = true;
+			}
+
+			UMaterialInterface* LithosMaterial = LoadObject<UMaterialInterface>(nullptr, LithosMaterialPath);
+			int32 KindCounts[AnastasisGeologicalDressing::KindCount] = {};
+			int32 MissingMesh = 0;
+			int32 Placed = 0;
+			for (const auto& P : LithosPlan.Instances)
+			{
+				const int32 KindIndex = static_cast<int32>(P.Kind);
+				UStaticMesh* LithosMesh = LoadObject<UStaticMesh>(nullptr, LithosMeshPaths[KindIndex]);
+				if (!LithosMesh)
+				{
+					++MissingMesh;
+					continue;
+				}
+
+				double GroundZ = 0.0;
+				const double Rad = FMath::DegreesToRadians(P.AspectYaw);
+				const FVector2D Uphill(FMath::Cos(Rad), FMath::Sin(Rad));
+				const FVector2D Embedded(P.Ground.X + Uphill.X * P.EmbedUU, P.Ground.Y + Uphill.Y * P.EmbedUU);
+				if (!(AnastasisTerrainForge::SampleActive(Embedded.X, Embedded.Y, GroundZ)
+					|| AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, Embedded.X, Embedded.Y, GroundZ)))
+				{
+					++UngroundedTiles;
+					continue;
+				}
+
+				AnastasisPresentation::FResolvedPresentation R;
+				R.Entry = &LithosEntries[KindIndex];
+				R.VariantIndex = 0;
+				R.Mesh = LithosMesh;
+				R.MaterialOverride = LithosMaterial;
+				auto* MeshComp = Prepare(R);
+				if (!MeshComp)
+				{
+					continue;
+				}
+
+				const double Scale = P.ScaleMultiplier;
+				const double Lift = 0.5 * AnastasisPresentation::EngineBasicShapeSize * Scale;
+				FTransform Pose;
+				Pose.SetScale3D(FVector(Scale));
+				Pose.SetRotation(FRotator(P.PitchDegrees, P.AspectYaw, 0.0).Quaternion());
+				Pose.SetLocation(FVector(Embedded.X, Embedded.Y, GroundZ + Lift));
+				MeshComp->AddInstance(Pose, false);
+				++KindCounts[KindIndex];
+				++Placed;
+				++DressingInstanceCount;
+			}
+			UE_LOG(LogAnastasis_UnrealV2, Display,
+				TEXT("ANASTASIS_LITHOS placed=%d plan=%d cliff=%d slope=%d talus=%d summit=%d missing_mesh=%d refused_water=%d refused_flat=%d refused_spacing=%d wall=%d inclined=%d stratum=%d cornice=%d outcrop=%d fractured=%d detached=%d talus_mesh=%d transition=%d peak=%d"),
+				Placed, LithosPlan.Instances.Num(),
+				LithosPlan.CliffCount, LithosPlan.SlopeCount, LithosPlan.TalusCount, LithosPlan.SummitCount,
+				MissingMesh, LithosPlan.RejectedWater, LithosPlan.RejectedFlat, LithosPlan.RejectedSpacing,
+				KindCounts[0], KindCounts[1], KindCounts[2], KindCounts[3], KindCounts[4],
+				KindCounts[5], KindCounts[6], KindCounts[7], KindCounts[8], KindCounts[9]);
+		}
+	}
     UE_LOG(LogAnastasis_UnrealV2, Display,
         TEXT("ANASTASIS_ECOLOGY_COST enabled=%d generation_ms=%.3f components=%d instances=%d"),
         bEcology, (FPlatformTime::Seconds() - DressingStart) * 1000.0, DressingMeshes.Num(), DressingInstanceCount);
