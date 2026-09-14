@@ -13,8 +13,15 @@ Le piege UE-Python que set_ruin_variant.py a paye une fois est conserve ici :
 get_editor_property sur un struct rend une COPIE. Muter la copie puis appeler
 save_asset ne salit rien et save_asset ne fait rien. Chaque struct mute doit
 etre reecrit dans son tableau par index, et le tableau reecrit dans son
-proprietaire, avant de sauver. La verification finale recharge l'asset depuis
-le disque plutot que de croire l'etat en memoire de ce meme process.
+proprietaire, avant de sauver.
+
+La verification, elle, ne peut PAS toujours relire le disque : UE 5.8 n'expose
+pas EditorAssetLibrary.unload_assets, et l'appeler sans garde leve
+AttributeError apres le save -- la mutation passe, la verification ne sort
+jamais. C'est ce qui arrive a set_ruin_variant.py. Ici le dechargement est
+tente puis signale : VERIFY force=DISQUE s'il a marche, force=MEMOIRE sinon.
+Dans le second cas la preuve solide est un SECOND run dans un process neuf, ou
+le script idempotent doit annoncer 'deja cable' pour chaque cible.
 
 Idempotent : une entree deja correcte est signalee et laissee telle quelle.
 
@@ -86,9 +93,43 @@ def wire_one(entries, sem_name, mesh_path):
     return "fail"
 
 
+def try_unload():
+    """Decharge le registre si l'API de cette version d'UE le permet.
+
+    EditorAssetLibrary.unload_assets n'existe pas en UE 5.8 : s'en servir sans
+    garde levait AttributeError APRES le save, donc la mutation passait mais la
+    verification ne sortait jamais (c'est le cas de set_ruin_variant.py). On
+    essaie les points d'entree connus et on dit franchement si aucun n'a marche.
+    """
+    sub = getattr(unreal, "EditorAssetSubsystem", None)
+    if sub is not None:
+        try:
+            fn = getattr(unreal.get_editor_subsystem(sub), "unload_asset", None)
+            if fn is not None:
+                fn(REGISTRY_PATH)
+                return True
+        except Exception as exc:
+            log("unload via EditorAssetSubsystem refuse: %s" % exc)
+    fn = getattr(unreal.EditorAssetLibrary, "unload_assets", None)
+    if fn is not None:
+        try:
+            fn([REGISTRY_PATH])
+            return True
+        except Exception as exc:
+            log("unload via EditorAssetLibrary refuse: %s" % exc)
+    return False
+
+
 def verify(results):
-    """Recharge depuis le disque et controle chaque cible visee."""
-    unreal.EditorAssetLibrary.unload_assets([REGISTRY_PATH])
+    """Controle chaque cible visee.
+
+    Fort si le dechargement a reussi (relecture disque). Sinon FAIBLE : on lit
+    l'etat memoire que ce process vient de muter. La preuve solide est alors un
+    SECOND run dans un process neuf : le script etant idempotent, il doit y
+    annoncer 'deja cable' pour chaque cible.
+    """
+    strong = try_unload()
+    log("VERIFY force=%s" % ("DISQUE" if strong else "MEMOIRE (relancer pour une preuve disque)"))
     reloaded = unreal.EditorAssetLibrary.load_asset(REGISTRY_PATH)
     if reloaded is None:
         log("VERIFY::FAIL rechargement impossible")
