@@ -780,6 +780,52 @@ bool FAnastasisTerrainShoreline::RunTest(const FString&)
                 FN, Submerged, ForgedMargin, ForgedFull, ForgedFlowing, ForgedMaxDepthUU,
                 AnastasisTerrainSurface::ShoreDepthSpan));
             AddInfo(FString::Printf(TEXT("TERRAIN_SHORELINE_FORGED_DEPTHS uu n=%d%s"), ForgedDepths.Num(), *Dec));
+
+            // GATE 7 sur le maillage REELLEMENT rendu. Les sites releves sur la
+            // surface tuilee ne valent plus : la forge exagere le relief, et deux
+            // des trois sites coarse sont passes AU-DESSUS du niveau de la mer --
+            // les cadrer donnait une capture de coteau, pas de rive. Un site de
+            // rive doit etre mesure sur le maillage qu'on photographie.
+            const int32 FW = Mesh.FineW;
+            int32 SoftI = INDEX_NONE, SteepI = INDEX_NONE, FlowI = INDEX_NONE;
+            double BestSoft = -1.0, BestSteep = 2.0, BestFlow = 0.0;
+            int32 SoftN = 0, SteepN = 0, FlowN = 0;
+            for (int32 I = 0; I < FN; ++I)
+            {
+                const double D = Forged.WaterUV0[I].X;
+                if (D <= 0.0 || D >= 1.0) continue;              // hors marge
+                const int32 X = I % FW, Y = I / FW;
+                // Un vrai bord d'eau : au moins un voisin emerge.
+                bool bEdge = false;
+                for (int32 DY = -1; DY <= 1 && !bEdge; ++DY)
+                    for (int32 DX = -1; DX <= 1; ++DX)
+                    {
+                        const int32 NX = X + DX, NY = Y + DY;
+                        if (NX < 0 || NY < 0 || NX >= FW || NY >= Mesh.FineH) continue;
+                        if (Forged.Vertices[NY * FW + NX].Z >= AnastasisTerrainSurface::WaterPlaneZ) { bEdge = true; break; }
+                    }
+                if (!bEdge) continue;
+                const double F = Forged.WaterUV0[I].Y, Fl = Forged.WaterUV1[I].X;
+                if (Fl > 0.0) { ++FlowN; if (Fl > BestFlow) { BestFlow = Fl; FlowI = I; } continue; }
+                if (F > 0.90) ++SoftN;
+                if (F < 0.70) ++SteepN;
+                if (F > BestSoft) { BestSoft = F; SoftI = I; }
+                if (F < BestSteep) { BestSteep = F; SteepI = I; }
+            }
+            auto ForgedSite = [&](const TCHAR* Label, int32 Index)
+            {
+                if (Index == INDEX_NONE) { AddInfo(FString::Printf(TEXT("TERRAIN_SHORELINE_FORGED_SITE %s ABSENT"), Label)); return; }
+                const FVector& P = Forged.Vertices[Index];
+                AddInfo(FString::Printf(
+                    TEXT("TERRAIN_SHORELINE_FORGED_SITE %s world=(%.0f,%.0f,%.0f) depth=%.3f flatness=%.3f flow=%.3f"),
+                    Label, P.X, P.Y, P.Z, Forged.WaterUV0[Index].X, Forged.WaterUV0[Index].Y, Forged.WaterUV1[Index].X));
+            };
+            ForgedSite(TEXT("TYPE_A_soft_wet_bank"), SoftI);
+            ForgedSite(TEXT("TYPE_B_flowing_edge"), FlowI);
+            ForgedSite(TEXT("TYPE_C_steep_bank"), SteepI);
+            AddInfo(FString::Printf(TEXT("TERRAIN_SHORELINE_FORGED_FAMILIES soft=%d steep=%d flowing=%d"), SoftN, SteepN, FlowN));
+            TestTrue(TEXT("les trois familles existent sur le maillage forge"),
+                SoftI != INDEX_NONE && SteepI != INDEX_NONE && FlowI != INDEX_NONE);
         }
     }
 

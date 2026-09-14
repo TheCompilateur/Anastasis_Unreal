@@ -49,23 +49,33 @@ inline constexpr int32 TrianglesFor(int32 W, int32 H) { return 2 * (W - 1) * (H 
  * Profondeur (UU) au-dela de laquelle l'eau est franche : au-dessous se joue
  * toute la marge de rive ; au-dessus, la nappe est pleine et uniforme.
  *
- * MESUREE, PAS CHOISIE. Une premiere version valait 120 uu, par raisonnement :
- * le pas de tuile fait 100 uu et AltitudeScale vaut 1000, donc 120 uu est la
- * marche qu'une berge de pente 1:1 franchit en une tuile. Le raisonnement etait
- * juste et la valeur etait fausse. Le marqueur TERRAIN_SHORELINE du test
- * Anastasis.Terrain.Shoreline a mesure le monde canonique : sa fosse la plus
- * profonde fait 91 uu. Avec un span de 120, AUCUN sommet du monde n'atteignait
- * jamais l'eau franche -- tout le monde etait marge, donc plus rien n'etait une
- * marge. Le test a echoue exactement la-dessus ("l'eau franche existe aussi").
+ * MESUREE, PAS CHOISIE, ET RE-MESUREE DEPUIS TERRAIN_FORGE.
  *
- * 60 uu, soit les deux tiers de la profondeur maximale relevee : la nappe atteint
- * son etat plein bien avant le point le plus creux du monde, donc "eau franche"
- * est un etat reellement occupe et pas une limite jamais atteinte. La marge,
- * elle, occupe 0.16 a 0.55 de ce span selon la platitude de la berge, soit les
- * 10 a 33 premiers uu d'eau.
+ * Premiere version : 120 uu, par raisonnement -- le pas de tuile fait 100 uu et
+ * AltitudeScale vaut 1000, donc 120 uu est la marche qu'une berge de pente 1:1
+ * franchit en une tuile. Le raisonnement etait juste et la valeur etait fausse :
+ * la surface tuilee ne creusait qu'a 91 uu, donc AUCUN sommet n'atteignait jamais
+ * l'eau franche. Le test a echoue exactement la-dessus.
  *
- * Changer cette valeur sans relire TERRAIN_SHORELINE_DEPTHS, c'est refaire
- * l'erreur de 120.
+ * Depuis, TERRAIN_FORGE tessele le relief et exagere le fond immerge (DepthExag
+ * 1.7) : sur le maillage REELLEMENT rendu, l'eau descend a 614 uu. Une
+ * justification en "deux tiers du maximum" n'a donc plus aucun sens -- elle
+ * donnerait 400 uu et noierait toute la rive dans une seule teinte.
+ *
+ * 60 uu est cale sur la DISTRIBUTION, et sur son debut : c'est la ou est la rive.
+ * Deciles de profondeur du maillage forge (TERRAIN_SHORELINE_FORGED_DEPTHS) :
+ *
+ *     p10=11.1  p20=21.7  p30=30.6  p40=35.5  p50=41.2
+ *     p60=47.0  p70=54.0  p80=62.5  p90=78.6        max=614
+ *
+ * A 60 uu, la marge couvre les sept premiers deciles de l'eau du monde et le
+ * dernier quart reste de l'eau franche -- un etat reellement occupe (3641 sommets
+ * sur 16234 immerges), pas une limite jamais atteinte. La bande de limon, elle,
+ * occupe 0.10 a 0.32 de ce span selon la platitude, soit 6 a 19 uu : elle se
+ * ferme avant le p20. C'est un bord d'eau, pas un lac brun.
+ *
+ * Les deux marqueurs sortent a chaque execution. Changer cette constante sans les
+ * relire, c'est refaire l'erreur de 120.
  */
 inline constexpr double ShoreDepthSpan = 60.0;
 

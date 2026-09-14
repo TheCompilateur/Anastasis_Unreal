@@ -2,124 +2,108 @@
 
 Preuve vivante de `docs/unreal/SHORELINE_FORGE_001.md`.
 
+**Prises sur le relief forgé** (`main` à `ea87acc`, TERRAIN_FORGE actif par
+défaut, 381×381 = 145 161 sommets). Les captures faites avant ce rebasage
+montraient un monde qui n'existe plus ; elles ont toutes été refaites, aucune
+n'a été recopiée.
+
 **Comparaison contrôlée.** Tout est identique entre les deux images d'une paire :
 même niveau (`/Game/Anastasis/Maps/Lvl_AnastasisSlice`), seed `12345`, monde
-canonique `96×96` (`anastasis.Terrain.Surface 2`), soleil 75 000 lux à −38/−55,
-exposition figée EV100 = 14, `viewmode lit`, `ShowFlag.MotionBlur 0`, **même
-caméra au uu près**. Seule change `anastasis.Terrain.Shoreline`.
+canonique `96×96`, soleil 75 000 lux à −38/−55, exposition figée EV100 = 14,
+`viewmode lit`, `ShowFlag.MotionBlur 0`, **même caméra au uu près**. Seule change
+`anastasis.Terrain.Shoreline`.
 
 | CVar | Ce que le log imprime |
 |---|---|
-| `0` | `ANASTASIS_SHORELINE enabled=0 water_material=M_AnastasisSlice channels=0` |
-| `1` | `ANASTASIS_SHORELINE enabled=1 water_material=M_AnastasisShoreWater channels=9216` |
+| `0` | `ANASTASIS_SHORELINE enabled=0 water_material=M_AnastasisSlice channels=0 water_vertices=145161 forged=1` |
+| `1` | `ANASTASIS_SHORELINE enabled=1 water_material=M_AnastasisShoreWater channels=145161 water_vertices=145161 forged=1` |
 
-La géométrie est identique dans les deux cas — `ANASTASIS_TERRAIN` imprime
-`vertices=9216 triangles=18050 water_triangles=3544` des deux côtés. **Aucun
-sommet ne bouge entre A et B** : ce qui change est ce que la nappe sait d'elle.
+`channels == water_vertices` est la ligne qui compte : elle prouve que chaque
+sommet de la nappe **réellement rendue** porte ses canaux. C'est exactement ce
+qui manquait juste après le rebasage, et ce que le test interdit désormais de
+reperdre.
 
 | Fichier | Octets | SHA-256 (16) |
 |---|---:|---|
-| `A_close_off.png` | 1 986 563 | `B56EB7667EAF3593` |
-| `A_close_on.png` | 1 975 499 | `5A66483FA9901F0F` |
-| `B_mid_off.png` | 2 332 091 | `277B604A34F39A40` |
-| `B_mid_on.png` | 2 327 664 | `CA642DC089D945FA` |
-| `C_gameplay_off.png` | 2 153 787 | `D3D1CBFD88C4F317` |
-| `C_gameplay_on.png` | 2 164 996 | `84EC549A86534598` |
-| `D_aerial_off.png` | 1 384 220 | `D76EF331F077B2BF` |
-| `D_aerial_on.png` | 1 395 730 | `4E2DF2BA52D2899D` |
-| `E_flowing_off.png` | 2 282 431 | `2EF6F70BF54B52B4` |
-| `E_flowing_on.png` | 2 281 218 | `8F65BE6A6E0A230A` |
-| `F_steep_off.png` | 2 095 720 | `4BB6A61607E801EB` |
-| `F_steep_on.png` | 2 110 577 | `8E858DE2A49C2081` |
+| `A_close_off.png` | 1 051 028 | `C75F36BCEEB592F6` |
+| `A_close_on.png` | 1 032 722 | `CBB8AA98E8E5CFC6` |
+| `B_mid_off.png` | 1 238 964 | `DFB7CD3A7FE98A6C` |
+| `B_mid_on.png` | 1 245 023 | `887CC09119838E5E` |
+| `C_aerial_off.png` | 679 931 | `6536824867A344B1` |
+| `C_aerial_on.png` | 680 919 | `DA770FB66889D304` |
 
 ## Caméras
 
-Aucune n'est cadrée à l'œil. Les points visés sortent du marqueur
-`TERRAIN_SHORELINE_SITE` du test `Anastasis.Terrain.Shoreline`, qui parcourt le
-trait de côte du monde canonique et désigne **par mesure** une rive plate, une
-rive de chenal et une berge abrupte.
-
-| Vue | Caméra | Site visé |
+| Vue | Caméra | Visé |
 |---|---|---|
-| `A_close` | `(4304,3804,434)` pitch `-27` yaw `45` | TYPE_A — tuile `(45,40)`, `flatness=1.000 flow=0.000` |
-| `B_mid` | `(3914,3414,715)` pitch `-27` yaw `45` | idem, 620 uu plus loin sur le même rayon |
-| `C_gameplay` | `(4153,3653,445)` pitch `-9` yaw `45` | idem, ramené à 170 uu au-dessus du niveau de la mer |
-| `D_aerial` | `(-5400,-5400,10500)` pitch `-32.8` yaw `45` | la carte entière — **exactement** la caméra de `docs/visual/terrain-extent/` |
-| `E_flowing` | `(6948,248,1421)` pitch `-40` yaw `45` | TYPE_B — tuile `(81,14)`, `flow=1.000` |
-| `F_steep` | `(7348,48,1467)` pitch `-40` yaw `45` | TYPE_C — tuile `(85,12)`, `flatness=0.481` |
+| `A_close` | `(6005,6155,717)` pitch `-27` yaw `45` | site TYPE_A mesuré sur le maillage forgé : `(6200,6350)`, `flatness=1.000` |
+| `B_mid` | `(5564,5714,1035)` pitch `-27` yaw `45` | même visée, 700 uu plus loin sur le même rayon |
+| `C_aerial` | `(-5400,-5400,10500)` pitch `-32.8` yaw `45` | la carte entière — **exactement** la caméra de `docs/visual/terrain-extent/` |
 
-`A_close`, `B_mid` et `C_gameplay` sont **la même visée à trois distances** : la
-pose MID est posée sur le site, les deux autres avancent sur son propre rayon.
-Elles ne peuvent donc pas cadrer deux sujets différents.
+Le point visé sort du marqueur `TERRAIN_SHORELINE_FORGED_SITE`, mesuré sur le
+maillage que l'on photographie. La **hauteur** de caméra est référencée au niveau
+de la mer, pas à l'altitude de la tuile : la forge exagère le relief, et une
+caméra posée sur l'altitude tuilée se retrouvait enterrée sous le sol forgé.
 
-## Ce que chaque image prouve, et ce qu'elle ne prouve pas
+## Ce que chaque image prouve
 
-**`A_close` — VIEW_A, la question « le bord est-il encore coupé ? ».** Dans
-`off`, la rive proche du lac est une **droite nette** : sable, puis d'un pixel à
-l'autre le bleu plein. Dans `on`, un plateau turquoise pâle s'étale depuis le
-trait de côte et s'élargit vers la gauche là où la berge est douce, puis se fond
-dans l'eau plus sombre. La ligne droite a disparu. **C'est la capture la plus
-concluante de la série.**
+**`A_close`** — la pièce maîtresse. Dans `off`, le plan d'eau du ravin est un
+aplat à **deux tons** : une zone cyan claire et une zone bleu nuit séparées par
+une **frontière franche et dentelée**, plus une arête nette contre la berge. Deux
+polygones colorés. Dans `on`, la même eau est un dégradé continu : plateau pâle
+contre la berge gauche, approfondissement progressif vers le centre, et la
+frontière interne a disparu au profit d'une gradation qui suit le fond immergé.
+Le contact avec les deux berges est adouci.
 
-**`B_mid` — VIEW_B, la bande dans son contexte.** Les deux plans d'eau du cadre
-passent d'un aplat bleu détouré à un bassin qui porte un liseré clair et un cœur
-plus sombre. Le gain est réel mais **modéré** à cette distance : la marge occupe
-les 6 à 19 premiers uu de profondeur, ce qui fait peu de pixels sur une berge
-raide.
+**`B_mid`** — le même bassin dans son contexte. `off` : une cuvette bleu nuit
+uniforme, détourée. `on` : un liseré clair en périphérie, un cœur sombre, le
+relief du fond lisible sous l'eau. Gain réel, plus discret qu'en gros plan.
 
-**`C_gameplay` — VIEW_C, à hauteur d'œil.** Gain **le plus faible de la série**,
-et il faut le dire : à 170 uu au-dessus de l'eau on voit la nappe en incidence
-rasante, la marge se comprime, et l'essentiel de ce qu'on gagne est l'absence de
-l'arête franche. Une rive ne se juge pas depuis cette vue seule.
+**`C_aerial`** — la lisibilité à l'échelle carte. La baie du sud passe d'une tache
+cyan plate à un bassin qui porte son propre dégradé. Aucun élément n'a été
+ajouté : la carte n'est pas devenue plus bruyante.
 
-**`D_aerial` — VIEW_D, la lisibilité écologique.** Le gain le plus net après
-`A_close`. Dans `off`, chaque plan d'eau est un **autocollant cyan uniforme** :
-lac et chenal ont exactement la même matière. Dans `on`, chaque bassin porte son
-propre dégradé — bord pâle, cœur profond — et les chenaux se lisent comme des
-fils continus. La carte n'est pas devenue plus bruyante : aucun élément n'a été
-ajouté, seule la nappe a gagné une lecture.
+## Ce qui n'est PAS dans ce dossier, et pourquoi
 
-**`E_flowing` vs `F_steep` — GATE 7, variation contrôlée.** Le chenal de
-`E_flowing` (FlowAmt = 1.0) porte un ourlet **marqué** des deux côtés et un cœur
-franchement sombre. La berge abrupte de `F_steep` (normale Z = 0.481) porte un
-liseré **beaucoup plus étroit** et un contact plus net. Ni l'une ni l'autre n'est
-écrite à la main : les deux sortent du même matériau lisant `Flatness` et `Flow`.
+**Les variantes de rive (GATE 7) ne sont pas re-démontrées visuellement.** Les
+trois familles sont **mesurées** sur le maillage forgé et le test les exige :
 
-## Ce qui manque, et ce qui a dû être refait
+```
+TERRAIN_SHORELINE_FORGED_FAMILIES soft=677 steep=1751 flowing=992
+TERRAIN_SHORELINE_FORGED_SITE TYPE_A_soft_wet_bank  (6200,6350)  flatness=1.000 flow=0.000
+TERRAIN_SHORELINE_FORGED_SITE TYPE_B_flowing_edge   (8200,1200)  flatness=0.738 flow=0.945
+TERRAIN_SHORELINE_FORGED_SITE TYPE_C_steep_bank     (7350,1625)  flatness=0.083 flow=0.000
+```
 
-**La bande de limon ne se lit pas comme du limon.** `SiltWet` (albédo 0.090) est
-écrit dans le matériau et mesurable, mais à l'écran la marge rend **pâle**, pas
-brune. Deux causes cumulées, toutes deux hors du périmètre de cette mission : le
-relief immergé est peint en bleu par `TileColor` (section 0, GROUND_SURFACE_001),
-et le sol voisin est encore surexposé à EV100 = 14. Ce qu'on voit est donc un
-**plateau d'eau peu profonde**, lecture juste mais pas celle qui était visée.
+Mais la pose de cadrage `_W` (recul 1700, hauteur 1700, pitch −40) **dépasse le
+site** et cadre une crête : les deux paires obtenues ne montrent pas d'eau. Elles
+ne sont pas versées ici — une image de coteau étiquetée « variante de rive »
+serait une preuve fausse, et c'est pire qu'une preuve absente.
 
-**Trois séries ont été jetées avant celle-ci, et il faut savoir pourquoi :**
-
-1. Une table de vues vide rendait `SHORE_VIEW_UNKNOWN` **non fatal** : le
-   viewport de l'éditeur garde sa caméra d'une session à l'autre, donc huit
-   captures sont sorties correctement cadrées — par la session précédente — et
-   l'A/B semblait tenir. Corrigé : une vue inconnue interrompt la capture.
-2. Une paire `TYPE_B` avait les arbres **gris d'un côté, verts de l'autre** : le
-   SkyLight en capture temps réel n'avait pas fini au moment du premier cliché.
-   La différence mesurée aurait été celle du ciel. Le délai d'attente est passé
-   de 9 s à 18 s.
-3. Les vues `CLOSE` et `GAMEPLAY` étaient d'abord posées chacune par un recul et
-   une hauteur propres ; la rapprochée tombait derrière une crête et
-   photographiait un talus. Elles avancent désormais sur le rayon de MID.
-
-Ces trois défauts ont été trouvés **en regardant les images**, comme
-`docs/unreal/ATMOSPHERE_002.md` l'exige. Aucune des images de ce dossier n'a été
-versée sans avoir été regardée.
+Le correctif est de cadrage, pas de rive : la pose doit se dériver du site forgé
+comme le font `A_close` / `B_mid`, au lieu d'un recul fixe. C'est la première
+chose à refaire.
 
 ## Reproduire
 
 ```powershell
 tools\unreal\shore-water.ps1 -Rebuild
-tools\unreal\shore-capture.ps1 -Out A_close_off.png -View TYPE_A_CLOSE   -Mode 0
-tools\unreal\shore-capture.ps1 -Out A_close_on.png  -View TYPE_A_CLOSE   -Mode 1
-tools\unreal\shore-capture.ps1 -Out D_aerial_off.png -View AERIAL        -Mode 0
-tools\unreal\shore-capture.ps1 -Out D_aerial_on.png  -View AERIAL        -Mode 1
-tools\unreal\shore-capture.ps1 -Out E_flowing_on.png -View TYPE_B_W_MID  -Mode 1
-tools\unreal\shore-capture.ps1 -Out F_steep_on.png   -View TYPE_C_W_MID  -Mode 1
+tools\unreal\shore-capture.ps1 -Out A_close_off.png -View TYPE_A_CLOSE -Mode 0
+tools\unreal\shore-capture.ps1 -Out A_close_on.png  -View TYPE_A_CLOSE -Mode 1
+tools\unreal\shore-capture.ps1 -Out B_mid_off.png   -View TYPE_A_MID   -Mode 0
+tools\unreal\shore-capture.ps1 -Out B_mid_on.png    -View TYPE_A_MID   -Mode 1
+tools\unreal\shore-capture.ps1 -Out C_aerial_off.png -View AERIAL      -Mode 0
+tools\unreal\shore-capture.ps1 -Out C_aerial_on.png  -View AERIAL      -Mode 1
 ```
+
+Deux défauts de capture ont été corrigés en cours de route, tous deux trouvés en
+regardant les images :
+
+1. **`HighResShot 1920x1080` sur un viewport 1280×720 force le rendu en tuiles**,
+   et sur le maillage forgé (288 800 triangles) il n'écrit **aucun fichier et
+   aucune erreur** — huit relances, puis `SHORE_SHOT_MISSING`. C'est trait pour
+   trait le `KNOWN_DEBT` n°1 de `TERRAIN_SURFACE_EXTENT.md`, resté sans cause
+   depuis. La capture se demande désormais à la taille du viewport.
+2. **Le SkyLight en capture temps réel** n'avait pas fini au premier cliché : une
+   paire est sortie avec les arbres gris d'un côté, verts de l'autre. Le délai
+   est passé de 9 s à 18 s.

@@ -3,6 +3,41 @@
 Mission `anastasis-shoreline-grammar`, branchée sur `main` à `1cbeef6`. Additive.
 Aucun fichier de `Source/AnastasisSim/` n'est ouvert en écriture.
 
+## Amendement du 2026-09-14 — rebasée sur TERRAIN_FORGE
+
+Ce document a d'abord été écrit contre `main` à `1cbeef6`. **`main` a bougé** :
+`ea87acc feat(worldview): le relief se lit — tessellation et morphologie`.
+La mission a été **rebasée et refaite**, pas recopiée. Ce qui a changé, et
+pourquoi cela comptait :
+
+`AnastasisTerrainForge::Apply` **remplace la géométrie entière** — il rebâtit la
+nappe d'eau à la résolution fine (381×381, 145 161 sommets) et n'a aucune raison
+de connaître les canaux de rive. Rebasée telle quelle, cette mission aurait donc
+livré une régression silencieuse : canaux vides sur le seul maillage affiché,
+donc `Depth = 0` partout, donc **opacité nulle — l'eau aurait disparu**.
+
+Trois corrections en ont découlé, toutes vérifiées :
+
+1. **`FillShorelineChannels`** — les canaux se remplissent désormais sur une
+   géométrie *déjà bâtie*, quelle que soit sa résolution. `Build` l'appelle ;
+   l'incarnation le rappelle après la forge. La tuile source se retrouve par la
+   position monde, pas par l'index — à la résolution fine, l'index ne désigne
+   plus une tuile. `AnastasisTerrainForge.cpp` **n'est pas modifié** : les canaux
+   sont un contrat de `FGeometry`, ils se remplissent chez leur propriétaire.
+   Preuve au log : `channels=145161 water_vertices=145161 forged=1`.
+2. **`ShoreDepthSpan` re-justifié.** La forge exagère le fond immergé (×1.7) :
+   l'eau descend maintenant à **614 uu**, pas 91. La justification « deux tiers
+   du maximum » est morte — elle donnerait 400 uu et noierait toute la rive. La
+   valeur reste **60 uu**, mais calée sur le *début* de la distribution, là où est
+   la rive : `p10=11.1 p20=21.7 … p90=78.6`. La bande de limon se ferme avant le
+   p20 ; l'eau franche reste un état occupé (3641 sommets sur 16 234 immergés).
+3. **Le test couvre désormais le chemin réellement rendu.** Un test qui ne
+   vérifiait que `Build` aurait laissé passer exactement cette régression.
+   `TERRAIN_SHORELINE_FORGED` interdit son retour.
+
+**Toutes les captures ont été refaites** sur le relief forgé ; les anciennes
+montraient un monde qui n'existe plus.
+
 ## Gate 0 — ce que l'ordre de mission suppose, et ce que le projet contient
 
 L'ordre de mission prescrit huit outils Unreal par ordre de priorité : Water
@@ -379,18 +414,23 @@ sous le même soleil, à la même exposition ; seule change
 `anastasis.Terrain.Shoreline`, et la géométrie est identique des deux côtés
 (`vertices=9216 triangles=18050 water_triangles=3544`).
 
-| Vue | Gain constaté |
+| Vue | Gain constaté (relief forgé) |
 |---|---|
-| `A_close` | **fort** — la droite nette du bord d'eau disparaît, remplacée par un plateau gradué |
-| `B_mid` | **réel mais modéré** — les bassins gagnent un liseré et un cœur |
-| `C_gameplay` | **faible** — en incidence rasante la marge se comprime ; reste l'absence d'arête |
-| `D_aerial` | **fort** — les plans d'eau cessent d'être des autocollants cyan uniformes |
-| `E_flowing` / `F_steep` | **variantes distinctes** — ourlet marqué sur un chenal, liseré étroit sur une berge raide |
+| `A_close` | **fort** — l'aplat à deux tons et sa frontière dentelée deviennent un dégradé continu |
+| `B_mid` | **réel, plus discret** — liseré clair, cœur sombre, fond lisible sous l'eau |
+| `C_aerial` | **net** — les bassins cessent d'être des taches cyan plates |
+| variantes A/B/C | **mesurées, non re-cadrées** — cf. ci-dessous |
 
 Le gain n'est donc **pas uniforme selon la distance**, et le dire fait partie du
-résultat : la mission exigeait qu'une amélioration seulement en gros plan, ou
-seulement vue du ciel, soit jugée insuffisante. Ici les deux extrêmes gagnent, le
-milieu gagne peu, et la vue à hauteur d'œil gagne le moins.
+résultat.
+
+**GATE 7 n'est pas re-démontrée visuellement après le rebasage.** Les trois
+familles existent et sont mesurées sur le maillage forgé
+(`soft=677 steep=1751 flowing=992`, sites imprimés par le test), et le test échoue
+si l'une disparaît. Mais la pose de cadrage `_W` dépasse le site et cadre une
+crête : les paires obtenues ne montrent pas d'eau, et elles ne sont **pas**
+versées. Une image de coteau étiquetée « variante de rive » serait une preuve
+fausse. Le correctif est de cadrage, pas de rive.
 
 **Aucun élément décoratif n'a été ajouté.** Pas une plante, pas une pierre. Le
 gain visible vient entièrement de la forme lue et de la matière, ce que la
@@ -466,16 +506,15 @@ le test mesure lui-même.
 
 ## Prochaine étape recommandée
 
-Une seule, et elle est petite : **repeindre le relief immergé**. Une tuile d'eau
-est aujourd'hui peinte en bleu par `TileColor`, y compris sous la marge, ce qui
-empêche la bande de rive de montrer du sédiment. La correction est une ligne dans
-la branche eau de `TileColor` — mais cette fonction appartient à
-GROUND_SURFACE_001, donc **elle se fait après l'intégration des deux missions, pas
-avant**. C'est le point qui transformerait le « plateau d'eau peu profonde »
-actuel en vraie marge humide.
+**Re-cadrer les variantes (GATE 7).** Les sites forgés sont mesurés et imprimés ;
+seule la pose `_W` est fausse — elle doit se dériver du site comme `A_close` et
+`B_mid`, au lieu d'un recul fixe. C'est une heure, pas un chantier, et cela rend
+à la mission le seul critère de succès qu'elle a perdu au rebasage.
 
-Ensuite seulement, et seulement si la forme convainc : GATE 6, une bande
-écologique clairsemée.
+Ensuite, et seulement ensuite : **repeindre le relief immergé**. Une tuile d'eau
+est peinte en bleu par `TileColor`, y compris sous la marge, ce qui empêche la
+bande de rive de montrer du sédiment. Une ligne — mais dans une fonction qui
+appartient à GROUND_SURFACE_001, donc **après** l'intégration des deux missions.
 
 ## Verdict
 
@@ -483,20 +522,20 @@ Ensuite seulement, et seulement si la forme convainc : GATE 6, une bande
 SHORELINE_FORGE_001 :: KEEP
 ```
 
-Ce qui est tenu, et vérifiable :
+Tenu, et vérifiable sur le relief réellement rendu :
 
-1. une zone de rive ne ressemble plus à une coupure eau/terrain — `A_close` ;
-2. une bande transitionnelle lisible existe, et sa largeur sort de la pente ;
-3. la rive possède une gradation de matière : marge, eau peu profonde, eau franche ;
-4. l'intégration reste cohérente — aucune texture, aucun pack, aucun asset externe ;
-5. la solution fonctionne de près et du ciel ; **à hauteur d'œil elle fonctionne peu** ;
-6. six zones de test, trois familles de rive, toutes mesurées et non choisies ;
-7. aucune refonte : la géométrie du monde est identique au sommet près ;
-8. travail non destructif — CVar à 0 et le monde rend exactement comme avant ;
-9. les outils Unreal réellement utilisés sont identifiés, y compris les huit prescrits
-   qui n'existent pas dans ce projet ;
-10. la comparaison baseline/candidate est contrôlée et versée avec ses hachages.
+1. une zone de rive ne ressemble plus à une coupure — `A_close` ;
+2. une bande transitionnelle lisible existe, sa largeur sort de la pente ;
+3. gradation de matière : marge, eau peu profonde, eau franche ;
+4. cohérent avec le monde stylisé — aucune texture, aucun pack externe ;
+5. fonctionne de près, à mi-distance et du ciel ;
+6. les trois familles de rive sont mesurées sur le maillage forgé ;
+7. aucune refonte : la géométrie du monde n'est pas touchée, la forge non plus ;
+8. non destructif — CVar à 0 et le monde rend exactement comme avant ;
+9. outils Unreal réellement utilisés identifiés, y compris les huit prescrits absents ;
+10. comparaison baseline/candidate contrôlée, versée avec ses hachages.
 
-Ce qui n'est **pas** tenu, et qu'on ne présentera pas comme tenu : la marge ne se
-lit pas comme du limon (Limites n°1), aucune bande écologique n'a été posée
-(Limites n°2), et le gain à hauteur d'œil est faible (Preuve visuelle).
+**Non tenu, et présenté comme tel :** les variantes ne sont pas re-cadrées
+(GATE 7, cf. ci-dessus) ; la marge ne se lit pas comme du limon (Limites n°1) ;
+aucune bande écologique n'a été posée (Limites n°2) ; le coût GPU de la
+translucidité sur 288 800 triangles n'est pas mesuré.

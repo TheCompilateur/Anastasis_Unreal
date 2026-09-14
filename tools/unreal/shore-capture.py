@@ -55,27 +55,26 @@ VIEWS = {}
 # 12345. RECOPIES DU MARQUEUR TERRAIN_SHORELINE_SITE, pas releves a la souris.
 # Si la graine ou le generateur changent, ces points ne valent plus rien : relancer
 # le test et recopier.
-# Releve de TERRAIN_SHORELINE_SITE, execution du 2026-09-14, graine 12345,
-# emprise WORLD (le monde canonique 96x96) :
+# Releve de TERRAIN_SHORELINE_FORGED_SITE, graine 12345, sur le maillage
+# REELLEMENT RENDU (TERRAIN_FORGE, 381x381) :
 #
-#   TYPE_A  tile=(45,40)  depth=0.333  flatness=1.000  flow=0.000
-#   TYPE_B  tile=(81,14)  depth=0.900  flatness=0.970  flow=1.000
-#   TYPE_C  tile=(85,12)  depth=0.133  flatness=0.481  flow=0.000
+#   TYPE_A  (6200,6350)  depth=0.538  flatness=1.000  flow=0.000   677 sommets
+#   TYPE_B  (8200,1200)  depth=0.312  flatness=0.738  flow=0.945   992 sommets
+#   TYPE_C  (7350,1625)  depth=0.642  flatness=0.083  flow=0.000  1751 sommets
 #
-# Emprise WORLD et non CROP parce que la tranche scellee 32x32 ne contient qu'UN
-# seul sommet de berge abrupte (TERRAIN_SHORELINE_FAMILIES CROP steep=1) : elle ne
-# peut pas montrer trois familles. Le monde en a 51, et 243 douces, et 304 de
-# chenal. Les captures se font donc en mode 2.
+# Les sites releves sur la surface TUILEE ne valent plus : la forge exagere le
+# relief, et deux des trois etaient passes au-dessus du niveau de la mer -- les
+# cadrer donnait une capture de coteau, pas de rive. Un site de rive se mesure sur
+# le maillage qu'on photographie, pas sur celui qui le precede.
+#
+# La cote Z n'est pas utilisee pour la camera (cf. register_family) : seul le XY
+# compte, la hauteur se prend sur le niveau de la mer.
 SITES = {
-    'TYPE_A': (4550.0, 4050.0, 255.0),   # rive douce, eau dormante
-    'TYPE_B': (8150.0, 1450.0, 221.0),   # rive de chenal, FlowAmt = 1.0
-    'TYPE_C': (8550.0, 1250.0, 267.0),   # berge abrupte, normale Z = 0.481
+    'TYPE_A': (6200.0, 6350.0, 243.0),   # rive douce, fond plat
+    'TYPE_B': (8200.0, 1200.0, 256.0),   # rive de chenal, FlowAmt = 0.945
+    'TYPE_C': (7350.0, 1625.0, 236.0),   # berge quasi verticale, normale Z = 0.083
 }
 
-# Repli si le mode 2 refuse d'ecrire un PNG a camera rapprochee (KNOWN_DEBT n.1 de
-# TERRAIN_SURFACE_EXTENT) : les memes familles dans la tranche scellee, ou la
-# capture est un chemin eprouve. La famille C y est un cas unique -- a dire tel
-# quel si ce repli sert.
 SITES_CROP = {
     'CROP_A': (1450.0, 650.0, 274.0),
     'CROP_B': (1950.0, 2050.0, 232.0),
@@ -107,9 +106,15 @@ def register(name, loc, pitch, yaw=45.0, fov=75.0):
 #       MID       la bande de rive dans son contexte de terrain
 #       CLOSE     la meme rive, 620 uu plus pres : la coupure se voit ou pas
 #       GAMEPLAY  la meme rive, ramenee a hauteur d'oeil au-dessus de l'eau
-def register_family(name, site, back=900.0, up=460.0, pitch=-27.0):
+def register_family(name, site, back=900.0, up=760.0, pitch=-27.0):
     d = back * 0.70710678
-    loc = (site[0] - d, site[1] - d, site[2] + up)
+    # La hauteur est reference au NIVEAU DE LA MER, pas a l'altitude de la tuile.
+    # TERRAIN_FORGE exagere le relief (jusqu'a z=1667 sur ce monde) : une camera
+    # posee sur l'altitude tuilee du site se retrouvait ENTERREE sous le relief
+    # forge, et photographiait l'envers de la geometrie. Le plan d'eau, lui, reste
+    # a SeaLevel quoi qu'il arrive -- c'est la seule cote stable a laquelle une
+    # camera de rive puisse s'accrocher.
+    loc = (site[0] - d, site[1] - d, WATER_PLANE_Z + up)
     register(name + '_MID', loc, pitch)
 
     # Avance sur le rayon de visee de MID. Aucun cadrage nouveau.
@@ -119,7 +124,7 @@ def register_family(name, site, back=900.0, up=460.0, pitch=-27.0):
     def advance(metres):
         return (loc[0] + fwd[0] * metres, loc[1] + fwd[1] * metres, loc[2] + fwd[2] * metres)
 
-    register(name + '_CLOSE', advance(620.0), pitch)
+    register(name + '_CLOSE', advance(700.0), pitch)
     # A hauteur d'oeil : 170 uu au-dessus du NIVEAU DE LA MER, pas au-dessus du
     # fond -- c'est la hauteur qu'aurait un personnage debout au bord de l'eau.
     g = advance(380.0)
@@ -139,7 +144,7 @@ for _name, _site in SITES_CROP.items():
 # peut pas cadrer trois topographies. Le repli monte assez haut pour qu'aucun
 # relief intermediaire ne puisse masquer le site.
 for _name, _site in SITES.items():
-    register_family(_name + '_W', _site, back=1700.0, up=1200.0, pitch=-40.0)
+    register_family(_name + '_W', _site, back=1700.0, up=1700.0, pitch=-40.0)
 
 VIEWS['AERIAL'] = (-5400.0, -5400.0, 10500.0, -32.8, 45.0, 90.0)
 
@@ -187,6 +192,20 @@ if not found:
     unreal.SystemLibrary.quit_editor()
 actor = found[0]
 unreal.log('SHORE_EMBODY=%s' % actor.call_method('EmbodyCanonical', args=(SEED,)))
+
+# RESOLUTION DE CAPTURE = celle du viewport, deliberement.
+#
+# Demander 1920x1080 a un viewport lance en 1280x720 force le rendu EN TUILES.
+# Sur la surface tuilee d'avant (18 050 triangles) cela passait ; sur le maillage
+# de TERRAIN_FORGE (288 800 triangles) la demande ne produit AUCUN fichier et
+# aucune erreur -- huit relances de suite, puis SHORE_SHOT_MISSING. C'est trait
+# pour trait le KNOWN_DEBT n.1 de docs/unreal/TERRAIN_SURFACE_EXTENT.md
+# (<< HighResShot ne rend rien en mode 2 >>), reste sans cause depuis. En demandant
+# exactement la taille du viewport, il n'y a plus de tuilage et la capture passe.
+#
+# Une preuve en 1280x720 qui existe vaut mieux qu'une preuve en 1920x1080 qui
+# n'est jamais ecrite.
+SHOT_W, SHOT_H = 1280, 720
 
 SHOT_DIR = os.path.join(unreal.Paths.project_saved_dir(), 'Screenshots')
 
@@ -254,7 +273,7 @@ def tick(dt):
         # la premiere image et la premiere demande de capture peut se perdre.
         phase = 2
         aim()
-        unreal.SystemLibrary.execute_console_command(world, 'HighResShot 1920x1080')
+        unreal.SystemLibrary.execute_console_command(world, 'HighResShot %dx%d' % (SHOT_W, SHOT_H))
         last_request = elapsed
         unreal.log('SHORE_SHOT_REQUESTED')
     elif phase == 2:
@@ -266,7 +285,7 @@ def tick(dt):
             finish('SHORE_COMPLETE')
         elif elapsed - last_request > 12.0 and elapsed < 120.0:
             aim()
-            unreal.SystemLibrary.execute_console_command(world, 'HighResShot 1920x1080')
+            unreal.SystemLibrary.execute_console_command(world, 'HighResShot %dx%d' % (SHOT_W, SHOT_H))
             last_request = elapsed
             unreal.log('SHORE_SHOT_RETRY t=%.0f' % elapsed)
         elif elapsed >= 120.0:
