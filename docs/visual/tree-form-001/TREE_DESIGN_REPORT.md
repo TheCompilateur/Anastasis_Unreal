@@ -19,6 +19,9 @@ Deux passes :
 - **Passe 2.6 — deux matériaux.** Le bois cesse d'être déclaré comme du feuillage. Correction
   de structure, **pas** d'apparence : mesurée, elle ne change presque rien à l'image, et le
   diagnostic qui l'avait motivée était faux.
+- **Passe 2.7 — le coût, enfin mesuré.** Trois passes livrées en affirmant « compatible avec
+  beaucoup d'arbres » sans un seul chiffre. La mesure a montré un coût **inversé** par rapport
+  à l'importance visuelle, et l'a corrigé : −29 % de triangles.
 
 ---
 
@@ -440,6 +443,92 @@ Rien sur l'image, et c'est correct de le dire. Ce qu'elle achète est structurel
 slots, la donnée en nomme autant, et le résolveur rend bien deux matériaux distincts et
 chargés (`TREE_SLOTS variants_checked=8`).
 
+## 7quinquies. Passe 2.7 — .5f : ce que la végétation coûte vraiment
+
+Trois passes ont été livrées en écrivant que la solution « reste compatible avec la présence
+future de beaucoup d'arbres ». Aucune ne produisait un chiffre. Pas de triangles, pas de
+sommets, pas de LOD, pas de draw calls. **Une affirmation de coût qu'on ne mesure pas est une
+opinion**, et la passe 2.6 venait de montrer ce que vaut une hypothèse non vérifiée.
+
+`tools/unreal/measure-tree-cost.{py,ps1}` mesure sur l'incarnation réelle du monde canonique,
+en lecture seule. Le chiffre qui compte n'est pas le triangle du mesh isolé mais
+`triangles × instances` — c'est lui qui explose quand la forêt se densifie.
+
+### Ce que la mesure a trouvé
+
+| | avant | après |
+|---|---|---|
+| triangles posés (886 instances) | **256 692** | **182 490** |
+| par instance | 290 | **206** |
+| composants HISM | 9 | 9 |
+| draw calls (borne haute) | 17 | 17 |
+| meshes avec LOD | **0 / 9** | **0 / 9** |
+
+Le total n'était pas le problème : 256 k triangles ne menacent rien. **La répartition l'était.**
+
+```
+feuillus    49 % des instances   ->  74 % des triangles
+coniferes   51 % des instances   ->  26 % des triangles
+```
+
+Et le détail par stature donnait ceci :
+
+```
+Broadleaf_Emergent   1076      Conifer_Emergent    498
+Broadleaf_Canopy      880      Conifer_Canopy      360
+Broadleaf_Understory  768  <-- Conifer_Subcanopy   252
+Broadleaf_Subcanopy   738      Conifer_Understory  174
+```
+
+**Un arbuste de 1,4 m coûtait 1,54× un émergent conifère de 6,3 m.** Le coût était inversé par
+rapport à l'importance visuelle. Les conifères, eux, se comportaient bien : 174 → 498, le prix
+suivait la stature.
+
+### La cause, et le correctif
+
+Ma fonction `lobe()` utilisait une tessellation **fixe** — `steps_phi=7, steps_theta=10` — quel
+que soit le rayon. Un lobe de rayon 7,5 payait autant qu'un lobe de rayon 27. Le correctif est
+proportionnel :
+
+```
+steps_phi = clamp(round(rayon / 3.5), 5, 8)      steps_theta = 9
+```
+
+Le plancher n'est pas négociable, et c'est `compute_split_normals` de la passe 2.5 qui le fixe :
+au-delà de 45° entre deux facettes, l'arête casse au lieu de se lisser. `steps_phi ≥ 5` donne
+180/5 = 36°, `steps_theta = 9` donne 360/9 = 40° — tous deux sous le seuil, donc les couronnes
+restent rondes. Descendre plus bas aurait transformé les dômes en cailloux facettés.
+
+S'y ajoute un ajustement du **nombre** de lobes à la stature : l'arbuste passe de 6 à 4 lobes,
+la sous-canopée feuillue de 6 à 5. À 1,4 m de haut, les deux plus petits lobes ne changeaient
+rien à la silhouette et coûtaient un tiers du mesh.
+
+Résultat : l'ordre est rétabli, le coût **croît** maintenant avec la stature dans les deux
+familles.
+
+```
+Broadleaf  384 -> 408 -> 576 -> 726        Conifer  174 -> 252 -> 360 -> 498
+```
+
+**Le prix payé, dit franchement :** les couronnes feuillues sont un peu plus facettées
+qu'avant. Visible sur `B_stature_board.png` à courte distance. C'est un compromis assumé —
+la direction artistique assume une géométrie stylisée — mais c'en est un, pas un repas gratuit.
+
+### Ce que la mesure dit pour la suite
+
+```
+PAR_INSTANCE  206 triangles
+PROJECTION      5 000 instances ->  1,0 M triangles
+PROJECTION     20 000 instances ->  4,1 M triangles
+PROJECTION    100 000 instances -> 20,6 M triangles
+```
+
+**Aucun des 9 meshes n'a de LOD.** À 886 instances c'est sans conséquence et l'affirmation
+« compatible avec beaucoup d'arbres » tient. À 20 000 instances — la densité qu'une vraie forêt
+pontique demanderait — chaque instance soumettrait encore sa géométrie pleine à toute distance.
+C'est là que le LOD cesse d'être théorique. Il n'est pas fait : c'est le point suivant, et il
+est désormais chiffré au lieu d'être supposé.
+
 ## 8. Intégration Unreal
 
 L'architecture n'a **pas** été réécrite. HISM reste le motif ; il y a maintenant un
@@ -553,8 +642,8 @@ Constatées, pas corrigées — elles sortent du mandat ou méritent leur propre
 
 1. **La hauteur littérale n'est pas atteinte.** 6,3 m au maximum contre les 10–25 m d'un
    conifère pontique réel. Bloqué par la densité de la distribution scellée (§4).
-2. **Pas de LOD.** `create_new_static_mesh_asset_from_mesh` ne produit que le LOD0. À 438
-   instances c'est sans effet ; à la densité d'une vraie forêt, il en faudra.
+2. **Pas de LOD.** `create_new_static_mesh_asset_from_mesh` ne produit que le LOD0. Chiffré en
+   passe 2.7 : sans effet à 886 instances, 4,1 M triangles à 20 000.
 3. **Collision NDOP10 sur l'arbre entier**, héritée de l'asset précédent. Sur un arbre haut,
    le volume est gros ; seul le fût devrait bloquer. Comportement inchangé, donc pas une
    régression — mais c'est désormais plus visible.
@@ -580,9 +669,11 @@ Constatées, pas corrigées — elles sortent du mandat ou méritent leur propre
     lisent beige moyen. C'est la couleur choisie (`BARK_OLD` ≈ 0,33 sRGB), pas un défaut de
     rendu, et dans la scène réelle elle fonctionne. À rouvrir seulement si un cadrage réel la
     met en défaut — pas pour flatter le banc d'essai.
-11. **Aucune mesure de coût.** Toujours pas de compte de triangles, de draw calls ni de LOD.
-    `create_new_static_mesh_asset_from_mesh` ne produit que le LOD0. À 438 instances ça ne
-    mord pas ; c'est le point .5f, non fait.
+11. ~~Aucune mesure de coût.~~ **Faite en passe 2.7** — voir §7quinquies. Ce qu'il en reste :
+    **aucun des 9 meshes n'a de LOD**, ce qui est sans conséquence à 886 instances et devient
+    le facteur limitant vers 20 000 (4,1 M triangles soumis à toute distance).
+12. **Les couronnes feuillues sont plus facettées** depuis la passe 2.7. Compromis assumé
+    contre −29 % de triangles, borné par le seuil de 45° des normales fractionnées.
 
 ## 13. NEXT TARGET recommandé — non exécuté
 

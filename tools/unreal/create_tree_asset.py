@@ -147,6 +147,24 @@ def taper(mesh, base_radius, top_radius, z0, z1, steps=9, location=None, rotator
         origin=unreal.GeometryScriptPrimitiveOriginMode.BASE)
 
 
+def lobe_steps(radius):
+    """Tessellation proportionnelle au rayon du lobe.
+
+    MESUREE, PAS SUPPOSEE. Avec une tessellation fixe (7 x 10 quel que soit le
+    rayon), les feuillus pesaient 74% des triangles pour 49% des instances, et
+    un arbuste de 1,4 m coutait 1,54x un emergent conifere de 6,3 m. Le cout
+    etait donc INVERSE par rapport a l'importance visuelle : un petit lobe
+    payait autant qu'un grand.
+
+    Le plancher n'est pas negociable : au-dela de 45 degres entre deux facettes,
+    compute_split_normals casse l'arete au lieu de la lisser, et la couronne
+    deviendrait un caillou facette. D'ou steps_phi >= 5 (180/5 = 36 deg) et
+    steps_theta fixe a 9 (360/9 = 40 deg) -- tous deux sous le seuil.
+    """
+    phi = int(min(8, max(5, round(radius / 3.5))))
+    return phi, 9
+
+
 def lobe(mesh, radius, cx, cy, cz, squash_z):
     """Une masse de feuillage : sphere ecrasee en Z.
 
@@ -159,9 +177,10 @@ def lobe(mesh, radius, cx, cy, cz, squash_z):
     galette posee sur un baton -- une sucette a nouveau, juste plus plate. Un
     hetre porte une masse HAUTE, pas un parasol."""
     centre = unreal.Vector(cx, cy, cz)
+    steps_phi, steps_theta = lobe_steps(radius)
     mesh = unreal.GeometryScript_Primitives.append_sphere_lat_long(
         mesh, PRIM, unreal.Transform(location=centre),
-        radius=radius, steps_phi=7, steps_theta=10,
+        radius=radius, steps_phi=steps_phi, steps_theta=steps_theta,
         origin=unreal.GeometryScriptPrimitiveOriginMode.CENTER)
     return unreal.GeometryScript_MeshTransforms.scale_mesh(
         mesh, unreal.Vector(1.0, 1.0, squash_z), centre)
@@ -334,8 +353,7 @@ FAMILIES = [
                   (14.0, 7.0, -5.0, 2.0, 0.95),
                   (12.5, -6.0, 6.0, 18.0, 0.92),
                   (11.0, 3.0, 8.0, 26.0, 0.90),
-                  (9.5, -8.0, -4.0, 12.0, 0.95),
-                  (8.5, 5.0, -7.0, 22.0, 0.92)],
+                  (9.5, -8.0, -4.0, 12.0, 0.95)],
         "bark": BARK_DARK,
         "foliage": LEAF_GREEN,
     },
@@ -355,12 +373,12 @@ FAMILIES = [
                   (2.0, 1.1, 28.0, -50.0, 10.0, 205.0),
                   (1.8, 1.0, 26.0, -50.0, 13.0, 295.0)],
         "tiers": [],
+        # Quatre lobes, pas six : a 1,4 m de haut, les deux plus petits ne
+        # changeaient rien a la silhouette et coutaient un tiers du mesh.
         "lobes": [(15.5, 0.0, 0.0, -14.0, 0.95),
                   (12.5, 6.0, -5.0, -22.0, 0.95),
                   (11.5, -5.0, 6.0, -6.0, 0.92),
-                  (10.0, 3.0, 6.0, 2.0, 0.90),
-                  (9.0, -6.0, -3.0, -12.0, 0.95),
-                  (7.5, 2.0, -6.0, 8.0, 0.92)],
+                  (10.0, 3.0, 6.0, 2.0, 0.90)],
         "bark": BARK_DARK,
         "foliage": LEAF_GREEN,
     },
