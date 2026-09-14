@@ -20,6 +20,7 @@ $Engine = 'C:\Program Files\Epic Games\UE_5.8'
 $Evidence = Join-Path $Root 'Saved\CanonicalVerification'
 $KnownFailFile = Join-Path $PSScriptRoot 'known-expected-failures.txt'
 $KnownLogFile = Join-Path $PSScriptRoot 'known-log-patterns.txt'
+. (Join-Path $PSScriptRoot 'automation-log.ps1')
 
 function Fingerprint {
   $paths = @(Get-ChildItem "$Root\Source", "$Root\Config" -Recurse -File) + @(Get-Item $Project)
@@ -161,21 +162,23 @@ $autoStatus = Dim 'UNKNOWN' 'no report-tests.log'
 $passN = 0; $kefN = 0; $failN = 0; $totalN = 0
 $knownFails = Load-KnownMap $KnownFailFile
 if (Test-Path $reportLog) {
-  $pass = @(); $expected = @(); $fail = @(); $broken = @()
-  Select-String -Path $reportLog -Pattern 'Test Completed\. Result=\{(\w+)\}.*Path=\{([^}]+)\}' | ForEach-Object {
-    $result = $_.Matches[0].Groups[1].Value
-    $path = $_.Matches[0].Groups[2].Value
-    if ($knownFails.ContainsKey($path)) {
-      if ($result -eq 'Success') { $expected += $path } else { $broken += $path }
-    } elseif ($result -eq 'Success') { $pass += $path }
-    else { $fail += $path }
-  }
-  $passN = $pass.Count; $kefN = $expected.Count; $failN = $fail.Count + $broken.Count
-  $totalN = $passN + $kefN + $failN
+  # Meme lecture que report-tests.ps1, via automation-log.ps1 : un log tronque
+  # par un crash ne doit pas se lire comme une suite verte amputee. Le code de
+  # sortie du lanceur n'est pas connu ici (le run appartient a une autre
+  # invocation) ; le log seul porte les trois autres preuves de completude.
+  $run = Read-AutomationLog -LogPath $reportLog -Known $knownFails
+  $passN = $run.Pass.Count; $kefN = $run.Expected.Count; $failN = $run.FailCount
+  $totalN = $run.Total
   $logTime = (Get-Item $reportLog).LastWriteTimeUtc
   $sourceNewer = @(Get-ChildItem "$Root\Source" -Recurse -File | Where-Object { $_.LastWriteTimeUtc -gt $logTime })
-  if ($totalN -eq 0) { $autoStatus = Dim 'UNKNOWN' 'report-tests.log has no Test Completed lines' }
-  elseif ($failN -gt 0) { $autoStatus = Dim 'FAIL' "$passN PASS / $kefN KEF / $failN FAIL" }
+  if ($failN -gt 0) { $autoStatus = Dim 'FAIL' "$passN PASS / $kefN KEF / $failN FAIL" }
+  elseif ($run.Incomplete.Count -gt 0) {
+    # Une preuve absente n'est pas une preuve d'echec : UNKNOWN, jamais PASS.
+    $why = $run.Incomplete[0]
+    if ($null -ne $run.Declared) { $why = "$totalN/$($run.Declared) rapportes ; " + $why }
+    $autoStatus = Dim 'UNKNOWN' ("run incomplet : " + $why)
+  }
+  elseif ($totalN -eq 0) { $autoStatus = Dim 'UNKNOWN' 'report-tests.log has no Test Completed lines' }
   elseif ($sourceNewer.Count -gt 0) { $autoStatus = Dim 'STALE' "$passN PASS / $kefN KEF / 0 FAIL ; Source newer than log" }
   else { $autoStatus = Dim 'PASS' "$passN PASS / $kefN KEF / 0 FAIL (KEF never counted as PASS)" }
 }
