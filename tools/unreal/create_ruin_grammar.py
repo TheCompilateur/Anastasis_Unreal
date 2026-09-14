@@ -43,6 +43,17 @@ tassement du soubassement dans le sol, qui est precisement ce que la planche app
 Echelle : une tuile fait 100 uu, soit un metre (meme regle que CreateCodeDefaults pour
 les arbres). Un noyau d'habitation modeste fait donc 400 a 700 uu de cote.
 
+TOUJOURS RECABLER APRES AVOIR REGENERE
+--------------------------------------
+save_static_mesh() fait delete_asset puis recree. Supprimer un mesh que
+DA_AnastasisPresentation reference fait TOMBER la reference : apres une regeneration,
+l'entree RUIN du registre etait revenue a son unique SM_Ruin_Generic_01 d'origine, et
+462 placements planifies ne dessinaient plus rien -- sans la moindre erreur.
+
+    create_ruin_grammar.py   PUIS   set_ruin_presentation.py
+
+Jamais l'inverse. Le meme piege attend create_rock_assets.py / set_rock_presentation.py.
+
 Run headless :
   UnrealEditor-Cmd.exe <uproject> -run=pythonscript -script="<root>/tools/unreal/create_ruin_grammar.py"
 
@@ -106,33 +117,38 @@ VARIANCE = {
 }
 
 ARCHETYPES = {
-    # LE vestige canonique : l'empreinte au sol d'un noyau d'habitation. Une a deux
-    # assises, plan encore lisible. C'est ce que la planche appelle SOUBASSEMENT.
+    # LE vestige canonique : l'empreinte au sol d'un noyau d'habitation, plan encore
+    # lisible. C'est ce que la planche appelle SOUBASSEMENT.
+    # Trois assises, pas deux, et des murs plus epais : la premiere passe donnait 52 cm
+    # de haut sur une empreinte de 4,3 x 5,6 m, ce qui se lisait comme une trace au sol et
+    # non comme une structure. 0,8 a 1 m reste exact -- un soubassement de pierre seche
+    # fait couramment 0,6 a 1,2 m -- et c'est la hauteur a partir de laquelle la masse
+    # porte une ombre, donc existe.
     "RUIN_SOUBASSEMENT": dict(
-        plan_w=430.0, plan_d=560.0, wall_t=58.0, course_h=26.0, courses=2,
+        plan_w=430.0, plan_d=560.0, wall_t=72.0, course_h=29.0, courses=3,
         breach=0.30, decay=0.45, rubble=3, settle=18.0, lean=1.5, kind="plan",
     ),
     # Un angle : deux murs qui se rencontrent. Les angles tiennent mieux que les pans,
     # donc il monte plus haut la ou les deux murs se contreventent.
     "RUIN_ANGLE": dict(
-        plan_w=390.0, plan_d=430.0, wall_t=62.0, course_h=27.0, courses=5,
+        plan_w=390.0, plan_d=430.0, wall_t=74.0, course_h=29.0, courses=5,
         breach=0.52, decay=0.55, rubble=2, settle=16.0, lean=2.2, kind="corner",
     ),
     # Un pan isole, casse aux deux bouts.
     "RUIN_MUR": dict(
-        plan_w=520.0, plan_d=0.0, wall_t=55.0, course_h=25.0, courses=4,
+        plan_w=520.0, plan_d=0.0, wall_t=68.0, course_h=27.0, courses=4,
         breach=0.40, decay=0.60, rubble=2, settle=14.0, lean=2.8, kind="wall",
     ),
     # Le foyer : « Foyer en pierre, evacuation fumee, coeur de la maison ». L'element
     # interieur le plus durable -- souvent la derniere chose lisible d'une maison.
     "RUIN_FOYER": dict(
-        plan_w=185.0, plan_d=165.0, wall_t=48.0, course_h=22.0, courses=3,
+        plan_w=195.0, plan_d=175.0, wall_t=56.0, course_h=25.0, courses=3,
         breach=0.35, decay=0.40, rubble=2, settle=10.0, lean=1.0, kind="hearth",
     ),
     # « Cloture, enclos » : mur de pierre seche, long et tres bas. Marque un territoire,
     # pas un abri.
     "RUIN_ENCLOS": dict(
-        plan_w=760.0, plan_d=0.0, wall_t=42.0, course_h=21.0, courses=2,
+        plan_w=760.0, plan_d=0.0, wall_t=52.0, course_h=24.0, courses=2,
         breach=0.46, decay=0.62, rubble=1, settle=12.0, lean=3.4, kind="wall",
     ),
     # « Reemplois » : la pierre triee, en attente d'etre reprise. Aucun plan, et c'est

@@ -35,7 +35,44 @@ namespace
 	constexpr const TCHAR* TreeMeshBroadleafSub = TEXT("/Game/Anastasis/Vegetation/SM_Tree_Broadleaf_Subcanopy_01.SM_Tree_Broadleaf_Subcanopy_01");
 	constexpr const TCHAR* TreeMeshBroadleafCanopy = TEXT("/Game/Anastasis/Vegetation/SM_Tree_Broadleaf_Canopy_01.SM_Tree_Broadleaf_Canopy_01");
 	constexpr const TCHAR* TreeMeshBroadleafEmergent = TEXT("/Game/Anastasis/Vegetation/SM_Tree_Broadleaf_Emergent_01.SM_Tree_Broadleaf_Emergent_01");
-	constexpr const TCHAR* DefaultRuinMeshPath = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
+	/**
+	 * RUIN_GRAMMAR_V1 -- six pieces x three variants, built by
+	 * tools/unreal/create_ruin_grammar.py and wired by tools/unreal/set_ruin_presentation.py.
+	 *
+	 * Replaces /Engine/BasicShapes/Cylinder.Cylinder, and before that a five-box stub that
+	 * stood 65-118uu tall -- knee height beside a 500uu canopy tree, 448 of them at a random
+	 * yaw each. It read as a field of headstones because that is what it was.
+	 *
+	 * docs/visual/reference/pontique-grammaire-architecturale-batiment.png settles what a
+	 * ruin is here: post-1204 rhomaioi rebuilding, whose SOUBASSEMENT is "pierre locale,
+	 * assise seche, drainage, contact terrain" while the walls are "ossature bois,
+	 * clayonnage, torchis". The timber and daub go; the stone stays. So a ruin is a base
+	 * course and a heap of reusable stone -- which is also what the simulation says, since
+	 * a Ruin tile carries Resource=Stone, Amount=8.
+	 *
+	 * The NAME of each mesh is what binds it to a piece (see PlaceDressing), not its rank
+	 * in this list.
+	 */
+	constexpr const TCHAR* RuinMeshPaths[] = {
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Soubassement_01.SM_Ruin_Soubassement_01"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Soubassement_02.SM_Ruin_Soubassement_02"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Soubassement_03.SM_Ruin_Soubassement_03"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Angle_01.SM_Ruin_Angle_01"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Angle_02.SM_Ruin_Angle_02"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Angle_03.SM_Ruin_Angle_03"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Mur_01.SM_Ruin_Mur_01"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Mur_02.SM_Ruin_Mur_02"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Mur_03.SM_Ruin_Mur_03"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Foyer_01.SM_Ruin_Foyer_01"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Foyer_02.SM_Ruin_Foyer_02"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Foyer_03.SM_Ruin_Foyer_03"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Enclos_01.SM_Ruin_Enclos_01"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Enclos_02.SM_Ruin_Enclos_02"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Enclos_03.SM_Ruin_Enclos_03"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Reemploi_01.SM_Ruin_Reemploi_01"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Reemploi_02.SM_Ruin_Reemploi_02"),
+		TEXT("/Game/Anastasis/Architecture/SM_Ruin_Reemploi_03.SM_Ruin_Reemploi_03"),
+	};
 
 	/**
 	 * ANASTASIS_ROCK_GRAMMAR_V1 -- six archetypes x three bounded variants, plus one
@@ -176,11 +213,28 @@ UAnastasisPresentationRegistry* UAnastasisPresentationRegistry::CreateCodeDefaul
 			MakeVariant(TreeMeshBroadleafEmergent, EAnastasisStatureClass::Emergent, EAnastasisFoliageFamily::Broadleaf, 1.12f, VegetationMaterialPath, BarkMaterialPath),
 		}));
 
-	// Ruin is unchanged, lean included: a wall stub is a manufactured thing and stands plumb.
+	// RUIN. The envelope stays near 1 because these meshes are already at building scale
+	// (footprints of 2 to 7.7 m); it no longer manufactures a size, it only keeps two
+	// neighbouring sites from being identical to the centimetre.
+	//
+	// Jitter is 0.10 where stone gets 0.34, and that gap is the point: an erratic block
+	// came to rest anywhere on its tile, a wall belongs to a plan. Scattering the pieces
+	// of one site by a third of a tile would destroy the alignment that makes it read as
+	// a building at all. Lean is 0 for the same reason -- a course was laid level.
 	Registry->Entries.Add(MakeDefaultEntry(
-		EAnastasisSemanticType::Ruin, TEXT("Ruin_Generic"),
-		FLinearColor(0.353f, 0.302f, 0.318f), 0.6f, 1.1f, 0.20f, 0.0f,
-		{MakeVariant(DefaultRuinMeshPath, EAnastasisStatureClass::Any, EAnastasisFoliageFamily::Any, 1.0f, nullptr)}));
+		EAnastasisSemanticType::Ruin, TEXT("Ruin_Grammar_V1"),
+		FLinearColor(0.168f, 0.155f, 0.140f), 0.92f, 1.12f, 0.10f, 0.0f,
+		[]
+		{
+			TArray<FAnastasisPresentationVariant> Variants;
+			Variants.Reserve(UE_ARRAY_COUNT(RuinMeshPaths));
+			for (const TCHAR* RuinMeshPath : RuinMeshPaths)
+			{
+				Variants.Add(MakeVariant(RuinMeshPath, EAnastasisStatureClass::Any,
+					EAnastasisFoliageFamily::Any, 1.0f, nullptr));
+			}
+			return Variants;
+		}()));
 
 	// STONE. Read against the same metre-per-tile ruler as the forest above: these meshes
 	// stand 150-300uu at scale 1, so this envelope gives blocks of 0.45m to 2.1m -- the

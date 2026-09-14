@@ -493,8 +493,43 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 }
             }
 
+            // If NOTHING matched, the naming convention has drifted. Degrade to "any
+            // variant" rather than to nothing: a ruin drawn with the wrong piece is a
+            // cosmetic bug someone will report, while 462 planned placements drawing
+            // nothing is indistinguishable from the feature being switched off.
+            bool bAnyBound = false;
+            for (const TArray<int32>& Pool : ByPiece)
+            {
+                bAnyBound = bAnyBound || Pool.Num() > 0;
+            }
+            if (!bAnyBound)
+            {
+                UE_LOG(LogAnastasis_UnrealV2, Warning,
+                    TEXT("ANASTASIS_RUIN_BIND no mesh name matched a piece; falling back to every variant"));
+                for (int32 V = 0; V < RuinEntry->Variants.Num(); ++V)
+                {
+                    for (TArray<int32>& Pool : ByPiece)
+                    {
+                        Pool.Add(V);
+                    }
+                }
+            }
+
+            // The binding is the one thing here that can fail silently: a plan of 462
+            // placements drawing nothing looks exactly like a plan of 0. Report the pools.
+            UE_LOG(LogAnastasis_UnrealV2, Display,
+                TEXT("ANASTASIS_RUIN_BIND variants=%d pools=[%d %d %d %d %d %d] first_mesh=%s"),
+                RuinEntry->Variants.Num(),
+                ByPiece[0].Num(), ByPiece[1].Num(), ByPiece[2].Num(),
+                ByPiece[3].Num(), ByPiece[4].Num(), ByPiece[5].Num(),
+                RuinEntry->Variants.Num() > 0
+                    ? *RuinEntry->Variants[0].Mesh.ToSoftObjectPath().ToString()
+                    : TEXT("<none>"));
+
             int32 PieceCounts[static_cast<uint8>(AnastasisRuinDressing::EPiece::Count)] = {};
             int32 RuinUngrounded = 0;
+            int32 RuinNoMesh = 0;
+            int32 RuinNoComponent = 0;
             for (const AnastasisRuinDressing::FPlacement& P : RuinPlan.Instances)
             {
                 const uint8 PieceIndex = static_cast<uint8>(P.Piece);
@@ -512,9 +547,9 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 R.Mesh = Variant.Mesh.LoadSynchronous();
                 R.MaterialOverride = Variant.MaterialOverride.LoadSynchronous();
                 R.ScaleBias = Variant.ScaleBias;
-                if (!R.Mesh) continue;
+                if (!R.Mesh) { ++RuinNoMesh; continue; }
                 auto* M = Prepare(R);
-                if (!M) continue;
+                if (!M) { ++RuinNoComponent; continue; }
 
                 const AnastasisWorldView::FVisualTile& T = CanonicalSource.Tiles[P.SourceIndex];
                 FTransform Pose = AnastasisPresentation::ResolveInstanceTransform(
@@ -545,9 +580,10 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
             }
             UE_LOG(LogAnastasis_UnrealV2, Display,
                 TEXT("ANASTASIS_RUIN sites=%d isolated=%d largest_site=%d planned=%d ungrounded=%d "
+                     "no_mesh=%d no_component=%d "
                      "soubassement=%d angle=%d mur=%d foyer=%d enclos=%d reemploi=%d"),
                 RuinPlan.SiteCount, RuinPlan.IsolatedSites, RuinPlan.LargestSiteTiles,
-                RuinPlan.Instances.Num(), RuinUngrounded,
+                RuinPlan.Instances.Num(), RuinUngrounded, RuinNoMesh, RuinNoComponent,
                 PieceCounts[0], PieceCounts[1], PieceCounts[2],
                 PieceCounts[3], PieceCounts[4], PieceCounts[5]);
         }
