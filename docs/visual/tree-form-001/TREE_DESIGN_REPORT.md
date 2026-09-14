@@ -5,7 +5,15 @@ conçues, avec hauteur, stature, masse et tronc. Périmètre : présentation uni
 Ni terrain, ni hydrologie, ni simulation, ni redistribution écologique.
 
 Worktree `anastasis-tree-visuals-136553`, branche `claude/anastasis-tree-visuals-136553`,
-base `main` à `1cbeef6`. `main` n'a pas bougé pendant la mission (vérifié au début et à la fin).
+base `main` à `1cbeef6`. `main` n'a pas bougé pendant la mission (vérifié au début, entre les
+deux passes, et à la fin).
+
+Deux passes :
+
+- **Passe 1 — stature.** Six silhouettes construites, quatre classes d'âge. Commit `8060b2a`.
+- **Passe 2 — espèce.** Le mélange conifère / feuillu cesse d'être un tirage aveugle et
+  devient une lecture du site (`Shade`, `Wetness`). Huit silhouettes, quatre statures × deux
+  familles. C'était le NEXT TARGET de la passe 1.
 
 ---
 
@@ -53,15 +61,15 @@ pas une forêt : c'était un champ de marqueurs.
 
 | Fichier | Rôle | Action |
 |---|---|---|
-| `tools/unreal/create_tree_asset.py` | autorité des meshes d'arbres | **réécrit** — produit désormais 6 silhouettes + 1 alias + le matériau |
+| `tools/unreal/create_tree_asset.py` | autorité des meshes d'arbres | **réécrit** — produit désormais 8 silhouettes + 1 alias + le matériau |
 | `tools/unreal/set_tree_grammar.py` | autorité du câblage FOREST | **créé** |
 | `tools/unreal/capture-tree-lineup.{py,ps1}` | planche de stature (test anti-arnaque) | **créés** |
-| `Content/Anastasis/Vegetation/SM_Tree_*.uasset` | 6 meshes + alias | **créés / régénéré** |
+| `Content/Anastasis/Vegetation/SM_Tree_*.uasset` | 8 meshes + alias | **créés / régénéré** |
 | `Content/Anastasis/Materials/M_AnastasisVegetation.uasset` | lecture des couleurs de sommet | **créé** |
-| `Source/.../AnastasisPresentationRegistry.{h,cpp}` | données de présentation | axe de stature + biais + inclinaison |
-| `Source/.../AnastasisPresentationResolver.{h,cpp}` | choix de variante et transform | sélection par stature, fail-open |
-| `Source/.../AnastasisWorldEmbodiment.cpp` | pose des instances | strate → stature, journal de profil |
-| `Source/.../AnastasisPresentationResolverTests.cpp` | tests | 3 tests ajoutés |
+| `Source/.../AnastasisPresentationRegistry.{h,cpp}` | données de présentation | axes de stature et de famille + biais + inclinaison |
+| `Source/.../AnastasisPresentationResolver.{h,cpp}` | choix de variante et transform | sélection par stature **et famille**, fail-open en deux temps, gradient d'espèce |
+| `Source/.../AnastasisWorldEmbodiment.cpp` | pose des instances | strate → stature, site → famille, journaux de profil et d'espèce |
+| `Source/.../AnastasisPresentationResolverTests.cpp` | tests | 5 tests ajoutés |
 
 **Fichiers partagés touchés, et pourquoi** (diff concurrent inspecté avant) :
 
@@ -127,18 +135,24 @@ pas bricolée ici.
 
 ## 5. Familles créées
 
-Six silhouettes construites, une par case de la grille (strate × conifère/feuillu) que la
+Huit silhouettes construites, une par case de la grille (strate × conifère/feuillu) que la
 planche de référence autorise. Chaque mesh est normalisé sur Z = [−50, +50] : **seules les
-proportions INTERNES changent d'une stature à l'autre**, jamais une simple mise à l'échelle.
+proportions INTERNES changent d'une case à l'autre**, jamais une simple mise à l'échelle.
 
-| Mesh | Strate | Fût dégagé | Largeur/hauteur | Signature |
+| Mesh | Strate | Famille | Largeur/hauteur | Signature |
 |---|---|---|---|---|
-| `SM_Tree_Conifer_Understory_01` | arbustive | 22 % | **0,27** | flèche fine, feuillue jusqu'en bas |
-| `SM_Tree_Conifer_Subcanopy_01` | sous-canopée | 30 % | **0,35** | 3 étages, tronc lisible |
-| `SM_Tree_Broadleaf_Subcanopy_01` | sous-canopée | 34 % | **0,47** | fourche + petit dôme asymétrique |
-| `SM_Tree_Conifer_Canopy_01` | canopée | 44 % | **0,39** | épicéa d'Orient, 4 étages à décrochement |
-| `SM_Tree_Broadleaf_Canopy_01` | canopée | 42 % | **0,57** | hêtre, 3 branches maîtresses, large dôme |
-| `SM_Tree_Conifer_Emergent_01` | émergente | 54 % | **0,44** | fût massif, cime **émoussée** (sénescence) |
+| `SM_Tree_Conifer_Understory_01` | arbustive | conifère | **0,27** | flèche fine, feuillue jusqu'en bas |
+| `SM_Tree_Broadleaf_Understory_01` | arbustive | feuillu | **0,54** | cépée de noisetier, **aucun fût** — quatre tiges depuis le sol |
+| `SM_Tree_Conifer_Subcanopy_01` | sous-canopée | conifère | **0,35** | 3 étages, tronc lisible |
+| `SM_Tree_Broadleaf_Subcanopy_01` | sous-canopée | feuillu | **0,47** | fourche + petit dôme asymétrique |
+| `SM_Tree_Conifer_Canopy_01` | canopée | conifère | **0,39** | épicéa d'Orient, 4 étages à décrochement |
+| `SM_Tree_Broadleaf_Canopy_01` | canopée | feuillu | **0,57** | hêtre, 3 branches maîtresses, large dôme |
+| `SM_Tree_Conifer_Emergent_01` | émergente | conifère | **0,44** | fût massif, cime **émoussée** (sénescence) |
+| `SM_Tree_Broadleaf_Emergent_01` | émergente | feuillu | **0,60** | vieux hêtre, ramure redressée, repère du couvert |
+
+L'arbuste feuillu n'a délibérément **pas de tronc** : un noisetier part en cépée. Lui coller
+un fût unique en aurait fait un petit arbre, c'est-à-dire la confusion de strate exacte que
+la planche de référence sépare (strate arbustive vs sous-canopée).
 
 `SM_Tree_Generic_01` survit comme alias géométrique de la silhouette de canopée : c'est le
 chemin que code en dur le repli de `AnastasisPresentationRegistry.cpp`, et il devait rester
@@ -170,17 +184,20 @@ Enveloppe portée de `1.6–2.4` à `3.6–5.0`. Les facteurs de strate appartie
 
 | | avant | après |
 |---|---|---|
-| hauteur min | 49 uu (0,5 m) | **107 uu (1,07 m)** |
-| hauteur max | 237 uu (2,4 m) | **668 uu (6,7 m)** |
-| amplitude | ×4,8 | **×6,2** |
-| silhouettes | 1 | **6** |
+| hauteur min | 49 uu (0,5 m) | **97 uu (0,97 m)** |
+| hauteur max | 237 uu (2,4 m) | **627 uu (6,3 m)** |
+| amplitude | ×4,8 | **×6,5** |
+| silhouettes | 1 | **8** |
 | classes de stature | 3 (échelles du même mesh) | **4 (meshes distincts)** |
+| familles d'espèce | 0 | **2, choisies par le site** |
 | instances | 886 | **886 — inchangé** |
 
 Profil journalisé à l'incarnation, mesuré et non affirmé :
 
 ```
-ANASTASIS_TREE_STATURE understory=180 subcanopy=129 canopy=103 emergent=26 height_uu=[107,668]
+ANASTASIS_TREE_STATURE understory=180 subcanopy=129 canopy=103 emergent=26 height_uu=[97,627]
+ANASTASIS_TREE_SPECIES conifer=225 broadleaf=213 shade=[-0.74 -0.04 0.79]
+                       wetness=[0.00 0.08 0.85] p_conifer=[0.06 0.57 0.86]
 ANASTASIS_ECOLOGY      young=180 secondary=129 canopy=129 full_plan=438   (identique à avant)
 ```
 
@@ -205,6 +222,61 @@ Trois axes, tous déterministes, tous pilotables par la donnée :
    donnerait à tout un peuplement la même ivresse moyenne — du bruit, pas des individus.
    `MaxLeanDegrees = 0` (la valeur par défaut, celle de Ruin) reproduit la transform
    historique **exactement** : un test le vérifie à 1e-6.
+4. **Espèce → mesh (passe 2).** Voir §7bis. Orthogonale à la stature : un peuplement peut
+   changer d'espèce sans changer de structure d'âge, et l'inverse.
+
+Le repli est en deux temps, et l'ordre est un choix : **la famille tombe avant la stature**.
+Perdre l'espèce est un moindre mensonge que perdre l'âge — une hêtraie dessinée en épicéas
+reste une forêt de la bonne forme, tandis qu'un semis dessiné en dominant casse tout le
+profil vertical du peuplement. Un test le verrouille.
+
+## 7bis. L'axe d'espèce — lire le site, pas tirer au sort
+
+La planche de référence demande un « mélange d'espèces selon l'humidité, l'altitude et
+l'exposition ». Ces trois mots tiennent dans **deux champs que la simulation produit déjà** :
+
+```
+Shade    [-1,1]  eclairement du relief : pente face a la lumiere, melangee a l'altitude.
+                 C'est DEJA la composition de "altitude et exposition" -- lire Alt comme
+                 troisieme terme compterait l'altitude deux fois.
+Wetness  [0,1]   humidite.
+```
+
+```
+Coniferousness = Base + 0,37 · Shade − 0,34 · (Wetness − 0,08)
+```
+
+Les conifères (épicéa d'Orient, sapin) prennent le haut, l'exposé, le sec ; les feuillus
+(hêtre, charme, aulne) tiennent le bas, l'humide, l'abrité. Le résultat est une
+**probabilité** résolue contre un hash par site, jamais un seuil : une coupure franche
+dessinerait une ligne de niveau visible en travers de la carte — un artefact de rendu, pas
+un écotone.
+
+### Les constantes viennent de la mesure, et la première tentative était fausse
+
+Mesuré sur les 438 sites forestiers réellement habillés :
+
+```
+Shade    min -0,74   médiane -0,04   max 0,79
+Wetness  min  0,00   médiane  0,08   max 0,85
+```
+
+**La médiane d'humidité vaut 0,08, pas 0,5.** Un champ dans [0,1] invite à supposer un
+pivot au milieu : un premier jet pivoté à 0,55 ajoutait donc un bonus quasi constant à
+presque tous les sites et rendait **366 conifères contre 72 feuillus**, avec `p_conifer`
+saturé **aux deux bouts** — exactement le « seuil déguisé en gradient » que le commentaire
+du code interdisait deux lignes plus haut. Pivot ramené à la médiane mesurée.
+
+Le diagnostic lui-même était faux une seconde fois : il rapportait
+`Coniferousness(pire ombre, pire humidité)`, une combinaison qui peut n'exister **nulle
+part** sur la carte, et affichait donc un clamp qu'aucun arbre ne rencontrait. Il rapporte
+maintenant la distribution des sites réels. Un diagnostic qui lève une fausse alerte est
+pire que pas de diagnostic.
+
+Résultat final, sur les sites réels : `p_conifer = [0,06 ; 0,57 ; 0,86]` — **aucun site ne
+touche un mur**, et le mélange sort à 225 conifères / 213 feuillus. Une forêt colchique est
+effectivement mixte ; ce qui compte est que la proportion **bascule avec le terrain**, et
+elle le fait de 6 % à 86 %.
 
 Tout est reproductible : même seed, même monde ⇒ même arbre au même endroit, à chaque
 lancement.
@@ -233,13 +305,13 @@ Le repli code dit la même chose, pour qu'un checkout sans data asset rende la m
 
 ```
 BUILD::PASS                       Anastasis_UnrealV2Editor Win64 Development
-PASS                   : 58
+PASS                   : 60
 KNOWN_EXPECTED_FAILURE : 4        (les 4 du registre, aucune nouvelle)
 FAIL                   : 0
-TOTAL                  : 62
+TOTAL                  : 64
 ```
 
-Trois tests ajoutés :
+Cinq tests ajoutés :
 
 - `Anastasis.Presentation.Stature` — une stature étiquetée atteint sa propre variante sur
   chaque tuile ; le choix est reproductible ; une demande `Any` couvre encore plusieurs
@@ -250,8 +322,17 @@ Trois tests ajoutés :
 - `Anastasis.Presentation.Lean` — `MaxLeanDegrees=0` reste d'aplomb à 1e-6
   (`worst_plumb=0.000000000`), une enveloppe incline réellement, et aucune instance ne
   dépasse l'enveloppe déclarée (`worst_lean=4.976`).
-- `Anastasis.Presentation.TreePivotConvention` — les 6 variantes chargent et couvrent
-  Z = [−50, +50] (`TREE_PIVOT variants_checked=6`).
+- `Anastasis.Presentation.TreePivotConvention` — les 8 variantes chargent et couvrent
+  Z = [−50, +50] (`TREE_PIVOT variants_checked=8`).
+- `Anastasis.Presentation.Species` — une demande (stature, famille) atterrit dans sa propre
+  case sur chaque tuile ; le repli descend d'un cran **dans le bon ordre** (famille
+  abandonnée, stature conservée) ; une variante non étiquetée sert encore toutes les
+  demandes ; le tirage est reproductible.
+- `Anastasis.Presentation.SpeciesGradient` — monotone dans chaque axe et dans le sens que
+  l'écologie donne ; **ne sature nulle part sur la plage réelle des champs**
+  (`SPECIES_GRADIENT low=0.064 high=0.919 span=0.855`) ; un champ non fini retombe sur la
+  base au lieu d'introduire un biais silencieux. C'est ce test qui aurait attrapé le pivot
+  à 0,55.
 
 Et surtout, l'invariant scellé qui aurait pu casser en silence tient exactement :
 
@@ -268,7 +349,7 @@ monde 96×96, mode surface. Aucun fog, aucun coucher de soleil, aucun étalonnag
 |---|---|---|
 | `A_close_before.png` | `(3050,4250,1100)` pitch −15 yaw 45 | **AVANT** — cônes identiques, aucun tronc |
 | `C_close_after.png` | **identique** | **APRÈS** — même monde, même caméra |
-| `B_stature_board.png` | banc dédié, arc | les 6 silhouettes + ruine 0,9 m + repère 1,8 m |
+| `B_stature_board.png` | banc dédié, arc | les 8 silhouettes par paires strate×famille + ruine 0,9 m + repère 1,8 m |
 | `A_before_cone.png` | caméra monde scellée | avant, lecture macro |
 | `C_wide_after.png` | **identique** | après, lecture macro |
 
@@ -284,7 +365,9 @@ M  Content/Anastasis/Presentation/DA_AnastasisPresentation.uasset
 M  Content/Anastasis/Vegetation/SM_Tree_Generic_01.uasset
 A  Content/Anastasis/Materials/M_AnastasisVegetation.uasset
 A  Content/Anastasis/Vegetation/SM_Tree_Broadleaf_Canopy_01.uasset
+A  Content/Anastasis/Vegetation/SM_Tree_Broadleaf_Emergent_01.uasset
 A  Content/Anastasis/Vegetation/SM_Tree_Broadleaf_Subcanopy_01.uasset
+A  Content/Anastasis/Vegetation/SM_Tree_Broadleaf_Understory_01.uasset
 A  Content/Anastasis/Vegetation/SM_Tree_Conifer_Canopy_01.uasset
 A  Content/Anastasis/Vegetation/SM_Tree_Conifer_Emergent_01.uasset
 A  Content/Anastasis/Vegetation/SM_Tree_Conifer_Subcanopy_01.uasset
@@ -307,7 +390,7 @@ A  docs/visual/tree-form-001/  (rapport + 5 captures)
 
 Constatées, pas corrigées — elles sortent du mandat ou méritent leur propre passe.
 
-1. **La hauteur littérale n'est pas atteinte.** 6,7 m au maximum contre les 10–25 m d'un
+1. **La hauteur littérale n'est pas atteinte.** 6,3 m au maximum contre les 10–25 m d'un
    conifère pontique réel. Bloqué par la densité de la distribution scellée (§4).
 2. **Pas de LOD.** `create_new_static_mesh_asset_from_mesh` ne produit que le LOD0. À 438
    instances c'est sans effet ; à la densité d'une vraie forêt, il en faudra.
@@ -316,38 +399,47 @@ Constatées, pas corrigées — elles sortent du mandat ou méritent leur propre
    régression — mais c'est désormais plus visible.
 4. **Aucune micro-texture.** Voulu : la mission portait sur la silhouette. De près, l'écorce
    et le feuillage sont des aplats de couleur de sommet.
-5. **Le mélange d'espèces n'est pas écologique.** Conifère ou feuillu sort du hash de
-   variante. La planche de référence demande un mélange « selon l'humidité, l'altitude et
-   l'exposition » — et `FVisualTile` porte déjà `Wetness`, `Alt` et `Shade`. C'est faisable
-   sans toucher la simulation, mais c'était une seconde mission.
-6. **La graine `RUIN` de `presentation-registry.py` pointe encore sur
+5. **Le gradient d'espèce n'a qu'un seul seed de preuve.** Les constantes sont réglées sur la
+   distribution du monde canonique (seed 12345). Un autre seed produira d'autres plages et
+   peut déplacer le mélange ; le diagnostic `ANASTASIS_TREE_SPECIES` le dira, mais rien ne
+   le vérifie automatiquement sur plusieurs mondes.
+6. **L'exposition n'entre que par `Shade`.** C'est volontaire — `Shade` compose déjà pente
+   et altitude — mais cela signifie qu'une pente nord et une pente sud à altitude égale ne
+   se distinguent que par le terme de pente, pas par une vraie orientation solaire.
+7. **La graine `RUIN` de `presentation-registry.py` pointe encore sur
    `/Engine/BasicShapes/Cylinder.Cylinder`** alors que l'asset réel porte
    `SM_Ruin_Generic_01`. Dérive préexistante, chantier d'un autre agent : signalée, pas
    corrigée.
-7. **Le sol reste pâle et lavé** sous le soleil du banc, ce qui affaiblit le contraste des
+8. **Le sol reste pâle et lavé** sous le soleil du banc, ce qui affaiblit le contraste des
    troncs. `M_AnastasisSlice` appartient au chantier matériaux en cours.
 
 ## 13. NEXT TARGET recommandé — non exécuté
 
-**Le mélange d'espèces piloté par l'écologie.** C'est la suite la moins chère et la plus
-rentable : `Wetness`, `Alt` et `Shade` existent déjà sur `FVisualTile`, la grammaire a déjà
-ses deux familles, et le résolveur a déjà un axe de filtrage. Un feuillu en fond de vallon
-humide et un conifère sur la croupe sèche feraient lire la topographie *à travers* la forêt
-— sans déplacer un seul arbre, sans toucher `AnastasisSim`.
+**`Stone` → rochers.** C'est désormais le candidat le plus mûr et le plus symétrique :
+`ETileType::Stone` est une vraie tuile de simulation, elle ne reçoit aujourd'hui **aucune
+instance** (couleur de sommet seulement), et `docs/unreal/ASSET_MAP_001.md` la désignait déjà
+comme la suite naturelle après l'arbre et la ruine. Tout l'outillage bâti ici se réemploie
+tel quel : le générateur paramétrique, la convention de pivot Z = [−50, +50], l'axe de
+stature (un bloc erratique n'est pas un affleurement), le matériau à couleur de sommet, et
+la planche anti-arnaque.
 
-Candidat suivant, symétrique et de même maturité : **`Stone` → rochers**. Le type de tuile
-existe, il n'a aucun dressing, et l'ASSET_MAP le désigne déjà comme le successeur naturel.
+Candidat suivant : **le bois mort**. `ASSET_MAP_001` le note comme faisable sans toucher
+`AnastasisSim` — une fraction des tuiles `Forest` résolue vers un archétype `DeadTree` par
+le même hash déterministe. La planche de référence en fait une strate à part entière
+(« bois mort, toutes les strates »), et la grammaire sait déjà exprimer une variante par
+stature.
 
 ---
 
 ### Verdict
 
 ```
-[x] les cônes ne sont plus la silhouette finale        6 silhouettes construites
-[x] le tronc est perceptible                           fût dégagé de 22 % à 54 % selon l'âge
-[x] plusieurs niveaux de stature                       4 classes, meshes distincts
-[x] hauteur cohérente avec l'échelle du monde          107–668 uu contre 91 uu de ruine
-[x] les arbres ne paraissent pas clonés                6 meshes x biais x inclinaison, déterministes
+[x] les cônes ne sont plus la silhouette finale        8 silhouettes construites
+[x] le tronc est perceptible                           fût dégagé de 22 % à 54 %, ou absent (cépée)
+[x] plusieurs niveaux de stature                       4 classes x 2 familles, meshes distincts
+[x] hauteur cohérente avec l'échelle du monde          97–627 uu contre 91 uu de ruine
+[x] les arbres ne paraissent pas clonés                8 meshes x biais x inclinaison, déterministes
+[x] l'espèce répond au terrain                         p_conifer 0,06 -> 0,86 selon Shade/Wetness
 [x] lecture claire à distance                          C_wide_after.png, caméra scellée
 [x] résultat stylisé                                   pas de photoréalisme, pas de Nanite
 [x] aucune refonte terrain                             AnastasisTerrainSurface intact

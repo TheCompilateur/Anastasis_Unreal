@@ -39,14 +39,20 @@ MAX_LEAN_DEGREES = 5.0
 TINT = (0.102, 0.243, 0.114)
 ARCHETYPE = "Tree_Generic"
 
-# (mesh, stature, biais d'echelle)
+# (mesh, stature, famille, biais d'echelle). Quatre statures x deux familles :
+# la grille que la planche de reference autorise, remplie. La stature vient de
+# l'ecologie, la famille vient du site (Shade et Wetness) -- deux axes
+# orthogonaux, donc un peuplement peut changer d'espece sans changer de
+# structure d'age, et l'inverse.
 VARIANTS = [
-    ("SM_Tree_Conifer_Understory_01", "UNDERSTORY", 1.00),
-    ("SM_Tree_Conifer_Subcanopy_01", "SUBCANOPY", 1.00),
-    ("SM_Tree_Broadleaf_Subcanopy_01", "SUBCANOPY", 0.92),
-    ("SM_Tree_Conifer_Canopy_01", "CANOPY", 1.00),
-    ("SM_Tree_Broadleaf_Canopy_01", "CANOPY", 0.85),
-    ("SM_Tree_Conifer_Emergent_01", "EMERGENT", 1.35),
+    ("SM_Tree_Conifer_Understory_01", "UNDERSTORY", "CONIFER", 1.00),
+    ("SM_Tree_Broadleaf_Understory_01", "UNDERSTORY", "BROADLEAF", 0.90),
+    ("SM_Tree_Conifer_Subcanopy_01", "SUBCANOPY", "CONIFER", 1.00),
+    ("SM_Tree_Broadleaf_Subcanopy_01", "SUBCANOPY", "BROADLEAF", 0.92),
+    ("SM_Tree_Conifer_Canopy_01", "CANOPY", "CONIFER", 1.00),
+    ("SM_Tree_Broadleaf_Canopy_01", "CANOPY", "BROADLEAF", 0.85),
+    ("SM_Tree_Conifer_Emergent_01", "EMERGENT", "CONIFER", 1.35),
+    ("SM_Tree_Broadleaf_Emergent_01", "EMERGENT", "BROADLEAF", 1.12),
 ]
 
 
@@ -54,11 +60,12 @@ def log(msg):
     unreal.log("[set_tree_grammar] " + str(msg))
 
 
-def stature(name):
-    value = getattr(unreal.AnastasisStatureClass, name, None)
+def enum_value(enum_name, name):
+    owner = getattr(unreal, enum_name, None)
+    value = getattr(owner, name, None) if owner is not None else None
     if value is None:
-        raise Exception("AnastasisStatureClass.%s inconnu de UE-Python "
-                        "(module C++ pas recompile ?)" % name)
+        raise Exception("unreal.%s.%s inconnu de UE-Python "
+                        "(module C++ pas recompile ?)" % (enum_name, name))
     return value
 
 
@@ -80,7 +87,7 @@ def build_variants():
         raise Exception("materiau introuvable %s -- lancer d'abord "
                         "tools/unreal/create_tree_asset.py" % VEGETATION_MATERIAL)
     out = []
-    for mesh_name, stature_name, bias in VARIANTS:
+    for mesh_name, stature_name, family_name, bias in VARIANTS:
         path = MESH_DIR + mesh_name
         mesh = unreal.EditorAssetLibrary.load_asset(path)
         if mesh is None:
@@ -89,7 +96,8 @@ def build_variants():
         variant = unreal.AnastasisPresentationVariant()
         variant.set_editor_property("mesh", mesh)
         variant.set_editor_property("material_override", material)
-        variant.set_editor_property("stature", stature(stature_name))
+        variant.set_editor_property("stature", enum_value("AnastasisStatureClass", stature_name))
+        variant.set_editor_property("family", enum_value("AnastasisFoliageFamily", family_name))
         variant.set_editor_property("scale_bias", bias)
         out.append(variant)
     return out
@@ -101,11 +109,12 @@ def describe(entry):
     for variant in entry.get_editor_property("variants"):
         mesh = variant.get_editor_property("mesh")
         try:
-            st = str(variant.get_editor_property("stature"))
+            st = str(variant.get_editor_property("stature")).split('.')[-1]
+            fam = str(variant.get_editor_property("family")).split('.')[-1]
             bias = round(float(variant.get_editor_property("scale_bias")), 4)
         except Exception:
-            st, bias = "<absent>", None
-        rows.append("%s/%s/%s" % (mesh.get_name() if mesh else "NONE", st, bias))
+            st, fam, bias = "<absent>", "<absent>", None
+        rows.append("%s/%s/%s/%s" % (mesh.get_name() if mesh else "NONE", st, fam, bias))
     try:
         lean = round(float(entry.get_editor_property("max_lean_degrees")), 3)
     except Exception:
@@ -172,9 +181,10 @@ def verify():
         variants = entry.get_editor_property("variants")
         log("VERIFY FOREST %s" % describe(entry))
         statures = {str(v.get_editor_property("stature")) for v in variants}
-        ok = len(variants) == len(VARIANTS) and len(statures) == 4
-        log("VERIFY variants=%d attendu=%d statures=%d attendu=4 -> %s"
-            % (len(variants), len(VARIANTS), len(statures), "OK" if ok else "MAUVAIS"))
+        families = {str(v.get_editor_property("family")) for v in variants}
+        ok = len(variants) == len(VARIANTS) and len(statures) == 4 and len(families) == 2
+        log("VERIFY variants=%d attendu=%d statures=%d attendu=4 familles=%d attendu=2 -> %s"
+            % (len(variants), len(VARIANTS), len(statures), len(families), "OK" if ok else "MAUVAIS"))
         return ok
     log("VERIFY::FAIL entree FOREST disparue")
     return False

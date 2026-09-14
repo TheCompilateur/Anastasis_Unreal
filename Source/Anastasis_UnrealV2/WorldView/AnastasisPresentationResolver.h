@@ -72,7 +72,37 @@ namespace AnastasisPresentation
 		uint32 Seed,
 		int32 TileX,
 		int32 TileY,
-		EAnastasisStatureClass Wanted = EAnastasisStatureClass::Any);
+		EAnastasisStatureClass Wanted = EAnastasisStatureClass::Any,
+		EAnastasisFoliageFamily Family = EAnastasisFoliageFamily::Any);
+
+	/**
+	 * Which species family the site itself calls for.
+	 *
+	 * PRESENTATION READS SIMULATION TRUTH; IT DOES NOT ADD ANY. Both inputs already exist
+	 * on FVisualTile and are produced by AnastasisWorld:
+	 *
+	 *   Shade    [-1,1] relief lighting: slope facing the light, blended with altitude.
+	 *                   It is already the composition of "altitude et exposition", so
+	 *                   reading Alt as a third term would double-count altitude.
+	 *   Wetness  [0,1]  moisture.
+	 *
+	 * Pontic ecology, which is what the reference plate documents: the oriental spruce and
+	 * the fir take the high, exposed, harsh ground; the beech, hornbeam and alder hold the
+	 * lower, wetter, sheltered ground and the stream bottoms.
+	 *
+	 * The result is a PROBABILITY resolved against a per-site hash, never a threshold. A
+	 * hard cut would draw a visible contour line across the map -- a rendering artefact,
+	 * not an ecotone. Real stands are mixed, and their proportions shift gradually.
+	 */
+	EAnastasisFoliageFamily SelectFoliageFamily(
+		double Shade,
+		double Wetness,
+		uint32 Seed,
+		int32 TileX,
+		int32 TileY);
+
+	/** Coniferousness in [0,1] for a site, before the hash draw. Exposed so the gradient itself is testable. */
+	double Coniferousness(double Shade, double Wetness);
 
 	/** Entry + variant + loaded assets for one tile. false = nothing renders here. Loads the variant's mesh synchronously. */
 	bool ResolvePresentation(
@@ -81,7 +111,8 @@ namespace AnastasisPresentation
 		int32 TileX,
 		int32 TileY,
 		FResolvedPresentation& Out,
-		EAnastasisStatureClass Wanted = EAnastasisStatureClass::Any);
+		EAnastasisStatureClass Wanted = EAnastasisStatureClass::Any,
+		EAnastasisFoliageFamily Family = EAnastasisFoliageFamily::Any);
 
 	/**
 	 * Deterministic placement: same (Seed, TileX, TileY, Entry, ScaleBias) always yields the

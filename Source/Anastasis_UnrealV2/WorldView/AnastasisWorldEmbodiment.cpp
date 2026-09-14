@@ -328,8 +328,18 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
         {
             int32 ForestLayerCounts[3] = {};
             int32 StatureCounts[5] = {};
+            int32 FamilyCounts[3] = {};
             double TallestUU = 0.0;
             double ShortestUU = TNumericLimits<double>::Max();
+            // The gradient's own inputs, gathered as they are actually sampled. The species
+            // weights in the resolver are only defensible against the distribution they
+            // actually see, so the distribution is reported rather than assumed.
+            TArray<double> SiteShade;
+            TArray<double> SiteWetness;
+            TArray<double> SiteConiferousness;
+            SiteShade.Reserve(ForestPlan.Instances.Num());
+            SiteWetness.Reserve(ForestPlan.Instances.Num());
+            SiteConiferousness.Reserve(ForestPlan.Instances.Num());
             for (const auto& P : ForestPlan.Instances)
             {
                 double GroundZ;
@@ -337,9 +347,17 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                     continue;
                 const auto& T = CanonicalSource.Tiles[P.SourceIndex];
                 const EAnastasisStatureClass Stature = StatureForLayer(P.Layer, P.VisualSeed, T.X, T.Y);
+                // Species comes from the site, not from a blind draw: Shade carries altitude
+                // and exposure, Wetness carries moisture, and both are simulation truth this
+                // layer only reads. Nothing here moves a tree.
+                const EAnastasisFoliageFamily Family = AnastasisPresentation::SelectFoliageFamily(
+                    T.Shade, T.Wetness, P.VisualSeed, T.X, T.Y);
+                SiteShade.Add(T.Shade);
+                SiteWetness.Add(T.Wetness);
+                SiteConiferousness.Add(AnastasisPresentation::Coniferousness(T.Shade, T.Wetness));
                 AnastasisPresentation::FResolvedPresentation R;
                 if (!AnastasisPresentation::ResolvePresentation(AnastasisWorld::ETileType::Forest,
-                    P.VisualSeed, T.X, T.Y, R, Stature)) continue;
+                    P.VisualSeed, T.X, T.Y, R, Stature, Family)) continue;
                 auto* M = Prepare(R);
                 if (!M) continue;
                 FTransform Pose = AnastasisPresentation::ResolveInstanceTransform(*R.Entry,
@@ -352,6 +370,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 M->AddInstance(Pose, false);
                 ++ForestLayerCounts[static_cast<uint8>(P.Layer)];
                 ++StatureCounts[static_cast<uint8>(Stature)];
+                ++FamilyCounts[static_cast<uint8>(Family)];
                 const double HeightUU = (MeshBounds.Max.Z - MinZ) * Pose.GetScale3D().Z;
                 TallestUU = FMath::Max(TallestUU, HeightUU);
                 ShortestUU = FMath::Min(ShortestUU, HeightUU);
@@ -370,6 +389,27 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 StatureCounts[static_cast<uint8>(EAnastasisStatureClass::Canopy)],
                 StatureCounts[static_cast<uint8>(EAnastasisStatureClass::Emergent)],
                 ShortestUU == TNumericLimits<double>::Max() ? 0.0 : ShortestUU, TallestUU);
+
+            // The species claim, measured the same way. A mix that has quietly collapsed to
+            // one family, or a gradient that has saturated, is visible in this one line.
+            SiteShade.Sort();
+            SiteWetness.Sort();
+            const auto At = [](const TArray<double>& V, double Q)
+            {
+                return V.Num() == 0 ? 0.0 : V[FMath::Clamp(FMath::FloorToInt(Q * (V.Num() - 1)), 0, V.Num() - 1)];
+            };
+            // p_conifer is the gradient as REAL SITES see it, not as its extreme corners
+            // would. Reporting Coniferousness(worst shade, worst wetness) described a
+            // combination that may exist nowhere on the map, and showed a clamp that no
+            // tree ever met -- a diagnostic that raises a false alarm is worse than none.
+            SiteConiferousness.Sort();
+            UE_LOG(LogAnastasis_UnrealV2, Display,
+                TEXT("ANASTASIS_TREE_SPECIES conifer=%d broadleaf=%d shade=[%.2f %.2f %.2f] wetness=[%.2f %.2f %.2f] p_conifer=[%.2f %.2f %.2f]"),
+                FamilyCounts[static_cast<uint8>(EAnastasisFoliageFamily::Conifer)],
+                FamilyCounts[static_cast<uint8>(EAnastasisFoliageFamily::Broadleaf)],
+                At(SiteShade, 0.0), At(SiteShade, 0.5), At(SiteShade, 1.0),
+                At(SiteWetness, 0.0), At(SiteWetness, 0.5), At(SiteWetness, 1.0),
+                At(SiteConiferousness, 0.0), At(SiteConiferousness, 0.5), At(SiteConiferousness, 1.0));
         }
     }
     UE_LOG(LogAnastasis_UnrealV2, Display,

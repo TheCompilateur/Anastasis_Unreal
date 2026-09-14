@@ -137,6 +137,11 @@ def lobe(mesh, radius, cx, cy, cz, squash_z):
 
 
 def build_trunk(segments, color):
+    """Le fut. None quand il n'y en a pas : un noisetier part en plusieurs
+    tiges depuis le sol, et lui coller un tronc unique en ferait un petit arbre
+    au lieu d'un arbuste -- exactement la confusion de strate qu'on evite."""
+    if not segments:
+        return None
     mesh = unreal.DynamicMesh()
     for seg in segments:
         mesh = taper(mesh, *seg[:4], steps=seg[4] if len(seg) > 4 else 9)
@@ -277,6 +282,31 @@ FAMILIES = [
         "foliage": LEAF_GREEN,
     },
     {
+        "name": "SM_Tree_Broadleaf_Understory_01",
+        "note": "strate arbustive feuillue -- noisetier / sureau, cepee multi-tiges, sans fut",
+        # Aucun tronc : quatre tiges partent du sol. C'est la difference qui fait
+        # lire un arbuste plutot qu'un arbre jeune, et la planche de reference
+        # separe bien les deux (strate arbustive vs sous-canopee).
+        "trunk": [],
+        # Tiges courtes et peu ecartees, masse posee BAS et qui les recouvre. Des
+        # tiges longues et ouvertes surmontees de lobes hauts ne font pas un
+        # noisetier : elles font un eventail, une plante de pot. L'arbuste doit
+        # se lire comme un volume au ras du sol, pas comme une main ouverte.
+        "limbs": [(2.2, 1.2, 32.0, -50.0, 9.0, 20.0),
+                  (2.1, 1.1, 30.0, -50.0, 12.0, 110.0),
+                  (2.0, 1.1, 28.0, -50.0, 10.0, 205.0),
+                  (1.8, 1.0, 26.0, -50.0, 13.0, 295.0)],
+        "tiers": [],
+        "lobes": [(15.5, 0.0, 0.0, -14.0, 0.95),
+                  (12.5, 6.0, -5.0, -22.0, 0.95),
+                  (11.5, -5.0, 6.0, -6.0, 0.92),
+                  (10.0, 3.0, 6.0, 2.0, 0.90),
+                  (9.0, -6.0, -3.0, -12.0, 0.95),
+                  (7.5, 2.0, -6.0, 8.0, 0.92)],
+        "bark": BARK_DARK,
+        "foliage": LEAF_GREEN,
+    },
+    {
         "name": "SM_Tree_Broadleaf_Canopy_01",
         "note": "canopee feuillue -- hetre / chene mature, fut fourchu, large dome",
         "trunk": [(5.4, 3.6, -50.0, -8.0)],
@@ -294,6 +324,33 @@ FAMILIES = [
         "bark": BARK_OLD,
         "foliage": LEAF_PALE,
     },
+    {
+        "name": "SM_Tree_Broadleaf_Emergent_01",
+        "note": "strate emergente feuillue -- vieux hetre, fut massif, dome haut et large",
+        # Le plus large de la grammaire (0.65). Un emergent feuillu n'est pas un
+        # arbre de canopee plus grand : c'est un individu qui a eu la place de
+        # s'etaler, et il doit se lire comme un point de repere dans le couvert.
+        "trunk": [(9.0, 6.5, -50.0, -14.0), (6.5, 5.5, -14.0, -2.0)],
+        # Ramure redressee et couronne resserree : a 0.80 de largeur, la premiere
+        # version faisait un chapeau de champignon qui APLATISSAIT la ligne de
+        # ciel au lieu de la ponctuer -- un emergent doit depasser le couvert,
+        # pas le couvrir. La masse remonte donc au lieu de s'etaler.
+        "limbs": [(5.0, 2.2, 34.0, -10.0, 22.0, 25.0),
+                  (4.6, 2.0, 32.0, -6.0, 27.0, 120.0),
+                  (4.2, 1.9, 30.0, -12.0, 20.0, 215.0),
+                  (3.8, 1.7, 28.0, -4.0, 30.0, 300.0)],
+        "tiers": [],
+        "lobes": [(21.0, 0.0, 0.0, 16.0, 0.92),
+                  (17.5, 11.0, -6.0, 8.0, 0.94),
+                  (16.0, -10.0, 8.0, 14.0, 0.94),
+                  (14.0, 5.0, 10.0, 26.0, 0.90),
+                  (13.0, -11.0, -7.0, 10.0, 0.94),
+                  (11.5, 10.0, -10.0, 22.0, 0.92),
+                  (10.0, -3.0, 3.0, 34.0, 0.88),
+                  (9.0, 7.0, 5.0, 30.0, 0.90)],
+        "bark": BARK_OLD,
+        "foliage": LEAF_GREEN,
+    },
 ]
 
 # Repli code de AnastasisPresentationRegistry.cpp : ce chemin doit rester
@@ -305,7 +362,9 @@ GENERIC_NAME = "SM_Tree_Generic_01"
 
 def build_family(spec):
     parts = []
-    parts.append(build_trunk(spec["trunk"], spec["bark"]))
+    trunk = build_trunk(spec["trunk"], spec["bark"])
+    if trunk is not None:
+        parts.append(trunk)
     limbs = build_limbs(spec["limbs"], spec["bark"])
     if limbs is not None:
         parts.append(limbs)

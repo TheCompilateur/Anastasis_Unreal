@@ -31,8 +31,10 @@ namespace
 	constexpr const TCHAR* TreeMeshSubcanopy = TEXT("/Game/Anastasis/Vegetation/SM_Tree_Conifer_Subcanopy_01.SM_Tree_Conifer_Subcanopy_01");
 	constexpr const TCHAR* TreeMeshCanopy = TEXT("/Game/Anastasis/Vegetation/SM_Tree_Conifer_Canopy_01.SM_Tree_Conifer_Canopy_01");
 	constexpr const TCHAR* TreeMeshEmergent = TEXT("/Game/Anastasis/Vegetation/SM_Tree_Conifer_Emergent_01.SM_Tree_Conifer_Emergent_01");
+	constexpr const TCHAR* TreeMeshBroadleafUnder = TEXT("/Game/Anastasis/Vegetation/SM_Tree_Broadleaf_Understory_01.SM_Tree_Broadleaf_Understory_01");
 	constexpr const TCHAR* TreeMeshBroadleafSub = TEXT("/Game/Anastasis/Vegetation/SM_Tree_Broadleaf_Subcanopy_01.SM_Tree_Broadleaf_Subcanopy_01");
 	constexpr const TCHAR* TreeMeshBroadleafCanopy = TEXT("/Game/Anastasis/Vegetation/SM_Tree_Broadleaf_Canopy_01.SM_Tree_Broadleaf_Canopy_01");
+	constexpr const TCHAR* TreeMeshBroadleafEmergent = TEXT("/Game/Anastasis/Vegetation/SM_Tree_Broadleaf_Emergent_01.SM_Tree_Broadleaf_Emergent_01");
 	constexpr const TCHAR* DefaultRuinMeshPath = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
 
 	/**
@@ -46,12 +48,14 @@ namespace
 	FAnastasisPresentationVariant MakeVariant(
 		const TCHAR* MeshPath,
 		EAnastasisStatureClass Stature,
+		EAnastasisFoliageFamily Family,
 		float ScaleBias,
 		const TCHAR* MaterialPath)
 	{
 		FAnastasisPresentationVariant Variant;
 		Variant.Mesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(MeshPath));
 		Variant.Stature = Stature;
+		Variant.Family = Family;
 		Variant.ScaleBias = ScaleBias;
 		if (MaterialPath)
 		{
@@ -114,21 +118,24 @@ UAnastasisPresentationRegistry* UAnastasisPresentationRegistry::CreateCodeDefaul
 		EAnastasisSemanticType::Forest, TEXT("Tree_Generic"),
 		FLinearColor(0.102f, 0.243f, 0.114f), 3.6f, 5.0f, 0.30f, 5.0f,
 		{
-			MakeVariant(TreeMeshUnderstory, EAnastasisStatureClass::Understory, 1.00f, VegetationMaterialPath),
-			MakeVariant(TreeMeshSubcanopy, EAnastasisStatureClass::Subcanopy, 1.00f, VegetationMaterialPath),
+			// Four statures x two families: the grid the reference plate authorises, filled.
 			// Broadleaves carry a bias below 1: hornbeam and beech sit under the spruce in a
 			// Pontic stand, and their wide dome needs less height to read than a spire does.
-			MakeVariant(TreeMeshBroadleafSub, EAnastasisStatureClass::Subcanopy, 0.92f, VegetationMaterialPath),
-			MakeVariant(TreeMeshCanopy, EAnastasisStatureClass::Canopy, 1.00f, VegetationMaterialPath),
-			MakeVariant(TreeMeshBroadleafCanopy, EAnastasisStatureClass::Canopy, 0.85f, VegetationMaterialPath),
-			MakeVariant(TreeMeshEmergent, EAnastasisStatureClass::Emergent, 1.35f, VegetationMaterialPath),
+			MakeVariant(TreeMeshUnderstory, EAnastasisStatureClass::Understory, EAnastasisFoliageFamily::Conifer, 1.00f, VegetationMaterialPath),
+			MakeVariant(TreeMeshBroadleafUnder, EAnastasisStatureClass::Understory, EAnastasisFoliageFamily::Broadleaf, 0.90f, VegetationMaterialPath),
+			MakeVariant(TreeMeshSubcanopy, EAnastasisStatureClass::Subcanopy, EAnastasisFoliageFamily::Conifer, 1.00f, VegetationMaterialPath),
+			MakeVariant(TreeMeshBroadleafSub, EAnastasisStatureClass::Subcanopy, EAnastasisFoliageFamily::Broadleaf, 0.92f, VegetationMaterialPath),
+			MakeVariant(TreeMeshCanopy, EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Conifer, 1.00f, VegetationMaterialPath),
+			MakeVariant(TreeMeshBroadleafCanopy, EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Broadleaf, 0.85f, VegetationMaterialPath),
+			MakeVariant(TreeMeshEmergent, EAnastasisStatureClass::Emergent, EAnastasisFoliageFamily::Conifer, 1.35f, VegetationMaterialPath),
+			MakeVariant(TreeMeshBroadleafEmergent, EAnastasisStatureClass::Emergent, EAnastasisFoliageFamily::Broadleaf, 1.12f, VegetationMaterialPath),
 		}));
 
 	// Ruin is unchanged, lean included: a wall stub is a manufactured thing and stands plumb.
 	Registry->Entries.Add(MakeDefaultEntry(
 		EAnastasisSemanticType::Ruin, TEXT("Ruin_Generic"),
 		FLinearColor(0.353f, 0.302f, 0.318f), 0.6f, 1.1f, 0.20f, 0.0f,
-		{MakeVariant(DefaultRuinMeshPath, EAnastasisStatureClass::Any, 1.0f, nullptr)}));
+		{MakeVariant(DefaultRuinMeshPath, EAnastasisStatureClass::Any, EAnastasisFoliageFamily::Any, 1.0f, nullptr)}));
 
 	return Registry;
 }

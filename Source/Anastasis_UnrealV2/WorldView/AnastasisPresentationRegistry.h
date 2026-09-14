@@ -61,6 +61,24 @@ enum class EAnastasisStatureClass : uint8
 	Emergent = 4,
 };
 
+/**
+ * Which broad species family a look belongs to.
+ *
+ * The reference plate separates CONIFERES (sapins, epicees, pins -- "verticalite,
+ * contraste, altitude") from FEUILLUS (hetres, chenes, charmes). At distance those two
+ * read as different things long before a species does: a dark spire against a pale dome.
+ *
+ * Any is value 0 for the same reason Stature's is: data written before this axis existed
+ * answers every request, so adding the field changes no shipped asset's behaviour.
+ */
+UENUM(BlueprintType)
+enum class EAnastasisFoliageFamily : uint8
+{
+	Any = 0,
+	Conifer = 1,
+	Broadleaf = 2,
+};
+
 /** One interchangeable look for an archetype. Adding a second entry here is how FOREST gets a second tree. */
 USTRUCT(BlueprintType)
 struct FAnastasisPresentationVariant
@@ -82,6 +100,14 @@ struct FAnastasisPresentationVariant
 	 */
 	UPROPERTY(EditAnywhere, Category = "Presentation")
 	EAnastasisStatureClass Stature = EAnastasisStatureClass::Any;
+
+	/**
+	 * Species family this look belongs to. Orthogonal to Stature: the pair (stature,
+	 * family) is what picks a mesh, so a stand can change species without changing age
+	 * structure, and change age structure without changing species.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Presentation")
+	EAnastasisFoliageFamily Family = EAnastasisFoliageFamily::Any;
 
 	/**
 	 * Multiplies the entry's uniform-scale envelope for THIS look only. It is how one

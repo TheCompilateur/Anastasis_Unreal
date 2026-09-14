@@ -5,6 +5,8 @@
 
 #include "Engine/StaticMesh.h"
 
+#include <limits>
+
 #if WITH_DEV_AUTOMATION_TESTS
 
 namespace
@@ -30,6 +32,14 @@ namespace
 		FAnastasisPresentationVariant Variant = MakeVariant(MeshPath);
 		Variant.Stature = Stature;
 		Variant.ScaleBias = Bias;
+		return Variant;
+	}
+
+	FAnastasisPresentationVariant MakeGridVariant(
+		const TCHAR* MeshPath, EAnastasisStatureClass Stature, EAnastasisFoliageFamily Family)
+	{
+		FAnastasisPresentationVariant Variant = MakeStatureVariant(MeshPath, Stature);
+		Variant.Family = Family;
 		return Variant;
 	}
 }
@@ -369,6 +379,141 @@ bool FAnastasisTreePivotConvention::RunTest(const FString&)
 	}
 	TestTrue(TEXT("the forest archetype names at least one loadable mesh"), Checked > 0);
 	AddInfo(FString::Printf(TEXT("TREE_PIVOT variants_checked=%d"), Checked));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisPresentationSpecies, "Anastasis.Presentation.Species", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisPresentationSpecies::RunTest(const FString&)
+{
+	using namespace AnastasisPresentation;
+
+	// The full grid: two statures x two families. A request for one cell must land in that
+	// cell, or the species axis is decoration.
+	UAnastasisPresentationRegistry* Registry = MakeRegistry();
+	FAnastasisPresentationEntry Grid;
+	Grid.SemanticType = EAnastasisSemanticType::Forest;
+	Grid.ArchetypeId = FName(TEXT("Tree_Grid"));
+	Grid.Variants.Add(MakeGridVariant(TEXT("/Engine/BasicShapes/Cone.Cone"), EAnastasisStatureClass::Understory, EAnastasisFoliageFamily::Conifer));
+	Grid.Variants.Add(MakeGridVariant(TEXT("/Engine/BasicShapes/Sphere.Sphere"), EAnastasisStatureClass::Understory, EAnastasisFoliageFamily::Broadleaf));
+	Grid.Variants.Add(MakeGridVariant(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"), EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Conifer));
+	Grid.Variants.Add(MakeGridVariant(TEXT("/Engine/BasicShapes/Cube.Cube"), EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Broadleaf));
+	Registry->Entries.Add(Grid);
+	const FAnastasisPresentationEntry& Entry = Registry->Entries[0];
+
+	struct FCase { EAnastasisStatureClass Stature; EAnastasisFoliageFamily Family; int32 Expected; };
+	const FCase Cases[] = {
+		{EAnastasisStatureClass::Understory, EAnastasisFoliageFamily::Conifer, 0},
+		{EAnastasisStatureClass::Understory, EAnastasisFoliageFamily::Broadleaf, 1},
+		{EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Conifer, 2},
+		{EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Broadleaf, 3},
+	};
+	for (const FCase& Case : Cases)
+	{
+		for (int32 Y = 0; Y < 8; ++Y)
+		{
+			for (int32 X = 0; X < 8; ++X)
+			{
+				if (!TestEqual(TEXT("a (stature, family) request lands in its own cell"),
+					SelectVariantIndex(Entry, 12345u, X, Y, Case.Stature, Case.Family), Case.Expected))
+				{
+					return false;
+				}
+			}
+		}
+	}
+
+	// FAIL OPEN, AND IN THE RIGHT ORDER. With no broadleaf understory in the data, an
+	// understory broadleaf request must fall back to the CONIFER UNDERSTORY -- same age,
+	// wrong species -- never to a broadleaf of another stature. Losing the species keeps
+	// the stand's shape; losing the age destroys its vertical profile.
+	UAnastasisPresentationRegistry* Partial = MakeRegistry();
+	FAnastasisPresentationEntry Gap;
+	Gap.SemanticType = EAnastasisSemanticType::Forest;
+	Gap.ArchetypeId = FName(TEXT("Tree_Gap"));
+	Gap.Variants.Add(MakeGridVariant(TEXT("/Engine/BasicShapes/Cone.Cone"), EAnastasisStatureClass::Understory, EAnastasisFoliageFamily::Conifer));
+	Gap.Variants.Add(MakeGridVariant(TEXT("/Engine/BasicShapes/Cube.Cube"), EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Broadleaf));
+	Partial->Entries.Add(Gap);
+	for (int32 X = 0; X < 32; ++X)
+	{
+		TestEqual(TEXT("a missing species degrades to the same stature, not to another one"),
+			SelectVariantIndex(Partial->Entries[0], 12345u, X, 1,
+				EAnastasisStatureClass::Understory, EAnastasisFoliageFamily::Broadleaf), 0);
+	}
+
+	// Data written before the family axis existed must keep answering every request.
+	UAnastasisPresentationRegistry* Legacy = MakeRegistry();
+	FAnastasisPresentationEntry Untagged;
+	Untagged.SemanticType = EAnastasisSemanticType::Forest;
+	Untagged.ArchetypeId = FName(TEXT("Tree_Untagged"));
+	Untagged.Variants.Add(MakeVariant(TEXT("/Engine/BasicShapes/Cone.Cone")));
+	Legacy->Entries.Add(Untagged);
+	TestEqual(TEXT("an untagged variant serves any family"),
+		SelectVariantIndex(Legacy->Entries[0], 12345u, 5, 5,
+			EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Broadleaf), 0);
+
+	// The draw itself: reproducible, and both outcomes actually occur.
+	TestEqual(TEXT("species choice is reproducible"),
+		static_cast<int32>(SelectFoliageFamily(0.1, 0.2, 12345u, 7, 9)),
+		static_cast<int32>(SelectFoliageFamily(0.1, 0.2, 12345u, 7, 9)));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisSpeciesGradient, "Anastasis.Presentation.SpeciesGradient", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisSpeciesGradient::RunTest(const FString&)
+{
+	using namespace AnastasisPresentation;
+
+	// The ranges the canonical world actually produces at dressed forest sites, measured
+	// and logged by ANASTASIS_TREE_SPECIES. The gradient is only required to behave on the
+	// data that exists -- and it is required to behave on ALL of it.
+	constexpr double ShadeMin = -0.74, ShadeMax = 0.79;
+	constexpr double WetMin = 0.0, WetMax = 0.85;
+
+	// Monotone in each axis, in the direction Pontic ecology gives: conifers climb and take
+	// the exposed ground, broadleaves hold the damp.
+	double Previous = -1.0;
+	for (int32 I = 0; I <= 20; ++I)
+	{
+		const double Shade = FMath::Lerp(ShadeMin, ShadeMax, I / 20.0);
+		const double P = Coniferousness(Shade, 0.2);
+		TestTrue(TEXT("coniferousness rises with exposure and altitude"), P >= Previous - 1.e-12);
+		Previous = P;
+	}
+	Previous = 2.0;
+	for (int32 I = 0; I <= 20; ++I)
+	{
+		const double Wet = FMath::Lerp(WetMin, WetMax, I / 20.0);
+		const double P = Coniferousness(0.0, Wet);
+		TestTrue(TEXT("coniferousness falls with moisture"), P <= Previous + 1.e-12);
+		Previous = P;
+	}
+
+	// NOT A THRESHOLD IN DISGUISE. Over the whole real field range the value must stay off
+	// both walls: a site pinned at 0 or 1 has no gradient, it has a rule. An earlier tuning
+	// pinned the wettest, darkest sites at exactly 0.00 and this is what caught it.
+	double Low = 1.0, High = 0.0;
+	for (int32 Y = 0; Y <= 12; ++Y)
+	{
+		for (int32 X = 0; X <= 12; ++X)
+		{
+			const double P = Coniferousness(
+				FMath::Lerp(ShadeMin, ShadeMax, X / 12.0),
+				FMath::Lerp(WetMin, WetMax, Y / 12.0));
+			Low = FMath::Min(Low, P);
+			High = FMath::Max(High, P);
+		}
+	}
+	TestTrue(TEXT("no corner of the real field range clamps to 0"), Low > 0.01);
+	TestTrue(TEXT("no corner of the real field range clamps to 1"), High < 0.99);
+	// And it must still be a gradient worth having, not a flat 0.5 everywhere.
+	TestTrue(TEXT("the gradient spans a visible range"), High - Low > 0.35);
+
+	// Garbage in must not produce a silent bias: a non-finite field falls back to the base.
+	TestEqual(TEXT("non-finite shade falls back to the base"),
+		Coniferousness(std::numeric_limits<double>::quiet_NaN(), 0.2), Coniferousness(0.0, 0.08), 0.06);
+
+	AddInfo(FString::Printf(TEXT("SPECIES_GRADIENT low=%.3f high=%.3f span=%.3f"), Low, High, High - Low));
 	return true;
 }
 

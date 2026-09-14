@@ -44,7 +44,7 @@ STAGE = unreal.Vector(-14000.0, 0.0, 0.0)
 #
 # Sur un arc centre sur la camera, tous sont a la MEME distance. La seule
 # difference de taille a l'ecran est la difference de taille reelle.
-ARC_RADIUS = 2000.0
+ARC_RADIUS = 2400.0
 ARC_SPACING = 340.0   # corde entre deux sujets : plus large que la plus large couronne
 CAM_HEIGHT = 320.0    # a mi-hauteur de l'emergent, pour ne privilegier ni le haut ni le bas
 
@@ -52,13 +52,18 @@ CAM_HEIGHT = 320.0    # a mi-hauteur de l'emergent, pour ne privilegier ni le ha
 # stature recoit dans le monde : enveloppe d'entree 3.6-5.0 au milieu (4.3),
 # multipliee par le facteur de strate ecologique, puis par le biais de variante.
 # Ce ne sont donc pas des tailles choisies pour la photo.
+#
+# Les paires se lisent deux a deux : meme strate, une famille contre l'autre.
+# C'est la comparaison qui compte, puisque c'est celle que le site tranche.
 SUBJECTS = [
-    ('SM_Tree_Conifer_Understory_01', 150.0, 'understory 1.5 m'),
+    ('SM_Tree_Broadleaf_Understory_01', 135.0, 'arbustive feuillue 1.4 m'),
+    ('SM_Tree_Conifer_Understory_01', 150.0, 'arbustive conifere 1.5 m'),
     ('SM_Tree_Broadleaf_Subcanopy_01', 253.0, 'sous-canopee feuillue 2.5 m'),
     ('SM_Tree_Conifer_Subcanopy_01', 275.0, 'sous-canopee conifere 2.8 m'),
     ('SM_Tree_Broadleaf_Canopy_01', 393.0, 'canopee feuillue 3.9 m'),
     ('SM_Tree_Conifer_Canopy_01', 462.0, 'canopee conifere 4.6 m'),
-    ('SM_Tree_Conifer_Emergent_01', 624.0, 'emergent 6.2 m'),
+    ('SM_Tree_Broadleaf_Emergent_01', 518.0, 'emergent feuillu 5.2 m'),
+    ('SM_Tree_Conifer_Emergent_01', 624.0, 'emergent conifere 6.2 m'),
 ]
 
 # Temoins d'echelle : la ruine telle qu'elle est reellement posee (mediane
