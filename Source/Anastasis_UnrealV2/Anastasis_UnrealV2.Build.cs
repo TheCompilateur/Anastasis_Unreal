@@ -17,6 +17,8 @@ public class Anastasis_UnrealV2 : ModuleRules
 			"AIModule",
 			"StateTreeModule",
 			"GameplayStateTreeModule",
+			"GameplayTags",
+			"SmartObjectsModule",
 			"UMG",
 			"Slate",
 			"AnastasisSim"
@@ -26,6 +28,7 @@ public class Anastasis_UnrealV2 : ModuleRules
 
 		PublicIncludePaths.AddRange(new string[] {
 			"Anastasis_UnrealV2",
+			"Anastasis_UnrealV2/Village",
 			"Anastasis_UnrealV2/Variant_Horror",
 			"Anastasis_UnrealV2/Variant_Horror/UI",
 			"Anastasis_UnrealV2/Variant_Shooter",
