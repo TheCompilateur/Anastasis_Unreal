@@ -85,6 +85,37 @@ FLinearColor BilinearColor(const AnastasisTerrainSurface::FGeometry& Coarse, int
 	return FMath::Lerp(FMath::Lerp(CA, CB, Fx), FMath::Lerp(CC, CD, Fx), Fy);
 }
 
+/**
+ * Meme bilineaire que BilinearColor, pour les canaux morphologiques UV0/UV1.
+ *
+ * Ils DOIVENT suivre la subdivision : ce sont des membres de FGeometry, et Apply
+ * remplace FGeometry. Les oublier laisserait des tableaux vides face a 145 161 sommets,
+ * la ProceduralMeshComponent les completerait a zero, et le materiau de sol lirait
+ * partout Rock=0 Litter=0 Worked=0 Wetness=0 -- plus de roche, plus de litiere, plus de
+ * bande humide, rien qu'une herbe uniforme. Sans erreur, sans journal : le sol
+ * redeviendrait la nappe plate que GROUND_SURFACE_001 a corrigee.
+ *
+ * Le bilineaire est le bon operateur ici, et pas seulement par symetrie avec la couleur :
+ * les poids de famille forment une partition de l'unite, que l'interpolation lineaire
+ * preserve exactement (la somme de quatre partitions ponderees reste 1), et l'humidite
+ * est un champ scalaire continu. Interpoler ces canaux ne fabrique donc aucune valeur
+ * qui n'ait de sens.
+ */
+FVector2D BilinearUV(const TArray<FVector2D>& Channel, int32 CoarseW, int32 CoarseH, double U, double V)
+{
+	const int32 X = FMath::Clamp(static_cast<int32>(FMath::FloorToDouble(U)), 0, CoarseW - 2);
+	const int32 Y = FMath::Clamp(static_cast<int32>(FMath::FloorToDouble(V)), 0, CoarseH - 2);
+	const double Fx = FMath::Clamp(U - static_cast<double>(X), 0.0, 1.0);
+	const double Fy = FMath::Clamp(V - static_cast<double>(Y), 0.0, 1.0);
+	const int32 A = Y * CoarseW + X, B = A + 1, C = A + CoarseW, D = C + 1;
+	if (!Channel.IsValidIndex(A) || !Channel.IsValidIndex(D))
+	{
+		return FVector2D::ZeroVector;
+	}
+	return FMath::Lerp(FMath::Lerp(Channel[A], Channel[B], Fx),
+					   FMath::Lerp(Channel[C], Channel[D], Fx), Fy);
+}
+
 void RebuildNormals(AnastasisTerrainSurface::FGeometry& G)
 {
 	G.Normals.SetNum(G.Vertices.Num());
@@ -460,6 +491,8 @@ bool AnastasisTerrainForge::Apply(
 	AnastasisTerrainSurface::FGeometry Result;
 	Result.Vertices.Reserve(FineN);
 	Result.Colors.Reserve(FineN);
+	Result.UV0.Reserve(FineN);
+	Result.UV1.Reserve(FineN);
 	Result.SourceIndices.Reserve(FineN);
 	Result.WaterVertices.Reserve(FineN);
 	Result.Triangles.Reserve(2 * (FineW - 1) * (FineH - 1) * 3);
@@ -500,6 +533,9 @@ bool AnastasisTerrainForge::Apply(
 			Result.Vertices.Add(FVector(WorldX, WorldY, Z));
 			Result.WaterVertices.Add(FVector(WorldX, WorldY, SeaZ));
 			Result.Colors.Add(BilinearColor(InOut, CoarseW, CoarseH, U, V));
+			// Canaux morphologiques du sol : ils suivent la subdivision comme la couleur.
+			Result.UV0.Add(BilinearUV(InOut.UV0, CoarseW, CoarseH, U, V));
+			Result.UV1.Add(BilinearUV(InOut.UV1, CoarseW, CoarseH, U, V));
 			const int32 CX = FMath::Clamp(FMath::RoundToInt(U), 0, CoarseW - 1);
 			const int32 CY = FMath::Clamp(FMath::RoundToInt(V), 0, CoarseH - 1);
 			Result.SourceIndices.Add(Crop.Tiles[CY * CoarseW + CX].SourceIndex);

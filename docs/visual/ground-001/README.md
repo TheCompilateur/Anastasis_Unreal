@@ -17,6 +17,8 @@ A/B ne mesure que la fonction qui les lit.
 | `D_shore_ground_on.png` | `1` | `MI_AnastasisGround` | idem | 1 046 790 | `BE0368CEDAB0F278` |
 | `F_forest_ground_off.png` | `0` | `M_AnastasisSlice` | lisière, PIE, signet `FOREST` | 883 444 | `3021A2C7CE5E3AB2` |
 | `G_forest_ground_on.png` | `1` | `MI_AnastasisGround` | idem | 978 775 | `9D171E595AD68C1E` |
+| `H_forge_ground_off.png` | `0` | `M_AnastasisSlice` | lisière, **terrain forgé** | 1 023 751 | `98B14C4F3684F6DE` |
+| `I_forge_ground_on.png` | `1` | `MI_AnastasisGround` | idem | 1 031 686 | `3EA2AFCE70DC259B` |
 
 Les caméras aériennes portent l'angle scellé de `docs/visual/terrain-extent` :
 pitch `-32.8`, yaw `45`.
@@ -57,6 +59,16 @@ signet `FOREST` la rend observable.
 Les arbres eux-mêmes restent les cônes de remplacement — ils appartiennent à la mission
 `anastasis-tree-visuals`, pas à celle-ci, et ils sont identiques dans les deux images.
 
+**`H` / `I` — après le rebase sur `TERRAIN_FORGE`.** Les six premières images ont été
+prises avant que la tessellation n'arrive sur `main`. Ce couple-ci est le même A/B sur
+le terrain réellement livré : relief forgé, arbres de la grammaire de stature, sol
+tessellé à 145 161 sommets. Matériau éteint, le sol est une nappe verte uniforme ;
+allumé, la litière du sous-bois, l'ocre sec de la crête au fond et la roche des faces
+raides à gauche se distinguent.
+
+C'est ce couple qui prouve que le sol **survit à la tessellation** — que les canaux
+morphologiques ont bien suivi la subdivision au lieu d'arriver vides.
+
 **Limite honnête de `C`/`D` :** la palette C++ a été retonée dans le même commit, et
 elle s'applique aux deux images. `C` n'est donc **pas** l'état d'avant la mission —
 c'est l'état d'avant le *matériau*, palette déjà corrigée. L'état réellement initial
@@ -77,6 +89,23 @@ léopard.
 Le correctif n'est pas « baisser le nombre » : c'est **borner le gradient**
 (`G / (1 + |G|)`), après quoi `BumpStrength` redevient une grandeur lisible — la
 tangente de l'inclinaison maximale. Voir `tools/unreal/ground-material.py`.
+
+## `J` — la seconde régression, gardée aussi
+
+`J_regression_slope_saturated.png` (1 045 798 octets, `32754A66526F7554`) est le même
+cadre que `I`, pris juste avant le recalibrage. Tout le sol y est beige : le masque de
+roche saturait.
+
+La cause n'est pas dans le matériau, elle est dans son **couplage** avec le terrain. Le
+matériau lit la pente de la surface RENDUE. `TERRAIN_FORGE` multiplie le relief émergé
+par `anastasis.Terrain.Forge.Exaggerate` (3.6 par défaut) : une pente de 28° dans la
+simulation en fait 64° une fois forgée. Les seuils `SlopeRockStart/End` d'origine
+(0.20 / 0.52), calibrés sur la surface non exagérée, plaçaient donc de la roche
+partout.
+
+Recalibrés à 0.62 / 0.82 — environ 35 à 45° d'origine — la roche revient là où elle a
+un sens. **Si quelqu'un change `Exaggerate`, ces deux nombres bougent avec lui.** C'est
+un couplage réel entre deux missions, et il se règle depuis l'instance sans recompiler.
 
 ## Reproduire
 
@@ -102,7 +131,7 @@ ANASTASIS_WORLD_BOOKMARK FOREST core=(74,44) density=25/25 stand=(71,47) ring=3 
 masse, pas un arbre isolé.
 
 Les captures brutes et leurs journaux restent dans `Saved/SliceEvidence/` et
-`Saved/Anastasis/Captures/` (non versionnés). Ces sept copies-ci sont versionnées
+`Saved/Anastasis/Captures/` (non versionnés). Ces dix copies-ci sont versionnées
 parce qu'elles étayent le rapport.
 
 ## L'outil de capture a encore photographié le mauvais viewport

@@ -163,6 +163,49 @@ Le repli est explicite : sans clairière à bonne distance, le signet se rabat s
 et le dit (`from_edge=0`). Mieux vaut un signet utilisable avec un tronc qu'un signet
 absent — mais il ne ment pas sur ce qu'il a trouvé.
 
+## Le couplage avec TERRAIN_FORGE
+
+Le sol est bâti sur `main` **après** `TERRAIN_FORGE`, qui subdivise la surface et
+exagère le relief. Deux conséquences, toutes deux découvertes en rebasant, toutes deux
+silencieuses si on ne les cherche pas.
+
+**1. Les canaux devaient suivre la subdivision.** `AnastasisTerrainForge::Apply`
+*remplace* la `FGeometry` : 9 216 sommets deviennent 145 161. `UV0` et `UV1` sont des
+membres de cette structure, et `Apply` — écrit avant qu'ils n'existent — ne les
+recopiait pas. La `ProceduralMeshComponent` aurait complété à zéro, et le matériau
+aurait lu partout `Rock=0 Litter=0 Worked=0 Wetness=0` : plus de roche, plus de litière,
+plus de bande humide, sans erreur ni journal.
+
+`Apply` les interpole désormais au bilinéaire, comme la couleur. Le bilinéaire est le
+bon opérateur : les poids de famille forment une partition de l'unité, que
+l'interpolation linéaire préserve exactement. Mesuré sur le maillage forgé :
+
+```
+TERRAIN_FORGE_MORPHOLOGY vertices=145161 rock=26113 litter=11644 worked=21062 grass=77229 wet_gt_half=55833 partition_error=0.000000000
+```
+
+`partition_error = 0` : la somme des quatre familles vaut exactement 1 sur les
+145 161 sommets.
+
+`Anastasis.Terrain.Forge.CarriesMorphology` verrouille l'invariant. **Il a été vérifié
+dans les deux sens** : fix désactivé, la suite rend `64 PASS / 1 FAIL` et l'échec est
+exactement ce test ; fix rétabli, `64 PASS / 0 FAIL`.
+
+Sa première version, elle, *plantait* l'éditeur — elle bouclait sur `UV0[I]` après un
+simple `TestEqual`, donc sur un tableau vide. La suite tombait de 68 tests à 42 et
+rapportait `FAIL=0` : le garde-fou emportait dix-huit tests et rendait un vert. Il sort
+maintenant avant d'indexer. Un test qui plante est pire que le bug qu'il surveille.
+
+**2. Les seuils de pente étaient calibrés sur le mauvais terrain.** Le matériau lit la
+pente de la surface **rendue**. `Exaggerate` vaut 3.6 : une pente de 28° dans la
+simulation en fait 64° une fois forgée. `SlopeRockStart/End` valaient 0.20 / 0.52,
+calibrés sur la surface non exagérée — le masque de roche saturait et tout le sol
+sortait beige (`docs/visual/ground-001/J_regression_slope_saturated.png`).
+
+Recalibrés à **0.62 / 0.82**, soit 35 à 45° d'origine. **Ce couplage est réel : si
+`anastasis.Terrain.Forge.Exaggerate` change, ces deux nombres doivent changer avec
+lui.** Ils vivent dans l'instance, donc sans recompilation.
+
 ## L'atténuation de détail, et pourquoi elle a été nécessaire
 
 Le point de conception le moins évident de la mission.
@@ -222,8 +265,8 @@ résout les noms contre la liste réelle du nœud et **relit** chaque propriét�
 |---|---|
 | `BUILD` | PASS — `Anastasis_UnrealV2Editor Win64 Development`, 0 warning |
 | `MEC` | PASS — matériau compile, 517 instructions, 0 erreur, paramètres répondent |
-| `TESTS` | PASS — 56 PASS / 4 KNOWN_EXPECTED_FAILURE / 0 FAIL |
-| `SCN` | PASS — monde 96×96, `vertices=9216 triangles=18050 water_triangles=3544`, inchangé |
+| `TESTS` | PASS — 64 PASS / 4 KNOWN_EXPECTED_FAILURE / 0 FAIL (68 au total, sur `main` rebasé) |
+| `SCN` | PASS — monde 96×96 ; surface tessellée par TERRAIN_FORGE à 145 161 sommets |
 | `VISUEL` | PASS — trois A/B à CVar unique : aérien, rive, lisière (`docs/visual/ground-001`) |
 | `PLY` | **NON ATTEINT** — voir ci-dessous |
 

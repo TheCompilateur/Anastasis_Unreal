@@ -112,4 +112,76 @@ bool FAnastasisTerrainForgeSample::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainForgeCarriesMorphology, "Anastasis.Terrain.Forge.CarriesMorphology",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainForgeCarriesMorphology::RunTest(const FString&)
+{
+	// Apply REMPLACE la FGeometry. Tout canal par sommet qu'il oublie de recopier arrive
+	// donc vide a la ProceduralMeshComponent, qui le complete a zero sans rien dire -- et
+	// le materiau de sol lit alors partout Rock=0 Litter=0 Worked=0 Wetness=0. Plus de
+	// roche, plus de litiere, plus de bande humide : le sol redevient une nappe plate,
+	// sans erreur, sans journal, sans test rouge. C'est exactement le mode de panne que
+	// GROUND_SURFACE_001 a corrige, et ce test est ce qui empeche de l'y reconduire.
+	const auto Crop = AnastasisWorldView::CaptureCanonicalWorld(12345);
+	AnastasisTerrainSurface::FGeometry Raw;
+	if (!TestTrue(TEXT("raw build"), AnastasisTerrainSurface::Build(Crop, Raw))) return false;
+
+	AnastasisTerrainSurface::FGeometry Forged = Raw;
+	AnastasisTerrainForge::FMesh Meta;
+	if (!TestTrue(TEXT("forge apply"), AnastasisTerrainForge::Apply(Crop, Forged, Meta))) return false;
+
+	// On SORT si la taille est fausse, au lieu de continuer vers l'indexation.
+	//
+	// La premiere version de ce test se contentait d'un TestEqual puis bouclait sur
+	// UV0[I] : le manquement qu'il devait detecter laisse justement ces tableaux VIDES,
+	// donc le test lisait hors bornes et faisait tomber l'editeur. La suite passait de
+	// 60 tests a 42 et rapportait FAIL=0 -- le garde-fou emportait dix-huit tests avec
+	// lui et rendait un vert. Un test qui plante est pire que le bug qu'il surveille.
+	if (Forged.UV0.Num() != Forged.Vertices.Num() || Forged.UV1.Num() != Forged.Vertices.Num())
+	{
+		AddError(FString::Printf(
+			TEXT("Apply n'a pas transporte les canaux morphologiques : vertices=%d UV0=%d UV1=%d. ")
+			TEXT("La ProceduralMeshComponent completerait a zero et le sol perdrait roche, litiere et humidite."),
+			Forged.Vertices.Num(), Forged.UV0.Num(), Forged.UV1.Num()));
+		AnastasisTerrainForge::ClearActive();
+		return false;
+	}
+
+	// Bornes et partition de l'unite preservees par l'interpolation. Un bilineaire sur une
+	// partition reste une partition : si ce n'etait plus vrai, le materiau melangerait des
+	// poids qui ne somment plus a 1 et l'herbe -- qui est le RESTE -- deviendrait negative.
+	int32 Rock = 0, Litter = 0, Worked = 0, Grass = 0, Wet = 0;
+	double WorstSum = 0.0;
+	for (int32 I = 0; I < Forged.Vertices.Num(); ++I)
+	{
+		const double R = Forged.UV0[I].X, L = Forged.UV0[I].Y;
+		const double W = Forged.UV1[I].X, Wetness = Forged.UV1[I].Y;
+		const double G = 1.0 - R - L - W;
+		WorstSum = FMath::Max(WorstSum, FMath::Abs(R + L + W + G - 1.0));
+		TestTrue(TEXT("poids et humidite bornes"),
+			R >= -KINDA_SMALL_NUMBER && L >= -KINDA_SMALL_NUMBER && W >= -KINDA_SMALL_NUMBER
+			&& G >= -KINDA_SMALL_NUMBER && G <= 1.0 + KINDA_SMALL_NUMBER
+			&& Wetness >= -KINDA_SMALL_NUMBER && Wetness <= 1.0 + KINDA_SMALL_NUMBER);
+		if (R > 0.5) ++Rock;
+		if (L > 0.5) ++Litter;
+		if (W > 0.5) ++Worked;
+		if (G > 0.5) ++Grass;
+		if (Wetness > 0.5) ++Wet;
+	}
+
+	// Non-vacuite : des tableaux de la bonne TAILLE mais remplis de zeros passeraient les
+	// controles ci-dessus sans que le sol reponde a quoi que ce soit.
+	TestTrue(TEXT("la roche survit a la tessellation"), Rock > 0);
+	TestTrue(TEXT("la litiere survit a la tessellation"), Litter > 0);
+	TestTrue(TEXT("la terre travaillee survit a la tessellation"), Worked > 0);
+	TestTrue(TEXT("l'herbe survit a la tessellation"), Grass > 0);
+	TestTrue(TEXT("l'humidite survit a la tessellation"), Wet > 0);
+
+	AnastasisTerrainForge::ClearActive();
+	AddInfo(FString::Printf(
+		TEXT("TERRAIN_FORGE_MORPHOLOGY vertices=%d rock=%d litter=%d worked=%d grass=%d wet_gt_half=%d partition_error=%.9f"),
+		Forged.Vertices.Num(), Rock, Litter, Worked, Grass, Wet, WorstSum));
+	return true;
+}
+
 #endif
