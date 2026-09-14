@@ -20,41 +20,59 @@ FLinearColor SurfaceTypeColor(ETileType Type)
     return FLinearColor::White;
 }
 
-const FLinearColor ShoreSand(0.694f, 0.612f, 0.435f);
+/** Zone inondable / vase : sol sature pontique, pas une plage seche. */
+const FLinearColor WetMud(0.204f, 0.184f, 0.137f);
+/** Rive saturee : berge humide au trait de cote. */
+const FLinearColor SaturatedBank(0.247f, 0.220f, 0.165f);
 const FLinearColor HighlandRock(0.518f, 0.490f, 0.463f);
 const FLinearColor ShallowWater(0.102f, 0.361f, 0.427f);
 const FLinearColor DeepWater(0.016f, 0.063f, 0.204f);
+/** Ecoulement : toujours bleu-dominant, un peu plus trouble que l'eau stagnante. */
+const FLinearColor ChannelWater(0.078f, 0.286f, 0.345f);
+}
 
-/** Projette une tuile en couleur lisible. Aucune donnee nouvelle : Type, Shade, Shore, Alt. */
-FLinearColor TileColor(const AnastasisWorldView::FVisualTile& T, double MinAlt, double MaxAlt)
+double AnastasisTerrainSurface::WaterDepthFromShade(double Shade)
 {
-    if (T.Type == ETileType::Water)
+    return FMath::Clamp((0.6 - Shade) / 1.6, 0.0, 1.0);
+}
+
+FLinearColor AnastasisTerrainSurface::TileColor(const AnastasisWorldView::FVisualTile& T, double MinAlt, double MaxAlt)
+{
+    if (T.Type == AnastasisWorld::ETileType::Water)
     {
-        // Shade = Lerp(0.6, -1.0, Depth) cote AnastasisSim : on inverse pour retrouver Depth.
-        const double Depth = FMath::Clamp((0.6 - T.Shade) / 1.6, 0.0, 1.0);
+        const double Depth = WaterDepthFromShade(T.Shade);
         FLinearColor Water = FMath::Lerp(ShallowWater, DeepWater, static_cast<float>(Depth));
+        const float Flow = static_cast<float>(FMath::Clamp(T.FlowAmt, 0.0, 1.0));
+        Water = FMath::Lerp(Water, ChannelWater, FMath::Pow(Flow, 0.85f) * 0.55f);
         Water.A = 1.0f;
         return Water;
     }
 
     FLinearColor Color = SurfaceTypeColor(T.Type);
 
-    // Altitude : au-dessus du niveau de la mer, le sol se mineralise avec la hauteur.
     const double HighSpan = FMath::Max(MaxAlt - AnastasisWorld::SeaLevel, 1.e-6);
     const double Height = FMath::Clamp((T.Alt - AnastasisWorld::SeaLevel) / HighSpan, 0.0, 1.0);
     Color = FMath::Lerp(Color, HighlandRock, static_cast<float>(FMath::SmoothStep(0.45, 1.0, Height)));
 
-    // Rive : bande cotiere sableuse, directement pilotee par Shore.
-    Color = FMath::Lerp(Color, ShoreSand, static_cast<float>(FMath::Pow(T.Shore, 1.6) * 0.85));
+    // Wetness est plus large que Shore (wd/6.5 contre ~5 tuiles) : c'est le deuxieme
+    // degre de liberte, la crue / la vase en arriere de la berge.
+    Color = FMath::Lerp(Color, WetMud, static_cast<float>(FMath::Pow(T.Wetness, 1.35) * 0.55));
 
-    // Basses terres : leger assombrissement pour que le fond de vallee se distingue.
+    // Shore : berge saturee au contact de l'eau, pas le sable mediterraneen.
+    Color = FMath::Lerp(Color, SaturatedBank, static_cast<float>(FMath::Pow(T.Shore, 1.4) * 0.70));
+
     const double LowSpan = FMath::Max(AnastasisWorld::SeaLevel - MinAlt, 1.e-6);
     const double Low = FMath::Clamp((AnastasisWorld::SeaLevel - T.Alt) / LowSpan, 0.0, 1.0);
     Color *= static_cast<float>(FMath::Lerp(1.0, 0.82, Low));
 
+    // Shade terre = pente sim (pas la profondeur, reservee a l'eau). 0 = identite.
+    const float SlopeLit = static_cast<float>(1.0 + FMath::Clamp(T.Shade, -1.0, 1.0) * 0.18);
+    Color.R = FMath::Clamp(Color.R * SlopeLit, 0.0f, 1.0f);
+    Color.G = FMath::Clamp(Color.G * SlopeLit, 0.0f, 1.0f);
+    Color.B = FMath::Clamp(Color.B * SlopeLit, 0.0f, 1.0f);
+
     Color.A = 0.0f;
     return Color;
-}
 }
 
 bool AnastasisTerrainSurface::SampleHeight(
@@ -111,7 +129,9 @@ bool AnastasisTerrainSurface::Build(const AnastasisWorldView::FWorldVisualSnapsh
         const auto& T = Crop.Tiles[I];
         const int32 X = Crop.OriginX + I % W, Y = Crop.OriginY + I / W;
         if (T.X != X || T.Y != Y || T.SourceIndex != Y * Crop.SourceW + X || !FMath::IsFinite(T.Alt)) return false;
-        if (!FMath::IsFinite(T.Shore) || !FMath::IsFinite(T.Shade)) return false;
+        if (!FMath::IsFinite(T.Shore) || !FMath::IsFinite(T.Shade)
+            || !FMath::IsFinite(T.Wetness) || !FMath::IsFinite(T.FlowAmt)
+            || !FMath::IsFinite(T.FlowX) || !FMath::IsFinite(T.FlowZ)) return false;
         const FVector P = AnastasisWorldView::TileToUnreal(X, Y, T.Alt);
         if (!FMath::IsFinite(P.X) || !FMath::IsFinite(P.Y) || !FMath::IsFinite(P.Z)) return false;
         Result.Vertices.Add(P);
