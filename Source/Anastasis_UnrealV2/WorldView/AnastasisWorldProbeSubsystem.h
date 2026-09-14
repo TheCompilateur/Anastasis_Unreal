@@ -129,6 +129,8 @@ private:
 	TObjectPtr<ACameraActor> ProbeCamera;
 
 	bool bCaptureInFlight = false;
+	/** Etat des messages d'ecran avant la prise, restaure apres : cf. CaptureGameViewportNow. */
+	bool bScreenMessagesWereEnabled = true;
 	FString PendingCaptureShotPath;
 	FString PendingCaptureJsonPath;
 	FString PendingCaptureBookmarkName;

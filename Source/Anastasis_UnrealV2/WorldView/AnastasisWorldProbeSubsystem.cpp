@@ -2170,8 +2170,22 @@ void UAnastasisWorldProbeSubsystem::CaptureGameViewportNow()
 	// multiplicateur rendrait la comparaison A/B dependante du materiel.
 	Config.SetResolution(Size.X, Size.Y, 1.0f);
 
+	// Les messages d'ecran sont coupes PENDANT la prise.
+	//
+	// Le chemin haute resolution vide le debug canvas dans l'image (UnrealClient.cpp) :
+	// tout avertissement que le moteur affiche a l'ecran se retrouve donc GRAVE dans la
+	// capture. Observe ici avec « YOUR SCENE CONTAINS A SKYDOME MESH... » en travers de
+	// la rive. Ce n'est pas un defaut du rendu, c'est du texte d'editeur dans une piece
+	// a conviction -- et une piece a conviction annotee par l'outil n'en est plus une.
+	//
+	// On restaure l'etat precedent des que le fichier est la, y compris en cas d'echec :
+	// couper les messages est une mesure de prise de vue, pas un reglage de session.
+	bScreenMessagesWereEnabled = GAreScreenMessagesEnabled;
+	GAreScreenMessagesEnabled = false;
+
 	if (!Viewport->TakeHighResScreenShot())
 	{
+		GAreScreenMessagesEnabled = bScreenMessagesWereEnabled;
 		CancelPendingCapture(TEXT("TakeHighResScreenShot refused (resolution too large?)"));
 		return;
 	}
@@ -2203,12 +2217,14 @@ void UAnastasisWorldProbeSubsystem::CaptureGameViewportNow()
 		if (FPaths::FileExists(CaptureToken))
 		{
 			delete Waited;
+			GAreScreenMessagesEnabled = Self->bScreenMessagesWereEnabled;
 			Self->FinishCapture();
 			return false;
 		}
 		if (*Waited > 15.0)
 		{
 			delete Waited;
+			GAreScreenMessagesEnabled = Self->bScreenMessagesWereEnabled;
 			Self->CancelPendingCapture(TEXT("timeout waiting for the high-res shot to reach disk"));
 			return false;
 		}

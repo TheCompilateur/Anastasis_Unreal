@@ -374,14 +374,28 @@ def build_master():
     p_slope_hi = g.scalar('SlopeRockEnd', 0.82, P + 'Rock', -1900, 400)
     p_damp_lo = g.scalar('DampStart', 0.60, P + 'Wet', -1900, 460)
     p_damp_hi = g.scalar('DampEnd', 0.96, P + 'Wet', -1900, 520)
-    p_damp_dark = g.scalar('DampDarken', 0.52, P + 'Wet', -1900, 580)
+    # 0.88, et pas 0.52 : l'ASSOMBRISSEMENT humide ne nous appartient plus.
+    #
+    # hydrology-surface projette Wetness dans la couleur de sommet (teinte WetMud, jusqu'a
+    # 55 % vers une vase sombre). Ce materiau lisait la MEME Wetness depuis UV1.y et
+    # assombrissait une seconde fois : au bord de l'eau le sol sortait deux fois plus
+    # sombre qu'aucune des deux missions ne le voulait.
+    #
+    # Le partage retenu suit ce que chaque support sait faire. La couleur de sommet porte
+    # la CHROMIE de la zone humide -- elle est large, basse frequence, et elle fonctionne
+    # meme a anastasis.Terrain.GroundMaterial 0. Le materiau garde le LUSTRE : rugosite et
+    # speculaire au trait de cote, que la couleur de sommet ne peut pas exprimer du tout.
+    # DampDarken ne creuse donc plus qu'un dernier cran au contact de l'eau.
+    p_damp_dark = g.scalar('DampDarken', 0.88, P + 'Wet', -1900, 580)
     p_soil_rough = g.scalar('SoilRoughness', 0.94, P + 'Roughness', -1900, 640)
     p_rock_rough = g.scalar('RockRoughness', 0.70, P + 'Roughness', -1900, 700)
     p_damp_rough = g.scalar('DampRoughness', 0.38, P + 'Roughness', -1900, 760)
     p_rough_grain = g.scalar('RoughnessGrain', 0.14, P + 'Roughness', -1900, 820)
     # Ces deux amplitudes ne valent que PRES du sol : DetailFade les eteint au loin.
     # BumpStrength n'est lisible que parce que le gradient est borne plus bas -- sans ce
-    # bornage, le meme nombre veut dire n'importe quoi.
+    # bornage, le meme nombre veut dire n'importe quoi. Elle a encore baisse (0.26 -> 0.16)
+    # apres TERRAIN_FORGE : le relief forge est plus raide, donc une meme inclinaison
+    # supplementaire bascule beaucoup plus de surface a l'ombre.
     #
     # Pourquoi il a fallu en arriver la. A 0.55 sans attenuation, le sol entier se lisait
     # en vermicelles clairs et sombres depuis la vue aerienne -- le "papier peint
@@ -393,13 +407,20 @@ def build_master():
     # 1,1 m fait une dizaine de pixels vue de 105 m : ce qu'on appelle "detail" devient un
     # MOTIF a cette distance, et aucune amplitude unique ne sert les deux bouts. Il est
     # donc fort de pres, nul de loin -- ou la macro et la meso portent seules la lecture.
-    p_bump = g.scalar('BumpStrength', 0.26, P + 'Relief', -1900, 880)
-    # Quasi neutre, et c'est voulu. A 1.6 les faces rocheuses raides basculaient au-dela
-    # du terminateur solaire et devenaient des taches noires franches : sur une pente qui
-    # tourne deja le dos au soleil, amplifier l'inclinaison ne donne pas du relief, cela
-    # donne de l'ombre pleine. La roche tire son caractere de son albedo et de sa
-    # rugosite, pas d'une bosse plus creusee.
-    p_rock_bump = g.scalar('RockBumpBoost', 1.15, P + 'Relief', -1900, 940)
+    p_bump = g.scalar('BumpStrength', 0.16, P + 'Relief', -1900, 880)
+    # INFERIEUR A 1 : sur les faces raides le relief micro s'ATTENUE, il ne s'amplifie pas.
+    #
+    # L'intuition de depart etait l'inverse -- la roche parait plus accidentee, donc plus
+    # de bosse. Trois captures ont dit le contraire. Une face raide tourne deja le dos au
+    # soleil : elle est a quelques degres du terminateur, et toute inclinaison
+    # supplementaire la fait basculer entierement a l'ombre. On n'obtient pas du relief,
+    # on obtient des taches noires -- la peau de leopard de
+    # docs/visual/ground-001/E_regression_leopard_bump.png, revenue apres TERRAIN_FORGE
+    # parce que le forgeage rend les pentes bien plus raides qu'avant.
+    #
+    # La roche tire son caractere de son albedo et de sa rugosite. Le relief micro, lui,
+    # se lit sur le plat, ou il ne risque pas de franchir le terminateur.
+    p_rock_bump = g.scalar('RockBumpScale', 0.55, P + 'Relief', -1900, 940)
     # 15 m : encore du relief sous les pieds. 70 m : plus rien, bien avant que la
     # structure n'atteigne la taille d'un motif a l'ecran.
     p_fade_near = g.scalar('DetailFadeStart', 1500.0, P + 'Detail', -1900, 1060)

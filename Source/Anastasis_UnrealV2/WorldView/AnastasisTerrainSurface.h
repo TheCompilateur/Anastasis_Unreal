@@ -5,10 +5,13 @@
 // are deliberately NOT extrapolated. No border halo or new altitude is needed.
 //
 // Colors and the water plane are PROJECTIONS of the snapshot, never new simulation:
-//   terre/eau  <- FVisualTile::Type
-//   profondeur <- FVisualTile::Shade   (Lerp(0.6, -1.0, Depth) cote AnastasisSim)
-//   rive       <- FVisualTile::Shore   (0 sur l'eau, decroit sur ~5 tuiles)
-//   altitude   <- FVisualTile::Alt normalisee sur le crop
+//   terre/eau     <- FVisualTile::Type
+//   profondeur    <- FVisualTile::Shade    (Lerp(0.6, -1.0, Depth) cote AnastasisSim)
+//   rive saturee  <- FVisualTile::Shore    (0 sur l'eau, decroit sur ~5 tuiles)
+//   vase / crue   <- FVisualTile::Wetness  (1 au bord, decroit sur ~6.5 tuiles)
+//   ecoulement    <- FVisualTile::FlowAmt  (eau seulement, seuil hydrologique 0.06)
+//   pente (terre) <- FVisualTile::Shade    (tanh des diffs d'altitude, [-1, 1])
+//   altitude      <- FVisualTile::Alt normalisee sur le crop
 // Le plan d'eau est plat a AnastasisWorld::SeaLevel : c'est une constante du monde,
 // pas une hauteur inventee.
 namespace AnastasisTerrainSurface
@@ -110,4 +113,15 @@ bool Build(const AnastasisWorldView::FWorldVisualSnapshot& Crop, FGeometry& Out)
  * etre pose. C'est un refus, pas un zero.
  */
 bool SampleHeight(const AnastasisWorldView::FWorldVisualSnapshot& Crop, double WorldX, double WorldY, double& OutZ);
+
+/**
+ * Inverse de Shade = Lerp(0.6, -1.0, Depth) cote sim. Aucune donnee nouvelle.
+ */
+double WaterDepthFromShade(double Shade);
+
+/**
+ * Projection sommet : les champs deja presents sur la tuile, rien d'invente.
+ * Palette distincte des cubes DEBUG.
+ */
+FLinearColor TileColor(const AnastasisWorldView::FVisualTile& Tile, double MinAlt, double MaxAlt);
 }

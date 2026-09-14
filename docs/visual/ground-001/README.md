@@ -19,6 +19,8 @@ A/B ne mesure que la fonction qui les lit.
 | `G_forest_ground_on.png` | `1` | `MI_AnastasisGround` | idem | 978 775 | `9D171E595AD68C1E` |
 | `H_forge_ground_off.png` | `0` | `M_AnastasisSlice` | lisière, **terrain forgé** | 1 023 751 | `98B14C4F3684F6DE` |
 | `I_forge_ground_on.png` | `1` | `MI_AnastasisGround` | idem | 1 031 686 | `3EA2AFCE70DC259B` |
+| `K_hydro_ground_off.png` | `0` | `M_AnastasisSlice` | rive, après fusion hydrologie | 913 788 | `53A4B7AEC52F7BF4` |
+| `L_hydro_ground_on.png` | `1` | `MI_AnastasisGround` | idem | 947 527 | `BE9512AB0E892097` |
 
 Les caméras aériennes portent l'angle scellé de `docs/visual/terrain-extent` :
 pitch `-32.8`, yaw `45`.
@@ -90,7 +92,17 @@ Le correctif n'est pas « baisser le nombre » : c'est **borner le gradient**
 (`G / (1 + |G|)`), après quoi `BumpStrength` redevient une grandeur lisible — la
 tangente de l'inclinaison maximale. Voir `tools/unreal/ground-material.py`.
 
-## `J` — la seconde régression, gardée aussi
+**`K` / `L` — après l'arbitrage avec `hydrology-surface`.** La rive, une fois les deux
+missions réunies : la couleur de sommet porte la chromie de la zone humide (leur
+`WetMud`, leur `SaturatedBank`), le matériau garde le lustre et le grain. Matériau
+éteint, le limon et l'herbe sont deux aplats ; allumé, la bande humide a du grain, la
+prairie de la variation, et la falaise une matière distincte.
+
+C'est l'état où les deux suites de tests passent ensemble — 69 PASS / 0 FAIL sur 73.
+Le détail de ce qui a été gardé de chaque côté est dans
+`docs/unreal/GROUND_HYDROLOGY_ARBITRATION.md`.
+
+## `J` et `M` — deux régressions, gardées aussi
 
 `J_regression_slope_saturated.png` (1 045 798 octets, `32754A66526F7554`) est le même
 cadre que `I`, pris juste avant le recalibrage. Tout le sol y est beige : le masque de
@@ -106,6 +118,18 @@ partout.
 Recalibrés à 0.62 / 0.82 — environ 35 à 45° d'origine — la roche revient là où elle a
 un sens. **Si quelqu'un change `Exaggerate`, ces deux nombres bougent avec lui.** C'est
 un couplage réel entre deux missions, et il se règle depuis l'instance sans recompiler.
+
+`M_regression_forged_bump.png` (975 695 octets, `B8619C47F9010C8D`) est la peau de
+léopard **revenue** après `TERRAIN_FORGE`. Même cause qu'en `E` — la normale bascule
+au-delà du terminateur solaire — mais déclenchée par autre chose : le forgeage rend les
+pentes bien plus raides, donc une inclinaison qui passait avant ne passe plus.
+
+Le correctif a inversé une intuition. `RockBumpBoost` partait de l'idée que la roche
+paraît plus accidentée, donc mérite plus de relief. C'est faux là où ça compte : une
+face raide tourne déjà le dos au soleil, et toute inclinaison supplémentaire la bascule
+entièrement à l'ombre. Le paramètre s'appelle maintenant `RockBumpScale` et vaut
+**0.55** — sur les faces raides le relief micro s'atténue. Il se lit sur le plat, où il
+ne risque rien.
 
 ## Reproduire
 
@@ -131,7 +155,7 @@ ANASTASIS_WORLD_BOOKMARK FOREST core=(74,44) density=25/25 stand=(71,47) ring=3 
 masse, pas un arbre isolé.
 
 Les captures brutes et leurs journaux restent dans `Saved/SliceEvidence/` et
-`Saved/Anastasis/Captures/` (non versionnés). Ces dix copies-ci sont versionnées
+`Saved/Anastasis/Captures/` (non versionnés). Ces treize copies-ci sont versionnées
 parce qu'elles étayent le rapport.
 
 ## L'outil de capture a encore photographié le mauvais viewport
