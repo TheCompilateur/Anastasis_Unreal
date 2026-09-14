@@ -140,6 +140,55 @@ multiplicateurs, bande de cadence, intervalle.
 `logicalLod.js`, l'autre moitié de la vague 3, n'est pas porté : il agrège l'état du
 village (habitants, bâtiments) et suivra ses systèmes.
 
+### Fait — cache de chemins (moitié cache de `navService.js`)
+
+| Unreal | Source JS |
+| --- | --- |
+| `World/AnastasisNavCache.h/.cpp` | `src/sim/navService.js`, moitié cache |
+
+**Un cache de chemins ressemble à une optimisation. Ce n'en est pas une.** `src/sim/save.js`
+l'écrit à propos du champ `navCache` : « un acteur repris avec un cache vide peut donc
+recevoir un chemin différent — même coût, mêmes règles — de celui qu'une partie continue
+aurait servi depuis son propre cache encore chaud ». Un cache qui ne sert pas les mêmes
+chemins fait marcher les habitants ailleurs.
+
+**Le piège de l'ordre.** L'éviction retire les 80 premières clés **dans l'ordre d'insertion
+d'une `Map` JS**. `TMap` n'a pas d'ordre : deux exécutions évinceraient des entrées
+différentes, donc serviraient des chemins différents. D'où un ordre tenu à la main, et deux
+détails de la `Map` JS reproduits — réécrire une clé existante ne la déplace pas en fin
+d'ordre, et supprimer une clé conserve l'ordre relatif des autres.
+
+Trois autres règles copiées plutôt que devinées :
+
+- `Math.round` arrondit les demis vers +∞ ; `FMath::RoundToDouble` s'éloigne de zéro. Les
+  deux coïncident sur les entrées positives d'ici — raison de plus pour écrire la règle.
+- `Math.floor(x / NAV_ZONE)`, pas une troncature : sur une coordonnée négative, la
+  troncature remonterait d'une zone entière. Des clés négatives sont au vecteur.
+- Une lecture **purge** ce qu'elle trouve de périmé. Le taire changerait la taille du cache
+  au coup d'après, donc l'éviction, donc les chemins servis.
+
+La preuve est en deux parties, parce que le module a deux natures. La part scalaire —
+`StepMult`, `Ttl`, `SweepInterval`, `PathBudget`, `CacheKeyFor` — passe par l'atelier
+déclaratif (`tools/migration/parity/nav-service.mjs`, 66 vecteurs). La part à état passe par
+un **scénario** rejoué des deux côtés (`gen-nav-cache-vectors.mjs`, 281 opérations) :
+rangement, succès exact, succès par zone, refus de zone quand le départ est trop loin du
+premier nœud, expiration au TTL, invalidation par `navVersion`, balayage, éviction — puis
+l'**ordre final des 440 clés**, comparé rang par rang. C'est ce dernier bloc qui attraperait
+un portage sur `TMap`.
+
+Le test porte un garde-fou sur le scénario lui-même, et il a servi tout de suite : la
+première version gardait la même cible pour tous les rangements, si bien que les clés de
+zone se confondaient, le cache plafonnait sous le seuil, et **aucune éviction ne se
+déclenchait**. Les 281 opérations passaient au vert en ne testant pas ce que le commentaire
+annonçait. La cible varie maintenant avec le rang : 520 clés posées, 80 évincées, 440
+restantes.
+
+Tests mesurés 2026-09-14 : `Parite.NavService` / `Parite.NavCache` **PASS** (suite
+`Anastasis.Sim` : 24 PASS, 2 KNOWN_EXPECTED_FAILURE, 0 FAIL).
+
+Non porté : la file budgétée (`requestPath`, `processNavQueue`, `applyPathToActor`). Elle ne
+manipule que des acteurs et suivra les acteurs.
+
 ### Fait — percolation du monde
 
 | Unreal | Source JS |
