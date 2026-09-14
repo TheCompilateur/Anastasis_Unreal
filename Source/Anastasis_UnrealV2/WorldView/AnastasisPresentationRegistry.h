@@ -38,6 +38,29 @@ inline AnastasisWorld::ETileType ToTileType(EAnastasisSemanticType Type)
 	return static_cast<AnastasisWorld::ETileType>(Type);
 }
 
+/**
+ * Which stature a look is built for.
+ *
+ * The names are the vertical strata of the forest section in
+ * docs/visual/reference/pontique-etat-zero-3-stratification-forestiere.png
+ * (emergente / canopee / sous-canopee / arbustive), because that plate is the
+ * art-direction authority for what a tree of each age looks like. The axis is
+ * generic all the same: any archetype with size classes can use it.
+ *
+ * Any is the untagged value, and it is deliberately value 0: data written
+ * before this field existed keeps resolving to every request, so adding the
+ * field changes no shipped asset's behaviour.
+ */
+UENUM(BlueprintType)
+enum class EAnastasisStatureClass : uint8
+{
+	Any = 0,
+	Understory = 1,
+	Subcanopy = 2,
+	Canopy = 3,
+	Emergent = 4,
+};
+
 /** One interchangeable look for an archetype. Adding a second entry here is how FOREST gets a second tree. */
 USTRUCT(BlueprintType)
 struct FAnastasisPresentationVariant
@@ -51,6 +74,22 @@ struct FAnastasisPresentationVariant
 	/** Optional. Left empty, the archetype's Tint is applied over the shared placeholder material instead. */
 	UPROPERTY(EditAnywhere, Category = "Presentation")
 	TSoftObjectPtr<UMaterialInterface> MaterialOverride;
+
+	/**
+	 * Stature this look is drawn for. A young tree and a dominant one are not the same
+	 * mesh at two scales: they differ in trunk fraction, crown width and tier count, so
+	 * the mesh, not the scale, has to change with the age class.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Presentation")
+	EAnastasisStatureClass Stature = EAnastasisStatureClass::Any;
+
+	/**
+	 * Multiplies the entry's uniform-scale envelope for THIS look only. It is how one
+	 * archetype spans more height than a single Min/Max pair can: an emergent tree is
+	 * taller than a canopy tree of the same species, not merely a different silhouette.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Presentation", meta = (ClampMin = "0.05", ClampMax = "4.0"))
+	float ScaleBias = 1.0f;
 };
 
 /** What one semantic type looks like. The simulation never sees this struct. */
@@ -90,6 +129,15 @@ struct FAnastasisPresentationEntry
 
 	UPROPERTY(EditAnywhere, Category = "Presentation")
 	bool bRandomYaw = true;
+
+	/**
+	 * Deterministic tilt envelope, in degrees, sampled per instance. 0 keeps every
+	 * instance plumb -- which is what a manufactured object wants and what every entry
+	 * did before this field existed. A few degrees is what stops a stand of trees from
+	 * reading as a row of identical posts.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Presentation", meta = (ClampMin = "0.0", ClampMax = "20.0"))
+	float MaxLeanDegrees = 0.0f;
 };
 
 /**

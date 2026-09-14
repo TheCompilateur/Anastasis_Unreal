@@ -19,9 +19,17 @@ ASSET_NAME = 'DA_AnastasisPresentation'
 ASSET_PATH = ASSET_DIR + '/' + ASSET_NAME
 
 # (semantic, archetype_id, mesh, tint rgb, min scale, max scale, jitter)
+# La graine ne pose qu'UNE variante par type : c'est ce qu'un registre vide doit
+# avoir pour rendre quelque chose, pas la donnee finale. Forest recoit donc la
+# silhouette de canopee et son enveloppe de stature, puis
+# tools/unreal/set_tree_grammar.py y ecrit les six variantes de la grammaire --
+# ce que ce format de ligne ne sait pas exprimer. Sans ce changement, un registre
+# recree de zero repartait sur un cone moteur, la silhouette meme que
+# TREE_FORM_001 retire.
 SEED_ENTRIES = [
-    (unreal.AnastasisSemanticType.FOREST, 'Tree_Generic', '/Engine/BasicShapes/Cone.Cone',
-     (0.102, 0.243, 0.114), 1.6, 2.4, 0.30),
+    (unreal.AnastasisSemanticType.FOREST, 'Tree_Generic',
+     '/Game/Anastasis/Vegetation/SM_Tree_Conifer_Canopy_01',
+     (0.102, 0.243, 0.114), 3.6, 5.0, 0.30),
     (unreal.AnastasisSemanticType.RUIN, 'Ruin_Generic', '/Engine/BasicShapes/Cylinder.Cylinder',
      (0.353, 0.302, 0.318), 0.6, 1.1, 0.20),
 ]

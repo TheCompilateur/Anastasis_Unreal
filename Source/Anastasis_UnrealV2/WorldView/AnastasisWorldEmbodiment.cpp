@@ -62,6 +62,42 @@ namespace
 			TEXT("Tiles_%s"),
 			AnastasisWorld::TileTypeName(static_cast<AnastasisWorld::ETileType>(TypeIndex))));
 	}
+
+	/**
+	 * Ecological layer -> stature the presentation should dress it as.
+	 *
+	 * AnastasisEcologicalDressing decides three layers because that is what its support and
+	 * clustering fields can justify. The reference plate names four strata, the fourth being
+	 * the emergents -- the few ancient trees that stand out of the canopy. They are not a
+	 * separate ecological decision, they are the oldest tail of the canopy itself, so they
+	 * are split off HERE, in presentation, from the same deterministic hash. Nothing about
+	 * where a tree grows changes; only how tall and how old the one already there looks.
+	 *
+	 * A canopy of uniform height reads as a hedge. This is what gives it a skyline.
+	 */
+	constexpr double EmergentShareOfCanopy = 0.18;
+
+	EAnastasisStatureClass StatureForLayer(
+		AnastasisEcologicalDressing::ELayer Layer, uint32 VisualSeed, int32 TileX, int32 TileY)
+	{
+		using AnastasisEcologicalDressing::ELayer;
+		switch (Layer)
+		{
+		case ELayer::Young:
+			return EAnastasisStatureClass::Understory;
+		case ELayer::Secondary:
+			return EAnastasisStatureClass::Subcanopy;
+		case ELayer::Canopy:
+		default:
+			break;
+		}
+		uint32 H = VisualSeed ^ 0x7F4A7C15u;
+		H = (H ^ static_cast<uint32>(TileX)) * 0x85EBCA6Bu;
+		H = (H ^ static_cast<uint32>(TileY)) * 0xC2B2AE35u;
+		H ^= H >> 15;
+		const double Unit = static_cast<double>(H) / static_cast<double>(MAX_uint32);
+		return Unit < EmergentShareOfCanopy ? EAnastasisStatureClass::Emergent : EAnastasisStatureClass::Canopy;
+	}
 }
 
 AAnastasisWorldEmbodiment::AAnastasisWorldEmbodiment()
@@ -291,31 +327,49 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
         else
         {
             int32 ForestLayerCounts[3] = {};
+            int32 StatureCounts[5] = {};
+            double TallestUU = 0.0;
+            double ShortestUU = TNumericLimits<double>::Max();
             for (const auto& P : ForestPlan.Instances)
             {
                 double GroundZ;
                 if (!AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, P.Ground.X, P.Ground.Y, GroundZ))
                     continue;
                 const auto& T = CanonicalSource.Tiles[P.SourceIndex];
+                const EAnastasisStatureClass Stature = StatureForLayer(P.Layer, P.VisualSeed, T.X, T.Y);
                 AnastasisPresentation::FResolvedPresentation R;
                 if (!AnastasisPresentation::ResolvePresentation(AnastasisWorld::ETileType::Forest,
-                    P.VisualSeed, T.X, T.Y, R)) continue;
+                    P.VisualSeed, T.X, T.Y, R, Stature)) continue;
                 auto* M = Prepare(R);
                 if (!M) continue;
                 FTransform Pose = AnastasisPresentation::ResolveInstanceTransform(*R.Entry,
-                    P.VisualSeed, T.X, T.Y, T.Alt);
+                    P.VisualSeed, T.X, T.Y, T.Alt, R.ScaleBias);
                 Pose.SetScale3D(Pose.GetScale3D() * P.ScaleMultiplier);
                 // Actual mesh bounds, not the resolver's 100uu primitive pivot convention.
-                const double MinZ = R.Mesh->GetBoundingBox().Min.Z;
+                const FBox MeshBounds = R.Mesh->GetBoundingBox();
+                const double MinZ = MeshBounds.Min.Z;
                 Pose.SetLocation(FVector(P.Ground.X, P.Ground.Y, GroundZ - MinZ * Pose.GetScale3D().Z));
                 M->AddInstance(Pose, false);
                 ++ForestLayerCounts[static_cast<uint8>(P.Layer)];
+                ++StatureCounts[static_cast<uint8>(Stature)];
+                const double HeightUU = (MeshBounds.Max.Z - MinZ) * Pose.GetScale3D().Z;
+                TallestUU = FMath::Max(TallestUU, HeightUU);
+                ShortestUU = FMath::Min(ShortestUU, HeightUU);
                 ++DressingInstanceCount;
             }
             UE_LOG(LogAnastasis_UnrealV2, Display,
                 TEXT("ANASTASIS_ECOLOGY young=%d secondary=%d canopy=%d full_plan=%d refused_water_or_footprint=%d refused_slope=%d refused_spacing=%d"),
                 ForestLayerCounts[0], ForestLayerCounts[1], ForestLayerCounts[2], ForestPlan.Instances.Num(),
                 ForestPlan.RejectedWaterOrFootprint, ForestPlan.RejectedSlope, ForestPlan.RejectedSpacing);
+            // The stature profile is the visual claim of this pass, so it is measured rather
+            // than asserted: a forest that has collapsed back onto one height says so here.
+            UE_LOG(LogAnastasis_UnrealV2, Display,
+                TEXT("ANASTASIS_TREE_STATURE understory=%d subcanopy=%d canopy=%d emergent=%d height_uu=[%.0f,%.0f]"),
+                StatureCounts[static_cast<uint8>(EAnastasisStatureClass::Understory)],
+                StatureCounts[static_cast<uint8>(EAnastasisStatureClass::Subcanopy)],
+                StatureCounts[static_cast<uint8>(EAnastasisStatureClass::Canopy)],
+                StatureCounts[static_cast<uint8>(EAnastasisStatureClass::Emergent)],
+                ShortestUU == TNumericLimits<double>::Max() ? 0.0 : ShortestUU, TallestUU);
         }
     }
     UE_LOG(LogAnastasis_UnrealV2, Display,

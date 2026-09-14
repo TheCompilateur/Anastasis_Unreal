@@ -82,24 +82,48 @@ const FAnastasisPresentationEntry* FindEntry(AnastasisWorld::ETileType Type)
 	return GetRegistry().FindEntry(Type);
 }
 
-int32 SelectVariantIndex(const FAnastasisPresentationEntry& Entry, uint32 Seed, int32 TileX, int32 TileY)
+int32 SelectVariantIndex(
+	const FAnastasisPresentationEntry& Entry,
+	uint32 Seed,
+	int32 TileX,
+	int32 TileY,
+	EAnastasisStatureClass Wanted)
 {
 	// Only variants that actually name a mesh are eligible: a half-filled row in the data
 	// asset must not produce an invisible "chosen" variant.
 	TArray<int32, TInlineAllocator<8>> Eligible;
+	TArray<int32, TInlineAllocator<8>> Matching;
 	for (int32 Index = 0; Index < Entry.Variants.Num(); ++Index)
 	{
-		if (!Entry.Variants[Index].Mesh.IsNull())
+		if (Entry.Variants[Index].Mesh.IsNull())
 		{
-			Eligible.Add(Index);
+			continue;
+		}
+		Eligible.Add(Index);
+
+		// Any on either side means "no opinion": an untagged variant serves every request,
+		// and an Any request takes whatever the data offers. That is what keeps a registry
+		// written before this axis existed rendering exactly as it did.
+		const EAnastasisStatureClass Tag = Entry.Variants[Index].Stature;
+		if (Wanted == EAnastasisStatureClass::Any || Tag == EAnastasisStatureClass::Any || Tag == Wanted)
+		{
+			Matching.Add(Index);
 		}
 	}
 	if (Eligible.Num() == 0)
 	{
 		return INDEX_NONE;
 	}
-	const uint32 H = HashTile(Seed, TileX, TileY, 0x5u);
-	return Eligible[H % static_cast<uint32>(Eligible.Num())];
+
+	// FAIL OPEN. If the art has no look for this stature yet, draw the archetype anyway with
+	// whatever exists. Presence is simulation truth; stature is only how it is dressed, and a
+	// missing dress must not delete the tree.
+	const TArray<int32, TInlineAllocator<8>>& Pool = Matching.Num() > 0 ? Matching : Eligible;
+
+	// The stature participates in the hash: two statures on the same tile must be free to
+	// land on different variants, which a (Seed, X, Y) hash alone could not express.
+	const uint32 H = HashTile(Seed, TileX, TileY, 0x5u + static_cast<uint32>(Wanted) * 0x9E37u);
+	return Pool[H % static_cast<uint32>(Pool.Num())];
 }
 
 bool ResolvePresentation(
@@ -107,7 +131,8 @@ bool ResolvePresentation(
 	uint32 Seed,
 	int32 TileX,
 	int32 TileY,
-	FResolvedPresentation& Out)
+	FResolvedPresentation& Out,
+	EAnastasisStatureClass Wanted)
 {
 	Out = FResolvedPresentation{};
 
@@ -117,7 +142,7 @@ bool ResolvePresentation(
 		return false;
 	}
 
-	const int32 VariantIndex = SelectVariantIndex(*Entry, Seed, TileX, TileY);
+	const int32 VariantIndex = SelectVariantIndex(*Entry, Seed, TileX, TileY, Wanted);
 	if (VariantIndex == INDEX_NONE)
 	{
 		return false;
@@ -139,6 +164,7 @@ bool ResolvePresentation(
 	Out.VariantIndex = VariantIndex;
 	Out.Mesh = Mesh;
 	Out.MaterialOverride = Variant.MaterialOverride.IsNull() ? nullptr : Variant.MaterialOverride.LoadSynchronous();
+	Out.ScaleBias = FMath::IsFinite(Variant.ScaleBias) && Variant.ScaleBias > 0.0f ? Variant.ScaleBias : 1.0f;
 	return true;
 }
 
@@ -147,17 +173,21 @@ FTransform ResolveInstanceTransform(
 	uint32 Seed,
 	int32 TileX,
 	int32 TileY,
-	double Alt)
+	double Alt,
+	float ScaleBias)
 {
 	const uint32 HX = HashTile(Seed, TileX, TileY, 0x1u);
 	const uint32 HY = HashTile(Seed, TileX, TileY, 0x2u);
 	const uint32 HYaw = HashTile(Seed, TileX, TileY, 0x3u);
 	const uint32 HScale = HashTile(Seed, TileX, TileY, 0x4u);
+	const uint32 HLean = HashTile(Seed, TileX, TileY, 0x6u);
+	const uint32 HLeanDir = HashTile(Seed, TileX, TileY, 0x7u);
 
 	const double MinScale = static_cast<double>(Entry.MinUniformScale);
 	const double MaxScale = static_cast<double>(Entry.MaxUniformScale);
 	const double JitterRadius = static_cast<double>(Entry.JitterRadiusFraction) * AnastasisWorldView::TileWorldSize;
-	const double Scale = FMath::Lerp(MinScale, MaxScale, UnitFloat(HScale));
+	const double Bias = FMath::IsFinite(ScaleBias) && ScaleBias > 0.0f ? static_cast<double>(ScaleBias) : 1.0;
+	const double Scale = FMath::Lerp(MinScale, MaxScale, UnitFloat(HScale)) * Bias;
 
 	FVector Location = AnastasisWorldView::TileToUnreal(TileX, TileY, Alt);
 	Location.X += (UnitFloat(HX) * 2.0 - 1.0) * JitterRadius;
@@ -167,6 +197,18 @@ FTransform ResolveInstanceTransform(
 	Location.Z += 0.5 * EngineBasicShapeSize * Scale;
 
 	const double Yaw = Entry.bRandomYaw ? UnitFloat(HYaw) * 360.0 : 0.0;
-	return FTransform(FRotator(0.0, Yaw, 0.0), Location, FVector(Scale));
+
+	// The tilt is squared before it is applied: most instances stay near plumb and only a
+	// few lean far. A uniform draw would give a whole stand the same drunken average, which
+	// reads as noise rather than as individuals.
+	const double LeanUnit = UnitFloat(HLean);
+	const double Lean = static_cast<double>(FMath::Max(0.0f, Entry.MaxLeanDegrees)) * LeanUnit * LeanUnit;
+	const double LeanDir = UnitFloat(HLeanDir) * 360.0;
+	const FQuat Tilt(FVector(FMath::Cos(FMath::DegreesToRadians(LeanDir)),
+			FMath::Sin(FMath::DegreesToRadians(LeanDir)), 0.0),
+		FMath::DegreesToRadians(Lean));
+	const FQuat Turn = FRotator(0.0, Yaw, 0.0).Quaternion();
+
+	return FTransform(Lean > 0.0 ? FRotator(Tilt * Turn) : FRotator(0.0, Yaw, 0.0), Location, FVector(Scale));
 }
 }

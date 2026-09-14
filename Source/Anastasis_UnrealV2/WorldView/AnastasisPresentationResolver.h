@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "World/AnastasisWorld.h"
 
+#include "WorldView/AnastasisPresentationRegistry.h"
+
 class UAnastasisPresentationRegistry;
 class UStaticMesh;
 class UMaterialInterface;
@@ -39,6 +41,8 @@ namespace AnastasisPresentation
 		int32 VariantIndex = INDEX_NONE;
 		UStaticMesh* Mesh = nullptr;
 		UMaterialInterface* MaterialOverride = nullptr;
+		/** The chosen variant's ScaleBias, to be handed back to ResolveInstanceTransform. */
+		float ScaleBias = 1.0f;
 	};
 
 	/** The live registry: the data asset when it loads, the code defaults otherwise. Never null. */
@@ -54,10 +58,21 @@ namespace AnastasisPresentation
 	const FAnastasisPresentationEntry* FindEntry(AnastasisWorld::ETileType Type);
 
 	/**
-	 * Deterministic variant choice: same (Seed, TileX, TileY) and same entry always give the
-	 * same index. Only variants carrying a mesh are eligible. INDEX_NONE = nothing to draw.
+	 * Deterministic variant choice: same (Seed, TileX, TileY, Wanted) and same entry always
+	 * give the same index. Only variants carrying a mesh are eligible. INDEX_NONE = nothing
+	 * to draw.
+	 *
+	 * Wanted narrows the pool to the looks built for that stature, plus the untagged (Any)
+	 * ones. It FAILS OPEN: an entry whose data names no variant for the requested stature
+	 * falls back to every eligible variant rather than rendering a hole. A missing art asset
+	 * must degrade the look, never the presence of the tree.
 	 */
-	int32 SelectVariantIndex(const FAnastasisPresentationEntry& Entry, uint32 Seed, int32 TileX, int32 TileY);
+	int32 SelectVariantIndex(
+		const FAnastasisPresentationEntry& Entry,
+		uint32 Seed,
+		int32 TileX,
+		int32 TileY,
+		EAnastasisStatureClass Wanted = EAnastasisStatureClass::Any);
 
 	/** Entry + variant + loaded assets for one tile. false = nothing renders here. Loads the variant's mesh synchronously. */
 	bool ResolvePresentation(
@@ -65,17 +80,28 @@ namespace AnastasisPresentation
 		uint32 Seed,
 		int32 TileX,
 		int32 TileY,
-		FResolvedPresentation& Out);
+		FResolvedPresentation& Out,
+		EAnastasisStatureClass Wanted = EAnastasisStatureClass::Any);
 
 	/**
-	 * Deterministic placement: same (Seed, TileX, TileY, Entry) always yields the same
-	 * transform. Location.Z is lifted so the instance's BASE, not its centre, sits at Alt
+	 * Deterministic placement: same (Seed, TileX, TileY, Entry, ScaleBias) always yields the
+	 * same transform. Location.Z is lifted so the instance's BASE, not its centre, sits at Alt
 	 * (engine primitives are centre-pivoted).
+	 *
+	 * ScaleBias multiplies the entry's envelope for one variant: it is how a single archetype
+	 * spans several statures. The lift uses the SAME final scale, so the base still rests on
+	 * Alt exactly -- 0.5 * EngineBasicShapeSize * FinalScale, the identity
+	 * Anastasis.Terrain.DressingRestsOnRenderedGround verifies.
+	 *
+	 * The tilt sampled from Entry.MaxLeanDegrees rotates about the instance centre, which
+	 * raises the trunk foot by (1 - cos Lean) * 50 * Scale -- under one unreal unit at the
+	 * envelope this project uses. It is therefore a silhouette change, not a placement one.
 	 */
 	FTransform ResolveInstanceTransform(
 		const FAnastasisPresentationEntry& Entry,
 		uint32 Seed,
 		int32 TileX,
 		int32 TileY,
-		double Alt);
+		double Alt,
+		float ScaleBias = 1.0f);
 }

@@ -34,8 +34,13 @@ REGISTRY_PATH = "/Game/Anastasis/Presentation/DA_AnastasisPresentation"
 
 # (type semantique, chemin du mesh reel). Ajouter une ligne quand un archetype
 # recoit son premier vrai asset.
+#
+# FOREST N'EST PLUS ICI. Depuis TREE_FORM_001 l'entree Forest porte SIX variantes,
+# une par stature, chacune avec son biais d'echelle et son materiau. Cet outil-ci
+# ne sait ecrire que variants[0].mesh : le relancer sur Forest ecraserait la
+# variante Understory par le mesh generique et casserait la grammaire en silence.
+# Forest se cable avec tools/unreal/set_tree_grammar.py, qui en est l'autorite.
 TARGETS = [
-    ("FOREST", "/Game/Anastasis/Vegetation/SM_Tree_Generic_01"),
     ("RUIN", "/Game/Anastasis/Architecture/SM_Ruin_Generic_01"),
 ]
 
