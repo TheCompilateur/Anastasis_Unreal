@@ -22,9 +22,15 @@ foreach($module in @('AnastasisSim','Anastasis_UnrealV2')){if($module -notin $up
 $Evidence=Join-Path $Root 'Saved/CanonicalVerification'
 New-Item -ItemType Directory -Force $Evidence | Out-Null
 $ModuleDlls=@('UnrealEditor-AnastasisSim.dll','UnrealEditor-Anastasis_UnrealV2.dll') | ForEach-Object { Join-Path $Root "Binaries\Win64\$_" }
+function FileSha256([string]$Path) {
+ $stream=[IO.File]::Open($Path,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::ReadWrite)
+ $sha=[Security.Cryptography.SHA256]::Create()
+ try { return ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace('-','') }
+ finally { $stream.Dispose(); $sha.Dispose() }
+}
 function Fingerprint {
  $paths=@(Get-ChildItem "$Root/Source","$Root/Config" -Recurse -File)+@(Get-Item $Project)
- $lines=$paths | Sort-Object FullName | ForEach-Object { $_.FullName.Substring($Root.Length)+':'+(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
+ $lines=$paths | Sort-Object FullName | ForEach-Object { $_.FullName.Substring($Root.Length)+':'+(FileSha256 $_.FullName) }
  $sha=[Security.Cryptography.SHA256]::Create()
  try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($lines -join "`n")))).Replace('-','') } finally {$sha.Dispose()}
 }
@@ -32,7 +38,7 @@ function Fingerprint {
 # rien affirmer et le build reel doit tourner.
 function ModuleStamp {
  if(@($ModuleDlls | Where-Object {!(Test-Path -LiteralPath $_)}).Count){return $null}
- return (($ModuleDlls | Sort-Object | ForEach-Object { [IO.Path]::GetFileName($_)+':'+(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash }) -join "`n")
+ return (($ModuleDlls | Sort-Object | ForEach-Object { [IO.Path]::GetFileName($_)+':'+(FileSha256 $_) }) -join "`n")
 }
 # Deux agents peuvent compiler la meme racine en meme temps. UBT se serialise
 # lui-meme (-WaitMutex) ; Tee-Object non. Le second heurtait alors 'le fichier est
@@ -140,7 +146,7 @@ try {
  if($modules.Count -ne 2 -or @($modules | Where-Object {!$_.FileName.StartsWith($Root+'\',[StringComparison]::OrdinalIgnoreCase)}).Count){throw 'VERIFY::FAIL module origin'}
  $built=(Get-Content "$Evidence/built-source.sha256").Trim()
  if((Fingerprint) -ne $built){throw 'VERIFY::FAIL source changed after build'}
- $dlls=$modules | ForEach-Object {[pscustomobject]@{Path=$_.FileName;SHA256=(Get-FileHash -LiteralPath $_.FileName).Hash}}
+ $dlls=$modules | ForEach-Object {[pscustomobject]@{Path=$_.FileName;SHA256=(FileSha256 $_.FileName)}}
  [ordered]@{VerifiedAt=(Get-Date).ToString('o');Result='PASS';SourceSHA256=$built;Engine='5.8.2 CL 56702186';EditorLog=$log;Modules=$dlls;Scope='Editor map PIE DEBUG; PLAYER unimplemented; not full test suite'} | ConvertTo-Json -Depth 5 | Set-Content "$Evidence/latest.json"
  Write-Output "VERIFY::PASS`nEVIDENCE::$Evidence/latest.json"
 } catch {Write-Error $_; exit 1}
