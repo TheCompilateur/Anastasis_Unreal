@@ -83,6 +83,13 @@ bool FAnastasisPresentationReachability::RunTest(const FString&)
 	TestTrue(TEXT("forest scale envelope is ordered"), Tree->MinUniformScale <= Tree->MaxUniformScale);
 	TestTrue(TEXT("ruin scale envelope is ordered"), Ruin->MinUniformScale <= Ruin->MaxUniformScale);
 
+	// Envelope 15-21, times canopy layer 0.95-1.20, is Etat Zero 3 (15-25 m),
+	// not a standing person. The live asset must track CreateCodeDefaults.
+	const double ForestMinCm = static_cast<double>(Tree->MinUniformScale) * EngineBasicShapeSize;
+	const double ForestMaxCm = static_cast<double>(Tree->MaxUniformScale) * EngineBasicShapeSize;
+	TestTrue(TEXT("live forest envelope min is canopy height, not person height"), ForestMinCm >= 1500.0);
+	TestTrue(TEXT("live forest envelope max stays at or below emergent height"), ForestMaxCm <= 4000.0);
+
 	return true;
 }
 
@@ -195,9 +202,15 @@ bool FAnastasisPresentationFallback::RunTest(const FString&)
 	{
 		return false;
 	}
-	TestNotNull(TEXT("code defaults cover Forest"), Defaults->FindEntry(AnastasisWorld::ETileType::Forest));
+	const FAnastasisPresentationEntry* DefaultTree = Defaults->FindEntry(AnastasisWorld::ETileType::Forest);
+	TestNotNull(TEXT("code defaults cover Forest"), DefaultTree);
 	TestNotNull(TEXT("code defaults cover Ruin"), Defaults->FindEntry(AnastasisWorld::ETileType::Ruin));
 	TestNull(TEXT("code defaults do not invent other types"), Defaults->FindEntry(AnastasisWorld::ETileType::Grass));
+	if (DefaultTree)
+	{
+		const double DefaultMinCm = static_cast<double>(DefaultTree->MinUniformScale) * EngineBasicShapeSize;
+		TestTrue(TEXT("code-default forest envelope min is canopy height, not person height"), DefaultMinCm >= 1500.0);
+	}
 
 	// The live resolver must always hand back a usable registry, asset or not.
 	TestTrue(TEXT("live registry is never empty"), GetRegistry().Entries.Num() > 0);

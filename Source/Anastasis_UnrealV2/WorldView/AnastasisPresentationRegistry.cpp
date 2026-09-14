@@ -107,16 +107,14 @@ UAnastasisPresentationRegistry* UAnastasisPresentationRegistry::CreateCodeDefaul
 	UAnastasisPresentationRegistry* Registry = NewObject<UAnastasisPresentationRegistry>(
 		Outer ? Outer : GetTransientPackage());
 
-	// The envelope is what turns a 100uu mesh into a tree of a believable height. Measured
-	// against this world: one tile is 100uu, and before this grammar the median instance
-	// stood at 104uu -- a metre-high marker, shorter than the ruin beside it. Multiplied by
-	// the ecological layer factors in FAnastasisForestDressingSettings (young 0.25-0.45,
-	// secondary 0.50-0.78, canopy 0.95-1.20) this envelope gives roughly 0.9m of sapling,
-	// 2-4m of sub-canopy, 3.4-6m of canopy, and up to ~8m for an emergent through its
-	// ScaleBias. The strata overlap, as they do in a real stand.
+	// The envelope is what turns a 100uu mesh into a tree of a believable height. Multiplied
+	// by FAnastasisForestDressingSettings (young 0.25-0.45, secondary 0.50-0.78,
+	// canopy 0.95-1.20) then by the variant ScaleBias. 15-21 maps the canopy band onto
+	// Etat Zero 3 (15-25 m) instead of a standing person (~1.8 m): roughly 4-9 m of
+	// sapling, 8-16 m of sub-canopy, 14-25 m of canopy, and ~19-34 m for an emergent.
 	Registry->Entries.Add(MakeDefaultEntry(
 		EAnastasisSemanticType::Forest, TEXT("Tree_Generic"),
-		FLinearColor(0.102f, 0.243f, 0.114f), 3.6f, 5.0f, 0.30f, 5.0f,
+		FLinearColor(0.102f, 0.243f, 0.114f), 15.0f, 21.0f, 0.30f, 5.0f,
 		{
 			// Four statures x two families: the grid the reference plate authorises, filled.
 			// Broadleaves carry a bias below 1: hornbeam and beech sit under the spruce in a

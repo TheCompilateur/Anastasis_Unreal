@@ -29,7 +29,7 @@ ASSET_PATH = ASSET_DIR + '/' + ASSET_NAME
 SEED_ENTRIES = [
     (unreal.AnastasisSemanticType.FOREST, 'Tree_Generic',
      '/Game/Anastasis/Vegetation/SM_Tree_Conifer_Canopy_01',
-     (0.102, 0.243, 0.114), 3.6, 5.0, 0.30),
+     (0.102, 0.243, 0.114), 15.0, 21.0, 0.30),
     (unreal.AnastasisSemanticType.RUIN, 'Ruin_Generic', '/Engine/BasicShapes/Cylinder.Cylinder',
      (0.353, 0.302, 0.318), 0.6, 1.1, 0.20),
 ]

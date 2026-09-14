@@ -51,10 +51,11 @@ sur les placeholders codés en dur : corrige l'asset, ne touche pas au C++.
 ## Échelles — l'unité qui compte
 
 1 tuile = 100 uu (≈ 1 m). Les scales sont des facteurs appliqués au mesh brut.
-Les placeholders actuels sont les primitives moteur (~100 uu), d'où
-`Min/Max Uniform Scale` autour de 1.6–2.4 pour un arbre. **Un vrai mesh d'arbre
-déjà à l'échelle réelle veut une enveloppe proche de 1.0** — sinon tu obtiens
-des arbres de 30 m. Ajuste l'enveloppe en même temps que le mesh.
+Les silhouettes Forest sont normalisées à ~100 uu, d'où `Min/Max Uniform Scale`
+**15–21** : après les facteurs de strate (jeune 0.25–0.45, canopée 0.95–1.20)
+cela lit la bande État Zéro 3 (canopée 15–25 m), pas un personnage (~1.8 m).
+**Un vrai mesh d'arbre déjà à l'échelle réelle veut une enveloppe proche de 1.0.**
+Ajuste l'enveloppe en même temps que le mesh.
 
 ## Ce que tu ne peux pas faire ici (et pourquoi)
 

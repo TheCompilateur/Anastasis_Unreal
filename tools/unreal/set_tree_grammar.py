@@ -29,11 +29,10 @@ MESH_DIR = "/Game/Anastasis/Vegetation/"
 
 # Enveloppe d'echelle de l'entree. Multipliee par les facteurs de strate de
 # FAnastasisForestDressingSettings (jeune 0.25-0.45, secondaire 0.50-0.78,
-# canopee 0.95-1.20) puis par le biais de la variante. Avant cette passe
-# l'enveloppe valait 1.6-2.4 et l'instance mediane mesurait 104 uu -- un metre,
-# dans un monde ou la tuile fait justement un metre.
-MIN_SCALE = 3.6
-MAX_SCALE = 5.0
+# canopee 0.95-1.20) puis par le biais de la variante. 15-21 pose la canopee
+# sur la bande Etat Zero 3 (15-25 m), pas a hauteur d'homme.
+MIN_SCALE = 15.0
+MAX_SCALE = 21.0
 JITTER = 0.30
 MAX_LEAN_DEGREES = 5.0
 TINT = (0.102, 0.243, 0.114)
