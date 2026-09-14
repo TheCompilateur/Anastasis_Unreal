@@ -70,7 +70,8 @@ views=[('overview',unreal.Vector(-5400,-5400,10500),unreal.Rotator(0,-32.8,45)),
        ('edge',local_loc,local_rot)]
 results={'seed':12345,'surface_mode':2,'sun_lux':75000,'ev100':14,
          'focus':str(focus),'baseline':baseline,'views':[(v,str(l),str(r)) for v,l,r in views]}
-phase=0; mark=time.monotonic(); requested=False; handle=None; active_shot=None
+PIE_ONLY = os.environ.get('ANASTASIS_ASTRAL_PIE_ONLY') == '1'
+phase=4 if PIE_ONLY else 0; mark=time.monotonic(); requested=False; handle=None; active_shot=None
 jobs=[(0,views[0]),(0,views[1]),(1,views[0]),(1,views[1])]
 def finish():
     with open(os.path.join(OUT,'observation.json'),'w') as f: json.dump(results,f,indent=2)
@@ -97,6 +98,7 @@ def tick(dt):
             unreal.log('ASTRAL_SHOT '+path)
             phase+=1; requested=False; mark=time.monotonic()
     elif phase==4:
+        if PIE_ONLY: rebuild(1)
         results['ecology']=inventory()
         rebuild(1)
         results['repeat']=inventory()
@@ -109,6 +111,9 @@ def tick(dt):
         found=list(unreal.GameplayStatics.get_all_actors_of_class(gw,cls))
         results['pie_embodiments']=len(found)
         results['pie_dressing']=[a.call_method('GetDressingInstanceCount') for a in found]
+        results['pie_hism']=[dict(name=c.get_name(),count=c.get_instance_count())
+            for a in found for c in a.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent)
+            if c.get_name().startswith('Dressing_')]
         les.editor_request_end_play()
         phase=6; mark=time.monotonic()
     elif phase==6 and not les.is_in_play_in_editor():
