@@ -83,3 +83,10 @@ Semantic requirements: retain canonical OnConstruction, transient components,
 constructor-owned terrain, ShouldSpawnEmbodiment, registry bindings; retain
 ASTRAL full-source plan and one-time-per-component material setup. No source
 simulation changes in either side. New evidence required after combination.
+
+Combination completed in 73ebc92. Exactly two merge conflicts:
+- .cpp: kept Ecology CVar and canonical Terrain.Surface default=2.
+- .h: kept ForestDressing settings AND canonical OnConstruction/EmbodyFromConsoleVariables.
+Reviewed resulting diff against 2cf1328: only eight ASTRAL files differ.
+Canonical transient components, construction-owned terrain, single-embodiment guard,
+and existing asset bindings are preserved. No canonical file was written by ASTRAL.

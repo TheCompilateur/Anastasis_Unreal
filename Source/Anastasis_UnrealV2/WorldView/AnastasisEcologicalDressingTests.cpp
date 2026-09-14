@@ -26,7 +26,7 @@ bool FAnastasisEcologyDeterminism::RunTest(const FString&)
     const auto S = AnastasisWorldView::CaptureCanonicalWorld(12345u);
     const auto Before = S.Tiles;
     FAnastasisForestDressingSettings C;
-    FPlan A,B;
+    AnastasisEcologicalDressing::FPlan A,B;
     FString E;
     TestTrue(TEXT("canonical plan A"), Build(S,C,A,E));
     TestTrue(TEXT("canonical plan B"), Build(S,C,B,E));
@@ -70,7 +70,7 @@ bool FAnastasisEcologyConditioning::RunTest(const FString&)
     using namespace AnastasisEcologicalDressing;
     auto S=FlatForestEdge();
     FAnastasisForestDressingSettings C;
-    FPlan A,Wet,Water,Steep,Disabled;
+    AnastasisEcologicalDressing::FPlan A,Wet,Water,Steep,Disabled;
     FString E;
     TestTrue(TEXT("edge fixture"),Build(S,C,A,E));
     int32 Fringe=0, Interior=0, YoungFringe=0, CanopyInterior=0;
@@ -108,7 +108,7 @@ bool FAnastasisEcologyBoundary::RunTest(const FString&)
     using namespace AnastasisEcologicalDressing;
     auto S=FlatForestEdge();
     FAnastasisForestDressingSettings C;
-    FPlan P; FString E;
+    AnastasisEcologicalDressing::FPlan P; FString E;
     S.Tiles[17].Wetness=std::numeric_limits<double>::quiet_NaN();
     TestFalse(TEXT("NaN rejected"),Build(S,C,P,E));
     TestTrue(TEXT("precise tile path"),E.Contains(TEXT("Source.Tiles[17]")));
