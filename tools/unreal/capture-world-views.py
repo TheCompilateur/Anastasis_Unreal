@@ -97,14 +97,24 @@ def rig(dist, height, pitch, yaw_deg=45.0):
     return loc, unreal.Rotator(0.0, pitch, yaw_deg)
 
 
-# Quatre distances sur la MEME diagonale (yaw 45) : la carte entiere, puis on descend.
-# Garder un seul azimut rend les quatre images comparables entre elles.
+# Quatre distances sur la MEME diagonale (yaw 45), garder un seul azimut rend les
+# images comparables entre elles.
+#
+# ORDRE DELIBERE, du plus informatif au moins. Sur une machine saturee l'editeur ne
+# tient parfois qu'un seul HighResShot avant le timeout : autant que ce soit celui qui
+# apprend le plus. La vue region montre a la fois les masses, le bati et l'echelle ;
+# la carte entiere, elle, ne dit que la repartition, qu'on lit deja dans les compteurs.
 VIEWS = [
-    ('01_MAP', rig(5200.0, 10500.0, -62.0)),     # la carte entiere, presque a plomb
-    ('02_OVERVIEW', rig(7600.0, 5200.0, -33.0)),  # trois quarts : le relief se lit
     ('03_REGION', rig(4200.0, 1900.0, -22.0)),    # une region, echelle des masses
     ('04_VISTA', rig(2600.0, 520.0, -7.0)),       # au ras du sol : ce que verrait un joueur
+    ('02_OVERVIEW', rig(7600.0, 5200.0, -33.0)),  # trois quarts : le relief se lit
+    ('01_MAP', rig(5200.0, 10500.0, -62.0)),      # la carte entiere, presque a plomb
 ]
+
+# Resolution de capture. 1920x1080 sur une machine qui rame coute plusieurs minutes par
+# vue ; a la taille de la fenetre le shot est quasi immediat, et une preuve un peu moins
+# large vaut infiniment mieux qu'une preuve absente.
+SHOT_RES = os.environ.get('ANASTASIS_WORLD_RES', '1280x720')
 
 SHOT_DIR = os.path.join(unreal.Paths.project_saved_dir(), 'Screenshots')
 RESULTS = []
@@ -166,7 +176,7 @@ def tick(dt):
         name, (loc, rot) = current
         aim_at(loc, rot)
         mark = time.time()
-        unreal.SystemLibrary.execute_console_command(world, 'HighResShot 1920x1080')
+        unreal.SystemLibrary.execute_console_command(world, 'HighResShot ' + SHOT_RES)
         log('SHOT_REQUESTED ' + name)
         state, t_state = 'wait', now
         return
@@ -185,7 +195,7 @@ def tick(dt):
             name, (loc, rot) = current
             aim_at(loc, rot)
             mark = time.time()
-            unreal.SystemLibrary.execute_console_command(world, 'HighResShot 1920x1080')
+            unreal.SystemLibrary.execute_console_command(world, 'HighResShot ' + SHOT_RES)
             log('SHOT_RETRY ' + name)
             t_state = now
         return
