@@ -2,6 +2,7 @@ param(
   [Parameter(Mandatory = $true)][string]$Out,
   [string]$View = 'MID',
   [ValidateSet('0', '1')][string]$Mode = '1',
+  [string]$ShotSize = '',
   [int]$TimeoutSec = 300)
 $ErrorActionPreference = 'Stop'
 # Root deduit de l'emplacement du script : la preuve doit porter sur les binaires
@@ -17,6 +18,7 @@ if (Test-Path $log) { Remove-Item $log }
 $env:ANASTASIS_SHORE_SHOT = $shot
 $env:ANASTASIS_SHORE_VIEW = $View
 $env:ANASTASIS_SHORE_MODE = $Mode
+$env:ANASTASIS_SHORE_SHOT_SIZE = $ShotSize
 $py = (Join-Path $Root 'tools\unreal\shore-capture.py').Replace('\', '/')
 $launchArgs = @(
   ('"' + (Join-Path $Root 'Anastasis_UnrealV2.uproject') + '"'),

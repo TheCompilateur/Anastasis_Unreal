@@ -177,6 +177,19 @@ for _name, _site in SITES.items():
 
 VIEWS['AERIAL'] = (-5400.0, -5400.0, 10500.0, -32.8, 45.0, 90.0)
 
+# TOUR DE CARTE. Les quatre diagonales, meme distance, meme hauteur, meme pique.
+# Le monde canonique occupe [0,9600]^2, centre (4800,4800) ; chaque camera est
+# posee a 10 200 uu du centre sur chaque axe et regarde le centre. Les quatre
+# images ne different donc QUE par l'angle d'approche : c'est un tour, pas quatre
+# cadrages choisis.
+_MAP_C = 4800.0
+_MAP_D = 10200.0
+_MAP_Z = 10500.0
+for _tag, _sx, _sy in (('SW', -1.0, -1.0), ('SE', 1.0, -1.0), ('NE', 1.0, 1.0), ('NW', -1.0, 1.0)):
+    _cx, _cy = _MAP_C + _sx * _MAP_D, _MAP_C + _sy * _MAP_D
+    _yaw = math.degrees(math.atan2(_MAP_C - _cy, _MAP_C - _cx))
+    VIEWS['MAP_' + _tag] = (_cx, _cy, _MAP_Z, -32.8, _yaw, 90.0)
+
 
 # Le viewport de l'editeur GARDE sa camera d'une session a l'autre. Une vue
 # inconnue ne rendait donc pas une erreur visible : elle rendait une image, cadree
@@ -234,7 +247,18 @@ unreal.log('SHORE_EMBODY=%s' % actor.call_method('EmbodyCanonical', args=(SEED,)
 #
 # Une preuve en 1280x720 qui existe vaut mieux qu'une preuve en 1920x1080 qui
 # n'est jamais ecrite.
+# Taille par defaut = celle du viewport. ANASTASIS_SHORE_SHOT_SIZE permet de
+# descendre en dessous quand la machine est a court de memoire : sous ~500 Mo
+# libres, le moteur abandonne la demande de capture sans rien ecrire ni rien
+# dire. Les preuves scellees restent a 1280x720 ; l'option sert aux tours de
+# carte, qu'on regarde au lieu de les verser.
 SHOT_W, SHOT_H = 1280, 720
+_size = os.environ.get('ANASTASIS_SHORE_SHOT_SIZE', '')
+if 'x' in _size:
+    try:
+        SHOT_W, SHOT_H = (int(v) for v in _size.lower().split('x', 1))
+    except ValueError:
+        pass
 
 # DELAIS. Le materiau de rive est TRANSLUCIDE : ses shaders compilent au premier
 # rendu qui l'utilise. Tant qu'ils compilent, HighResShot ne produit AUCUN fichier
@@ -249,6 +273,9 @@ SHOT_W, SHOT_H = 1280, 720
 # editeurs ouverts.
 SETTLE_SECONDS = 45.0
 WINDOW_SECONDS = 300.0
+# Intervalle entre deux demandes. Doit rester LARGE devant le temps d'ecriture
+# d'une capture sur une scene lourde, sinon chaque relance annule la precedente.
+RETRY_SECONDS = 60.0
 
 SHOT_DIR = os.path.join(unreal.Paths.project_saved_dir(), 'Screenshots')
 
@@ -326,8 +353,13 @@ def tick(dt):
             shutil.copyfile(found_png, SHOT)
             unreal.log('SHORE_SHOT_OK bytes=%d' % os.path.getsize(SHOT))
             finish('SHORE_COMPLETE')
-        elif elapsed - last_request > 15.0 and elapsed < WINDOW_SECONDS:
-            aim()
+        elif elapsed - last_request > RETRY_SECONDS and elapsed < WINDOW_SECONDS:
+            # NE PAS re-viser ici. Redemander la camera annule la capture en vol :
+            # sur le maillage forge l'editeur tourne a ~3 images/s, une capture
+            # met plusieurs secondes a s'ecrire, et l'ancienne boucle la relancait
+            # toutes les 15 s en repositionnant la camera -- elle se sabotait
+            # elle-meme. Plus la scene est lourde, plus surement elle echouait.
+            # Une seule demande, on laisse le temps au moteur.
             unreal.SystemLibrary.execute_console_command(world, 'HighResShot %dx%d' % (SHOT_W, SHOT_H))
             last_request = elapsed
             unreal.log('SHORE_SHOT_RETRY t=%.0f' % elapsed)
