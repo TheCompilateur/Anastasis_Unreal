@@ -184,4 +184,99 @@ bool FAnastasisTerrainForgeCarriesMorphology::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainForgeChunkSeam, "Anastasis.Terrain.Forge.ChunkSeam",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainForgeChunkSeam::RunTest(const FString&)
+{
+	// Verite de reference : le monde entier d'un coup. Chaque sommet qui n'est pas sur le
+	// bord du MONDE (X/Y = 0 ou 95) y est calcule avec de vrais voisins des deux cotes --
+	// aucun bord de CHUNK n'existe ici, donc rien n'y masque l'artefact vise.
+	const auto World = AnastasisWorldView::CaptureCanonicalWorld(12345);
+	AnastasisTerrainSurface::FGeometry RefGeometry;
+	if (!TestTrue(TEXT("ref build"), AnastasisTerrainSurface::Build(World, RefGeometry))) return false;
+	AnastasisTerrainForge::FMesh RefMesh;
+	TArray<double> RefLap;
+	if (!TestTrue(TEXT("ref forge"), AnastasisTerrainForge::Apply(World, RefGeometry, RefMesh, nullptr, &RefLap))) return false;
+
+	// Une emprise loin de tous les bords du monde -- les siens SONT des bords de chunk.
+	const int32 OX = 24, OY = 24, W = 20, H = 20;
+	const auto Crop = AnastasisWorldView::CropSnapshot(World, OX, OY, W, H);
+	if (!TestEqual(TEXT("crop valide"), Crop.Tiles.Num(), W * H)) return false;
+
+	AnastasisTerrainSurface::FGeometry GeoNoHalo;
+	if (!TestTrue(TEXT("build sans halo"), AnastasisTerrainSurface::Build(Crop, GeoNoHalo))) return false;
+	AnastasisTerrainForge::FMesh MeshNoHalo;
+	TArray<double> LapNoHalo;
+	if (!TestTrue(TEXT("forge sans halo"), AnastasisTerrainForge::Apply(Crop, GeoNoHalo, MeshNoHalo, nullptr, &LapNoHalo))) return false;
+
+	const auto HaloCrop = AnastasisWorldView::CropSnapshot(World, OX - 1, OY - 1, W + 2, H + 2);
+	if (!TestEqual(TEXT("halo valide"), HaloCrop.Tiles.Num(), (W + 2) * (H + 2))) return false;
+
+	AnastasisTerrainSurface::FGeometry GeoHalo;
+	if (!TestTrue(TEXT("build avec halo"), AnastasisTerrainSurface::Build(Crop, GeoHalo))) return false;
+	AnastasisTerrainForge::FMesh MeshHalo;
+	TArray<double> LapHalo;
+	if (!TestTrue(TEXT("forge avec halo"), AnastasisTerrainForge::Apply(Crop, GeoHalo, MeshHalo, &HaloCrop, &LapHalo))) return false;
+
+	if (!TestEqual(TEXT("meme subdiv que la reference"), MeshNoHalo.Subdiv, RefMesh.Subdiv)) return false;
+	const int32 Subdiv = MeshNoHalo.Subdiv;
+
+	// Anneau exterieur du maillage fin de Crop. On y compare le LAPLACIEN, pas la hauteur
+	// finale : bassin habitable et point haut cherchent leur candidat sur TOUTE l'emprise,
+	// donc la hauteur finale diverge legitimement entre un petit crop et le monde entier
+	// (mesure separement ci-dessous, a titre informatif). Le Laplacien ne depend que des
+	// 4 voisins immediats -- c'est la seule quantite que HaloCrop peut faire correspondre
+	// exactement a celle du monde entier, et c'est exactement ce que le bug visait.
+	double MaxLapErrorNoHalo = 0.0;
+	double MaxLapErrorHalo = 0.0;
+	double MaxHeightErrorNoHalo = 0.0;
+	double MaxHeightErrorHalo = 0.0;
+	int32 Sampled = 0;
+	for (int32 JY = 0; JY < MeshNoHalo.FineH; ++JY)
+	{
+		for (int32 IX = 0; IX < MeshNoHalo.FineW; ++IX)
+		{
+			const bool bBorder = IX == 0 || JY == 0 || IX == MeshNoHalo.FineW - 1 || JY == MeshNoHalo.FineH - 1;
+			if (!bBorder)
+			{
+				continue;
+			}
+			const int32 I = JY * MeshNoHalo.FineW + IX;
+			const int32 WorldIX = OX * Subdiv + IX;
+			const int32 WorldIY = OY * Subdiv + JY;
+			if (WorldIX < 0 || WorldIY < 0 || WorldIX >= RefMesh.FineW || WorldIY >= RefMesh.FineH)
+			{
+				continue; // Hors du monde entier : pas de verite a comparer ici.
+			}
+			const int32 RefI = WorldIY * RefMesh.FineW + WorldIX;
+			MaxLapErrorNoHalo = FMath::Max(MaxLapErrorNoHalo, FMath::Abs(LapNoHalo[I] - RefLap[RefI]));
+			MaxLapErrorHalo = FMath::Max(MaxLapErrorHalo, FMath::Abs(LapHalo[I] - RefLap[RefI]));
+
+			const FVector& P = MeshNoHalo.Geometry.Vertices[I];
+			double ZRef = 0.0, ZHalo = 0.0;
+			if (AnastasisTerrainForge::SampleHeight(RefMesh, P.X, P.Y, ZRef)
+				&& AnastasisTerrainForge::SampleHeight(MeshHalo, P.X, P.Y, ZHalo))
+			{
+				MaxHeightErrorNoHalo = FMath::Max(MaxHeightErrorNoHalo, FMath::Abs(P.Z - ZRef));
+				MaxHeightErrorHalo = FMath::Max(MaxHeightErrorHalo, FMath::Abs(ZHalo - ZRef));
+			}
+			++Sampled;
+		}
+	}
+
+	TestTrue(TEXT("anneau de bord echantillonne"), Sampled > 0);
+	// Le halo ne doit jamais degrader l'accord du Laplacien avec le monde entier.
+	TestTrue(TEXT("le halo ne fait jamais pire que le clamp"), MaxLapErrorHalo <= MaxLapErrorNoHalo + KINDA_SMALL_NUMBER);
+	// Et il doit coller a cette verite : c'est le contrat de raccord de chunk vise par le fix.
+	TestTrue(TEXT("le halo colle au Laplacien du monde entier"), MaxLapErrorHalo < 1.e-6);
+
+	AnastasisTerrainForge::ClearActive();
+	AddInfo(FString::Printf(
+		TEXT("TERRAIN_FORGE_CHUNK_SEAM border_samples=%d lap_error_no_halo=%.9f lap_error_halo=%.9f ")
+		TEXT("height_error_no_halo=%.3f height_error_halo=%.3f (hauteur = info seulement : bassin/point ")
+		TEXT("haut cherchent sur toute l'emprise, leur placement differe legitimement du monde entier)"),
+		Sampled, MaxLapErrorNoHalo, MaxLapErrorHalo, MaxHeightErrorNoHalo, MaxHeightErrorHalo));
+	return true;
+}
+
 #endif

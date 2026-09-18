@@ -38,8 +38,31 @@ struct FMesh
 	bool bLandmarkFound = false;
 };
 
-/** Remplace InOut par le maillage forgé. False = laisser la surface tuilée telle quelle. */
-bool Apply(const AnastasisWorldView::FWorldVisualSnapshot& Crop, AnastasisTerrainSurface::FGeometry& InOut, FMesh& OutMeta);
+/**
+ * Remplace InOut par le maillage forgé. False = laisser la surface tuilée telle quelle.
+ *
+ * HaloCrop (optionnel) : un instantané couvrant Crop plus une marge de tuiles voisines,
+ * dans le même repère absolu (OriginX/OriginY). Pente et Laplacien en tirent alors de
+ * vrais voisins au bord fin de Crop au lieu de dupliquer le sommet du bord sur lui-même
+ * (l'artefact clamp-sur-soi qui pouvait faire gicler l'escarpement pile aux bords de
+ * chunk, sur les pentes raides). Sans HaloCrop, le comportement est inchangé : c'est le
+ * seul cas correct quand Crop touche déjà le bord du MONDE, où il n'existe aucune tuile
+ * voisine à lire.
+ *
+ * OutLaplacian (optionnel, tests uniquement) : copie du Laplacien fin par sommet utilisé
+ * pour l'escarpement/la macro-crête. Le bassin habitable et le point haut cherchent leur
+ * candidat sur TOUTE l'emprise de Crop, donc leur placement change legitimement avec la
+ * taille de Crop — comparer la hauteur finale entre deux emprises differentes mesurerait
+ * ca, pas l'artefact de bord. Le Laplacien, lui, ne depend que des 4 voisins immediats :
+ * c'est la seule quantite qu'un test peut comparer directement a une autre emprise pour
+ * juger HaloCrop sans ce bruit.
+ */
+bool Apply(
+	const AnastasisWorldView::FWorldVisualSnapshot& Crop,
+	AnastasisTerrainSurface::FGeometry& InOut,
+	FMesh& OutMeta,
+	const AnastasisWorldView::FWorldVisualSnapshot* HaloCrop = nullptr,
+	TArray<double>* OutLaplacian = nullptr);
 
 bool SampleHeight(const FMesh& Mesh, double WorldX, double WorldY, double& OutZ);
 

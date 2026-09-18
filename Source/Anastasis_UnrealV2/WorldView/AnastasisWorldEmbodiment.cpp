@@ -568,9 +568,28 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
         AnastasisTerrainSurface::FGeometry Geometry;
         if (AnastasisTerrainSurface::Build(Crop, Geometry))
         {
+            // TERRAIN_FORGE lit pente/Laplacien au bord fin de Crop. Mode 2 incarne un
+            // decoupage LIBRE du monde canonique : ses bords sont de vrais bords de chunk,
+            // pas le bord du monde, et CanonicalSource a les tuiles voisines pour les
+            // couvrir -- sans elles, ANASTASIS_TERRAIN_FORGE clampait un voisin manquant sur
+            // lui-meme et pouvait y lire une convexite fictive (pic sur pente raide, cf.
+            // TERRAIN_FORGE_CHUNK_SEAM). Mode 1 est la tranche scellee WORLD_SLICE_006 et
+            // doit rester bit-a-bit identique : elle ne recoit jamais de halo.
+            AnastasisWorldView::FWorldVisualSnapshot HaloCrop;
+            bool bHaveHaloCrop = false;
+            if (SurfaceMode == 2)
+            {
+                const int32 HaloX0 = FMath::Max(0, Crop.OriginX - 1);
+                const int32 HaloY0 = FMath::Max(0, Crop.OriginY - 1);
+                const int32 HaloX1 = FMath::Min(CanonicalSource.W, Crop.OriginX + Crop.W + 1);
+                const int32 HaloY1 = FMath::Min(CanonicalSource.H, Crop.OriginY + Crop.H + 1);
+                HaloCrop = AnastasisWorldView::CropSnapshot(
+                    CanonicalSource, HaloX0, HaloY0, HaloX1 - HaloX0, HaloY1 - HaloY0);
+                bHaveHaloCrop = HaloCrop.Tiles.Num() == (HaloX1 - HaloX0) * (HaloY1 - HaloY0);
+            }
             AnastasisTerrainForge::FMesh ForgeMesh;
             const bool bForged = CVarTerrainForge.GetValueOnGameThread() != 0
-                && AnastasisTerrainForge::Apply(Crop, Geometry, ForgeMesh);
+                && AnastasisTerrainForge::Apply(Crop, Geometry, ForgeMesh, bHaveHaloCrop ? &HaloCrop : nullptr);
             if (!bForged)
             {
                 AnastasisTerrainForge::ClearActive();
