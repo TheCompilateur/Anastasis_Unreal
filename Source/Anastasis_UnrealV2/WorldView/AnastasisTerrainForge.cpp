@@ -200,7 +200,9 @@ bool AnastasisTerrainForge::SampleHeight(const FMesh& Mesh, double WorldX, doubl
 bool AnastasisTerrainForge::Apply(
 	const FWorldVisualSnapshot& Crop,
 	AnastasisTerrainSurface::FGeometry& InOut,
-	FMesh& OutMeta)
+	FMesh& OutMeta,
+	const FWorldVisualSnapshot* HaloCrop,
+	TArray<double>* OutLaplacian)
 {
 	OutMeta = FMesh{};
 	const int32 CoarseW = Crop.W;
@@ -250,27 +252,67 @@ bool AnastasisTerrainForge::Apply(
 		}
 	}
 
-	auto At = [FineW, FineH, FineN](const TArray<double>& G, int32 X, int32 Y) -> double
+	// Voisin fin (X,Y), meme hors de [0,FineW)x[0,FineH). Au bord de Crop, ce n'est PAS
+	// forcement le bord du MONDE : si HaloCrop couvre ce point, on lit son vrai voisin de
+	// tuile au lieu de dupliquer le sommet du bord sur lui-meme. OutReliable, si fourni,
+	// dit lequel des deux vient de se produire -- c'est ce qui distingue un vrai bord du
+	// monde (clamp legitime, aucune tuile voisine n'existe) d'un bord de chunk que le
+	// halo couvre (clamp evitable).
+	auto At = [&H, &Crop, HaloCrop, FineW, FineH, InvSub](int32 X, int32 Y, bool* OutReliable = nullptr) -> double
 	{
-		X = FMath::Clamp(X, 0, FineW - 1);
-		Y = FMath::Clamp(Y, 0, FineH - 1);
-		return G[Y * FineW + X];
+		if (X >= 0 && X < FineW && Y >= 0 && Y < FineH)
+		{
+			if (OutReliable) { *OutReliable = true; }
+			return H[Y * FineW + X];
+		}
+		if (HaloCrop)
+		{
+			const double U = static_cast<double>(X) * InvSub + static_cast<double>(Crop.OriginX - HaloCrop->OriginX);
+			const double V = static_cast<double>(Y) * InvSub + static_cast<double>(Crop.OriginY - HaloCrop->OriginY);
+			if (U >= 0.0 && V >= 0.0 && U <= static_cast<double>(HaloCrop->W - 1) && V <= static_cast<double>(HaloCrop->H - 1))
+			{
+				double Alt = 0.0, Sh = 0.0, We = 0.0;
+				bool bW = false;
+				BilinearSample(*HaloCrop, U, V, Alt, Sh, We, bW);
+				if (OutReliable) { *OutReliable = true; }
+				return Alt;
+			}
+		}
+		if (OutReliable) { *OutReliable = false; }
+		const int32 CX = FMath::Clamp(X, 0, FineW - 1);
+		const int32 CY = FMath::Clamp(Y, 0, FineH - 1);
+		return H[CY * FineW + CX];
 	};
 
 	TArray<double> Slope;
 	TArray<double> Lap;
+	// Vrai seulement pour les cellules de bord dont AU MOINS un voisin de Lap/Slope a du
+	// retomber sur le clamp-sur-soi (pas de halo a cet endroit) : c'est la, et seulement
+	// la, qu'un Laplacien peut mentir sur la convexite du relief.
+	TArray<uint8> LapUnreliable;
 	Slope.SetNumUninitialized(FineN);
 	Lap.SetNumUninitialized(FineN);
+	LapUnreliable.SetNumZeroed(FineN);
 	for (int32 JY = 0; JY < FineH; ++JY)
 	{
 		for (int32 IX = 0; IX < FineW; ++IX)
 		{
 			const int32 I = JY * FineW + IX;
-			const double Dx = At(H, IX + 1, JY) - At(H, IX - 1, JY);
-			const double Dy = At(H, IX, JY + 1) - At(H, IX, JY - 1);
+			bool bReliableLeft = true, bReliableRight = true, bReliableDown = true, bReliableUp = true;
+			const double Left = At(IX - 1, JY, &bReliableLeft);
+			const double Right = At(IX + 1, JY, &bReliableRight);
+			const double Down = At(IX, JY - 1, &bReliableDown);
+			const double Up = At(IX, JY + 1, &bReliableUp);
+			const double Dx = Right - Left;
+			const double Dy = Up - Down;
 			Slope[I] = FMath::Sqrt(Dx * Dx + Dy * Dy) * 0.5 * static_cast<double>(Subdiv);
-			Lap[I] = 4.0 * H[I] - At(H, IX - 1, JY) - At(H, IX + 1, JY) - At(H, IX, JY - 1) - At(H, IX, JY + 1);
+			Lap[I] = 4.0 * H[I] - Left - Right - Down - Up;
+			LapUnreliable[I] = (bReliableLeft && bReliableRight && bReliableDown && bReliableUp) ? 0 : 1;
 		}
+	}
+	if (OutLaplacian)
+	{
+		*OutLaplacian = Lap;
 	}
 
 	// D8 accumulation on the fine height field — drainage for ravine carving, not hydrology color.
@@ -356,7 +398,12 @@ bool AnastasisTerrainForge::Apply(
 			// Escarpments: steepen already-steep convex breaks.
 			if (SlopeDeg > 18.0 && L > 0.0)
 			{
-				Alt += SmoothStep(18.0, 28.0, SlopeDeg) * 0.012 * L * 8.0;
+				// LapUnreliable is only set where a neighbour truly had no data (world edge,
+				// no HaloCrop covering it) and got duplicated onto itself instead — the one
+				// case where L can read as spuriously convex. Elsewhere (interior, or a chunk
+				// border HaloCrop covers) L is the real Laplacian and gets the full effect.
+				const double EdgeFade = LapUnreliable[I] ? 0.0 : 1.0;
+				Alt += SmoothStep(18.0, 28.0, SlopeDeg) * 0.012 * L * 8.0 * EdgeFade;
 			}
 
 			// Meso roughness only on slopes, never as a uniform blanket.
