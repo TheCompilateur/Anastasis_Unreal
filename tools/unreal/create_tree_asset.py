@@ -527,6 +527,20 @@ def save_static_mesh(mesh, asset_path):
 # invisible ailleurs.
 TRANSMISSION_WARMTH = unreal.LinearColor(1.5, 1.25, 0.55, 1.0)
 
+# Balancement du feuillage. Exprime dans l'espace LOCAL du mesh (Z=[-50,+50],
+# meme convention que NORMALISED_HEIGHT) : le World Position Offset y est
+# calcule avant le Scale par instance, donc un arbre jeune et un emergent
+# balancent proportionnellement a leur taille sans second reglage.
+#
+# PAS DE WindDirectionalSource. Le lire depuis une fonction moteur (par ex.
+# SimpleGrassWind) suppose des noms de broches que l'entete de ce fichier
+# interdit de supposer sans les verifier contre CE build. Un sinus du temps,
+# lui, ne depend d'aucune signature externe : deterministe dans sa forme,
+# dephase par instance via PerInstanceRandom pour que la foret ne batte pas au
+# meme rythme partout.
+WIND_SWAY_STRENGTH = 4.0
+WIND_SWAY_SPEED = 0.6
+
 
 def ensure_material():
     """VertexColor -> BaseColor, et surtout : feuillage deux faces.
@@ -580,6 +594,51 @@ def ensure_material():
     spec.set_editor_property('r', 0.18)
     r_spec = mel.connect_material_property(spec, '', unreal.MaterialProperty.MP_SPECULAR)
 
+    # VENT -- balancement du feuillage, jamais du tronc. Un sinus du temps,
+    # dephase par PerInstanceRandom (sans quoi chaque HISM balancerait a
+    # l'unisson), pondere par le meme masque alpha que la transmission
+    # (masked ci-dessus, vc.A) : 0 sur le bois, 1 sur le feuillage.
+    time_node = mel.create_material_expression(mat, unreal.MaterialExpressionTime, -900, 620)
+    speed = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -900, 700)
+    speed.set_editor_property('r', WIND_SWAY_SPEED)
+    sped_time = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -700, 660)
+    mel.connect_material_expressions(time_node, '', sped_time, 'A')
+    mel.connect_material_expressions(speed, '', sped_time, 'B')
+
+    phase = mel.create_material_expression(mat, unreal.MaterialExpressionPerInstanceRandom, -900, 780)
+    two_pi = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -900, 840)
+    two_pi.set_editor_property('r', 6.2832)
+    phase_scaled = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -700, 800)
+    mel.connect_material_expressions(phase, '', phase_scaled, 'A')
+    mel.connect_material_expressions(two_pi, '', phase_scaled, 'B')
+
+    phased_time = mel.create_material_expression(mat, unreal.MaterialExpressionAdd, -500, 700)
+    mel.connect_material_expressions(sped_time, '', phased_time, 'A')
+    mel.connect_material_expressions(phase_scaled, '', phased_time, 'B')
+
+    sway = mel.create_material_expression(mat, unreal.MaterialExpressionSine, -350, 700)
+    mel.connect_material_expressions(phased_time, '', sway, '')
+
+    strength = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -350, 780)
+    strength.set_editor_property('r', WIND_SWAY_STRENGTH)
+    sway_scaled = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -200, 720)
+    mel.connect_material_expressions(sway, '', sway_scaled, 'A')
+    mel.connect_material_expressions(strength, '', sway_scaled, 'B')
+
+    sway_masked = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -50, 720)
+    mel.connect_material_expressions(sway_scaled, '', sway_masked, 'A')
+    mel.connect_material_expressions(vc, 'A', sway_masked, 'B')
+
+    zero = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -50, 820)
+    zero.set_editor_property('r', 0.0)
+    sway_xy = mel.create_material_expression(mat, unreal.MaterialExpressionAppendVector, 100, 740)
+    mel.connect_material_expressions(sway_masked, '', sway_xy, 'A')
+    mel.connect_material_expressions(zero, '', sway_xy, 'B')
+    sway_xyz = mel.create_material_expression(mat, unreal.MaterialExpressionAppendVector, 250, 740)
+    mel.connect_material_expressions(sway_xy, '', sway_xyz, 'A')
+    mel.connect_material_expressions(zero, '', sway_xyz, 'B')
+    r_wpo = mel.connect_material_property(sway_xyz, '', unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+
     # Deux faces : les etages de couronne sont des troncons fins vus des deux
     # cotes des qu'on entre sous le couvert. Le modele feuillage l'exige de toute
     # facon -- la transmission n'a de sens que si la face arriere est rendue.
@@ -594,8 +653,8 @@ def ensure_material():
 
     # Relu depuis l'asset, pas suppose : un set_editor_property qui echoue en
     # silence laisserait un materiau opaque et .5a n'aurait servi a rien.
-    log("MATERIAL wiring base_color=%s subsurface=%s roughness=%s specular=%s shading=%s"
-        % (wired, r_sss, r_rough, r_spec, shading))
+    log("MATERIAL wiring base_color=%s subsurface=%s roughness=%s specular=%s shading=%s wpo=%s"
+        % (wired, r_sss, r_rough, r_spec, shading, r_wpo))
     mel.recompile_material(mat)
     unreal.EditorAssetLibrary.save_asset(MATERIAL_PATH)
     log("MATERIAL saved " + MATERIAL_PATH)
