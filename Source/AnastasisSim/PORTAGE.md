@@ -140,6 +140,21 @@ multiplicateurs, bande de cadence, intervalle.
 `logicalLod.js`, l'autre moitié de la vague 3, n'est pas porté : il agrège l'état du
 village (habitants, bâtiments) et suivra ses systèmes.
 
+### Fait — tranche verticale : le puits (mission first-building-001)
+
+Hors de l'ordre des vagues, et assumé : une seule boucle d'habitant, de bout en bout, pour
+brancher le premier bâtiment. Détail, écarts et dette : `docs/unreal/FIRST_BUILDING_001.md`.
+
+| Unreal | Source JS | Preuve |
+| --- | --- | --- |
+| `Life/AnastasisNeeds.h/.cpp` | `life/needs.js` : `urgeScore`, `needGoalScores`, `tickNeeds` hors intérieur, `tickVitality`, `satisfyDrink` | `Parite.Besoins`, 165 vecteurs bit à bit (`tools/migration/parity/needs.mjs`) |
+| `Village/AnastasisVillage.h/.cpp` | `addBuilding`, `countBuildings`, seuils (`navGrid.js`), `localOccupancy`, `accessPointNear`, `drinkAccessPoint`, `nearestWell`, `reachedMoveTarget`, `moveActor`/`nextWaypoint` réduits, `updateNpc`/`act`/`perform` pour `drink` | `Village.Puits.*` : assemblage déterministe, **pas** de parité de trajectoire |
+| `Sim/AnastasisSimulation.*` (repris de `agent/sim-tick-day`) | `tick(dt)` → `for (npc of actors) updateNpc` | `Village.Puits.Hote` |
+
+La table de décision est RÉDUITE : `drink` contre un plancher déclaré (`UnportedGoalsFloor`),
+pas contre les ~24 autres buts. Tant qu'elle l'est, le harnais différentiel ne peut pas juger
+cette boucle — seules les fonctions de besoins sont en parité.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

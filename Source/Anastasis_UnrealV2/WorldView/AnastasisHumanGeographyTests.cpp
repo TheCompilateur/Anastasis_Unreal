@@ -10,6 +10,8 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
+#include "Village/AnastasisVillagePresentation.h"
+#include "Sim/AnastasisSimulation.h"
 
 namespace
 {
@@ -161,6 +163,7 @@ bool FHumanGeographyCollision::RunTest(const FString&)
     auto* Actor=World->SpawnActor<AAnastasisWorldEmbodiment>(FVector::ZeroVector,FRotator::ZeroRotator,Params);
     if(!Actor){AddError(TEXT("spawn failed"));return false;}
     Actor->Embody(12345,96,96);
+    FAnastasisSimulation Sim; Sim.Reset(12345,96,96);
     TestEqual(TEXT("default scene uses approved physical scale"),Actor->GetSnapshot().SpatialScale,5.0);
     TArray<UProceduralMeshComponent*> Meshes;Actor->GetComponents(Meshes);
     if(Meshes.IsEmpty()){Actor->Destroy();AddError(TEXT("no procedural collision surface"));return false;}
@@ -168,6 +171,9 @@ bool FHumanGeographyCollision::RunTest(const FString&)
     for(const FVector2D P: {FVector2D(53,53),FVector2D(61,47),FVector2D(33,24),FVector2D(42,33),FVector2D(60,86)})
     {
         double Z=0;if(!AnastasisTerrainForge::SampleActive(P.X*2000,P.Y*2000,Z))continue;
+        const FVector VillagePosition = FAnastasisVillagePresentation::SimToUnreal(Sim.GetWorld(), P.X, P.Y, World);
+        TestTrue(TEXT("village adapter uses physical tile coordinates and actual terrain height"),
+            VillagePosition.Equals(FVector(P.X*2000,P.Y*2000,Z),1.0));
         FHitResult Hit;const FVector Top(P.X*2000,P.Y*2000,Z+5000),Bottom(P.X*2000,P.Y*2000,Z-5000);
         if(Meshes[0]->LineTraceComponent(Hit,Top,Bottom,FCollisionQueryParams(SCENE_QUERY_STAT(HumanGeographyTest),true)))
         {++Hits;Error=FMath::Max(Error,FMath::Abs(Hit.ImpactPoint.Z-Z));}

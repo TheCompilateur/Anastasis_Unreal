@@ -15,6 +15,8 @@ if(-not ($isCanonical -or $isWorktree)){throw "FAIL: operator must run from $Can
 Set-Location -LiteralPath $Root
 $Project=Join-Path $Root 'Anastasis_UnrealV2.uproject'
 $Engine='C:\Program Files\Epic Games\UE_5.8'
+. (Join-Path $PSScriptRoot 'mcp-port.ps1')
+$McpPort=Get-AnastasisMcpPort $Root
 $up=Get-Content $Project -Raw | ConvertFrom-Json
 $v=Get-Content "$Engine/Engine/Build/Build.version" -Raw | ConvertFrom-Json
 if($up.EngineAssociation -ne '5.8' -or $v.MajorVersion -ne 5 -or $v.MinorVersion -ne 8 -or $v.PatchVersion -ne 2 -or $v.Changelist -ne 56702186){throw 'FAIL: engine identity mismatch'}
@@ -99,7 +101,7 @@ function BuildGame {
 try {
  if($Command -eq 'status') {
   if($isCanonical){$roleLabel='CANONICAL_ROOT'}else{$roleLabel='AGENT_WORKTREE'}
-  Write-Output "$roleLabel::$Root`nUPROJECT::$Project`nENGINE::5.8.2 CL 56702186`nSOURCE_SHA256::$(Fingerprint)"
+  Write-Output "$roleLabel::$Root`nUPROJECT::$Project`nENGINE::5.8.2 CL 56702186`nSOURCE_SHA256::$(Fingerprint)`nMCP_URL::http://localhost:$McpPort/mcp"
   & git -C $Root branch --show-current
   & git -C $Root rev-parse --verify HEAD
   & git -C $Root status --short
@@ -112,8 +114,9 @@ try {
   exit $LASTEXITCODE
  }
  if($Command -eq 'editor'){
-  Start-Process "$Engine/Engine/Binaries/Win64/UnrealEditor.exe" -ArgumentList ('"'+$Project+'"') -WindowStyle Hidden | Out-Null
-  Write-Output 'EDITOR::START_REQUESTED (not a verification)'; exit 0
+  # Port MCP propre a cette racine, sinon tous les editeurs se disputent 8000 : voir mcp-port.ps1.
+  Start-Process "$Engine/Engine/Binaries/Win64/UnrealEditor.exe" -ArgumentList @(('"'+$Project+'"'),"-ModelContextProtocolPort=$McpPort") -WindowStyle Hidden | Out-Null
+  Write-Output "EDITOR::START_REQUESTED (not a verification)`nMCP_URL::http://localhost:$McpPort/mcp"; exit 0
  }
  # UBT performs the incremental dependency check even when the fingerprint matches.
  BuildCanonical

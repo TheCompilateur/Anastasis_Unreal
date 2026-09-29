@@ -130,3 +130,27 @@ collision ne constituent pas une validation joueur ni une preuve economique.
   le script de capture dans cet index lors de l'integration a ce systeme.
 
 **Ne juge pas la carte uniquement depuis la vue aerienne.**
+
+
+## Integration autorisee : main 984b0c7
+
+Alexandre a demande explicitement commit, integration et push. La reprise inclut
+maintenant main a 984b0c7, donc le tick de simulation et le premier batiment.
+Le raccord VillagePresentation prend l'echelle de l'embodiment du meme UWorld
+et projette les puits et marqueurs PNJ sur son maillage physique. Il ne consulte
+pas le cache global Forge, qui peut appartenir a un autre monde editeur/PIE.
+Les tailles des marqueurs et des batiments ne sont pas multipliees.
+Les tests HumanGeography.CollisionAndDressing et FirstBuilding.Presentation
+couvrent ce raccord. L'index des scripts importes est complet (0 Missing/Stale).
+
+Fichiers supplementaires possedes par le raccord :
+- AGENTS.md (index seulement)
+- Source/Anastasis_UnrealV2/Village/AnastasisVillagePresentation.h
+- Source/Anastasis_UnrealV2/Village/AnastasisVillagePresentation.cpp
+- Source/Anastasis_UnrealV2/Village/AnastasisFirstBuildingTests.cpp
+
+Exclus du commit, conserves dans le poste canonique : Config/DefaultInput.ini,
+Anastasis_UnrealV2Character.cpp et Anastasis_UnrealV2Character.h. Aucun seal de
+cette racine sale n'est revendique. Le portail et le hook de push portent sur le
+worktree propre. Les resultats 89/4/0 ci-dessus concernent l'assemblage precedent;
+le portail d'integration relance la suite incluant le tick et le premier batiment.
