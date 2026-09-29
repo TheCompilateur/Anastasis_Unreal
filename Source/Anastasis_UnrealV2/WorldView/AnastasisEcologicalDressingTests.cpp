@@ -1,5 +1,6 @@
 #include "WorldView/AnastasisEcologicalDressing.h"
 #include "WorldView/AnastasisTerrainSurface.h"
+#include "WorldView/AnastasisTerrainForge.h"
 #include "Misc/AutomationTest.h"
 #include <limits>
 
@@ -123,6 +124,103 @@ bool FAnastasisEcologyBoundary::RunTest(const FString&)
     C=FAnastasisForestDressingSettings{};
     S=AnastasisWorldView::CropSnapshot(S,0,0,32,32);
     TestFalse(TEXT("crop cannot invent missing ecological context"),Build(S,C,P,E));
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisMacroForestHabitat, "Anastasis.Ecology.MacroForestRenderedHabitat",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisMacroForestHabitat::RunTest(const FString&)
+{
+    using namespace AnastasisEcologicalDressing;
+    using AnastasisWorld::ETileType;
+    auto S = FlatForestEdge();
+    for (auto& T : S.Tiles) T.Type = ETileType::Stone;
+    FAnastasisForestDressingSettings C;
+    FRenderedHabitat H;
+    H.bHasBasin = true;
+    H.Basin = FVector(4800,4800,800);
+    H.SampleHeight = [](double X,double Y,double& Z) { Z=800; return X>=50 && Y>=50 && X<=9550 && Y<=9550; };
+    FPlan P, Repeat;
+    FString E;
+    TestTrue(TEXT("rendered upland rock habitat"),Build(S,C,P,E,&H));
+    TestTrue(TEXT("mountain forest reachable beyond semantic forest"),P.Instances.Num()>100);
+    TestTrue(TEXT("repeat build"),Build(S,C,Repeat,E,&H));
+    TestEqual(TEXT("repeat count"),P.Instances.Num(),Repeat.Instances.Num());
+    for (int32 I=0; I<P.Instances.Num(); ++I)
+    {
+        const auto& Tree = P.Instances[I];
+        TestEqual(TEXT("uses rendered height rather than semantic altitude"),Tree.Ground.Z,800.0);
+        TestTrue(TEXT("basin kept open"),FVector::DistSquared2D(Tree.Ground,H.Basin)>=FMath::Square(C.BasinClearRadius*100.0));
+        TestTrue(TEXT("macro contains no sapling filler"),Tree.Layer!=ELayer::Young);
+        if (Repeat.Instances.IsValidIndex(I)) TestTrue(TEXT("stable placement"),Tree.Ground==Repeat.Instances[I].Ground);
+        for (int32 J=0; J<I; ++J)
+            if (FVector::DistSquared2D(Tree.Ground,P.Instances[J].Ground)<FMath::Square(C.TrunkSpacing*100.0)-1.e-6)
+                AddError(TEXT("macro spacing violated"));
+    }
+    H.SampleHeight = [](double,double,double& Z) { Z=200; return true; };
+    TestTrue(TEXT("water sample"),Build(S,C,P,E,&H));
+    TestEqual(TEXT("no submerged trunks despite dry semantic terrain"),P.Instances.Num(),0);
+    H.SampleHeight = [](double X,double,double& Z) { Z=800+X*3.0; return true; };
+    TestTrue(TEXT("cliff sample"),Build(S,C,P,E,&H));
+    TestEqual(TEXT("rendered cliffs excluded despite flat semantic terrain"),P.Instances.Num(),0);
+    H.SampleHeight = [](double,double,double& Z) { Z=400; return true; };
+    for (auto& T : S.Tiles) T.Type=ETileType::Grass;
+    TestTrue(TEXT("valley sample"),Build(S,C,P,E,&H));
+    TestEqual(TEXT("flat low prairie stays open"),P.Instances.Num(),0);
+    H.SampleHeight = [](double,double,double& Z) { Z=1000; return true; };
+    for (auto& T : S.Tiles) T.Type=ETileType::Field;
+    TestTrue(TEXT("fields"),Build(S,C,P,E,&H));
+    TestEqual(TEXT("fields reserved even at altitude"),P.Instances.Num(),0);
+    for (auto& T : S.Tiles) T.Type=ETileType::Ruin;
+    TestTrue(TEXT("ruins"),Build(S,C,P,E,&H));
+    TestEqual(TEXT("existing ruin footprints reserved"),P.Instances.Num(),0);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisMacroForestCanonical, "Anastasis.Ecology.MacroForestCanonicalRelief",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisMacroForestCanonical::RunTest(const FString&)
+{
+    using namespace AnastasisEcologicalDressing;
+    for (const uint32 Seed : {12345u, 42u, 98765u})
+    {
+        const auto S=AnastasisWorldView::CaptureCanonicalWorld(Seed);
+        AnastasisTerrainSurface::FGeometry G;
+        AnastasisTerrainForge::FMesh M;
+        if (!TestTrue(TEXT("surface"),AnastasisTerrainSurface::Build(S,G))
+            || !TestTrue(TEXT("rendered relief"),AnastasisTerrainForge::Apply(S,G,M))) return false;
+        const auto BeforeVertices=G.Vertices;
+        FRenderedHabitat H;
+        H.SampleHeight=[&](double X,double Y,double& Z) { return AnastasisTerrainForge::SampleHeight(M,X,Y,Z); };
+        H.Basin=FVector(M.BasinX,M.BasinY,M.BasinZ);
+        H.bHasBasin=M.bBasinFound;
+        FAnastasisForestDressingSettings C;
+        FPlan P, B;
+        FString E;
+        TestTrue(TEXT("macro build"),Build(S,C,P,E,&H));
+        TestTrue(TEXT("macro repeat"),Build(S,C,B,E,&H));
+        TestEqual(TEXT("stable count"),P.Instances.Num(),B.Instances.Num());
+        int32 Canopy=0, Stone=0;
+        for (int32 I=0; I<P.Instances.Num(); ++I)
+        {
+            const auto& Tree=P.Instances[I];
+            double Z=0;
+            TestTrue(TEXT("rendered anchor exists"),H.SampleHeight(Tree.Ground.X,Tree.Ground.Y,Z));
+            TestTrue(TEXT("exact rendered root"),FMath::IsNearlyEqual(Z,Tree.Ground.Z,1.e-8));
+            TestTrue(TEXT("rendered slope bound"),Tree.SlopeDegrees<=C.HillsideMaxSlope);
+            TestTrue(TEXT("above water"),Z>AnastasisTerrainSurface::WaterPlaneZ+C.WaterClearanceUU);
+            if (H.bHasBasin) TestTrue(TEXT("basin reserved"),FVector::DistSquared2D(Tree.Ground,H.Basin)>=FMath::Square(C.BasinClearRadius*100.0));
+            if (B.Instances.IsValidIndex(I)) TestTrue(TEXT("identical tree"),Tree.Ground==B.Instances[I].Ground && Tree.ScaleMultiplier==B.Instances[I].ScaleMultiplier);
+            Canopy += Tree.Layer==ELayer::Canopy;
+            Stone += S.Tiles[Tree.SourceIndex].Type==AnastasisWorld::ETileType::Stone;
+        }
+        TestTrue(TEXT("macro forest present"),P.Instances.Num()>50);
+        TestTrue(TEXT("canopy dominates"),Canopy>P.Instances.Num()/2);
+        TestTrue(TEXT("mountain habitat populated"),Stone>0);
+        TestTrue(TEXT("terrain unchanged"),G.Vertices==BeforeVertices);
+        AddInfo(FString::Printf(TEXT("MACRO_FOREST seed=%u trees=%d canopy=%d on_stone=%d open_rejected=%d slope_rejected=%d"),
+            Seed,P.Instances.Num(),Canopy,Stone,P.RejectedOpenGround,P.RejectedSlope));
+    }
+    AnastasisTerrainForge::ClearActive();
     return true;
 }
 #endif
