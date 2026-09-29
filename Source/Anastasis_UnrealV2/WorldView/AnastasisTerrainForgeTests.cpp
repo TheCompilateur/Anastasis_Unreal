@@ -576,8 +576,10 @@ bool FAnastasisTerrainForgeNoCliffs::RunTest(const FString&)
 	const FRenderedReliefStats Before = MeasureRenderedRelief(Raw);
 	const FRenderedReliefStats After = MeasureRenderedRelief(Eroded);
 
-	// Le controle doit pouvoir echouer : sans erosion, l'interieur a bien des parois.
-	TestTrue(TEXT("l'interieur avait des parois"), Before.InlandSteepFrac > 0.05);
+	// Le controle doit pouvoir echouer : sans erosion, l'interieur a bien des parois. Le
+	// seuil etait 5 % quand la tuile faisait 1 m (14 % mesures) ; a 4 m l'echelle seule en
+	// retire presque toutes (0.25 % mesures) -- il en reste, et c'est ce qu'on exige.
+	TestTrue(TEXT("l'interieur avait des parois"), Before.InlandSteepFrac > 0.0);
 	TestTrue(TEXT("plus aucune paroi > 60 deg a l'interieur des terres"), After.InlandSteepFrac < 1.e-3);
 	TestTrue(TEXT("moins de parois au total"), After.SteepFrac < Before.SteepFrac);
 	TestTrue(TEXT("moins de terrain > 45 deg"), After.Steep45Frac < Before.Steep45Frac);
@@ -604,6 +606,91 @@ bool FAnastasisTerrainForgeNoCliffs::RunTest(const FString&)
 		Before.SteepFrac, Before.InlandSteepFrac, Before.Steep45Frac, Before.P99SlopeDeg, Before.Spikes, Raw.LandmarkZ,
 		After.SteepFrac, After.InlandSteepFrac, After.Steep45Frac, After.P99SlopeDeg, After.Spikes, Eroded.LandmarkZ,
 		After.InlandSamples, SumEroded - SumRaw, MaxMove, Ms));
+	return true;
+}
+
+namespace
+{
+/** Pente des aretes qui franchissent la nappe d'eau rendue (un sommet sec, un mouille). */
+struct FBankStats
+{
+	int32 Crossings = 0;
+	double P50 = 0.0;
+	double P90 = 0.0;
+	double Over60 = 0.0;
+	/** Sommets sous la nappe qu'aucun triangle d'eau ne couvre : fosse seche, bord droit du plan d'eau. */
+	int32 DryPits = 0;
+};
+
+FBankStats MeasureBanks(const AnastasisTerrainForge::FMesh& Mesh)
+{
+	FBankStats Out;
+	const TArray<FVector>& V = Mesh.Geometry.Vertices;
+	const int32 W = Mesh.FineW, H = Mesh.FineH;
+	const double SeaZ = AnastasisTerrainSurface::WaterPlaneZ;
+	const double Spacing = AnastasisWorldView::TileWorldSize / static_cast<double>(Mesh.Subdiv);
+	TArray<double> Angles;
+	for (int32 JY = 0; JY < H; ++JY)
+	{
+		for (int32 IX = 0; IX < W; ++IX)
+		{
+			const int32 I = JY * W + IX;
+			const int32 Next[2] = {IX + 1 < W ? I + 1 : INDEX_NONE, JY + 1 < H ? I + W : INDEX_NONE};
+			for (const int32 NI : Next)
+			{
+				if (NI != INDEX_NONE && (V[I].Z < SeaZ) != (V[NI].Z < SeaZ))
+				{
+					Angles.Add(FMath::RadiansToDegrees(FMath::Atan(FMath::Abs(V[I].Z - V[NI].Z) / Spacing)));
+				}
+			}
+		}
+	}
+	TArray<uint8> Covered;
+	Covered.SetNumZeroed(V.Num());
+	for (const int32 Index : Mesh.Geometry.WaterTriangles)
+	{
+		if (Covered.IsValidIndex(Index)) Covered[Index] = 1;
+	}
+	for (int32 I = 0; I < V.Num(); ++I)
+	{
+		Out.DryPits += (V[I].Z < SeaZ - 0.5 && !Covered[I]) ? 1 : 0;
+	}
+	Out.Crossings = Angles.Num();
+	if (Out.Crossings == 0)
+	{
+		return Out;
+	}
+	Angles.Sort();
+	Out.P50 = Angles[Out.Crossings / 2];
+	Out.P90 = Angles[FMath::Min(Out.Crossings - 1, static_cast<int32>(Out.Crossings * 0.9))];
+	int32 Over60 = 0;
+	for (const double A : Angles) Over60 += A > 60.0 ? 1 : 0;
+	Out.Over60 = static_cast<double>(Over60) / Out.Crossings;
+	return Out;
+}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainForgeBanks, "Anastasis.Terrain.Forge.Banks",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainForgeBanks::RunTest(const FString&)
+{
+	// TERRAIN_RELIEF_001, echelle. Les berges ne se reglaient pas dans la forge (etape 4
+	// abandonnee, mesuree) : la riviere d'une tuile a cote d'une tuile de terre haute etait
+	// une marche de ~72 degres a 1 m par tuile. Ce test mesure la berge rendue par defaut.
+	const auto Crop = AnastasisWorldView::CaptureCanonicalWorld(12345);
+	AnastasisTerrainForge::FMesh Mesh;
+	if (!TestTrue(TEXT("forge"), ForgeWith({}, Crop, Mesh)))
+	{
+		AnastasisTerrainForge::ClearActive();
+		return false;
+	}
+	const FBankStats B = MeasureBanks(Mesh);
+	TestTrue(TEXT("il y a un trait de rive"), B.Crossings > 1000);
+
+	AnastasisTerrainForge::ClearActive();
+	AddInfo(FString::Printf(
+		TEXT("TERRAIN_RELIEF_BANKS tile_uu=%.0f crossings=%d bank_p50=%.1f bank_p90=%.1f bank_over60=%.4f dry_pits=%d"),
+		AnastasisWorldView::TileWorldSize, B.Crossings, B.P50, B.P90, B.Over60, B.DryPits));
 	return true;
 }
 

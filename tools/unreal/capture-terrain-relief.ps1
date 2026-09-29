@@ -1,6 +1,6 @@
 # TERRAIN_RELIEF_001 -- captures avant / apres d'une etape de la forge.
 # Voir terrain-relief-capture.py. Sortie : Saved\TerrainReliefEvidence\step<N>\<vue>_<etat>.png
-param([ValidateSet('1','2','3')][string]$Step='3', [int]$TimeoutSec=420)
+param([ValidateSet('1','2','3','scale')][string]$Step='scale', [int]$TimeoutSec=420)
 $ErrorActionPreference='Stop'
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 $Editor='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
@@ -30,8 +30,10 @@ if(-not $p.HasExited){
  throw 'CAPTURE::FAIL editeur bloque'
 }
 Select-String -Path $log -Pattern 'RELIEF_' | ForEach-Object { ($_.Line -replace '^\[[^\]]*\]\[[ 0-9]*\]','') }
+# L'etape 'scale' n'a qu'un etat : l'avant (1 m/tuile) ne se rend plus dans ce build.
+$states = if ($Step -eq 'scale') { @('after') } else { @('before','after') }
 foreach($view in 'A_overview','B_ground','C_slope'){
- foreach($state in 'before','after'){
+ foreach($state in $states){
   $shot=Join-Path $dir "$($view)_$state.png"
   if(!(Test-Path $shot)){throw "CAPTURE::FAIL missing $($view)_$state.png"}
  }
