@@ -251,6 +251,7 @@ manque puis se contentent de le vérifier ; `*_REBUILD=1` le régénère et écr
 | `atmosphere-profile.py` | `DA_AnastasisAtmosphere` |
 | `create_tree_asset.py` | `SM_Tree_*`, `M_AnastasisVegetation` — régénérés à **chaque** run |
 | `create-reed-form.py` | recette isolee de roseaux courbes ; cree les assets de la variante |
+| `world-dressing-01.ps1` + `.py` | trois lieux composes sur Human Geography V2 ; Preview sans sauvegarde, Save ecrit les acteurs WD01 de Lvl_AnastasisSlice et MI_WeatheredStone, Verify relit la map ; preuves via -Out |
 | `create_ruin_asset.py` | `SM_Ruin_Generic_01` |
 | `set_presentation_meshes.py` | câble un mesh par archétype dans `DA_AnastasisPresentation` |
 | `set_tree_grammar.py` | entrée FOREST du registre (variantes d'arbres) |

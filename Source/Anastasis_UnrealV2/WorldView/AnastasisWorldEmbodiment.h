@@ -84,9 +84,11 @@ public:
 	FVector GetTerrainForgeLandmark() const { return ForgeLandmark; }
 
 protected:
-	UPROPERTY()
+	// Components are RF_Transient: persisting their references writes null into the map.
+	// Keep constructor-created subobjects on reload; rebuild generated dressing instead.
+	UPROPERTY(Transient)
 	TObjectPtr<UProceduralMeshComponent> ExperimentalSurface;
-	UPROPERTY()
+	UPROPERTY(Transient)
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> TerrainMeshes[7];
 
 	/**
@@ -94,7 +96,7 @@ protected:
 	 * demand from the presentation registry instead of in the constructor: the mesh set is
 	 * data now, so it is not known until EmbodyCrop reads it.
 	 */
-	UPROPERTY()
+	UPROPERTY(Transient)
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> DressingMeshes;
 
 	/** "<ArchetypeId>_v<VariantIndex>" -> index into DressingMeshes. */
