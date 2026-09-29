@@ -1,6 +1,7 @@
 #include "WorldView/AnastasisEcologicalDressing.h"
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisTerrainForge.h"
+#include "WorldView/AnastasisHumanGeography.h"
 #include "Misc/AutomationTest.h"
 #include <limits>
 
@@ -137,8 +138,9 @@ bool FAnastasisMacroForestHabitat::RunTest(const FString&)
     FAnastasisForestDressingSettings C;
     FRenderedHabitat H;
     H.bHasBasin = true;
-    H.Basin = FVector(4800,4800,800);
-    H.SampleHeight = [](double X,double Y,double& Z) { Z=800; return X>=50 && Y>=50 && X<=9550 && Y<=9550; };
+    constexpr double TileUU=AnastasisWorldView::TileWorldSize;
+    H.Basin = FVector(48*TileUU,48*TileUU,800);
+    H.SampleHeight = [](double X,double Y,double& Z) { Z=800; return X>=TileUU*0.5 && Y>=TileUU*0.5 && X<=TileUU*95.5 && Y<=TileUU*95.5; };
     FPlan P, Repeat;
     FString E;
     TestTrue(TEXT("rendered upland rock habitat"),Build(S,C,P,E,&H));
@@ -149,13 +151,17 @@ bool FAnastasisMacroForestHabitat::RunTest(const FString&)
     {
         const auto& Tree = P.Instances[I];
         TestEqual(TEXT("uses rendered height rather than semantic altitude"),Tree.Ground.Z,800.0);
-        TestTrue(TEXT("basin kept open"),FVector::DistSquared2D(Tree.Ground,H.Basin)>=FMath::Square(C.BasinClearRadius*100.0));
+        TestTrue(TEXT("basin kept open"),FVector::DistSquared2D(Tree.Ground,H.Basin)>=FMath::Square(C.BasinClearRadius*TileUU));
         TestTrue(TEXT("macro contains no sapling filler"),Tree.Layer!=ELayer::Young);
         if (Repeat.Instances.IsValidIndex(I)) TestTrue(TEXT("stable placement"),Tree.Ground==Repeat.Instances[I].Ground);
         for (int32 J=0; J<I; ++J)
-            if (FVector::DistSquared2D(Tree.Ground,P.Instances[J].Ground)<FMath::Square(C.TrunkSpacing*100.0)-1.e-6)
+            if (FVector::DistSquared2D(Tree.Ground,P.Instances[J].Ground)<FMath::Square(C.TrunkSpacingUU)-1.e-6)
                 AddError(TEXT("macro spacing violated"));
     }
+    H.SampleWaterHeight=[](double,double,double& Z) { Z=900; return true; };
+    TestTrue(TEXT("raised river sample"),Build(S,C,P,E,&H));
+    TestEqual(TEXT("actual river level excludes submerged trees"),P.Instances.Num(),0);
+    H.SampleWaterHeight=nullptr;
     H.SampleHeight = [](double,double,double& Z) { Z=200; return true; };
     TestTrue(TEXT("water sample"),Build(S,C,P,E,&H));
     TestEqual(TEXT("no submerged trunks despite dry semantic terrain"),P.Instances.Num(),0);
@@ -183,7 +189,9 @@ bool FAnastasisMacroForestCanonical::RunTest(const FString&)
     using namespace AnastasisEcologicalDressing;
     for (const uint32 Seed : {12345u, 42u, 98765u})
     {
-        const auto S=AnastasisWorldView::CaptureCanonicalWorld(Seed);
+        auto S=AnastasisWorldView::CaptureCanonicalWorld(Seed);
+        S.SpatialScale=5.0;
+        S.bHumanGeography=Seed==AnastasisWorldView::ReferenceSeed;
         AnastasisTerrainSurface::FGeometry G;
         AnastasisTerrainForge::FMesh M;
         if (!TestTrue(TEXT("surface"),AnastasisTerrainSurface::Build(S,G))
@@ -191,6 +199,7 @@ bool FAnastasisMacroForestCanonical::RunTest(const FString&)
         const auto BeforeVertices=G.Vertices;
         FRenderedHabitat H;
         H.SampleHeight=[&](double X,double Y,double& Z) { return AnastasisTerrainForge::SampleHeight(M,X,Y,Z); };
+        H.SampleWaterHeight=[](double X,double Y,double& Z) { return AnastasisTerrainForge::SampleActiveWater(X,Y,Z); };
         H.Basin=FVector(M.BasinX,M.BasinY,M.BasinZ);
         H.bHasBasin=M.bBasinFound;
         FAnastasisForestDressingSettings C;
@@ -208,12 +217,22 @@ bool FAnastasisMacroForestCanonical::RunTest(const FString&)
             TestTrue(TEXT("exact rendered root"),FMath::IsNearlyEqual(Z,Tree.Ground.Z,1.e-8));
             TestTrue(TEXT("rendered slope bound"),Tree.SlopeDegrees<=C.HillsideMaxSlope);
             TestTrue(TEXT("above water"),Z>AnastasisTerrainSurface::WaterPlaneZ+C.WaterClearanceUU);
-            if (H.bHasBasin) TestTrue(TEXT("basin reserved"),FVector::DistSquared2D(Tree.Ground,H.Basin)>=FMath::Square(C.BasinClearRadius*100.0));
+            double WaterZ=0;
+            TestTrue(TEXT("water sample"),H.SampleWaterHeight(Tree.Ground.X,Tree.Ground.Y,WaterZ));
+            TestTrue(TEXT("above actual water"),Z>WaterZ+C.WaterClearanceUU);
+            if (H.bHasBasin) TestTrue(TEXT("basin reserved"),FVector::DistSquared2D(Tree.Ground,H.Basin)>=FMath::Square(C.BasinClearRadius*AnastasisWorldView::TileWorldSize*S.SpatialScale));
+            if (S.bHumanGeography)
+            {
+                const auto Geo=AnastasisHumanGeography::Evaluate(Tree.Ground.X/(AnastasisWorldView::TileWorldSize*S.SpatialScale),
+                    Tree.Ground.Y/(AnastasisWorldView::TileWorldSize*S.SpatialScale),0.0);
+                TestTrue(TEXT("existing habitable valleys and pass remain open"),Geo.ValleyWeight<0.8);
+                TestTrue(TEXT("existing river corridor remains open"),Geo.RiverWeight<0.5);
+            }
             if (B.Instances.IsValidIndex(I)) TestTrue(TEXT("identical tree"),Tree.Ground==B.Instances[I].Ground && Tree.ScaleMultiplier==B.Instances[I].ScaleMultiplier);
             Canopy += Tree.Layer==ELayer::Canopy;
             Stone += S.Tiles[Tree.SourceIndex].Type==AnastasisWorld::ETileType::Stone;
         }
-        TestTrue(TEXT("macro forest present"),P.Instances.Num()>50);
+        TestTrue(TEXT("macro forest present at 1.9km scale"),P.Instances.Num()>1000);
         TestTrue(TEXT("canopy dominates"),Canopy>P.Instances.Num()/2);
         TestTrue(TEXT("mountain habitat populated"),Stone>0);
         TestTrue(TEXT("terrain unchanged"),G.Vertices==BeforeVertices);

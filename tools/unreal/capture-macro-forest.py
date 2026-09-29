@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import time
+import struct
 import unreal
 
 OUT = os.environ['ANASTASIS_FOREST_OUT']
@@ -56,10 +57,30 @@ report = {'default_load': inventory(), 'project': os.path.dirname(os.path.dirnam
           'scope': 'editor scene; no player or frame-time claim'}
 basin = actor.call_method('GetTerrainForgeBasin')
 report['basin'] = [basin.x, basin.y, basin.z]
-overview = unreal.Vector(-3200,-3200,6400)
-overview_target = unreal.Vector(4800,4800,600)
-valley = unreal.Vector(basin.x,basin.y,basin.z+170)
-valley_target = unreal.Vector(5900,2400,1050)
+surface = actor.get_components_by_class(unreal.ProceduralMeshComponent)[0]
+
+
+def terrain_data():
+    digest = hashlib.sha256()
+    ground = None
+    for section in range(surface.get_num_sections()):
+        vertices, triangles, normals, uvs, tangents = unreal.ProceduralMeshLibrary.get_section_from_procedural_mesh(surface, section)
+        for v in vertices:
+            digest.update(struct.pack('<3d',v.x,v.y,v.z))
+        for i in triangles:
+            digest.update(struct.pack('<i',i))
+        if section == 0:
+            ground = vertices
+    return digest.hexdigest(), ground
+
+
+report['terrain_default'], ground = terrain_data()
+# The current Human_Geography_V2 scale: 400cm tiles, spatial scale 5.
+overview = unreal.Vector(-35000,-55000,178000)
+overview_target = unreal.Vector(96000,96000,10000)
+floor = min(ground,key=lambda p:(p.x-106000)**2+(p.y-106000)**2)
+valley = unreal.Vector(floor.x,floor.y,floor.z+170)
+valley_target = unreal.Vector(floor.x,floor.y+20000,floor.z+170)
 jobs = [(0,'A_overview',overview,overview_target), (1,'B_overview',overview,overview_target),
         (0,'A_valley',valley,valley_target), (1,'B_valley',valley,valley_target)]
 phase = -1
@@ -73,6 +94,9 @@ def finish():
     report['repeat'] = inventory()
     report['repeat_matches'] = report['repeat']['sha256'] == report['macro']['sha256']
     report['default_matches_macro'] = report['default_load']['sha256'] == report['macro']['sha256']
+    report['terrain_final'], unused = terrain_data()
+    report['terrain_unchanged'] = report['terrain_final'] == report['terrain_original'] == report['terrain_default']
+    report['completed'] = True
     with open(os.path.join(OUT,'forest-scene.json'),'w') as f:
         json.dump(report,f,indent=2)
     unreal.log('MACRO_FOREST_SCENE ' + json.dumps(report))
@@ -90,7 +114,11 @@ def advance():
     cmd('anastasis.Dressing.MacroForest %d' % mode)
     assert actor.call_method('EmbodyCanonical',args=(12345,))
     report['macro' if mode else 'original'] = inventory()
+    if phase == 0:
+        report['terrain_original'], unused = terrain_data()
     report[name] = {'location': [loc.x,loc.y,loc.z], 'target': [target.x,target.y,target.z]}
+    with open(os.path.join(OUT,'forest-scene.json'),'w') as f:
+        json.dump(report,f,indent=2)
     ues.set_level_viewport_camera_info(loc,unreal.MathLibrary.find_look_at_rotation(loc,target))
     unreal.get_editor_subsystem(unreal.EditorActorSubsystem).select_nothing()
     cmd('ShowFlag.Sprites 0')
@@ -108,7 +136,7 @@ def tick(dt):
         if elapsed > 5:
             advance()
         return
-    if elapsed > 90:
+    if elapsed > 240:
         unreal.log_error('MACRO_FOREST_CAPTURE timeout phase=%d' % phase)
         unreal.unregister_slate_post_tick_callback(handle)
         unreal.SystemLibrary.quit_editor()

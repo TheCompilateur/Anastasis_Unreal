@@ -1,64 +1,76 @@
-# macro-forest-001 — première passe de masses forestières
+# macro-forest-001 — forêt de la vallée actuelle
 
-MISSION: Donner à la vallée une canopée dominante, en réutilisant le terrain, les arbres et les HISM existants. Ne modifier ni la topographie ni AnastasisSim.
+MISSION: Première passe de macro végétation, sans modifier la topographie ni le simulateur PNJ.
 
 FILES_OWNED:
+- AGENTS.md (une ligne dans l'index des outils)
 - Source/Anastasis_UnrealV2/WorldView/AnastasisEcologicalDressing.h
 - Source/Anastasis_UnrealV2/WorldView/AnastasisEcologicalDressing.cpp
 - Source/Anastasis_UnrealV2/WorldView/AnastasisEcologicalDressingTests.cpp
+- Source/Anastasis_UnrealV2/WorldView/AnastasisHumanGeographyTests.cpp
 - Source/Anastasis_UnrealV2/WorldView/AnastasisWorldEmbodiment.cpp
 - tools/unreal/capture-macro-forest.py
 - docs/unreal/handoffs/macro-forest-001.md
 
-COMMIT: PENDING
+COMMIT: BRANCH_HEAD
 
-## Inspection et choix
+## Base et inspection
 
-Base: `ce9ecfa73e8398c24bc1f7b72f044479b6d3238e`, branche canonique observée `atmosphere-cached-lighting-preexposure`.
-Worktree géré par Codex: `C:\Users\alex_\.codex\worktrees\macro-forest-001\ANASTASIS_UNREAL`, branche `agent/macro-forest-001`.
-Le chemin est celui du gestionnaire de worktrees Codex; l'opérateur historique refuse ce préfixe. Compilation via le même Build.bat UE 5.8.2, sans modifier l'opérateur.
+Base validée: `50a66d82b1f67b7a2f005e59c7572525967ebcf6`, avec Human_Geography_V2 et l'étendue de 1,9 km. Branche: `agent/macro-forest-001`.
+Worktree: `C:\Users\alex_\.codex\worktrees\macro-forest-001\ANASTASIS_UNREAL`.
+Ce chemin provient du gestionnaire Codex; l'opérateur historique refuse ce préfixe. Le build utilise directement le même Build.bat UE 5.8.2. Aucun opérateur modifié, aucun seal canonique revendiqué.
 
-Map inspectée dans un éditeur: `/Game/Anastasis/Maps/Lvl_AnastasisSlice`, un `AnastasisWorldEmbodiment`, aucun acteur Landscape/PCG/foliage peint. La surface est reconstruite depuis le snapshot canonique 96×96 puis TerrainForge. Le registre fournit huit variantes conifère/feuillu × quatre statures, déjà présentes et chargées. Le placement écologique et les HISM fonctionnent; aucun nouvel asset n'est nécessaire.
+Map inspectée en éditeur: `/Game/Anastasis/Maps/Lvl_AnastasisSlice`, un `AnastasisWorldEmbodiment`, surface procédurale TerrainForge issue du snapshot 96×96. Aucun acteur Landscape/PCG/foliage peint dans cette scène. Le placement écologique et les HISM existent déjà, ainsi que huit variantes conifère/feuillu × quatre statures et leurs matériaux. Référence Three.js consultée en lecture seule: `forestGenerator3d.js` et `landForest3d.js`, pour les masses et clairières; aucun port du renderer.
 
-État initial observé: 438 arbres, 180 jeunes, 129 secondaires, 103 canopées, 26 émergents; hauteur 97–627 UU. Les tuiles Stone sont exclues et le placement utilise la pente du terrain sémantique avant projection sur le relief forgé. Référence Three.js consultée en lecture seule: `forestGenerator3d.js` et `landForest3d.js` (masses, clairières, silhouettes); aucun port de renderer.
+## Implémentation
 
-## Changement
+Extension du placement existant avec échantillonnage du relief et de l'eau réellement rendus. Les épaules rocheuses deviennent plantables, avec pente maximale de 48°. Les falaises, eau, champs et ruines sont exclus. Les poids EXISTANTS HumanGeography réservent les vallées et la rivière; le bassin conserve une ouverture de 8 tuiles et une transition de 4 tuiles. Les prairies basses et plates restent ouvertes.
 
-Extension de `AnastasisEcologicalDressing::Build` avec un échantillonneur du relief déjà rendu. Les crêtes plantables et épaules rocheuses deviennent éligibles; les falaises, l'eau, champs et ruines restent exclus. Le bassin possède une réserve de 8 tuiles avec transition de 4 tuiles. Les prairies basses et plates restent ouvertes.
+Masses corrélées sur 14 tuiles; espacement minimal des troncs de 500 cm indépendamment de SpatialScale; hauteur ×3,5 appliquée aux enveloppes existantes; majorité de canopées et émergents. Troncs verticaux, azimut variable, pieds ancrés par les bornes réelles des meshes. Maximum de 128 candidats par tuile, placement déterministe, HISM existants, aucun acteur par arbre. Ce peuplement est de la présentation: aucune ressource ou sémantique de simulation ajoutée.
 
-Masses corrélées sur 14 tuiles, espacement minimal des troncs 2,4 tuiles, hauteur multipliée par 2,5; canopée majoritaire et émergents issus du registre existant. Troncs verticaux, azimut variable, racines sur le relief rendu. Ces arbres sont de la présentation, sans création de ressources de simulation.
+Activation par défaut à l'ouverture de la map et en BeginPlay. Pour l'A/B, reconstruire après `anastasis.Dressing.MacroForest 0` (grammaire antérieure) ou `1` (macro forêt). Réglages dans `ForestDressing`, catégorie Macro.
 
-Activation par défaut à l'ouverture et en BeginPlay. `anastasis.Dressing.MacroForest 0` + reconstruction retrouve l'ancienne grammaire; `1` réactive la passe. Réglages dans `ForestDressing`, catégorie Macro. Le commutateur ne change aucune géométrie de terrain ni matériau.
+## Preuve mécanique
 
-MEC: BUILD::PASS (source/config stables pendant le build). Tests ciblés complets: 27 PASS, 0 KNOWN_EXPECTED_FAILURE, 0 FAIL, 0 absent, sortie 0. Exécution `-nullrhi`, classification via `tools/unreal/automation-log.ps1` et le registre officiel. Cela ne constitue pas une preuve visuelle.
+MEC: BUILD::PASS, empreinte Source/Config inchangée pendant la compilation. Suite ciblée complète: 36 PASS, 0 KNOWN_EXPECTED_FAILURE, 0 FAIL, 0 manquant, sortie 0. Filtres: `Anastasis.Ecology+Anastasis.Terrain+Anastasis.Presentation`. Classification par `tools/unreal/automation-log.ps1` et le registre officiel, sans modification des marqueurs attendus. Run `-nullrhi`: ce résultat ne prouve pas le rendu.
 
-Nouveaux tests: `Anastasis.Ecology.MacroForestRenderedHabitat` (hauteur rendue, eau, falaises, bassin, champs, ruines, espacement, répétabilité) et `Anastasis.Ecology.MacroForestCanonicalRelief` (trois graines réelles). Les 3 tests écologiques existants, 9 tests Presentation et 13 tests Terrain passent également.
+Nouveaux tests:
+- `Anastasis.Ecology.MacroForestRenderedHabitat`: relief rendu, eau élevée, falaises, bassin, champs, ruines, espacement et déterminisme.
+- `Anastasis.Ecology.MacroForestCanonicalRelief`: trois graines à SpatialScale=5, racines, eau et pentes réelles, réserves HumanGeography, terrain inchangé, répétabilité.
 
 | Graine | Arbres | Canopées, émergents compris | Sur tuiles Stone |
 |---|---:|---:|---:|
-| 12345 | 260 | 213 | 81 |
-| 42 | 385 | 319 | 135 |
-| 98765 | 196 | 167 | 28 |
+| 12345 | 16123 | 13428 | 5159 |
+| 42 | 24534 | 20092 | 9557 |
+| 98765 | 13377 | 10789 | 1359 |
 
-Le nombre total d'arbres baisse volontairement: on remplace les petits sujets serrés par des arbres dominants espacés. La couverture et la silhouette se jugent sur les images, pas sur ce compteur.
+`Anastasis.Terrain.HumanGeography.CollisionAndDressing` distingue maintenant la stature physique des arbres du scale des autres objets: l'ancien proxy mesh-scale <10 interdisait les grands arbres voulus. Nouveau garde-fou: arbres sous 30 m, autres objets scale <10, collisions toujours contrôlées. Résultat: 5/5 sites, erreur maximale 0,000195 cm; scale autres 1,099; arbre maximal 2707,8 cm. Cela détecte encore une multiplication accidentelle par SpatialScale=5.
 
-Preuves brutes: `C:\Users\alex_\.codex\visualizations\2026\09\29\01a0ef4d-f7a0-72c0-8f4d-cc4c8234f6c4\build-final.log`, `automation.log`, `tests-summary.json`. Une première exécution globale était incomplète alors que les assets LFS du worktree étaient encore des pointeurs; elle est exclue du verdict. `git lfs checkout` a matérialisé les 620 objets depuis le cache local; aucun asset modifié dans le diff final.
+Preuves brutes finales, hors Git:
+`C:\Users\alex_\.codex\visualizations\2026\09\29\01a0ef4d-f7a0-72c0-8f4d-cc4c8234f6c4\`
+- `build-delivery.log`
+- `automation-delivery.log`
+- `tests-delivery.json`
+- `delivery/forest-scene.json`, `delivery/capture.log`, quatre images A/B.
 
-SCN: VALIDATION_PENDING
+Les runs antérieurs et les captures sur l'ancienne étendue ne sont pas la preuve de cette livraison.
 
-PLY: UNKNOWN — aucune validation humaine ni revendication de performance joueur.
+SCN: OBSERVED — quatre captures A/B terminées, vues aérienne et depuis la vallée à 170 cm. Masses boisées visibles sur les reliefs et pourtours, deux grandes vallées ouvertes. Les silhouettes restent répétitives et la forêt est encore une première passe artistique.
 
-INTEGRATION_RISK: `AnastasisWorldEmbodiment.cpp` est un fichier partagé entre chantiers. La racine canonique était sale (DefaultInput.ini et Character.cpp/.h, plus .claude/), ces changements sont exclus. Pas de fusion automatique. Les réserves actuelles ne constituent pas un plan définitif de village/chemins. Les arbres utilisent encore seulement deux familles de silhouettes. Le coût GPU doit être mesuré avec la caméra joueur retenue.
+Ouverture par défaut: 16120 arbres effectivement instanciés (le plan en contient 16123, avant les filtres finaux existants), dans six variantes HISM de sous-canopée/canopée/émergents. Hauteurs min/médiane/max: 7,70 / 14,17 / 27,08 m. `completed`, `default_matches_macro`, `repeat_matches` et `terrain_unchanged` sont tous vrais. Empreinte des arbres identique à l'ouverture et après reconstruction: `761467322d424df6fe4e1c5267de826d914961f69852e3216efd2792a00824ae`. Le SHA256 des sommets et triangles de terrain reste identique entre les modes A/B. Le jugement visuel porte sur ces deux caméras d'éditeur, pas sur une partie jouée.
 
-## Reproduire
+PLY: UNKNOWN. Performance GPU et validation humaine non établies.
 
-Ouvrir le projet de CE worktree (association moteur inchangée). La map par défaut est `Lvl_AnastasisSlice`:
+## Intégration et ouverture
+
+INTEGRATION_RISK: Pas de fusion automatique dans le canonique. `AnastasisWorldEmbodiment.cpp` est partagé avec d'autres chantiers: examiner le diff depuis la base indiquée. Aucun changement de Content, Config, AnastasisSim, TerrainForge ou HumanGeography runtime. Les modifications concurrentes du canonique sont exclues.
+
+Ouvrir le projet du worktree avec le moteur existant; la map par défaut contient le peuplement:
 
 ```powershell
-& 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe' 'C:\Users\alex_\.codex\worktrees\macro-forest-001\ANASTASIS_UNREAL\Anastasis_UnrealV2.uproject'
+& 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe' 'C:\Users\alex_\.codex\worktrees\macro-forest-001\ANASTASIS_UNREAL\Anastasis_UnrealV2.uproject' -ModelContextProtocolPort=18731
 ```
 
-Tests ciblés: `tools\unreal\report-tests.ps1 -Filter 'Anastasis.Ecology+Anastasis.Terrain+Anastasis.Presentation'`. Le run de cette mission utilise les mêmes filtres et le même classificateur avec `-nullrhi`. Les processus de validation avaient `UE_SKIP_UBT_SDK_SETUP=1`, variable locale aux processus, après compilation réussie; elle évite la file des contrôles SDK concurrents, sans changement du projet ni du rendu.
-Captures: définir `ANASTASIS_FOREST_OUT`, lancer l'éditeur avec `-ExecCmds="py <worktree>/tools/unreal/capture-macro-forest.py"`. Le script ne sauve pas d'asset; il mesure l'ouverture par défaut, capture A/B à caméras identiques et compare deux reconstructions.
+Captures reproductibles: définir `ANASTASIS_FOREST_OUT`, puis lancer cet éditeur avec `-ExecCmds="py <worktree>/tools/unreal/capture-macro-forest.py"`. Le script ne sauvegarde aucun asset. Il mesure l'ouverture par défaut, compare les modes à caméras identiques, reconstruit une seconde fois et compare le terrain. Les processus de validation utilisent `UE_SKIP_UBT_SDK_SETUP=1` localement, après le build réussi, et des ports MCP dédiés 18731/18732 pour ne pas commander les autres éditeurs.
 
-NEXT: arbitrer les lisières depuis la caméra de jeu et réserver les accès du futur village; diversifier les couronnes seulement après validation de ces masses. Aucun sous-bois détaillé dans cette passe.
+NEXT: arbitrer les lisières et accès depuis la caméra de jeu; diversifier les couronnes existantes si la répétition reste trop visible; mesurer le coût GPU avant une nouvelle densification. Les réserves actuelles ne sont pas encore un plan définitif de village ou de chemins. Aucun sous-bois détaillé dans cette passe.
