@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$OutDir,[int]$TimeoutSec=720)
+param([Parameter(Mandatory=$true)][string]$OutDir,[int]$TimeoutSec=720,[ValidateSet('capture-reed-form.py','capture-shore-composition.py')][string]$CaptureScript='capture-reed-form.py')
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $project=Join-Path $root 'Anastasis_UnrealV2.uproject'
@@ -7,7 +7,7 @@ $outPath=[IO.Path]::GetFullPath($OutDir)
 if(Test-Path -LiteralPath $outPath){throw 'Choose a new output directory; preserve prior evidence.'}
 New-Item -ItemType Directory -Path $outPath | Out-Null
 $env:ANASTASIS_REED_FORM_OUT=$outPath
-$script=(Join-Path $PSScriptRoot 'capture-reed-form.py').Replace('\','/')
+$script=(Join-Path $PSScriptRoot $CaptureScript).Replace('\','/')
 $log=Join-Path $outPath 'capture.log'
 $argsList=@(('"'+$project+'"'),'-windowed','-resx=1600','-resy=900','-nosplash','-NoLiveCoding',
  '-unattended','-NoSound','-RenderOffscreen',

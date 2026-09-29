@@ -277,4 +277,10 @@ def tick(dt):
         finish(traceback.format_exc(),True)
 
 
-handle=unreal.register_slate_post_tick_callback(tick)
+def start_capture():
+    global handle
+    handle=unreal.register_slate_post_tick_callback(tick)
+
+
+if __name__ == '__main__':
+    start_capture()
