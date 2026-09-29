@@ -35,7 +35,7 @@ REGISTRY_PATH = "/Game/Anastasis/Presentation/DA_AnastasisPresentation"
 # (type semantique, chemin du mesh reel). Ajouter une ligne quand un archetype
 # recoit son premier vrai asset.
 #
-# FOREST N'EST PLUS ICI. Depuis TREE_FORM_001 l'entree Forest porte SIX variantes,
+# FOREST N'EST PLUS ICI. Depuis TREE_FORM_001 l'entree Forest porte HUIT variantes,
 # une par stature, chacune avec son biais d'echelle et son materiau. Cet outil-ci
 # ne sait ecrire que variants[0].mesh : le relancer sur Forest ecraserait la
 # variante Understory par le mesh generique et casserait la grammaire en silence.
@@ -186,4 +186,5 @@ def main():
     return ok
 
 
-main()
+if __name__ == "__main__":
+    main()

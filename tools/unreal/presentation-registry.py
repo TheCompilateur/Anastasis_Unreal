@@ -1,129 +1,138 @@
-"""Cree et peuple le Data Asset de presentation ANASTASIS.
+"""Create/rebuild the complete presentation registry; otherwise inspect only.
 
-PROPRIETE DE L'ASSET. Ce script est la SOURCE D'AUTORITE de
-/Game/Anastasis/Presentation/DA_AnastasisPresentation, meme convention que
-tools/unreal/observe-slice.py pour M_AnastasisSlice : il le cree s'il manque,
-puis il ne fait plus que le verifier. Le regenerer explicitement
-(ANASTASIS_PRESENTATION_REBUILD=1) ecrase toute retouche faite a la main.
-
-Un agent assets n'a PAS besoin de ce script : il edite l'asset dans l'editeur.
-Voir docs/unreal/PRESENTATION_ASSET_BINDING.md.
-
-Les valeurs semees ici sont exactement celles que VISUAL_BUILD_001 codait en dur,
-pour que la migration ne change pas le rendu.
+The saved Data Asset owns the runtime look. An explicit rebuild replaces its
+entries with the existing tree grammar and dedicated ruin binding. Dependencies
+are loaded before any asset mutation; the package is never deleted/recreated.
 """
-import os, unreal
+import importlib.util
+import os
+from pathlib import Path
+import unreal
 
-ASSET_DIR = '/Game/Anastasis/Presentation'
-ASSET_NAME = 'DA_AnastasisPresentation'
-ASSET_PATH = ASSET_DIR + '/' + ASSET_NAME
-
-# (semantic, archetype_id, mesh, tint rgb, min scale, max scale, jitter)
-# La graine ne pose qu'UNE variante par type : c'est ce qu'un registre vide doit
-# avoir pour rendre quelque chose, pas la donnee finale. Forest recoit donc la
-# silhouette de canopee et son enveloppe de stature, puis
-# tools/unreal/set_tree_grammar.py y ecrit les six variantes de la grammaire --
-# ce que ce format de ligne ne sait pas exprimer. Sans ce changement, un registre
-# recree de zero repartait sur un cone moteur, la silhouette meme que
-# TREE_FORM_001 retire.
-SEED_ENTRIES = [
-    (unreal.AnastasisSemanticType.FOREST, 'Tree_Generic',
-     '/Game/Anastasis/Vegetation/SM_Tree_Conifer_Canopy_01',
-     (0.102, 0.243, 0.114), 3.6, 5.0, 0.30),
-    (unreal.AnastasisSemanticType.RUIN, 'Ruin_Generic', '/Engine/BasicShapes/Cylinder.Cylinder',
-     (0.353, 0.302, 0.318), 0.6, 1.1, 0.20),
-]
+ASSET_DIR = "/Game/Anastasis/Presentation"
+ASSET_NAME = "DA_AnastasisPresentation"
+ASSET_PATH = ASSET_DIR + "/" + ASSET_NAME
 
 
 def log(msg):
-    unreal.log('PRESENTATION_REGISTRY ' + msg)
+    unreal.log("PRESENTATION_REGISTRY " + str(msg))
+
+
+def recipe(filename):
+    path = Path(__file__).resolve().with_name(filename)
+    spec = importlib.util.spec_from_file_location("_registry_" + path.stem, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def set_prop(obj, names, value):
-    """Ecrit la premiere propriete qui existe parmi `names`.
-
-    Le binding Python d'Unreal retire le prefixe `b` des booleens (bEnabled ->
-    enabled), mais la convention a varie selon les versions : on essaie les deux
-    plutot que de parier.
-    """
     for name in names:
         try:
             obj.set_editor_property(name, value)
-            return name
+            return
         except Exception:
             continue
-    raise Exception('aucune de ces proprietes n existe: ' + ','.join(names))
+    raise RuntimeError("No writable property: " + ",".join(names))
 
 
-def make_variant(mesh_path):
-    variant = unreal.AnastasisPresentationVariant()
-    mesh = unreal.load_asset(mesh_path)
-    if mesh is None:
-        unreal.log_error('PRESENTATION_REGISTRY MESH_MISSING ' + mesh_path)
-        return None
-    variant.set_editor_property('mesh', mesh)
-    return variant
-
-
-def make_entry(semantic, archetype_id, mesh_path, tint, min_scale, max_scale, jitter):
+def make_entry(semantic, archetype, tint, minimum, maximum, jitter, lean, variants):
+    if not variants:
+        raise RuntimeError("No variants for " + archetype)
     entry = unreal.AnastasisPresentationEntry()
-    entry.set_editor_property('semantic_type', semantic)
-    entry.set_editor_property('archetype_id', archetype_id)
-    set_prop(entry, ('enabled', 'b_enabled'), True)
-    entry.set_editor_property('tint', unreal.LinearColor(tint[0], tint[1], tint[2], 1.0))
-    entry.set_editor_property('min_uniform_scale', min_scale)
-    entry.set_editor_property('max_uniform_scale', max_scale)
-    entry.set_editor_property('jitter_radius_fraction', jitter)
-    set_prop(entry, ('random_yaw', 'b_random_yaw'), True)
-    variant = make_variant(mesh_path)
-    entry.set_editor_property('variants', [variant] if variant else [])
+    entry.set_editor_property("semantic_type", semantic)
+    entry.set_editor_property("archetype_id", archetype)
+    set_prop(entry, ("enabled", "b_enabled"), True)
+    entry.set_editor_property("tint", unreal.LinearColor(*tint, 1.0))
+    entry.set_editor_property("min_uniform_scale", minimum)
+    entry.set_editor_property("max_uniform_scale", maximum)
+    entry.set_editor_property("jitter_radius_fraction", jitter)
+    entry.set_editor_property("max_lean_degrees", lean)
+    set_prop(entry, ("random_yaw", "b_random_yaw"), True)
+    entry.set_editor_property("variants", variants)
     return entry
 
 
-if os.environ.get('ANASTASIS_PRESENTATION_REBUILD', '0') == '1' and unreal.EditorAssetLibrary.does_asset_exist(ASSET_PATH):
-    unreal.EditorAssetLibrary.delete_asset(ASSET_PATH)
-    log('DELETED ' + ASSET_PATH)
+def make_seed_entries():
+    # Import-safe existing owners: no duplicate tree paths, biases or materials.
+    trees = recipe("set_tree_grammar.py")
+    bindings = recipe("set_presentation_meshes.py")
+    tree_variants = trees.build_variants()
+    ruin_paths = [path for semantic, path in bindings.TARGETS if semantic == "RUIN"]
+    if len(ruin_paths) != 1:
+        raise RuntimeError("Expected exactly one RUIN binding")
+    ruin_path = ruin_paths[0]
+    ruin_mesh = unreal.EditorAssetLibrary.load_asset(ruin_path)
+    if ruin_mesh is None:
+        raise RuntimeError("Missing RUIN mesh: " + ruin_path)
+    ruin = unreal.AnastasisPresentationVariant()
+    ruin.set_editor_property("mesh", ruin_mesh)
+    return [
+        make_entry(unreal.AnastasisSemanticType.FOREST, trees.ARCHETYPE, trees.TINT,
+                   trees.MIN_SCALE, trees.MAX_SCALE, trees.JITTER,
+                   trees.MAX_LEAN_DEGREES, tree_variants),
+        make_entry(unreal.AnastasisSemanticType.RUIN, "Ruin_Generic",
+                   (0.353, 0.302, 0.318), 0.6, 1.1, 0.20, 0.0, [ruin]),
+    ]
 
-if not unreal.EditorAssetLibrary.does_asset_exist(ASSET_PATH):
-    log('CREATE ' + ASSET_PATH)
-    factory = unreal.DataAssetFactory()
-    factory.set_editor_property('data_asset_class', unreal.AnastasisPresentationRegistry)
-    asset = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
-        ASSET_NAME, ASSET_DIR, unreal.AnastasisPresentationRegistry, factory)
-    entries = [make_entry(*row) for row in SEED_ENTRIES]
-    asset.set_editor_property('entries', entries)
-    unreal.EditorAssetLibrary.save_asset(ASSET_PATH)
-    log('SAVED entries=%d' % len(entries))
 
-# Verification en lecture seule : l'asset committe fait foi.
-asset = unreal.load_asset(ASSET_PATH)
-if asset is None:
-    unreal.log_error('PRESENTATION_REGISTRY LOAD_FAILED ' + ASSET_PATH)
-else:
-    entries = asset.get_editor_property('entries')
-    log('VERIFY entries=%d' % len(entries))
+def inspect(asset):
+    entries = asset.get_editor_property("entries")
+    log("INSPECT entries=%d evidence=memory" % len(entries))
     for entry in entries:
-        variants = entry.get_editor_property('variants')
-        meshes = []
-        for variant in variants:
-            mesh = variant.get_editor_property('mesh')
-            meshes.append(mesh.get_path_name() if mesh else 'NONE')
-        try:
-            enabled = entry.get_editor_property('enabled')
-        except Exception:
-            enabled = entry.get_editor_property('b_enabled')
-        log('  entry semantic=%s archetype=%s enabled=%s variants=%d meshes=%s scale=(%.2f,%.2f) jitter=%.2f' % (
-            entry.get_editor_property('semantic_type'),
-            entry.get_editor_property('archetype_id'),
-            enabled,
-            len(variants), ','.join(meshes),
-            entry.get_editor_property('min_uniform_scale'),
-            entry.get_editor_property('max_uniform_scale'),
-            entry.get_editor_property('jitter_radius_fraction')))
+        variants = entry.get_editor_property("variants")
+        meshes = [v.get_editor_property("mesh") for v in variants]
+        log("entry semantic=%s variants=%d meshes=%s" % (
+            entry.get_editor_property("semantic_type"), len(variants),
+            ",".join(m.get_path_name() if m else "NONE" for m in meshes)))
 
-log('COMPLETE')
 
-# Le script se termine lui-meme, comme observe-slice.py : passer ";Quit" dans
-# -ExecCmds collerait le token a l'argument du "py" et Python evaluerait le chemin.
-if os.environ.get('ANASTASIS_PRESENTATION_KEEP_EDITOR', '0') != '1':
-    unreal.SystemLibrary.quit_editor()
+def main(rebuild=None):
+    if rebuild is None:
+        rebuild = os.environ.get("ANASTASIS_PRESENTATION_REBUILD", "0") == "1"
+    eal = unreal.EditorAssetLibrary
+    exists = eal.does_asset_exist(ASSET_PATH)
+    asset = eal.load_asset(ASSET_PATH) if exists else None
+    if exists and asset is None:
+        raise RuntimeError("Existing registry cannot be loaded: " + ASSET_PATH)
+    if exists and not isinstance(asset, unreal.AnastasisPresentationRegistry):
+        raise RuntimeError("Wrong registry class: " + ASSET_PATH)
+    if exists and not rebuild:
+        inspect(asset)
+        log("UNCHANGED (no rebuild requested)")
+        return asset
+
+    # Complete dependency preflight. A missing mesh/material leaves the current
+    # package and its entries untouched, including when rebuild was requested.
+    entries = make_seed_entries()
+    old_entries = list(asset.get_editor_property("entries")) if exists else None
+    if not exists:
+        factory = unreal.DataAssetFactory()
+        factory.set_editor_property("data_asset_class", unreal.AnastasisPresentationRegistry)
+        asset = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+            ASSET_NAME, ASSET_DIR, unreal.AnastasisPresentationRegistry, factory)
+        if asset is None:
+            raise RuntimeError("Registry creation failed: " + ASSET_PATH)
+    try:
+        asset.modify()
+        asset.set_editor_property("entries", entries)
+        if not eal.save_asset(ASSET_PATH, only_if_is_dirty=False):
+            raise RuntimeError("Registry save failed: " + ASSET_PATH)
+    except Exception:
+        if old_entries is not None:
+            asset.set_editor_property("entries", old_entries)
+        raise
+    log("SAVED entries=%d forest_variants=%d ruin_variants=%d" % (
+        len(entries), len(entries[0].get_editor_property("variants")),
+        len(entries[1].get_editor_property("variants"))))
+    inspect(asset)
+    log("COMPLETE (saved; disk reload requires a fresh editor process)")
+    return asset
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    finally:
+        if os.environ.get("ANASTASIS_PRESENTATION_KEEP_EDITOR", "0") != "1":
+            unreal.SystemLibrary.quit_editor()
