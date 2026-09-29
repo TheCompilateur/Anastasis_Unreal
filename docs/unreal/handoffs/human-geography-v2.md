@@ -18,6 +18,7 @@ La mission artistique complete n'est pas declaree terminee.
 - Pendant cette intervention, une autre session a avance `main` a `19e0709` :
   son code TerrainForge et sa constante TileWorldSize correspondent a `95a3ac6`.
   Notre passe n'a ni avance `main`, ni modifie les fichiers du poste canonique.
+- Dernier controle : le poste canonique reste sur `atmosphere-cached-lighting-preexposure` a `ce9ecfa`, meme si la reference `main` a avance. La V2 reste absente des deux.
 
 ## FILES_OWNED
 
@@ -60,7 +61,7 @@ La simulation, les ressources, la fertilite et le debit semantique ne sont pas m
 
 ## MEC
 
-BUILD::PASS sur l'assemblage. La suite finale est executee par le portail `finish`.
+BUILD::PASS sur l'assemblage. Portail `finish` sur `75f7f54` : 89 PASS, 4 KNOWN_EXPECTED_FAILURE, 0 FAIL, total 93. TESTS::PASS et HANDOFF_READY::YES. Le commit suivant ne modifie que cette fiche de resultat.
 Resultat brut : `Saved/CanonicalVerification/report-tests.log` (non suivi).
 
 Premier run sur cette base : 88 PASS, 4 KNOWN_EXPECTED_FAILURE, 1 FAIL.
@@ -71,8 +72,9 @@ grandes surfaces continues <10 degres et demande >=12 ha en A et >=4 ha en B
 sous 5 degres, avec agrandissement des deux parcelles par rapport a la source corrigee.
 Le registre des echecs connus n'a pas ete modifie.
 
-Mesures du premier run (geometrie identique a la capture) :
+Mesures confirmees par le portail final (geometrie identique a la capture) :
 
+- Terres agricoles continues <5 degres : A 99400 -> 194675 m2 ; B 52975 -> 99550 m2.
 - A, plus grande composante seche <10 degres : 235775 -> 255325 m2.
 - B, meme critere : 68675 -> 128525 m2.
 - Zones protegees : ecart nul entre relief corrige sans/avec V2.
