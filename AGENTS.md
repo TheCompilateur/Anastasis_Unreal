@@ -226,6 +226,7 @@ Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
 | `capture-slice.ps1` + `observe-slice.py` | capture viewport de `Lvl_AnastasisSlice` ; `-PreCmds` pour un A/B sur une seule CVar. `-RebuildMaterial 1` réécrit le matériau |
 | `probe-demo.ps1` + `probe-demo.py` | preuve PIE : snapshot monde + capture par bookmark (défauts connus : `ATMOSPHERE_002.md`) |
 | `asset_agent_probe.py` | preuve PIE partagée par les missions d'asset, un bookmark par run |
+| `first-building-pie.py` | preuve PIE du premier bâtiment : pilote `Anastasis.Village.*` en console (puits, habitants, retraits), lecture par les lignes `ANASTASIS_VILLAGE` du log |
 | `shore-capture.ps1` + `shore-capture.py` | A/B visuel du bord d'eau, cadrage sur une rive |
 | `capture-terrain-forge.ps1` + `terrain-forge-capture.py` | captures avant/après du relief → `Saved/TerrainForgeEvidence/` |
 | `capture-terrain-relief.ps1` + `terrain-relief-capture.py` | avant/après d'une étape de la forge de relief (`-Step 1/2/3/scale`), dressing masqué → `Saved/TerrainReliefEvidence/` |

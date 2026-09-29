@@ -130,8 +130,23 @@ UAnastasisSimulationSubsystem::Tick                       (Unreal, PIE)
 
 ## 5. Résultats des tests
 
-Voir la fiche de passation (`MEC`) : chiffres du run, avec la séparation
-PASS / KNOWN_EXPECTED_FAILURE / FAIL.
+Run complet `report-tests.ps1 -Filter Anastasis`, base `main@19e0709` : **106 exécutés,
+102 PASS, 4 KNOWN_EXPECTED_FAILURE (le registre), 0 FAIL.**
+
+| Exigence de la mission | Test | Valeur mesurée |
+|---|---|---|
+| bâtiment enregistré dans la simulation | `Anastasis.Sim.Village.Puits.Enregistrement` | `building-0`, case bloquée, 4 seuils sur l'anneau 1, porte vers le camp, inachevé non compté |
+| habitant capable de le sélectionner | `…Puits.Selection` | but `drink`, le plus proche de deux puits, cible = un seuil ; déclenchement exactement à soif 40 |
+| habitant capable de l'atteindre | `…Puits.AtteinteEtEffet` | contourne un mur d'eau par A*, arrive au seuil, jamais sur une case bloquée |
+| interaction modifiant l'état réel | `…Puits.AtteinteEtEffet` | tick de l'acte = `tickNeeds` + `satisfyDrink` **au bit près** ; soif 62,04 -> 0 ; il revient boire quand elle remonte |
+| destruction sans référence morte | `…Puits.Destruction`, `Village.FirstBuilding.Presentation` | aucun `DestBuildingId`, cible ni chemin restant ; case libérée ; acteur et Smart Object détruits ; identifiant jamais recyclé |
+| bâtiment inaccessible | `…Puits.Inaccessible` | emmuré : boit depuis la case libre la plus proche ; hors d'atteinte : abandon, ne traverse jamais l'eau |
+| plusieurs agents, état partagé cohérent | `…Puits.MultiAgents` | 6 habitants -> 4 seuils distincts ; un retiré en plein puisage ; `UsersOf` exact à chaque tick ; enregistrement intact ; empreinte déterministe |
+| l'hôte fait vivre la boucle | `…Puits.Hote` | monde canonique 12345, `tick(dt)` fait boire l'habitant |
+| parité des besoins | `Anastasis.Sim.Parite.Besoins` | 165 vecteurs, 0 écart |
+
+Preuve en scène : `tools/unreal/first-building-pie.py` (PIE, `Lvl_AnastasisSlice`) — voir la
+fiche de passation, section `SCN`.
 
 ## 6. Écarts déclarés et dette architecturale
 
