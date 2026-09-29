@@ -21,6 +21,7 @@ $Evidence = Join-Path $Root 'Saved\CanonicalVerification'
 $KnownFailFile = Join-Path $PSScriptRoot 'known-expected-failures.txt'
 $KnownLogFile = Join-Path $PSScriptRoot 'known-log-patterns.txt'
 . (Join-Path $PSScriptRoot 'automation-log.ps1')
+. (Join-Path $PSScriptRoot 'tools-index.ps1')
 
 function Fingerprint {
   $paths = @(Get-ChildItem "$Root\Source", "$Root\Config" -Recurse -File) + @(Get-Item $Project)
@@ -224,6 +225,12 @@ if ($simple -match 'FirstPersonExampleMap') {
 if (-not $mapExists) { $drift += 'canonical umap missing' }
 if (-not (Test-Path $sliceMap)) { $drift += 'Lvl_AnastasisSlice.umap missing (observation map)' }
 $driftStatus = 'NONE'
+
+# --- TOOLS INDEX (AGENTS.md vs tools/unreal/) ---
+$toolsIndex = Test-AnastasisToolsIndex $Root
+$toolsIndexBad = ($toolsIndex.Missing.Count + $toolsIndex.Stale.Count) -gt 0
+$toolsIndexStatus = 'PASS'
+if ($toolsIndexBad) { $toolsIndexStatus = "YELLOW  missing=$($toolsIndex.Missing -join ',') stale=$($toolsIndex.Stale -join ',')" }
 if ($drift.Count -gt 0) { $driftStatus = ($drift -join '; ') }
 
 # --- NIGHTLY (canonical task, informational) ---
@@ -242,7 +249,7 @@ $dims = @($projectStatus, $cppStatus, $editorTargetStatus, $bootStatus, $moduleS
 $hasFail = @($dims | Where-Object { $_.Status -eq 'FAIL' }).Count -gt 0 -or $critical -gt 0 -or $newErr -gt 0
 $hasUnknown = @($dims | Where-Object { $_.Status -in @('UNKNOWN', 'STALE') }).Count -gt 0 -or $gameStatus.Status -in @('UNKNOWN', 'STALE', 'FAIL')
 if ($hasFail -or $gameStatus.Status -eq 'FAIL') { $verdict = 'RED' }
-elseif ($hasUnknown -or $newWarn -gt 0 -or $drift.Count -gt 0 -or $worktreeState -eq 'DIRTY' -or $nightlyBad) { $verdict = 'YELLOW' }
+elseif ($hasUnknown -or $newWarn -gt 0 -or $drift.Count -gt 0 -or $worktreeState -eq 'DIRTY' -or $nightlyBad -or $toolsIndexBad) { $verdict = 'YELLOW' }
 else { $verdict = 'GREEN' }
 
 $role = 'CANONICAL_ROOT'
@@ -279,6 +286,7 @@ New              $newWarn
 
 CRITICAL LOG     $critical
 CONFIG DRIFT     $driftStatus
+TOOLS INDEX      $toolsIndexStatus
 NIGHTLY TASK     $nightly
 STARTUP MAP      $startup
 GAME DEFAULT MAP $gameMap

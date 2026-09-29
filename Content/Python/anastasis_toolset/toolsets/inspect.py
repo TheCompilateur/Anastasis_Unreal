@@ -255,11 +255,16 @@ class AnastasisInspectTools(unreal.ToolsetDefinition):
     @toolset_registry.tool_call
     @staticmethod
     def get_session_snapshot() -> dict[str, str]:
-        """Returns engine, project, current editor world, actor count, and PIE state.
+        """Returns engine, project, project directory, current editor world, actor count, and PIE state.
+
+        Every worktree runs its own editor, and they all claim MCP port 8000: the
+        first one up wins. project_dir is how a caller checks that it is talking
+        to the editor of ITS worktree, not to another agent's.
 
         Returns:
-            String-valued snapshot keys. actor_count is a decimal integer string.
-            pie is 'true' or 'false'.
+            String-valued snapshot keys. project_dir is the absolute directory of
+            the .uproject, forward slashes, trailing slash. actor_count is a
+            decimal integer string. pie is 'true' or 'false'.
         """
         editor = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
         world = editor.get_editor_world() if editor else None
@@ -274,6 +279,7 @@ class AnastasisInspectTools(unreal.ToolsetDefinition):
         return {
             "engine": unreal.SystemLibrary.get_engine_version(),
             "project": unreal.SystemLibrary.get_game_name(),
+            "project_dir": unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()),
             "world": world_name,
             "actor_count": str(len(actors)),
             "pie": "true" if pie else "false",

@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from anastasis_toolset.toolsets.inspect import (
     AnastasisInspectTools,
@@ -32,9 +33,14 @@ class AnastasisInspectToolsTestCase(unittest.TestCase):
 
     def test_get_session_snapshot_has_required_keys(self):
         snapshot = AnastasisInspectTools.get_session_snapshot()
-        for key in ("engine", "project", "world", "actor_count", "pie"):
+        for key in ("engine", "project", "project_dir", "world", "actor_count", "pie"):
             self.assertIn(key, snapshot)
         self.assertIn("5.8", snapshot["engine"])
+
+    def test_get_session_snapshot_project_dir_holds_the_uproject(self):
+        project_dir = Path(AnastasisInspectTools.get_session_snapshot()["project_dir"])
+        self.assertTrue(project_dir.is_absolute())
+        self.assertTrue((project_dir / "Anastasis_UnrealV2.uproject").is_file())
 
     @unittest.expectedFailure
     def test_list_selected_actors_returns_list(self):
