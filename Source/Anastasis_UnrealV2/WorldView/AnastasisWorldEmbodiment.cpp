@@ -23,6 +23,10 @@ static TAutoConsoleVariable<int32> CVarEcologicalDressing(
     TEXT("anastasis.Dressing.Ecology"), 1,
     TEXT("0=legacy tile dressing, 1=forest grammar on continuous terrain; applied on embodiment."), ECVF_Default);
 
+static TAutoConsoleVariable<int32> CVarMacroForest(
+    TEXT("anastasis.Dressing.MacroForest"), 1,
+    TEXT("0=original ecological dressing, 1=large forest masses conditioned by rendered relief; applied on embodiment."), ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainForge(
@@ -368,7 +372,17 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
     {
         AnastasisEcologicalDressing::FPlan ForestPlan;
         FString Error;
-        if (!AnastasisEcologicalDressing::Build(CanonicalSource, ForestDressing, ForestPlan, Error))
+        AnastasisEcologicalDressing::FRenderedHabitat Habitat;
+        Habitat.SampleHeight = [&](double X, double Y, double& Z)
+        {
+            return AnastasisTerrainForge::SampleActive(X, Y, Z)
+                || AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, X, Y, Z);
+        };
+        Habitat.Basin = ForgeBasin;
+        Habitat.bHasBasin = !ForgeBasin.IsZero();
+        const bool bMacro = ForestDressing.bMacroForest && CVarMacroForest.GetValueOnGameThread() != 0;
+        if (!AnastasisEcologicalDressing::Build(CanonicalSource, ForestDressing, ForestPlan, Error,
+            bMacro ? &Habitat : nullptr))
         {
             UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_ECOLOGY rejected=%s"), *Error);
         }
@@ -414,6 +428,8 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 FTransform Pose = AnastasisPresentation::ResolveInstanceTransform(*R.Entry,
                     P.VisualSeed, T.X, T.Y, T.Alt, R.ScaleBias);
                 Pose.SetScale3D(Pose.GetScale3D() * P.ScaleMultiplier);
+                // Large trunks stay plumb on steep ground; random yaw still varies the skyline.
+                if (bMacro) Pose.SetRotation(FRotator(0.0, Pose.Rotator().Yaw, 0.0).Quaternion());
                 // Actual mesh bounds, not the resolver's 100uu primitive pivot convention.
                 const FBox MeshBounds = R.Mesh->GetBoundingBox();
                 const double MinZ = MeshBounds.Min.Z;
@@ -428,9 +444,10 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 ++DressingInstanceCount;
             }
             UE_LOG(LogAnastasis_UnrealV2, Display,
-                TEXT("ANASTASIS_ECOLOGY young=%d secondary=%d canopy=%d full_plan=%d refused_water_or_footprint=%d refused_slope=%d refused_spacing=%d"),
+                TEXT("ANASTASIS_ECOLOGY young=%d secondary=%d canopy=%d full_plan=%d refused_water_or_footprint=%d refused_slope=%d refused_spacing=%d macro=%d reserved_open=%d"),
                 ForestLayerCounts[0], ForestLayerCounts[1], ForestLayerCounts[2], ForestPlan.Instances.Num(),
-                ForestPlan.RejectedWaterOrFootprint, ForestPlan.RejectedSlope, ForestPlan.RejectedSpacing);
+                ForestPlan.RejectedWaterOrFootprint, ForestPlan.RejectedSlope, ForestPlan.RejectedSpacing,
+                bMacro, ForestPlan.RejectedOpenGround);
             // The stature profile is the visual claim of this pass, so it is measured rather
             // than asserted: a forest that has collapsed back onto one height says so here.
             UE_LOG(LogAnastasis_UnrealV2, Display,
