@@ -10,6 +10,7 @@ void FAnastasisSimulation::Reset(uint32 SeedValue, int32 Width, int32 Height)
 	bBootDeferred = false;
 	Seed = SeedValue;
 	World = AnastasisWorld::GenerateWorld(Seed, Width, Height);
+	Village.Bind(World);
 	// JS: this.time = DAY_LENGTH * 0.42; this.day = 1;
 	Time = DayLength * 0.42;
 	Day = 1;
@@ -34,6 +35,10 @@ void FAnastasisSimulation::Tick(double Dt)
 	}
 
 	ProcessDayDeferred(DayDeferredJobsPerTick);
+
+	// JS: le LOD logique peut sortir ici (non porte). Puis :
+	// `for (const npc of this.actors) updateNpc(this, npc, dt);`
+	Village.UpdateActors(Time, Dt);
 }
 
 int32 FAnastasisSimulation::PumpFrame(double WallSeconds, double Speed)

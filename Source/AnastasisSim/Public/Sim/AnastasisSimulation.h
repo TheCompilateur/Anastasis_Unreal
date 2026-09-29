@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Village/AnastasisVillage.h"
 #include "World/AnastasisWorld.h"
 
 /**
@@ -9,9 +10,12 @@
  * Porte dans cette tranche, et rien d'autre :
  *   time / day / dayFrac / tick / onNewDay({ defer }) / file jour vide
  *   generateWorld une fois au Reset, puis le monde est fige
+ *   `for (const npc of this.actors) updateNpc(this, npc, dt)` — la boucle du
+ *   puits (Village/AnastasisVillage.h, mission first-building-001)
  *
  * PAS porte (reste NOT_IMPLEMENTED, volontaire) :
- *   acteurs, besoins, economie, nav, onNewDay critique (spoilage, life, clio)
+ *   economie, onNewDay critique (spoilage, life, clio), LOD logique,
+ *   file de navigation, foule, animaux, transport
  *
  * Autorite JS:
  *   DAY_LENGTH = 90
@@ -60,6 +64,10 @@ public:
 
 	const AnastasisWorld::FWorld& GetWorld() const { return World; }
 
+	/** Batiments et habitants. Lie au monde par Reset ; vide avant. */
+	AnastasisVillage::FVillage& GetVillage() { return Village; }
+	const AnastasisVillage::FVillage& GetVillage() const { return Village; }
+
 	/** Empreinte du terrain fige : type + bits d'altitude, dans l'ordre des tuiles. */
 	uint64 TileFingerprint() const;
 
@@ -75,4 +83,10 @@ private:
 	int32 DeferredRemaining = 0;
 	double Accumulator = 0.0;
 	AnastasisWorld::FWorld World;
+	/** Pointe sur `World` : l'hote n'est ni copie ni deplace (voir les declarations supprimees). */
+	AnastasisVillage::FVillage Village;
+
+public:
+	FAnastasisSimulation(const FAnastasisSimulation&) = delete;
+	FAnastasisSimulation& operator=(const FAnastasisSimulation&) = delete;
 };
