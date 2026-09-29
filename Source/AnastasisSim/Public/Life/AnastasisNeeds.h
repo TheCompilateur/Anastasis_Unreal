@@ -2,13 +2,12 @@
 //
 // Porte, et prouve par vecteurs (`Anastasis.Sim.Parite.Besoins`) :
 //   urgeScore, needGoalScores (les six buts de besoin, entiers),
-//   tickNeeds (branche « boit » et branche par defaut) + tickVitality,
-//   satisfyDrink.
+//   tickNeeds (branche « boit », branche interieure « rest », branche par
+//   defaut) + tickVitality, satisfyDrink, satisfyRest.
 //
 // PAS porte, volontairement :
-//   - les branches interieures de tickNeeds (rest / relieve / eat / socialize /
-//     relax) : elles supposent `npc.inside`, donc l'entree dans un batiment,
-//     donc le chantier domestique. Aucun habitant porte n'entre nulle part.
+//   - les autres branches interieures de tickNeeds (relieve / eat / socialize /
+//     relax) : leurs buts n'ont pas encore de boucle. Seul `rest` entre.
 //   - tickMoodlets et tickConditioning, appeles en fin de tickNeeds. Ils
 //     n'ecrivent aucun des huit metres ci-dessous au meme tick, mais
 //     tickConditioning fait deriver `conditioning.fatigueAdaptation`, donc le
@@ -64,6 +63,14 @@ namespace AnastasisNeeds
 		inline constexpr double BoredCritical = 68.0;
 		inline constexpr double HygieneUrge = 38.0;
 		inline constexpr double HygieneCritical = 66.0;
+
+		inline constexpr double SleepEnergyGain = 6.5;
+		inline constexpr double NapEnergyGain = 3.2;
+		inline constexpr double HealthSleepRestore = 0.08;
+		inline constexpr double SleepRelief = 82.0;
+		inline constexpr double NapRelief = 42.0;
+		inline constexpr double SleepDuration = 11.5;
+		inline constexpr double NapDuration = 4.2;
 
 		inline constexpr double DrinkRelief = 62.0;
 		inline constexpr double DrinkHygiene = 6.0;
@@ -122,8 +129,36 @@ namespace AnastasisNeeds
 	 */
 	ANASTASISSIM_API void TickNeeds(FNeeds& Needs, double Dt, bool bDrinking, bool bWorking);
 
+	/**
+	 * `tickNeeds`, branche interieure `rest` (`insideGoal === "rest"`), puis `tickVitality`.
+	 * bNight = `isNightPhase(sim)` ; SleepQuality = `sleepQuality(npc)` (domestic.js).
+	 */
+	ANASTASISSIM_API void TickNeedsRestInside(FNeeds& Needs, double Dt, bool bNight, double SleepQuality);
+
 	/** `tickVitality` — un seul drain a la fois : famine > soif > epuisement. */
 	ANASTASISSIM_API void TickVitality(FNeeds& Needs, double Dt);
+
+	/**
+	 * `satisfyRest` — la fin d'un repos. bNight = nuit et pas garde ; bIndoor =
+	 * `npc.inside` ; bAtHome = `isAtHome(npc)` (a l'interieur de son foyer ou abri).
+	 */
+	ANASTASISSIM_API void SatisfyRest(FNeeds& Needs, bool bNight, double SleepQuality, bool bIndoor, bool bAtHome);
+
+	/** `DOMESTIC` de life/domestic.js — qualite du repos selon le lieu. */
+	namespace Domestic
+	{
+		inline constexpr double HomeEnterRadius = 3.6;
+		inline constexpr double OutdoorRestFactor = 0.42;
+		inline constexpr double ShelterRestFactor = 0.78;
+		inline constexpr double HomeRestBonus = 1.12;
+		inline constexpr double HomeMorale = 2.0;
+	}
+
+	/**
+	 * `sleepQuality(npc)` — ne lit que des identifiants. InsideBuildingId vide =
+	 * dehors ; HomeId / ShelterId vides = sans toit / sans abri.
+	 */
+	ANASTASISSIM_API double SleepQuality(const FString& InsideBuildingId, const FString& HomeId, const FString& ShelterId);
 
 	/** `satisfyDrink` — la gorgee finale, une fois l'acte accompli. */
 	ANASTASISSIM_API void SatisfyDrink(FNeeds& Needs, double Amount = Constants::DrinkRelief);
