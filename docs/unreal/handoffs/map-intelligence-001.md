@@ -120,9 +120,53 @@ ni de preuve de fertilité, de risque d'inondation ou de capacité de subsistanc
 - agent-worktree.ps1 finish n'est pas exécuté : ce portail cible le répertoire traditionnel
   C:/dev/ANASTASIS_WORKTREES, différent du worktree géré. Aucun HANDOFF_READY::YES inventé.
 
+## Integration et preuve canonique — 2026-09-29
+
+Integration autorisee par Alexandre : commit auditeur `50a66d8` sur `main`, apres
+rebase sur `afaf2b6`. Les neuf fichiers du lot sont identiques au commit initial.
+Les trois modifications locales Input/Character ont ete conservees octet pour octet.
+Le smoke importe maintenant le module depuis le canonique : six controles PASS,
+mesures repetables, Actors/cartes dirty inchanges, dessin borne et callback retire.
+Les 27 tests Python du lot sont PASS ; 0 KNOWN_EXPECTED_FAILURE ; 0 FAIL.
+
+Le premier smoke post-integration chargeait encore une emprise de 95 x 95 m.
+Apres compilation canonique reelle (13 actions, `BUILD::PASS`) et relance dediee,
+la carte charge directement 1900 x 1900 m, avant toute regeneration manuelle.
+Les valeurs runtime sont Scale=5 et HumanGeography=1. Une regeneration explicite
+conserve cette emprise. Aucun patch de terrain ni sauvegarde de carte necessaire.
+
+Paire live Baseline/V2 : seed 12345, meme carte, grille demandee 8 m, rugosite
+locale 8 m, relief 32 m ; toggles HumanGeography=0 puis 1, regeneration en memoire.
+Les sommets ET triangles des sections sol/eau de chaque variante correspondent
+exactement aux exports corrected_relief cites dans human-geography-v2.
+
+| Mesure geometrique | Baseline | V2 |
+|---|---:|---:|
+| Emprise echantillonnee | 361 ha | 361 ha |
+| Plus grande zone habitable candidate | 11,3888 ha | 34,5806 ha |
+| Surface agricole candidate | 38,9079 % | 42,4617 % |
+| Composantes terrain traversables | 128 | 148 |
+| Navigation Unreal | UNKNOWN | UNKNOWN |
+
+Chaque analyse conserve les Actors et les cartes dirty. Les 171 fichiers suivis
+Source/Config/Python/Maps controles sont inchanges pendant la sonde ; HEAD stable.
+L'editeur dedie s'est ferme. Les autres editeurs n'ont pas ete controles ou fermes.
+Le build comprend les modifications locales preexistantes Input/Character :
+ceci n'est pas un seal d'un arbre Git propre, ni une preuve joueur ou visuelle V2.
+La fragmentation globale n'est pas uniformement amelioree ; corridors plafonnes a 64.
+
+Preuves brutes sous
+`C:/Users/alex_/.codex/visualizations/2026/09/29/01a0eec3-f3bb-7ea3-b905-b86ada136008/` :
+- `integration_result.json`, `integrated_smoke/Integration.json` ;
+- `canonical_regeneration_build.log`, `canonical_regeneration.log` ;
+- `canonical_regeneration_probe.py`, `canonical_regeneration/Diagnostic.json` ;
+- `canonical_regeneration/Baseline.json`, `HumanGeographyV2.json`,
+  `Comparison_Baseline_V2.json` et leurs rapports Markdown dans ce meme dossier ;
+- `regeneration_source_before.json`, `regeneration_postcheck.json`.
+
 ## STOP
 
-Lot isolé soumis à revue de l'intégrateur. Ne pas fusionner automatiquement.
-NEXT : appliquer sélectivement ce commit, conserver le hook Python existant et lancer
-le smoke sur la carte choisie ; ensuite constituer la vraie paire Baseline/V2 avec
-même emprise, grille et paramètres. Terrain, assets, Player et travaux voisins hors mission.
+Integration et comparaison geometrique canonique terminees. Aucun push de ce lot.
+NEXT : valider la lisibilite au sol de V2 puis la navigation effective sur une
+fixture autorisee. NavMesh, parcours joueur et viabilite du village restent UNKNOWN.
+Terrain, assets, Player et travaux voisins restent hors du lot auditeur.
