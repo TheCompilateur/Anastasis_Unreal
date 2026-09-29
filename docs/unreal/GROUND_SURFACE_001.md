@@ -206,6 +206,13 @@ Recalibrés à **0.62 / 0.82**, soit 35 à 45° d'origine. **Ce couplage est ré
 `anastasis.Terrain.Forge.Exaggerate` change, ces deux nombres doivent changer avec
 lui.** Ils vivent dans l'instance, donc sans recompilation.
 
+> **TERRAIN_RELIEF_001 étape 3 (2026-09-29) — seuils non recalibrés, à trancher.**
+> L'érosion thermique (`anastasis.Terrain.Forge.TalusDeg` = 40) ramène toute la terre
+> intérieure sous ~40° rendus, soit une pente de matériau d'environ 0.23 : sous
+> `SlopeRockStart` (0.62). La roche de pente n'apparaît plus que sur les berges ; la
+> roche des tuiles Stone/Ruin (canal UV0) est inchangée. Recalibrer ces deux seuils est
+> un travail de matériau, laissé hors de la mission terrain.
+
 ## L'atténuation de détail, et pourquoi elle a été nécessaire
 
 Le point de conception le moins évident de la mission.

@@ -16,7 +16,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "WorldView/AnastasisWorldDebugVisual.h"
 
-static TAutoConsoleVariable<float> CVarWorldScale(TEXT("anastasis.WorldView.Scale"), 20.0f, TEXT("Physical scale of forged full-world presentation; 1=95m original, 20=1900m. Applied on embodiment."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarWorldScale(TEXT("anastasis.WorldView.Scale"), 5.0f, TEXT("Physical scale of forged full-world presentation; 1=380m corrected source, 5=1900m. Applied on embodiment."), ECVF_Default);
 static TAutoConsoleVariable<int32> CVarHumanGeography(TEXT("anastasis.Terrain.HumanGeography"), 1, TEXT("Human_Geography_V2: reversible authored macro terrain for seed 12345. 0=original forms, 1=V2. Applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarEcologicalDressing(
@@ -583,9 +583,29 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
         AnastasisTerrainSurface::FGeometry Geometry;
         if (AnastasisTerrainSurface::Build(Crop, Geometry))
         {
+            // TERRAIN_FORGE lit pente/Laplacien au bord fin de Crop. Mode 2 incarne un
+            // decoupage LIBRE du monde canonique : ses bords sont de vrais bords de chunk,
+            // pas le bord du monde, et CanonicalSource a les tuiles voisines pour les
+            // couvrir -- sans elles, ANASTASIS_TERRAIN_FORGE clampait un voisin manquant sur
+            // lui-meme et pouvait y lire une convexite fictive (pic sur pente raide, cf.
+            // TERRAIN_FORGE_CHUNK_SEAM). Mode 1 est la tranche scellee WORLD_SLICE_006 et
+            // doit rester bit-a-bit identique : elle ne recoit jamais de halo.
+            AnastasisWorldView::FWorldVisualSnapshot HaloCrop;
+            bool bHaveHaloCrop = false;
+            if (SurfaceMode == 2)
+            {
+                const int32 Margin = AnastasisTerrainForge::HaloTiles;
+                const int32 HaloX0 = FMath::Max(0, Crop.OriginX - Margin);
+                const int32 HaloY0 = FMath::Max(0, Crop.OriginY - Margin);
+                const int32 HaloX1 = FMath::Min(CanonicalSource.W, Crop.OriginX + Crop.W + Margin);
+                const int32 HaloY1 = FMath::Min(CanonicalSource.H, Crop.OriginY + Crop.H + Margin);
+                HaloCrop = AnastasisWorldView::CropSnapshot(
+                    CanonicalSource, HaloX0, HaloY0, HaloX1 - HaloX0, HaloY1 - HaloY0);
+                bHaveHaloCrop = HaloCrop.Tiles.Num() == (HaloX1 - HaloX0) * (HaloY1 - HaloY0);
+            }
             AnastasisTerrainForge::FMesh ForgeMesh;
             const bool bForged = CVarTerrainForge.GetValueOnGameThread() != 0
-                && AnastasisTerrainForge::Apply(Crop, Geometry, ForgeMesh);
+                && AnastasisTerrainForge::Apply(Crop, Geometry, ForgeMesh, bHaveHaloCrop ? &HaloCrop : nullptr);
             if (!bForged)
             {
                 AnastasisTerrainForge::ClearActive();
@@ -609,7 +629,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                     ForgeMesh.LandmarkX, ForgeMesh.LandmarkY, ForgeMesh.LandmarkZ);
             }
             UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_HUMAN_GEOGRAPHY layer=Human_Geography_V2 enabled=%d spatial_scale=%.1f extent_m=%.1fx%.1f simulation_unchanged=1"),
-                ForgeMesh.bHumanGeography ? 1 : 0, Crop.SpatialScale, (Crop.W-1)*Crop.SpatialScale, (Crop.H-1)*Crop.SpatialScale);
+                ForgeMesh.bHumanGeography ? 1 : 0, Crop.SpatialScale, (Crop.W-1)*AnastasisWorldView::TileWorldSize*Crop.SpatialScale/100.0, (Crop.H-1)*AnastasisWorldView::TileWorldSize*Crop.SpatialScale/100.0);
             // Section 0 : relief. La couleur de sommet porte la TEINTE semantique du sol ;
             // depuis GROUND_SURFACE_001 elle ne porte plus seule toute la semantique --
             // les familles de surface et l'humidite passent par UV0/UV1. Le Forge ayant

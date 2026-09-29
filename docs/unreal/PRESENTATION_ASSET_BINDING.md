@@ -50,7 +50,11 @@ sur les placeholders codés en dur : corrige l'asset, ne touche pas au C++.
 
 ## Échelles — l'unité qui compte
 
-1 tuile = 100 uu (≈ 1 m). Les scales sont des facteurs appliqués au mesh brut.
+1 tuile = 400 uu (4 m) depuis le 2026-09-29 (`AnastasisWorldView::TileWorldSize`,
+TERRAIN_RELIEF_001 ; c'était 100 uu, échelle de diagnostic jamais choisie). Les
+scales sont des facteurs appliqués au mesh brut, en uu : un arbre garde sa taille
+réelle, c'est le monde qui a grandi autour. Tout ce qui est exprimé **en fraction de
+tuile** (espacement des troncs, jitter) a été multiplié par 4 sur le terrain.
 Les placeholders actuels sont les primitives moteur (~100 uu), d'où
 `Min/Max Uniform Scale` autour de 1.6–2.4 pour un arbre. **Un vrai mesh d'arbre
 déjà à l'échelle réelle veut une enveloppe proche de 1.0** — sinon tu obtiens

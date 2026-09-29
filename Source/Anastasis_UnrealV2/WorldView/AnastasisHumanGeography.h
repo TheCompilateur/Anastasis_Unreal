@@ -2,7 +2,8 @@
 #include "WorldView/AnastasisTerrainSurface.h"
 
 /** Authored, reversible presentation layer for the inspected seed 12345.
- * Coordinates are metres in the ORIGINAL 95m field, independent of physical scale.
+ * XY are source tile coordinates (centres at X/Y + 0.5), independent of physical scale.
+ * Height arguments/results are metres in the unscaled corrected relief.
  * Does not mutate Alt, Type, resources, fertility, or simulation water flow.
  */
 namespace AnastasisHumanGeography

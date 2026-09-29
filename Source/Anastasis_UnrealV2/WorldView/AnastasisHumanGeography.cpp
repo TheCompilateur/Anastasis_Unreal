@@ -112,7 +112,7 @@ void AnastasisHumanGeography::Apply(const AnastasisWorldView::FWorldVisualSnapsh
     {
         FVector& P=G.Vertices[I];
         const double Original=(Sea+(P.Z-Sea)/Scale)/100.0;
-        const FSample V=Evaluate(P.X/(100.0*Scale),P.Y/(100.0*Scale),Original);
+        const FSample V=Evaluate(P.X/(AnastasisWorldView::TileWorldSize*Scale),P.Y/(AnastasisWorldView::TileWorldSize*Scale),Original);
         P.Z=Sea+(V.Height*100.0-Sea)*Scale;
         G.WaterVertices[I].Z=Sea+(V.WaterHeight*100.0-Sea)*Scale;
         G.RiverFlow[I]=static_cast<float>(V.RiverWeight);

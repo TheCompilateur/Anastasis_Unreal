@@ -15,8 +15,19 @@
  */
 namespace AnastasisWorldView
 {
-	/** Unreal units (cm) per simulation tile. Tile (0,0) occupies [0, TileWorldSize). P1.5 diagnostic; Lot 4.5 freeze. */
-	inline constexpr double TileWorldSize = 100.0;
+	/**
+	 * Unreal units (cm) per simulation tile. Tile (0,0) occupies [0, TileWorldSize).
+	 *
+	 * 400 = 4 m, choisi par Alexandre le 2026-09-29 (TERRAIN_RELIEF_001). La valeur
+	 * precedente, 100 (1 m), etait une echelle de DIAGNOSTIC (P1.5), gelee sans etre
+	 * choisie : "Lot 4.5 does not pick a player scale". A 1 m, le monde faisait 96 m,
+	 * une riviere d'une tuile faisait 1 m de large, et la marche qu'une tuile de terre a
+	 * +0.2 d'altitude fait au-dessus d'une tuile d'eau montait a 72 degres une fois le
+	 * relief exagere : aucune erosion ne pouvait adoucir les berges sans raboter les
+	 * collines ou combler les rivieres (mesure). A 4 m, la meme marche fait 37 degres.
+	 * AltitudeScale ne change pas : les hauteurs restent, les pentes s'adoucissent.
+	 */
+	inline constexpr double TileWorldSize = 400.0;
 
 	/** Simulation altitude 1.0 maps to this many Unreal units on Z. SeaLevel 0.275 -> 275 UU. */
 	inline constexpr double AltitudeScale = 1000.0;

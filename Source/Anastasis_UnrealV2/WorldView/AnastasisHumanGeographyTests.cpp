@@ -16,7 +16,7 @@ namespace
 using namespace AnastasisWorldView;
 bool BuildHuman(bool Layer, AnastasisTerrainForge::FMesh& M)
 {
-    auto S=CaptureCanonicalWorld(ReferenceSeed); S.SpatialScale=20;S.bHumanGeography=Layer;
+    auto S=CaptureCanonicalWorld(ReferenceSeed); S.SpatialScale=5;S.bHumanGeography=Layer;
     AnastasisTerrainSurface::FGeometry G;
     return AnastasisTerrainSurface::Build(S,G) && AnastasisTerrainForge::Apply(S,G,M);
 }
@@ -25,19 +25,19 @@ double TriangleSlope(const FVector& A,const FVector& B,const FVector& C)
     const FVector N=FVector::CrossProduct(B-A,C-A);
     return FMath::RadiansToDegrees(FMath::Atan2(FMath::Sqrt(N.X*N.X+N.Y*N.Y),FMath::Abs(N.Z)));
 }
-double LargestGentlePatch(const AnastasisTerrainForge::FMesh& M,double X0,double X1,double Y0,double Y1)
+double LargestGentlePatch(const AnastasisTerrainForge::FMesh& M,double X0,double X1,double Y0,double Y1,double MaxSlope=10)
 {
     const int32 W=M.FineW-1,H=M.FineH-1;
     TArray<uint8> Valid;Valid.SetNumZeroed(W*H);
     const auto& V=M.Geometry.Vertices;const auto& Water=M.Geometry.WaterVertices;
-    const double Unit=100*M.SpatialScale;
+    const double Unit=TileWorldSize*M.SpatialScale;
     for(int32 Y=0;Y<H;++Y) for(int32 X=0;X<W;++X)
     {
         const int32 A=Y*M.FineW+X,B=A+1,C=A+M.FineW,D=C+1;
         const double PX=V[A].X/Unit,PY=V[A].Y/Unit;
         if(PX<X0 || PX>X1 || PY<Y0 || PY>Y1) continue;
         if(V[A].Z<Water[A].Z+50 || V[B].Z<Water[B].Z+50 || V[C].Z<Water[C].Z+50 || V[D].Z<Water[D].Z+50) continue;
-        if(FMath::Max(TriangleSlope(V[A],V[C],V[B]),TriangleSlope(V[B],V[C],V[D]))<10) Valid[Y*W+X]=1;
+        if(FMath::Max(TriangleSlope(V[A],V[C],V[B]),TriangleSlope(V[B],V[C],V[D]))<MaxSlope) Valid[Y*W+X]=1;
     }
     int32 Best=0;TArray<int32> Queue;
     for(int32 I=0;I<Valid.Num();++I) if(Valid[I])
@@ -62,12 +62,12 @@ bool FHumanGeographyScale::RunTest(const FString&)
 {
     auto S=CaptureCanonicalWorld(ReferenceSeed);
     const auto Original=S;
-    S.SpatialScale=20;S.bHumanGeography=true;
+    S.SpatialScale=5;S.bHumanGeography=true;
     const auto Crop=CropSnapshot(S,24,32,20,18);
-    TestEqual(TEXT("crop carries scale"),Crop.SpatialScale,20.0);
+    TestEqual(TEXT("crop carries scale"),Crop.SpatialScale,5.0);
     const auto Plan=BuildPlan(S);
     TestEqual(TEXT("1900m between outer sample centres"),(Plan.Locations.Last().X-Plan.Locations[0].X)/100,1900.0);
-    TestEqual(TEXT("sea datum unchanged"),AltitudeToUnreal(AnastasisWorld::SeaLevel,20),275.0);
+    TestEqual(TEXT("sea datum unchanged"),AltitudeToUnreal(AnastasisWorld::SeaLevel,5),275.0);
     AnastasisTerrainSurface::FGeometry G;
     AnastasisTerrainForge::FMesh M;
     if(!TestTrue(TEXT("scaled surface builds"),AnastasisTerrainSurface::Build(S,G)))return false;
@@ -100,7 +100,18 @@ bool FHumanGeographyBasins::RunTest(const FString&)
     const double B0=LargestGentlePatch(Before,23,44,15,34),B1=LargestGentlePatch(After,23,44,15,34);
     TestTrue(TEXT("A contains a contiguous >=6ha patch below 10 degrees"),A1>=60000);
     TestTrue(TEXT("B contains a contiguous >=1.8ha patch below 10 degrees"),B1>=18000);
-    TestTrue(TEXT("both basins materially exceed baseline"),A1>A0*3 && B1>B0*3);
+    // The corrected relief already has connected <10-degree land. The old x3
+    // requirement was tied to the discarded spiky source, not to the human brief.
+    // Keep the absolute floor, forbid loss of that existing land, and require
+    // large continuous <5-degree agricultural areas with an actual A/B gain.
+    const double A5Before=LargestGentlePatch(Before,31,75,39,70,5);
+    const double A5=LargestGentlePatch(After,31,75,39,70,5);
+    const double B5Before=LargestGentlePatch(Before,23,44,15,34,5);
+    const double B5=LargestGentlePatch(After,23,44,15,34,5);
+    TestTrue(TEXT("retain or enlarge the corrected source's connected gentle land"),A1>=A0 && B1>=B0);
+    TestTrue(TEXT("A has >=12ha and B >=4ha of continuous land below 5 degrees"),A5>=120000 && B5>=40000);
+    TestTrue(TEXT("both agricultural patches enlarge the corrected baseline"),A5>A5Before && B5>B5Before);
+    AddInfo(FString::Printf(TEXT("HUMAN_AGRICULTURE A5_m2=%.0f->%.0f B5_m2=%.0f->%.0f"),A5Before,A5,B5Before,B5));
     int32 Changed=0,Protected=0;double ProtectedError=0,XYError=0;
     for(int32 I=0;I<After.Geometry.Vertices.Num();++I)
     {
@@ -150,7 +161,7 @@ bool FHumanGeographyCollision::RunTest(const FString&)
     auto* Actor=World->SpawnActor<AAnastasisWorldEmbodiment>(FVector::ZeroVector,FRotator::ZeroRotator,Params);
     if(!Actor){AddError(TEXT("spawn failed"));return false;}
     Actor->Embody(12345,96,96);
-    TestEqual(TEXT("default scene uses approved physical scale"),Actor->GetSnapshot().SpatialScale,20.0);
+    TestEqual(TEXT("default scene uses approved physical scale"),Actor->GetSnapshot().SpatialScale,5.0);
     TArray<UProceduralMeshComponent*> Meshes;Actor->GetComponents(Meshes);
     if(Meshes.IsEmpty()){Actor->Destroy();AddError(TEXT("no procedural collision surface"));return false;}
     int32 Hits=0;double Error=0;

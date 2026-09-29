@@ -50,7 +50,7 @@ bool FAnastasisEcologyDeterminism::RunTest(const FString&)
         TestTrue(TEXT("slope bound"),P.SlopeDegrees <= C.MaxSlopeDegrees);
         ++Layers[static_cast<uint8>(P.Layer)];
         for (int32 J=0; J<I; ++J)
-            if (FVector::DistSquared2D(P.Ground,A.Instances[J].Ground) < FMath::Square(C.MinimumSpacing*100.0)-1.e-6)
+            if (FVector::DistSquared2D(P.Ground,A.Instances[J].Ground) < FMath::Square(C.MinimumSpacing*AnastasisWorldView::TileWorldSize)-1.e-6)
                 AddError(TEXT("minimum spacing violated"));
     }
     for (int32 I=0; I<S.Tiles.Num(); ++I)
@@ -76,7 +76,7 @@ bool FAnastasisEcologyConditioning::RunTest(const FString&)
     int32 Fringe=0, Interior=0, YoungFringe=0, CanopyInterior=0;
     for (const auto& P:A.Instances)
     {
-        const double X=P.Ground.X/100.0;
+        const double X=P.Ground.X/AnastasisWorldView::TileWorldSize;
         TestTrue(TEXT("no distant prairie scatter"),X > 45.0);
         if (X<48.0) { ++Fringe; YoungFringe += P.Layer==ELayer::Young; }
         if (X>=50.0 && X<53.0) { ++Interior; CanopyInterior += P.Layer==ELayer::Canopy; }
@@ -90,7 +90,12 @@ bool FAnastasisEcologyConditioning::RunTest(const FString&)
     for (auto& T:S.Tiles) T.Alt=0.20;
     TestTrue(TEXT("submerged fixture"),Build(S,C,Water,E));
     TestEqual(TEXT("zero submerged trees"),Water.Instances.Num(),0);
-    for (auto& T:S.Tiles) { T.Alt=0.5+T.X*0.15; T.Wetness=0; }
+    // Pente IMPOSSIBLE formulee en angle, pas en altitude par tuile : 0.15 par tuile valait
+    // 56 degres a 1 m par tuile, mais 20 a 4 m -- des arbres y poussaient, legitimement.
+    // Dix degres au-dessus de la limite reglee, quelle que soit l'echelle.
+    const double Rise = FMath::Tan(FMath::DegreesToRadians(C.MaxSlopeDegrees + 10.0))
+        * AnastasisWorldView::TileWorldSize / AnastasisWorldView::AltitudeScale;
+    for (auto& T:S.Tiles) { T.Alt=0.5+T.X*Rise; T.Wetness=0; }
     TestTrue(TEXT("steep fixture"),Build(S,C,Steep,E));
     TestEqual(TEXT("zero impossible-slope trees"),Steep.Instances.Num(),0);
     C.bEnabled=false;
