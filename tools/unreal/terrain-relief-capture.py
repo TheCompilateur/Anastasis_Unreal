@@ -26,8 +26,18 @@ STEPS = {
     '2': [('before', {'Bicubic': 0, 'Sharpen': 1, 'TalusDeg': 0}),
           ('after', {'Bicubic': 1, 'Sharpen': 0, 'TalusDeg': 0})],
     '3': [('before', {'TalusDeg': 0}), ('after', {'TalusDeg': 40})],
+    # Echelle : TileWorldSize est une constante de compilation, l'"avant" (1 m) ne se rend
+    # plus dans ce build. On capture l'etat courant avec les MEMES cadres exprimes en tuiles,
+    # a comparer a step3/*_after.png.
+    'scale': [('after', {})],
 }
-STEP = os.environ.get('ANASTASIS_RELIEF_STEP', '3')
+STEP = os.environ.get('ANASTASIS_RELIEF_STEP', 'scale')
+
+# Pas de tuile en uu -- DOIT valoir AnastasisWorldView::TileWorldSize. Les cadres des
+# captures ont ete regles a 100 uu/tuile ; on les multiplie par FRAME pour qu'ils regardent
+# le meme morceau de monde. Les hauteurs de terrain, elles, ne changent pas avec l'echelle.
+TILE_UU = 400.0
+FRAME = TILE_UU / 100.0
 STATES = STEPS[STEP]
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -84,14 +94,16 @@ def views():
     # terrasses mordaient surtout les versants du rempart de bordure (X~0 et Y~9600).
     # Un oeil decale du bassin tombait contre une paroi : l'oeil est SUR le bassin, a
     # hauteur d'homme, et regarde le rempart ouest.
+    # Positions en plan et hauteurs de camera : x FRAME. Oeil humain (170 uu) et cibles
+    # posees sur le relief (Z de terrain) : absolus, le relief ne change pas d'altitude.
     eye = unreal.Vector(basin.x, basin.y, basin.z + 170.0)
-    rim_w = unreal.Vector(600.0, basin.y - 300.0, basin.z + 350.0)
-    slope = unreal.Vector(3000.0, 5200.0, 3200.0)
-    over = unreal.Vector(-2200.0, -2200.0, 7800.0)
+    rim_w = unreal.Vector(600.0 * FRAME, basin.y - 300.0 * FRAME, basin.z + 350.0)
+    slope = unreal.Vector(3000.0 * FRAME, 5200.0 * FRAME, 3200.0 * FRAME)
+    over = unreal.Vector(-2200.0 * FRAME, -2200.0 * FRAME, 7800.0 * FRAME)
     return [
-        ('A_overview', over, look(over, unreal.Vector(4800.0, 4800.0, 300.0))),
+        ('A_overview', over, look(over, unreal.Vector(4800.0 * FRAME, 4800.0 * FRAME, 300.0))),
         ('B_ground', eye, look(eye, rim_w)),
-        ('C_slope', slope, look(slope, unreal.Vector(6000.0, 8800.0, 900.0))),
+        ('C_slope', slope, look(slope, unreal.Vector(6000.0 * FRAME, 8800.0 * FRAME, 900.0))),
     ]
 
 

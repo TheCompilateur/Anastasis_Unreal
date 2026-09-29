@@ -11,17 +11,25 @@ Alexandre). Présentation seulement : AnastasisSim (contrat de parité JS) n'est
   chaque ligne de tuile ; couper l'amplification du Laplacien et l'affûtage du point haut,
   qui levaient une frange de lames au bord des chenaux.
 - Étape 3 : érosion thermique sur la hauteur RENDUE (talus 40°, 300 itérations,
-  conservative, l'eau figée). Exagération laissée à 3.6 : mesuré, la baisser n'apporte
-  rien à l'intérieur des terres et coûte du relief.
+  conservative, l'eau figée). Exagération laissée à 3.6.
+- Étape 4 (rive dérivée du relief) : mesurée, **abandonnée** sur décision d'Alexandre —
+  à 1 m/tuile, adoucir les berges exigeait de raboter les collines ou de combler les
+  rivières. Rien n'en est commité.
+- **Échelle** : `AnastasisWorldView::TileWorldSize` 100 → 400 uu (4 m), choisi par
+  Alexandre. 100 était l'échelle de diagnostic P1.5, gelée sans être choisie.
 
 ## FILES_OWNED
 
 - Source/Anastasis_UnrealV2/WorldView/AnastasisTerrainForge.cpp
 - Source/Anastasis_UnrealV2/WorldView/AnastasisTerrainForge.h
 - Source/Anastasis_UnrealV2/WorldView/AnastasisTerrainForgeTests.cpp
+- Source/Anastasis_UnrealV2/WorldView/AnastasisWorldView.h (TileWorldSize)
+- Source/Anastasis_UnrealV2/WorldView/AnastasisTerrainSurfaceTests.cpp (coordonnées en tuiles)
+- Source/Anastasis_UnrealV2/WorldView/AnastasisEcologicalDressingTests.cpp (échelle hors du test)
 - Source/Anastasis_UnrealV2/WorldView/AnastasisWorldEmbodiment.cpp (marge du halo seulement)
 - Source/Anastasis_UnrealV2/WorldView/AnastasisTerrainSurface.h (commentaire de ShoreDepthSpan seulement)
 - docs/unreal/GROUND_SURFACE_001.md (note de couplage seulement)
+- docs/unreal/PRESENTATION_ASSET_BINDING.md (section échelles)
 - tools/unreal/capture-terrain-relief.ps1
 - tools/unreal/terrain-relief-capture.py
 - docs/visual/terrain-relief-001/
@@ -33,57 +41,56 @@ Voir `git log agent/terrain-relief-001`.
 ## MEC
 
 - BUILD: PASS (`anastasis-unreal.ps1 build`, worktree)
-- TESTS: `report-tests.ps1` — PASS 83, KNOWN_EXPECTED_FAILURE 4, FAIL 0, total 87
-- `Anastasis.Terrain.Forge.NoStaircase` (étape 1, Bicubic 0 / Sharpen 1 / Talus 0 épinglés) :
-  rugosité 22.29 → 18.98 uu, >60° 20.83 % → 20.53 %, p99 81.6° → 81.4°
-- `Anastasis.Terrain.Forge.NoSpikes` (étape 2, Talus 0 épinglé) :
-  lames 651 → 44, pli de grille 2.97 → 1.39, rugosité 18.98 → 9.86 uu,
-  >60° 20.53 % → 18.36 %, p99 81.4° → 80.3°
-- `Anastasis.Terrain.Forge.NoCliffs` (étape 3) :
-  >60° intérieur (> 1 tuile de l'eau) 14.24 % → 0.00 %, >60° total 18.36 % → 3.13 %,
-  >45° 32.3 % → 3.6 %, lames 44 → 10, point haut 1353 → 1156 uu,
-  masse conservée (Δ = 1e-6 uu), déplacement max 770 uu, forge 1.1 s
-- `Anastasis.Terrain.Forge.ChunkSeam` : erreur de Laplacien au bord, halo 2 tuiles = 0
+- TESTS: `report-tests.ps1` — PASS 84, KNOWN_EXPECTED_FAILURE 4, FAIL 0, total 88
+- Chiffres à 4 m/tuile (ceux des étapes 1–3 à 1 m sont dans leurs commits et le README) :
+  - `Anastasis.Terrain.Forge.Banks` : berges p50 26.3°, p90 48.5°, > 60° 3.2 %
+    (1 m : 68.3° / 84.5° / 72.6 %) ; fosses sèches 303 (1 m : 11)
+  - `Anastasis.Terrain.Forge.NoCliffs` : > 60° avant érosion 0.34 %, intérieur 0.25 %
+    → 0 % ; > 45° après érosion 1.2 % ; point haut 1353 uu
+  - `NoStaircase`, `NoSpikes` : comparaisons relatives, toujours vertes
 - COMMANDS:
   - `tools\unreal\anastasis-unreal.ps1 build`
   - `tools\unreal\report-tests.ps1`
-  - `tools\unreal\capture-terrain-relief.ps1 -Step 1|2|3`
+  - `tools\unreal\capture-terrain-relief.ps1 -Step 1|2|3|scale`
 
 ## SCN
 
-Captures avant/après : `docs/visual/terrain-relief-001/` (étape 1), `.../step2/`,
-`.../step3/`, README avec lecture.
+Captures : `docs/visual/terrain-relief-001/` (étape 1), `step2/`, `step3/`, `scale/`
+(à comparer à `step3/*_after.png`), README avec lecture.
 
 ## PLY
 
-Non vérifié en PIE ; captures éditeur seulement.
+Non vérifié en PIE ; captures éditeur seulement. Le monde fait 384 m au lieu de 96 m.
 
 ## INTEGRATION_RISK
 
-- CVars nouvelles : `anastasis.Terrain.Forge.Terraces` (0), `.Escarpments` (0),
-  `.Bicubic` (1), `.Sharpen` (0), `.TalusDeg` (40), `.ErosionIterations` (300).
-  Le rendu par défaut change.
-- **Coût** : l'érosion fait passer `Apply` de ~85 ms à ~1.1 s (monde 96×96, subdiv 4).
-  Une liste active a été essayée : même résultat bit à bit, mesurée deux fois plus lente.
-- **Matériau de sol** : `SlopeRockStart/End` (0.62 / 0.82) sont calibrés sur des pentes
-  rendues de 68–80°. Après érosion, l'intérieur est sous ~40° : la roche de pente ne
-  s'affiche plus que sur les berges. Non recalibré (hors mandat), noté dans
-  GROUND_SURFACE_001.md.
-- **Chunks** : l'érosion est non locale. Un chunk érodé seul ne raccorde pas en hauteur
-  au monde entier érodé (le Laplacien, lui, reste exact). Sans effet aujourd'hui : le
-  mode 2 incarne le monde en un seul morceau. À traiter si le monde est découpé.
-- **Contrat de halo** : `AnastasisTerrainForge::HaloTiles = 2` (était 1 en dur dans
-  l'incarnation). Tout appelant qui bâtit un HaloCrop doit utiliser cette constante.
-- Bicubic 0 reproduit la forge précédente bit à bit (même formule que BilinearSample).
-- **Le bassin habitable s'est déplacé** à l'étape 2 : (2100,6350) → (6650,3550). Z du
-  bassin après érosion 474 uu.
-- `ShoreDepthSpan` (60 uu) inchangé ; commentaire re-mesuré (p70 59.0, p80 68.9,
-  max 614 → 154.7 uu). `Anastasis.Terrain.Shoreline` vert.
+- **Échelle — risque majeur, à relire avant intégration.** Tout ce qui est exprimé en
+  tuiles suit (terrain, dressing, brume, cubes de débogage). Ce qui est en uu absolus ne
+  suit pas :
+  - caméras codées en dur dans d'autres outils de capture : `astral-observe.py`,
+    `observe-slice.py`, `capture-tree-lineup.py`, `terrain-forge-capture.py` visent
+    désormais un coin du monde ;
+  - atmosphère : `FogStartDistance` 1500 uu, profils réglés pour un monde de 96 m ;
+  - ruines : cylindres de 0.6–1.1 m, par tuile de 4 m ;
+  - acteurs posés dans `Lvl_AnastasisSlice` (lumières, volumes) : non inspectés ;
+  - branches d'autres agents réglées à 1 m/tuile (ecotone, hydra, forêts…).
+- Forêts : l'espacement des troncs, en fraction de tuile, passe de 55 cm à 2.2 m ; le
+  nombre d'arbres est inchangé, leur densité au m² est divisée par 16.
+- **Bords carrés de l'eau** : défaut devenu dominant à 4 m (fosses sèches 11 → 303).
+  Masque d'eau à la tuile la plus proche. Le masque par contour (partie sûre de
+  l'étape 4) les ramenait à 0 ; non repris sans accord.
+- CVars de la forge : `Terraces` (0), `Escarpments` (0), `Bicubic` (1), `Sharpen` (0),
+  `TalusDeg` (40), `ErosionIterations` (300). À 4 m l'érosion n'a presque plus rien à
+  faire mais coûte encore ~0.9 s.
+- **Matériau de sol** : `SlopeRockStart/End` calibrés sur 68–80° rendus ; plus aucune
+  pente n'y arrive. Couleurs de sommet par tuile : taches de 4 m aux bords nets. Motif
+  « léopard » visible sur tout versant éclairé.
+- **Contrat de halo** : `AnastasisTerrainForge::HaloTiles = 2`.
+- `ShoreDepthSpan` (60 uu, en Z) inchangé : l'échelle ne touche pas aux profondeurs.
 - `AnastasisTerrainForge.cpp` est chaud (`terrain-forge-chunk-seam-halo` vient d'y passer).
 
 ## STOP
 
-Ne revendique pas un relief corrigé partout : 3 % de la terre reste au-delà de 60°, et
-tout ce reste est à moins d'une tuile de l'eau (berges). Les lacs gardent bords droits
-et parois : masque d'eau à la tuile la plus proche, exagération différente de part et
-d'autre de la rive, sommets d'eau hors érosion. C'est l'étape 4, non commencée.
+Ne revendique pas une carte finie : les bords carrés de l'eau, le vide autour de la
+carte, la bordure de rochers, l'échelle des ruines, l'atmosphère à 384 m et le
+matériau ne sont pas traités.

@@ -104,3 +104,47 @@ Mesure (`Anastasis.Terrain.Forge.NoCliffs`, terre émergée) :
 Couplage non traité (hors mandat) : le matériau de sol ne peint la roche de pente
 qu'entre 68° et 80° rendus (`SlopeRockStart/End` 0.62 / 0.82). L'intérieur étant
 désormais sous 40°, cette roche n'apparaît plus que sur les berges.
+
+---
+
+# Étape 4 : abandonnée — et pourquoi
+
+Rive dérivée du relief, berges érodées, trait de rive verrouillé sur la simulation :
+mesurée puis **abandonnée sur décision d'Alexandre**. À 1 m par tuile, une rivière
+d'une tuile bordée de terre à +0.2 d'altitude est une marche de ~72° : l'adoucir
+demandait soit de raboter les collines (point haut 1156 → 786–996 uu), soit de
+combler les rivières (25 % des sommets d'eau à moins de 5 uu). Aucun réglage de forge
+n'en sortait : c'était l'échelle.
+
+---
+
+# Échelle : 1 tuile = 4 m — `scale/`
+
+`AnastasisWorldView::TileWorldSize` 100 → 400, choisi par Alexandre. La valeur de
+100 était une échelle de **diagnostic** (P1.5), gelée sans être choisie
+(« Lot 4.5 does not pick a player scale »). Carte 96 m → 384 m ; hauteurs inchangées.
+
+`TileWorldSize` étant une constante de compilation, l'« avant » ne se rend plus dans ce
+build : les captures `scale/*_after.png` reprennent les cadres de l'étape 3 **en tuiles**,
+à comparer à `step3/*_after.png`. Reproduire : `tools\unreal\capture-terrain-relief.ps1 -Step scale`.
+
+| Mesure (terre émergée, forge par défaut) | 1 m (étape 3) | 4 m |
+|---|---|---|
+| berges, pente médiane (`Forge.Banks`) | 68.3° | **26.3°** |
+| berges, p90 | 84.5° | **48.5°** |
+| berges > 60° | 72.6 % | **3.2 %** |
+| > 60° avant érosion (`Forge.NoCliffs`) | 18.4 % | 0.34 % |
+| > 45° après érosion | 3.6 % | 1.2 % |
+| point haut (uu) | 1156 | 1353 (l'érosion n'a presque plus rien à faire) |
+| fosses sèches (sous la nappe, sans eau) | 11 | **303** |
+
+| Vue | Lecture |
+|---|---|
+| `B_ground_after` | Au sol depuis le bassin : un versant doux, plus de paroi. Le motif « léopard » du matériau domine. |
+| `C_slope_after`, `A_overview_after` | Relief vallonné, berges douces. **Défaut devenu dominant : l'eau a des bords carrés** — rectangles et L de 4 m, posés dans des fosses. |
+
+Pourquoi les bords carrés ressortent : le masque d'eau prend la tuile la plus proche. À
+1 m, ses « pixels » faisaient 1 m et l'érosion comblait les fosses avec la matière des
+falaises ; à 4 m, ils font 4 m et il n'y a presque plus de falaise pour combler (fosses
+sèches 11 → 303). Le masque d'eau par contour (partie sûre de l'étape 4, qui les mettait
+à 0) règle exactement ce défaut — non repris sans accord.

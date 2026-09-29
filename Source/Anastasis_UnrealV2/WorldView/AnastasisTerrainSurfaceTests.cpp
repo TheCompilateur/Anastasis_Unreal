@@ -343,10 +343,12 @@ bool FAnastasisTerrainSampleHeight::RunTest(const FString&)
 
     // 4. Refus hors emprise. Les sommets etant au CENTRE des tuiles, il n'y a pas de sol
     //    dans la demi-tuile exterieure : y poser quoi que ce soit serait le poser sur rien.
-    TestFalse(TEXT("refus avant le premier sommet"), AnastasisTerrainSurface::SampleHeight(Crop, 10.0, 1600.0, Z));
-    TestFalse(TEXT("refus au-dela du dernier sommet"), AnastasisTerrainSurface::SampleHeight(Crop, 3190.0, 1600.0, Z));
-    TestFalse(TEXT("refus en Y hors emprise"), AnastasisTerrainSurface::SampleHeight(Crop, 1600.0, -50.0, Z));
-    TestFalse(TEXT("refus sur une coordonnee non finie"), AnastasisTerrainSurface::SampleHeight(Crop, std::numeric_limits<double>::quiet_NaN(), 1600.0, Z));
+    //    En tuiles, pas en uu : le pas de tuile est un choix d'echelle, pas une constante du test.
+    const double T = AnastasisWorldView::TileWorldSize;
+    TestFalse(TEXT("refus avant le premier sommet"), AnastasisTerrainSurface::SampleHeight(Crop, 0.1 * T, 16.0 * T, Z));
+    TestFalse(TEXT("refus au-dela du dernier sommet"), AnastasisTerrainSurface::SampleHeight(Crop, 31.9 * T, 16.0 * T, Z));
+    TestFalse(TEXT("refus en Y hors emprise"), AnastasisTerrainSurface::SampleHeight(Crop, 16.0 * T, -0.5 * T, Z));
+    TestFalse(TEXT("refus sur une coordonnee non finie"), AnastasisTerrainSurface::SampleHeight(Crop, std::numeric_limits<double>::quiet_NaN(), 16.0 * T, Z));
 
     // 5. Le monde entier, et le decalage d'emprise : un point donne doit rendre la MEME
     //    hauteur qu'on l'echantillonne dans la tranche ou dans le monde.
