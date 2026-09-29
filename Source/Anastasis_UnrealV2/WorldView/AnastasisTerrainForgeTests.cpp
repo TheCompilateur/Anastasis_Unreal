@@ -694,4 +694,100 @@ bool FAnastasisTerrainForgeBanks::RunTest(const FString&)
 	return true;
 }
 
+
+namespace
+{
+double ShoreAxisFraction(const AnastasisTerrainForge::FMesh& Mesh)
+{
+    const auto& G=Mesh.Geometry;
+    const double Sea=AnastasisTerrainSurface::WaterPlaneZ;
+    double Total=0, Axis=0;
+    for (int32 T=0; T<G.Triangles.Num(); T+=3)
+    {
+        TArray<FVector2D, TInlineAllocator<3>> Hits;
+        for(int32 E=0; E<3; ++E)
+        {
+            const FVector& A=G.Vertices[G.Triangles[T+E]];
+            const FVector& B=G.Vertices[G.Triangles[T+(E+1)%3]];
+            if ((A.Z<Sea)==(B.Z<Sea)) continue;
+            const double U=(Sea-A.Z)/(B.Z-A.Z);
+            Hits.Add(FVector2D(A.X+(B.X-A.X)*U,A.Y+(B.Y-A.Y)*U));
+        }
+        if(Hits.Num()!=2) continue;
+        const FVector2D D=Hits[1]-Hits[0];
+        const double L=D.Size();
+        if(L<1.e-6) continue;
+        Total+=L;
+        if(FMath::Min(FMath::Abs(D.X),FMath::Abs(D.Y))/L < FMath::Sin(FMath::DegreesToRadians(10.0))) Axis+=L;
+    }
+    return Total>0 ? Axis/Total : 0;
+}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainShoreProfile, "Anastasis.Terrain.Forge.ShoreProfile",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainShoreProfile::RunTest(const FString&)
+{
+    const TCHAR* Var=TEXT("anastasis.Terrain.Forge.ShoreProfile");
+    for(const int32 Seed : {12345,54321,42})
+    {
+        const auto Crop=AnastasisWorldView::CaptureCanonicalWorld(Seed);
+        AnastasisTerrainForge::FMesh Before,After;
+        if(!TestTrue(TEXT("baseline forge"),ForgeWith({{Var,0}},Crop,Before)) ||
+           !TestTrue(TEXT("profile forge"),ForgeWith({{Var,1}},Crop,After))) return false;
+        int32 CentreErrors=0, BeforeErrors=0, OutsideChanges=0, Changed=0, NewSteepEdges=0, CentreMoves=0, CoverageChanges=0, ProtectedDryCentres=0;
+        double MaxMove=0;
+        const double Sea=AnastasisTerrainSurface::WaterPlaneZ;
+        const int32 S=After.Subdiv,W=After.FineW,H=After.FineH;
+        TArray<uint8> CoveredBefore,CoveredAfter;
+        CoveredBefore.SetNumZeroed(W*H); CoveredAfter.SetNumZeroed(W*H);
+        for(int32 I:Before.Geometry.WaterTriangles) CoveredBefore[I]=1;
+        for(int32 I:After.Geometry.WaterTriangles) CoveredAfter[I]=1;
+        for(int32 Y=0;Y<H;++Y) for(int32 X=0;X<W;++X)
+        {
+            const int32 I=Y*W+X;
+            const double Move=FMath::Abs(After.Geometry.Vertices[I].Z-Before.Geometry.Vertices[I].Z);
+            MaxMove=FMath::Max(MaxMove,Move);
+            Changed+=Move>1.e-6;
+            const int32 CX=FMath::Min(X/S,Crop.W-2),CY=FMath::Min(Y/S,Crop.H-2);
+            int32 Wet=0;
+            for(int32 J=-1;J<=2;++J) for(int32 K=-1;K<=2;++K)
+                Wet+=Crop.Tiles[FMath::Clamp(CY+J,0,Crop.H-1)*Crop.W+FMath::Clamp(CX+K,0,Crop.W-1)].Type==AnastasisWorld::ETileType::Water;
+            OutsideChanges+=(Wet==0 || Wet==16) && Move>1.e-6;
+            if(X%S==0 && Y%S==0)
+            {
+                CentreMoves+=Move>1.e-6;
+                const bool IsWet=Crop.Tiles[(Y/S)*Crop.W+X/S].Type==AnastasisWorld::ETileType::Water;
+                CentreErrors+=IsWet!=(After.Geometry.Vertices[I].Z<Sea);
+                BeforeErrors+=IsWet!=(Before.Geometry.Vertices[I].Z<Sea);
+                CoverageChanges+=(CoveredBefore[I] && Before.Geometry.Vertices[I].Z<Sea)!=(CoveredAfter[I] && After.Geometry.Vertices[I].Z<Sea);
+                ProtectedDryCentres+=!IsWet && After.Geometry.Vertices[I].Z<Sea-0.5;
+            }
+            for(const int32 N : {X+1<W?I+1:INDEX_NONE,Y+1<H?I+W:INDEX_NONE})
+            {
+                if(N==INDEX_NONE) continue;
+                const double Threshold=(AnastasisWorldView::TileWorldSize/S)*FMath::Tan(FMath::DegreesToRadians(60.0));
+                const bool WasSteep=FMath::Abs(Before.Geometry.Vertices[I].Z-Before.Geometry.Vertices[N].Z)>Threshold;
+                const bool IsSteep=FMath::Abs(After.Geometry.Vertices[I].Z-After.Geometry.Vertices[N].Z)>Threshold;
+                NewSteepEdges+=!WasSteep && IsSteep;
+            }
+        }
+        const auto B=MeasureBanks(Before),A=MeasureBanks(After);
+        const double AxisB=ShoreAxisFraction(Before),AxisA=ShoreAxisFraction(After);
+        AddInfo(FString::Printf(TEXT("SHORE_PROFILE seed=%d centres=%d->%d axis=%.4f->%.4f bank_p90=%.2f->%.2f over60=%.4f->%.4f dry_pits=%d->%d changed=%d max_move=%.2f outside=%d new_steep_edges=%d coverage_changes=%d protected_dry_centres=%d"),
+            Seed,BeforeErrors,CentreErrors,AxisB,AxisA,B.P90,A.P90,B.Over60,A.Over60,B.DryPits,A.DryPits,Changed,MaxMove,OutsideChanges,NewSteepEdges,CoverageChanges,ProtectedDryCentres));
+        TestEqual(TEXT("aucun centre de tuile deplace"),CentreMoves,0);
+        TestEqual(TEXT("aucune nouvelle divergence terre/eau"),CentreErrors,BeforeErrors);
+        TestTrue(TEXT("deplacement vertical borne a 1 m"),MaxMove<=100.000001);
+        TestEqual(TEXT("hors cellules de rive inchange"),OutsideChanges,0);
+        TestEqual(TEXT("seuls les centres secs proteges restent sans eau"),A.DryPits,ProtectedDryCentres);
+        TestEqual(TEXT("aucun centre inonde ou asseche"),CoverageChanges,0);
+        TestTrue(TEXT("moins de rive alignee sur les axes"),AxisA<AxisB);
+        TestTrue(TEXT("p90 de berge non degrade"),A.P90<=B.P90);
+        TestEqual(TEXT("aucune nouvelle arete de paroi >60 deg"),NewSteepEdges,0);
+    }
+    AnastasisTerrainForge::ClearActive();
+    return true;
+}
+
 #endif

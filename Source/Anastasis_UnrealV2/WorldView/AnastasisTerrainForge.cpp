@@ -94,6 +94,11 @@ static TAutoConsoleVariable<int32> CVarForgeErosionIterations(
 	TEXT("Thermal erosion iterations. 0 = off."),
 	ECVF_Default);
 
+// Opt-in comparison: smooth a bounded shore band, preserving all coarse centre heights.
+static TAutoConsoleVariable<int32> CVarForgeShoreProfile(
+    TEXT("anastasis.Terrain.Forge.ShoreProfile"), 0,
+    TEXT("1 = bounded rendered shore profile and water coverage from final height. 0 = delivered terrain."), ECVF_Default);
+
 namespace
 {
 using AnastasisWorldView::FVisualTile;
@@ -145,6 +150,71 @@ void BilinearSample(
 double CatmullRom(double P0, double P1, double P2, double P3, double T)
 {
 	return P1 + 0.5 * T * (P2 - P0 + T * (2.0 * P0 - 5.0 * P1 + 4.0 * P2 - P3 + T * (3.0 * (P1 - P2) + P3 - P0)));
+}
+
+/** Bounded smoothing of the rendered shore. Coarse centres are immutable.
+ * Stencil/halo matches SampleAlt. Edge projections cannot introduce a >60 degree
+ * edge where the delivered mesh had none. This is not erosion or sim hydrology.
+ */
+void SmoothRenderedShore(const FWorldVisualSnapshot& Source, double DX, double DY,
+    TArray<FVector>& Vertices, int32 W, int32 H, int32 Subdiv)
+{
+    const int32 N=Vertices.Num();
+    TArray<double> Original, Z, Next;
+    TArray<uint8> Movable;
+    Original.SetNumUninitialized(N); Z.SetNumUninitialized(N); Next.SetNumUninitialized(N);
+    Movable.SetNumZeroed(N);
+    for(int32 Y=0;Y<H;++Y) for(int32 X=0;X<W;++X)
+    {
+        const int32 I=Y*W+X;
+        Original[I]=Z[I]=Vertices[I].Z;
+        if((X%Subdiv==0 && Y%Subdiv==0) || X==0 || Y==0 || X==W-1 || Y==H-1) continue;
+        const int32 CX=FMath::FloorToInt(X/static_cast<double>(Subdiv)+DX);
+        const int32 CY=FMath::FloorToInt(Y/static_cast<double>(Subdiv)+DY);
+        int32 Wet=0;
+        for(int32 J=-1;J<=2;++J) for(int32 K=-1;K<=2;++K)
+            Wet+=CoarseTile(Source,FMath::Clamp(CX+K,0,Source.W-1),FMath::Clamp(CY+J,0,Source.H-1)).Type==ETileType::Water;
+        Movable[I]=Wet>0 && Wet<16;
+    }
+    constexpr double MaxMove=100.0;
+    for(int32 Pass=0;Pass<32;++Pass)
+    {
+        Next=Z;
+        for(int32 Y=1;Y<H-1;++Y) for(int32 X=1;X<W-1;++X)
+        {
+            const int32 I=Y*W+X;
+            if(!Movable[I]) continue;
+            const double Average=(Z[I-1]+Z[I+1]+Z[I-W]+Z[I+W])*0.25;
+            Next[I]=FMath::Clamp(FMath::Lerp(Z[I],Average,0.5),Original[I]-MaxMove,Original[I]+MaxMove);
+        }
+        Swap(Z,Next);
+    }
+    const double Steep=(AnastasisWorldView::TileWorldSize/Subdiv)*FMath::Tan(FMath::DegreesToRadians(60.0))-0.01;
+    // Alternating projections onto convex edge, displacement and fixed-centre constraints.
+    // The original mesh is feasible. Stop only when all edge violations are negligible.
+    bool bConverged=false;
+    for(int32 Pass=0;Pass<400;++Pass)
+    {
+        double Violation=0;
+        for(int32 Y=0;Y<H;++Y) for(int32 X=0;X<W;++X)
+        {
+            const int32 I=Y*W+X;
+            for(const int32 J : {X+1<W?I+1:INDEX_NONE,Y+1<H?I+W:INDEX_NONE})
+            {
+                if(J==INDEX_NONE || (!Movable[I] && !Movable[J])) continue;
+                const double Limit=FMath::Max(Steep,FMath::Abs(Original[I]-Original[J]));
+                const double D=Z[I]-Z[J], Excess=FMath::Abs(D)-Limit;
+                if(Excess<=1.e-7) continue;
+                Violation=FMath::Max(Violation,Excess);
+                const double Move=FMath::Sign(D)*Excess/(Movable[I]+Movable[J]);
+                if(Movable[I]) Z[I]=FMath::Clamp(Z[I]-Move,Original[I]-MaxMove,Original[I]+MaxMove);
+                if(Movable[J]) Z[J]=FMath::Clamp(Z[J]+Move,Original[J]-MaxMove,Original[J]+MaxMove);
+            }
+        }
+        if(Violation<1.e-6) { bConverged=true; break; }
+    }
+    if(!bConverged) UE_LOG(LogTemp,Warning,TEXT("SHORE_PROFILE projection limit: keeping original heights"));
+    for(int32 I=0;I<N;++I) Vertices[I].Z=bConverged ? Z[I] : Original[I];
 }
 
 /**
@@ -855,19 +925,37 @@ bool AnastasisTerrainForge::Apply(
 		ThermalErode(Result.Vertices, Water, FineW, FineH,
 			AnastasisWorldView::TileWorldSize * InvSub, TalusDeg, ErosionIterations);
 	}
+
+    const bool bShoreProfile = CVarForgeShoreProfile.GetValueOnGameThread() != 0;
+    if (bShoreProfile)
+        SmoothRenderedShore(AltSource, AltDX, AltDY, Result.Vertices, FineW, FineH, Subdiv);
 	for (const FVector& P : Result.Vertices)
 	{
 		MinZ = FMath::Min(MinZ, P.Z);
 		MaxZ = FMath::Max(MaxZ, P.Z);
 	}
 
+    // Some delivered non-water centres lie below the global water plane. Extending
+    // coverage must not flood them. Preserve those dry centres until their source
+    // height/water-level inconsistency is handled by a separate hydrology decision.
+    TArray<uint8> ProtectedDryCentre;
+    ProtectedDryCentre.SetNumZeroed(FineN);
+    if(bShoreProfile)
+        for(int32 Y=0;Y<CoarseH;++Y) for(int32 X=0;X<CoarseW;++X)
+        {
+            const int32 I=Y*Subdiv*FineW+X*Subdiv;
+            ProtectedDryCentre[I]=CoarseTile(Crop,X,Y).Type!=ETileType::Water && Result.Vertices[I].Z<SeaZ;
+        }
 	for (int32 JY = 0; JY < FineH - 1; ++JY)
 	{
 		for (int32 IX = 0; IX < FineW - 1; ++IX)
 		{
 			const int32 A = JY * FineW + IX, B = A + 1, C = A + FineW, D = C + 1;
 			Result.Triangles.Append({A, C, B, B, C, D});
-			if (Water[A] || Water[B] || Water[C] || Water[D])
+			if (bShoreProfile
+                ? (!ProtectedDryCentre[A] && !ProtectedDryCentre[B] && !ProtectedDryCentre[C] && !ProtectedDryCentre[D]
+                    && (Result.Vertices[A].Z < SeaZ || Result.Vertices[B].Z < SeaZ || Result.Vertices[C].Z < SeaZ || Result.Vertices[D].Z < SeaZ))
+                : (Water[A] || Water[B] || Water[C] || Water[D]))
 			{
 				Result.WaterTriangles.Append({A, C, B, B, C, D});
 			}
