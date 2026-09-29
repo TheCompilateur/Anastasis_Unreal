@@ -396,6 +396,12 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
         };
         Habitat.Basin = ForgeBasin;
         Habitat.bHasBasin = !ForgeBasin.IsZero();
+        Habitat.SampleWaterHeight = [&](double X,double Y,double& Z)
+        {
+            if (AnastasisTerrainForge::SampleActiveWater(X,Y,Z)) return true;
+            Z=AnastasisTerrainSurface::WaterPlaneZ;
+            return true;
+        };
         const bool bMacro = ForestDressing.bMacroForest && CVarMacroForest.GetValueOnGameThread() != 0;
         if (!AnastasisEcologicalDressing::Build(CanonicalSource, ForestDressing, ForestPlan, Error,
             bMacro ? &Habitat : nullptr))

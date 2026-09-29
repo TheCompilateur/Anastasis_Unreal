@@ -9,6 +9,7 @@
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Engine/StaticMesh.h"
 #include "HAL/IConsoleManager.h"
 #include "Village/AnastasisVillagePresentation.h"
 #include "Sim/AnastasisSimulation.h"
@@ -181,7 +182,7 @@ bool FHumanGeographyCollision::RunTest(const FString&)
     TestEqual(TEXT("collision hits at all five physical sites"),Hits,5);
     TestTrue(TEXT("collision follows rendered terrain within 1cm"),Error<1.0);
     TArray<UHierarchicalInstancedStaticMeshComponent*> HISMs;Actor->GetComponents(HISMs);
-    int32 HiddenColliders=0,Instances=0;double MaxObjectScale=0;
+    int32 HiddenColliders=0,Instances=0;double MaxOtherScale=0,MaxTreeHeightUU=0;
     for(auto* H:HISMs)
     {
         if(H->GetName().StartsWith(TEXT("Tiles_"))){if(H->GetCollisionEnabled()!=ECollisionEnabled::NoCollision)++HiddenColliders;continue;}
@@ -189,12 +190,21 @@ bool FHumanGeographyCollision::RunTest(const FString&)
         // normalises a 1 m (un chene de 21 m = echelle 21), constante, sans lien avec SpatialScale.
         if(H->GetName().StartsWith(TEXT("Place_"))){Instances+=H->GetInstanceCount();continue;}
         Instances+=H->GetInstanceCount();
-        for(int32 I=0;I<H->GetInstanceCount();++I){FTransform T;H->GetInstanceTransform(I,T,true);MaxObjectScale=FMath::Max(MaxObjectScale,T.GetScale3D().GetMax());}
+        for(int32 I=0;I<H->GetInstanceCount();++I)
+        {
+            FTransform T;H->GetInstanceTransform(I,T,true);
+            if(H->GetName().StartsWith(TEXT("Dressing_Tree_")) && H->GetStaticMesh())
+                MaxTreeHeightUU=FMath::Max(MaxTreeHeightUU,H->GetStaticMesh()->GetBoundingBox().GetSize().Z*T.GetScale3D().Z);
+            else MaxOtherScale=FMath::Max(MaxOtherScale,T.GetScale3D().GetMax());
+        }
     }
     TestEqual(TEXT("hidden debug slabs cannot collide with the new terrain"),HiddenColliders,0);
     TestTrue(TEXT("dressing remains present"),Instances>0);
-    TestTrue(TEXT("object meshes were not enlarged twentyfold"),MaxObjectScale<10.0);
-    AddInfo(FString::Printf(TEXT("HUMAN_COLLISION hits=%d max_error_cm=%.6f dressing=%d max_object_scale=%.3f"),Hits,Error,Instances,MaxObjectScale));
+    // Macro trees intentionally exceed the old <10 mesh-scale proxy. Guard physical
+    // stature separately: multiplying them by world scale 5 would break this 30m ceiling.
+    TestTrue(TEXT("non-tree objects were not enlarged with the terrain"),MaxOtherScale<10.0);
+    TestTrue(TEXT("tree stature remains under 30m independently of world scale"),MaxTreeHeightUU>0 && MaxTreeHeightUU<=3000.0);
+    AddInfo(FString::Printf(TEXT("HUMAN_COLLISION hits=%d max_error_cm=%.6f dressing=%d max_other_scale=%.3f max_tree_height_cm=%.1f"),Hits,Error,Instances,MaxOtherScale,MaxTreeHeightUU));
     Actor->Destroy();AnastasisTerrainForge::ClearActive();return true;
 }
 #endif
