@@ -89,6 +89,26 @@ Non vérifié en PIE ; captures éditeur seulement. Le monde fait 384 m au lieu 
 - `ShoreDepthSpan` (60 uu, en Z) inchangé : l'échelle ne touche pas aux profondeurs.
 - `AnastasisTerrainForge.cpp` est chaud (`terrain-forge-chunk-seam-halo` vient d'y passer).
 
+## ÉTUDE — bords carrés de l'eau (lecture seule, 2026-09-29)
+
+Le masque d'eau par contour a été essayé à 4 m puis **non retenu** : fosses sèches
+303 → 0 et centres de tuile fidèles à la sim (8 écarts → 0), mais image quasi identique
+(1.4 % de pixels changés) et dernière arête avant l'eau plus raide (> 60° : 3 % → 12.5 %).
+
+Cause réelle des bords carrés : la **forme de l'eau dans la simulation**, pas le masque.
+`StampLakeBasins` creuse les lacs tuile par tuile à fond plat ; `CarveChannels` suit
+`FlowTo` en 4 directions (rivières en escalier, en L) ; `WidenAround` élargit en carrés.
+Le relief rendu croise la nappe le long de ces formes : à 4 m, ce sont des blocs de 4 m.
+Changer le masque ne change pas où le **relief** passe sous l'eau.
+
+Voie identifiée, non commencée : remodeler le relief dans une bande de rive à partir
+d'une distance signée à l'eau, lissée (coins arrondis, escaliers adoucis), avec un
+profil de berge. Coût : le trait de rive s'écarte des tuiles de la sim aux coins
+(à mesurer : centres de tuile basculés). Recouvre `hydra-forge-001` (rubans et berges
+posés sur les tuiles d'eau, non commité, réglé à 1 m/tuile) : à coordonner. Première
+étape proposée : une mesure de « l'équerrage » du rivage (part du trait de rive dont la
+normale est à ±10° d'un axe) pour que le progrès se chiffre.
+
 ## STOP
 
 Ne revendique pas une carte finie : les bords carrés de l'eau, le vide autour de la
