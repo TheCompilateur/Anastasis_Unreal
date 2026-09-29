@@ -39,6 +39,29 @@ static TAutoConsoleVariable<int32> CVarForgeEscarpments(
 	TEXT("1 = steepen steep convex breaks into escarpments (legacy TERRAIN_FORGE). 0 = off."),
 	ECVF_Default);
 
+// TERRAIN_RELIEF_001, etape 2.
+//
+// Bicubic : l'altitude fine etait un bilineaire de la grille de tuiles. Un bilineaire
+// est continu mais sa pente saute sur chaque ligne de tuile : le maillage fin porte
+// donc un pli tous les 1 m, et son Laplacien n'est non nul QUE sur ces lignes.
+//
+// Sharpen : la passe "macro" ajoutait 1.35 x Laplacien positif (et 0.95 x negatif),
+// puis affutait le point haut. Sur un bilineaire, ce Laplacien est concentre aux noeuds
+// de tuile, et il est enorme a cote des chenaux que l'hydrologie creuse d'une tuile de
+// large : la tuile de terre qui borde le chenal lit une convexite forte et monte en
+// lame. C'est la frange de pics le long de l'eau des captures de l'etape 1.
+static TAutoConsoleVariable<int32> CVarForgeBicubic(
+	TEXT("anastasis.Terrain.Forge.Bicubic"),
+	1,
+	TEXT("1 = clamped Catmull-Rom altitude between tiles. 0 = bilinear (legacy, creases on every tile line)."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarForgeSharpen(
+	TEXT("anastasis.Terrain.Forge.Sharpen"),
+	0,
+	TEXT("1 = Laplacian ridge/bowl amplification and landmark peak sharpening (legacy TERRAIN_FORGE). 0 = off."),
+	ECVF_Default);
+
 namespace
 {
 using AnastasisWorldView::FVisualTile;
@@ -85,6 +108,61 @@ void BilinearSample(
 	const int32 NX = FMath::Clamp(FMath::RoundToInt(U), 0, W - 1);
 	const int32 NY = FMath::Clamp(FMath::RoundToInt(V), 0, H - 1);
 	bWater = CoarseTile(Crop, NX, NY).Type == ETileType::Water;
+}
+
+double CatmullRom(double P0, double P1, double P2, double P3, double T)
+{
+	return P1 + 0.5 * T * (P2 - P0 + T * (2.0 * P0 - 5.0 * P1 + 4.0 * P2 - P3 + T * (3.0 * (P1 - P2) + P3 - P0)));
+}
+
+/**
+ * Altitude au point (U,V), en coordonnees de tuile LOCALES a Source.
+ *
+ * Bicubique : Catmull-Rom sur 4x4 tuiles, borne au min/max des 4 tuiles de la cellule.
+ * Catmull-Rom passe par chaque tuile (l'altitude de simulation reste exacte au centre de
+ * tuile) et sa pente est continue d'une cellule a l'autre : plus de pli sur les lignes de
+ * tuile. La borne interdit tout extremum nouveau : sans elle, le bord d'un chenal creuse
+ * d'une tuile de large fait "sonner" la spline -- une bosse au-dessus de la berge, un creux
+ * sous le lit. C'est exactement l'artefact que cette etape retire, il ne doit pas revenir
+ * par l'interpolation. Prix de la borne : un sommet dont le maximum tombe entre deux tuiles
+ * est ecrete a la valeur de sa tuile la plus haute, comme le faisait deja le bilineaire.
+ *
+ * Portee : une tuile de plus que le bilineaire de chaque cote. C'est ce qui fixe
+ * AnastasisTerrainForge::HaloTiles a 2.
+ */
+double SampleAlt(const FWorldVisualSnapshot& Source, double U, double V, bool bBicubic)
+{
+	const int32 W = Source.W, H = Source.H;
+	const int32 X = FMath::Clamp(static_cast<int32>(FMath::FloorToDouble(U)), 0, W - 2);
+	const int32 Y = FMath::Clamp(static_cast<int32>(FMath::FloorToDouble(V)), 0, H - 2);
+	const double Fx = FMath::Clamp(U - static_cast<double>(X), 0.0, 1.0);
+	const double Fy = FMath::Clamp(V - static_cast<double>(Y), 0.0, 1.0);
+	auto A = [&Source, W, H](int32 I, int32 J) -> double
+	{
+		return Source.Tiles[FMath::Clamp(J, 0, H - 1) * W + FMath::Clamp(I, 0, W - 1)].Alt;
+	};
+	const double A00 = A(X, Y), A10 = A(X + 1, Y), A01 = A(X, Y + 1), A11 = A(X + 1, Y + 1);
+	if (!bBicubic)
+	{
+		// Meme formule, meme ordre d'operations que BilinearSample : bit a bit la forge
+		// d'avant. Les terrasses arrondissent l'altitude (Floor) ; un ecart d'un ULP y
+		// change une marche entiere, et la reference de l'etape 1 ne se reproduirait plus.
+		const double W00 = (1.0 - Fx) * (1.0 - Fy);
+		const double W10 = Fx * (1.0 - Fy);
+		const double W01 = (1.0 - Fx) * Fy;
+		const double W11 = Fx * Fy;
+		return A00 * W00 + A10 * W10 + A01 * W01 + A11 * W11;
+	}
+	double Rows[4];
+	for (int32 K = 0; K < 4; ++K)
+	{
+		const int32 J = Y - 1 + K;
+		Rows[K] = CatmullRom(A(X - 1, J), A(X, J), A(X + 1, J), A(X + 2, J), Fx);
+	}
+	const double Value = CatmullRom(Rows[0], Rows[1], Rows[2], Rows[3], Fy);
+	const double Lo = FMath::Min(FMath::Min(A00, A10), FMath::Min(A01, A11));
+	const double Hi = FMath::Max(FMath::Max(A00, A10), FMath::Max(A01, A11));
+	return FMath::Clamp(Value, Lo, Hi);
 }
 
 ETileType NearestType(const FWorldVisualSnapshot& Crop, double U, double V)
@@ -239,6 +317,14 @@ bool AnastasisTerrainForge::Apply(
 	const double Exaggerate = FMath::Clamp(static_cast<double>(CVarForgeExaggerate.GetValueOnGameThread()), 1.0, 8.0);
 	const bool bTerraces = CVarForgeTerraces.GetValueOnGameThread() != 0;
 	const bool bEscarpments = CVarForgeEscarpments.GetValueOnGameThread() != 0;
+	const bool bBicubic = CVarForgeBicubic.GetValueOnGameThread() != 0;
+	const bool bSharpen = CVarForgeSharpen.GetValueOnGameThread() != 0;
+	// L'altitude fine se lit dans le halo quand il existe : au bord de Crop, le stencil
+	// bicubique a besoin des tuiles voisines, et sans elles la derniere cellule du chunk
+	// ne raccorderait pas a celle du monde entier (cf. Anastasis.Terrain.Forge.ChunkSeam).
+	const FWorldVisualSnapshot& AltSource = HaloCrop ? *HaloCrop : Crop;
+	const double AltDX = static_cast<double>(Crop.OriginX - AltSource.OriginX);
+	const double AltDY = static_cast<double>(Crop.OriginY - AltSource.OriginY);
 	const int32 FineW = (CoarseW - 1) * Subdiv + 1;
 	const int32 FineH = (CoarseH - 1) * Subdiv + 1;
 	const int32 FineN = FineW * FineH;
@@ -268,7 +354,7 @@ bool AnastasisTerrainForge::Apply(
 			double Alt = 0.0, Sh = 0.0, We = 0.0;
 			bool bWater = false;
 			BilinearSample(Crop, U, V, Alt, Sh, We, bWater);
-			H[I] = Alt;
+			H[I] = SampleAlt(AltSource, U + AltDX, V + AltDY, bBicubic);
 			Shore[I] = Sh;
 			Wet[I] = We;
 			Water[I] = bWater ? 1 : 0;
@@ -283,7 +369,7 @@ bool AnastasisTerrainForge::Apply(
 	// dit lequel des deux vient de se produire -- c'est ce qui distingue un vrai bord du
 	// monde (clamp legitime, aucune tuile voisine n'existe) d'un bord de chunk que le
 	// halo couvre (clamp evitable).
-	auto At = [&H, &Crop, HaloCrop, FineW, FineH, InvSub](int32 X, int32 Y, bool* OutReliable = nullptr) -> double
+	auto At = [&H, &Crop, HaloCrop, FineW, FineH, InvSub, bBicubic](int32 X, int32 Y, bool* OutReliable = nullptr) -> double
 	{
 		if (X >= 0 && X < FineW && Y >= 0 && Y < FineH)
 		{
@@ -296,11 +382,8 @@ bool AnastasisTerrainForge::Apply(
 			const double V = static_cast<double>(Y) * InvSub + static_cast<double>(Crop.OriginY - HaloCrop->OriginY);
 			if (U >= 0.0 && V >= 0.0 && U <= static_cast<double>(HaloCrop->W - 1) && V <= static_cast<double>(HaloCrop->H - 1))
 			{
-				double Alt = 0.0, Sh = 0.0, We = 0.0;
-				bool bW = false;
-				BilinearSample(*HaloCrop, U, V, Alt, Sh, We, bW);
 				if (OutReliable) { *OutReliable = true; }
-				return Alt;
+				return SampleAlt(*HaloCrop, U, V, bBicubic);
 			}
 		}
 		if (OutReliable) { *OutReliable = false; }
@@ -402,8 +485,11 @@ bool AnastasisTerrainForge::Apply(
 			const double Acc = static_cast<double>(Accum[I]);
 
 			// Macro: ridges rise, bowls drop — existing masses, not new continents.
-			Alt += FMath::Max(L, 0.0) * 1.35;
-			Alt += FMath::Min(L, 0.0) * 0.95;
+			if (bSharpen)
+			{
+				Alt += FMath::Max(L, 0.0) * 1.35;
+				Alt += FMath::Min(L, 0.0) * 0.95;
+			}
 
 			// Ravines follow drainage. Keep them off the wet coastal shelf.
 			const double Ravine = SmoothStep(8.0, 40.0, Acc) * (1.0 - SmoothStep(0.35, 0.75, Sh));
@@ -538,8 +624,9 @@ bool AnastasisTerrainForge::Apply(
 		}
 	}
 
-	// Landmark high ground: keep the peak, sharpen its shoulders.
-	if (LandmarkI != INDEX_NONE)
+	// Landmark high ground: keep the peak, sharpen its shoulders. Le point haut reste
+	// identifie (les cameras et le bassin s'y referent) ; seul l'affutage est coupe.
+	if (bSharpen && LandmarkI != INDEX_NONE)
 	{
 		const int32 LX = LandmarkI % FineW;
 		const int32 LY = LandmarkI / FineW;

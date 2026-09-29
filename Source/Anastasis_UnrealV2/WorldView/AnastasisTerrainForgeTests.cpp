@@ -210,8 +210,9 @@ bool FAnastasisTerrainForgeChunkSeam::RunTest(const FString&)
 	TArray<double> LapNoHalo;
 	if (!TestTrue(TEXT("forge sans halo"), AnastasisTerrainForge::Apply(Crop, GeoNoHalo, MeshNoHalo, nullptr, &LapNoHalo))) return false;
 
-	const auto HaloCrop = AnastasisWorldView::CropSnapshot(World, OX - 1, OY - 1, W + 2, H + 2);
-	if (!TestEqual(TEXT("halo valide"), HaloCrop.Tiles.Num(), (W + 2) * (H + 2))) return false;
+	const int32 M = AnastasisTerrainForge::HaloTiles;
+	const auto HaloCrop = AnastasisWorldView::CropSnapshot(World, OX - M, OY - M, W + 2 * M, H + 2 * M);
+	if (!TestEqual(TEXT("halo valide"), HaloCrop.Tiles.Num(), (W + 2 * M) * (H + 2 * M))) return false;
 
 	AnastasisTerrainSurface::FGeometry GeoHalo;
 	if (!TestTrue(TEXT("build avec halo"), AnastasisTerrainSurface::Build(Crop, GeoHalo))) return false;
@@ -292,6 +293,14 @@ struct FRenderedReliefStats
 	double SteepFrac = 0.0;
 	double P99SlopeDeg = 0.0;
 	double MaxSlopeDeg = 0.0;
+	/** Sommets de terre plus hauts que leurs 8 voisins ET de plus de 50 uu que leur moyenne : des lames. */
+	int32 Spikes = 0;
+	/**
+	 * |Z''| moyen sur les lignes de tuile / |Z''| moyen entre elles. Un bilineaire n'a de
+	 * courbure QUE sur les lignes de tuile : le rapport y est grand. Une surface sans pli
+	 * de grille tend vers 1.
+	 */
+	double CreaseRatio = 0.0;
 };
 
 FRenderedReliefStats MeasureRenderedRelief(const AnastasisTerrainForge::FMesh& Mesh)
@@ -304,6 +313,8 @@ FRenderedReliefStats MeasureRenderedRelief(const AnastasisTerrainForge::FMesh& M
 	TArray<double> Slopes;
 	double SecondSum = 0.0;
 	int32 Steep = 0;
+	double OnLine = 0.0, OffLine = 0.0;
+	int32 OnCount = 0, OffCount = 0;
 	for (int32 Y = 1; Y < H - 1; ++Y)
 	{
 		for (int32 X = 1; X < W - 1; ++X)
@@ -321,9 +332,33 @@ FRenderedReliefStats MeasureRenderedRelief(const AnastasisTerrainForge::FMesh& M
 			const double Deg = FMath::RadiansToDegrees(FMath::Atan(FMath::Sqrt(Dx * Dx + Dy * Dy)));
 			Slopes.Add(Deg);
 			Steep += Deg > 60.0 ? 1 : 0;
-			SecondSum += 0.5 * (FMath::Abs(ZL - 2.0 * Z + ZR) + FMath::Abs(ZD - 2.0 * Z + ZU));
+			const double D2X = FMath::Abs(ZL - 2.0 * Z + ZR);
+			const double D2Y = FMath::Abs(ZD - 2.0 * Z + ZU);
+			SecondSum += 0.5 * (D2X + D2Y);
+			// Courbure le long de X : sur une ligne de tuile quand X tombe sur un noeud grossier.
+			(X % Mesh.Subdiv == 0 ? OnLine : OffLine) += D2X;
+			++(X % Mesh.Subdiv == 0 ? OnCount : OffCount);
+			(Y % Mesh.Subdiv == 0 ? OnLine : OffLine) += D2Y;
+			++(Y % Mesh.Subdiv == 0 ? OnCount : OffCount);
+
+			double NeighbourSum = 0.0;
+			bool bStrictMax = true;
+			for (int32 DY = -1; DY <= 1; ++DY)
+			{
+				for (int32 DX = -1; DX <= 1; ++DX)
+				{
+					if (DX == 0 && DY == 0) continue;
+					const double ZN = V[I + DY * W + DX].Z;
+					NeighbourSum += ZN;
+					bStrictMax &= ZN < Z;
+				}
+			}
+			Out.Spikes += (bStrictMax && Z - NeighbourSum / 8.0 > 50.0) ? 1 : 0;
 		}
 	}
+	Out.CreaseRatio = (OnCount > 0 && OffCount > 0 && OffLine > 0.0)
+		? (OnLine / OnCount) / (OffLine / OffCount)
+		: 0.0;
 	Out.Samples = Slopes.Num();
 	if (Out.Samples == 0)
 	{
@@ -337,24 +372,35 @@ FRenderedReliefStats MeasureRenderedRelief(const AnastasisTerrainForge::FMesh& M
 	return Out;
 }
 
-bool ForgeWith(int32 Terraces, int32 Escarpments, const AnastasisWorldView::FWorldVisualSnapshot& Crop, AnastasisTerrainForge::FMesh& OutMesh)
+/** Forge Crop avec certaines CVars de la forge forcees, puis les restaure. Les autres gardent leur defaut. */
+bool ForgeWith(std::initializer_list<TPair<const TCHAR*, int32>> Vars, const AnastasisWorldView::FWorldVisualSnapshot& Crop, AnastasisTerrainForge::FMesh& OutMesh)
 {
-	IConsoleVariable* TerraceVar = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Terrain.Forge.Terraces"));
-	IConsoleVariable* EscarpVar = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Terrain.Forge.Escarpments"));
-	if (!TerraceVar || !EscarpVar)
+	TArray<TPair<IConsoleVariable*, int32>> Previous;
+	bool bOk = true;
+	for (const TPair<const TCHAR*, int32>& Var : Vars)
 	{
-		return false;
+		IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(Var.Key);
+		if (!CVar)
+		{
+			bOk = false;
+			break;
+		}
+		Previous.Emplace(CVar, CVar->GetInt());
+		CVar->Set(Var.Value, ECVF_SetByCode);
 	}
-	const int32 PrevTerraces = TerraceVar->GetInt();
-	const int32 PrevEscarp = EscarpVar->GetInt();
-	TerraceVar->Set(Terraces, ECVF_SetByCode);
-	EscarpVar->Set(Escarpments, ECVF_SetByCode);
 	AnastasisTerrainSurface::FGeometry Geometry;
-	const bool bOk = AnastasisTerrainSurface::Build(Crop, Geometry) && AnastasisTerrainForge::Apply(Crop, Geometry, OutMesh);
-	TerraceVar->Set(PrevTerraces, ECVF_SetByCode);
-	EscarpVar->Set(PrevEscarp, ECVF_SetByCode);
+	bOk = bOk && AnastasisTerrainSurface::Build(Crop, Geometry) && AnastasisTerrainForge::Apply(Crop, Geometry, OutMesh);
+	for (const TPair<IConsoleVariable*, int32>& Var : Previous)
+	{
+		Var.Key->Set(Var.Value, ECVF_SetByCode);
+	}
 	return bOk;
 }
+
+const TCHAR* const TerracesVar = TEXT("anastasis.Terrain.Forge.Terraces");
+const TCHAR* const EscarpmentsVar = TEXT("anastasis.Terrain.Forge.Escarpments");
+const TCHAR* const BicubicVar = TEXT("anastasis.Terrain.Forge.Bicubic");
+const TCHAR* const SharpenVar = TEXT("anastasis.Terrain.Forge.Sharpen");
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainForgeNoStaircase, "Anastasis.Terrain.Forge.NoStaircase",
@@ -377,8 +423,10 @@ bool FAnastasisTerrainForgeNoStaircase::RunTest(const FString&)
 
 	const auto Crop = AnastasisWorldView::CaptureCanonicalWorld(12345);
 	AnastasisTerrainForge::FMesh Legacy, Relief;
-	if (!TestTrue(TEXT("forge d'origine"), ForgeWith(1, 1, Crop, Legacy))
-		|| !TestTrue(TEXT("forge sans escalier"), ForgeWith(0, 0, Crop, Relief)))
+	// Bicubic/Sharpen epingles a leur valeur de l'etape 1 : ce test isole les terrasses et
+	// l'escarpement, et ses chiffres doivent rester ceux que l'etape 1 a publies.
+	if (!TestTrue(TEXT("forge d'origine"), ForgeWith({{BicubicVar, 0}, {SharpenVar, 1}, {TerracesVar, 1}, {EscarpmentsVar, 1}}, Crop, Legacy))
+		|| !TestTrue(TEXT("forge sans escalier"), ForgeWith({{BicubicVar, 0}, {SharpenVar, 1}, {TerracesVar, 0}, {EscarpmentsVar, 0}}, Crop, Relief)))
 	{
 		AnastasisTerrainForge::ClearActive();
 		return false;
@@ -398,6 +446,48 @@ bool FAnastasisTerrainForgeNoStaircase::RunTest(const FString&)
 		TEXT("after: samples=%d second_diff_uu=%.2f steep60=%.4f p99_deg=%.1f max_deg=%.1f"),
 		Before.Samples, Before.MeanSecondDiff, Before.SteepFrac, Before.P99SlopeDeg, Before.MaxSlopeDeg,
 		After.Samples, After.MeanSecondDiff, After.SteepFrac, After.P99SlopeDeg, After.MaxSlopeDeg));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainForgeNoSpikes, "Anastasis.Terrain.Forge.NoSpikes",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainForgeNoSpikes::RunTest(const FString&)
+{
+	// TERRAIN_RELIEF_001, etape 2. Deux causes, deux mesures :
+	//  - le bilineaire plie le maillage sur chaque ligne de tuile     -> CreaseRatio
+	//  - l'amplification du Laplacien leve des lames au bord des chenaux -> Spikes
+	// Reference : la forge de l'etape 1 (bilineaire + amplification), meme processus.
+	IConsoleVariable* Bicubic = IConsoleManager::Get().FindConsoleVariable(BicubicVar);
+	IConsoleVariable* Sharpen = IConsoleManager::Get().FindConsoleVariable(SharpenVar);
+	if (!TestNotNull(TEXT("cvar bicubique"), Bicubic) || !TestNotNull(TEXT("cvar affutage"), Sharpen))
+	{
+		return false;
+	}
+	TestEqual(TEXT("bicubique par defaut"), Bicubic->GetInt(), 1);
+	TestEqual(TEXT("affutage coupe par defaut"), Sharpen->GetInt(), 0);
+
+	const auto Crop = AnastasisWorldView::CaptureCanonicalWorld(12345);
+	AnastasisTerrainForge::FMesh Legacy, Smooth;
+	if (!TestTrue(TEXT("forge etape 1"), ForgeWith({{BicubicVar, 0}, {SharpenVar, 1}}, Crop, Legacy))
+		|| !TestTrue(TEXT("forge etape 2"), ForgeWith({{BicubicVar, 1}, {SharpenVar, 0}}, Crop, Smooth)))
+	{
+		AnastasisTerrainForge::ClearActive();
+		return false;
+	}
+	const FRenderedReliefStats Before = MeasureRenderedRelief(Legacy);
+	const FRenderedReliefStats After = MeasureRenderedRelief(Smooth);
+	TestTrue(TEXT("terre mesuree"), Before.Samples > 1000 && After.Samples > 1000);
+
+	TestTrue(TEXT("moins de lames"), After.Spikes < Before.Spikes);
+	TestTrue(TEXT("le pli de grille recule"), After.CreaseRatio < Before.CreaseRatio);
+	TestTrue(TEXT("moins rugueux"), After.MeanSecondDiff < Before.MeanSecondDiff);
+
+	AnastasisTerrainForge::ClearActive();
+	AddInfo(FString::Printf(
+		TEXT("TERRAIN_RELIEF_SPIKES before: spikes=%d crease=%.2f second_diff_uu=%.2f steep60=%.4f p99_deg=%.1f | ")
+		TEXT("after: spikes=%d crease=%.2f second_diff_uu=%.2f steep60=%.4f p99_deg=%.1f"),
+		Before.Spikes, Before.CreaseRatio, Before.MeanSecondDiff, Before.SteepFrac, Before.P99SlopeDeg,
+		After.Spikes, After.CreaseRatio, After.MeanSecondDiff, After.SteepFrac, After.P99SlopeDeg));
 	return true;
 }
 

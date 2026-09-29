@@ -61,19 +61,23 @@ inline constexpr int32 TrianglesFor(int32 W, int32 H) { return 2 * (W - 1) * (H 
  * l'eau franche. Le test a echoue exactement la-dessus.
  *
  * Depuis, TERRAIN_FORGE tessele le relief et exagere le fond immerge (DepthExag
- * 1.7) : sur le maillage REELLEMENT rendu, l'eau descend a 614 uu. Une
- * justification en "deux tiers du maximum" n'a donc plus aucun sens -- elle
- * donnerait 400 uu et noierait toute la rive dans une seule teinte.
+ * 1.7) : sur le maillage REELLEMENT rendu, l'eau descendait a 614 uu -- dont une
+ * part etait de la terre que l'affutage enfoncait sous la nappe. Une justification
+ * en "deux tiers du maximum" n'a donc aucun sens : le maximum est un extreme, pas
+ * la rive, et il a bouge de 614 a 182 uu sans que la rive change.
  *
  * 60 uu est cale sur la DISTRIBUTION, et sur son debut : c'est la ou est la rive.
- * Deciles de profondeur du maillage forge (TERRAIN_SHORELINE_FORGED_DEPTHS) :
+ * Deciles de profondeur du maillage forge (TERRAIN_SHORELINE_FORGED_DEPTHS),
+ * re-mesures apres TERRAIN_RELIEF_001 etape 2 (bicubique, affutage coupe) :
  *
- *     p10=11.1  p20=21.7  p30=30.6  p40=35.5  p50=41.2
- *     p60=47.0  p70=54.0  p80=62.5  p90=78.6        max=614
+ *     p10=9.8   p20=20.3  p30=30.6  p40=36.7  p50=43.7
+ *     p60=50.3  p70=58.1  p80=68.1  p90=81.5        max=181.7
+ *
+ * (Avant : p70=54.0 p80=62.5 p90=78.6 max=614, 3641 sommets francs sur 16234.)
  *
  * A 60 uu, la marge couvre les sept premiers deciles de l'eau du monde et le
- * dernier quart reste de l'eau franche -- un etat reellement occupe (3641 sommets
- * sur 16234 immerges), pas une limite jamais atteinte. La bande de limon, elle,
+ * reste est de l'eau franche -- un etat reellement occupe (4640 sommets sur 16394
+ * immerges), pas une limite jamais atteinte. La bande de limon, elle,
  * occupe 0.10 a 0.32 de ce span selon la platitude, soit 6 a 19 uu : elle se
  * ferme avant le p20. C'est un bord d'eau, pas un lac brun.
  *

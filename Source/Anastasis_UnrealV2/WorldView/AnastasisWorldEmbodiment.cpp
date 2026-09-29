@@ -579,10 +579,11 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             bool bHaveHaloCrop = false;
             if (SurfaceMode == 2)
             {
-                const int32 HaloX0 = FMath::Max(0, Crop.OriginX - 1);
-                const int32 HaloY0 = FMath::Max(0, Crop.OriginY - 1);
-                const int32 HaloX1 = FMath::Min(CanonicalSource.W, Crop.OriginX + Crop.W + 1);
-                const int32 HaloY1 = FMath::Min(CanonicalSource.H, Crop.OriginY + Crop.H + 1);
+                const int32 Margin = AnastasisTerrainForge::HaloTiles;
+                const int32 HaloX0 = FMath::Max(0, Crop.OriginX - Margin);
+                const int32 HaloY0 = FMath::Max(0, Crop.OriginY - Margin);
+                const int32 HaloX1 = FMath::Min(CanonicalSource.W, Crop.OriginX + Crop.W + Margin);
+                const int32 HaloY1 = FMath::Min(CanonicalSource.H, Crop.OriginY + Crop.H + Margin);
                 HaloCrop = AnastasisWorldView::CropSnapshot(
                     CanonicalSource, HaloX0, HaloY0, HaloX1 - HaloX0, HaloY1 - HaloY0);
                 bHaveHaloCrop = HaloCrop.Tiles.Num() == (HaloX1 - HaloX0) * (HaloY1 - HaloY0);

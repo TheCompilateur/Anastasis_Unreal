@@ -1,14 +1,15 @@
-# TERRAIN_RELIEF_001 -- captures avant / apres (forge d'origine contre forge actuelle).
-# Voir terrain-relief-capture.py. Sortie : Saved\TerrainReliefEvidence\<vue>_<etat>.png
-param([int]$TimeoutSec=420)
+# TERRAIN_RELIEF_001 -- captures avant / apres d'une etape de la forge.
+# Voir terrain-relief-capture.py. Sortie : Saved\TerrainReliefEvidence\step<N>\<vue>_<etat>.png
+param([ValidateSet('1','2')][string]$Step='2', [int]$TimeoutSec=420)
 $ErrorActionPreference='Stop'
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 $Editor='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
-$dir=Join-Path $Root 'Saved\TerrainReliefEvidence'
+$dir=Join-Path $Root "Saved\TerrainReliefEvidence\step$Step"
 New-Item -ItemType Directory -Force $dir | Out-Null
 $log=Join-Path $dir 'capture.log'
 if(Test-Path $log){Remove-Item $log}
 $env:ANASTASIS_RELIEF_OUT=$dir
+$env:ANASTASIS_RELIEF_STEP=$Step
 $py=(Join-Path $Root 'tools\unreal\terrain-relief-capture.py').Replace('\','/')
 $launchArgs=@(
  ('"'+(Join-Path $Root 'Anastasis_UnrealV2.uproject')+'"'),

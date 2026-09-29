@@ -1,9 +1,11 @@
 """TERRAIN_RELIEF_001 -- captures avant / apres d'une etape de la forge.
 
-Memes vues, meme build, seules les variables de l'etape changent :
-  avant = anastasis.Terrain.Forge.Terraces 1, .Escarpments 1  (forge d'origine)
-  apres = 0, 0                                               (defaut actuel)
-Le dressing (arbres, ruines) est masque : on juge le relief, rien d'autre.
+Memes vues, meme build, seules les variables de l'etape changent
+(ANASTASIS_RELIEF_STEP, defaut la derniere) :
+  etape 1  avant = Terraces 1, Escarpments 1   apres = 0, 0   (Bicubic 0, Sharpen 1)
+  etape 2  avant = Bicubic 0, Sharpen 1        apres = 1, 0
+Toute variable non citee garde son defaut : l'"avant" d'une etape est l'"apres" de la
+precedente. Le dressing (arbres, ruines) est masque : on juge le relief, rien d'autre.
 
 HighResShot est servi par le prochain redessin du viewport ; une scene statique
 ne se redessine pas, d'ou l'invalidation a chaque tick (cf. terrain-forge-capture.py).
@@ -14,7 +16,15 @@ OUT_DIR = os.environ.get('ANASTASIS_RELIEF_OUT', os.path.join(unreal.Paths.proje
 os.makedirs(OUT_DIR, exist_ok=True)
 SEED = 12345
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
-STATES = [('before', 1, 1), ('after', 0, 0)]
+FORGE = 'anastasis.Terrain.Forge.'
+STEPS = {
+    # L'etape 1 a ete capturee avant que l'etape 2 change les defauts : on les epingle.
+    '1': [('before', {'Bicubic': 0, 'Sharpen': 1, 'Terraces': 1, 'Escarpments': 1}),
+          ('after', {'Bicubic': 0, 'Sharpen': 1, 'Terraces': 0, 'Escarpments': 0})],
+    '2': [('before', {'Bicubic': 0, 'Sharpen': 1}), ('after', {'Bicubic': 1, 'Sharpen': 0})],
+}
+STEP = os.environ.get('ANASTASIS_RELIEF_STEP', '2')
+STATES = STEPS[STEP]
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
@@ -44,14 +54,15 @@ found = unreal.GameplayStatics.get_all_actors_of_class(world, cls)
 actor = found[0] if len(found) > 0 else eas.spawn_actor_from_class(cls, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
 
 
-def embody(terraces, escarpments):
-    cmd('anastasis.Terrain.Forge.Terraces %d' % terraces)
-    cmd('anastasis.Terrain.Forge.Escarpments %d' % escarpments)
+def embody(cvars):
+    for name, value in cvars.items():
+        cmd('%s%s %d' % (FORGE, name, value))
     ok = actor.call_method('EmbodyCanonical', args=(SEED,))
     for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
         comp.set_visibility(False)
     redraw()
-    unreal.log('RELIEF_EMBODY terraces=%d escarpments=%d ok=%s' % (terraces, escarpments, ok))
+    unreal.log('RELIEF_EMBODY step=%s %s ok=%s'
+               % (STEP, ' '.join('%s=%d' % kv for kv in cvars.items()), ok))
 
 
 def views():
@@ -99,8 +110,8 @@ def finish(msg, error=False):
 
 def start_state():
     global queue, view_list
-    name, terraces, escarpments = STATES[state_i]
-    embody(terraces, escarpments)
+    name, cvars = STATES[state_i]
+    embody(cvars)
     if view_list is None:
         view_list = views()
     queue = [(name, v) for v in view_list]
