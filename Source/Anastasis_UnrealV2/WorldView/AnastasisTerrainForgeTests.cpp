@@ -1,3 +1,4 @@
+#include "HAL/IConsoleManager.h"
 #include "Misc/AutomationTest.h"
 #include "WorldView/AnastasisTerrainForge.h"
 #include "WorldView/AnastasisTerrainSurface.h"
@@ -276,6 +277,127 @@ bool FAnastasisTerrainForgeChunkSeam::RunTest(const FString&)
 		TEXT("height_error_no_halo=%.3f height_error_halo=%.3f (hauteur = info seulement : bassin/point ")
 		TEXT("haut cherchent sur toute l'emprise, leur placement differe legitimement du monde entier)"),
 		Sampled, MaxLapErrorNoHalo, MaxLapErrorHalo, MaxHeightErrorNoHalo, MaxHeightErrorHalo));
+	return true;
+}
+
+namespace
+{
+/** Lecture du relief REELLEMENT rendu : ce que le joueur voit, pas l'altitude de tuile. */
+struct FRenderedReliefStats
+{
+	int32 Samples = 0;
+	/** Moyenne de |Z[x-1] - 2 Z[x] + Z[x+1]| (x et y), uu. L'escalier est une rugosite fine. */
+	double MeanSecondDiff = 0.0;
+	/** Part des sommets de terre rendus au-dela de 60 degres : des parois, pas des pentes. */
+	double SteepFrac = 0.0;
+	double P99SlopeDeg = 0.0;
+	double MaxSlopeDeg = 0.0;
+};
+
+FRenderedReliefStats MeasureRenderedRelief(const AnastasisTerrainForge::FMesh& Mesh)
+{
+	FRenderedReliefStats Out;
+	const TArray<FVector>& V = Mesh.Geometry.Vertices;
+	const int32 W = Mesh.FineW, H = Mesh.FineH;
+	const double Spacing = AnastasisWorldView::TileWorldSize / static_cast<double>(Mesh.Subdiv);
+	const double SeaZ = AnastasisTerrainSurface::WaterPlaneZ;
+	TArray<double> Slopes;
+	double SecondSum = 0.0;
+	int32 Steep = 0;
+	for (int32 Y = 1; Y < H - 1; ++Y)
+	{
+		for (int32 X = 1; X < W - 1; ++X)
+		{
+			const int32 I = Y * W + X;
+			const double Z = V[I].Z, ZL = V[I - 1].Z, ZR = V[I + 1].Z, ZD = V[I - W].Z, ZU = V[I + W].Z;
+			// Terre emergee seulement, voisins compris : la rive et le fond immerge ont leur
+			// propre exageration et ne sont pas l'objet de cette mesure.
+			if (Z <= SeaZ || ZL <= SeaZ || ZR <= SeaZ || ZD <= SeaZ || ZU <= SeaZ)
+			{
+				continue;
+			}
+			const double Dx = (ZR - ZL) / (2.0 * Spacing);
+			const double Dy = (ZU - ZD) / (2.0 * Spacing);
+			const double Deg = FMath::RadiansToDegrees(FMath::Atan(FMath::Sqrt(Dx * Dx + Dy * Dy)));
+			Slopes.Add(Deg);
+			Steep += Deg > 60.0 ? 1 : 0;
+			SecondSum += 0.5 * (FMath::Abs(ZL - 2.0 * Z + ZR) + FMath::Abs(ZD - 2.0 * Z + ZU));
+		}
+	}
+	Out.Samples = Slopes.Num();
+	if (Out.Samples == 0)
+	{
+		return Out;
+	}
+	Slopes.Sort();
+	Out.MeanSecondDiff = SecondSum / Out.Samples;
+	Out.SteepFrac = static_cast<double>(Steep) / Out.Samples;
+	Out.P99SlopeDeg = Slopes[FMath::Min(Out.Samples - 1, static_cast<int32>(Out.Samples * 0.99))];
+	Out.MaxSlopeDeg = Slopes.Last();
+	return Out;
+}
+
+bool ForgeWith(int32 Terraces, int32 Escarpments, const AnastasisWorldView::FWorldVisualSnapshot& Crop, AnastasisTerrainForge::FMesh& OutMesh)
+{
+	IConsoleVariable* TerraceVar = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Terrain.Forge.Terraces"));
+	IConsoleVariable* EscarpVar = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Terrain.Forge.Escarpments"));
+	if (!TerraceVar || !EscarpVar)
+	{
+		return false;
+	}
+	const int32 PrevTerraces = TerraceVar->GetInt();
+	const int32 PrevEscarp = EscarpVar->GetInt();
+	TerraceVar->Set(Terraces, ECVF_SetByCode);
+	EscarpVar->Set(Escarpments, ECVF_SetByCode);
+	AnastasisTerrainSurface::FGeometry Geometry;
+	const bool bOk = AnastasisTerrainSurface::Build(Crop, Geometry) && AnastasisTerrainForge::Apply(Crop, Geometry, OutMesh);
+	TerraceVar->Set(PrevTerraces, ECVF_SetByCode);
+	EscarpVar->Set(PrevEscarp, ECVF_SetByCode);
+	return bOk;
+}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainForgeNoStaircase, "Anastasis.Terrain.Forge.NoStaircase",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainForgeNoStaircase::RunTest(const FString&)
+{
+	// TERRAIN_RELIEF_001, etape 1. Les terrasses quantifiaient l'altitude par paliers de
+	// 0.016 sur des pentes jugees AVANT exageration, donc rendues jusqu'a ~58 degres : un
+	// escalier. L'escarpement redressait ce qui etait deja rendu au-dela de 50 degres.
+	// Les deux sont coupes par defaut ; ce test mesure la difference sur le maillage rendu,
+	// contre la forge d'origine rebatie dans le meme processus.
+	IConsoleVariable* TerraceVar = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Terrain.Forge.Terraces"));
+	IConsoleVariable* EscarpVar = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Terrain.Forge.Escarpments"));
+	if (!TestNotNull(TEXT("cvar terrasses"), TerraceVar) || !TestNotNull(TEXT("cvar escarpements"), EscarpVar))
+	{
+		return false;
+	}
+	TestEqual(TEXT("terrasses coupees par defaut"), TerraceVar->GetInt(), 0);
+	TestEqual(TEXT("escarpements coupes par defaut"), EscarpVar->GetInt(), 0);
+
+	const auto Crop = AnastasisWorldView::CaptureCanonicalWorld(12345);
+	AnastasisTerrainForge::FMesh Legacy, Relief;
+	if (!TestTrue(TEXT("forge d'origine"), ForgeWith(1, 1, Crop, Legacy))
+		|| !TestTrue(TEXT("forge sans escalier"), ForgeWith(0, 0, Crop, Relief)))
+	{
+		AnastasisTerrainForge::ClearActive();
+		return false;
+	}
+	const FRenderedReliefStats Before = MeasureRenderedRelief(Legacy);
+	const FRenderedReliefStats After = MeasureRenderedRelief(Relief);
+	TestTrue(TEXT("terre mesuree"), Before.Samples > 1000 && After.Samples > 1000);
+
+	TestTrue(TEXT("le relief rendu est moins rugueux sans terrasses ni escarpements"),
+		After.MeanSecondDiff < Before.MeanSecondDiff);
+	TestTrue(TEXT("moins de parois au-dela de 60 degres"), After.SteepFrac <= Before.SteepFrac);
+	TestTrue(TEXT("p99 de pente pas plus raide"), After.P99SlopeDeg <= Before.P99SlopeDeg + KINDA_SMALL_NUMBER);
+
+	AnastasisTerrainForge::ClearActive();
+	AddInfo(FString::Printf(
+		TEXT("TERRAIN_RELIEF_STAIRCASE before: samples=%d second_diff_uu=%.2f steep60=%.4f p99_deg=%.1f max_deg=%.1f | ")
+		TEXT("after: samples=%d second_diff_uu=%.2f steep60=%.4f p99_deg=%.1f max_deg=%.1f"),
+		Before.Samples, Before.MeanSecondDiff, Before.SteepFrac, Before.P99SlopeDeg, Before.MaxSlopeDeg,
+		After.Samples, After.MeanSecondDiff, After.SteepFrac, After.P99SlopeDeg, After.MaxSlopeDeg));
 	return true;
 }
 

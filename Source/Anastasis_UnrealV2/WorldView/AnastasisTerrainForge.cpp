@@ -16,6 +16,29 @@ static TAutoConsoleVariable<float> CVarForgeExaggerate(
 	TEXT("Vertical exaggeration of land above sea. Water plane stays at SeaLevel."),
 	ECVF_Default);
 
+// TERRAIN_RELIEF_001 -- terrasses et escarpements coupes par defaut.
+//
+// Les deux passes jugent la pente AVANT l'exageration verticale (SlopeDeg vient de S,
+// pente de l'altitude brute), mais le relief rendu est ensuite multiplie par LocalExag,
+// jusqu'a 3.6. Une "pente de 6 a 24 degres" visee par les terrasses est donc rendue
+// jusqu'a atan(3.6 * tan 24) ~ 58 degres : la quantification par palier de 0.016
+// (~58 uu) y dessine un escalier, pas des banquettes agricoles. L'escarpement, lui,
+// redresse ce qui est deja rendu au-dela de 50 degres : il fabrique des parois.
+//
+// Gardes en variables plutot que supprimes : c'est ce qui permet la capture avant /
+// apres dans un seul build, et le test qui mesure l'escalier contre sa propre source.
+static TAutoConsoleVariable<int32> CVarForgeTerraces(
+	TEXT("anastasis.Terrain.Forge.Terraces"),
+	0,
+	TEXT("1 = quantize hillsides and the basin rim into terraces (legacy TERRAIN_FORGE). 0 = off."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarForgeEscarpments(
+	TEXT("anastasis.Terrain.Forge.Escarpments"),
+	0,
+	TEXT("1 = steepen steep convex breaks into escarpments (legacy TERRAIN_FORGE). 0 = off."),
+	ECVF_Default);
+
 namespace
 {
 using AnastasisWorldView::FVisualTile;
@@ -214,6 +237,8 @@ bool AnastasisTerrainForge::Apply(
 
 	const int32 Subdiv = FMath::Clamp(CVarForgeSubdiv.GetValueOnGameThread(), 2, 6);
 	const double Exaggerate = FMath::Clamp(static_cast<double>(CVarForgeExaggerate.GetValueOnGameThread()), 1.0, 8.0);
+	const bool bTerraces = CVarForgeTerraces.GetValueOnGameThread() != 0;
+	const bool bEscarpments = CVarForgeEscarpments.GetValueOnGameThread() != 0;
 	const int32 FineW = (CoarseW - 1) * Subdiv + 1;
 	const int32 FineH = (CoarseH - 1) * Subdiv + 1;
 	const int32 FineN = FineW * FineH;
@@ -386,7 +411,7 @@ bool AnastasisTerrainForge::Apply(
 
 			// Terraces on usable hillsides — agricultural benches, not a staircase everywhere.
 			const double SlopeDeg = FMath::RadiansToDegrees(FMath::Atan(S * AnastasisWorldView::AltitudeScale / AnastasisWorldView::TileWorldSize));
-			if (SlopeDeg > 6.0 && SlopeDeg < 24.0 && Sh < 0.5)
+			if (bTerraces && SlopeDeg > 6.0 && SlopeDeg < 24.0 && Sh < 0.5)
 			{
 				const double Step = 0.016;
 				const double Rel = (Alt - Sea) / Step;
@@ -396,7 +421,7 @@ bool AnastasisTerrainForge::Apply(
 			}
 
 			// Escarpments: steepen already-steep convex breaks.
-			if (SlopeDeg > 18.0 && L > 0.0)
+			if (bEscarpments && SlopeDeg > 18.0 && L > 0.0)
 			{
 				// LapUnreliable is only set where a neighbour truly had no data (world edge,
 				// no HaloCrop covering it) and got duplicated onto itself instead — the one
@@ -493,7 +518,7 @@ bool AnastasisTerrainForge::Apply(
 			Forged[I] = FMath::Lerp(Forged[I], Target, 0.58);
 		}
 		// Secondary terraces around the basin — buildable shoulders, not a village yet.
-		for (int32 I = 0; I < FineN; ++I)
+		for (int32 I = 0; bTerraces && I < FineN; ++I)
 		{
 			if (BasinMask[I] || Water[I] || !Buildable[I])
 			{
