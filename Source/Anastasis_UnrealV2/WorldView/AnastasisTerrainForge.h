@@ -9,9 +9,10 @@
  * de sol / rive (AnastasisTerrainSurface::TileColor), ni les arbres.
  *
  * Prend la surface tuilée déjà bâtie et produit le relief réellement rendu :
- * tessellation bicubique, ravines, bassin habitable. Amplification des masses,
- * terrasses et escarpements existent encore derriere des CVars, coupees par defaut
- * (TERRAIN_RELIEF_001). SampleActive suit EXACTEMENT ce maillage.
+ * tessellation bicubique, ravines, bassin habitable, puis erosion thermique sur la
+ * hauteur rendue. Amplification des masses, terrasses et escarpements existent encore
+ * derriere des CVars, coupees par defaut (TERRAIN_RELIEF_001). SampleActive suit
+ * EXACTEMENT ce maillage, erosion comprise.
  */
 namespace AnastasisTerrainForge
 {

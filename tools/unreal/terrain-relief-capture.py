@@ -2,8 +2,9 @@
 
 Memes vues, meme build, seules les variables de l'etape changent
 (ANASTASIS_RELIEF_STEP, defaut la derniere) :
-  etape 1  avant = Terraces 1, Escarpments 1   apres = 0, 0   (Bicubic 0, Sharpen 1)
-  etape 2  avant = Bicubic 0, Sharpen 1        apres = 1, 0
+  etape 1  avant = Terraces 1, Escarpments 1   apres = 0, 0   (Bicubic 0, Sharpen 1, TalusDeg 0)
+  etape 2  avant = Bicubic 0, Sharpen 1        apres = 1, 0   (TalusDeg 0)
+  etape 3  avant = TalusDeg 0                  apres = 40
 Toute variable non citee garde son defaut : l'"avant" d'une etape est l'"apres" de la
 precedente. Le dressing (arbres, ruines) est masque : on juge le relief, rien d'autre.
 
@@ -18,12 +19,15 @@ SEED = 12345
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
 FORGE = 'anastasis.Terrain.Forge.'
 STEPS = {
-    # L'etape 1 a ete capturee avant que l'etape 2 change les defauts : on les epingle.
-    '1': [('before', {'Bicubic': 0, 'Sharpen': 1, 'Terraces': 1, 'Escarpments': 1}),
-          ('after', {'Bicubic': 0, 'Sharpen': 1, 'Terraces': 0, 'Escarpments': 0})],
-    '2': [('before', {'Bicubic': 0, 'Sharpen': 1}), ('after', {'Bicubic': 1, 'Sharpen': 0})],
+    # Chaque etape a ete capturee avant que les suivantes changent les defauts : on les
+    # epingle, pour que la capture se reproduise a l'identique.
+    '1': [('before', {'Bicubic': 0, 'Sharpen': 1, 'TalusDeg': 0, 'Terraces': 1, 'Escarpments': 1}),
+          ('after', {'Bicubic': 0, 'Sharpen': 1, 'TalusDeg': 0, 'Terraces': 0, 'Escarpments': 0})],
+    '2': [('before', {'Bicubic': 0, 'Sharpen': 1, 'TalusDeg': 0}),
+          ('after', {'Bicubic': 1, 'Sharpen': 0, 'TalusDeg': 0})],
+    '3': [('before', {'TalusDeg': 0}), ('after', {'TalusDeg': 40})],
 }
-STEP = os.environ.get('ANASTASIS_RELIEF_STEP', '2')
+STEP = os.environ.get('ANASTASIS_RELIEF_STEP', '3')
 STATES = STEPS[STEP]
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -31,6 +35,10 @@ ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 
 unreal.log('RELIEF_CAPTURE_BOOT out=%s' % OUT_DIR)
+
+# Un editeur hors premier plan ne rend plus ses viewports ("Use Less CPU when in
+# Background") : HighResShot n'est alors jamais servi. capture-terrain-relief.ps1 coupe
+# ce reglage par -ini: -- le lancer sans lui, c'est retrouver RELIEF_SHOT_MISSING.
 les.load_level(LEVEL)
 world = ues.get_editor_world()
 
@@ -56,7 +64,7 @@ actor = found[0] if len(found) > 0 else eas.spawn_actor_from_class(cls, unreal.V
 
 def embody(cvars):
     for name, value in cvars.items():
-        cmd('%s%s %d' % (FORGE, name, value))
+        cmd('%s%s %s' % (FORGE, name, value))
     ok = actor.call_method('EmbodyCanonical', args=(SEED,))
     for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
         comp.set_visibility(False)

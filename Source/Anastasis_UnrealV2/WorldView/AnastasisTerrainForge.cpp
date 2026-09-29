@@ -62,6 +62,38 @@ static TAutoConsoleVariable<int32> CVarForgeSharpen(
 	TEXT("1 = Laplacian ridge/bowl amplification and landmark peak sharpening (legacy TERRAIN_FORGE). 0 = off."),
 	ECVF_Default);
 
+// TERRAIN_RELIEF_001, etape 3 -- erosion thermique sur la hauteur RENDUE.
+//
+// Apres les etapes 1 et 2, un sommet de terre sur cinq est encore rendu au-dela de 60
+// degres. Aucune passe ne les fabrique plus : c'est l'exageration (x3.6 sur des tuiles
+// de 1 m) qui transforme une pente de simulation ordinaire en paroi. L'erosion travaille
+// donc APRES l'exageration, en unites Unreal, sur la pente que le joueur voit -- c'est la
+// correction de l'erreur de fond des terrasses, qui jugeaient la pente avant.
+//
+// Talus : au-dela de cet angle, la matiere glisse vers les voisins plus bas ; en dessous,
+// rien ne bouge. Conservative : ce qu'une paroi perd se depose a son pied. L'eau n'y
+// participe pas (la rive appartient a l'etape suivante).
+//
+// Valeurs MESUREES (balayage exageration x talus x iterations, seed 12345) :
+//  - quel que soit le reglage, 0 % de la terre a plus d'une tuile de l'eau reste
+//    au-dela de 60 degres ; les ~3 % restants sont tous des berges.
+//  - baisser Exaggerate n'apporte donc rien a l'interieur et coute du relief (point haut
+//    1156 uu a x3.6, 986 a x2.8) : Exaggerate reste a 3.6.
+//  - 40 degres : sous l'angle marchable du personnage (44.76) avec une marge ; a 45,
+//    la terre se tasse pile au seuil. 300 iterations : 600 ne change plus rien
+//    (>45 degres 3.6 % -> 3.3 %) pour deux fois le cout.
+static TAutoConsoleVariable<float> CVarForgeTalusDeg(
+	TEXT("anastasis.Terrain.Forge.TalusDeg"),
+	40.0f,
+	TEXT("Thermal erosion talus angle in degrees, on the rendered surface. 0 = off."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarForgeErosionIterations(
+	TEXT("anastasis.Terrain.Forge.ErosionIterations"),
+	300,
+	TEXT("Thermal erosion iterations. 0 = off."),
+	ECVF_Default);
+
 namespace
 {
 using AnastasisWorldView::FVisualTile;
@@ -215,6 +247,121 @@ FVector2D BilinearUV(const TArray<FVector2D>& Channel, int32 CoarseW, int32 Coar
 	}
 	return FMath::Lerp(FMath::Lerp(Channel[A], Channel[B], Fx),
 					   FMath::Lerp(Channel[C], Channel[D], Fx), Fy);
+}
+
+/**
+ * Erosion thermique de Jacobi sur Z (uu) des sommets de terre d'une grille FineW x FineH.
+ *
+ * A chaque iteration, un sommet dont la chute vers un voisin depasse le talus
+ * (tan(Talus) x distance) cede une part de son plus grand exces, repartie entre les
+ * voisins en exces au prorata. Jacobi (tous les transferts lus sur l'etat precedent) et
+ * ordre de parcours fixe : le resultat est deterministe. La somme des Z de terre est
+ * conservee. Les sommets d'eau ne donnent ni ne recoivent : ils restent fixes.
+ *
+ * Renvoie le nombre d'iterations effectuees (arret anticipe quand plus rien ne depasse).
+ */
+int32 ThermalErode(TArray<FVector>& Vertices, const TArray<uint8>& Water, int32 W, int32 H,
+	double Spacing, double TalusDeg, int32 Iterations)
+{
+	const int32 N = W * H;
+	const int32 OffX[8] = {1, -1, 0, 0, 1, 1, -1, -1};
+	const int32 OffY[8] = {0, 0, 1, -1, 1, -1, 1, -1};
+	const double Tan = FMath::Tan(FMath::DegreesToRadians(TalusDeg));
+	double Limit[8];
+	for (int32 K = 0; K < 8; ++K)
+	{
+		Limit[K] = Tan * Spacing * (K < 4 ? 1.0 : UE_DOUBLE_SQRT_2);
+	}
+	// 0.4 et pas 0.5 : en Jacobi, un sommet peut recevoir de plusieurs voisins pendant
+	// qu'il cede ; ceder la moitie de l'exces le fait osciller en damier sur les parois.
+	constexpr double Rate = 0.4;
+	// En dessous d'un centieme d'uu, un transfert ne se voit plus : on s'arrete.
+	constexpr double Settled = 0.01;
+
+	TArray<double> Z;
+	TArray<double> Delta;
+	Z.SetNumUninitialized(N);
+	Delta.SetNumZeroed(N);
+	for (int32 I = 0; I < N; ++I)
+	{
+		Z[I] = Vertices[I].Z;
+	}
+
+	// Balayage complet a chaque iteration. Une liste active triee (seuls les voisinages
+	// qui ont bouge) donne le meme resultat bit a bit mais a ete MESUREE deux fois plus
+	// lente : une paroi qui s'effondre en cascade garde son tablier actif sur des
+	// centaines d'iterations, et le tri de la liste coute plus qu'il n'epargne.
+	int32 Done = 0;
+	for (; Done < Iterations; ++Done)
+	{
+		bool bMoved = false;
+		for (int32 I = 0; I < N; ++I)
+		{
+			if (Water[I])
+			{
+				continue;
+			}
+			const int32 X = I % W;
+			const int32 Y = I / W;
+			double Excess[8];
+			int32 Neighbour[8];
+			double Total = 0.0, Max = 0.0;
+			for (int32 K = 0; K < 8; ++K)
+			{
+				Excess[K] = 0.0;
+				const int32 NX = X + OffX[K], NY = Y + OffY[K];
+				if (NX < 0 || NY < 0 || NX >= W || NY >= H)
+				{
+					continue;
+				}
+				const int32 NI = NY * W + NX;
+				if (Water[NI])
+				{
+					continue;
+				}
+				const double E = Z[I] - Z[NI] - Limit[K];
+				if (E > 0.0)
+				{
+					Excess[K] = E;
+					Neighbour[K] = NI;
+					Total += E;
+					Max = FMath::Max(Max, E);
+				}
+			}
+			if (Max <= Settled)
+			{
+				continue;
+			}
+			bMoved = true;
+			const double Move = Rate * Max;
+			Delta[I] -= Move;
+			for (int32 K = 0; K < 8; ++K)
+			{
+				if (Excess[K] > 0.0)
+				{
+					Delta[Neighbour[K]] += Move * Excess[K] / Total;
+				}
+			}
+		}
+		if (!bMoved)
+		{
+			break;
+		}
+		for (int32 I = 0; I < N; ++I)
+		{
+			Z[I] += Delta[I];
+			Delta[I] = 0.0;
+		}
+	}
+
+	for (int32 I = 0; I < N; ++I)
+	{
+		if (!Water[I])
+		{
+			Vertices[I].Z = Z[I];
+		}
+	}
+	return Done;
 }
 
 void RebuildNormals(AnastasisTerrainSurface::FGeometry& G)
@@ -698,9 +845,20 @@ bool AnastasisTerrainForge::Apply(
 			const int32 CX = FMath::Clamp(FMath::RoundToInt(U), 0, CoarseW - 1);
 			const int32 CY = FMath::Clamp(FMath::RoundToInt(V), 0, CoarseH - 1);
 			Result.SourceIndices.Add(Crop.Tiles[CY * CoarseW + CX].SourceIndex);
-			MinZ = FMath::Min(MinZ, Z);
-			MaxZ = FMath::Max(MaxZ, Z);
 		}
+	}
+
+	const double TalusDeg = FMath::Clamp(static_cast<double>(CVarForgeTalusDeg.GetValueOnGameThread()), 0.0, 89.0);
+	const int32 ErosionIterations = FMath::Clamp(CVarForgeErosionIterations.GetValueOnGameThread(), 0, 2000);
+	if (TalusDeg > 0.0 && ErosionIterations > 0)
+	{
+		ThermalErode(Result.Vertices, Water, FineW, FineH,
+			AnastasisWorldView::TileWorldSize * InvSub, TalusDeg, ErosionIterations);
+	}
+	for (const FVector& P : Result.Vertices)
+	{
+		MinZ = FMath::Min(MinZ, P.Z);
+		MaxZ = FMath::Max(MaxZ, P.Z);
 	}
 
 	for (int32 JY = 0; JY < FineH - 1; ++JY)

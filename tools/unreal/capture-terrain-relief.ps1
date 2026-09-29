@@ -1,6 +1,6 @@
 # TERRAIN_RELIEF_001 -- captures avant / apres d'une etape de la forge.
 # Voir terrain-relief-capture.py. Sortie : Saved\TerrainReliefEvidence\step<N>\<vue>_<etat>.png
-param([ValidateSet('1','2')][string]$Step='2', [int]$TimeoutSec=420)
+param([ValidateSet('1','2','3')][string]$Step='3', [int]$TimeoutSec=420)
 $ErrorActionPreference='Stop'
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 $Editor='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
@@ -14,6 +14,11 @@ $py=(Join-Path $Root 'tools\unreal\terrain-relief-capture.py').Replace('\','/')
 $launchArgs=@(
  ('"'+(Join-Path $Root 'Anastasis_UnrealV2.uproject')+'"'),
  '-windowed','-resx=1280','-resy=720','-nosplash','-NoLiveCoding',
+ # Hors premier plan, UEditorEngine::Tick coupe le rendu des viewports quand
+ # bThrottleCPUWhenNotForeground est vrai (EditorEngine.cpp, "Background Process") :
+ # ~3 images/s et HighResShot jamais servi. La classe est config=EditorSettings.
+ # Surcharge de ligne de commande, en memoire : rien n'est ecrit dans Saved/Config.
+ '-ini:EditorSettings:[/Script/UnrealEd.EditorPerformanceSettings]:bThrottleCPUWhenNotForeground=False',
  ('-abslog="'+$log+'"'),
  ('-ExecCmds="py '+$py+'"')
 )

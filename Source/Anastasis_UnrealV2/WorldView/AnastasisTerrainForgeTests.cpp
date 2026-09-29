@@ -291,6 +291,14 @@ struct FRenderedReliefStats
 	double MeanSecondDiff = 0.0;
 	/** Part des sommets de terre rendus au-dela de 60 degres : des parois, pas des pentes. */
 	double SteepFrac = 0.0;
+	/** Part au-dela de 45 degres : ou un marcheur ne passe plus sans les mains. */
+	double Steep45Frac = 0.0;
+	/**
+	 * Part au-dela de 60 degres, a plus d'une tuile de toute eau. Separe les parois de
+	 * l'interieur (l'affaire de l'erosion) des berges (l'affaire du trait de rive).
+	 */
+	int32 InlandSamples = 0;
+	double InlandSteepFrac = 0.0;
 	double P99SlopeDeg = 0.0;
 	double MaxSlopeDeg = 0.0;
 	/** Sommets de terre plus hauts que leurs 8 voisins ET de plus de 50 uu que leur moyenne : des lames. */
@@ -310,9 +318,33 @@ FRenderedReliefStats MeasureRenderedRelief(const AnastasisTerrainForge::FMesh& M
 	const int32 W = Mesh.FineW, H = Mesh.FineH;
 	const double Spacing = AnastasisWorldView::TileWorldSize / static_cast<double>(Mesh.Subdiv);
 	const double SeaZ = AnastasisTerrainSurface::WaterPlaneZ;
+	// Distance a l'eau : alpha de couleur > 0.5 = eau (A vaut 1 sur l'eau, 0 sur la terre,
+	// interpole). Un sommet est "interieur" si aucun sommet d'eau n'est a moins d'une tuile.
+	const TArray<FLinearColor>& C = Mesh.Geometry.Colors;
+	const int32 R = Mesh.Subdiv;
+	TArray<uint8> NearWater;
+	NearWater.SetNumZeroed(W * H);
+	for (int32 Y = 0; Y < H; ++Y)
+	{
+		for (int32 X = 0; X < W; ++X)
+		{
+			if (C.IsValidIndex(Y * W + X) && C[Y * W + X].A > 0.5f)
+			{
+				for (int32 DY = FMath::Max(0, Y - R); DY <= FMath::Min(H - 1, Y + R); ++DY)
+				{
+					for (int32 DX = FMath::Max(0, X - R); DX <= FMath::Min(W - 1, X + R); ++DX)
+					{
+						NearWater[DY * W + DX] = 1;
+					}
+				}
+			}
+		}
+	}
+	int32 InlandSteep = 0;
 	TArray<double> Slopes;
 	double SecondSum = 0.0;
 	int32 Steep = 0;
+	int32 Steep45 = 0;
 	double OnLine = 0.0, OffLine = 0.0;
 	int32 OnCount = 0, OffCount = 0;
 	for (int32 Y = 1; Y < H - 1; ++Y)
@@ -332,6 +364,12 @@ FRenderedReliefStats MeasureRenderedRelief(const AnastasisTerrainForge::FMesh& M
 			const double Deg = FMath::RadiansToDegrees(FMath::Atan(FMath::Sqrt(Dx * Dx + Dy * Dy)));
 			Slopes.Add(Deg);
 			Steep += Deg > 60.0 ? 1 : 0;
+			Steep45 += Deg > 45.0 ? 1 : 0;
+			if (!NearWater[I])
+			{
+				++Out.InlandSamples;
+				InlandSteep += Deg > 60.0 ? 1 : 0;
+			}
 			const double D2X = FMath::Abs(ZL - 2.0 * Z + ZR);
 			const double D2Y = FMath::Abs(ZD - 2.0 * Z + ZU);
 			SecondSum += 0.5 * (D2X + D2Y);
@@ -367,17 +405,21 @@ FRenderedReliefStats MeasureRenderedRelief(const AnastasisTerrainForge::FMesh& M
 	Slopes.Sort();
 	Out.MeanSecondDiff = SecondSum / Out.Samples;
 	Out.SteepFrac = static_cast<double>(Steep) / Out.Samples;
+	Out.Steep45Frac = static_cast<double>(Steep45) / Out.Samples;
+	Out.InlandSteepFrac = Out.InlandSamples > 0 ? static_cast<double>(InlandSteep) / Out.InlandSamples : 0.0;
 	Out.P99SlopeDeg = Slopes[FMath::Min(Out.Samples - 1, static_cast<int32>(Out.Samples * 0.99))];
 	Out.MaxSlopeDeg = Slopes.Last();
 	return Out;
 }
 
 /** Forge Crop avec certaines CVars de la forge forcees, puis les restaure. Les autres gardent leur defaut. */
-bool ForgeWith(std::initializer_list<TPair<const TCHAR*, int32>> Vars, const AnastasisWorldView::FWorldVisualSnapshot& Crop, AnastasisTerrainForge::FMesh& OutMesh)
+bool ForgeWith(std::initializer_list<TPair<const TCHAR*, double>> Vars, const AnastasisWorldView::FWorldVisualSnapshot& Crop, AnastasisTerrainForge::FMesh& OutMesh)
 {
-	TArray<TPair<IConsoleVariable*, int32>> Previous;
+	// La valeur precedente est gardee en texte : c'est la seule forme qui restaure a
+	// l'identique une CVar entiere comme une CVar flottante.
+	TArray<TPair<IConsoleVariable*, FString>> Previous;
 	bool bOk = true;
-	for (const TPair<const TCHAR*, int32>& Var : Vars)
+	for (const TPair<const TCHAR*, double>& Var : Vars)
 	{
 		IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(Var.Key);
 		if (!CVar)
@@ -385,14 +427,21 @@ bool ForgeWith(std::initializer_list<TPair<const TCHAR*, int32>> Vars, const Ana
 			bOk = false;
 			break;
 		}
-		Previous.Emplace(CVar, CVar->GetInt());
-		CVar->Set(Var.Value, ECVF_SetByCode);
+		Previous.Emplace(CVar, CVar->GetString());
+		if (Var.Value == FMath::RoundToDouble(Var.Value))
+		{
+			CVar->Set(static_cast<int32>(Var.Value), ECVF_SetByCode);
+		}
+		else
+		{
+			CVar->Set(static_cast<float>(Var.Value), ECVF_SetByCode);
+		}
 	}
 	AnastasisTerrainSurface::FGeometry Geometry;
 	bOk = bOk && AnastasisTerrainSurface::Build(Crop, Geometry) && AnastasisTerrainForge::Apply(Crop, Geometry, OutMesh);
-	for (const TPair<IConsoleVariable*, int32>& Var : Previous)
+	for (const TPair<IConsoleVariable*, FString>& Var : Previous)
 	{
-		Var.Key->Set(Var.Value, ECVF_SetByCode);
+		Var.Key->Set(*Var.Value, ECVF_SetByCode);
 	}
 	return bOk;
 }
@@ -401,6 +450,7 @@ const TCHAR* const TerracesVar = TEXT("anastasis.Terrain.Forge.Terraces");
 const TCHAR* const EscarpmentsVar = TEXT("anastasis.Terrain.Forge.Escarpments");
 const TCHAR* const BicubicVar = TEXT("anastasis.Terrain.Forge.Bicubic");
 const TCHAR* const SharpenVar = TEXT("anastasis.Terrain.Forge.Sharpen");
+const TCHAR* const TalusVar = TEXT("anastasis.Terrain.Forge.TalusDeg");
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainForgeNoStaircase, "Anastasis.Terrain.Forge.NoStaircase",
@@ -425,8 +475,8 @@ bool FAnastasisTerrainForgeNoStaircase::RunTest(const FString&)
 	AnastasisTerrainForge::FMesh Legacy, Relief;
 	// Bicubic/Sharpen epingles a leur valeur de l'etape 1 : ce test isole les terrasses et
 	// l'escarpement, et ses chiffres doivent rester ceux que l'etape 1 a publies.
-	if (!TestTrue(TEXT("forge d'origine"), ForgeWith({{BicubicVar, 0}, {SharpenVar, 1}, {TerracesVar, 1}, {EscarpmentsVar, 1}}, Crop, Legacy))
-		|| !TestTrue(TEXT("forge sans escalier"), ForgeWith({{BicubicVar, 0}, {SharpenVar, 1}, {TerracesVar, 0}, {EscarpmentsVar, 0}}, Crop, Relief)))
+	if (!TestTrue(TEXT("forge d'origine"), ForgeWith({{BicubicVar, 0}, {SharpenVar, 1}, {TalusVar, 0}, {TerracesVar, 1}, {EscarpmentsVar, 1}}, Crop, Legacy))
+		|| !TestTrue(TEXT("forge sans escalier"), ForgeWith({{BicubicVar, 0}, {SharpenVar, 1}, {TalusVar, 0}, {TerracesVar, 0}, {EscarpmentsVar, 0}}, Crop, Relief)))
 	{
 		AnastasisTerrainForge::ClearActive();
 		return false;
@@ -468,8 +518,9 @@ bool FAnastasisTerrainForgeNoSpikes::RunTest(const FString&)
 
 	const auto Crop = AnastasisWorldView::CaptureCanonicalWorld(12345);
 	AnastasisTerrainForge::FMesh Legacy, Smooth;
-	if (!TestTrue(TEXT("forge etape 1"), ForgeWith({{BicubicVar, 0}, {SharpenVar, 1}}, Crop, Legacy))
-		|| !TestTrue(TEXT("forge etape 2"), ForgeWith({{BicubicVar, 1}, {SharpenVar, 0}}, Crop, Smooth)))
+	// Erosion epinglee a 0 : ce test isole l'interpolation et l'affutage (etape 2).
+	if (!TestTrue(TEXT("forge etape 1"), ForgeWith({{BicubicVar, 0}, {SharpenVar, 1}, {TalusVar, 0}}, Crop, Legacy))
+		|| !TestTrue(TEXT("forge etape 2"), ForgeWith({{BicubicVar, 1}, {SharpenVar, 0}, {TalusVar, 0}}, Crop, Smooth)))
 	{
 		AnastasisTerrainForge::ClearActive();
 		return false;
@@ -488,6 +539,71 @@ bool FAnastasisTerrainForgeNoSpikes::RunTest(const FString&)
 		TEXT("after: spikes=%d crease=%.2f second_diff_uu=%.2f steep60=%.4f p99_deg=%.1f"),
 		Before.Spikes, Before.CreaseRatio, Before.MeanSecondDiff, Before.SteepFrac, Before.P99SlopeDeg,
 		After.Spikes, After.CreaseRatio, After.MeanSecondDiff, After.SteepFrac, After.P99SlopeDeg));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainForgeNoCliffs, "Anastasis.Terrain.Forge.NoCliffs",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainForgeNoCliffs::RunTest(const FString&)
+{
+	// TERRAIN_RELIEF_001, etape 3. Apres les etapes 1 et 2, les parois restantes venaient
+	// de l'exageration x3.6 sur des tuiles de 1 m. L'erosion thermique travaille sur la
+	// hauteur RENDUE ; ce test verifie qu'elle vide l'interieur des terres de ses parois,
+	// qu'elle conserve la matiere, et il separe ce qui reste (les berges) de ce qu'elle doit
+	// regler.
+	IConsoleVariable* Talus = IConsoleManager::Get().FindConsoleVariable(TalusVar);
+	IConsoleVariable* Iterations = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Terrain.Forge.ErosionIterations"));
+	if (!TestNotNull(TEXT("cvar talus"), Talus) || !TestNotNull(TEXT("cvar iterations"), Iterations))
+	{
+		return false;
+	}
+	TestTrue(TEXT("erosion active par defaut"), Talus->GetFloat() > 0.0f && Iterations->GetInt() > 0);
+
+	const auto Crop = AnastasisWorldView::CaptureCanonicalWorld(12345);
+	AnastasisTerrainForge::FMesh Raw, Eroded;
+	if (!TestTrue(TEXT("forge etape 2"), ForgeWith({{TalusVar, 0}}, Crop, Raw)))
+	{
+		AnastasisTerrainForge::ClearActive();
+		return false;
+	}
+	const double Start = FPlatformTime::Seconds();
+	if (!TestTrue(TEXT("forge etape 3"), ForgeWith({}, Crop, Eroded)))
+	{
+		AnastasisTerrainForge::ClearActive();
+		return false;
+	}
+	const double Ms = (FPlatformTime::Seconds() - Start) * 1000.0;
+	const FRenderedReliefStats Before = MeasureRenderedRelief(Raw);
+	const FRenderedReliefStats After = MeasureRenderedRelief(Eroded);
+
+	// Le controle doit pouvoir echouer : sans erosion, l'interieur a bien des parois.
+	TestTrue(TEXT("l'interieur avait des parois"), Before.InlandSteepFrac > 0.05);
+	TestTrue(TEXT("plus aucune paroi > 60 deg a l'interieur des terres"), After.InlandSteepFrac < 1.e-3);
+	TestTrue(TEXT("moins de parois au total"), After.SteepFrac < Before.SteepFrac);
+	TestTrue(TEXT("moins de terrain > 45 deg"), After.Steep45Frac < Before.Steep45Frac);
+
+	// Conservation : l'eau est figee et identique dans les deux maillages, donc la somme de
+	// TOUS les Z ne peut differer que si l'erosion cree ou detruit de la matiere.
+	double SumRaw = 0.0, SumEroded = 0.0, MaxMove = 0.0;
+	const int32 N = FMath::Min(Raw.Geometry.Vertices.Num(), Eroded.Geometry.Vertices.Num());
+	TestEqual(TEXT("meme topologie"), Raw.Geometry.Vertices.Num(), Eroded.Geometry.Vertices.Num());
+	for (int32 I = 0; I < N; ++I)
+	{
+		SumRaw += Raw.Geometry.Vertices[I].Z;
+		SumEroded += Eroded.Geometry.Vertices[I].Z;
+		MaxMove = FMath::Max(MaxMove, FMath::Abs(Eroded.Geometry.Vertices[I].Z - Raw.Geometry.Vertices[I].Z));
+	}
+	TestTrue(TEXT("matiere conservee"), FMath::Abs(SumEroded - SumRaw) < 1.e-6 * FMath::Abs(SumRaw));
+	TestTrue(TEXT("bassin toujours identifie"), Eroded.bBasinFound);
+
+	AnastasisTerrainForge::ClearActive();
+	AddInfo(FString::Printf(
+		TEXT("TERRAIN_RELIEF_CLIFFS before: steep60=%.4f inland_steep60=%.4f steep45=%.4f p99_deg=%.1f spikes=%d landmark_z=%.0f | ")
+		TEXT("after: steep60=%.4f inland_steep60=%.4f steep45=%.4f p99_deg=%.1f spikes=%d landmark_z=%.0f | ")
+		TEXT("inland=%d mass_delta=%.6f max_move_uu=%.0f forge_ms=%.0f"),
+		Before.SteepFrac, Before.InlandSteepFrac, Before.Steep45Frac, Before.P99SlopeDeg, Before.Spikes, Raw.LandmarkZ,
+		After.SteepFrac, After.InlandSteepFrac, After.Steep45Frac, After.P99SlopeDeg, After.Spikes, Eroded.LandmarkZ,
+		After.InlandSamples, SumEroded - SumRaw, MaxMove, Ms));
 	return true;
 }
 

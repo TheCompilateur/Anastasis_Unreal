@@ -64,3 +64,43 @@ Contrat de chunk : le stencil bicubique déborde de deux tuiles, le halo passe d
 Ce qui reste : 18 % de la terre au-delà de 60° — l'exagération ×3.6 sur 1 m (étape 3).
 Les lacs gardent des bords droits et des parois : masque d'eau pris à la tuile la plus
 proche et exagération différente de part et d'autre de la rive (étape 4).
+
+---
+
+# Étape 3 : érosion thermique sur la hauteur rendue — `step3/`
+
+`before` = `TalusDeg 0` (l'« after » de l'étape 2), `after` = `TalusDeg 40`,
+`ErosionIterations 300` (nouveau défaut). Reproduire :
+`tools\unreal\capture-terrain-relief.ps1 -Step 3`.
+
+Au-delà du talus, la matière glisse vers les voisins plus bas ; en dessous, rien ne
+bouge. Conservative, l'eau figée. Elle travaille **après** l'exagération, sur la pente
+que le joueur voit.
+
+**L'exagération reste à ×3.6** — c'était une piste du plan, les mesures l'ont écartée.
+Balayage exagération × talus × itérations : avec érosion, 0 % de la terre intérieure
+dépasse 60°, à ×3.6 comme à ×2.4. Baisser l'exagération ne fait donc que rabaisser le
+relief (point haut 1156 uu à ×3.6, 986 à ×2.8, 903 à ×2.4).
+
+| Vue | Lecture |
+|---|---|
+| `B_ground_*` | Œil sur le **nouveau** bassin (6650, 3550) : la paroi noire dans l'ombre devient un versant éclairé et praticable. Les taches sombres sur le sol éclairé sont le motif « léopard » du matériau (cf. `ground-001/E_regression_leopard_bump.png`), qui se voyait peu tant que le versant était dans l'ombre. |
+| `C_slope_*` | L'intérieur des terres est arrondi et continu. Les parois sombres qui restent bordent toutes l'eau. 23 % des pixels changent. |
+| `A_overview_*` | Pas de damier d'érosion. Rivières et lacs gardent des berges verticales en dents de scie : c'est l'étape 4. |
+
+Mesure (`Anastasis.Terrain.Forge.NoCliffs`, terre émergée) :
+
+| | before | after |
+|---|---|---|
+| > 60° à plus d'une tuile de l'eau | 14.24 % | **0.00 %** |
+| > 60° total | 18.36 % | 3.13 % (tout sur les berges) |
+| > 45° total | 32.3 % | 3.6 % |
+| lames | 44 | 10 |
+| point haut (uu) | 1353 | 1156 |
+| masse (Σ Z) | — | Δ = 1e-6 uu |
+| déplacement max (uu) | — | 770 |
+| durée de `Apply` | ~85 ms | ~1.1 s |
+
+Couplage non traité (hors mandat) : le matériau de sol ne peint la roche de pente
+qu'entre 68° et 80° rendus (`SlopeRockStart/End` 0.62 / 0.82). L'intérieur étant
+désormais sous 40°, cette roche n'apparaît plus que sur les berges.
