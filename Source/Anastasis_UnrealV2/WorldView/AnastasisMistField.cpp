@@ -94,12 +94,12 @@ TArray<FMistPocket> BuildMistField(
 			const double CentroidTileY = WeightedY / WeightSum;
 			const double CentroidAlt = WetAltSum / WeightSum;
 			Pocket.Location = FVector(
-				CentroidTileX * AnastasisWorldView::TileWorldSize,
-				CentroidTileY * AnastasisWorldView::TileWorldSize,
-				CentroidAlt * AnastasisWorldView::AltitudeScale);
+				CentroidTileX * AnastasisWorldView::TileWorldSize * Snapshot.SpatialScale,
+				CentroidTileY * AnastasisWorldView::TileWorldSize * Snapshot.SpatialScale,
+				AnastasisWorldView::AltitudeToUnreal(CentroidAlt, Snapshot.SpatialScale));
 
 			Pocket.RadiusUU =
-				static_cast<double>(Params.CellTiles) * AnastasisWorldView::TileWorldSize * Params.VolumeRadiusFraction;
+				static_cast<double>(Params.CellTiles) * AnastasisWorldView::TileWorldSize * Snapshot.SpatialScale * Params.VolumeRadiusFraction;
 
 			Pockets.Add(Pocket);
 		}

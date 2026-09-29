@@ -1,4 +1,5 @@
 #include "WorldView/AnastasisTerrainForge.h"
+#include "WorldView/AnastasisHumanGeography.h"
 
 #include "HAL/IConsoleManager.h"
 #include "Math/NumericLimits.h"
@@ -159,10 +160,27 @@ bool AnastasisTerrainForge::SampleActive(double WorldX, double WorldY, double& O
 	return SampleHeight(GActive, WorldX, WorldY, OutZ);
 }
 
+bool AnastasisTerrainForge::SampleActiveWater(double WorldX, double WorldY, double& OutZ)
+{
+    if (!GActiveValid) return false;
+    const double Step = AnastasisWorldView::TileWorldSize * GActive.SpatialScale;
+    const double U = (WorldX / Step - 0.5 - GActive.OriginX) * GActive.Subdiv;
+    const double V = (WorldY / Step - 0.5 - GActive.OriginY) * GActive.Subdiv;
+    if (!FMath::IsFinite(U) || !FMath::IsFinite(V) || U < 0 || V < 0 || U > GActive.FineW-1 || V > GActive.FineH-1) return false;
+    const int32 X = FMath::Min(FMath::FloorToInt(U), GActive.FineW-2), Y = FMath::Min(FMath::FloorToInt(V), GActive.FineH-2);
+    const int32 A=Y*GActive.FineW+X, B=A+1, C=A+GActive.FineW, D=C+1;
+    const auto& W=GActive.Geometry.WaterVertices;
+    if (!W.IsValidIndex(D)) return false;
+    const double Fx=U-X, Fy=V-Y;
+    OutZ = Fx+Fy<=1 ? W[A].Z+Fx*(W[B].Z-W[A].Z)+Fy*(W[C].Z-W[A].Z)
+        : W[D].Z+(1-Fx)*(W[C].Z-W[D].Z)+(1-Fy)*(W[B].Z-W[D].Z);
+    return true;
+}
+
 bool AnastasisTerrainForge::SampleHeight(const FMesh& Mesh, double WorldX, double WorldY, double& OutZ)
 {
 	OutZ = 0.0;
-	if (Mesh.FineW < 2 || Mesh.FineH < 2 || Mesh.Subdiv < 1)
+	if (Mesh.FineW < 2 || Mesh.FineH < 2 || Mesh.Subdiv < 1 || !FMath::IsFinite(Mesh.SpatialScale) || Mesh.SpatialScale <= 0)
 	{
 		return false;
 	}
@@ -174,8 +192,8 @@ bool AnastasisTerrainForge::SampleHeight(const FMesh& Mesh, double WorldX, doubl
 	{
 		return false;
 	}
-	const double U = WorldX / AnastasisWorldView::TileWorldSize - 0.5 - static_cast<double>(Mesh.OriginX);
-	const double V = WorldY / AnastasisWorldView::TileWorldSize - 0.5 - static_cast<double>(Mesh.OriginY);
+	const double U = WorldX / (AnastasisWorldView::TileWorldSize * Mesh.SpatialScale) - 0.5 - static_cast<double>(Mesh.OriginX);
+	const double V = WorldY / (AnastasisWorldView::TileWorldSize * Mesh.SpatialScale) - 0.5 - static_cast<double>(Mesh.OriginY);
 	const double FineU = U * static_cast<double>(Mesh.Subdiv);
 	const double FineV = V * static_cast<double>(Mesh.Subdiv);
 	if (FineU < 0.0 || FineV < 0.0 || FineU > static_cast<double>(Mesh.FineW - 1) || FineV > static_cast<double>(Mesh.FineH - 1))
@@ -205,7 +223,7 @@ bool AnastasisTerrainForge::Apply(
 	OutMeta = FMesh{};
 	const int32 CoarseW = Crop.W;
 	const int32 CoarseH = Crop.H;
-	if (CoarseW < 2 || CoarseH < 2 || InOut.Vertices.Num() != CoarseW * CoarseH)
+	if (!FMath::IsFinite(Crop.SpatialScale) || Crop.SpatialScale <= 0 || CoarseW < 2 || CoarseH < 2 || InOut.Vertices.Num() != CoarseW * CoarseH)
 	{
 		return false;
 	}
@@ -273,7 +291,7 @@ bool AnastasisTerrainForge::Apply(
 		}
 	}
 
-	// D8 accumulation on the fine height field — drainage for ravine carving, not hydrology color.
+	// D8 accumulation on the fine height field â€” drainage for ravine carving, not hydrology color.
 	TArray<int32> Order;
 	Order.SetNumUninitialized(FineN);
 	for (int32 I = 0; I < FineN; ++I)
@@ -334,7 +352,7 @@ bool AnastasisTerrainForge::Apply(
 			const double We = Wet[I];
 			const double Acc = static_cast<double>(Accum[I]);
 
-			// Macro: ridges rise, bowls drop — existing masses, not new continents.
+			// Macro: ridges rise, bowls drop â€” existing masses, not new continents.
 			Alt += FMath::Max(L, 0.0) * 1.35;
 			Alt += FMath::Min(L, 0.0) * 0.95;
 
@@ -342,7 +360,7 @@ bool AnastasisTerrainForge::Apply(
 			const double Ravine = SmoothStep(8.0, 40.0, Acc) * (1.0 - SmoothStep(0.35, 0.75, Sh));
 			Alt -= Ravine * 0.016 * (0.45 + S * 2.0);
 
-			// Terraces on usable hillsides — agricultural benches, not a staircase everywhere.
+			// Terraces on usable hillsides â€” agricultural benches, not a staircase everywhere.
 			const double SlopeDeg = FMath::RadiansToDegrees(FMath::Atan(S * AnastasisWorldView::AltitudeScale / AnastasisWorldView::TileWorldSize));
 			if (SlopeDeg > 6.0 && SlopeDeg < 24.0 && Sh < 0.5)
 			{
@@ -445,7 +463,7 @@ bool AnastasisTerrainForge::Apply(
 			}
 			Forged[I] = FMath::Lerp(Forged[I], Target, 0.58);
 		}
-		// Secondary terraces around the basin — buildable shoulders, not a village yet.
+		// Secondary terraces around the basin â€” buildable shoulders, not a village yet.
 		for (int32 I = 0; I < FineN; ++I)
 		{
 			if (BasinMask[I] || Water[I] || !Buildable[I])
@@ -510,14 +528,14 @@ bool AnastasisTerrainForge::Apply(
 			const double V = static_cast<double>(JY) * InvSub;
 			const double TileX = static_cast<double>(Crop.OriginX) + U;
 			const double TileY = static_cast<double>(Crop.OriginY) + V;
-			const double WorldX = (TileX + 0.5) * AnastasisWorldView::TileWorldSize;
-			const double WorldY = (TileY + 0.5) * AnastasisWorldView::TileWorldSize;
+			const double WorldX = (TileX + 0.5) * AnastasisWorldView::TileWorldSize * Crop.SpatialScale;
+			const double WorldY = (TileY + 0.5) * AnastasisWorldView::TileWorldSize * Crop.SpatialScale;
 
 			double Z;
 			if (Water[I])
 			{
 				const double DepthExag = 1.7;
-				Z = SeaZ + (H[I] - Sea) * AnastasisWorldView::AltitudeScale * DepthExag;
+				Z = SeaZ + (H[I] - Sea) * AnastasisWorldView::AltitudeScale * Crop.SpatialScale * DepthExag;
 			}
 			else
 			{
@@ -527,7 +545,7 @@ bool AnastasisTerrainForge::Apply(
 				const double EdgeDist = static_cast<double>(FMath::Min(FMath::Min(IX, JY), FMath::Min(FineW - 1 - IX, FineH - 1 - JY)));
 				const double Interior = SmoothStep(static_cast<double>(Subdiv) * 2.0, static_cast<double>(Subdiv) * 10.0, EdgeDist);
 				const double LocalExag = FMath::Lerp(1.55, Exaggerate, Interior) * FMath::Lerp(1.0, 0.42, ShoreBlend);
-				Z = SeaZ + Above * AnastasisWorldView::AltitudeScale * LocalExag;
+				Z = SeaZ + Above * AnastasisWorldView::AltitudeScale * Crop.SpatialScale * LocalExag;
 			}
 
 			Result.Vertices.Add(FVector(WorldX, WorldY, Z));
@@ -557,10 +575,19 @@ bool AnastasisTerrainForge::Apply(
 		}
 	}
 
+	if (Crop.bHumanGeography && Crop.Seed == AnastasisWorldView::ReferenceSeed)
+	{
+		AnastasisHumanGeography::Apply(Crop, Result, FineW, FineH);
+		MinZ = TNumericLimits<double>::Max();
+		MaxZ = TNumericLimits<double>::Lowest();
+		for (const FVector& P : Result.Vertices) { MinZ = FMath::Min(MinZ, P.Z); MaxZ = FMath::Max(MaxZ, P.Z); }
+	}
 	Result.WaterNormals.Init(FVector::UpVector, FineN);
 	RebuildNormals(Result);
 
 	OutMeta.Geometry = MoveTemp(Result);
+	OutMeta.SpatialScale = Crop.SpatialScale;
+	OutMeta.bHumanGeography = Crop.bHumanGeography && Crop.Seed == AnastasisWorldView::ReferenceSeed;
 	OutMeta.CoarseW = CoarseW;
 	OutMeta.CoarseH = CoarseH;
 	OutMeta.Subdiv = Subdiv;
@@ -585,6 +612,12 @@ bool AnastasisTerrainForge::Apply(
 		OutMeta.LandmarkZ = OutMeta.Geometry.Vertices[LandmarkI].Z;
 	}
 
+	if (OutMeta.bHumanGeography)
+	{
+		OutMeta.BasinX = 53.0 * 100.0 * Crop.SpatialScale;
+		OutMeta.BasinY = 53.0 * 100.0 * Crop.SpatialScale;
+		SampleHeight(OutMeta, OutMeta.BasinX, OutMeta.BasinY, OutMeta.BasinZ);
+	}
 	InOut = OutMeta.Geometry;
 	SetActive(OutMeta);
 	return true;

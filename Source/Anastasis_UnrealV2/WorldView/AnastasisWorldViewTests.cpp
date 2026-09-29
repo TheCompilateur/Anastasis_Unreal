@@ -196,7 +196,7 @@ bool FAnastasisWorldViewEmbodimentSpawnTest::RunTest(const FString&)
 
 	const AnastasisWorldView::FTilePose Far = AnastasisWorldView::SamplePose(Actor->GetPlan(), 95, 95);
 	TestTrue(TEXT("far instance readable"), Actor->GetInstanceWorldTransform(Far.Index, InstanceTransform));
-	TestTrue(TEXT("far instance Z uses alt"), FMath::IsNearlyEqual(InstanceTransform.GetLocation().Z, Far.Alt * AnastasisWorldView::AltitudeScale, 0.01));
+	TestTrue(TEXT("far instance Z uses alt"), FMath::IsNearlyEqual(InstanceTransform.GetLocation().Z, AnastasisWorldView::AltitudeToUnreal(Far.Alt, Actor->GetPlan().SpatialScale), 0.01));
 	TestTrue(TEXT("distinct terrain Z or type"), Origin.Type != Far.Type || !FMath::IsNearlyEqual(Origin.Alt, Far.Alt));
 
 	Actor->Destroy();

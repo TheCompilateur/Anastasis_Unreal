@@ -54,6 +54,9 @@ namespace AnastasisWorldView
 
 	struct FWorldVisualSnapshot
 	{
+		// Presentation coordinates only; simulation fields are never rescaled.
+		double SpatialScale = 1.0;
+		bool bHumanGeography = false;
 		uint32 Seed = 0;
 		int32 SourceW = 0;
 		int32 SourceH = 0;
@@ -80,6 +83,7 @@ namespace AnastasisWorldView
 	/** Unreal spatialization of a snapshot. Not debug art. */
 	struct FPlan
 	{
+		double SpatialScale = 1.0;
 		uint32 Seed = 0;
 		int32 SourceW = 0;
 		int32 SourceH = 0;
@@ -97,12 +101,17 @@ namespace AnastasisWorldView
 	};
 
 	/** SIM (x, y, alt) -> UE (X, Y, Z). Origin: tile centers; axes: SimX->UEX, SimY->UEY, Alt->UEZ. */
-	inline FVector TileToUnreal(int32 TileX, int32 TileY, double Alt)
+	inline double AltitudeToUnreal(double Alt, double SpatialScale = 1.0)
+	{
+		return AnastasisWorld::SeaLevel * AltitudeScale + (Alt - AnastasisWorld::SeaLevel) * AltitudeScale * SpatialScale;
+	}
+
+	inline FVector TileToUnreal(int32 TileX, int32 TileY, double Alt, double SpatialScale = 1.0)
 	{
 		return FVector(
-			(static_cast<double>(TileX) + 0.5) * TileWorldSize,
-			(static_cast<double>(TileY) + 0.5) * TileWorldSize,
-			Alt * AltitudeScale);
+			(static_cast<double>(TileX) + 0.5) * TileWorldSize * SpatialScale,
+			(static_cast<double>(TileY) + 0.5) * TileWorldSize * SpatialScale,
+			AltitudeToUnreal(Alt, SpatialScale));
 	}
 
 	FVisualTile MakeVisualTile(const AnastasisWorld::FTile& Tile, int32 SourceIndex);

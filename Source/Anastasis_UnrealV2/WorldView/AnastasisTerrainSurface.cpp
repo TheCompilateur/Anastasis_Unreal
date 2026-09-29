@@ -50,7 +50,7 @@ FLinearColor SurfaceTypeColor(ETileType Type)
  * plus CLAIRE que le sol sec : la crue eclaircissait le terrain au lieu de le noircir.
  *
  * C'est le test Anastasis.Terrain.HydrologyGradient d'hydrology-surface qui l'a
- * attrape, « la crue assombrit le sol », et il avait raison. La vase saturee est une
+ * attrape, Â« la crue assombrit le sol Â», et il avait raison. La vase saturee est une
  * des surfaces naturelles les plus sombres (albedo reel 0.05-0.10) : 0.073 de luminance
  * la remet sous l'herbe, ou elle doit etre.
  */
@@ -176,14 +176,14 @@ bool AnastasisTerrainSurface::SampleHeight(
 {
     OutZ = 0.0;
     const int32 W = Crop.W, H = Crop.H;
-    if (W < 2 || H < 2 || Crop.Tiles.Num() != VerticesFor(W, H)) return false;
+    if (W < 2 || H < 2 || Crop.Tiles.Num() != VerticesFor(W, H) || !FMath::IsFinite(Crop.SpatialScale) || Crop.SpatialScale <= 0) return false;
     if (!FMath::IsFinite(WorldX) || !FMath::IsFinite(WorldY)) return false;
 
     // Les sommets sont au CENTRE des tuiles (TileToUnreal ajoute 0.5) : le champ de
     // hauteur ne commence donc qu'a un demi-tuile du bord de l'emprise. Au-dela il n'y
     // a pas de face rendue -- Build n'extrapole deliberement aucune bande exterieure.
-    const double U = WorldX / AnastasisWorldView::TileWorldSize - 0.5 - static_cast<double>(Crop.OriginX);
-    const double V = WorldY / AnastasisWorldView::TileWorldSize - 0.5 - static_cast<double>(Crop.OriginY);
+    const double U = WorldX / (AnastasisWorldView::TileWorldSize * Crop.SpatialScale) - 0.5 - static_cast<double>(Crop.OriginX);
+    const double V = WorldY / (AnastasisWorldView::TileWorldSize * Crop.SpatialScale) - 0.5 - static_cast<double>(Crop.OriginY);
     if (U < 0.0 || V < 0.0 || U > static_cast<double>(W - 1) || V > static_cast<double>(H - 1)) return false;
 
     const int32 X = FMath::Clamp(static_cast<int32>(FMath::FloorToDouble(U)), 0, W - 2);
@@ -191,10 +191,10 @@ bool AnastasisTerrainSurface::SampleHeight(
     const double Fx = U - static_cast<double>(X), Fy = V - static_cast<double>(Y);
 
     const int32 A = Y * W + X, B = A + 1, C = A + W, D = C + 1;
-    const double ZA = Crop.Tiles[A].Alt * AnastasisWorldView::AltitudeScale;
-    const double ZB = Crop.Tiles[B].Alt * AnastasisWorldView::AltitudeScale;
-    const double ZC = Crop.Tiles[C].Alt * AnastasisWorldView::AltitudeScale;
-    const double ZD = Crop.Tiles[D].Alt * AnastasisWorldView::AltitudeScale;
+    const double ZA = AnastasisWorldView::AltitudeToUnreal(Crop.Tiles[A].Alt, Crop.SpatialScale);
+    const double ZB = AnastasisWorldView::AltitudeToUnreal(Crop.Tiles[B].Alt, Crop.SpatialScale);
+    const double ZC = AnastasisWorldView::AltitudeToUnreal(Crop.Tiles[C].Alt, Crop.SpatialScale);
+    const double ZD = AnastasisWorldView::AltitudeToUnreal(Crop.Tiles[D].Alt, Crop.SpatialScale);
     if (!FMath::IsFinite(ZA) || !FMath::IsFinite(ZB) || !FMath::IsFinite(ZC) || !FMath::IsFinite(ZD)) return false;
 
     // Build emet {A,C,B} puis {B,C,D} : la diagonale est B-C. Fx+Fy <= 1 tombe dans le
@@ -221,13 +221,15 @@ void AnastasisTerrainSurface::FillShorelineChannels(
         // chemins, et elle est ici.
         const FVector& P = InOut.Vertices[I];
         const int32 TileX = FMath::Clamp(
-            FMath::FloorToInt32(P.X / AnastasisWorldView::TileWorldSize) - Crop.OriginX, 0, Crop.W - 1);
+            FMath::FloorToInt32(P.X / (AnastasisWorldView::TileWorldSize * Crop.SpatialScale)) - Crop.OriginX, 0, Crop.W - 1);
         const int32 TileY = FMath::Clamp(
-            FMath::FloorToInt32(P.Y / AnastasisWorldView::TileWorldSize) - Crop.OriginY, 0, Crop.H - 1);
+            FMath::FloorToInt32(P.Y / (AnastasisWorldView::TileWorldSize * Crop.SpatialScale)) - Crop.OriginY, 0, Crop.H - 1);
         const AnastasisWorldView::FVisualTile& T = Crop.Tiles[TileY * Crop.W + TileX];
         const FShorelineVertex S = ShorelineAt(T, P.Z, bHaveNormals ? InOut.Normals[I] : FVector::UpVector);
-        InOut.WaterUV0[I] = FVector2D(S.Depth, S.Flatness);
-        InOut.WaterUV1[I] = FVector2D(S.Flow, 0.0);
+        const double WaterZ = InOut.WaterVertices.IsValidIndex(I) ? InOut.WaterVertices[I].Z : WaterPlaneZ;
+        const double ActualDepth = FMath::Clamp((WaterZ - P.Z) / ShoreDepthSpan, 0.0, 1.0);
+        InOut.WaterUV0[I] = FVector2D(ActualDepth, S.Flatness);
+        InOut.WaterUV1[I] = FVector2D(InOut.RiverFlow.IsValidIndex(I) ? FMath::Max(S.Flow, static_cast<double>(InOut.RiverFlow[I])) : S.Flow, 0.0);
     }
 }
 
@@ -238,7 +240,7 @@ bool AnastasisTerrainSurface::Build(const AnastasisWorldView::FWorldVisualSnapsh
     // que le 96x96 canonique ne serait plus adossee a la verite de simulation.
     // Il faut deux sommets par axe pour former une seule cellule.
     const int32 W = Crop.W, H = Crop.H;
-    if (W < 2 || H < 2 || Crop.SourceW != SourceW || Crop.SourceH != SourceH
+    if (!FMath::IsFinite(Crop.SpatialScale) || Crop.SpatialScale <= 0 || W < 2 || H < 2 || Crop.SourceW != SourceW || Crop.SourceH != SourceH
         || Crop.OriginX < 0 || Crop.OriginY < 0
         || Crop.OriginX + W > SourceW || Crop.OriginY + H > SourceH
         || Crop.Tiles.Num() != VerticesFor(W, H)) return false;
@@ -254,7 +256,7 @@ bool AnastasisTerrainSurface::Build(const AnastasisWorldView::FWorldVisualSnapsh
         if (!FMath::IsFinite(T.Shore) || !FMath::IsFinite(T.Shade)
             || !FMath::IsFinite(T.Wetness) || !FMath::IsFinite(T.FlowAmt)
             || !FMath::IsFinite(T.FlowX) || !FMath::IsFinite(T.FlowZ)) return false;
-        const FVector P = AnastasisWorldView::TileToUnreal(X, Y, T.Alt);
+        const FVector P = AnastasisWorldView::TileToUnreal(X, Y, T.Alt, Crop.SpatialScale);
         if (!FMath::IsFinite(P.X) || !FMath::IsFinite(P.Y) || !FMath::IsFinite(P.Z)) return false;
         Result.Vertices.Add(P);
         Result.SourceIndices.Add(T.SourceIndex);

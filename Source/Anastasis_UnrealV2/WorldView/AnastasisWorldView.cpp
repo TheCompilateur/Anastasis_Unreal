@@ -97,6 +97,8 @@ namespace AnastasisWorldView
 	{
 		FWorldVisualSnapshot Cropped;
 		Cropped.Seed = Source.Seed;
+		Cropped.SpatialScale = Source.SpatialScale;
+		Cropped.bHumanGeography = Source.bHumanGeography;
 		Cropped.SourceW = Source.SourceW;
 		Cropped.SourceH = Source.SourceH;
 		Cropped.OriginX = OriginX;
@@ -145,6 +147,7 @@ namespace AnastasisWorldView
 	{
 		FPlan Plan;
 		Plan.Seed = Snapshot.Seed;
+		Plan.SpatialScale = Snapshot.SpatialScale;
 		Plan.SourceW = Snapshot.SourceW;
 		Plan.SourceH = Snapshot.SourceH;
 		Plan.OriginX = Snapshot.OriginX;
@@ -166,7 +169,7 @@ namespace AnastasisWorldView
 		for (int32 Index = 0; Index < Plan.TileCount; ++Index)
 		{
 			const FVisualTile& Tile = Snapshot.Tiles[Index];
-			Plan.Locations[Index] = TileToUnreal(Tile.X, Tile.Y, Tile.Alt);
+			Plan.Locations[Index] = TileToUnreal(Tile.X, Tile.Y, Tile.Alt, Snapshot.SpatialScale);
 			Plan.Types[Index] = Tile.Type;
 			Plan.Alts[Index] = Tile.Alt;
 		}
@@ -211,7 +214,7 @@ namespace AnastasisWorldView
 		{
 			Box += Location;
 		}
-		const FVector Half(TileWorldSize * 0.5, TileWorldSize * 0.5, 0.0);
+		const FVector Half(TileWorldSize * Plan.SpatialScale * 0.5, TileWorldSize * Plan.SpatialScale * 0.5, 0.0);
 		Box.Min -= Half;
 		Box.Max += Half;
 		return Box;

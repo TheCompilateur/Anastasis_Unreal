@@ -171,6 +171,8 @@ struct FGeometry
      */
     TArray<FVector2D> WaterUV0;
     TArray<FVector2D> WaterUV1;
+    /** Optional geometry-owned river flow, distinct from simulation FlowAmt. */
+    TArray<float> RiverFlow;
 
     /**
      * Canaux morphologiques lus par le materiau de sol. La couleur de sommet ne peut

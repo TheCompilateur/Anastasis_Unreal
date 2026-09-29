@@ -18,6 +18,8 @@ inline constexpr int32 DefaultSubdiv = 4;
 
 struct FMesh
 {
+	double SpatialScale = 1.0;
+	bool bHumanGeography = false;
 	AnastasisTerrainSurface::FGeometry Geometry;
 	int32 CoarseW = 0;
 	int32 CoarseH = 0;
@@ -42,6 +44,7 @@ struct FMesh
 bool Apply(const AnastasisWorldView::FWorldVisualSnapshot& Crop, AnastasisTerrainSurface::FGeometry& InOut, FMesh& OutMeta);
 
 bool SampleHeight(const FMesh& Mesh, double WorldX, double WorldY, double& OutZ);
+bool SampleActiveWater(double WorldX, double WorldY, double& OutZ);
 
 void SetActive(const FMesh& Mesh);
 void ClearActive();
