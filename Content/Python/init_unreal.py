@@ -18,3 +18,10 @@ try:
         )
 except Exception as exc:
     unreal.log_error(f"Anastasis agentic Python init failed: {exc}")
+
+# Independent Editor-only metrology; no runtime imports or terrain mutation.
+try:
+    from anastasis_map_intelligence import editor as _map_intelligence
+    _map_intelligence.register()
+except Exception as exc:
+    unreal.log_warning(f'Anastasis Map Intelligence registration failed: {exc}')
