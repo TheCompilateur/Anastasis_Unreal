@@ -353,6 +353,10 @@ Le bruit `Condition failed` au démarrage est sensible à la culture de l'édite
 Un changement C++ n'est pas fini tant que `build` n'est pas `BUILD::PASS` et que les tests du chantier
 concerné ne sont pas verts. Citer les noms de tests et les valeurs, pas « ça marche ».
 
+Un run qui échoue sans rapport évident avec ton changement : lire `docs/unreal/PIEGES_UNREAL.md` **avant**
+de chercher une régression. Éditeur fermé de l'extérieur, mémoire vidéo saturée, capture sans focus,
+build vert en non-unity : chaque piège y est rangé par sa signature dans le log.
+
 ## État
 
 `PLAYER` reste **NOT_IMPLEMENTED**. Ne pas le commencer sans mandat explicite d'Alexandre.
