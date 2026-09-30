@@ -23,6 +23,11 @@ namespace
 			OutKind = EAnastasisVillageBuildingKind::Well;
 			return true;
 		}
+		if (Type == AnastasisVillage::HouseType)
+		{
+			OutKind = EAnastasisVillageBuildingKind::House;
+			return true;
+		}
 		return false;
 	}
 
@@ -177,7 +182,15 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 	for (const AnastasisVillage::FBuilding& Building : Village.GetBuildings())
 	{
 		const FVector Base = SimToUnreal(SimWorld, Building.X + 0.5, Building.Y + 0.5, World);
-		DrawDebugCylinder(World, Base, Base + FVector(0, 0, Tile * 0.6), Tile * 0.35, 16, FColor::Cyan, false, 0.f, 0, 4.f);
+		const bool bHouse = Building.Type == AnastasisVillage::HouseType;
+		if (bHouse)
+		{
+			DrawDebugBox(World, Base + FVector(0, 0, Tile * 0.35), FVector(Tile * 0.45, Tile * 0.45, Tile * 0.35), FColor::Orange, false, 0.f, 0, 4.f);
+		}
+		else
+		{
+			DrawDebugCylinder(World, Base, Base + FVector(0, 0, Tile * 0.6), Tile * 0.35, 16, FColor::Cyan, false, 0.f, 0, 4.f);
+		}
 		for (const AnastasisVillage::FPoint& P : Building.AccessPoints)
 		{
 			DrawDebugPoint(World, SimToUnreal(SimWorld, P.X, P.Y, World) + FVector(0, 0, 10), 12.f, FColor::Turquoise, false, 0.f);
@@ -186,9 +199,14 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 		DrawDebugString(
 			World,
 			Base + FVector(0, 0, Tile * 0.9),
-			FString::Printf(TEXT("%s %s  users=%d [%s]"), *Building.Id, *Building.Type, Users.Num(), *FString::Join(Users, TEXT(","))),
+			bHouse
+				? FString::Printf(TEXT("%s house owner=%s  foyer/abri=%d/%d  dedans=%d  users=[%s]"),
+					*Building.Id, Building.Owner.IsEmpty() ? TEXT("-") : *Building.Owner,
+					Village.CountShelterOccupants(Building.Id), Village.ShelterCapacity(Building),
+					Village.InsideOf(Building.Id).Num(), *FString::Join(Users, TEXT(",")))
+				: FString::Printf(TEXT("%s %s  users=%d [%s]"), *Building.Id, *Building.Type, Users.Num(), *FString::Join(Users, TEXT(","))),
 			nullptr,
-			FColor::Cyan,
+			bHouse ? FColor::Orange : FColor::Cyan,
 			0.f);
 	}
 
@@ -196,8 +214,11 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 	{
 		const FVector Pos = SimToUnreal(SimWorld, Npc.X, Npc.Y, World) + FVector(0, 0, Tile * 0.25);
 		const float Thirst01 = static_cast<float>(FMath::Clamp(Npc.Needs.Thirst / 100.0, 0.0, 1.0));
-		const FColor Color = FLinearColor::LerpUsingHSV(FLinearColor::Green, FLinearColor::Red, Thirst01).ToFColor(true);
-		DrawDebugSphere(World, Pos, Tile * 0.18, 10, Color, false, 0.f, 0, 3.f);
+		// Dedans : bleu, petite sphere au seuil (la position reste celle de l'entree).
+		const FColor Color = Npc.Inside.bActive
+			? FColor(80, 120, 255)
+			: FLinearColor::LerpUsingHSV(FLinearColor::Green, FLinearColor::Red, Thirst01).ToFColor(true);
+		DrawDebugSphere(World, Pos, Tile * (Npc.Inside.bActive ? 0.1 : 0.18), 10, Color, false, 0.f, 0, 3.f);
 		if (Npc.bHasTarget)
 		{
 			DrawDebugLine(World, Pos, SimToUnreal(SimWorld, Npc.Target.X, Npc.Target.Y, World) + FVector(0, 0, Tile * 0.25), Color, false, 0.f, 0, 2.f);
@@ -206,11 +227,13 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 			World,
 			Pos + FVector(0, 0, Tile * 0.3),
 			FString::Printf(
-				TEXT("%s %s/%s soif=%.1f%s"),
+				TEXT("%s %s/%s%s soif=%.1f energie=%.1f%s"),
 				*Npc.Id,
 				*Npc.Goal,
 				*Npc.Activity,
+				Npc.Inside.bActive ? *FString::Printf(TEXT(" [dans %s]"), *Npc.Inside.BuildingId) : TEXT(""),
 				Npc.Needs.Thirst,
+				Npc.Needs.Energy,
 				Npc.DestBuildingId.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" -> %s"), *Npc.DestBuildingId)),
 			nullptr,
 			Color,
@@ -223,11 +246,13 @@ void FAnastasisVillagePresentation::LogStatus(const AnastasisVillage::FVillage& 
 	UE_LOG(
 		LogAnastasis_UnrealV2,
 		Display,
-		TEXT("ANASTASIS_VILLAGE status t=%.3f buildings=%d actors=%d wells=%d navVersion=%d digest=%s"),
+		TEXT("ANASTASIS_VILLAGE status t=%.3f phase=%s buildings=%d actors=%d wells=%d houses=%d navVersion=%d digest=%s"),
 		Time,
+		AnastasisRhythm::PhaseId(AnastasisRhythm::VillagePhase(AnastasisRhythm::DayFracOf(Time))),
 		Village.GetBuildings().Num(),
 		Village.GetActors().Num(),
 		Village.CountBuildings(AnastasisVillage::WellType),
+		Village.CountBuildings(AnastasisVillage::HouseType),
 		Village.GetNavVersion(),
 		*AnastasisDigest::ToHex(Village.Digest()));
 
@@ -242,12 +267,16 @@ void FAnastasisVillagePresentation::LogStatus(const AnastasisVillage::FVillage& 
 		UE_LOG(
 			LogAnastasis_UnrealV2,
 			Display,
-			TEXT("ANASTASIS_VILLAGE building %s type=%s tile=(%.0f,%.0f) progress=%.2f access=%s users=[%s]"),
+			TEXT("ANASTASIS_VILLAGE building %s type=%s tile=(%.0f,%.0f) progress=%.2f owner=%s occupants=%d/%d inside=[%s] access=%s users=[%s]"),
 			*B.Id,
 			*B.Type,
 			B.X,
 			B.Y,
 			B.Progress,
+			B.Owner.IsEmpty() ? TEXT("-") : *B.Owner,
+			Village.CountShelterOccupants(B.Id),
+			Village.ShelterCapacity(B),
+			*FString::Join(Village.InsideOf(B.Id), TEXT(",")),
 			*FString::Join(Points, TEXT(" ")),
 			*FString::Join(Users, TEXT(",")));
 	}
@@ -258,22 +287,31 @@ void FAnastasisVillagePresentation::LogStatus(const AnastasisVillage::FVillage& 
 		UE_LOG(
 			LogAnastasis_UnrealV2,
 			Display,
-			TEXT("ANASTASIS_VILLAGE npc %s pos=(%.2f,%.2f) goal=%s activity=%s thirst=%.2f hygiene=%.2f morale=%.2f health=%.2f target=%s dest=%s drinks=%d | why t=%.2f drinkRow=%.2f floor=%.0f -> %s source=%s building=%s"),
+			TEXT("ANASTASIS_VILLAGE npc %s pos=(%.2f,%.2f) goal=%s activity=%s inside=%s home=%s shelter=%s thirst=%.2f energy=%.2f hygiene=%.2f morale=%.2f health=%.2f sleepQ=%.2f target=%s dest=%s drinks=%d rests=%d | why t=%.2f phase=%s rest=%.2f drink=%.2f floor=%.2f(%s) -> %s source=%s building=%s"),
 			*N.Id,
 			N.X,
 			N.Y,
 			*N.Goal,
 			*N.Activity,
+			N.Inside.bActive ? *N.Inside.BuildingId : TEXT("-"),
+			N.HomeId.IsEmpty() ? TEXT("-") : *N.HomeId,
+			N.ShelterId.IsEmpty() ? TEXT("-") : *N.ShelterId,
 			N.Needs.Thirst,
+			N.Needs.Energy,
 			N.Needs.Hygiene,
 			N.Needs.Morale,
 			N.Needs.Health,
+			AnastasisVillage::FVillage::SleepQualityOf(N),
 			N.bHasTarget ? *FString::Printf(TEXT("(%.1f,%.1f)"), N.Target.X, N.Target.Y) : TEXT("null"),
 			N.DestBuildingId.IsEmpty() ? TEXT("-") : *N.DestBuildingId,
 			N.DrinksTaken,
+			N.RestsTaken,
 			D.Time,
+			D.Phase.IsEmpty() ? TEXT("-") : *D.Phase,
+			D.RestRowScore,
 			D.DrinkRowScore,
-			AnastasisVillage::UnportedGoalsFloor,
+			D.FloorScore,
+			D.FloorGoal.IsEmpty() ? TEXT("-") : *D.FloorGoal,
 			D.Winner.IsEmpty() ? TEXT("-") : *D.Winner,
 			D.TargetSource.IsEmpty() ? TEXT("-") : *D.TargetSource,
 			D.BuildingId.IsEmpty() ? TEXT("-") : *D.BuildingId);

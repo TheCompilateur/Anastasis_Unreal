@@ -155,6 +155,19 @@ La table de décision est RÉDUITE : `drink` contre un plancher déclaré (`Unpo
 pas contre les ~24 autres buts. Tant qu'elle l'est, le harnais différentiel ne peut pas juger
 cette boucle — seules les fonctions de besoins sont en parité.
 
+### Fait — tranche verticale : la maison (mission house-rest-001)
+
+Le deuxième bâtiment, et le premier où l'on entre. Détail : `docs/unreal/HOUSE_REST_001.md`.
+
+| Unreal | Source JS | Preuve |
+| --- | --- | --- |
+| `Life/AnastasisVillageRhythm.h/.cpp` | `life/villageRhythm.js` : phases, `villagePhase`, `isNightPhase`, `phaseBias` | `Parite.Rythme`, 642 vecteurs |
+| `Life/AnastasisNeeds.*` (ajouts) | `tickNeeds` branche intérieure `rest`, `satisfyRest` ; `sleepQuality` (`life/domestic.js`) | `Parite.Besoins` (495) ; `Parite.Rythme` (7 de foyer) |
+| `Village/AnastasisVillage.*` (ajouts) | `enterBuilding`, `updateInside`, `exitBuilding`, `tryEnterIndoorAction`, `buildingForIndoorAction` (rest), `buildingNearActor`, `nearestHousing`, `findOpenShelter`, `countShelterOccupants`, `assignSheltersDaily`, `assignHomeToHousehold` (sans famille), `redirectDomesticDoorFailure` | `Village.Maison.*` |
+
+La table compte désormais deux lignes portées, `rest` et `drink`. Chaque but non porté vaut 42
+**plus son vrai `phaseBias`** : le rythme est en parité, seul le 42 est déclaré.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

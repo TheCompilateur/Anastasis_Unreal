@@ -13,11 +13,18 @@ namespace AnastasisVillage
 
 	namespace
 	{
-		/** `ACCESS_BUDGET` de navGrid.js — seul le puits est pose par ce portage. */
+		/** `ACCESS_BUDGET` de navGrid.js, pour les types que ce portage sait poser. */
 		int32 AccessBudget(const FString& Type)
 		{
 			if (Type == WellType) return 4;
+			if (Type == HouseType) return 2;
 			return 3; // `ACCESS_BUDGET.default`
+		}
+
+		/** Types connus du catalogue porte (`BUILDINGS[type]` existe). */
+		bool IsKnownType(const FString& Type)
+		{
+			return Type == WellType || Type == HouseType;
 		}
 
 		FString TargetKey(const FPoint& P)
@@ -29,6 +36,18 @@ namespace AnastasisVillage
 		}
 
 		int32 FloorInt(double V) { return static_cast<int32>(AnastasisJs::Floor(V)); }
+
+		/** `distToBuilding` — distance au CENTRE du batiment. */
+		double DistToBuilding(const FNpc& Npc, const FBuilding& B)
+		{
+			return JsHypot(Npc.X - (B.X + 0.5), Npc.Y - (B.Y + 0.5));
+		}
+
+		/** `restActivity` : « dort » la nuit (pas de gardes dans ce portage), « repose » sinon. */
+		const TCHAR* RestActivity(bool bNight)
+		{
+			return bNight ? TEXT("dort") : TEXT("repose");
+		}
 	}
 
 	double AiThinkStagger(const FString& Id)
@@ -56,6 +75,26 @@ namespace AnastasisVillage
 			|| N.Morale < MoraleCritical;
 	}
 
+	int32 HousingOfType(const FString& Type)
+	{
+		// sim/batiments/catalog.js : house `housing: 3`. Le puits n'abrite personne.
+		if (Type == HouseType) return 3;
+		return 0;
+	}
+
+	const TArray<FString>& UnportedGoals()
+	{
+		// Table adulte de npc.js (adultScores), moins `rest` et `drink`.
+		static const TArray<FString> Goals = {
+			TEXT("eat"), TEXT("eatTogether"), TEXT("relax"), TEXT("relieve"),
+			TEXT("gatherWood"), TEXT("gatherStone"), TEXT("gatherFood"), TEXT("helpFarm"),
+			TEXT("sell"), TEXT("buy"), TEXT("build"), TEXT("craft"), TEXT("maintain"), TEXT("deliver"),
+			TEXT("fetchInput"), TEXT("haulJob"), TEXT("aidHousehold"), TEXT("visitFamily"), TEXT("explore"),
+			TEXT("socialize"), TEXT("confront"), TEXT("shelterRain"), TEXT("closeWorkplace"),
+		};
+		return Goals;
+	}
+
 	// --- Monde et batiments ---------------------------------------------------
 
 	void FVillage::Bind(const AnastasisWorld::FWorld& InWorld)
@@ -68,6 +107,7 @@ namespace AnastasisVillage
 		Settlement = { InWorld.W * 0.5, InWorld.H * 0.5 };
 		NextBuildingId = 0;
 		NextNpcId = 0;
+		Now = 0.0;
 		Buildings = TAnastasisEntityTable<FBuilding>();
 		Actors = TAnastasisEntityTable<FNpc>();
 	}
@@ -79,6 +119,11 @@ namespace AnastasisVillage
 			return true;
 		}
 		return AnastasisNav::FootBlockedAt(Nav, *World, FloorInt(InX), FloorInt(InY));
+	}
+
+	bool FVillage::IsBlocked(double InX, double InY) const
+	{
+		return AnastasisNav::BlockedAt(Nav, FloorInt(InX), FloorInt(InY));
 	}
 
 	bool FVillage::IsFreeCell(int32 TX, int32 TY) const
@@ -109,6 +154,7 @@ namespace AnastasisVillage
 		Building.Y = TileY;
 		Building.Progress = Progress;
 		Building.CreatedDay = Day;
+		Building.HousePhase = 1;
 
 		Nav.Blocked[Index] = 1;
 		Nav.MoveCost[Index] = std::numeric_limits<float>::infinity();
@@ -141,19 +187,42 @@ namespace AnastasisVillage
 		}
 		++NavVersion;
 
-		// Aucune reference morte : identifiant, cible et chemin tombent ensemble.
+		// Aucune reference morte : dedans, foyer, abri, cible, chemin.
 		for (FNpc& Npc : Actors.GetItemsMutable())
 		{
-			if (Npc.DestBuildingId != Id)
+			bool bLostPlace = false;
+			if (Npc.Inside.bActive && Npc.Inside.BuildingId == Id)
 			{
-				continue;
+				// Sortie par le seuil d'entree ; la case du batiment est libre desormais,
+				// et exitBuilding ne retrouverait plus le batiment de toute facon.
+				Npc.X = Npc.Inside.ExitX;
+				Npc.Y = Npc.Inside.ExitY;
+				Npc.Inside = FInside();
+				bLostPlace = true;
 			}
-			ClearNavigation(Npc);
-			Npc.bHasTarget = false;
-			Npc.DestBuildingId.Reset();
-			Npc.Goal = GoalObserver;
-			Npc.WorkTimer = 0.0;
-			Npc.Activity = TEXT("attend");
+			if (Npc.HomeId == Id)
+			{
+				Npc.HomeId.Reset();
+			}
+			if (Npc.ShelterId == Id)
+			{
+				Npc.ShelterId.Reset();
+			}
+			if (Npc.DestBuildingId == Id)
+			{
+				bLostPlace = true;
+			}
+			if (bLostPlace)
+			{
+				ClearNavigation(Npc);
+				Npc.bHasTarget = false;
+				Npc.DestBuildingId.Reset();
+				Npc.Goal = GoalObserver;
+				Npc.WorkTimer = 0.0;
+				Npc.DoorStuckAt = 0.0;
+				Npc.DoorApproachAt = 0.0;
+				Npc.Activity = TEXT("attend");
+			}
 		}
 		return true;
 	}
@@ -279,6 +348,7 @@ namespace AnastasisVillage
 		for (const FNpc& Actor : Actors.GetItems())
 		{
 			if (&Actor == Ignored) continue;
+			if (Actor.Inside.bActive) continue;
 			Bump(FloorInt(Actor.X), FloorInt(Actor.Y), 1.0);
 			// La case visee est reservee aussi : sinon trois PNJ choisissent le meme
 			// seuil tant qu'aucun n'y est encore arrive.
@@ -331,6 +401,12 @@ namespace AnastasisVillage
 			return true;
 		}
 		return false;
+	}
+
+	bool FVillage::BuildingAccessPointById(const FString& BuildingId, FNpc* Actor, FPoint& Out)
+	{
+		FBuilding* Building = Buildings.FindById(BuildingId);
+		return Building && BuildingAccessPoint(*Building, Actor, Out);
 	}
 
 	bool FVillage::NearestFreePoint(double InX, double InY, int32 MaxRadius, FPoint& Out) const
@@ -466,8 +542,7 @@ namespace AnastasisVillage
 		// puits acheve, c'est lui, le plus proche, quelle que soit la base.
 		if (const FBuilding* Well = NearestWell(Npc.X, Npc.Y))
 		{
-			FBuilding* Mutable = Buildings.FindById(Well->Id);
-			if (Mutable && BuildingAccessPoint(*Mutable, &Npc, OutTarget))
+			if (BuildingAccessPointById(Well->Id, &Npc, OutTarget))
 			{
 				OutSource = TEXT("well");
 				return true;
@@ -509,6 +584,355 @@ namespace AnastasisVillage
 		return false;
 	}
 
+	// --- Foyer (life/domestic.js) ----------------------------------------------
+
+	int32 FVillage::ShelterCapacity(const FBuilding& Building) const
+	{
+		if (Building.Type == HouseType)
+		{
+			// `HOUSE_PHASES[phase - 1].capacity` ; seule la phase 1 existe dans ce portage.
+			return HousePhaseOneCapacity + FMath::Clamp(Building.HousePhase, 1, 6) - 1;
+		}
+		return HousingOfType(Building.Type);
+	}
+
+	int32 FVillage::CountShelterOccupants(const FString& BuildingId) const
+	{
+		int32 N = 0;
+		for (const FNpc& Actor : Actors.GetItems())
+		{
+			if (Actor.HomeId == BuildingId || Actor.ShelterId == BuildingId) ++N;
+		}
+		return N;
+	}
+
+	TArray<FString> FVillage::InsideOf(const FString& BuildingId) const
+	{
+		TArray<FString> Ids;
+		for (const FNpc& Actor : Actors.GetItems())
+		{
+			if (Actor.Inside.bActive && Actor.Inside.BuildingId == BuildingId) Ids.Add(Actor.Id);
+		}
+		return Ids;
+	}
+
+	double FVillage::SleepQualityOf(const FNpc& Npc)
+	{
+		return AnastasisNeeds::SleepQuality(
+			Npc.Inside.bActive ? Npc.Inside.BuildingId : FString(), Npc.HomeId, Npc.ShelterId);
+	}
+
+	bool FVillage::IsEnterableHousing(const FBuilding& Building) const
+	{
+		if (Building.Progress < 1.0) return false;
+		return HousingOfType(Building.Type) > 0;
+	}
+
+	const FBuilding* FVillage::NearLivingHome(const FNpc& Npc) const
+	{
+		const FString& Living = Npc.LivingHomeId();
+		if (Living.IsEmpty()) return nullptr;
+		const FBuilding* Home = Buildings.FindById(Living);
+		if (!Home) return nullptr;
+		return DistToBuilding(Npc, *Home) <= AnastasisNeeds::Domestic::HomeEnterRadius ? Home : nullptr;
+	}
+
+	const FBuilding* FVillage::NearestHousing(const FNpc& Npc) const
+	{
+		const FBuilding* Best = nullptr;
+		double BestDist = AnastasisNav::Infinity;
+		for (const FBuilding& B : Buildings.GetItems())
+		{
+			if (B.Progress < 1.0 || HousingOfType(B.Type) <= 0) continue;
+			if (B.Type == HouseType && !B.Owner.IsEmpty() && B.Owner != Npc.Id) continue;
+			const double DX = (B.X + 0.5) - Npc.X;
+			const double DY = (B.Y + 0.5) - Npc.Y;
+			const double D = DX * DX + DY * DY;
+			const double Bias = 2.0; // dortoir 0, le reste 2 ; pas de dortoir dans ce portage
+			if (D + Bias < BestDist)
+			{
+				BestDist = D + Bias;
+				Best = &B;
+			}
+		}
+		return Best;
+	}
+
+	const FBuilding* FVillage::FindOpenShelter(const FNpc& Npc) const
+	{
+		const FBuilding* Best = nullptr;
+		double BestScore = AnastasisNav::Infinity;
+		const FString& Living = Npc.LivingHomeId();
+		for (const FBuilding& B : Buildings.GetItems())
+		{
+			if (!IsEnterableHousing(B)) continue;
+			// Maison d'un autre foyer : pas d'intrusion (les maisons du joueur restent cedables).
+			if (B.Type == HouseType && !B.Owner.IsEmpty() && B.Owner != Npc.Id && B.Owner != TEXT("player")) continue;
+			const int32 Occupants = CountShelterOccupants(B.Id);
+			const int32 Cap = ShelterCapacity(B);
+			if (Occupants >= Cap && Living != B.Id) continue;
+			const double D = DistToBuilding(Npc, B);
+			const double Bias = B.Type == HouseType ? 4.0 : 12.0; // dortoir 0
+			const double Score = D + Bias + Occupants * 0.35;
+			if (Score < BestScore)
+			{
+				BestScore = Score;
+				Best = &B;
+			}
+		}
+		return Best;
+	}
+
+	bool FVillage::AssignHome(const FString& NpcId, const FString& HouseId)
+	{
+		FBuilding* House = Buildings.FindById(HouseId);
+		FNpc* Npc = Actors.FindById(NpcId);
+		if (!House || !Npc || House->Type != HouseType || !House->IsCompleted())
+		{
+			return false;
+		}
+		if (!House->Owner.IsEmpty() && House->Owner != NpcId)
+		{
+			return false;
+		}
+		House->Owner = NpcId;
+		Npc->HomeId = HouseId;
+		// `owner.morale = clamp(owner.morale + 12, 0, 100)` — sans repli sur 50.
+		Npc->Needs.Morale = Clamp(Npc->Needs.Morale + 12.0, 0.0, 100.0);
+		return true;
+	}
+
+	int32 FVillage::AssignSheltersDaily()
+	{
+		int32 Assigned = 0;
+		// La liste des sans-toit est prise AVANT la liberation des abris, comme la reference.
+		TArray<FString> Homeless;
+		for (const FNpc& Npc : Actors.GetItems())
+		{
+			if (Npc.HomeId.IsEmpty() && Npc.ShelterId.IsEmpty()) Homeless.Add(Npc.Id);
+		}
+		for (FNpc& Npc : Actors.GetItemsMutable())
+		{
+			if (!Npc.HomeId.IsEmpty() && !Npc.ShelterId.IsEmpty()) Npc.ShelterId.Reset();
+			if (!Npc.ShelterId.IsEmpty())
+			{
+				const FBuilding* Shelter = Buildings.FindById(Npc.ShelterId);
+				if (!Shelter || !IsEnterableHousing(*Shelter)) Npc.ShelterId.Reset();
+			}
+		}
+		for (const FString& Id : Homeless)
+		{
+			FNpc* Npc = Actors.FindById(Id);
+			if (!Npc) continue;
+			const FBuilding* Bed = FindOpenShelter(*Npc);
+			if (!Bed) break;
+			Npc->ShelterId = Bed->Id;
+			const double Morale = Npc->Needs.Morale != 0.0 ? Npc->Needs.Morale : 50.0; // `npc.morale || 50`
+			Npc->Needs.Morale = Clamp(Morale + 3.0, 0.0, 100.0);
+			++Assigned;
+		}
+		return Assigned;
+	}
+
+	bool FVillage::RestTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource)
+	{
+		// Base (`bestKnownBed || home access || accessPointNear(settlement)`) : toujours
+		// recouverte par la couche rythme ci-dessous, qui ne rend jamais rien de vide.
+		bool bHave = false;
+
+		// Couche rythme (`rhythmTarget`, branche rest).
+		if (!Npc.HomeId.IsEmpty() && BuildingAccessPointById(Npc.HomeId, &Npc, OutTarget))
+		{
+			bHave = true;
+			OutSource = TEXT("home");
+		}
+		else if (!Npc.ShelterId.IsEmpty() && BuildingAccessPointById(Npc.ShelterId, &Npc, OutTarget))
+		{
+			bHave = true;
+			OutSource = TEXT("shelter");
+		}
+		else if (const FBuilding* Housing = NearestHousing(Npc))
+		{
+			if (BuildingAccessPointById(Housing->Id, &Npc, OutTarget))
+			{
+				bHave = true;
+				OutSource = TEXT("housing");
+			}
+		}
+		if (!bHave && AccessPointNear(Settlement.X, Settlement.Y, &Npc, OutTarget))
+		{
+			bHave = true;
+			OutSource = TEXT("settlement");
+		}
+
+		// Couche domestique (`domesticTarget`) : le foyer, sinon un abri ouvert.
+		const FString Living = Npc.LivingHomeId();
+		FPoint Domestic;
+		if (!Living.IsEmpty())
+		{
+			if (BuildingAccessPointById(Living, &Npc, Domestic))
+			{
+				OutTarget = Domestic;
+				bHave = true;
+				OutSource = Living == Npc.HomeId ? TEXT("home") : TEXT("shelter");
+			}
+		}
+		else if (const FBuilding* Open = FindOpenShelter(Npc))
+		{
+			if (BuildingAccessPointById(Open->Id, &Npc, Domestic))
+			{
+				OutTarget = Domestic;
+				bHave = true;
+				OutSource = TEXT("open-shelter");
+			}
+		}
+		if (!bHave)
+		{
+			OutSource = TEXT("none");
+		}
+		return bHave;
+	}
+
+	// --- Interieur -------------------------------------------------------------
+
+	const FBuilding* FVillage::BuildingNearActor(const FNpc& Npc, double Radius) const
+	{
+		const FBuilding* Best = nullptr;
+		double BestScore = Radius;
+		for (const FBuilding& B : Buildings.GetItems())
+		{
+			if (B.Progress < 1.0) continue;
+			const double TargetDistance = Npc.bHasTarget
+				? JsHypot(Npc.Target.X - (B.X + 0.5), Npc.Target.Y - (B.Y + 0.5))
+				: AnastasisNav::Infinity;
+			const double ActorDistance = JsHypot(Npc.X - (B.X + 0.5), Npc.Y - (B.Y + 0.5));
+			const double Score = FMath::Min(ActorDistance, TargetDistance * 0.85);
+			if (Score < BestScore)
+			{
+				Best = &B;
+				BestScore = Score;
+			}
+		}
+		return Best;
+	}
+
+	const FBuilding* FVillage::BuildingForIndoorAction(const FNpc& Npc) const
+	{
+		// Foyer d'abord : dormir se fait DANS la maison ou l'abri.
+		const FString& Living = Npc.LivingHomeId();
+		if (!Living.IsEmpty())
+		{
+			const FBuilding* Home = Buildings.FindById(Living);
+			if (Home && Home->Progress >= 1.0
+				&& DistToBuilding(Npc, *Home) <= AnastasisNeeds::Domestic::HomeEnterRadius)
+			{
+				return Home;
+			}
+		}
+		// (Poste de travail : pas de metier dans ce portage.)
+		const FBuilding* Building = BuildingNearActor(Npc, IndoorBuildingRadius);
+		if (!Building || Building->Progress < 1.0) return nullptr;
+		if (!IsKnownType(Building->Type)) return nullptr;
+		const bool bAtOwn = !Living.IsEmpty() && Living == Building->Id;
+		// `if (goal === "rest" || goal === "relieve") return afford(atOwn || data.housing)`.
+		// AUCUN controle de proprietaire ni de capacite : c'est la reference.
+		return bAtOwn || HousingOfType(Building->Type) > 0 ? Building : nullptr;
+	}
+
+	bool FVillage::EnterBuilding(FNpc& Npc, const FBuilding& Building, const FString& InActivity, double Duration)
+	{
+		if (Building.Progress < 1.0 || Npc.Inside.bActive) return false;
+		FPoint Entrance = { Npc.X, Npc.Y };
+		if (IsBlocked(Npc.X, Npc.Y))
+		{
+			FPoint Door;
+			if (BuildingAccessPointById(Building.Id, &Npc, Door)) Entrance = Door;
+		}
+		Npc.X = Entrance.X;
+		Npc.Y = Entrance.Y;
+		Npc.Inside.bActive = true;
+		Npc.Inside.BuildingId = Building.Id;
+		Npc.Inside.Activity = InActivity;
+		Npc.Inside.Goal = Npc.Goal;
+		Npc.Inside.EnteredAt = Now;
+		Npc.Inside.Until = Now + FMath::Max(0.45, Duration);
+		Npc.Inside.ExitX = Entrance.X;
+		Npc.Inside.ExitY = Entrance.Y;
+		Npc.bHasTarget = false;
+		ClearNavigation(Npc);
+		return true;
+	}
+
+	bool FVillage::ExitBuilding(FNpc& Npc)
+	{
+		if (!Npc.Inside.bActive) return false;
+		const FString BuildingId = Npc.Inside.BuildingId;
+		const double ExitX = Npc.Inside.ExitX;
+		const double ExitY = Npc.Inside.ExitY;
+		Npc.Inside = FInside();
+		if (FMath::IsFinite(ExitX) && FMath::IsFinite(ExitY) && !IsBlocked(ExitX, ExitY))
+		{
+			Npc.X = ExitX;
+			Npc.Y = ExitY;
+		}
+		else
+		{
+			FPoint Exit;
+			if (BuildingAccessPointById(BuildingId, &Npc, Exit))
+			{
+				Npc.X = Exit.X;
+				Npc.Y = Exit.Y;
+			}
+		}
+		Npc.Path.Reset();
+		Npc.PathStep = 0;
+		Npc.bHasPathGoal = false;
+		return true;
+	}
+
+	bool FVillage::TryEnterIndoorAction(FNpc& Npc)
+	{
+		if (Npc.Inside.bActive || Npc.Goal != GoalRest) return false;
+		const FBuilding* Building = NearLivingHome(Npc);
+		if (!Building) Building = BuildingForIndoorAction(Npc);
+		if (!Building)
+		{
+			// Au seuil du foyer meme si son centre est un peu loin.
+			const FString Living = Npc.LivingHomeId();
+			const FBuilding* Home = Living.IsEmpty() ? nullptr : Buildings.FindById(Living);
+			if (Home && Home->Progress >= 1.0)
+			{
+				FPoint Access = Npc.Target;
+				const bool bAccess = Npc.bHasTarget || BuildingAccessPointById(Living, &Npc, Access);
+				if (bAccess && Dist(Npc.X, Npc.Y, Access.X, Access.Y) <= DoorAccessRadius) Building = Home;
+			}
+		}
+		if (!Building) return false;
+		// `indoorNeedDuration(rest)` : la nuit se decide UNE fois, a l'entree.
+		const bool bNight = IsNight();
+		const double Duration = bNight ? AnastasisNeeds::Constants::SleepDuration : AnastasisNeeds::Constants::NapDuration;
+		return EnterBuilding(Npc, *Building, RestActivity(bNight), Duration);
+	}
+
+	void FVillage::UpdateInside(FNpc& Npc)
+	{
+		Npc.Activity = Npc.Inside.Activity;
+		if (Now < Npc.Inside.Until) return;
+		const bool bWorked = Perform(Npc);
+		ExitBuilding(Npc);
+		if (!bWorked)
+		{
+			Npc.Activity = TEXT("attend");
+			if (++Npc.FailedActions >= 3) RedirectAfterFailure(Npc);
+		}
+		else
+		{
+			Npc.FailedActions = 0;
+		}
+		// La cible a ete effacee a l'entree : la prochaine pensee redecidera.
+		Npc.bHasTarget = false;
+	}
+
 	// --- Habitants -------------------------------------------------------------
 
 	FString FVillage::SpawnNpc(double InX, double InY, const AnastasisNeeds::FNeeds& Needs, double Speed)
@@ -526,9 +950,16 @@ namespace AnastasisVillage
 
 	bool FVillage::RemoveNpc(const FString& Id)
 	{
-		// Aucun batiment ne reference un habitant : le puits n'a ni occupant ni
-		// reservation. Retirer l'habitant suffit, et l'occupation des seuils, qui
-		// est recalculee a chaque choix, l'oublie d'elle-meme.
+		if (!Actors.FindById(Id))
+		{
+			return false;
+		}
+		// Un proprietaire qui disparait libere sa maison : la reference le fait a la
+		// mort (mortality.js) ; sans cela la maison resterait close pour toujours.
+		for (FBuilding& B : Buildings.GetItemsMutable())
+		{
+			if (B.Owner == Id) B.Owner.Reset();
+		}
 		return Actors.RemoveById(Id);
 	}
 
@@ -538,30 +969,59 @@ namespace AnastasisVillage
 		{
 			return;
 		}
+		Now = Time;
 		TArray<FNpc>& Items = Actors.GetItemsMutable();
 		for (int32 Index = 0; Index < Items.Num(); ++Index)
 		{
-			UpdateNpc(Items[Index], Time, Dt);
+			UpdateNpc(Items[Index], Dt);
 		}
 	}
 
-	void FVillage::UpdateNpc(FNpc& Npc, double Time, double Dt)
+	bool FVillage::IsNight() const
 	{
-		const bool bDrinking = Npc.Goal == GoalDrink && AtDrinkSpot(Npc.X, Npc.Y);
-		AnastasisNeeds::TickNeeds(Npc.Needs, Dt, bDrinking, /*bWorking=*/false);
+		return AnastasisRhythm::IsNightPhase(Now);
+	}
+
+	AnastasisRhythm::FPhaseSubject FVillage::PhaseSubjectOf(const FNpc& Npc) const
+	{
+		AnastasisRhythm::FPhaseSubject S;
+		S.bHasHomeOrShelter = !Npc.LivingHomeId().IsEmpty();
+		S.Energy = Npc.Needs.Energy;
+		S.Hunger = Npc.Needs.Hunger;
+		return S;
+	}
+
+	void FVillage::UpdateNpc(FNpc& Npc, double Dt)
+	{
+		if (Npc.Inside.bActive && Npc.Inside.Goal == GoalRest)
+		{
+			AnastasisNeeds::TickNeedsRestInside(Npc.Needs, Dt, IsNight(), SleepQualityOf(Npc));
+		}
+		else
+		{
+			const bool bDrinking = Npc.Goal == GoalDrink && !Npc.Inside.bActive && AtDrinkSpot(Npc.X, Npc.Y);
+			AnastasisNeeds::TickNeeds(Npc.Needs, Dt, bDrinking, /*bWorking=*/false);
+		}
+
+		// Dedans : ni pensee, ni marche, seulement le temps qui passe.
+		if (Npc.Inside.bActive)
+		{
+			UpdateInside(Npc);
+			return;
+		}
 
 		const bool bCritical = NeedsCritical(Npc.Needs);
 		if (Npc.AiThinkAt < 0.0)
 		{
-			Npc.AiThinkAt = Time + AiThinkStagger(Npc.Id);
+			Npc.AiThinkAt = Now + AiThinkStagger(Npc.Id);
 		}
-		if (Time >= Npc.AiThinkAt)
+		if (Now >= Npc.AiThinkAt)
 		{
-			Npc.AiThinkAt = Time + (bCritical ? ThinkEveryCritical : ThinkEvery);
+			Npc.AiThinkAt = Now + (bCritical ? ThinkEveryCritical : ThinkEvery);
 			// `perceive` n'est pas porte (croyances). Reconsideration seulement sans cible (ecart n°2).
 			if (!Npc.bHasTarget)
 			{
-				ChooseGoal(Npc, Time);
+				ChooseGoal(Npc);
 			}
 		}
 
@@ -573,33 +1033,69 @@ namespace AnastasisVillage
 		Act(Npc, Dt);
 	}
 
-	void FVillage::ChooseGoal(FNpc& Npc, double Time)
+	void FVillage::ChooseGoal(FNpc& Npc)
 	{
+		const AnastasisRhythm::EPhase Phase = AnastasisRhythm::VillagePhase(AnastasisRhythm::DayFracOf(Now));
+		const AnastasisRhythm::FPhaseSubject Subject = PhaseSubjectOf(Npc);
 		const int32 Wells = CountBuildings(WellType);
+
 		FDecisionTrace Trace;
-		Trace.Time = Time;
+		Trace.Time = Now;
+		Trace.Phase = AnastasisRhythm::PhaseId(Phase);
 		Trace.NeedScores = AnastasisNeeds::NeedGoalScores(Npc.Needs, Wells, /*CompletedTaverns=*/0);
-		// Ligne `drink` de adultScores, sans goalNoise (ecart n°1).
-		Trace.DrinkRowScore = Trace.NeedScores.Drink + (Wells > 0 ? 6.0 : 0.0);
+		// Lignes de adultScores, puis `rhythmBias` = `phaseBias` (ecart n°1 pour le reste).
+		Trace.RestRowScore = Trace.NeedScores.Rest + RestJobPriorityBias
+			+ AnastasisRhythm::PhaseBias(Phase, Subject, GoalRest);
+		Trace.DrinkRowScore = Trace.NeedScores.Drink + (Wells > 0 ? 6.0 : 0.0)
+			+ AnastasisRhythm::PhaseBias(Phase, Subject, GoalDrink);
+		Trace.FloorScore = -AnastasisNav::Infinity;
+		for (const FString& Goal : UnportedGoals())
+		{
+			const double Score = UnportedGoalsFloor + AnastasisRhythm::PhaseBias(Phase, Subject, Goal);
+			if (Score > Trace.FloorScore)
+			{
+				Trace.FloorScore = Score;
+				Trace.FloorGoal = Goal;
+			}
+		}
+
+		// Ordre de la table : rest avant drink ; un but porte ne l'emporte que
+		// s'il depasse strictement le meilleur but non porte.
+		FString Wanted;
+		double Best = Trace.FloorScore;
+		if (Trace.RestRowScore > Best)
+		{
+			Best = Trace.RestRowScore;
+			Wanted = GoalRest;
+		}
+		if (Trace.DrinkRowScore > Best)
+		{
+			Best = Trace.DrinkRowScore;
+			Wanted = GoalDrink;
+		}
 
 		Npc.DestBuildingId.Reset();
-		if (Trace.DrinkRowScore > UnportedGoalsFloor)
+		if (!Wanted.IsEmpty())
 		{
 			FPoint Target;
 			FString Source;
-			if (DrinkTarget(Npc, Target, Source))
+			const bool bFound = Wanted == GoalDrink
+				? DrinkTarget(Npc, Target, Source)
+				: RestTarget(Npc, Target, Source);
+			Trace.TargetSource = Source;
+			if (bFound)
 			{
-				if (Npc.Goal != GoalDrink) Npc.WorkTimer = 0.0;
-				Npc.Goal = GoalDrink;
+				if (Npc.Goal != Wanted) Npc.WorkTimer = 0.0;
+				Npc.Goal = Wanted;
 				Npc.bHasTarget = true;
 				Npc.Target = Target;
-				Trace.Winner = GoalDrink;
+				Npc.DoorStuckAt = 0.0;
+				Npc.DoorApproachAt = 0.0;
+				Trace.Winner = Wanted;
 				Trace.BuildingId = Npc.DestBuildingId;
-				Trace.TargetSource = Source;
 				Npc.LastDecision = MoveTemp(Trace);
 				return;
 			}
-			Trace.TargetSource = Source; // "none" : aucune eau atteignable
 		}
 
 		Npc.Goal = GoalObserver;
@@ -617,7 +1113,30 @@ namespace AnastasisVillage
 		Npc.WorkTimer = 0.0;
 		Npc.FailedActions = 0;
 		Npc.StuckStage = 0;
+		Npc.DoorStuckAt = 0.0;
+		Npc.DoorApproachAt = 0.0;
 		Npc.Activity = TEXT("attend");
+	}
+
+	void FVillage::RedirectDomesticDoorFailure(FNpc& Npc)
+	{
+		// Porte inaccessible : le besoin se fait dehors, puis `explore` (non porte : observer).
+		Npc.DoorStuckAt = 0.0;
+		Npc.DoorApproachAt = 0.0;
+		ClearNavigation(Npc);
+		Npc.PathCooldown = 0.6;
+		if (Npc.Goal == GoalRest || Npc.Goal == GoalDrink)
+		{
+			if (Perform(Npc))
+			{
+				Npc.FailedActions = 0;
+				Npc.Goal = GoalObserver;
+				Npc.bHasTarget = false;
+				Npc.DestBuildingId.Reset();
+				return;
+			}
+		}
+		RedirectAfterFailure(Npc);
 	}
 
 	bool FVillage::ReachedMoveTarget(const FNpc& Npc, const FPoint& Target) const
@@ -641,7 +1160,45 @@ namespace AnastasisVillage
 			return;
 		}
 
-		if (Npc.Goal != GoalDrink)
+		if (Npc.Goal == GoalRest)
+		{
+			if (TryEnterIndoorAction(Npc))
+			{
+				Npc.DoorStuckAt = 0.0;
+				Npc.DoorApproachAt = 0.0;
+				return;
+			}
+			const FString Living = Npc.LivingHomeId();
+			if (!Living.IsEmpty())
+			{
+				// Foyer : on n'agit pas dehors. On insiste a la porte, puis on se debloque.
+				FPoint Access = Npc.Target;
+				const bool bAccess = Npc.bHasTarget || BuildingAccessPointById(Living, &Npc, Access);
+				if (bAccess)
+				{
+					Npc.bHasTarget = true;
+					Npc.Target = Access;
+				}
+				Npc.Activity = RestActivity(IsNight());
+				const bool bAtDoor = bAccess && Dist(Npc.X, Npc.Y, Access.X, Access.Y) <= DoorAccessRadius;
+				if (!bAccess || !bAtDoor)
+				{
+					Npc.DoorApproachAt += Dt;
+					if (!bAtDoor && bAccess) MoveActor(Npc, Access, Dt);
+					if (Npc.DoorApproachAt >= DoorApproachSeconds) RedirectDomesticDoorFailure(Npc);
+					return;
+				}
+				Npc.DoorApproachAt = 0.0;
+				Npc.DoorStuckAt += Dt;
+				if (Npc.DoorStuckAt >= DoorWaitSeconds) RedirectDomesticDoorFailure(Npc);
+				return;
+			}
+			// Sans toit ni abri : pas de porte a forcer, on se repose dehors.
+		}
+		Npc.DoorStuckAt = 0.0;
+		Npc.DoorApproachAt = 0.0;
+
+		if (Npc.Goal != GoalDrink && Npc.Goal != GoalRest)
 		{
 			// But non porte : il n'accomplit rien. La reference ferait `perform`.
 			Npc.Activity = TEXT("attend");
@@ -652,7 +1209,8 @@ namespace AnastasisVillage
 		Npc.WorkTimer += Dt;
 		if (Npc.WorkTimer < 1.0)
 		{
-			Npc.Activity = TEXT("attend");
+			// `waitingActivity` : « boit » ; pour rest, `restActivity`.
+			Npc.Activity = Npc.Goal == GoalDrink ? TEXT("boit") : RestActivity(IsNight());
 			return;
 		}
 		Npc.WorkTimer = 0.0;
@@ -673,15 +1231,26 @@ namespace AnastasisVillage
 
 	bool FVillage::Perform(FNpc& Npc)
 	{
-		if (Npc.Goal != GoalDrink)
+		if (Npc.Goal == GoalDrink)
 		{
-			return false;
+			// `case "drink"` : setActivity("boit"), satisfyDrink, markDrink (gestuelle, non portee).
+			Npc.Activity = TEXT("boit");
+			AnastasisNeeds::SatisfyDrink(Npc.Needs);
+			++Npc.DrinksTaken;
+			return true;
 		}
-		// `case "drink"` : setActivity("boit"), satisfyDrink, markDrink (gestuelle, non portee).
-		Npc.Activity = TEXT("boit");
-		AnastasisNeeds::SatisfyDrink(Npc.Needs);
-		++Npc.DrinksTaken;
-		return true;
+		if (Npc.Goal == GoalRest)
+		{
+			// `case "rest"` : setActivity(restActivity), satisfyRest.
+			const bool bNight = IsNight();
+			const FString& Living = Npc.LivingHomeId();
+			const bool bAtHome = !Living.IsEmpty() && Npc.Inside.bActive && Npc.Inside.BuildingId == Living;
+			Npc.Activity = RestActivity(bNight);
+			AnastasisNeeds::SatisfyRest(Npc.Needs, bNight, SleepQualityOf(Npc), Npc.Inside.bActive, bAtHome);
+			++Npc.RestsTaken;
+			return true;
+		}
+		return false;
 	}
 
 	// --- Deplacement -----------------------------------------------------------
@@ -848,9 +1417,16 @@ namespace AnastasisVillage
 				}
 			}
 		}
-		// `_navAbandon` -> redirectAfterFailure.
+		// `_navAbandon` -> redirectDomesticDoorFailure (foyer) ou redirectAfterFailure.
 		++Npc.FailedActions;
-		RedirectAfterFailure(Npc);
+		if (Npc.Goal == GoalRest && !Npc.LivingHomeId().IsEmpty())
+		{
+			RedirectDomesticDoorFailure(Npc);
+		}
+		else
+		{
+			RedirectAfterFailure(Npc);
+		}
 	}
 
 	// --- Observation ----------------------------------------------------------
@@ -860,7 +1436,9 @@ namespace AnastasisVillage
 		TArray<FString> Users;
 		for (const FNpc& Npc : Actors.GetItems())
 		{
-			if (Npc.Goal == GoalDrink && Npc.DestBuildingId == BuildingId)
+			const bool bHeading = (Npc.Goal == GoalDrink || Npc.Goal == GoalRest) && Npc.DestBuildingId == BuildingId;
+			const bool bInside = Npc.Inside.bActive && Npc.Inside.BuildingId == BuildingId;
+			if (bHeading || bInside)
 			{
 				Users.Add(Npc.Id);
 			}
@@ -881,6 +1459,9 @@ namespace AnastasisVillage
 			Writer.Key(TEXT("x")).Number(B.X);
 			Writer.Key(TEXT("y")).Number(B.Y);
 			Writer.Key(TEXT("progress")).Number(B.Progress);
+			Writer.Key(TEXT("owner"));
+			if (B.Owner.IsEmpty()) Writer.Null(); else Writer.String(B.Owner);
+			Writer.Key(TEXT("housePhase")).Number(B.HousePhase);
 			Writer.Key(TEXT("accessPoints")).BeginArray(B.AccessPoints.Num());
 			for (const FPoint& P : B.AccessPoints)
 			{
@@ -908,6 +1489,23 @@ namespace AnastasisVillage
 				Writer.BeginObject();
 				Writer.Key(TEXT("x")).Number(N.Target.X);
 				Writer.Key(TEXT("y")).Number(N.Target.Y);
+				Writer.EndObject();
+			}
+			else
+			{
+				Writer.Null();
+			}
+			Writer.Key(TEXT("homeId"));
+			if (N.HomeId.IsEmpty()) Writer.Null(); else Writer.String(N.HomeId);
+			Writer.Key(TEXT("shelterId"));
+			if (N.ShelterId.IsEmpty()) Writer.Null(); else Writer.String(N.ShelterId);
+			Writer.Key(TEXT("inside"));
+			if (N.Inside.bActive)
+			{
+				Writer.BeginObject();
+				Writer.Key(TEXT("buildingId")).String(N.Inside.BuildingId);
+				Writer.Key(TEXT("goal")).String(N.Inside.Goal);
+				Writer.Key(TEXT("until")).Number(N.Inside.Until);
 				Writer.EndObject();
 			}
 			else

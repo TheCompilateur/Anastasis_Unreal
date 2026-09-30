@@ -94,6 +94,28 @@ namespace AnastasisNeeds
 		TickVitality(N, Dt);
 	}
 
+	void TickNeedsRestInside(FNeeds& N, double Dt, bool bNight, double SleepQuality)
+	{
+		constexpr double HydrationMul = 1.0;
+		constexpr double MetabolicMul = 1.0;
+		constexpr double FatigueRecoveryMul = 1.0;
+		constexpr double RecoveryConditioningMul = 1.0;
+
+		const double Rate = bNight ? SleepEnergyGain : NapEnergyGain;
+		N.Energy = Clamp(N.Energy + Dt * Rate * FatigueRecoveryMul * RecoveryConditioningMul, 0.0, 100.0);
+		N.Hunger = Clamp(N.Hunger + Dt * HungerRise * 0.35 * MetabolicMul, 0.0, 100.0);
+		N.Thirst = Clamp(N.Thirst + Dt * ThirstRise * 0.4 * HydrationMul, 0.0, 100.0);
+		N.Social = Clamp(N.Social - Dt * SocialFall * 0.25, 0.0, 100.0);
+		N.Leisure = Clamp(N.Leisure + Dt * 1.1, 0.0, 100.0);
+		N.Hygiene = Clamp(N.Hygiene - Dt * HygieneFall * 0.2, 0.0, 100.0);
+		if (N.Hunger < StarvingAt && N.Thirst < ParchedAt)
+		{
+			N.Health = Clamp(N.Health + Dt * HealthSleepRestore * SleepQuality, 0.0, 100.0);
+		}
+
+		TickVitality(N, Dt);
+	}
+
 	void TickVitality(FNeeds& N, double Dt)
 	{
 		const bool bStarving = N.Hunger >= StarvingAt;
@@ -115,6 +137,53 @@ namespace AnastasisNeeds
 		{
 			N.Health = Clamp(N.Health + Dt * HealthGain, 0.0, 100.0);
 		}
+	}
+
+	namespace
+	{
+		/** `(npc.morale || 50)`. */
+		double MoraleOr50(double Morale)
+		{
+			return Morale != 0.0 && !FMath::IsNaN(Morale) ? Morale : 50.0;
+		}
+	}
+
+	double SleepQuality(const FString& InsideBuildingId, const FString& HomeId, const FString& ShelterId)
+	{
+		if (!InsideBuildingId.IsEmpty())
+		{
+			if (!HomeId.IsEmpty() && HomeId == InsideBuildingId) return Domestic::HomeRestBonus;
+			if (!ShelterId.IsEmpty() && ShelterId == InsideBuildingId) return Domestic::ShelterRestFactor;
+		}
+		// Les trois replis de la reference valent tous outdoorRestFactor.
+		return Domestic::OutdoorRestFactor;
+	}
+
+	void SatisfyRest(FNeeds& N, bool bNight, double Quality, bool bIndoor, bool bAtHome)
+	{
+		// Interieur : l'energie est deja remontee par tickNeeds ; on plafonne vers
+		// une cible selon la qualite du lit, sans re-ajouter sleepRelief.
+		if (bIndoor)
+		{
+			const double Target = bNight
+				? Clamp(58.0 + 38.0 * Quality, 0.0, 100.0)
+				: Clamp(42.0 + 28.0 * Quality, 0.0, 100.0);
+			if (N.Energy < Target)
+			{
+				N.Energy = Clamp(N.Energy + (Target - N.Energy) * 0.7, 0.0, 100.0);
+			}
+			N.Leisure = Clamp(N.Leisure + (bNight ? 10.0 : 5.0) * Quality, 0.0, 100.0);
+		}
+		else
+		{
+			const double Base = bNight ? SleepRelief : NapRelief;
+			N.Energy = Clamp(N.Energy + Base * Quality * 0.9, 0.0, 100.0);
+			N.Leisure = Clamp(N.Leisure + (bNight ? 14.0 : 7.0) * Quality, 0.0, 100.0);
+		}
+		// `3 + DOMESTIC.homeMorale` (2).
+		if (bNight && bAtHome) N.Morale = Clamp(MoraleOr50(N.Morale) + 3.0 + Domestic::HomeMorale, 0.0, 100.0);
+		else if (bNight && Quality < 0.5) N.Morale = Clamp(MoraleOr50(N.Morale) - 4.0, 0.0, 100.0);
+		else if (bNight) N.Morale = Clamp(MoraleOr50(N.Morale) + 1.0, 0.0, 100.0);
 	}
 
 	void SatisfyDrink(FNeeds& N, double Amount)

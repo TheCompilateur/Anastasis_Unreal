@@ -156,6 +156,9 @@ fiche de passation, section `SCN`.
    par un plancher déclaré, `UnportedGoalsFloor = 42` : `drink` part exactement quand la soif
    atteint `thirstUrge` (40). Ce n'est pas une valeur de la référence. Sans `goalNoise` : un flux
    rng partiel serait faux plus sournoisement qu'un flux absent.
+   **Remplacé par HOUSE_REST_001** : le rythme du jour est porté et s'applique à toutes les lignes.
+   Chaque but non porté vaut désormais 42 + son `phaseBias`. Le seuil de soif vaut 40 la nuit, à
+   l'aube et à midi, environ 64 le matin.
 2. **Pas de reconsidération aléatoire** en route (`sim.rng() < chance`).
 3. **Seuils sans intention urbaine** (`urban/intent.js`, vague 5) : l'anneau 1, repli exact de la référence.
 4. **Pilotage réduit** : ni file de porte, ni hésitation, ni facteur de vitesse, ni contournement

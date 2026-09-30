@@ -2,6 +2,7 @@
 
 #include "Life/AnastasisNeeds.h"
 #include "Sim/AnastasisSimulation.h"
+#include "Life/AnastasisVillageRhythm.h"
 #include "Village/AnastasisVillage.h"
 #include "World/AnastasisWorld.h"
 
@@ -83,6 +84,23 @@ namespace AnastasisVillageSimTest
 			}
 		}
 		return true;
+	}
+
+	/** Le plancher des buts non portes a une phase donnee (ecart n°1 de AnastasisVillage.h). */
+	double FloorAt(AnastasisRhythm::EPhase Phase, const AnastasisRhythm::FPhaseSubject& Subject)
+	{
+		double Best = -AnastasisNav::Infinity;
+		for (const FString& Goal : UnportedGoals())
+		{
+			Best = FMath::Max(Best, UnportedGoalsFloor + AnastasisRhythm::PhaseBias(Phase, Subject, Goal));
+		}
+		return Best;
+	}
+
+	/** Ligne `drink` de la table, un puits existant. */
+	double DrinkRowAt(AnastasisRhythm::EPhase Phase, const AnastasisNeeds::FNeeds& Needs, const AnastasisRhythm::FPhaseSubject& Subject)
+	{
+		return AnastasisNeeds::NeedGoalScores(Needs, 1, 0).Drink + 6.0 + AnastasisRhythm::PhaseBias(Phase, Subject, GoalDrink);
 	}
 
 	bool SamePoint(const FPoint& A, const FPoint& B)
@@ -182,20 +200,32 @@ bool FAnastasisVillageWellSelectionTest::RunTest(const FString&)
 	TestEqual(TEXT("trace : vainqueur"), Why.Winner, FString(GoalDrink));
 	TestEqual(TEXT("trace : source"), Why.TargetSource, FString(TEXT("well")));
 	TestEqual(TEXT("trace : batiment"), Why.BuildingId, Near);
-	TestTrue(TEXT("trace : ligne drink = needGoalScores.drink + 6 (exact)"), Why.DrinkRowScore == Why.NeedScores.Drink + 6.0);
-	TestTrue(TEXT("trace : au-dessus du plancher des buts non portes"), Why.DrinkRowScore > UnportedGoalsFloor);
+	TestTrue(TEXT("trace : ligne drink = needGoalScores.drink + 6 + phaseBias (exact)"),
+		Why.DrinkRowScore == Why.NeedScores.Drink + 6.0 + AnastasisRhythm::PhaseBias(AnastasisRhythm::EPhase::Night, AnastasisRhythm::FPhaseSubject(), GoalDrink));
+	TestTrue(TEXT("trace : au-dessus du plancher des buts non portes"), Why.DrinkRowScore > Why.FloorScore);
+	TestTrue(TEXT("trace : au-dessus de la ligne rest"), Why.DrinkRowScore > Why.RestRowScore);
+	TestEqual(TEXT("trace : l'horloge commence la nuit"), Why.Phase, FString(TEXT("night")));
 	TestTrue(TEXT("usagers du puits proche"), Village.UsersOf(Near).Num() == 1 && Village.UsersOf(Near)[0] == ThirstyId);
 	TestEqual(TEXT("personne au puits lointain"), Village.UsersOf(Far).Num(), 0);
 
-	TestEqual(TEXT("sous le seuil : observer"), Calm->Goal, FString(GoalObserver));
-	TestFalse(TEXT("sous le seuil : pas de cible"), Calm->bHasTarget);
-	TestTrue(TEXT("sous le seuil : ligne drink sous le plancher"), Calm->LastDecision.DrinkRowScore <= UnportedGoalsFloor);
+	// Sous le seuil, il ne boit pas ; et la nuit, c'est le repos qui l'emporte.
+	TestNotEqual(TEXT("sous le seuil : ne va pas boire"), Calm->Goal, FString(GoalDrink));
+	TestTrue(TEXT("sous le seuil : ligne drink sous le plancher"), Calm->LastDecision.DrinkRowScore <= Calm->LastDecision.FloorScore);
+	TestEqual(TEXT("la nuit, sans toit : il va se reposer"), Calm->Goal, FString(GoalRest));
 
-	// Le seuil de decision tombe exactement sur thirstUrge (40) : voir UnportedGoalsFloor.
-	AnastasisNeeds::FNeeds Below = Thirsty(39.99);
-	AnastasisNeeds::FNeeds At = Thirsty(40.0);
-	TestTrue(TEXT("39.99 ne declenche pas"), AnastasisNeeds::NeedGoalScores(Below, 1, 0).Drink + 6.0 <= UnportedGoalsFloor);
-	TestTrue(TEXT("40 declenche"), AnastasisNeeds::NeedGoalScores(At, 1, 0).Drink + 6.0 > UnportedGoalsFloor);
+	// Le seuil de soif DEPEND de la phase : c'est le rythme de la reference.
+	// Nuit, aube, midi : exactement thirstUrge (40). Matin : il faut ~64.
+	AnastasisRhythm::FPhaseSubject Homeless;
+	for (const AnastasisRhythm::EPhase Phase : { AnastasisRhythm::EPhase::Night, AnastasisRhythm::EPhase::Dawn, AnastasisRhythm::EPhase::Midday })
+	{
+		const FString Name = AnastasisRhythm::PhaseId(Phase);
+		TestTrue(*(Name + TEXT(" : 39.99 ne declenche pas")), DrinkRowAt(Phase, Thirsty(39.99), Homeless) <= FloorAt(Phase, Homeless));
+		TestTrue(*(Name + TEXT(" : 40 declenche")), DrinkRowAt(Phase, Thirsty(40.0), Homeless) > FloorAt(Phase, Homeless));
+	}
+	TestTrue(TEXT("matin : 60 ne suffit pas contre le travail"),
+		DrinkRowAt(AnastasisRhythm::EPhase::Morning, Thirsty(60.0), Homeless) <= FloorAt(AnastasisRhythm::EPhase::Morning, Homeless));
+	TestTrue(TEXT("matin : 65 l'emporte"),
+		DrinkRowAt(AnastasisRhythm::EPhase::Morning, Thirsty(65.0), Homeless) > FloorAt(AnastasisRhythm::EPhase::Morning, Homeless));
 	return true;
 }
 
@@ -281,12 +311,12 @@ bool FAnastasisVillageWellLoopTest::RunTest(const FString&)
 	// La boucle se referme : a la pensee suivante, la soif est basse, il vaque.
 	Run(Village, Time, 0.3, [] { return false; });
 	Npc = Village.FindNpc(NpcId);
-	TestEqual(TEXT("desaltere : observer"), Npc->Goal, FString(GoalObserver));
+	TestNotEqual(TEXT("desaltere : ne va plus boire"), Npc->Goal, FString(GoalDrink));
 	TestEqual(TEXT("desaltere : plus usager du puits"), Village.UsersOf(WellId).Num(), 0);
 
 	// ... et recommence quand la soif remonte (0,48/s -> ~40 s pour repasser 40).
 	const int32 DrinksBefore = Npc->DrinksTaken;
-	Run(Village, Time, 120.0, [&] { return Village.FindNpc(NpcId)->DrinksTaken > DrinksBefore; });
+	Run(Village, Time, 240.0, [&] { return Village.FindNpc(NpcId)->DrinksTaken > DrinksBefore; });
 	TestTrue(TEXT("revient boire quand la soif remonte"), Village.FindNpc(NpcId)->DrinksTaken > DrinksBefore);
 	return true;
 }
@@ -425,7 +455,9 @@ bool FAnastasisVillageWellCrowdTest::RunTest(const FString&)
 		const double Ring[6][2] = { { 12.5, 20.5 }, { 28.5, 20.5 }, { 20.5, 12.5 }, { 20.5, 28.5 }, { 14.5, 14.5 }, { 26.5, 26.5 } };
 		for (int32 K = 0; K < 6; ++K)
 		{
-			Village.SpawnNpc(Ring[K][0], Ring[K][1], Thirsty(50.0 + K));
+			// La nuit, sans toit, `rest` pese ~93,6 : il faut une soif > ~53 pour que
+			// `drink` l'emporte. 60+ : tous vont au puits.
+			Village.SpawnNpc(Ring[K][0], Ring[K][1], Thirsty(60.0 + K));
 		}
 	};
 
@@ -546,7 +578,9 @@ bool FAnastasisVillageWellHostTest::RunTest(const FString&)
 	// L'habitant se tient sur le seuil principal : l'atteinte est prouvee ailleurs,
 	// ici on prouve que c'est l'hote qui pompe la boucle.
 	const FPoint Door = Village.FindBuilding(WellId)->AccessPoints[0];
-	const FString NpcId = Village.SpawnNpc(Door.X, Door.Y, Thirsty(60.0));
+	// L'hote demarre a 0,42 jour (le matin, comme la reference) : la soif doit
+	// battre le travail, qui pese 42 + 62 a cette heure.
+	const FString NpcId = Village.SpawnNpc(Door.X, Door.Y, Thirsty(80.0));
 
 	for (int32 I = 0; I < 60 * 10 && Village.FindNpc(NpcId)->DrinksTaken == 0; ++I)
 	{
