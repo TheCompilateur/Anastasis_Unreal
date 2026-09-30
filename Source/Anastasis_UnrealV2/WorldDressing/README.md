@@ -25,23 +25,23 @@ There is no Bake feature in V0. No collision, overlap events, ticking, navigatio
 
 - Terrain families mirror semantic Grass, Water, Stone, Ruin, Forest, Scrub, Field, Road. Empty = all land.
 - Altitudes and distances are Unreal centimeters in source space; slope uses geometric surface normals in degrees.
-- Density = expected candidates per 100x100cm semantic tile BEFORE filters, limited to 0..16.
+- Density = expected candidates per semantic tile (TileWorldSize * Snapshot.SpatialScale on each axis) BEFORE filters, limited to 0..16.
 - ClusterRadius 0 gives uniform scatter. Positive values scatter candidates in a disk around a seeded point per tile; the destination tile is revalidated.
 - Scale is uniform and positive. Mesh lowest local Z is placed at the surface along its rotated up axis.
 - RandomYaw rotates around aligned up; AlignToSurfaceNormal is optional.
 - AvoidWater adds 25cm shoreline clearance. V0 always forbids submerged/semantic-water roots, including when this margin is disabled.
-- DistanceToWater uses XY distance to semantic water tile rectangles, not geodesic distance or exact forged shoreline. Maximum -1 = unlimited. A finite maximum rejects a map with no water.
+- DistanceToWater conservatively uses the minimum XY distance to semantic water rectangles and rendered water triangle footprints. Water height is read from the source section 1, including raised rivers. Dry bank corners covered by water triangles can also be excluded. Maximum -1 = unlimited. A finite maximum rejects a map with no water.
 - ClearanceRadius checks the root and an eight-point support ring. This is not full mesh/canopy collision checking. Large crowns can overlap each other; V0 has no inter-prop spacing solver.
 - Road exclusions read Road tiles plus actors tagged `WorldDressingRoad` or assigned in RoadExclusions.
 - Building exclusions read `AAnastasisVillageBuilding`, actors tagged `WorldDressingBuilding`, and BuildingExclusions. XY bounds are expanded by ExclusionPadding (default 100cm, also covers logical buildings without mesh bounds).
 - The snapshot contains no building mask; unsupported building/road representations need explicit exclusion actors. Absence of these inputs is not proof of complete village clearance.
-- Ground sampling reads visible `ExperimentalTerrain` section 0, including forged heights. Water section 1 is never sampled as ground. Missing/hidden surface or invalid snapshot fails explicitly; no synthetic fallback terrain.
+- Ground sampling reads visible `ExperimentalTerrain` section 0, including forged heights. Water section 1 is sampled only as water, never as ground; no global Forge cache is used. Missing/hidden surface or invalid snapshot fails explicitly; no synthetic fallback terrain.
 - Source translation is supported. Rotated/scaled sources are rejected in V0, avoiding incorrect slope/water metrics.
 - Limits: 128 rules and 100,000 instances maximum (default 20,000). Reaching the instance cap is reported.
 
 ## Determinism and reporting
 
-Fixed row-major traversal and per-AssetId FRandomStream; no global random source or unordered map iteration.
+Fixed row-major traversal, per-AssetId FRandomStream and explicit HISM material random seed; no global random source or unordered map iteration.
 Same seed + profile/order + snapshot + rendered geometry + source transform + exclusions + mesh bounds on the same engine produce identical placements.
 The placement hash is versioned SHA-1 over AssetId, asset path, and final world transforms. Positions/scales quantized to 1e-4; quaternion to 1e-7.
 It is a placement comparison checksum, not a content fingerprint: changing a mesh's materials alone does not change it, and two empty previews have the same hash.
@@ -65,3 +65,7 @@ Tests cover exact repeat hash, seed sensitivity, bounds, geometry height, clumpi
 It keeps the existing map/dressing, captures before/after at two fixed cameras, independently hashes HISM transforms, verifies Rebuild/Clear and actor counts, and saves **no map or asset**.
 Output: four PNGs, `observation.json`, and the launcher log. Use `launch_preview.ps1` below. `-KeepOpen` leaves the preview selected in the dedicated editor for inspection.
 Only trees and existing ruin pieces are demonstrated; bushes/reeds/deadwood/rocks can be assigned when suitable assets are available. No substitute final assets are fabricated.
+
+## Current-main edge revalidation (2026-09-29)
+
+launch_preview.ps1 -Edge -OutputDirectory <absolute-path> runs capture_edge.py on the current map. It selects an existing stand, restricts the preview to 90x90m using existing exclusion inputs, reserves a clearing and two exclusion probes, freezes material time, and checks actual HISM roots against independently sampled ground/water triangles. It saves two before/after views and a cleared view, without saving the map or assets. Main baseline: 394448c. The geometry and pre-existing HISM inventories must remain identical.

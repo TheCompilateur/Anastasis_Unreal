@@ -12,10 +12,16 @@ struct FMap
     AnastasisWorldView::FWorldVisualSnapshot Snapshot;
     FTransform SourceTransform = FTransform::Identity;
     TArray<FTriangle> Triangles;
+    // Section 1 of this exact source, not the global Forge cache or a fixed sea level.
+    TArray<FTriangle> WaterTriangles;
+    TMap<FIntPoint, TArray<int32>> WaterBuckets;
+    bool bUseRenderedWater = false;
+    double TileSize() const { return AnastasisWorldView::TileWorldSize * Snapshot.SpatialScale; }
     TMap<FIntPoint, TArray<int32>> TriangleBuckets;
     TArray<FBox2D> Water, Roads, Buildings;
     bool Prepare(FString& Error);
     bool Sample(double X, double Y, FVector& Ground, FVector& Normal) const;
+    bool SampleWater(double X, double Y, FVector& Ground, FVector& Normal) const;
     const AnastasisWorldView::FVisualTile* TileAt(double X, double Y) const;
     double WaterDistance(FVector2D Point) const;
     bool IsDry(FVector2D Point) const;

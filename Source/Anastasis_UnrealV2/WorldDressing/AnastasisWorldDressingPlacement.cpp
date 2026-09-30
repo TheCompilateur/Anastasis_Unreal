@@ -6,8 +6,8 @@ namespace AnastasisWorldDressing
 {
 namespace
 {
-constexpr double TileSize = AnastasisWorldView::TileWorldSize;
-FIntPoint Bucket(double X, double Y) { return FIntPoint(FMath::FloorToInt(X/TileSize), FMath::FloorToInt(Y/TileSize)); }
+
+FIntPoint Bucket(double X, double Y, double TileSize) { return FIntPoint(FMath::FloorToInt(X/TileSize), FMath::FloorToInt(Y/TileSize)); }
 double Distance(FVector2D P, const FBox2D& B)
 {
     const double X=FMath::Max(FMath::Max(B.Min.X-P.X, 0.0), P.X-B.Max.X);
@@ -36,9 +36,10 @@ bool ValidRule(const FAnastasisDressingRule& R)
 
 bool FMap::Prepare(FString& Error)
 {
-    TriangleBuckets.Reset(); Water.Reset();
+    TriangleBuckets.Reset(); WaterBuckets.Reset(); Water.Reset();
     const auto& S=Snapshot;
-    if (S.W<1 || S.H<1 || S.W>96 || S.H>96 || S.Tiles.Num()!=S.W*S.H
+    const double TileSize=this->TileSize();
+    if (!FMath::IsFinite(S.SpatialScale) || S.SpatialScale<1 || S.SpatialScale>20 || S.W<1 || S.H<1 || S.W>96 || S.H>96 || S.Tiles.Num()!=S.W*S.H
         || S.OriginX<0 || S.OriginY<0 || S.OriginX+S.W>S.SourceW || S.OriginY+S.H>S.SourceH
         || SourceTransform.ContainsNaN() || !SourceTransform.GetRotation().Equals(FQuat::Identity)
         || !SourceTransform.GetScale3D().Equals(FVector::OneVector))
@@ -53,33 +54,37 @@ bool FMap::Prepare(FString& Error)
         if (T.Type==AnastasisWorld::ETileType::Road) Roads.Add(B);
     }
     if (Triangles.IsEmpty()) { Error=TEXT("No rendered ground triangles; legacy/debug slabs are not supported"); return false; }
-    for (int32 I=0;I<Triangles.Num();++I)
+    auto IndexTriangles=[&](const TArray<FTriangle>& Faces,TMap<FIntPoint,TArray<int32>>& Buckets)
     {
-        const auto& T=Triangles[I];
+    for (int32 I=0;I<Faces.Num();++I)
+    {
+        const auto& T=Faces[I];
         if (T.A.ContainsNaN() || T.B.ContainsNaN() || T.C.ContainsNaN())
         { Error=FString::Printf(TEXT("Invalid surface triangle[%d]"),I); return false; }
-        const auto Min=Bucket(FMath::Min3(T.A.X,T.B.X,T.C.X),FMath::Min3(T.A.Y,T.B.Y,T.C.Y));
-        const auto Max=Bucket(FMath::Max3(T.A.X,T.B.X,T.C.X),FMath::Max3(T.A.Y,T.B.Y,T.C.Y));
+        const auto Min=Bucket(FMath::Min3(T.A.X,T.B.X,T.C.X),FMath::Min3(T.A.Y,T.B.Y,T.C.Y),TileSize);
+        const auto Max=Bucket(FMath::Max3(T.A.X,T.B.X,T.C.X),FMath::Max3(T.A.Y,T.B.Y,T.C.Y),TileSize);
         if (Max.X-Min.X>96 || Max.Y-Min.Y>96) { Error=TEXT("Surface triangle exceeds map bounds"); return false; }
         for (int32 Y=Min.Y;Y<=Max.Y;++Y) for (int32 X=Min.X;X<=Max.X;++X)
-            TriangleBuckets.FindOrAdd(FIntPoint(X,Y)).Add(I);
+            Buckets.FindOrAdd(FIntPoint(X,Y)).Add(I);
     }
     return true;
+    };
+    return IndexTriangles(Triangles,TriangleBuckets) && IndexTriangles(WaterTriangles,WaterBuckets);
 }
 
 const AnastasisWorldView::FVisualTile* FMap::TileAt(double X,double Y) const
 {
-    const auto B=Bucket(X,Y);
+    const auto B=Bucket(X,Y,TileSize());
     return AnastasisWorldView::FindTile(Snapshot,B.X,B.Y);
 }
-bool FMap::Sample(double X,double Y,FVector& Ground,FVector& Normal) const
+static bool SampleFaces(const TArray<FTriangle>& Faces,const TMap<FIntPoint,TArray<int32>>& Buckets,double TileSize,double X,double Y,FVector& Ground,FVector& Normal)
 {
-    const auto* Indices=TriangleBuckets.Find(Bucket(X,Y));
-    if (!Indices || !TileAt(X,Y)) return false;
+    const auto* Indices=Buckets.Find(Bucket(X,Y,TileSize));
+    if (!Indices) return false;
     bool Found=false;
     for (int32 I:*Indices)
     {
-        const auto& T=Triangles[I];
+        const auto& T=Faces[I];
         const double D=(T.B.Y-T.C.Y)*(T.A.X-T.C.X)+(T.C.X-T.B.X)*(T.A.Y-T.C.Y);
         if (FMath::Abs(D)<1.e-10) continue;
         const double A=((T.B.Y-T.C.Y)*(X-T.C.X)+(T.C.X-T.B.X)*(Y-T.C.Y))/D;
@@ -95,18 +100,44 @@ bool FMap::Sample(double X,double Y,FVector& Ground,FVector& Normal) const
     }
     return Found;
 }
+bool FMap::Sample(double X,double Y,FVector& Ground,FVector& Normal) const
+{
+    return TileAt(X,Y) && SampleFaces(Triangles,TriangleBuckets,TileSize(),X,Y,Ground,Normal);
+}
+bool FMap::SampleWater(double X,double Y,FVector& Ground,FVector& Normal) const
+{
+    return SampleFaces(WaterTriangles,WaterBuckets,TileSize(),X,Y,Ground,Normal);
+}
 double FMap::WaterDistance(FVector2D P) const
 {
     double D=TNumericLimits<double>::Max();
     for (const auto& B:Water) D=FMath::Min(D,Distance(P,B));
+    // Conservative distance to rendered water footprints; dry bank corners may be excluded too.
+    for (const auto& T:WaterTriangles)
+    {
+        const FVector2D A(T.A.X,T.A.Y),B(T.B.X,T.B.Y),C(T.C.X,T.C.Y);
+        const double Area=FVector2D::CrossProduct(B-A,C-A);
+        if (FMath::Abs(Area)<1.e-10) continue;
+        const double AB=FVector2D::CrossProduct(B-A,P-A),BC=FVector2D::CrossProduct(C-B,P-B),CA=FVector2D::CrossProduct(A-C,P-C);
+        if ((AB>=0 && BC>=0 && CA>=0) || (AB<=0 && BC<=0 && CA<=0)) return 0;
+        auto EdgeDistance=[&](FVector2D U,FVector2D V)
+        {
+            const FVector2D Edge=V-U;
+            const double Alpha=FMath::Clamp(FVector2D::DotProduct(P-U,Edge)/FMath::Max(Edge.SizeSquared(),1.e-12),0.0,1.0);
+            return (P-U-Alpha*Edge).Size();
+        };
+        D=FMath::Min(D,FMath::Min3(EdgeDistance(A,B),EdgeDistance(B,C),EdgeDistance(C,A)));
+    }
     return D;
 }
 bool FMap::IsDry(FVector2D P) const
 {
     const auto* T=TileAt(P.X,P.Y);
     FVector G=FVector::ZeroVector,N=FVector::UpVector;
-    return T && T->Type!=AnastasisWorld::ETileType::Water && Sample(P.X,P.Y,G,N)
-        && G.Z>AnastasisTerrainSurface::WaterPlaneZ+1;
+    if (!T || T->Type==AnastasisWorld::ETileType::Water || !Sample(P.X,P.Y,G,N)) return false;
+    FVector W,WN;
+    if (bUseRenderedWater) return !SampleWater(P.X,P.Y,W,WN) || G.Z>W.Z+1;
+    return G.Z>AnastasisTerrainSurface::WaterPlaneZ+1;
 }
 
 bool Build(const FMap& Map,const TArray<FAnastasisDressingRule>& Rules,int32 Seed,
@@ -115,6 +146,7 @@ bool Build(const FMap& Map,const TArray<FAnastasisDressingRule>& Rules,int32 See
     Out=FResult(); Error.Reset(); Out.Counts.SetNumZeroed(Rules.Num());
     if (Rules.Num()>128 || MaxInstances<1 || MaxInstances>100000)
     { Error=TEXT("V0 limits: 128 rules, 1..100000 instances"); return false; }
+    const double TileSize=Map.TileSize();
     TSet<FName> Ids;
     for (int32 I=0;I<Rules.Num();++I)
     {
@@ -149,7 +181,9 @@ bool Build(const FMap& Map,const TArray<FAnastasisDressingRule>& Rules,int32 See
                 const double Radius=R.ClearanceRadius*Scale;
                 FVector G=FVector::ZeroVector,N=FVector::UpVector;
                 const auto* At=Map.TileAt(P.X,P.Y);
-                bool Valid=At && Map.IsDry(P) && Map.Sample(P.X,P.Y,G,N);
+                bool Valid=At && (!R.bAvoidRoads || !Overlaps(P,Radius,Map.Roads))
+                    && (!R.bAvoidBuildings || !Overlaps(P,Radius,Map.Buildings))
+                    && Map.IsDry(P) && Map.Sample(P.X,P.Y,G,N);
                 if (Valid)
                 {
                     const double Slope=FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(N.Z,0.0,1.0)));

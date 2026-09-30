@@ -17,8 +17,9 @@ FMap Fixture()
         AnastasisWorldView::FVisualTile T; T.X=X;T.Y=Y;T.Alt=0.5;
         T.Type=X==0?AnastasisWorld::ETileType::Water:AnastasisWorld::ETileType::Grass; S.Tiles.Add(T);
     }
-    M.Triangles.Add({FVector(0,0,500),FVector(800,0,500),FVector(0,800,500)});
-    M.Triangles.Add({FVector(800,0,500),FVector(800,800,500),FVector(0,800,500)});
+    const double Extent=8*AnastasisWorldView::TileWorldSize;
+    M.Triangles.Add({FVector(0,0,500),FVector(Extent,0,500),FVector(0,Extent,500)});
+    M.Triangles.Add({FVector(Extent,0,500),FVector(Extent,Extent,500),FVector(0,Extent,500)});
     return M;
 }
 FAnastasisDressingRule Rule()
@@ -61,11 +62,11 @@ bool FWorldDressingFilters::RunTest(const FString&)
     auto V=R;V.AltitudeMin=501;TestEqual(TEXT("altitude exclusion"),Count(V),0);
     V=R;V.SlopeMin=1;TestEqual(TEXT("slope exclusion"),Count(V),0);
     V=R;V.AllowedTerrainFamilies={EAnastasisDressingTerrain::Forest};TestEqual(TEXT("family exclusion"),Count(V),0);
-    V=R;V.DistanceToWaterMin=900;TestEqual(TEXT("water distance exclusion"),Count(V),0);
+    V=R;V.DistanceToWaterMin=9*AnastasisWorldView::TileWorldSize;TestEqual(TEXT("water distance exclusion"),Count(V),0);
     V=R;V.StaticMesh.Reset();TestEqual(TEXT("unassigned mesh supported"),Count(V),0);
-    M.Buildings.Add(FBox2D(FVector2D(0,0),FVector2D(800,800)));
+    M.Buildings.Add(FBox2D(FVector2D(0,0),FVector2D(8*AnastasisWorldView::TileWorldSize,8*AnastasisWorldView::TileWorldSize)));
     TestEqual(TEXT("building exclusion"),Count(R),0);V=R;V.bAvoidBuildings=false;TestTrue(TEXT("building toggle"),Count(V)>0);
-    M.Buildings.Reset();M.Roads.Add(FBox2D(FVector2D(0,0),FVector2D(800,800)));
+    M.Buildings.Reset();M.Roads.Add(FBox2D(FVector2D(0,0),FVector2D(8*AnastasisWorldView::TileWorldSize,8*AnastasisWorldView::TileWorldSize)));
     TestEqual(TEXT("road exclusion"),Count(R),0);V=R;V.bAvoidRoads=false;TestTrue(TEXT("road toggle"),Count(V)>0);
     V=R;V.Density=std::numeric_limits<float>::quiet_NaN();TestFalse(TEXT("NaN rejected"),Build(M,{V},42,20000,A,E));
     TestFalse(TEXT("duplicate ID rejected"),Build(M,{R,R},42,20000,A,E));
@@ -106,6 +107,37 @@ bool FWorldDressingSurface::RunTest(const FString&)
     for (int32 I=0;I<A.Placements.Num() && I<B.Placements.Num();++I)
         TestTrue(TEXT("world location includes source translation"),(B.Placements[I].Transform.GetLocation()-A.Placements[I].Transform.GetLocation()).Equals(FVector(1200,-450,300)));
     TestTrue(TEXT("manager excluded from runtime cook"),GetDefault<AAnastasisWorldDressingManager>()->IsEditorOnly());
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWorldDressingCurrentMap,"Anastasis.WorldDressing.CurrentSpatialScaleAndRaisedWater",
+    EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FWorldDressingCurrentMap::RunTest(const FString&)
+{
+    FString E; auto M=Fixture(); M.Snapshot.SpatialScale=5;
+    for (auto& T:M.Triangles) for (FVector* V:{&T.A,&T.B,&T.C}) { V->X*=5; V->Y*=5; }
+    M.bUseRenderedWater=true;
+    const double Step=AnastasisWorldView::TileWorldSize*5;
+    // A raised river covers otherwise dry grass; fixed SeaLevel would miss this water entirely.
+    const double X0=Step*3,X1=Step*5,Y0=0,Y1=Step*8;
+    M.WaterTriangles={{{X0,Y0,700},{X1,Y0,700},{X0,Y1,700}},{{X1,Y0,700},{X1,Y1,700},{X0,Y1,700}}};
+    TestTrue(TEXT("scale5 and raised river prepare"),M.Prepare(E));
+    const auto* T=M.TileAt(Step*6.5,Step*4.5);
+    TestTrue(TEXT("tile indices use spatial scale"),T && T->X==6 && T->Y==4);
+    TestFalse(TEXT("raised river is wet on grass"),M.IsDry({Step*4,Step*4}));
+    TestTrue(TEXT("neighboring bank is dry"),M.IsDry({Step*6,Step*4}));
+    TestEqual(TEXT("distance includes rendered river"),M.WaterDistance({Step*5.5,Step*4}),Step*.5);
+    FResult A,B; auto R=Rule();
+    TestTrue(TEXT("build current map"),Build(M,{R},12345,20000,A,E));
+    TestTrue(TEXT("repeat current map"),Build(M,{R},12345,20000,B,E));
+    TestEqual(TEXT("current scale repeat hash"),A.Hash,B.Hash);
+    TestTrue(TEXT("current map reachable"),A.Placements.Num()>5);
+    for (const auto& P:A.Placements)
+    {
+        TestTrue(TEXT("no river roots"),P.Ground.X<X0 || P.Ground.X>X1);
+        TestTrue(TEXT("physical map bounds"),P.Ground.X>=0 && P.Ground.X<8*Step && P.Ground.Y>=0 && P.Ground.Y<8*Step);
+    }
+    M.Snapshot.SpatialScale=std::numeric_limits<double>::quiet_NaN();
+    TestFalse(TEXT("invalid scale rejected"),M.Prepare(E));
     return true;
 }
 #endif

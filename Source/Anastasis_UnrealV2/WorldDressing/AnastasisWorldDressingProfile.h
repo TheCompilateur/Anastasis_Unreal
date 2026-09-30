@@ -24,7 +24,7 @@ struct FAnastasisDressingRule
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Placement") float AltitudeMax = 100000;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Placement", meta=(ClampMin="0", ClampMax="89")) float SlopeMin = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Placement", meta=(ClampMin="0", ClampMax="89")) float SlopeMax = 35;
-    /** XY distance to the nearest semantic water tile rectangle, cm; -1 max means unlimited. */
+    /** Conservative XY distance to semantic water or rendered water triangles, cm; -1 max means unlimited. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Placement", meta=(ClampMin="0")) float DistanceToWaterMin = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Placement", meta=(ClampMin="-1")) float DistanceToWaterMax = -1;
     /** Expected candidate count per tile, before rejection. Hard cap 16 candidates/tile. */

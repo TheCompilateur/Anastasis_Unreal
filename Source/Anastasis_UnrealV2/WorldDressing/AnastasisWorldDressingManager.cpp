@@ -7,6 +7,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Misc/Crc.h"
 #include "ProceduralMeshComponent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAnastasisWorldDressing, Log, All);
@@ -22,16 +23,18 @@ bool ReadMap(const AAnastasisWorldDressingManager& Manager,FMap& Out,FString& Er
     // Sole semantic integration point: copy the existing snapshot. Never GenerateWorld/Embody here.
     Out.Snapshot=Source->GetSnapshot(); Out.SourceTransform=Source->GetActorTransform();
     // Sole geometric integration point: read section 0 of ExperimentalTerrain, including forge relief.
-    // No line trace: collisions might be stale or hit another prop; section 1 is WATER, never ground.
+    // No line trace or global cache: section 1 supplies actual water occupancy/height, never ground.
     TArray<UProceduralMeshComponent*> Surfaces;
     Source->GetComponents(Surfaces);
-    bool Found=false;
+    bool Found=false; Out.bUseRenderedWater=true;
     for (auto* Surface:Surfaces)
     {
         if (Surface->GetFName()!=TEXT("ExperimentalTerrain") || !Surface->IsVisible()) continue;
-        const auto* Section=Surface->GetProcMeshSection(0);
-        if (!Section || !Section->bSectionVisible) continue;
-        Found=true;
+        for (int32 SectionIndex=0;SectionIndex<2;++SectionIndex)
+        {
+        const auto* Section=Surface->GetProcMeshSection(SectionIndex);
+        if (!Section || (SectionIndex==0 && !Section->bSectionVisible)) continue;
+        if (SectionIndex==0) Found=true;
         for (int32 I=0;I+2<Section->ProcIndexBuffer.Num();I+=3)
         {
             FVector V[3];
@@ -41,7 +44,8 @@ bool ReadMap(const AAnastasisWorldDressingManager& Manager,FMap& Out,FString& Er
                 if (!Section->ProcVertexBuffer.IsValidIndex(Index)) { Error=TEXT("Invalid rendered surface index"); return false; }
                 V[K]=Out.SourceTransform.InverseTransformPosition(Surface->GetComponentTransform().TransformPosition(Section->ProcVertexBuffer[Index].Position));
             }
-            Out.Triangles.Add({V[0],V[1],V[2]});
+            (SectionIndex==0?Out.Triangles:Out.WaterTriangles).Add({V[0],V[1],V[2]});
+        }
         }
     }
     if (!Found) { Error=TEXT("WorldSource has no visible ExperimentalTerrain section 0; generate its surface first"); return false; }
@@ -130,6 +134,8 @@ void AAnastasisWorldDressingManager::GeneratePreview()
         C->SetupAttachment(GetRootComponent());
         C->SetMobility(EComponentMobility::Movable);
         C->SetStaticMesh(Meshes[I]);
+        // PerInstanceRandom now drives foliage sway. Fix its seed as well as the transforms.
+        C->InstancingRandomSeed=static_cast<int32>((static_cast<uint32>(Seed)^FCrc::StrCrc32(*Profile->Rules[I].AssetId.ToString()))|1u);
         C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         C->SetGenerateOverlapEvents(false);
         C->SetCanEverAffectNavigation(false);
