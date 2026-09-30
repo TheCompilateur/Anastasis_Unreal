@@ -22,7 +22,7 @@
 // etat — un A*, un hacheur, une boucle de tick — demandent un generateur
 // dedie, et c'est normal: leur difficulte est ailleurs que dans la plomberie.
 
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
@@ -161,7 +161,10 @@ export async function genererVecteurs(spec, options = {}) {
   let tete = "inconnu";
   try {
     tete = execFileSync("git", ["-C", REF, "log", "-1", "--format=%h"], { encoding: "utf8" }).trim();
-  } catch { /* depot sans git: la provenance sera moins precise */ }
+  } catch {
+    // Extraction sans git (`git archive <commit>`) : elle porte sa provenance dans `.tete`.
+    try { tete = readFileSync(join(REF, ".tete"), "utf8").trim(); } catch { /* provenance inconnue */ }
+  }
 
   const lignes = [];
   const emit = (s = "") => lignes.push(s);

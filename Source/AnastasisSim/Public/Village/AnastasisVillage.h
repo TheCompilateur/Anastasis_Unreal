@@ -545,6 +545,16 @@ namespace AnastasisVillage
 		/** `for (const npc of this.actors) updateNpc(this, npc, dt)` — Time = temps de sim APRES avance. */
 		void UpdateActors(double Time, double Dt);
 
+		/**
+		 * `regrowFieldsDaily` sur l'etat vivant des tuiles (Work/AnastasisFields.h).
+		 * Appele par l'hote en tete des travaux de minuit. Une tuile ouverte par
+		 * l'extension food-supply n'est jamais regarnie (elle se declare sans repousse).
+		 * Rend le nombre de tuiles qui ont repousse.
+		 */
+		int32 RegrowFieldsDaily(int32 Day);
+		/** Observation : nourriture ajoutee aux champs par la repousse depuis Bind. */
+		int64 GetRegrownFood() const { return RegrownFood; }
+
 		/** `countBuildings(type)` — acheves seulement. */
 		int32 CountBuildings(const FString& Type) const;
 
@@ -707,6 +717,7 @@ namespace AnastasisVillage
 		const AnastasisWorld::FWorld* World = nullptr;
 		/** Tuiles touchees par la recolte : index -> etat vivant. Ecrit seulement par TakeFromTile / DepleteTile. */
 		TMap<int32, AnastasisWorld::FTile> LiveTiles;
+		int64 RegrownFood = 0;
 		AnastasisNav::FNavGrid Nav;
 		int32 NavVersion = 0;
 		FPoint Settlement;

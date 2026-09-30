@@ -4,6 +4,7 @@
 #include "Core/AnastasisSimMath.h"
 #include "Core/AnastasisStateDigest.h"
 #include "World/AnastasisWorld.h"
+#include "Work/AnastasisFields.h"
 
 namespace AnastasisVillage
 {
@@ -162,6 +163,7 @@ namespace AnastasisVillage
 		FoodSources.Reset();
 		MealReservations.Reset();
 		LiveTiles.Reset();
+		RegrownFood = 0;
 		MealSeq = 0;
 		ReservationSweepAt = 0.0;
 		Buildings = TAnastasisEntityTable<FBuilding>();
@@ -3247,5 +3249,27 @@ namespace AnastasisVillage
 		// `gainSkill(npc, 0.002)` : domaine du but, le marche.
 		AnastasisGather::GainDomainSkill(Npc.Skill, Npc.SkillTrade, AnastasisGather::DeliverSkillGain);
 		return true;
+	}
+
+	// --- Repousse des champs (simulation.js regrowFieldsDaily) -------------------
+
+	int32 FVillage::RegrowFieldsDaily(int32 Day)
+	{
+		if (!World) return 0;
+		int32 Grown = 0;
+		for (int32 Index = 0; Index < World->Tiles.Num(); ++Index)
+		{
+			if (World->Tiles[Index].Type != AnastasisWorld::ETileType::Field && !LiveTiles.Contains(Index)) continue;
+			if (FoodSources.ContainsByPredicate([&](const FFoodSource& S) { return S.TileIndex == Index; })) continue;
+			AnastasisWorld::FTile Tile = LiveTile(Index);
+			const int32 Before = Tile.Resource == AnastasisWorld::EResource::Food ? Tile.Amount : 0;
+			if (AnastasisFields::RegrowTileDaily(Tile, Day))
+			{
+				RegrownFood += Tile.Amount - Before;
+				LiveTiles.Add(Index, Tile);
+				++Grown;
+			}
+		}
+		return Grown;
 	}
 }

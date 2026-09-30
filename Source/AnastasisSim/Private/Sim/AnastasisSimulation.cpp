@@ -16,6 +16,8 @@ void FAnastasisSimulation::Reset(uint32 SeedValue, int32 Width, int32 Height)
 	Day = 1;
 	NewDayCount = 0;
 	DeferredRemaining = 0;
+	bLandRegenPending = false;
+	LastRegrownFields = 0;
 	Accumulator = 0.0;
 }
 
@@ -98,16 +100,33 @@ void FAnastasisSimulation::OnNewDay(bool bDefer)
 	// que `assignSheltersDaily` (les sans-toit recoivent un lit). Achats de maison,
 	// agrandissements, loyers : economie, non portee.
 	Village.AssignSheltersDaily();
-	// Eco / life / clio : NOT_IMPLEMENTED. La file reste vide, que defer soit
-	// true (tick runtime) ou false (appel direct / verifies).
+	// `enqueueDayDeferred` : de la file, seul le premier job est porte, `landRegen`
+	// (regen du sol). Collectif, vie, metiers, betail, immigration : NOT_IMPLEMENTED.
+	bLandRegenPending = true;
+	DeferredRemaining = 1;
 	if (!bDefer)
 	{
+		// `flushDayDeferred` : tout, tout de suite.
+		RunLandRegen();
 		DeferredRemaining = 0;
 	}
 }
 
-void FAnastasisSimulation::ProcessDayDeferred(int32 /*MaxJobs*/)
+void FAnastasisSimulation::ProcessDayDeferred(int32 MaxJobs)
 {
-	// DETERMINISME JS: budget en NOMBRE de jobs, jamais en duree. File vide.
-	DeferredRemaining = 0;
+	// DETERMINISME JS: budget en NOMBRE de jobs, jamais en duree.
+	if (MaxJobs > 0 && bLandRegenPending)
+	{
+		RunLandRegen();
+	}
+	DeferredRemaining = bLandRegenPending ? 1 : 0;
+}
+
+void FAnastasisSimulation::RunLandRegen()
+{
+	// `sim.regrowFieldsDaily(); sim.regrowForestDaily(); syncAllYardsFromStock(sim);`
+	// La foret : `regrowWoodTile` rend toujours false dans la reference (fee66ae),
+	// rien ne repousse. Les cours de stock sont une vue, pas de l'etat.
+	LastRegrownFields = Village.RegrowFieldsDaily(Day);
+	bLandRegenPending = false;
 }
