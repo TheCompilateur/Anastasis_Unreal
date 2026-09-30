@@ -95,8 +95,10 @@ function Start-AnastasisEditor {
 # l'ecriture de cette regle, capture-horizon.ps1 arrivait sur main avec un Start-Process.
 function Find-RawEditorLaunch([string]$Root) {
   $skip = @('editor-launch.ps1', 'editor-window-guard.ps1')
-  # Chemin entre guillemets (avec espaces : 'C:\Program Files\...'), chemin nu, ou variable $Editor.
-  $pattern = 'Start-Process\s+(''[^'']*UnrealEditor|"[^"]*UnrealEditor|\S*UnrealEditor|\$editor\b)'
+  # Toute ligne Start-Process qui nomme UnrealEditor ou $Editor : chemin entre guillemets (avec
+  # espaces), chemin nu, (Join-Path $engine '...UnrealEditor.exe'), variable. Large expres : un
+  # faux positif se corrige en une ligne, un faux negatif rouvre des fenetres devant Alexandre.
+  $pattern = 'Start-Process\b.*(UnrealEditor|\$editor\b)'
   foreach ($f in Get-ChildItem (Join-Path $Root 'tools\unreal') -Filter *.ps1 -File) {
     if ($skip -contains $f.Name) { continue }
     Select-String -LiteralPath $f.FullName -Pattern $pattern | ForEach-Object { "$($f.Name):$($_.LineNumber)" }
