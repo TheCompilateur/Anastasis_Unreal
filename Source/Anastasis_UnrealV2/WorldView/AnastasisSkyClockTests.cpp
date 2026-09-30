@@ -1,0 +1,182 @@
+#include "Misc/AutomationTest.h"
+
+#include "Life/AnastasisVillageRhythm.h"
+#include "World/AnastasisWeather.h"
+#include "WorldView/AnastasisAtmosphereProfile.h"
+#include "WorldView/AnastasisSkyClock.h"
+
+#if WITH_DEV_AUTOMATION_TESTS
+
+namespace AnastasisSkyClockTest
+{
+	uint64 Bits(double Value)
+	{
+		uint64 Out;
+		FMemory::Memcpy(&Out, &Value, sizeof(Out));
+		return Out;
+	}
+}
+
+/**
+ * ONE clock, not two that happen to agree: the sky's hour and phase are the village's own
+ * fraction (AnastasisRhythm::DayFracOf), at every instant of two simulated years.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisSkyClockOneClock, "Anastasis.Sky.Clock.OneClock", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisSkyClockOneClock::RunTest(const FString&)
+{
+	using AnastasisSkyClockTest::Bits;
+	const UAnastasisAtmosphereProfile* Profile = UAnastasisAtmosphereProfile::CreateCodeDefaults(GetTransientPackage());
+	int32 Bad = 0;
+	for (double Time = 0.0; Time < 240.0 * AnastasisSkyClock::DayLengthSeconds; Time += 0.37)
+	{
+		const AnastasisSkyClock::FSkyState S = AnastasisSkyClock::Evaluate(*Profile, Time, 12345u);
+		const double Frac = AnastasisRhythm::DayFracOf(Time);
+		const FString Phase = AnastasisRhythm::PhaseId(AnastasisRhythm::VillagePhase(Frac));
+		if (Bits(S.DayFrac) != Bits(Frac) || Phase != S.VillagePhase
+			|| S.Day != 1.0 + FMath::FloorToDouble(Time / AnastasisSkyClock::DayLengthSeconds))
+		{
+			if (++Bad <= 5)
+			{
+				AddError(FString::Printf(TEXT("t=%.2f sky frac=%.17g phase=%s / village frac=%.17g phase=%s"),
+					Time, S.DayFrac, S.VillagePhase, Frac, *Phase));
+			}
+		}
+	}
+	TestEqual(TEXT("instants where the sky and the village disagree on the time"), Bad, 0);
+
+	// The editor stand-in is the reference simulation's first frame (~10h), not an arbitrary noon.
+	const AnastasisSkyClock::FSkyState First = AnastasisSkyClock::Evaluate(*Profile, AnastasisSkyClock::InitialSimTime, 12345u);
+	TestEqual(TEXT("the first frame is day 1"), First.Day, 1.0);
+	TestEqual(TEXT("the first frame is at 10.08h"), First.Hours, 0.42 * 24.0, 1e-9);
+
+	// Pins are the inverse of the clock.
+	for (const double Day : {1.0, 17.0, 95.0})
+	{
+		for (const double Hours : {0.0, 6.5, 12.0, 23.75})
+		{
+			const AnastasisSkyClock::FSkyState P = AnastasisSkyClock::Evaluate(*Profile, AnastasisSkyClock::SimTimeFor(Day, Hours), 12345u);
+			TestEqual(FString::Printf(TEXT("pinned day %.0f"), Day), P.Day, Day);
+			TestEqual(FString::Printf(TEXT("pinned hour %.2f on day %.0f"), Hours, Day), P.Hours, Hours, 1e-9);
+		}
+	}
+	return true;
+}
+
+/**
+ * The inconsistency this mission exists to remove: the village slept under a noon sun. Over a
+ * whole year, every 15 simulated minutes: while the village's phase is "night" (21h-5h) the sun
+ * is below the horizon or grazing it (< 6 deg, the summer dawn at 41 N rises before 5h); at
+ * "midday" it stands high (> 20 deg, the winter noon is 25.6 deg); and the pinned exposure is
+ * darker at every night instant than at every midday one.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisSkyClockVillageSleepsInTheDark, "Anastasis.Sky.Clock.VillageSleepsInTheDark", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisSkyClockVillageSleepsInTheDark::RunTest(const FString&)
+{
+	const UAnastasisAtmosphereProfile* Profile = UAnastasisAtmosphereProfile::CreateCodeDefaults(GetTransientPackage());
+	double MaxNightElevation = -90.0;
+	double MinMiddayElevation = 90.0;
+	double MaxNightEV = -100.0;
+	double MinMiddayEV = 100.0;
+	for (int32 Day = 1; Day <= 120; ++Day)
+	{
+		for (int32 Quarter = 0; Quarter < 96; ++Quarter)
+		{
+			const double Time = AnastasisSkyClock::SimTimeFor(Day, Quarter * 0.25);
+			const AnastasisSkyClock::FSkyState S = AnastasisSkyClock::Evaluate(*Profile, Time, 12345u);
+			const FString Phase = S.VillagePhase;
+			if (Phase == TEXT("night"))
+			{
+				MaxNightElevation = FMath::Max(MaxNightElevation, S.SunElevationDegrees);
+				MaxNightEV = FMath::Max(MaxNightEV, S.ExposureEV100);
+				TestTrue(TEXT("night phase is also AnastasisRhythm::IsNightPhase"), AnastasisRhythm::IsNightPhase(Time));
+			}
+			else if (Phase == TEXT("midday"))
+			{
+				MinMiddayElevation = FMath::Min(MinMiddayElevation, S.SunElevationDegrees);
+				MinMiddayEV = FMath::Min(MinMiddayEV, S.ExposureEV100);
+			}
+		}
+	}
+	AddInfo(FString::Printf(TEXT("ANASTASIS_SKY_YEAR max_night_sun_elev=%.2f min_midday_sun_elev=%.2f max_night_ev=%.2f min_midday_ev=%.2f"),
+		MaxNightElevation, MinMiddayElevation, MaxNightEV, MinMiddayEV));
+	TestTrue(TEXT("the village never sleeps under a risen sun (night phase: sun < 6 deg)"), MaxNightElevation < 6.0);
+	TestTrue(TEXT("midday is always a high sun (> 20 deg)"), MinMiddayElevation > 20.0);
+	TestTrue(TEXT("every night instant is exposed darker than every midday instant"), MaxNightEV < MinMiddayEV);
+	return true;
+}
+
+/**
+ * The season moves the sun, the way the 120-day year of fieldCrops.js says: day 1 equinox,
+ * day 31 summer solstice, day 91 winter solstice. And exposure is monotonic in sun elevation,
+ * pinned at the night and day values outside the twilight band.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisSkyClockSeasonsAndExposure, "Anastasis.Sky.Clock.SeasonsAndExposure", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisSkyClockSeasonsAndExposure::RunTest(const FString&)
+{
+	const UAnastasisAtmosphereProfile* Profile = UAnastasisAtmosphereProfile::CreateCodeDefaults(GetTransientPackage());
+	TestEqual(TEXT("day 1 is the equinox"), AnastasisSkyClock::DeclinationForDay(1.0), 0.0, 1e-12);
+	TestEqual(TEXT("day 31 is the summer solstice"), AnastasisSkyClock::DeclinationForDay(31.0), 23.44, 1e-9);
+	TestEqual(TEXT("day 91 is the winter solstice"), AnastasisSkyClock::DeclinationForDay(91.0), -23.44, 1e-9);
+	TestEqual(TEXT("the year wraps at 120 days"), AnastasisSkyClock::DeclinationForDay(121.0), AnastasisSkyClock::DeclinationForDay(1.0), 1e-12);
+
+	auto NoonElevation = [Profile](double Day)
+	{
+		return AnastasisSkyClock::Evaluate(*Profile, AnastasisSkyClock::SimTimeFor(Day, 12.0), 12345u).SunElevationDegrees;
+	};
+	TestEqual(TEXT("equinox noon at 41 N is 49 deg"), NoonElevation(1.0), 49.0, 0.01);
+	TestTrue(TEXT("summer noon is higher than equinox noon"), NoonElevation(31.0) > NoonElevation(1.0));
+	TestTrue(TEXT("winter noon is lower than equinox noon"), NoonElevation(91.0) < NoonElevation(1.0));
+
+	const double Day = Profile->ExposureEV100;
+	const double Night = Profile->NightExposureEV100;
+	TestEqual(TEXT("deep night holds the night exposure"), AnastasisSkyClock::ExposureForSunElevation(-40.0, Day, Night, Profile->NightElevationDegrees, Profile->DayElevationDegrees), Night, 1e-12);
+	TestEqual(TEXT("full day holds the day exposure"), AnastasisSkyClock::ExposureForSunElevation(60.0, Day, Night, Profile->NightElevationDegrees, Profile->DayElevationDegrees), Day, 1e-12);
+	double Previous = -1000.0;
+	bool bMonotonic = true;
+	for (double E = -40.0; E <= 60.0; E += 0.25)
+	{
+		const double EV = AnastasisSkyClock::ExposureForSunElevation(E, Day, Night, Profile->NightElevationDegrees, Profile->DayElevationDegrees);
+		bMonotonic &= EV >= Previous;
+		Previous = EV;
+	}
+	TestTrue(TEXT("exposure never darkens as the sun rises"), bMonotonic);
+	return true;
+}
+
+/**
+ * The sky's weather IS the simulation's: AnastasisWeather::WeatherAt with the sky's own day and
+ * fraction, bit for bit -- not a presentation-side roll. And the weather actually reaches the
+ * sky's parameters: cover moves the cloud coverage monotonically between the profile's clear and
+ * overcast values, humidity thickens the fog and dry air leaves it at the profile's density.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisSkyClockWeatherIsTheSimulations, "Anastasis.Sky.Clock.WeatherIsTheSimulations", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisSkyClockWeatherIsTheSimulations::RunTest(const FString&)
+{
+	using AnastasisSkyClockTest::Bits;
+	const UAnastasisAtmosphereProfile* Profile = UAnastasisAtmosphereProfile::CreateCodeDefaults(GetTransientPackage());
+	int32 Bad = 0;
+	int32 RainyInstants = 0;
+	for (double Time = 0.0; Time < 120.0 * AnastasisSkyClock::DayLengthSeconds; Time += 1.7)
+	{
+		const AnastasisSkyClock::FSkyState S = AnastasisSkyClock::Evaluate(*Profile, Time, 12345u);
+		const AnastasisWeather::FWeather W = AnastasisWeather::WeatherAt(12345u, S.Day, nullptr, S.DayFrac);
+		if (Bits(S.Weather.Cover) != Bits(W.Cover) || Bits(S.Weather.Rain) != Bits(W.Rain) || S.Weather.Season != W.Season
+			|| Bits(S.Humidity) != Bits(AnastasisWeather::WeatherHumidityAt(W)))
+		{
+			++Bad;
+		}
+		RainyInstants += S.Weather.Rain > 0.2 ? 1 : 0;
+	}
+	TestEqual(TEXT("instants where the sky's weather differs from the simulation's"), Bad, 0);
+	AddInfo(FString::Printf(TEXT("ANASTASIS_SKY_WEATHER rainy_instants_over_a_year=%d"), RainyInstants));
+	TestTrue(TEXT("a year of seed 12345 has some rain (the model is not inert)"), RainyInstants > 0);
+
+	TestEqual(TEXT("clear sky -> clear coverage"), AnastasisSkyClock::CloudCoverageFor(*Profile, 0.0), static_cast<double>(Profile->CloudCoverageClear), 1e-6);
+	TestEqual(TEXT("overcast -> overcast coverage"), AnastasisSkyClock::CloudCoverageFor(*Profile, 1.0), static_cast<double>(Profile->CloudCoverageOvercast), 1e-6);
+	TestTrue(TEXT("more cover, more coverage"), AnastasisSkyClock::CloudCoverageFor(*Profile, 0.7) > AnastasisSkyClock::CloudCoverageFor(*Profile, 0.3));
+	TestEqual(TEXT("dry air leaves the fog at the profile density"), AnastasisSkyClock::FogDensityScaleFor(*Profile, 0.0), 1.0, 1e-12);
+	TestTrue(TEXT("humid air thickens the fog"), AnastasisSkyClock::FogDensityScaleFor(*Profile, 0.7) > 1.0);
+	return true;
+}
+
+#endif

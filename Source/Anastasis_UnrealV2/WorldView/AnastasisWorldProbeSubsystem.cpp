@@ -8,6 +8,7 @@
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
+#include "Components/VolumetricCloudComponent.h"
 #include "Containers/Ticker.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
@@ -43,6 +44,7 @@
 #include "WorldPartition/WorldPartition.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "WorldView/AnastasisAtmosphereResolver.h"
+#include "WorldView/AnastasisWorldAtmosphere.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
 #include "WorldView/AnastasisVisualMode.h"
 #include "WorldView/AnastasisWorldView.h"
@@ -1069,7 +1071,10 @@ TSharedRef<FJsonObject> UAnastasisWorldProbeSubsystem::BuildSnapshotObject() con
 	AtmosphereObj->SetStringField(TEXT("profile_source"),
 		AnastasisAtmosphere::IsProfileDataDriven() ? TEXT("asset") : TEXT("code_defaults"));
 
+	// The moon is a DirectionalLight too (ENV_REALISM_001): it is counted, but never read as
+	// the sun, or the snapshot would report a world lit at 0.3 lux.
 	ADirectionalLight* ProbeSun = nullptr;
+	ADirectionalLight* ProbeMoon = nullptr;
 	int32 DirectionalLightCount = 0;
 	for (TActorIterator<ADirectionalLight> It(World); It; ++It)
 	{
@@ -1078,13 +1083,28 @@ TSharedRef<FJsonObject> UAnastasisWorldProbeSubsystem::BuildSnapshotObject() con
 			continue;
 		}
 		++DirectionalLightCount;
-		if (!ProbeSun)
+		if (It->ActorHasTag(AAnastasisWorldAtmosphere::MoonTag))
+		{
+			ProbeMoon = ProbeMoon ? ProbeMoon : *It;
+		}
+		else if (!ProbeSun)
 		{
 			ProbeSun = *It;
 		}
 	}
 	AtmosphereObj->SetNumberField(TEXT("directional_light_count"), DirectionalLightCount);
 	AtmosphereObj->SetBoolField(TEXT("sun_present"), ProbeSun != nullptr);
+	AtmosphereObj->SetBoolField(TEXT("moon_present"), ProbeMoon != nullptr);
+	if (ProbeMoon)
+	{
+		if (const UDirectionalLightComponent* MoonComponent = Cast<UDirectionalLightComponent>(ProbeMoon->GetLightComponent()))
+		{
+			AtmosphereObj->SetNumberField(TEXT("moon_intensity"), MoonComponent->Intensity);
+			AtmosphereObj->SetNumberField(TEXT("moon_atmosphere_index"), MoonComponent->GetAtmosphereSunLightIndex());
+			AtmosphereObj->SetBoolField(TEXT("moon_casts_shadows"), MoonComponent->CastShadows != 0);
+		}
+	}
+	AtmosphereObj->SetBoolField(TEXT("volumetric_cloud_present"), FindFirstActor<AVolumetricCloud>(World) != nullptr);
 	if (ProbeSun)
 	{
 		AtmosphereObj->SetArrayField(TEXT("sun_rotation_pitch_yaw_roll"), RotArray(ProbeSun->GetActorRotation()));
@@ -1119,6 +1139,8 @@ TSharedRef<FJsonObject> UAnastasisWorldProbeSubsystem::BuildSnapshotObject() con
 			AtmosphereObj->SetNumberField(TEXT("fog_height_falloff"), FogComponent->FogHeightFalloff);
 			AtmosphereObj->SetNumberField(TEXT("fog_start_distance"), FogComponent->StartDistance);
 			AtmosphereObj->SetNumberField(TEXT("fog_max_opacity"), FogComponent->FogMaxOpacity);
+			AtmosphereObj->SetNumberField(TEXT("valley_fog_density"), FogComponent->SecondFogData.FogDensity);
+			AtmosphereObj->SetBoolField(TEXT("volumetric_fog"), FogComponent->bEnableVolumetricFog);
 		}
 		AtmosphereObj->SetNumberField(TEXT("fog_height_z"), ProbeFog->GetActorLocation().Z);
 	}

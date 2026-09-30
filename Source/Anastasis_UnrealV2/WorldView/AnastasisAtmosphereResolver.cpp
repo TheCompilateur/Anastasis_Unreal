@@ -89,4 +89,15 @@ FRotator ResolveSunRotation(const UAnastasisAtmosphereProfile& Profile)
 	return FRotator(Profile.SunPitchDegrees, Profile.SunYawDegrees, 0.0f);
 }
 
+FRotator ResolveMoonRotation(const UAnastasisAtmosphereProfile& Profile)
+{
+	if (Profile.bDeriveSunFromTimeOfDay)
+	{
+		return SunRotationForTimeOfDay(
+			FMath::Fmod(static_cast<double>(Profile.TimeOfDayHours) + 12.0, 24.0),
+			Profile.LatitudeDegrees, -Profile.SunDeclinationDegrees);
+	}
+	return FRotator(Profile.MoonPitchDegrees, Profile.MoonYawDegrees, 0.0f);
+}
+
 }

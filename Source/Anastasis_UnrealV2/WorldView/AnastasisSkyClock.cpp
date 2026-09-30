@@ -1,0 +1,73 @@
+#include "WorldView/AnastasisSkyClock.h"
+
+#include "Life/AnastasisVillageRhythm.h"
+#include "WorldView/AnastasisAtmosphereProfile.h"
+#include "WorldView/AnastasisAtmosphereResolver.h"
+
+namespace AnastasisSkyClock
+{
+
+double SimTimeFor(const double Day, const double Hours)
+{
+	return (FMath::Max(1.0, FMath::FloorToDouble(Day)) - 1.0) * DayLengthSeconds
+		+ FMath::Fmod(FMath::Max(0.0, Hours), 24.0) / 24.0 * DayLengthSeconds;
+}
+
+double DeclinationForDay(const double Day, const double MaxDeclinationDegrees)
+{
+	// fieldCrops.js: a 120-day year of four 30-day seasons, day 1 = first day of spring.
+	// Astronomically, spring starts at the equinox and summer at the solstice, so day 1 is
+	// the equinox (0), day 31 the summer solstice (+max), day 91 the winter one (-max).
+	const double DayInYear = FMath::Fmod(FMath::Max(0.0, FMath::FloorToDouble(Day) - 1.0), AnastasisWeather::YearDays);
+	return MaxDeclinationDegrees * FMath::Sin(2.0 * UE_DOUBLE_PI * DayInYear / AnastasisWeather::YearDays);
+}
+
+double ExposureForSunElevation(const double ElevationDegrees, const double DayEV100, const double NightEV100,
+	const double LowElevationDegrees, const double HighElevationDegrees)
+{
+	const double Span = FMath::Max(1e-3, HighElevationDegrees - LowElevationDegrees);
+	const double T = FMath::Clamp((ElevationDegrees - LowElevationDegrees) / Span, 0.0, 1.0);
+	const double S = T * T * (3.0 - 2.0 * T);
+	return NightEV100 + (DayEV100 - NightEV100) * S;
+}
+
+FSkyState Evaluate(const UAnastasisAtmosphereProfile& Profile, const double SimTime, const uint32 Seed)
+{
+	FSkyState State;
+	const double Time = FMath::Max(0.0, SimTime);
+
+	// One clock: the fraction the village's rhythm reads, not a recomputation of it.
+	State.DayFrac = AnastasisRhythm::DayFracOf(Time);
+	State.Day = 1.0 + FMath::FloorToDouble(Time / DayLengthSeconds);
+	State.Hours = State.DayFrac * 24.0;
+	State.VillagePhase = AnastasisRhythm::PhaseId(AnastasisRhythm::VillagePhase(State.DayFrac));
+	State.DeclinationDegrees = DeclinationForDay(State.Day, Profile.MaxDeclinationDegrees);
+
+	State.SunRotation = AnastasisAtmosphere::SunRotationForTimeOfDay(State.Hours, Profile.LatitudeDegrees, State.DeclinationDegrees);
+	// Full moon: opposite hour angle, opposite declination (see ResolveMoonRotation).
+	State.MoonRotation = AnastasisAtmosphere::SunRotationForTimeOfDay(
+		FMath::Fmod(State.Hours + 12.0, 24.0), Profile.LatitudeDegrees, -State.DeclinationDegrees);
+	State.SunElevationDegrees = ElevationOf(State.SunRotation);
+
+	State.ExposureEV100 = ExposureForSunElevation(State.SunElevationDegrees, Profile.ExposureEV100,
+		Profile.NightExposureEV100, Profile.NightElevationDegrees, Profile.DayElevationDegrees);
+
+	// The renderer's call in the reference: with the hour, so a front can build and clear within a day.
+	State.Weather = AnastasisWeather::WeatherAt(Seed, State.Day, nullptr, State.DayFrac);
+	State.Humidity = AnastasisWeather::WeatherHumidityAt(State.Weather);
+	State.Wetness = AnastasisWeather::WeatherWetnessAt(State.Weather);
+	return State;
+}
+
+double CloudCoverageFor(const UAnastasisAtmosphereProfile& Profile, const double Cover)
+{
+	return FMath::Lerp(static_cast<double>(Profile.CloudCoverageClear), static_cast<double>(Profile.CloudCoverageOvercast),
+		FMath::Clamp(Cover, 0.0, 1.0));
+}
+
+double FogDensityScaleFor(const UAnastasisAtmosphereProfile& Profile, const double Humidity)
+{
+	return 1.0 + Profile.FogHumidityGain * FMath::Clamp(Humidity, 0.0, 1.0);
+}
+
+}

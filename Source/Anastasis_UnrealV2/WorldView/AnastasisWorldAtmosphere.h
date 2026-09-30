@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "WorldView/AnastasisSkyClock.h"
 #include "AnastasisWorldAtmosphere.generated.h"
 
 class ADirectionalLight;
@@ -9,6 +10,8 @@ class AExponentialHeightFog;
 class APostProcessVolume;
 class ASkyAtmosphere;
 class ASkyLight;
+class AVolumetricCloud;
+class UAnastasisAtmosphereProfile;
 
 /**
  * ATMOSPHERE OWNER.
@@ -43,12 +46,50 @@ public:
 
 	virtual void BeginPlay() override;
 
+	/** Follows the simulation clock while the sky clock is active (DAY_NIGHT_WEATHER_001). */
+	virtual void Tick(float DeltaSeconds) override;
+
+	/**
+	 * anastasis.Sky.Clock: 1 (default) the sky follows the simulation's hour, season and
+	 * weather; 0 the profile's fixed sun angles (the observation rig).
+	 */
+	static bool IsSkyClockEnabledByCVar();
+
+	/**
+	 * The simulation instant the sky shows, and the seed it reads the weather with: the live
+	 * simulation's in a game world, AnastasisSkyClock::InitialSimTime and the canonical seed
+	 * where no simulation runs (the editor). anastasis.Sky.Day / anastasis.Sky.Hour pin a day
+	 * or an hour for captures -- they move the SKY, never the simulation.
+	 */
+	double ResolveSkySimTime(uint32& OutSeed) const;
+
+	/** The sky as last written by Apply() or Tick(). Meaningful only while the clock is active. */
+	const AnastasisSkyClock::FSkyState& GetLastSkyState() const { return LastSky; }
+	bool IsSkyClockActive() const { return bSkyClockActive; }
+
 	/**
 	 * anastasis.Atmosphere: 1 (default) applies the profile, 0 leaves the level's own
 	 * lighting untouched. The escape hatch for anyone who needs to compare against the
 	 * pre-ATMOSPHERE_001 image without editing data.
 	 */
 	static bool IsEnabledByCVar();
+
+	/**
+	 * anastasis.Atmosphere.Realism: 1 (default) applies the realism layer of the profile
+	 * (ENV_REALISM_001), 0 restores the engine defaults of every property that layer owns and
+	 * removes its moon and clouds. Read on every Apply(), so the A/B needs no restart.
+	 */
+	static bool IsRealismEnabledByCVar();
+
+	/**
+	 * Tag carried by the moon. The sun is adopted as "the first DirectionalLight in the level",
+	 * so without it the second Apply() would adopt the moon as the sun and light the world at
+	 * 0.3 lux. Every sun lookup skips it.
+	 */
+	static const FName MoonTag;
+
+	/** Tag carried by a cloud layer this actor created: only those are removed with the realism layer off. */
+	static const FName RealismCloudTag;
 
 	/**
 	 * Resolve the profile and write it into the level. Returns false only when the profile
@@ -84,6 +125,11 @@ public:
 	ASkyLight* GetSkyLight() const { return SkyLight; }
 	AExponentialHeightFog* GetFog() const { return Fog; }
 	APostProcessVolume* GetExposureVolume() const { return ExposureVolume; }
+	ADirectionalLight* GetMoon() const { return Moon; }
+	AVolumetricCloud* GetCloud() const { return Cloud; }
+
+	/** Whether the last Apply() ran the realism layer (profile switch AND CVar). */
+	bool WasRealismApplied() const { return bRealismApplied; }
 
 	/** How many of the five rig actors Apply() had to create because the level had none. */
 	int32 GetSpawnedCount() const { return SpawnedCount; }
@@ -113,6 +159,37 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<APostProcessVolume> ExposureVolume;
+
+	UPROPERTY()
+	TObjectPtr<ADirectionalLight> Moon;
+
+	UPROPERTY()
+	TObjectPtr<AVolumetricCloud> Cloud;
+
+	/**
+	 * The realism layer, on or off. Off is not "do nothing": it writes the engine component
+	 * defaults back into every property the layer owns and removes the moon and the cloud layer
+	 * it created, so that switching it off in a live session returns the exact pre-realism image.
+	 */
+	void ApplyRealism(const UAnastasisAtmosphereProfile& Profile, bool bOn, const FRotator& SunRotation, const FRotator& MoonRotation);
+
+	bool bRealismApplied = false;
+
+	/**
+	 * Writes one sky instant: sun and moon orientation and shadows, pinned exposure, cloud
+	 * coverage and fog density from the weather. Called by Apply() and, while the clock is
+	 * active, every Tick. Logs a line when the village phase changes (or when bForceLog).
+	 */
+	void UpdateSky(const UAnastasisAtmosphereProfile& Profile, bool bForceLog);
+
+	/** Coverage lives on a material parameter: the engine instance is shared, so this actor drives its own dynamic instance. */
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> CloudMaterialInstance;
+
+	AnastasisSkyClock::FSkyState LastSky;
+	bool bSkyClockActive = false;
+	FString LastLoggedPhase;
+	float LastExposureWritten = TNumericLimits<float>::Lowest();
 
 	/**
 	 * Adopt what the level already has, create only what is missing, and record which is

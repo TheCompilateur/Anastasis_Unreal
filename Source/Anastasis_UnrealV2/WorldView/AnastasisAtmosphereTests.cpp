@@ -1,6 +1,8 @@
 #include "Misc/AutomationTest.h"
 
 #include "Components/DirectionalLightComponent.h"
+#include "Components/ExponentialHeightFogComponent.h"
+#include "Components/SkyAtmosphereComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/Engine.h"
 #include "Engine/ExponentialHeightFog.h"
@@ -32,19 +34,68 @@ namespace
 		return nullptr;
 	}
 
+	/**
+	 * Actors of this class, the moon excepted. Since ENV_REALISM_001 the moon is a second
+	 * DirectionalLight; "how many suns" has to mean suns.
+	 */
 	template <typename ActorType>
 	int32 CountActors(UWorld* World)
 	{
 		int32 Count = 0;
 		for (TActorIterator<ActorType> It(World); It; ++It)
 		{
-			if (IsValid(*It))
+			if (IsValid(*It) && !It->ActorHasTag(AAnastasisWorldAtmosphere::MoonTag))
 			{
 				++Count;
 			}
 		}
 		return Count;
 	}
+
+	template <typename ActorType>
+	int32 CountTagged(UWorld* World, const FName Tag)
+	{
+		int32 Count = 0;
+		for (TActorIterator<ActorType> It(World); It; ++It)
+		{
+			if (IsValid(*It) && It->ActorHasTag(Tag))
+			{
+				++Count;
+			}
+		}
+		return Count;
+	}
+
+	/** Forces anastasis.Atmosphere.Realism for the scope of a test, and puts it back. */
+	struct FScopedRealismCVar
+	{
+		IConsoleVariable* CVar = nullptr;
+		int32 Before = 1;
+
+		explicit FScopedRealismCVar(const int32 Value)
+		{
+			CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Atmosphere.Realism"));
+			if (CVar)
+			{
+				Before = CVar->GetInt();
+				CVar->Set(Value, ECVF_SetByCode);
+			}
+		}
+		void Set(const int32 Value) const
+		{
+			if (CVar)
+			{
+				CVar->Set(Value, ECVF_SetByCode);
+			}
+		}
+		~FScopedRealismCVar()
+		{
+			if (CVar)
+			{
+				CVar->Set(Before, ECVF_SetByCode);
+			}
+		}
+	};
 }
 
 /**
@@ -237,8 +288,9 @@ bool FAnastasisAtmosphereIdempotence::RunTest(const FString&)
 			const UAnastasisAtmosphereProfile& Profile = AnastasisAtmosphere::GetProfile();
 			TestEqual(TEXT("sun intensity comes from the profile"), Component->Intensity, Profile.SunIntensityLux);
 			TestTrue(TEXT("sun lights the sky atmosphere"), Component->IsUsedAsAtmosphereSunLight());
-			const FRotator Expected = AnastasisAtmosphere::ResolveSunRotation(Profile);
-			TestEqual(TEXT("sun pitch comes from the profile"), static_cast<double>(Applied->GetActorRotation().Pitch), static_cast<double>(Expected.Pitch), 0.01);
+			// DAY_NIGHT_WEATHER_001: with the sky clock active the sun is the clock's, else the profile's fixed angle.
+			const FRotator Expected = First->IsSkyClockActive() ? First->GetLastSkyState().SunRotation : AnastasisAtmosphere::ResolveSunRotation(Profile);
+			TestEqual(TEXT("sun pitch comes from the clock or the profile"), static_cast<double>(Applied->GetActorRotation().Pitch), static_cast<double>(Expected.Pitch), 0.01);
 		}
 	}
 
@@ -305,6 +357,237 @@ bool FAnastasisAtmosphereCachedLightingPreExposure::RunTest(const FString&)
 	Atmosphere->Destroy();
 	CVar->Set(BeforeValue, ECVF_SetByCode);
 
+	return true;
+}
+
+/**
+ * ENV_REALISM_001. The moon is a second DirectionalLight, and the sun has always been adopted as
+ * "the first DirectionalLight in the level". This locks the one failure that makes a moon
+ * dangerous: a second Apply() lighting the world with it. It also locks the two physical claims
+ * the moon is allowed to make -- moonlight is sub-lux and is not bluer than sunlight (a blue
+ * night is a grade, not a light) -- and that it only pays for shadows once the sun has set.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisAtmosphereRealismMoonIsNotTheSun, "Anastasis.Atmosphere.Realism.MoonIsNotTheSun", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisAtmosphereRealismMoonIsNotTheSun::RunTest(const FString&)
+{
+	UWorld* World = FindAtmosphereAutomationWorld();
+	if (!World)
+	{
+		AddInfo(TEXT("no editor/game world available; not exercised"));
+		return true;
+	}
+	const UAnastasisAtmosphereProfile& Profile = AnastasisAtmosphere::GetProfile();
+	if (!Profile.bRealismEnabled || !Profile.bMoonEnabled)
+	{
+		AddInfo(TEXT("profile disables the realism layer or the moon; not exercised"));
+		return true;
+	}
+
+	// Physical claims, on the data itself.
+	TestTrue(TEXT("moonlight is sub-lux"), Profile.MoonIlluminanceLux < 1.0f);
+	TestTrue(TEXT("moonlight is not bluer than sunlight"), Profile.MoonTemperatureKelvin <= Profile.SunTemperatureKelvin);
+
+	const FScopedRealismCVar Realism(1);
+	const int32 SunsBefore = CountActors<ADirectionalLight>(World);
+	const int32 MoonsBefore = CountTagged<ADirectionalLight>(World, AAnastasisWorldAtmosphere::MoonTag);
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	Params.ObjectFlags |= RF_Transient;
+
+	AAnastasisWorldAtmosphere* First = World->SpawnActor<AAnastasisWorldAtmosphere>(
+		AAnastasisWorldAtmosphere::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+	AAnastasisWorldAtmosphere* Second = World->SpawnActor<AAnastasisWorldAtmosphere>(
+		AAnastasisWorldAtmosphere::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+	if (!TestNotNull(TEXT("first actor"), First) || !TestNotNull(TEXT("second actor"), Second))
+	{
+		return false;
+	}
+	TestTrue(TEXT("first apply"), First->Apply());
+	TestTrue(TEXT("second apply"), Second->Apply());
+
+	TestTrue(TEXT("the realism layer ran"), Second->WasRealismApplied());
+	TestEqual(TEXT("exactly one moon after two applies"), CountTagged<ADirectionalLight>(World, AAnastasisWorldAtmosphere::MoonTag), 1);
+	TestEqual(TEXT("no second sun"), CountActors<ADirectionalLight>(World), FMath::Max(SunsBefore, 1));
+	TestTrue(TEXT("both passes converge on the same sun"), First->GetSun() == Second->GetSun());
+	TestTrue(TEXT("the sun is not the moon"), Second->GetSun() != Second->GetMoon());
+
+	if (ADirectionalLight* SunActor = Second->GetSun())
+	{
+		if (const UDirectionalLightComponent* SunComponent = Cast<UDirectionalLightComponent>(SunActor->GetLightComponent()))
+		{
+			TestEqual(TEXT("the adopted sun keeps the sun's intensity"), SunComponent->Intensity, Profile.SunIntensityLux);
+			TestEqual(TEXT("the sun drives atmosphere slot 0"), SunComponent->GetAtmosphereSunLightIndex(), 0);
+		}
+	}
+	if (ADirectionalLight* MoonActor = Second->GetMoon())
+	{
+		if (const UDirectionalLightComponent* MoonComponent = Cast<UDirectionalLightComponent>(MoonActor->GetLightComponent()))
+		{
+			TestEqual(TEXT("moon intensity comes from the profile"), MoonComponent->Intensity, Profile.MoonIlluminanceLux);
+			TestEqual(TEXT("the moon drives atmosphere slot 1"), MoonComponent->GetAtmosphereSunLightIndex(), 1);
+			TestTrue(TEXT("the moon lights the atmosphere"), MoonComponent->IsUsedAsAtmosphereSunLight());
+			const FRotator SunNow = Second->IsSkyClockActive() ? Second->GetLastSkyState().SunRotation : AnastasisAtmosphere::ResolveSunRotation(Profile);
+			const FRotator MoonNow = Second->IsSkyClockActive() ? Second->GetLastSkyState().MoonRotation : AnastasisAtmosphere::ResolveMoonRotation(Profile);
+			const bool bSunDown = AnastasisAtmosphere::IsBelowHorizon(SunNow);
+			TestTrue(TEXT("the moon never shadows while the sun is up"), bSunDown || MoonComponent->CastShadows == 0);
+			if (Second->IsSkyClockActive())
+			{
+				TestEqual(TEXT("under the clock the moon shadows exactly when it is up and the sun is down"),
+					MoonComponent->CastShadows != 0, bSunDown && !AnastasisAtmosphere::IsBelowHorizon(MoonNow));
+			}
+		}
+	}
+
+	Second->DestroySpawnedActors();
+	Second->Destroy();
+	First->DestroySpawnedActors();
+	First->Destroy();
+	TestEqual(TEXT("the world is left as it was found: suns"), CountActors<ADirectionalLight>(World), SunsBefore);
+	TestEqual(TEXT("the world is left as it was found: moons"), CountTagged<ADirectionalLight>(World, AAnastasisWorldAtmosphere::MoonTag), MoonsBefore);
+	return true;
+}
+
+/**
+ * ENV_REALISM_001. The A/B of this mission is one CVar in one session, which is only honest if
+ * "off" really is the pre-realism image. Off must write back the engine component defaults of
+ * every property the layer owns -- neither the observation rig nor ATMOSPHERE_001/002 ever wrote
+ * them, so those defaults are the old state -- and take the moon and the clouds away; on again
+ * must bring the profile back.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisAtmosphereRealismReversible, "Anastasis.Atmosphere.Realism.Reversible", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisAtmosphereRealismReversible::RunTest(const FString&)
+{
+	UWorld* World = FindAtmosphereAutomationWorld();
+	if (!World)
+	{
+		AddInfo(TEXT("no editor/game world available; not exercised"));
+		return true;
+	}
+	const UAnastasisAtmosphereProfile& Profile = AnastasisAtmosphere::GetProfile();
+	if (!Profile.bRealismEnabled)
+	{
+		AddInfo(TEXT("profile disables the realism layer; not exercised"));
+		return true;
+	}
+
+	FScopedRealismCVar Realism(1);
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	Params.ObjectFlags |= RF_Transient;
+	AAnastasisWorldAtmosphere* Atmosphere = World->SpawnActor<AAnastasisWorldAtmosphere>(
+		AAnastasisWorldAtmosphere::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+	if (!TestNotNull(TEXT("atmosphere actor spawns"), Atmosphere))
+	{
+		return false;
+	}
+
+	const USkyAtmosphereComponent* SkyDefault = GetDefault<USkyAtmosphereComponent>();
+	const UExponentialHeightFogComponent* FogDefault = GetDefault<UExponentialHeightFogComponent>();
+	const UDirectionalLightComponent* SunDefault = GetDefault<UDirectionalLightComponent>();
+
+	auto Sky = [Atmosphere]() { return Atmosphere->GetSkyAtmosphere() ? Atmosphere->GetSkyAtmosphere()->GetComponent() : nullptr; };
+	auto FogC = [Atmosphere]() { return Atmosphere->GetFog() ? Atmosphere->GetFog()->GetComponent() : nullptr; };
+	auto SunC = [Atmosphere]() { return Atmosphere->GetSun() ? Cast<UDirectionalLightComponent>(Atmosphere->GetSun()->GetLightComponent()) : nullptr; };
+
+	// On.
+	TestTrue(TEXT("apply (on)"), Atmosphere->Apply());
+	if (const USkyAtmosphereComponent* S = Sky())
+	{
+		TestEqual(TEXT("on: mie from the profile"), S->MieScatteringScale, Profile.SkyMieScatteringScale);
+		TestEqual(TEXT("on: aerial perspective from the profile"), S->AerialPespectiveViewDistanceScale, Profile.SkyAerialPerspectiveDistanceScale);
+	}
+	if (const UExponentialHeightFogComponent* F = FogC())
+	{
+		TestEqual(TEXT("on: valley fog layer from the profile"), F->SecondFogData.FogDensity, Profile.ValleyFogDensity);
+		TestEqual(TEXT("on: volumetric fog from the profile"), F->bEnableVolumetricFog, Profile.bVolumetricFog);
+	}
+	if (const UDirectionalLightComponent* L = SunC())
+	{
+		TestTrue(TEXT("on: sun uses a colour temperature"), L->bUseTemperature != 0);
+		TestEqual(TEXT("on: sun temperature from the profile"), L->Temperature, Profile.SunTemperatureKelvin);
+	}
+	TestEqual(TEXT("on: moon present iff the profile asks"), Atmosphere->GetMoon() != nullptr, Profile.bMoonEnabled);
+
+	// Off.
+	Realism.Set(0);
+	TestTrue(TEXT("apply (off)"), Atmosphere->Apply());
+	TestFalse(TEXT("off: the layer reports itself off"), Atmosphere->WasRealismApplied());
+	if (const USkyAtmosphereComponent* S = Sky())
+	{
+		TestEqual(TEXT("off: mie back to the engine default"), S->MieScatteringScale, SkyDefault->MieScatteringScale);
+		TestEqual(TEXT("off: aerial perspective back to the engine default"), S->AerialPespectiveViewDistanceScale, SkyDefault->AerialPespectiveViewDistanceScale);
+		TestTrue(TEXT("off: ground albedo back to the engine default"), S->GroundAlbedo == SkyDefault->GroundAlbedo);
+	}
+	if (const UExponentialHeightFogComponent* F = FogC())
+	{
+		TestEqual(TEXT("off: valley layer back to the engine default"), F->SecondFogData.FogDensity, FogDefault->SecondFogData.FogDensity);
+		TestEqual(TEXT("off: volumetric fog back to the engine default"), F->bEnableVolumetricFog, FogDefault->bEnableVolumetricFog);
+		TestEqual(TEXT("off: volumetric distance back to the engine default"), F->VolumetricFogDistance, FogDefault->VolumetricFogDistance);
+	}
+	if (const UDirectionalLightComponent* L = SunC())
+	{
+		TestEqual(TEXT("off: sun temperature flag back to the engine default"), L->bUseTemperature != 0, SunDefault->bUseTemperature != 0);
+		TestEqual(TEXT("off: cloud shadows back to the engine default"), L->bCastCloudShadows != 0, SunDefault->bCastCloudShadows != 0);
+		TestEqual(TEXT("off: the sun keeps its intensity"), L->Intensity, Profile.SunIntensityLux);
+	}
+	TestNull(TEXT("off: no moon"), Atmosphere->GetMoon());
+	TestNull(TEXT("off: no managed cloud layer"), Atmosphere->GetCloud());
+	TestEqual(TEXT("off: no moon left in the level"), CountTagged<ADirectionalLight>(World, AAnastasisWorldAtmosphere::MoonTag), 0);
+
+	// On again: the same values, not a drift.
+	Realism.Set(1);
+	TestTrue(TEXT("apply (on again)"), Atmosphere->Apply());
+	if (const USkyAtmosphereComponent* S = Sky())
+	{
+		TestEqual(TEXT("on again: mie from the profile"), S->MieScatteringScale, Profile.SkyMieScatteringScale);
+	}
+	TestTrue(TEXT("on again: the layer reports itself on"), Atmosphere->WasRealismApplied());
+
+	Atmosphere->DestroySpawnedActors();
+	Atmosphere->Destroy();
+	return true;
+}
+
+/**
+ * ENV_REALISM_001, pure geometry. The derived moon is a full moon: opposite the sun in hour
+ * angle. What the night needs from that is simple and checkable -- when the sun is down the moon
+ * is up, and vice versa -- and it must be as deterministic as the sun it mirrors.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisAtmosphereRealismMoonGeometry, "Anastasis.Atmosphere.Realism.MoonGeometry", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisAtmosphereRealismMoonGeometry::RunTest(const FString&)
+{
+	UAnastasisAtmosphereProfile* Profile = UAnastasisAtmosphereProfile::CreateCodeDefaults(GetTransientPackage());
+	if (!TestNotNull(TEXT("code defaults"), Profile))
+	{
+		return false;
+	}
+
+	// Explicit mode: the profile's own angles, the sun's untouched.
+	TestFalse(TEXT("default sun is explicit"), Profile->bDeriveSunFromTimeOfDay);
+	const FRotator Explicit = AnastasisAtmosphere::ResolveMoonRotation(*Profile);
+	TestEqual(TEXT("explicit moon pitch"), static_cast<float>(Explicit.Pitch), Profile->MoonPitchDegrees);
+	TestEqual(TEXT("explicit moon yaw"), static_cast<float>(Explicit.Yaw), Profile->MoonYawDegrees);
+	TestFalse(TEXT("default sun is above the horizon"), AnastasisAtmosphere::IsBelowHorizon(AnastasisAtmosphere::ResolveSunRotation(*Profile)));
+
+	// Derived mode, across a day.
+	Profile->bDeriveSunFromTimeOfDay = true;
+	for (const float Hours : {0.0f, 3.0f, 12.0f, 15.0f, 21.0f})
+	{
+		Profile->TimeOfDayHours = Hours;
+		const FRotator SunR = AnastasisAtmosphere::ResolveSunRotation(*Profile);
+		const FRotator MoonR = AnastasisAtmosphere::ResolveMoonRotation(*Profile);
+		const FString At = FString::Printf(TEXT(" at %.0fh"), Hours);
+		TestTrue(TEXT("sun and full moon are on opposite sides of the horizon") + At,
+			AnastasisAtmosphere::IsBelowHorizon(SunR) != AnastasisAtmosphere::IsBelowHorizon(MoonR));
+		TestTrue(TEXT("the moon is deterministic") + At, MoonR == AnastasisAtmosphere::ResolveMoonRotation(*Profile));
+	}
+	Profile->TimeOfDayHours = 0.0f;
+	const FRotator Midnight = AnastasisAtmosphere::ResolveMoonRotation(*Profile);
+	Profile->TimeOfDayHours = 12.0f;
+	const FRotator NoonSun = AnastasisAtmosphere::ResolveSunRotation(*Profile);
+	TestEqual(TEXT("the midnight full moon stands where the noon sun did (equinox)"),
+		static_cast<double>(Midnight.Pitch), static_cast<double>(NoonSun.Pitch), 0.001);
 	return true;
 }
 

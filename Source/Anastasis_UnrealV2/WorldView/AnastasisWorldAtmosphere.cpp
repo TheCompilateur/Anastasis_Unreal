@@ -10,10 +10,15 @@
 #include "Engine/ExponentialHeightFog.h"
 #include "Engine/LocalFogVolume.h"
 #include "Engine/PostProcessVolume.h"
+#include "Components/VolumetricCloudComponent.h"
 #include "Engine/SkyLight.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
+#include "Life/AnastasisVillageRhythm.h"
+#include "Sim/AnastasisSimulationSubsystem.h"
 #include "WorldView/AnastasisAtmosphereProfile.h"
 #include "WorldView/AnastasisAtmosphereResolver.h"
 #include "WorldView/AnastasisMistField.h"
@@ -33,6 +38,39 @@ static TAutoConsoleVariable<int32> CVarAtmosphere(
 	TEXT("World atmosphere. 0=leave the level's own lighting alone, 1=apply UAnastasisAtmosphereProfile; read when the world is embodied."),
 	ECVF_Default);
 
+static TAutoConsoleVariable<int32> CVarSkyClock(
+	TEXT("anastasis.Sky.Clock"),
+	1,
+	TEXT("DAY_NIGHT_WEATHER_001. 1=the sky follows the simulation's hour, season and weather; 0=the profile's fixed sun (the observation rig). Read on every Apply() and Tick."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<float> CVarSkyHour(
+	TEXT("anastasis.Sky.Hour"),
+	-1.0f,
+	TEXT("Pins the SKY at this hour [0,24) for captures; -1 follows the simulation. Never moves the simulation's own clock."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarSkyDay(
+	TEXT("anastasis.Sky.Day"),
+	-1,
+	TEXT("Pins the SKY on this simulation day (>=1: season and weather) for captures; -1 follows the simulation. Never moves the simulation."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarSkyWeather(
+	TEXT("anastasis.Sky.Weather"),
+	1,
+	TEXT("1=the simulation's weather drives cloud coverage and fog density; 0=fixed fair-weather sky."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarRealism(
+	TEXT("anastasis.Atmosphere.Realism"),
+	1,
+	TEXT("ENV_REALISM_001 layer: tuned sky, clouds, moon, valley fog, volumetric fog. 0=engine defaults for every property it owns (the pre-realism image), 1=profile values; read on every Apply()."),
+	ECVF_Default);
+
+const FName AAnastasisWorldAtmosphere::MoonTag(TEXT("AnastasisMoon"));
+const FName AAnastasisWorldAtmosphere::RealismCloudTag(TEXT("AnastasisRealismCloud"));
+
 namespace
 {
 	/**
@@ -41,13 +79,29 @@ namespace
 	 * Deliberately "first" rather than "the one we like best": a level with two suns is a
 	 * level-authoring problem, and silently picking among them would hide it. The summary
 	 * line reports what was adopted so a duplicate is visible in the log instead.
+	 *
+	 * The moon is never "an existing sun": it is a DirectionalLight too, and adopting it as the
+	 * sun would light the world at moonlight intensity after the second Apply().
 	 */
 	template <typename ActorType>
 	ActorType* FindExisting(UWorld* World)
 	{
 		for (TActorIterator<ActorType> It(World); It; ++It)
 		{
-			if (IsValid(*It))
+			if (IsValid(*It) && !It->ActorHasTag(AAnastasisWorldAtmosphere::MoonTag))
+			{
+				return *It;
+			}
+		}
+		return nullptr;
+	}
+
+	template <typename ActorType>
+	ActorType* FindTagged(UWorld* World, const FName Tag)
+	{
+		for (TActorIterator<ActorType> It(World); It; ++It)
+		{
+			if (IsValid(*It) && It->ActorHasTag(Tag))
 			{
 				return *It;
 			}
@@ -71,7 +125,9 @@ namespace
 
 AAnastasisWorldAtmosphere::AAnastasisWorldAtmosphere()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	// Ticks only to follow the simulation clock; Tick returns at once when the clock is off.
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = true;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 }
 
@@ -108,11 +164,354 @@ void AAnastasisWorldAtmosphere::DestroySpawnedActors()
 	}
 	SpawnedActors.Reset();
 	SpawnedCount = 0;
+
+	// The moon and the managed cloud layer are always this layer's own (found by tag, never
+	// adopted from the level), so they go too.
+	if (IsValid(Moon))
+	{
+		Moon->Destroy();
+	}
+	Moon = nullptr;
+	if (IsValid(Cloud))
+	{
+		Cloud->Destroy();
+	}
+	Cloud = nullptr;
 }
 
 bool AAnastasisWorldAtmosphere::IsEnabledByCVar()
 {
 	return CVarAtmosphere.GetValueOnAnyThread() != 0;
+}
+
+bool AAnastasisWorldAtmosphere::IsRealismEnabledByCVar()
+{
+	return CVarRealism.GetValueOnAnyThread() != 0;
+}
+
+bool AAnastasisWorldAtmosphere::IsSkyClockEnabledByCVar()
+{
+	return CVarSkyClock.GetValueOnAnyThread() != 0;
+}
+
+double AAnastasisWorldAtmosphere::ResolveSkySimTime(uint32& OutSeed) const
+{
+	// The canonical seed: the world every capture and test of this project is taken on.
+	OutSeed = 12345u;
+	double SimTime = AnastasisSkyClock::InitialSimTime;
+
+	if (const UWorld* World = GetWorld())
+	{
+		if (const UAnastasisSimulationSubsystem* Host = World->GetSubsystem<UAnastasisSimulationSubsystem>())
+		{
+			const FAnastasisSimulation& Simulation = Host->GetSimulation();
+			if (Simulation.IsRunning())
+			{
+				SimTime = Simulation.GetTime();
+				OutSeed = Simulation.GetSeed();
+			}
+		}
+	}
+
+	// Pins for captures. They move what the sky SHOWS; the simulation keeps its own time.
+	const int32 PinnedDay = CVarSkyDay.GetValueOnAnyThread();
+	const float PinnedHour = CVarSkyHour.GetValueOnAnyThread();
+	if (PinnedDay >= 1 || PinnedHour >= 0.0f)
+	{
+		const double Day = PinnedDay >= 1 ? static_cast<double>(PinnedDay) : 1.0 + FMath::FloorToDouble(SimTime / AnastasisSkyClock::DayLengthSeconds);
+		const double Hours = PinnedHour >= 0.0f ? static_cast<double>(PinnedHour) : AnastasisRhythm::DayFracOf(SimTime) * 24.0;
+		SimTime = AnastasisSkyClock::SimTimeFor(Day, Hours);
+	}
+	return SimTime;
+}
+
+void AAnastasisWorldAtmosphere::Tick(const float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (!bSkyClockActive)
+	{
+		return;
+	}
+	const UAnastasisAtmosphereProfile& Profile = AnastasisAtmosphere::GetProfile();
+	// The CVar is re-read here too: switching the clock off in a live session freezes the
+	// sky where it is until the next Apply() restores the fixed rig.
+	if (!Profile.bEnabled || !Profile.bSkyFollowsSimulation || !IsSkyClockEnabledByCVar())
+	{
+		return;
+	}
+	uint32 Seed = 0;
+	const double SimTime = ResolveSkySimTime(Seed);
+	LastSky = AnastasisSkyClock::Evaluate(Profile, SimTime, Seed);
+	UpdateSky(Profile, /*bForceLog*/ false);
+}
+
+void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Profile, const bool bForceLog)
+{
+	const bool bSunUp = !AnastasisAtmosphere::IsBelowHorizon(LastSky.SunRotation);
+
+	// --- Sun and moon ------------------------------------------------------------------
+	if (Sun)
+	{
+		Sun->SetActorRotation(LastSky.SunRotation);
+		if (UDirectionalLightComponent* SunComponent = Cast<UDirectionalLightComponent>(Sun->GetLightComponent()))
+		{
+			// A sun under the horizon lights nothing through the planet, but its shadow
+			// pass would still be paid every frame.
+			const bool bShadows = Profile.bSunCastsShadows && bSunUp;
+			if ((SunComponent->CastShadows != 0) != bShadows)
+			{
+				SunComponent->SetCastShadows(bShadows);
+			}
+		}
+	}
+	if (Moon)
+	{
+		Moon->SetActorRotation(LastSky.MoonRotation);
+		if (UDirectionalLightComponent* MoonComponent = Cast<UDirectionalLightComponent>(Moon->GetLightComponent()))
+		{
+			// The moon earns its shadows once the sun has set, and only while it is itself up.
+			const bool bShadows = !bSunUp && !AnastasisAtmosphere::IsBelowHorizon(LastSky.MoonRotation);
+			if ((MoonComponent->CastShadows != 0) != bShadows)
+			{
+				MoonComponent->SetCastShadows(bShadows);
+			}
+		}
+	}
+
+	// --- Exposure: pinned, but pinned to the hour --------------------------------------
+	if (Profile.bFixedExposure && ExposureVolume)
+	{
+		const float EV = static_cast<float>(LastSky.ExposureEV100);
+		if (FMath::Abs(EV - LastExposureWritten) > 0.005f)
+		{
+			ExposureVolume->Settings.AutoExposureMinBrightness = EV;
+			ExposureVolume->Settings.AutoExposureMaxBrightness = EV;
+			// Lumen's cached lighting pre-exposes against this window; it has to follow the
+			// camera's exposure through the night, not stay at the day's EV (see Apply()).
+			if (IConsoleVariable* CachedLightingPreExposure =
+				IConsoleManager::Get().FindConsoleVariable(TEXT("r.EyeAdaptation.CachedLightingPreExposure")))
+			{
+				CachedLightingPreExposure->Set(EV, ECVF_SetByCode);
+			}
+			LastExposureWritten = EV;
+		}
+	}
+
+	// --- Weather: clouds and fog -------------------------------------------------------
+	const bool bWeather = Profile.bWeatherDrivesSky && CVarSkyWeather.GetValueOnAnyThread() != 0;
+	if (Fog)
+	{
+		if (UExponentialHeightFogComponent* FogComponent = Fog->GetComponent())
+		{
+			const double Scale = bWeather ? AnastasisSkyClock::FogDensityScaleFor(Profile, LastSky.Humidity) : 1.0;
+			const float Density = static_cast<float>(Profile.FogDensity * Scale);
+			if (!FMath::IsNearlyEqual(FogComponent->FogDensity, Density, 1e-6f))
+			{
+				FogComponent->SetFogDensity(Density);
+			}
+		}
+	}
+	if (UVolumetricCloudComponent* CloudComponent = Cloud ? Cloud->FindComponentByClass<UVolumetricCloudComponent>() : nullptr)
+	{
+		if (bWeather)
+		{
+			// Apply() hands the layer back its shared engine instance on every pass; the
+			// dynamic instance is (re)made on top of whatever the component carries then.
+			if (!CloudMaterialInstance || CloudComponent->GetMaterial() != CloudMaterialInstance)
+			{
+				if (UMaterialInterface* Base = Cast<UMaterialInterface>(Profile.CloudMaterial.TryLoad()))
+				{
+					CloudMaterialInstance = UMaterialInstanceDynamic::Create(Base, this);
+					CloudComponent->SetMaterial(CloudMaterialInstance);
+				}
+			}
+			if (CloudMaterialInstance)
+			{
+				CloudMaterialInstance->SetScalarParameterValue(TEXT("Cloud_GlobalCoverage"),
+					static_cast<float>(AnastasisSkyClock::CloudCoverageFor(Profile, LastSky.Weather.Cover)));
+			}
+		}
+	}
+
+	const FString Phase = LastSky.VillagePhase;
+	if (bForceLog || Phase != LastLoggedPhase)
+	{
+		LastLoggedPhase = Phase;
+		UE_LOG(LogAnastasis_UnrealV2, Display,
+			TEXT("ANASTASIS_SKY day=%.0f hour=%.2f phase=%s season=%s decl=%.2f sun_elev=%.2f moon_elev=%.2f ev100=%.2f ")
+			TEXT("cover=%.3f rain=%.3f snow=%.3f humidity=%.3f wind=%.3f weather=%d"),
+			LastSky.Day, LastSky.Hours, *Phase, AnastasisWeather::SeasonId(LastSky.Weather.Season),
+			LastSky.DeclinationDegrees, LastSky.SunElevationDegrees,
+			AnastasisSkyClock::ElevationOf(LastSky.MoonRotation), LastSky.ExposureEV100,
+			LastSky.Weather.Cover, LastSky.Weather.Rain, LastSky.Weather.Snow, LastSky.Humidity,
+			LastSky.Weather.Wind, bWeather ? 1 : 0);
+	}
+}
+
+void AAnastasisWorldAtmosphere::ApplyRealism(const UAnastasisAtmosphereProfile& Profile, const bool bOn, const FRotator& SunRotation, const FRotator& MoonRotation)
+{
+	UWorld* World = GetWorld();
+	bRealismApplied = bOn;
+	if (!World)
+	{
+		return;
+	}
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	Params.ObjectFlags |= RF_Transient;
+
+	// "Off" writes the engine's own component defaults: the rig and ATMOSPHERE_001/002 never
+	// touched any of these properties, so the defaults ARE the pre-realism state, without this
+	// actor having to remember anything about what it found.
+
+	// --- Sun ---------------------------------------------------------------------------
+	if (Sun)
+	{
+		if (UDirectionalLightComponent* SunComponent = Cast<UDirectionalLightComponent>(Sun->GetLightComponent()))
+		{
+			const UDirectionalLightComponent* D = GetDefault<UDirectionalLightComponent>();
+			// Index 0 in both states: the moon takes 1, and two lights on one index would
+			// make the sky atmosphere pick one arbitrarily.
+			SunComponent->SetAtmosphereSunLightIndex(0);
+			SunComponent->SetUseTemperature(bOn ? true : D->bUseTemperature);
+			SunComponent->SetTemperature(bOn ? Profile.SunTemperatureKelvin : D->Temperature);
+			SunComponent->bCastCloudShadows = bOn ? true : D->bCastCloudShadows;
+			SunComponent->CloudShadowStrength = bOn ? Profile.SunCloudShadowStrength : D->CloudShadowStrength;
+			SunComponent->MarkRenderStateDirty();
+		}
+	}
+
+	// --- Sky atmosphere ----------------------------------------------------------------
+	if (SkyAtmosphere)
+	{
+		if (USkyAtmosphereComponent* SkyComponent = SkyAtmosphere->GetComponent())
+		{
+			const USkyAtmosphereComponent* D = GetDefault<USkyAtmosphereComponent>();
+			SkyComponent->SetMieScatteringScale(bOn ? Profile.SkyMieScatteringScale : D->MieScatteringScale);
+			SkyComponent->SetAerialPespectiveViewDistanceScale(bOn ? Profile.SkyAerialPerspectiveDistanceScale : D->AerialPespectiveViewDistanceScale);
+			SkyComponent->SetGroundAlbedo(bOn ? Profile.SkyGroundAlbedo : D->GroundAlbedo);
+		}
+	}
+
+	// --- Sky light ---------------------------------------------------------------------
+	if (SkyLight)
+	{
+		if (USkyLightComponent* SkyComponent = SkyLight->GetLightComponent())
+		{
+			const USkyLightComponent* D = GetDefault<USkyLightComponent>();
+			SkyComponent->bCloudAmbientOcclusion = bOn ? Profile.bSkyLightCloudOcclusion : D->bCloudAmbientOcclusion;
+			SkyComponent->MarkRenderStateDirty();
+		}
+	}
+
+	// --- Fog ---------------------------------------------------------------------------
+	if (Fog)
+	{
+		if (UExponentialHeightFogComponent* FogComponent = Fog->GetComponent())
+		{
+			const UExponentialHeightFogComponent* D = GetDefault<UExponentialHeightFogComponent>();
+			FExponentialHeightFogData Valley = D->SecondFogData;
+			if (bOn)
+			{
+				Valley.FogDensity = Profile.ValleyFogDensity;
+				Valley.FogHeightFalloff = Profile.ValleyFogHeightFalloff;
+				Valley.FogHeightOffset = Profile.ValleyFogHeightOffsetUU;
+			}
+			FogComponent->SetSecondFogData(Valley);
+
+			const bool bVolumetric = bOn && Profile.bVolumetricFog;
+			FogComponent->SetVolumetricFog(bVolumetric ? true : D->bEnableVolumetricFog);
+			FogComponent->SetVolumetricFogDistance(bVolumetric ? Profile.VolumetricFogDistanceUU : D->VolumetricFogDistance);
+			FogComponent->SetVolumetricFogExtinctionScale(bVolumetric ? Profile.VolumetricFogExtinctionScale : D->VolumetricFogExtinctionScale);
+			FogComponent->SetVolumetricFogScatteringDistribution(bVolumetric ? Profile.VolumetricFogScatteringDistribution : D->VolumetricFogScatteringDistribution);
+		}
+	}
+
+	// --- Moon --------------------------------------------------------------------------
+	// Found by tag, never by class: see MoonTag. Removed with the layer off.
+	Moon = FindTagged<ADirectionalLight>(World, MoonTag);
+	if (bOn && Profile.bMoonEnabled)
+	{
+		if (!Moon)
+		{
+			Moon = World->SpawnActor<ADirectionalLight>(FVector(0.0, 0.0, 4200.0), MoonRotation, Params);
+			if (Moon)
+			{
+				Moon->Tags.AddUnique(MoonTag);
+#if WITH_EDITOR
+				Moon->SetActorLabel(TEXT("Anastasis_Moon"));
+#endif
+			}
+		}
+		if (Moon)
+		{
+			MakeMovable(Moon->GetRootComponent());
+			Moon->SetActorRotation(MoonRotation);
+			if (UDirectionalLightComponent* MoonComponent = Cast<UDirectionalLightComponent>(Moon->GetLightComponent()))
+			{
+				MoonComponent->SetIntensity(Profile.MoonIlluminanceLux);
+				MoonComponent->SetLightColor(FLinearColor::White);
+				MoonComponent->SetUseTemperature(true);
+				MoonComponent->SetTemperature(Profile.MoonTemperatureKelvin);
+				MoonComponent->SetAtmosphereSunLight(true);
+				MoonComponent->SetAtmosphereSunLightIndex(1);
+				// A second shadow-casting directional light doubles the shadow cost for 0.3 lux.
+				// It only earns its shadows once the sun has set.
+				MoonComponent->SetCastShadows(AnastasisAtmosphere::IsBelowHorizon(SunRotation));
+			}
+		}
+	}
+	else if (Moon)
+	{
+		Moon->Destroy();
+		Moon = nullptr;
+	}
+
+	// --- Clouds ------------------------------------------------------------------------
+	// Only a layer this actor created is managed. A cloud layer authored into the level is the
+	// level's: adopted neither on nor off, and reported.
+	Cloud = FindTagged<AVolumetricCloud>(World, RealismCloudTag);
+	const bool bLevelOwnsClouds = !Cloud && FindExisting<AVolumetricCloud>(World) != nullptr;
+	if (bOn && Profile.bCloudsEnabled && !bLevelOwnsClouds)
+	{
+		if (!Cloud)
+		{
+			Cloud = World->SpawnActor<AVolumetricCloud>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
+			if (Cloud)
+			{
+				Cloud->Tags.AddUnique(RealismCloudTag);
+#if WITH_EDITOR
+				Cloud->SetActorLabel(TEXT("Anastasis_Clouds"));
+#endif
+			}
+		}
+		if (UVolumetricCloudComponent* CloudComponent = Cloud ? Cloud->FindComponentByClass<UVolumetricCloudComponent>() : nullptr)
+		{
+			CloudComponent->SetLayerBottomAltitude(Profile.CloudLayerBottomKm);
+			CloudComponent->SetLayerHeight(Profile.CloudLayerHeightKm);
+			// A missing engine material leaves the component with the engine's own default
+			// rather than no clouds -- and says so, instead of silently shipping a blank sky.
+			if (UMaterialInterface* CloudMaterial = Cast<UMaterialInterface>(Profile.CloudMaterial.TryLoad()))
+			{
+				CloudComponent->SetMaterial(CloudMaterial);
+			}
+			else
+			{
+				UE_LOG(LogAnastasis_UnrealV2, Warning,
+					TEXT("ANASTASIS_ATMOSPHERE cloud_material_missing path=%s"), *Profile.CloudMaterial.ToString());
+			}
+		}
+	}
+	else if (Cloud)
+	{
+		Cloud->Destroy();
+		Cloud = nullptr;
+	}
+	if (bLevelOwnsClouds)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_ATMOSPHERE clouds=level_owned (not managed)"));
+	}
 }
 
 void AAnastasisWorldAtmosphere::BeginPlay()
@@ -148,7 +547,16 @@ bool AAnastasisWorldAtmosphere::Apply()
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	Params.ObjectFlags |= RF_Transient;
 
-	const FRotator SunRotation = AnastasisAtmosphere::ResolveSunRotation(Profile);
+	// The sky clock decides the sun when it is active; the fixed profile angles otherwise.
+	bSkyClockActive = Profile.bSkyFollowsSimulation && IsSkyClockEnabledByCVar();
+	if (bSkyClockActive)
+	{
+		uint32 Seed = 0;
+		const double SimTime = ResolveSkySimTime(Seed);
+		LastSky = AnastasisSkyClock::Evaluate(Profile, SimTime, Seed);
+	}
+	const FRotator SunRotation = bSkyClockActive ? LastSky.SunRotation : AnastasisAtmosphere::ResolveSunRotation(Profile);
+	const FRotator MoonRotation = bSkyClockActive ? LastSky.MoonRotation : AnastasisAtmosphere::ResolveMoonRotation(Profile);
 
 	// --- Sun ---------------------------------------------------------------------------
 	Sun = AdoptOrSpawn<ADirectionalLight>(FVector(0.0, 0.0, 4000.0), SunRotation, Params);
@@ -244,14 +652,42 @@ bool AAnastasisWorldAtmosphere::Apply()
 		}
 	}
 
+	// --- Realism (ENV_REALISM_001) -----------------------------------------------------
+	// After the five rig actors, because it writes into them. Run in both states: "off" is an
+	// active restore, not a skip.
+	ApplyRealism(Profile, Profile.bRealismEnabled && IsRealismEnabledByCVar(), SunRotation, MoonRotation);
+
+	// --- Sky clock (DAY_NIGHT_WEATHER_001) ----------------------------------------------
+	// Last, because it overrides what the fixed profile just wrote: exposure by sun
+	// elevation, fog by humidity, clouds by cover. With the clock off, nothing below runs and
+	// the image is the fixed rig's, exactly as before.
+	if (bSkyClockActive)
+	{
+		// Apply() just wrote the profile's day EV into the volume: the cache of what the
+		// clock last wrote is stale, and must not suppress the rewrite.
+		LastExposureWritten = TNumericLimits<float>::Lowest();
+		UpdateSky(Profile, /*bForceLog*/ true);
+	}
+	else if (CloudMaterialInstance)
+	{
+		// The clock was on and is now off: give the cloud layer its profile material back.
+		if (UVolumetricCloudComponent* CloudComponent = Cloud ? Cloud->FindComponentByClass<UVolumetricCloudComponent>() : nullptr)
+		{
+			CloudComponent->SetMaterial(Cast<UMaterialInterface>(Profile.CloudMaterial.TryLoad()));
+		}
+		CloudMaterialInstance = nullptr;
+	}
+
 	LastSummary = FString::Printf(
 		TEXT("ANASTASIS_ATMOSPHERE applied=1 profile=%s sun_source=%s sun_pitch=%.3f sun_yaw=%.3f lux=%.1f ")
-		TEXT("fog=%d fog_density=%.4f ev100=%.2f adopted=%d spawned=%d"),
+		TEXT("fog=%d fog_density=%.4f ev100=%.2f adopted=%d spawned=%d realism=%d moon=%d clouds=%d volumetric_fog=%d"),
 		Source,
 		Profile.bDeriveSunFromTimeOfDay ? TEXT("time_of_day") : TEXT("explicit"),
 		SunRotation.Pitch, SunRotation.Yaw, Profile.SunIntensityLux,
 		Profile.bFogEnabled ? 1 : 0, Profile.FogDensity, Profile.ExposureEV100,
-		AdoptedCount, SpawnedCount);
+		AdoptedCount, SpawnedCount,
+		bRealismApplied ? 1 : 0, Moon ? 1 : 0, Cloud ? 1 : 0,
+		(Fog && Fog->GetComponent() && Fog->GetComponent()->bEnableVolumetricFog) ? 1 : 0);
 	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("%s"), *LastSummary);
 
 	return true;

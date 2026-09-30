@@ -42,4 +42,15 @@ namespace AnastasisAtmosphere
 
 	/** The profile's explicit angles, or SunRotationForTimeOfDay when it asks for the derived sun. */
 	FRotator ResolveSunRotation(const UAnastasisAtmosphereProfile& Profile);
+
+	/**
+	 * The moon's light rotation. With the sun derived from time of day: a FULL moon, i.e. the
+	 * sun's geometry twelve hours on with the opposite declination -- an approximation stated
+	 * as one (no lunar phase, no orbital inclination), but one that puts the moon high when the
+	 * sun is low, which is what the night needs. Otherwise the profile's explicit angles.
+	 */
+	FRotator ResolveMoonRotation(const UAnastasisAtmosphereProfile& Profile);
+
+	/** True when a light with this rotation shines from below the horizon (its rays point up). */
+	inline bool IsBelowHorizon(const FRotator& LightRotation) { return LightRotation.Pitch > 0.0; }
 }
