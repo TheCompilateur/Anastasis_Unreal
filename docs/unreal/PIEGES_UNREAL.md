@@ -109,6 +109,16 @@ de fatal et l'`ExitCode` ; il rapporte `RUN_INCOMPLET` sinon. Ne jamais recompte
 Les tests marqués `AddExpectedError` / `@unittest.expectedFailure` rapportent `Success`. Ils sont
 KNOWN_EXPECTED_FAILURE, jamais PASS (`AGENTS.md`, registre `known-expected-failures.txt`).
 
+### Un test marqué KNOWN_EXPECTED_FAILURE sort `Fail` alors que Python dit `OK (expected failures=1)`
+**Tu vois** dans la même milliseconde : `LogPython: Error: RuntimeError: <_overlapped.Overlapped object …> still
+has pending operation at deallocation`, puis `Result={Fail}` et `GIsCriticalError=1`.
+**Cause** : le contrôleur d'automation attribue toute ligne `LogPython: Error` au test en cours. L'erreur vient de
+la boucle `asyncio` de l'éditeur, pas du test (2026-09-30, machine à 1,8 Go de RAM libre ; non reproduit au run
+suivant).
+**Parade** : lire la sortie Python du test lui-même avant de conclure. Si elle dit `OK`, relancer la suite ; ne
+**jamais** retirer le marqueur ni toucher au registre pour ça. Si l'erreur `asyncio` revient sur une machine
+calme, c'est un sujet à part entière.
+
 ---
 
 ## Python éditeur
