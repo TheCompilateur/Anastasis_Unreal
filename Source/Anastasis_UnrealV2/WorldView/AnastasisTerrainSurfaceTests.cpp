@@ -381,8 +381,9 @@ bool FAnastasisDressingOnGround::RunTest(const FString&)
     auto* Actor = World->SpawnActor<AAnastasisWorldEmbodiment>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
     if (!Actor) { AddError(TEXT("Spawn failed")); return false; }
 
-    // This test locks legacy one-per-tile placement; Ecology has its own conditioning tests.
+    // This test locks legacy one-per-tile placement; Ecology and Places have their own tests.
     Actor->ForestDressing.bEnabled = false;
+    Actor->bComposePlaces = false;
 
     // Le dressing est reparti sur plusieurs HISM (un par archetype) ; les sept HISM de sol
     // portent le prefixe "Tiles_" et ne sont pas du dressing.

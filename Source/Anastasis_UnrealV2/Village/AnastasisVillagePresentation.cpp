@@ -28,6 +28,11 @@ namespace
 			OutKind = EAnastasisVillageBuildingKind::House;
 			return true;
 		}
+		if (Type == AnastasisVillage::GranaryType)
+		{
+			OutKind = EAnastasisVillageBuildingKind::Granary;
+			return true;
+		}
 		return false;
 	}
 
@@ -183,7 +188,12 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 	{
 		const FVector Base = SimToUnreal(SimWorld, Building.X + 0.5, Building.Y + 0.5, World);
 		const bool bHouse = Building.Type == AnastasisVillage::HouseType;
-		if (bHouse)
+		const bool bGranary = Building.Type == AnastasisVillage::GranaryType;
+		if (bGranary)
+		{
+			DrawDebugBox(World, Base + FVector(0, 0, Tile * 0.3), FVector(Tile * 0.4, Tile * 0.4, Tile * 0.3), FColor::Yellow, false, 0.f, 0, 4.f);
+		}
+		else if (bHouse)
 		{
 			DrawDebugBox(World, Base + FVector(0, 0, Tile * 0.35), FVector(Tile * 0.45, Tile * 0.45, Tile * 0.35), FColor::Orange, false, 0.f, 0, 4.f);
 		}
@@ -199,14 +209,18 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 		DrawDebugString(
 			World,
 			Base + FVector(0, 0, Tile * 0.9),
-			bHouse
+			bGranary
+				? FString::Printf(TEXT("%s granary  nourriture %d (reserve %d)  dedans=%d  users=[%s]"),
+					*Building.Id, Building.FoodPhysical, Building.FoodReserved,
+					Village.InsideOf(Building.Id).Num(), *FString::Join(Users, TEXT(",")))
+				: bHouse
 				? FString::Printf(TEXT("%s house owner=%s  foyer/abri=%d/%d  dedans=%d  users=[%s]"),
 					*Building.Id, Building.Owner.IsEmpty() ? TEXT("-") : *Building.Owner,
 					Village.CountShelterOccupants(Building.Id), Village.ShelterCapacity(Building),
 					Village.InsideOf(Building.Id).Num(), *FString::Join(Users, TEXT(",")))
 				: FString::Printf(TEXT("%s %s  users=%d [%s]"), *Building.Id, *Building.Type, Users.Num(), *FString::Join(Users, TEXT(","))),
 			nullptr,
-			bHouse ? FColor::Orange : FColor::Cyan,
+			bGranary ? FColor::Yellow : bHouse ? FColor::Orange : FColor::Cyan,
 			0.f);
 	}
 
@@ -227,11 +241,12 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 			World,
 			Pos + FVector(0, 0, Tile * 0.3),
 			FString::Printf(
-				TEXT("%s %s/%s%s soif=%.1f energie=%.1f%s"),
+				TEXT("%s %s/%s%s faim=%.1f soif=%.1f energie=%.1f%s"),
 				*Npc.Id,
 				*Npc.Goal,
 				*Npc.Activity,
 				Npc.Inside.bActive ? *FString::Printf(TEXT(" [dans %s]"), *Npc.Inside.BuildingId) : TEXT(""),
+				Npc.Needs.Hunger,
 				Npc.Needs.Thirst,
 				Npc.Needs.Energy,
 				Npc.DestBuildingId.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" -> %s"), *Npc.DestBuildingId)),
@@ -246,13 +261,15 @@ void FAnastasisVillagePresentation::LogStatus(const AnastasisVillage::FVillage& 
 	UE_LOG(
 		LogAnastasis_UnrealV2,
 		Display,
-		TEXT("ANASTASIS_VILLAGE status t=%.3f phase=%s buildings=%d actors=%d wells=%d houses=%d navVersion=%d digest=%s"),
+		TEXT("ANASTASIS_VILLAGE status t=%.3f phase=%s buildings=%d actors=%d wells=%d houses=%d granaries=%d reservations=%d navVersion=%d digest=%s"),
 		Time,
 		AnastasisRhythm::PhaseId(AnastasisRhythm::VillagePhase(AnastasisRhythm::DayFracOf(Time))),
 		Village.GetBuildings().Num(),
 		Village.GetActors().Num(),
 		Village.CountBuildings(AnastasisVillage::WellType),
 		Village.CountBuildings(AnastasisVillage::HouseType),
+		Village.CountBuildings(AnastasisVillage::GranaryType),
+		Village.GetMealReservations().Num(),
 		Village.GetNavVersion(),
 		*AnastasisDigest::ToHex(Village.Digest()));
 
@@ -267,7 +284,7 @@ void FAnastasisVillagePresentation::LogStatus(const AnastasisVillage::FVillage& 
 		UE_LOG(
 			LogAnastasis_UnrealV2,
 			Display,
-			TEXT("ANASTASIS_VILLAGE building %s type=%s tile=(%.0f,%.0f) progress=%.2f owner=%s occupants=%d/%d inside=[%s] access=%s users=[%s]"),
+			TEXT("ANASTASIS_VILLAGE building %s type=%s tile=(%.0f,%.0f) progress=%.2f owner=%s occupants=%d/%d food=%d reserved=%d inside=[%s] access=%s users=[%s]"),
 			*B.Id,
 			*B.Type,
 			B.X,
@@ -276,6 +293,8 @@ void FAnastasisVillagePresentation::LogStatus(const AnastasisVillage::FVillage& 
 			B.Owner.IsEmpty() ? TEXT("-") : *B.Owner,
 			Village.CountShelterOccupants(B.Id),
 			Village.ShelterCapacity(B),
+			B.FoodPhysical,
+			B.FoodReserved,
 			*FString::Join(Village.InsideOf(B.Id), TEXT(",")),
 			*FString::Join(Points, TEXT(" ")),
 			*FString::Join(Users, TEXT(",")));
@@ -287,7 +306,7 @@ void FAnastasisVillagePresentation::LogStatus(const AnastasisVillage::FVillage& 
 		UE_LOG(
 			LogAnastasis_UnrealV2,
 			Display,
-			TEXT("ANASTASIS_VILLAGE npc %s pos=(%.2f,%.2f) goal=%s activity=%s inside=%s home=%s shelter=%s thirst=%.2f energy=%.2f hygiene=%.2f morale=%.2f health=%.2f sleepQ=%.2f target=%s dest=%s drinks=%d rests=%d | why t=%.2f phase=%s rest=%.2f drink=%.2f floor=%.2f(%s) -> %s source=%s building=%s"),
+			TEXT("ANASTASIS_VILLAGE npc %s pos=(%.2f,%.2f) goal=%s activity=%s inside=%s home=%s shelter=%s hunger=%.2f food=%d meal=%s action=%s knows=%d meals=%d thirst=%.2f energy=%.2f hygiene=%.2f morale=%.2f health=%.2f sleepQ=%.2f target=%s dest=%s drinks=%d rests=%d | why t=%.2f phase=%s nous=%s(%.2f,u%.2f) eat=%.2f rest=%.2f drink=%.2f floor=%.2f(%s) top=%s gate=%s -> %s source=%s building=%s"),
 			*N.Id,
 			N.X,
 			N.Y,
@@ -296,6 +315,12 @@ void FAnastasisVillagePresentation::LogStatus(const AnastasisVillage::FVillage& 
 			N.Inside.bActive ? *N.Inside.BuildingId : TEXT("-"),
 			N.HomeId.IsEmpty() ? TEXT("-") : *N.HomeId,
 			N.ShelterId.IsEmpty() ? TEXT("-") : *N.ShelterId,
+			N.Needs.Hunger,
+			N.InventoryFood,
+			Village.FindMealReservation(N.Id) ? *Village.FindMealReservation(N.Id)->BuildingId : TEXT("-"),
+			*N.HungerAction.State,
+			N.KnownStocks.Num(),
+			N.MealsTaken,
 			N.Needs.Thirst,
 			N.Needs.Energy,
 			N.Needs.Hygiene,
@@ -308,10 +333,16 @@ void FAnastasisVillagePresentation::LogStatus(const AnastasisVillage::FVillage& 
 			N.RestsTaken,
 			D.Time,
 			D.Phase.IsEmpty() ? TEXT("-") : *D.Phase,
+			D.NousType.IsEmpty() ? TEXT("-") : *D.NousType,
+			D.NousScore,
+			D.NousUrgency,
+			D.EatRowScore,
 			D.RestRowScore,
 			D.DrinkRowScore,
 			D.FloorScore,
 			D.FloorGoal.IsEmpty() ? TEXT("-") : *D.FloorGoal,
+			D.TableWinner.IsEmpty() ? TEXT("-") : *D.TableWinner,
+			D.CommitGate.IsEmpty() ? TEXT("-") : *D.CommitGate,
 			D.Winner.IsEmpty() ? TEXT("-") : *D.Winner,
 			D.TargetSource.IsEmpty() ? TEXT("-") : *D.TargetSource,
 			D.BuildingId.IsEmpty() ? TEXT("-") : *D.BuildingId);

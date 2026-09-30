@@ -2,12 +2,12 @@
 //
 // Porte, et prouve par vecteurs (`Anastasis.Sim.Parite.Besoins`) :
 //   urgeScore, needGoalScores (les six buts de besoin, entiers),
-//   tickNeeds (branche « boit », branche interieure « rest », branche par
-//   defaut) + tickVitality, satisfyDrink, satisfyRest.
+//   tickNeeds (branche « boit », branches interieures « rest » et « eat »,
+//   branche par defaut) + tickVitality, satisfyDrink, satisfyRest, satisfyEat.
 //
 // PAS porte, volontairement :
-//   - les autres branches interieures de tickNeeds (relieve / eat / socialize /
-//     relax) : leurs buts n'ont pas encore de boucle. Seul `rest` entre.
+//   - les autres branches interieures de tickNeeds (relieve / socialize /
+//     relax) : leurs buts n'ont pas encore de boucle. `rest` et `eat` entrent.
 //   - tickMoodlets et tickConditioning, appeles en fin de tickNeeds. Ils
 //     n'ecrivent aucun des huit metres ci-dessous au meme tick, mais
 //     tickConditioning fait deriver `conditioning.fatigueAdaptation`, donc le
@@ -72,6 +72,11 @@ namespace AnastasisNeeds
 		inline constexpr double SleepDuration = 11.5;
 		inline constexpr double NapDuration = 4.2;
 
+		inline constexpr double EatHungerFall = 2.4;
+		inline constexpr double EatRelief = 58.0;
+		inline constexpr double EatDuration = 2.1;
+		inline constexpr double HealthEatRestore = 10.0;
+
 		inline constexpr double DrinkRelief = 62.0;
 		inline constexpr double DrinkHygiene = 6.0;
 		inline constexpr double DrinkMorale = 2.0;
@@ -135,6 +140,9 @@ namespace AnastasisNeeds
 	 */
 	ANASTASISSIM_API void TickNeedsRestInside(FNeeds& Needs, double Dt, bool bNight, double SleepQuality);
 
+	/** `tickNeeds`, branche interieure `eat` / `eatTogether`, puis `tickVitality`. */
+	ANASTASISSIM_API void TickNeedsEatInside(FNeeds& Needs, double Dt);
+
 	/** `tickVitality` — un seul drain a la fois : famine > soif > epuisement. */
 	ANASTASISSIM_API void TickVitality(FNeeds& Needs, double Dt);
 
@@ -152,6 +160,7 @@ namespace AnastasisNeeds
 		inline constexpr double ShelterRestFactor = 0.78;
 		inline constexpr double HomeRestBonus = 1.12;
 		inline constexpr double HomeMorale = 2.0;
+		inline constexpr double HomeEatBonus = 8.0;
 	}
 
 	/**
@@ -159,6 +168,12 @@ namespace AnastasisNeeds
 	 * dehors ; HomeId / ShelterId vides = sans toit / sans abri.
 	 */
 	ANASTASISSIM_API double SleepQuality(const FString& InsideBuildingId, const FString& HomeId, const FString& ShelterId);
+
+	/**
+	 * `satisfyEat` — le repas acheve. bIndoor = `npc.inside` ; bAtHome = `isAtHome(npc)`.
+	 * `starvingDays` (remis a 0 par la reference) n'est pas porte : la famine ne l'est pas.
+	 */
+	ANASTASISSIM_API void SatisfyEat(FNeeds& Needs, bool bIndoor, bool bAtHome, double Amount = Constants::EatRelief);
 
 	/** `satisfyDrink` — la gorgee finale, une fois l'acte accompli. */
 	ANASTASISSIM_API void SatisfyDrink(FNeeds& Needs, double Amount = Constants::DrinkRelief);

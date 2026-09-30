@@ -166,7 +166,7 @@ bool FAnastasisVillageHouseSelectionTest::RunTest(const FString&)
 		Village.AssignHome(A, Owned);
 
 		double Time = NightTime;
-		Run(Village, Time, 0.3, [] { return false; });
+		Run(Village, Time, 2.5, [] { return false; }); // Noûs : une pensee chacun (cadence 2,2 s)
 		const FNpc* NA = Village.FindNpc(A);
 		const FNpc* NB = Village.FindNpc(B);
 
@@ -180,9 +180,14 @@ bool FAnastasisVillageHouseSelectionTest::RunTest(const FString&)
 		TestEqual(TEXT("sans-toit : rest"), NB->Goal, FString(GoalRest));
 		TestEqual(TEXT("sans-toit -> la maison LIBRE, jamais celle d'autrui"), NB->DestBuildingId, Free);
 		TestEqual(TEXT("source : abri ouvert"), NB->LastDecision.TargetSource, FString(TEXT("open-shelter")));
-		// phaseBias(rest) de nuit : +52 avec un toit, +30 sans. La trace le montre.
+		// phaseBias(rest) de nuit : +52 avec un toit, +30 sans. La trace le montre, a
+		// la fatigue pres : Noûs pense toutes les 2,2 s, les deux habitants decident
+		// a des instants differents (jusqu'a 2,2 s d'ecart, soit ~0,6 point d'urgence).
+		AddInfo(FString::Printf(TEXT("rest A=%.4f (%s %.4f u%.4f t=%.3f e=%.3f) B=%.4f (%s %.4f u%.4f t=%.3f e=%.3f)"),
+			NA->LastDecision.RestRowScore, *NA->LastDecision.NousType, NA->LastDecision.NousScore, NA->LastDecision.NousUrgency, NA->LastDecision.Time, NA->Needs.Energy,
+			NB->LastDecision.RestRowScore, *NB->LastDecision.NousType, NB->LastDecision.NousScore, NB->LastDecision.NousUrgency, NB->LastDecision.Time, NB->Needs.Energy));
 		TestTrue(TEXT("le toit pese +22 sur la ligne rest"),
-			FMath::IsNearlyEqual(NA->LastDecision.RestRowScore - NB->LastDecision.RestRowScore, 22.0, 0.1));
+			FMath::IsNearlyEqual(NA->LastDecision.RestRowScore - NB->LastDecision.RestRowScore, 22.0, 1.0));
 	}
 
 	// Le matin : on travaille (plancher), sauf a tomber d'epuisement.
@@ -194,7 +199,7 @@ bool FAnastasisVillageHouseSelectionTest::RunTest(const FString&)
 		const FString Spent = Village.SpawnNpc(6.5, 12.5, Tired(5.0));
 		Village.AssignHome(Fresh, House);
 		double Time = MorningTime;
-		Run(Village, Time, 0.3, [] { return false; });
+		Run(Village, Time, 2.5, [] { return false; }); // Noûs : une pensee chacun (cadence 2,2 s)
 		const FNpc* NF = Village.FindNpc(Fresh);
 		const FNpc* NS = Village.FindNpc(Spent);
 		TestEqual(TEXT("matin : phase tracee"), NF->LastDecision.Phase, FString(TEXT("morning")));
@@ -293,7 +298,7 @@ bool FAnastasisVillageHouseSleepTest::RunTest(const FString&)
 	AddInfo(FString::Printf(TEXT("energie 40 -> %.3f apres une nuit de 11,5 s"), AfterExit.Energy));
 
 	// 4. Toujours la nuit : il redecide, et se recouche aussitot.
-	Run(Village, Time, 1.0, [&] { return Village.FindNpc(A)->Inside.bActive; });
+	Run(Village, Time, 3.0, [&] { return Village.FindNpc(A)->Inside.bActive; }); // prochaine pensee Noûs
 	TestTrue(TEXT("la nuit continue : il se recouche"), Village.FindNpc(A)->Inside.bActive);
 	return true;
 }

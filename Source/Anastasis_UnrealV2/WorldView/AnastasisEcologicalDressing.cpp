@@ -1,5 +1,6 @@
 #include "WorldView/AnastasisEcologicalDressing.h"
 #include "WorldView/AnastasisTerrainSurface.h"
+#include "WorldView/AnastasisHumanGeography.h"
 
 namespace AnastasisEcologicalDressing
 {
@@ -28,9 +29,10 @@ double Cluster(uint32 Seed, double X, double Y)
         FMath::Lerp(Unit(Hash(Seed, IX, IY+1, 91)), Unit(Hash(Seed, IX+1, IY+1, 91)), U), V);
 }
 
-bool Habitat(ETileType Type)
+bool Habitat(ETileType Type, bool bMacro = false)
 {
-    return Type == ETileType::Forest || Type == ETileType::Grass || Type == ETileType::Scrub;
+    return Type == ETileType::Forest || Type == ETileType::Grass || Type == ETileType::Scrub
+        || (bMacro && Type == ETileType::Stone);
 }
 
 bool ValidScale(const FVector2D& V)
@@ -39,19 +41,37 @@ bool ValidScale(const FVector2D& V)
 }
 
 bool GroundAt(const FWorldVisualSnapshot& S, double X, double Y,
-    const FAnastasisForestDressingSettings& C, double& Z, double& Slope)
+    const FAnastasisForestDressingSettings& C, double& Z, double& Slope,
+    const FRenderedHabitat* Rendered)
 {
-    const double Radius = C.RootRadius * TileWorldSize;
+    const auto Sample = [&](double PX, double PY, double& H)
+    {
+        return (Rendered ? Rendered->SampleHeight(PX, PY, H)
+            : AnastasisTerrainSurface::SampleHeight(S, PX, PY, H)) && FMath::IsFinite(H);
+    };
+    const double Radius = Rendered ? 60.0 : C.RootRadius * TileWorldSize;
     const FVector2D Offsets[] = {{0,0}, {Radius,0}, {-Radius,0}, {0,Radius}, {0,-Radius}};
     for (const auto& O : Offsets)
     {
         const double PX = X + O.X, PY = Y + O.Y;
         const FVisualTile* Tile = FindTile(S, FMath::FloorToInt(PX / (TileWorldSize * S.SpatialScale)), FMath::FloorToInt(PY / (TileWorldSize * S.SpatialScale)));
-        double H;
-        if (!Tile || !Habitat(Tile->Type) || !AnastasisTerrainSurface::SampleHeight(S, PX, PY, H)
-            || H <= AnastasisTerrainSurface::WaterPlaneZ + C.WaterClearanceUU) return false;
+        double H, Water = AnastasisTerrainSurface::WaterPlaneZ;
+        if (Rendered && Rendered->SampleWaterHeight && !Rendered->SampleWaterHeight(PX,PY,Water)) return false;
+        if (!Tile || !Habitat(Tile->Type, Rendered != nullptr) || !Sample(PX, PY, H)
+            || !FMath::IsFinite(Water) || H <= Water + C.WaterClearanceUU) return false;
     }
-    if (!AnastasisTerrainSurface::SampleHeight(S, X, Y, Z)) return false;
+    if (!Sample(X, Y, Z)) return false;
+    if (Rendered)
+    {
+        // Four one-sided gradients avoid averaging a narrow cliff into a plantable slope.
+        double East, West, North, South;
+        if (!Sample(X + Radius,Y,East) || !Sample(X - Radius,Y,West)
+            || !Sample(X,Y + Radius,North) || !Sample(X,Y - Radius,South)) return false;
+        const double DX = FMath::Max(FMath::Abs(East-Z), FMath::Abs(West-Z)) / Radius;
+        const double DY = FMath::Max(FMath::Abs(North-Z), FMath::Abs(South-Z)) / Radius;
+        Slope = FMath::RadiansToDegrees(FMath::Atan(FMath::Sqrt(DX*DX + DY*DY)));
+        return true;
+    }
     // Exact triangle gradient, same B-C diagonal as TerrainSurface::Build/SampleHeight.
     const double U = X / (TileWorldSize * S.SpatialScale) - 0.5, V = Y / (TileWorldSize * S.SpatialScale) - 0.5;
     const int32 IX = FMath::Min(FMath::FloorToInt(U), S.W - 2);
@@ -65,7 +85,8 @@ bool GroundAt(const FWorldVisualSnapshot& S, double X, double Y,
 }
 }
 
-bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings& C, FPlan& Out, FString& Error)
+bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings& C, FPlan& Out, FString& Error,
+    const FRenderedHabitat* Rendered)
 {
     Out = FPlan{};
     Error.Reset();
@@ -75,7 +96,8 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
         Error = TEXT("Source: expected full canonical 96x96 snapshot"); return false;
     }
     const float Values[] = {C.EdgeRadius,C.Density,C.ClusterSpan,C.ClearingThreshold,C.MaxSlopeDegrees,
-        C.WetnessPenalty,C.WaterClearanceUU,C.MinimumSpacing,C.RootRadius};
+        C.WetnessPenalty,C.WaterClearanceUU,C.MinimumSpacing,C.RootRadius,
+        C.MassSpan,C.TrunkSpacingUU,C.HeightMultiplier,C.BasinClearRadius,C.HillsideMaxSlope};
     for (float Value : Values)
         if (!FMath::IsFinite(Value)) { Error = TEXT("Settings: non-finite value"); return false; }
     if (C.CandidatesPerTile < 1 || C.CandidatesPerTile > 4 || C.EdgeRadius < 1 || C.EdgeRadius > 5
@@ -83,7 +105,10 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
         || C.ClearingThreshold < 0 || C.ClearingThreshold > 0.8 || C.MaxSlopeDegrees < 1 || C.MaxSlopeDegrees > 60
         || C.WetnessPenalty < 0 || C.WetnessPenalty > 1 || C.WaterClearanceUU < 0 || C.WaterClearanceUU > 50
         || C.MinimumSpacing < 0.1 || C.MinimumSpacing > 0.9 || C.RootRadius < 0 || C.RootRadius > 0.25
-        || !ValidScale(C.YoungScale) || !ValidScale(C.SecondaryScale) || !ValidScale(C.CanopyScale))
+        || !ValidScale(C.YoungScale) || !ValidScale(C.SecondaryScale) || !ValidScale(C.CanopyScale)
+        || C.MassSpan < 4 || C.MassSpan > 32 || C.TrunkSpacingUU < 300 || C.TrunkSpacingUU > 1600
+        || C.HeightMultiplier < 1 || C.HeightMultiplier > 4 || C.BasinClearRadius < 0 || C.BasinClearRadius > 20
+        || C.HillsideMaxSlope < 1 || C.HillsideMaxSlope > 60)
     {
         Error = TEXT("Settings: value outside supported range"); return false;
     }
@@ -98,14 +123,26 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
         }
     }
     if (!C.bEnabled) return true;
+    if (!C.bMacroForest) Rendered = nullptr;
+    if (Rendered && (!Rendered->SampleHeight || (Rendered->bHasBasin && Rendered->Basin.ContainsNaN())))
+    {
+        Error = TEXT("Rendered: missing height sampler or invalid basin"); return false;
+    }
+    const bool bMacro = Rendered != nullptr;
     FPlan Result;
-    const double Spacing = C.MinimumSpacing * TileWorldSize * S.SpatialScale;
+    const double TileUU = TileWorldSize * S.SpatialScale;
+    if (!FMath::IsFinite(TileUU) || TileUU <= 0.0) { Error=TEXT("Source.SpatialScale: invalid scale"); return false; }
+    const double Spacing = bMacro ? C.TrunkSpacingUU : C.MinimumSpacing * TileUU;
+    // Physical sampling density stays useful when a simulation tile spans twenty metres.
+    // Bounded work: at most 128 candidates per canonical tile; never one actor per tree.
+    const int32 CandidateCount = bMacro ? FMath::Clamp(FMath::CeilToInt(FMath::Square(TileUU/Spacing)*14.0),4,128)
+        : C.CandidatesPerTile;
     TMap<FIntPoint, TArray<FVector2D>> Occupied;
     const int32 Radius = FMath::CeilToInt(C.EdgeRadius);
     for (const auto& T : S.Tiles)
     {
-        if (!Habitat(T.Type)) continue;
-        for (int32 Candidate=0; Candidate<C.CandidatesPerTile; ++Candidate)
+        if (!Habitat(T.Type, bMacro)) continue;
+        for (int32 Candidate=0; Candidate<CandidateCount; ++Candidate)
         {
             const uint32 Seed = Hash(S.Seed, T.X, T.Y, 100 + Candidate);
             const double X = T.X + Unit(Hash(Seed,T.X,T.Y,1));
@@ -121,17 +158,54 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
                     Weight += W;
                     if (N->Type == ETileType::Forest) Forest += W;
                 }
-            const double Support = Weight > 0 ? Forest / Weight : 0.0;
+            double Support = Weight > 0 ? Forest / Weight : 0.0;
+            double Z = 0.0, Slope = 0.0;
+            double Opening = 1.0;
+            if (bMacro)
+            {
+                if (!GroundAt(S, X * TileUU, Y * TileUU, C, Z, Slope, Rendered))
+                { ++Result.RejectedWaterOrFootprint; continue; }
+                if (Slope > C.HillsideMaxSlope)
+                { ++Result.RejectedSlope; continue; }
+                // Upland shoulders and mountain shelves can carry a forest even where the
+                // simulation labels a rock resource. Flat low grass remains an open valley.
+                const double UnscaledHeight = (Z - AnastasisTerrainSurface::WaterPlaneZ) / S.SpatialScale;
+                const double Upland = Smooth((UnscaledHeight - 160.0) / 500.0);
+                const double Hillside = Smooth((Slope - 5.0) / 18.0);
+                Support = FMath::Max(Support, Upland * 0.95 + Hillside * 0.35);
+                Support = FMath::Clamp(Support, 0.0, 1.0);
+                if (T.Type == ETileType::Grass)
+                    Opening *= FMath::Max(Upland, Smooth((Slope - 5.0) / 10.0));
+                if (S.bHumanGeography && S.Seed == ReferenceSeed)
+                {
+                    // Consume the EXISTING valley/pass/river weights; never author another
+                    // terrain or duplicate its geographic masks in the vegetation layer.
+                    const auto Geo = AnastasisHumanGeography::Evaluate(X,Y,
+                        (AnastasisTerrainSurface::WaterPlaneZ + UnscaledHeight)/100.0);
+                    Opening *= 1.0-Smooth((Geo.ValleyWeight-0.20)/0.60);
+                    Opening *= 1.0-Smooth(Geo.RiverWeight/0.50);
+                }
+                if (Rendered->bHasBasin && C.BasinClearRadius > 0.0f)
+                {
+                    const double Distance = FVector2D(X - Rendered->Basin.X / TileUU,
+                        Y - Rendered->Basin.Y / TileUU).Size();
+                    // Wide, gradual edge, keeping the village basin entirely free of trunks.
+                    Opening *= Smooth((Distance - C.BasinClearRadius) / 4.0);
+                }
+                if (Opening <= 0.0) { ++Result.RejectedOpenGround; continue; }
+            }
             if (Support <= 0) continue;
-            const double Patch = Smooth((Cluster(S.Seed, X / C.ClusterSpan, Y / C.ClusterSpan)
+            const double Span = bMacro ? C.MassSpan : C.ClusterSpan;
+            const double Patch = Smooth((Cluster(S.Seed, X / Span, Y / Span)
                 - C.ClearingThreshold) / (1.0 - C.ClearingThreshold));
-            const double Probability = C.Density * FMath::Sqrt(Support) * Patch * (1.0 - C.WetnessPenalty * T.Wetness);
+            const double CanopyCover = bMacro ? FMath::Sqrt(Patch) : Patch;
+            const double Probability = C.Density * FMath::Sqrt(Support) * CanopyCover * Opening
+                * (1.0 - C.WetnessPenalty * T.Wetness);
             if (Unit(Hash(Seed,T.X,T.Y,3)) >= Probability) continue;
             FPlacement P;
-            double Z, Slope;
-            if (!GroundAt(S, X * TileWorldSize * S.SpatialScale, Y * TileWorldSize * S.SpatialScale, C, Z, Slope))
+            if (!bMacro && !GroundAt(S, X * TileWorldSize * S.SpatialScale, Y * TileWorldSize * S.SpatialScale, C, Z, Slope, nullptr))
             { ++Result.RejectedWaterOrFootprint; continue; }
-            if (Slope > C.MaxSlopeDegrees)
+            if (!bMacro && Slope > C.MaxSlopeDegrees)
             { ++Result.RejectedSlope; continue; }
             const FVector2D XY(X * TileWorldSize * S.SpatialScale, Y * TileWorldSize * S.SpatialScale);
             const FIntPoint Cell(FMath::FloorToInt(XY.X / Spacing), FMath::FloorToInt(XY.Y / Spacing));
@@ -145,11 +219,13 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
             Occupied.FindOrAdd(Cell).Add(XY);
             const double Mature = Smooth((Support - 0.25) / 0.60);
             const double Choice = Unit(Hash(Seed,T.X,T.Y,4));
-            P.Layer = Choice < Mature * 0.60 ? ELayer::Canopy
+            P.Layer = bMacro ? (Choice < 0.65 + 0.25 * Mature ? ELayer::Canopy : ELayer::Secondary)
+                : Choice < Mature * 0.60 ? ELayer::Canopy
                 : Choice < 0.25 + Mature * 0.65 ? ELayer::Secondary : ELayer::Young;
             const FVector2D Envelope = P.Layer == ELayer::Canopy ? C.CanopyScale
                 : P.Layer == ELayer::Secondary ? C.SecondaryScale : C.YoungScale;
-            P.ScaleMultiplier = FMath::Lerp(Envelope.X, Envelope.Y, Unit(Hash(Seed,T.X,T.Y,5)));
+            P.ScaleMultiplier = FMath::Lerp(Envelope.X, Envelope.Y, Unit(Hash(Seed,T.X,T.Y,5)))
+                * (bMacro ? C.HeightMultiplier : 1.0);
             P.SourceIndex = T.SourceIndex;
             P.VisualSeed = Seed;
             P.Ground = FVector(XY.X,XY.Y,Z);

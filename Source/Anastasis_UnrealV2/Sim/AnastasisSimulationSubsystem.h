@@ -44,6 +44,14 @@ public:
 	 */
 	FString SeedFirstHouse(int32 NpcCount, int32 TileX, int32 TileY);
 
+	/**
+	 * Le grenier (mission granary-eat-001) : un grenier pres de (TileX, TileY),
+	 * rempli de `Food` portions, et `NpcCount` habitants SANS TOIT a moins de 7
+	 * cases (ils le voient), faims echelonnees. Sans toit parce que, dans la
+	 * reference, un habitant qui a un foyer va manger chez lui (HOUSE -> eat).
+	 */
+	FString SeedFirstGranary(int32 NpcCount, int32 Food, int32 TileX, int32 TileY);
+
 	/** Reflete les batiments de la simulation en acteurs. Appele a chaque Tick. */
 	int32 SyncVillagePresentation();
 	const FAnastasisVillagePresentation& GetVillagePresentation() const { return VillagePresentation; }
@@ -84,4 +92,12 @@ public:
 	/** Habitants dedans ce batiment (`npc.inside`), -1 sans hote. */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static int32 CountInside(const UObject* WorldContextObject, const FString& BuildingId);
+
+	/** Stock physique de nourriture d'un batiment, -1 sans hote ou sans batiment. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static int32 GetFoodStock(const UObject* WorldContextObject, const FString& BuildingId);
+
+	/** Total des repas confirmes par les habitants presents, -1 sans hote. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static int32 CountMealsTaken(const UObject* WorldContextObject);
 };

@@ -116,6 +116,17 @@ namespace AnastasisNeeds
 		TickVitality(N, Dt);
 	}
 
+	void TickNeedsEatInside(FNeeds& N, double Dt)
+	{
+		constexpr double HydrationMul = 1.0;
+		constexpr double MetabolicMul = 1.0;
+		constexpr double FatigueAdaptationMul = 1.0;
+		N.Hunger = Clamp(N.Hunger - Dt * EatHungerFall, 0.0, 100.0);
+		N.Thirst = Clamp(N.Thirst + Dt * ThirstRise * 0.3 * HydrationMul, 0.0, 100.0);
+		N.Energy = Clamp(N.Energy - Dt * EnergyFall * 0.25 * MetabolicMul * FatigueAdaptationMul, 0.0, 100.0);
+		TickVitality(N, Dt);
+	}
+
 	void TickVitality(FNeeds& N, double Dt)
 	{
 		const bool bStarving = N.Hunger >= StarvingAt;
@@ -184,6 +195,32 @@ namespace AnastasisNeeds
 		if (bNight && bAtHome) N.Morale = Clamp(MoraleOr50(N.Morale) + 3.0 + Domestic::HomeMorale, 0.0, 100.0);
 		else if (bNight && Quality < 0.5) N.Morale = Clamp(MoraleOr50(N.Morale) - 4.0, 0.0, 100.0);
 		else if (bNight) N.Morale = Clamp(MoraleOr50(N.Morale) + 1.0, 0.0, 100.0);
+	}
+
+	void SatisfyEat(FNeeds& N, bool bIndoor, bool bAtHome, double Amount)
+	{
+		// Interieur : tickNeeds a deja baisse la faim pendant le repas. On finalise
+		// vers un ventre raisonnable + bonus foyer, sans re-soustraire eatRelief entier.
+		if (bIndoor)
+		{
+			const double Target = bAtHome ? 10.0 : 18.0;
+			if (N.Hunger > Target)
+			{
+				N.Hunger = Clamp(N.Hunger - (N.Hunger - Target) * 0.75, 0.0, 100.0);
+			}
+			N.Morale = Clamp(MoraleOr50(N.Morale) + (bAtHome ? 5.0 : 3.0), 0.0, 100.0);
+			N.Leisure = Clamp(N.Leisure + (bAtHome ? 6.0 : 3.0), 0.0, 100.0);
+			// `Math.ceil(NEEDS.healthEatRestore * 0.55)` = ceil(5.5) = 6.
+			N.Health = Clamp(N.Health + FMath::CeilToDouble(HealthEatRestore * 0.55) + (bAtHome ? 2.0 : 0.0), 0.0, 100.0);
+		}
+		else
+		{
+			N.Hunger = Clamp(N.Hunger - Amount - (bAtHome ? Domestic::HomeEatBonus : 0.0), 0.0, 100.0);
+			N.Morale = Clamp(MoraleOr50(N.Morale) + (bAtHome ? 6.0 : 4.0), 0.0, 100.0);
+			N.Leisure = Clamp(N.Leisure + (bAtHome ? 8.0 : 4.0), 0.0, 100.0);
+			N.Health = Clamp(N.Health + HealthEatRestore + (bAtHome ? 4.0 : 0.0), 0.0, 100.0);
+		}
+		if (bAtHome) N.Hygiene = Clamp(N.Hygiene + 4.0, 0.0, 100.0);
 	}
 
 	void SatisfyDrink(FNeeds& N, double Amount)

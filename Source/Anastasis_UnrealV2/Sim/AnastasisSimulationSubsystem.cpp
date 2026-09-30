@@ -399,6 +399,89 @@ FString UAnastasisSimulationSubsystem::SeedFirstHouse(int32 NpcCount, int32 Tile
 	return Owned;
 }
 
+FString UAnastasisSimulationSubsystem::SeedFirstGranary(int32 NpcCount, int32 Food, int32 TileX, int32 TileY)
+{
+	if (!Simulation.IsRunning())
+	{
+		return FString();
+	}
+	AnastasisVillage::FVillage& Village = Simulation.GetVillage();
+	const AnastasisNav::FNavGrid& Nav = Village.GetNavGrid();
+
+	FString GranaryId;
+	int32 GX = 0;
+	int32 GY = 0;
+	for (int32 Radius = 0; Radius <= 24 && GranaryId.IsEmpty(); ++Radius)
+	{
+		for (int32 DY = -Radius; DY <= Radius && GranaryId.IsEmpty(); ++DY)
+		{
+			for (int32 DX = -Radius; DX <= Radius && GranaryId.IsEmpty(); ++DX)
+			{
+				if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) != Radius) continue;
+				const int32 X = TileX + DX;
+				const int32 Y = TileY + DY;
+				if (X < 2 || Y < 2 || X > Nav.W - 3 || Y > Nav.H - 3) continue;
+				if (Village.IsFootBlocked(X + 0.5, Y + 0.5)) continue;
+				if (Village.IsFootBlocked(X + 1.5, Y + 0.5) && Village.IsFootBlocked(X - 0.5, Y + 0.5)) continue;
+				GranaryId = Village.AddBuilding(AnastasisVillage::GranaryType, X, Y, 1.0, Simulation.GetDay());
+				GX = X;
+				GY = Y;
+			}
+		}
+	}
+	if (GranaryId.IsEmpty())
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VILLAGE first granary: no free tile near (%d,%d)"), TileX, TileY);
+		return GranaryId;
+	}
+	const int32 Stored = Village.CreditFood(GranaryId, Food);
+
+	for (int32 K = 0; K < NpcCount; ++K)
+	{
+		const double Angle = 2.0 * UE_DOUBLE_PI * K / FMath::Max(1, NpcCount);
+		const int32 CX = GX + FMath::RoundToInt32(5.0 * FMath::Cos(Angle));
+		const int32 CY = GY + FMath::RoundToInt32(5.0 * FMath::Sin(Angle));
+		bool bPlaced = false;
+		for (int32 R = 0; R <= 2 && !bPlaced; ++R)
+		{
+			for (int32 DY = -R; DY <= R && !bPlaced; ++DY)
+			{
+				for (int32 DX = -R; DX <= R && !bPlaced; ++DX)
+				{
+					const int32 X = CX + DX;
+					const int32 Y = CY + DY;
+					if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) != R || !Nav.IsInBounds(X, Y)) continue;
+					if (Village.IsFootBlocked(X + 0.5, Y + 0.5)) continue;
+					AnastasisNeeds::FNeeds Needs;
+					Needs.Hunger = FMath::Max(10.0, 80.0 - 15.0 * K);
+					Needs.Energy = 80.0;
+					Needs.Social = 70.0;
+					Needs.Leisure = 70.0;
+					Needs.Hygiene = 60.0;
+					Needs.Thirst = 10.0;
+					Needs.Health = 90.0;
+					Needs.Morale = 55.0;
+					Village.SpawnNpc(X + 0.5, Y + 0.5, Needs, 4.0);
+					bPlaced = true;
+				}
+			}
+		}
+	}
+
+	SyncVillagePresentation();
+	UE_LOG(
+		LogAnastasis_UnrealV2,
+		Display,
+		TEXT("ANASTASIS_VILLAGE first granary %s at (%d,%d), food=%d, %d inhabitants"),
+		*GranaryId,
+		GX,
+		GY,
+		Stored,
+		Village.GetActors().Num());
+	FAnastasisVillagePresentation::LogStatus(Village, Simulation.GetTime());
+	return GranaryId;
+}
+
 namespace
 {
 	UAnastasisSimulationSubsystem* VillageHost(UWorld* World)
@@ -440,6 +523,22 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVillageFirstHouse(
 			const int32 X = Args.IsValidIndex(1) ? FCString::Atoi(*Args[1]) : FMath::FloorToInt32(Settlement.X);
 			const int32 Y = Args.IsValidIndex(2) ? FCString::Atoi(*Args[2]) : FMath::FloorToInt32(Settlement.Y);
 			Host->SeedFirstHouse(Count, X, Y);
+		}
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVillageFirstGranary(
+	TEXT("Anastasis.Village.FirstGranary"),
+	TEXT("Anastasis.Village.FirstGranary [NpcCount=4] [Food=12] [TileX] [TileY] - poses a granary filled with food near a tile (default: settlement) and homeless, hungry inhabitants who can see it."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		if (UAnastasisSimulationSubsystem* Host = VillageHost(World))
+		{
+			const AnastasisVillage::FPoint Settlement = Host->GetSimulation().GetVillage().GetSettlement();
+			const int32 Count = Args.IsValidIndex(0) ? FCString::Atoi(*Args[0]) : 4;
+			const int32 Food = Args.IsValidIndex(1) ? FCString::Atoi(*Args[1]) : 12;
+			const int32 X = Args.IsValidIndex(2) ? FCString::Atoi(*Args[2]) : FMath::FloorToInt32(Settlement.X);
+			const int32 Y = Args.IsValidIndex(3) ? FCString::Atoi(*Args[3]) : FMath::FloorToInt32(Settlement.Y);
+			Host->SeedFirstGranary(Count, Food, X, Y);
 		}
 	}));
 
@@ -509,4 +608,20 @@ int32 UAnastasisSimulationDebugLibrary::CountInside(const UObject* WorldContextO
 {
 	const FAnastasisSimulation* Sim = DebugSimulation(WorldContextObject);
 	return Sim ? Sim->GetVillage().InsideOf(BuildingId).Num() : -1;
+}
+
+int32 UAnastasisSimulationDebugLibrary::GetFoodStock(const UObject* WorldContextObject, const FString& BuildingId)
+{
+	const FAnastasisSimulation* Sim = DebugSimulation(WorldContextObject);
+	const AnastasisVillage::FBuilding* B = Sim ? Sim->GetVillage().FindBuilding(BuildingId) : nullptr;
+	return B ? B->FoodPhysical : -1;
+}
+
+int32 UAnastasisSimulationDebugLibrary::CountMealsTaken(const UObject* WorldContextObject)
+{
+	const FAnastasisSimulation* Sim = DebugSimulation(WorldContextObject);
+	if (!Sim) return -1;
+	int32 Meals = 0;
+	for (const AnastasisVillage::FNpc& N : Sim->GetVillage().GetActors()) Meals += N.MealsTaken;
+	return Meals;
 }

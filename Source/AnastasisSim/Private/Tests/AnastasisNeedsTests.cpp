@@ -163,6 +163,41 @@ bool FAnastasisParityNeedsTest::RunTest(const FString&)
 		Check(TEXT("SatisfyRest"), I, TEXT("morale"), N.Morale, V.AttenduMoraleBits);
 	}
 
+	for (int32 I = 0; I < UE_ARRAY_COUNT(TickNeedsEatVectors); ++I)
+	{
+		const FTickNeedsEatVector& V = TickNeedsEatVectors[I];
+		AnastasisNeeds::FNeeds N = NeedsFromVector(V.A0Bits, V.A1Bits, V.A2Bits, V.A3Bits, V.A4Bits, V.A5Bits, V.A6Bits, V.A7Bits);
+		AnastasisNeeds::TickNeedsEatInside(N, NeedsFromBits(V.A8Bits));
+		Check(TEXT("TickNeedsEat"), I, TEXT("hunger"), N.Hunger, V.AttenduHungerBits);
+		Check(TEXT("TickNeedsEat"), I, TEXT("energy"), N.Energy, V.AttenduEnergyBits);
+		Check(TEXT("TickNeedsEat"), I, TEXT("social"), N.Social, V.AttenduSocialBits);
+		Check(TEXT("TickNeedsEat"), I, TEXT("leisure"), N.Leisure, V.AttenduLeisureBits);
+		Check(TEXT("TickNeedsEat"), I, TEXT("hygiene"), N.Hygiene, V.AttenduHygieneBits);
+		Check(TEXT("TickNeedsEat"), I, TEXT("thirst"), N.Thirst, V.AttenduThirstBits);
+		Check(TEXT("TickNeedsEat"), I, TEXT("health"), N.Health, V.AttenduHealthBits);
+		Check(TEXT("TickNeedsEat"), I, TEXT("morale"), N.Morale, V.AttenduMoraleBits);
+	}
+
+	for (int32 I = 0; I < UE_ARRAY_COUNT(SatisfyEatVectors); ++I)
+	{
+		const FSatisfyEatVector& V = SatisfyEatVectors[I];
+		AnastasisNeeds::FNeeds N;
+		N.Hunger = NeedsFromBits(V.A0Bits);
+		N.Morale = NeedsFromBits(V.A1Bits);
+		N.Leisure = NeedsFromBits(V.A2Bits);
+		N.Health = NeedsFromBits(V.A3Bits);
+		N.Hygiene = NeedsFromBits(V.A4Bits);
+		const FLieu Lieu = LieuOf(V.A5);
+		const FString Living = !Lieu.Home.IsEmpty() ? Lieu.Home : Lieu.Shelter;
+		const bool bAtHome = !Living.IsEmpty() && Lieu.Inside == Living; // `isAtHome`
+		AnastasisNeeds::SatisfyEat(N, !Lieu.Inside.IsEmpty(), bAtHome);
+		Check(TEXT("SatisfyEat"), I, TEXT("hunger"), N.Hunger, V.AttenduHungerBits);
+		Check(TEXT("SatisfyEat"), I, TEXT("morale"), N.Morale, V.AttenduMoraleBits);
+		Check(TEXT("SatisfyEat"), I, TEXT("leisure"), N.Leisure, V.AttenduLeisureBits);
+		Check(TEXT("SatisfyEat"), I, TEXT("health"), N.Health, V.AttenduHealthBits);
+		Check(TEXT("SatisfyEat"), I, TEXT("hygiene"), N.Hygiene, V.AttenduHygieneBits);
+	}
+
 	for (int32 I = 0; I < UE_ARRAY_COUNT(SatisfyDrinkVectors); ++I)
 	{
 		const FSatisfyDrinkVector& V = SatisfyDrinkVectors[I];
@@ -180,7 +215,8 @@ bool FAnastasisParityNeedsTest::RunTest(const FString&)
 
 	const int32 Total = UE_ARRAY_COUNT(UrgeScoreVectors) + UE_ARRAY_COUNT(NeedGoalScoresVectors)
 		+ UE_ARRAY_COUNT(TickNeedsVectors) + UE_ARRAY_COUNT(SatisfyDrinkVectors)
-		+ UE_ARRAY_COUNT(TickNeedsRestVectors) + UE_ARRAY_COUNT(SatisfyRestVectors);
+		+ UE_ARRAY_COUNT(TickNeedsRestVectors) + UE_ARRAY_COUNT(SatisfyRestVectors)
+		+ UE_ARRAY_COUNT(TickNeedsEatVectors) + UE_ARRAY_COUNT(SatisfyEatVectors);
 	AddInfo(FString::Printf(TEXT("Besoins : %d vecteurs, %d ecarts"), Total, Failures));
 	return Failures == 0;
 }

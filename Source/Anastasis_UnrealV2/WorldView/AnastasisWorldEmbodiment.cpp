@@ -4,8 +4,9 @@
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisTerrainForge.h"
+#include "WorldView/AnastasisTerrainHorizon.h"
 #include "WorldView/AnastasisHumanGeography.h"
-
+#include "WorldView/AnastasisPlaces.h"
 
 #include "Anastasis_UnrealV2.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
@@ -22,6 +23,15 @@ static TAutoConsoleVariable<int32> CVarHumanGeography(TEXT("anastasis.Terrain.Hu
 static TAutoConsoleVariable<int32> CVarEcologicalDressing(
     TEXT("anastasis.Dressing.Ecology"), 1,
     TEXT("0=legacy tile dressing, 1=forest grammar on continuous terrain; applied on embodiment."), ECVF_Default);
+
+// WORLD_DRESSING_01. Coupable pour les captures A/B : meme monde, meme dressing, sans les lieux.
+static TAutoConsoleVariable<int32> CVarPlaces(
+    TEXT("anastasis.Dressing.Places"), 1,
+    TEXT("0=aucun lieu compose, 1=lieux lus dans la geographie (source, col, guet, hameau...) ; applique a l'incarnation."), ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarMacroForest(
+    TEXT("anastasis.Dressing.MacroForest"), 1,
+    TEXT("0=original ecological dressing, 1=large forest masses conditioned by rendered relief; applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
@@ -53,6 +63,15 @@ static TAutoConsoleVariable<int32> CVarShoreline(
 static TAutoConsoleVariable<int32> CVarGroundMaterial(
     TEXT("anastasis.Terrain.GroundMaterial"), 1,
     TEXT("0=materiau de tranche historique (couleur de sommet plate), 1=sol morphologique MI_AnastasisGround (defaut); applique a l'incarnation."),
+    ECVF_Default);
+
+// HORIZON_RING_001. Le bord du monde rendu : 0 = rien au-dela des 96 tuiles (le sol de
+// planete du SkyAtmosphere, presque noir, remplit le bas de l'horizon), 1 = anneau de
+// terrain lointain raccorde au bord forge. N'existe que sur le monde ENTIER forge : un
+// decoupage partiel a des voisins reels, pas un horizon.
+static TAutoConsoleVariable<int32> CVarTerrainHorizon(
+    TEXT("anastasis.Terrain.Horizon"), 1,
+    TEXT("0=nothing beyond the map edge, 1=distant terrain ring around the forged world (default); applied on embodiment."),
     ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarWorldViewSeed(
@@ -182,6 +201,14 @@ AAnastasisWorldEmbodiment::AAnastasisWorldEmbodiment()
 	ExperimentalSurface->SetCastShadow(true);
 	ExperimentalSurface->SetVisibility(false);
 
+	// Anneau lointain : decor pur, jamais marche -- ni collision ni navigation.
+	HorizonSurface = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("HorizonTerrain"));
+	HorizonSurface->SetupAttachment(Root);
+	HorizonSurface->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HorizonSurface->SetCanEverAffectNavigation(false);
+	HorizonSurface->SetCastShadow(true);
+	HorizonSurface->SetVisibility(false);
+
 	// The level holds no world truth: every tile is regenerated from the seed at load. Transient
 	// keeps the instances OnConstruction builds in the editor out of the .umap, which would
 	// otherwise bake simulation output into the map the first time anyone saves it.
@@ -289,6 +316,12 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	int32 UngroundedTiles = 0;
     const double DressingStart = FPlatformTime::Seconds();
     const bool bEcology = SurfaceCrop && ForestDressing.bEnabled && CVarEcologicalDressing.GetValueOnGameThread() != 0;
+    // Les lieux sont composes AVANT le dressing par tuile : une ruine composee (hameau,
+    // vestiges) remplace le moignon generique de ses tuiles au lieu de s'y superposer.
+    AnastasisPlaces::FInputs PlaceInputs;
+    AnastasisPlaces::FPlan Places;
+    const bool bPlaces = ComposePlaces(SurfaceCrop, CanonicalSource, PlaceInputs, Places);
+    int32 SupersededRuins = 0;
     TSet<UHierarchicalInstancedStaticMeshComponent*> Prepared;
     auto Prepare = [&](const AnastasisPresentation::FResolvedPresentation& R)
     {
@@ -316,6 +349,11 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	{
 		const AnastasisWorldView::FVisualTile& SourceTile = Snapshot.Tiles[Index];
         if (bEcology && SourceTile.Type == AnastasisWorld::ETileType::Forest) continue;
+        if (bPlaces && SourceTile.Type == AnastasisWorld::ETileType::Ruin && AnastasisPlaces::SupersedesTile(Places, SourceTile.SourceIndex))
+        {
+            ++SupersededRuins;
+            continue;
+        }
 		AnastasisPresentation::FResolvedPresentation Resolved;
 		if (!AnastasisPresentation::ResolvePresentation(
 				Plan.Types[Index], Seed, SourceTile.X, SourceTile.Y, Resolved))
@@ -368,7 +406,23 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
     {
         AnastasisEcologicalDressing::FPlan ForestPlan;
         FString Error;
-        if (!AnastasisEcologicalDressing::Build(CanonicalSource, ForestDressing, ForestPlan, Error))
+        AnastasisEcologicalDressing::FRenderedHabitat Habitat;
+        Habitat.SampleHeight = [&](double X, double Y, double& Z)
+        {
+            return AnastasisTerrainForge::SampleActive(X, Y, Z)
+                || AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, X, Y, Z);
+        };
+        Habitat.Basin = ForgeBasin;
+        Habitat.bHasBasin = !ForgeBasin.IsZero();
+        Habitat.SampleWaterHeight = [&](double X,double Y,double& Z)
+        {
+            if (AnastasisTerrainForge::SampleActiveWater(X,Y,Z)) return true;
+            Z=AnastasisTerrainSurface::WaterPlaneZ;
+            return true;
+        };
+        const bool bMacro = ForestDressing.bMacroForest && CVarMacroForest.GetValueOnGameThread() != 0;
+        if (!AnastasisEcologicalDressing::Build(CanonicalSource, ForestDressing, ForestPlan, Error,
+            bMacro ? &Habitat : nullptr))
         {
             UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_ECOLOGY rejected=%s"), *Error);
         }
@@ -414,6 +468,8 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 FTransform Pose = AnastasisPresentation::ResolveInstanceTransform(*R.Entry,
                     P.VisualSeed, T.X, T.Y, T.Alt, R.ScaleBias);
                 Pose.SetScale3D(Pose.GetScale3D() * P.ScaleMultiplier);
+                // Large trunks stay plumb on steep ground; random yaw still varies the skyline.
+                if (bMacro) Pose.SetRotation(FRotator(0.0, Pose.Rotator().Yaw, 0.0).Quaternion());
                 // Actual mesh bounds, not the resolver's 100uu primitive pivot convention.
                 const FBox MeshBounds = R.Mesh->GetBoundingBox();
                 const double MinZ = MeshBounds.Min.Z;
@@ -428,9 +484,10 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 ++DressingInstanceCount;
             }
             UE_LOG(LogAnastasis_UnrealV2, Display,
-                TEXT("ANASTASIS_ECOLOGY young=%d secondary=%d canopy=%d full_plan=%d refused_water_or_footprint=%d refused_slope=%d refused_spacing=%d"),
+                TEXT("ANASTASIS_ECOLOGY young=%d secondary=%d canopy=%d full_plan=%d refused_water_or_footprint=%d refused_slope=%d refused_spacing=%d macro=%d reserved_open=%d"),
                 ForestLayerCounts[0], ForestLayerCounts[1], ForestLayerCounts[2], ForestPlan.Instances.Num(),
-                ForestPlan.RejectedWaterOrFootprint, ForestPlan.RejectedSlope, ForestPlan.RejectedSpacing);
+                ForestPlan.RejectedWaterOrFootprint, ForestPlan.RejectedSlope, ForestPlan.RejectedSpacing,
+                bMacro, ForestPlan.RejectedOpenGround);
             // The stature profile is the visual claim of this pass, so it is measured rather
             // than asserted: a forest that has collapsed back onto one height says so here.
             UE_LOG(LogAnastasis_UnrealV2, Display,
@@ -476,6 +533,56 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	UE_LOG(LogAnastasis_UnrealV2, Display,
 		TEXT("ANASTASIS_DRESSING ground=%s instances=%d refused_ungrounded=%d"),
 		SurfaceCrop ? TEXT("surface") : TEXT("slab"), DressingInstanceCount, UngroundedTiles);
+	EmbodyPlaces(PlaceInputs, Places, bPlaces, CanonicalSource, SupersededRuins);
+}
+
+bool AAnastasisWorldEmbodiment::ComposePlaces(const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop,
+	const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource, AnastasisPlaces::FInputs& In, AnastasisPlaces::FPlan& Places)
+{
+	In.Source = &CanonicalSource;
+	// Le sol et l'eau REELLEMENT rendus : un lieu se lit sur ce qu'on voit, pas sur la tuile.
+	In.Ground = [SurfaceCrop](double X, double Y, double& Z)
+	{
+		return AnastasisTerrainForge::SampleActive(X, Y, Z)
+			|| (SurfaceCrop && AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, X, Y, Z));
+	};
+	In.Water = [](double X, double Y, double& Z) { return AnastasisTerrainForge::SampleActiveWater(X, Y, Z); };
+	// Bassin et point haut ne valent que si la forge a tourne pour CETTE incarnation :
+	// forge coupee, les membres gardent les valeurs du passage precedent.
+	double Probe = 0.0;
+	const bool bForged = AnastasisTerrainForge::SampleActive(ForgeLandmark.X, ForgeLandmark.Y, Probe);
+	In.bLandmark = bForged && !ForgeLandmark.IsZero();
+	In.Landmark = ForgeLandmark;
+	In.bBasin = bForged && !ForgeBasin.IsZero();
+	In.Basin = ForgeBasin;
+	FString Error;
+	const bool bEnabled = SurfaceCrop && bComposePlaces && CVarPlaces.GetValueOnGameThread() != 0;
+	if (bEnabled && !AnastasisPlaces::Compose(In, Places, Error))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_PLACES rejected=%s"), *Error);
+	}
+	return bEnabled;
+}
+
+void AAnastasisWorldEmbodiment::EmbodyPlaces(const AnastasisPlaces::FInputs& In, const AnastasisPlaces::FPlan& Places,
+	bool bEnabled, const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource, int32 SupersededRuins)
+{
+	PlaceReport.Reset();
+	// Plan vide si coupe : Embody vide alors les composants du passage precedent.
+	const AnastasisPlaces::FEmbodyResult Result = AnastasisPlaces::Embody(*this, Places, In, BaseShapeMaterial, PlaceMeshes);
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_PLACES enabled=%d places=%d pieces=%d instances=%d components=%d ungrounded=%d missing_meshes=%d superseded_ruin_tiles=%d missing=[%s]"),
+		bEnabled, Places.Places.Num(), Places.Pieces.Num(), Result.Instances, PlaceMeshes.Num(), Result.Ungrounded,
+		Result.MissingMeshes, SupersededRuins, *FString::Join(Places.Missing, TEXT(",")));
+	const double T = AnastasisWorldView::TileWorldSize * CanonicalSource.SpatialScale;
+	for (int32 I = 0; I < Places.Places.Num(); ++I)
+	{
+		const AnastasisPlaces::FPlace& P = Places.Places[I];
+		const FVector L = Result.PlaceLocations.IsValidIndex(I) ? Result.PlaceLocations[I] : FVector(P.Center, 0.0);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLACE id=%s name=\"%s\" at=(%.0f,%.0f,%.0f) tile=(%.1f,%.1f) radius_uu=%.0f pieces=%d"),
+			*P.Id, *P.Name, L.X, L.Y, L.Z, P.Center.X / T, P.Center.Y / T, P.Radius, P.NumPieces);
+		PlaceReport.Add(FString::Printf(TEXT("%s|%.0f|%.0f|%.0f|%.0f"), *P.Id, L.X, L.Y, L.Z, P.Radius));
+	}
 }
 
 bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 OriginY, int32 Width, int32 Height)
@@ -566,6 +673,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
     bool bSurfaceBuilt = false;
 
     if (ExperimentalSurface) ExperimentalSurface->SetVisibility(false);
+    if (HorizonSurface) { HorizonSurface->ClearAllMeshSections(); HorizonSurface->SetVisibility(false); }
     for (auto& Mesh : TerrainMeshes) if (Mesh) { Mesh->SetVisibility(true); Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); }
     const int32 SurfaceMode = CVarTerrainSurface.GetValueOnGameThread();
     if (SurfaceMode == 1 || SurfaceMode == 2)
@@ -680,6 +788,54 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 ExperimentalSurface->SetMaterial(1, ShoreMaterial);
             }
             ExperimentalSurface->SetVisibility(true);
+            // HORIZON_RING_001 : seulement quand Crop EST le monde -- ses bords sont alors
+            // les vrais bords, et le maillage forge porte le pourtour que l'anneau reprend.
+            const bool bWholeWorld = Crop.OriginX == 0 && Crop.OriginY == 0
+                && Crop.W == Crop.SourceW && Crop.H == Crop.SourceH;
+            if (HorizonSurface && bForged && SurfaceMode == 2 && bWholeWorld
+                && CVarTerrainHorizon.GetValueOnGameThread() != 0)
+            {
+                AnastasisTerrainHorizon::FRing Ring;
+                // Geometry, pas ForgeMesh.Geometry : c'est elle qui porte les canaux de rive
+                // (FillShorelineChannels ci-dessus), que l'anneau 0 doit reprendre.
+                if (AnastasisTerrainHorizon::Build(ForgeMesh, Crop.Seed, Ring, &Geometry))
+                {
+                    const auto& RG = Ring.Geometry;
+                    HorizonSurface->CreateMeshSection_LinearColor(0, RG.Vertices, RG.Triangles,
+                        RG.Normals, RG.UV0, RG.UV1, TArray<FVector2D>{}, TArray<FVector2D>{},
+                        RG.Colors, TArray<FProcMeshTangent>{}, false);
+                    if (SurfaceMaterial)
+                    {
+                        HorizonSurface->SetMaterial(0, SurfaceMaterial);
+                    }
+                    // Section 1 : la rivière qui sort de la carte, meme nappe et meme
+                    // materiau que la section 1 de la carte, qu'elle prolonge.
+                    if (RG.WaterTriangles.Num() > 0)
+                    {
+                        TArray<FLinearColor> RingWaterColors;
+                        RingWaterColors.Init(FLinearColor(0.043f, 0.176f, 0.290f, 1.0f), RG.WaterVertices.Num());
+                        HorizonSurface->CreateMeshSection_LinearColor(1, RG.WaterVertices, RG.WaterTriangles, RG.WaterNormals,
+                            bShoreline ? RG.WaterUV0 : TArray<FVector2D>{},
+                            bShoreline ? RG.WaterUV1 : TArray<FVector2D>{},
+                            TArray<FVector2D>{}, TArray<FVector2D>{},
+                            RingWaterColors, TArray<FProcMeshTangent>{}, false);
+                        if (ShoreMaterial)
+                        {
+                            HorizonSurface->SetMaterial(1, ShoreMaterial);
+                        }
+                    }
+                    HorizonSurface->SetVisibility(true);
+                    UE_LOG(LogAnastasis_UnrealV2, Display,
+                        TEXT("ANASTASIS_TERRAIN_HORIZON enabled=1 perimeter=%d rings=%d vertices=%d triangles=%d water_triangles=%d edge_water=%d outer_m=%.0f skirt_m=%.0f z=[%.0f,%.0f]"),
+                        Ring.Perimeter, Ring.Rings, RG.Vertices.Num(), RG.Triangles.Num() / 3, RG.WaterTriangles.Num() / 3,
+                        Ring.EdgeWater, Ring.Distances[Ring.Rings - 2] / 100.0, Ring.Distances.Last() / 100.0, Ring.MinZ, Ring.MaxZ);
+                }
+            }
+            else
+            {
+                UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN_HORIZON enabled=0 forged=%d whole_world=%d"),
+                    bForged ? 1 : 0, bWholeWorld ? 1 : 0);
+            }
             for (auto& Mesh : TerrainMeshes) if (Mesh) { Mesh->SetVisibility(false); Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); }
             BuiltSurfaceCrop = Crop;
             bSurfaceBuilt = true;

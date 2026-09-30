@@ -228,10 +228,14 @@ Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
 | `asset_agent_probe.py` | preuve PIE partagée par les missions d'asset, un bookmark par run |
 | `first-building-pie.py` | preuve PIE du premier bâtiment : pilote `Anastasis.Village.*` en console (puits, habitants, retraits), lecture par les lignes `ANASTASIS_VILLAGE` du log |
 | `house-rest-pie.py` | preuve PIE de la maison : `Anastasis.Village.FirstHouse`, une nuit de sommeil, retrait d'un dormeur puis de la maison occupée |
+| `granary-eat-pie.py` | preuve PIE du grenier (Noûs) : `Anastasis.Village.FirstGranary`, repas confirmés, stock qui baisse, démolition avec réservations en cours |
 | `shore-capture.ps1` + `shore-capture.py` | A/B visuel du bord d'eau, cadrage sur une rive |
 | `capture-terrain-forge.ps1` + `terrain-forge-capture.py` | captures avant/après du relief → `Saved/TerrainForgeEvidence/` |
 | `capture-terrain-relief.ps1` + `terrain-relief-capture.py` | avant/après d'une étape de la forge de relief (`-Step 1/2/3/scale`), dressing masqué → `Saved/TerrainReliefEvidence/` |
+| `capture-horizon.ps1` + `capture-horizon.py` | A/B de l'horizon (`anastasis.Terrain.Horizon` 0 puis 1), cinq vues calées sur la carte, part de pixels « vide » par image ; `-PreCmds` pour l'étape brume → `Saved/HorizonEvidence/<Label>/` |
+| `capture-places.ps1` + `places-capture.py` | lieux composés (`AnastasisPlaces`) : vue lointaine et vues à 1,7 m par lieu, lieux actifs puis coupés aux mêmes caméras (`-OnOnly`, `-All`) → `Saved/PlacesEvidence/<Label>/` |
 | `capture-human-geography.py` | comparaison du relief corrige et de Human_Geography_V2 : export des maillages et vues a 170 cm ; sortie via ANASTASIS_HUMAN_EVIDENCE ; ferme l'editeur dedie |
+| `capture-macro-forest.py` | A/B forestier sur Human_Geography_V2, ouverture par defaut, empreintes des instances et du terrain ; sortie via ANASTASIS_FOREST_OUT ; aucun asset sauve |
 | `capture-reed-form.ps1` + `capture-reed-form.py` | comparaison des formes de roseaux dans une scene temporaire |
 | `capture-shore-reeds.ps1` + `capture-shore-reeds.py` | comparaison de silhouettes et proportions de roseaux sur la rive |
 | `capture-tree-lineup.ps1` + `capture-tree-lineup.py` | planche de stature de la grammaire d'arbres |
@@ -252,6 +256,7 @@ manque puis se contentent de le vérifier ; `*_REBUILD=1` le régénère et écr
 | `atmosphere-profile.py` | `DA_AnastasisAtmosphere` |
 | `create_tree_asset.py` | `SM_Tree_*`, `M_AnastasisVegetation` — régénérés à **chaque** run |
 | `create-reed-form.py` | recette isolee de roseaux courbes ; cree les assets de la variante |
+| `world-dressing-01.ps1` + `.py` | trois lieux composes sur Human Geography V2 ; Preview sans sauvegarde, Save ecrit les acteurs WD01 de Lvl_AnastasisSlice et MI_WeatheredStone, Verify relit la map ; preuves via -Out |
 | `create_ruin_asset.py` | `SM_Ruin_Generic_01` |
 | `set_presentation_meshes.py` | câble un mesh par archétype dans `DA_AnastasisPresentation` |
 | `set_tree_grammar.py` | entrée FOREST du registre (variantes d'arbres) |

@@ -73,4 +73,7 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<USmartObjectDefinition> WorkshopDef;
+
+	UPROPERTY()
+	TObjectPtr<USmartObjectDefinition> GranaryDef;
 };

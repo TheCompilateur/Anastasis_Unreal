@@ -175,7 +175,7 @@ bool FAnastasisVillageWellSelectionTest::RunTest(const FString&)
 	const FString CalmId = Village.SpawnNpc(4.5, 20.5, Thirsty(20.0));
 
 	double Time = 0.0;
-	Run(Village, Time, 0.25, [] { return false; }); // au moins une pensee chacun
+	Run(Village, Time, 2.5, [] { return false; }); // Noûs : une pensee chacun (cadence 2,2 s)
 
 	const FNpc* Npc = Village.FindNpc(ThirstyId);
 	const FNpc* Calm = Village.FindNpc(CalmId);
@@ -214,9 +214,11 @@ bool FAnastasisVillageWellSelectionTest::RunTest(const FString&)
 	TestEqual(TEXT("la nuit, sans toit : il va se reposer"), Calm->Goal, FString(GoalRest));
 
 	// Le seuil de soif DEPEND de la phase : c'est le rythme de la reference.
-	// Nuit, aube, midi : exactement thirstUrge (40). Matin : il faut ~64.
+	// Nuit, aube : exactement thirstUrge (40). Matin : il faut ~64. (Midi n'est plus
+	// dans la liste : depuis granary-eat-001, `eat` est une ligne calculee et ne pese
+	// plus 42 + son rythme ; a midi le plancher est `relax`.)
 	AnastasisRhythm::FPhaseSubject Homeless;
-	for (const AnastasisRhythm::EPhase Phase : { AnastasisRhythm::EPhase::Night, AnastasisRhythm::EPhase::Dawn, AnastasisRhythm::EPhase::Midday })
+	for (const AnastasisRhythm::EPhase Phase : { AnastasisRhythm::EPhase::Night, AnastasisRhythm::EPhase::Dawn })
 	{
 		const FString Name = AnastasisRhythm::PhaseId(Phase);
 		TestTrue(*(Name + TEXT(" : 39.99 ne declenche pas")), DrinkRowAt(Phase, Thirsty(39.99), Homeless) <= FloorAt(Phase, Homeless));
@@ -309,7 +311,7 @@ bool FAnastasisVillageWellLoopTest::RunTest(const FString&)
 	TestFalse(TEXT("cible effacee apres l'acte"), Npc->bHasTarget);
 
 	// La boucle se referme : a la pensee suivante, la soif est basse, il vaque.
-	Run(Village, Time, 0.3, [] { return false; });
+	Run(Village, Time, 2.5, [] { return false; }); // prochaine pensee Noûs
 	Npc = Village.FindNpc(NpcId);
 	TestNotEqual(TEXT("desaltere : ne va plus boire"), Npc->Goal, FString(GoalDrink));
 	TestEqual(TEXT("desaltere : plus usager du puits"), Village.UsersOf(WellId).Num(), 0);
@@ -337,7 +339,7 @@ bool FAnastasisVillageWellRemovalTest::RunTest(const FString&)
 	const FString B = Village.SpawnNpc(4.5, 14.5, Thirsty(65.0));
 
 	double Time = 0.0;
-	Run(Village, Time, 1.0, [] { return false; });
+	Run(Village, Time, 2.5, [] { return false; }); // Noûs : une pensee chacun
 	TestEqual(TEXT("deux usagers en route"), Village.UsersOf(WellId).Num(), 2);
 	const int32 VersionBefore = Village.GetNavVersion();
 
@@ -467,7 +469,7 @@ bool FAnastasisVillageWellCrowdTest::RunTest(const FString&)
 	const FBuilding Snapshot = *Village.FindBuilding(WellId);
 
 	double Time = 0.0;
-	Run(Village, Time, 0.25, [] { return false; });
+	Run(Village, Time, 2.3, [] { return false; }); // Noûs : une pensee chacun
 	TestEqual(TEXT("six usagers simultanes"), Village.UsersOf(WellId).Num(), 6);
 	TSet<FIntPoint> Targets;
 	for (const FNpc& Npc : Village.GetActors())

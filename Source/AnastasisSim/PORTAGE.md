@@ -168,6 +168,21 @@ Le deuxième bâtiment, et le premier où l'on entre. Détail : `docs/unreal/HOU
 La table compte désormais deux lignes portées, `rest` et `drink`. Chaque but non porté vaut 42
 **plus son vrai `phaseBias`** : le rythme est en parité, seul le 42 est déclaré.
 
+### Fait — tranche verticale : le grenier, par Noûs (mission granary-eat-001)
+
+Noûs (`src/ai/algorithmic`) est ACTIF PAR DÉFAUT dans la référence : c'est lui qui est porté.
+Détail et comportements JS reproduits : `docs/unreal/GRANARY_EAT_001.md`.
+
+| Unreal | Source JS | Preuve |
+| --- | --- | --- |
+| `Ai/AnastasisNous.h/.cpp` | `hungerUtility.js` (urgence, candidats, tri, cooldown, but), `inertia.js`, `scheduler.js`, `decision.js` | `Parite.Nous`, 312 vecteurs |
+| `Life/AnastasisNeeds.*` (ajouts) | `tickNeeds` branche intérieure `eat`, `satisfyEat` | `Parite.Besoins` (542 au total) |
+| `Village/AnastasisVillage.*` (ajouts) | `mealReservation.js` (1-377), `hungerAction.js`, `runtime.js`, `bridge.js`, `stockLedger.js` (réserver / rendre / prélever), `memory.js` (croyances de stock), `mealPlace`, branche `eat` d'`assignTarget` et de `buildingForIndoorAction` | `Village.Grenier.*` |
+
+La table compte les 25 lignes d'`adultScores` ; `eat`, `rest`, `drink` sont calculées, les autres
+valent 42 + `phaseBias`, et Noûs les biaise toutes. La cadence de pensée est celle de Noûs pour tous
+les buts (2,2 s ; 0,55 s en crise).
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

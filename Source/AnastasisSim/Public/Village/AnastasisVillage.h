@@ -1,8 +1,8 @@
 // Village — les batiments fonctionnels et les habitants qui s'en servent.
 //
 // Tranche de `src/sim/simulation.js` + `src/sim/npc.js` + `src/sim/navGrid.js`
-// + `src/life/villageRhythm.js` + `src/life/domestic.js`, limitee a deux
-// boucles completes, celles que la reference ferme avec le moins de systemes :
+// + `src/life/villageRhythm.js` + `src/life/domestic.js` + `src/ai/algorithmic/*`
+// + `src/sim/transport/stockLedger.js`, limitee a trois boucles completes :
 //
 //   PUITS  (first-building-001)             MAISON  (house-rest-001)
 //   la soif monte                           la fatigue monte ; la nuit tombe
@@ -13,6 +13,15 @@
 //                                           a `until`, satisfyRest puis SORTIE
 //   npc.thirst baisse                       npc.energy remonte, selon la qualite du lit
 //
+//   GRENIER (granary-eat-001) — Noûs, le chemin ACTIF PAR DEFAUT de la reference
+//   la faim monte ; Noûs (toutes les 2,2 s) score manger / chercher / travailler...
+//   `eat` gagne (table complete + biais Noûs + porte de commit)
+//   RESERVATION d'une portion dans le stock du grenier connu (croyance vue a 7 tuiles)
+//   cible : couches rythme (mealPlace) et domestique — le FOYER passe avant le grenier
+//   ENTREE (2,1 s) ; tickNeeds branche repas ; a `until` : confirmMeal (stock -1),
+//   inventaire +1 -1, satisfyEat
+//   building.stock.food.physical baisse ; npc.hunger baisse
+//
 // La maison apporte le mecanisme d'INTERIEUR (enterBuilding / updateInside /
 // exitBuilding) que reutiliseront manger, se soulager, se detendre, socialiser.
 // Elle apporte aussi le foyer (npc.home, npc.shelter, proprietaire, capacite)
@@ -20,12 +29,12 @@
 //
 // ECARTS DECLARES — ce qui n'est pas la reference, et pourquoi :
 //
-//  1. Table de decision reduite. La reference classe ~25 buts ; seuls `rest` et
-//     `drink` ont leur boucle. Chaque but NON porte est tenu pour valoir
-//     `UnportedGoalsFloor` (42) AVANT le rythme, puis recoit son vrai
-//     `phaseBias` (porte, prouve) : le plancher est le meilleur de ces buts a la
-//     phase courante. Les lignes `rest` et `drink` sont celles de la reference
-//     (needGoalScores + jobPriority / bonus puits + phaseBias), sans `goalNoise`
+//  1. Table de decision : les 25 lignes de adultScores, dans l'ordre de la
+//     reference, triees de facon stable. `eat`, `rest`, `drink` sont calculees
+//     (needGoalScores + jobPriority / bonus puits + phaseBias) ; chaque but NON
+//     porte vaut `UnportedGoalsFloor` (42) + son vrai `phaseBias`. Noûs biaise
+//     TOUTES les lignes (applyAlgorithmicScoreBias) puis la porte de commit peut
+//     forcer `eat` ou `rest`. Un but non porte qui gagne donne `observer`. Sans `goalNoise`
 //     (le bruit consomme `sim.rng()` dans l'ordre de TOUTE la table), sans
 //     `statusBias` (misere = or <= 2 et sans toit : l'or n'existe pas encore),
 //     sans mode de vie, district, meteo, age, memoire, prevision de survie.
@@ -37,7 +46,9 @@
 //  4. Pilotage reduit : pas de file de porte (crowdNav), pas d'hesitation, pas
 //     de facteur de vitesse, pas de contournement local ; escalade anti-blocage
 //     en trois paliers ; pas de verrou de seuil domestique en route.
-//  5. Pas de cadence LOD : chaque habitant est « proche du point de vue ».
+//  5. Pas de cadence LOD : chaque habitant est « proche du point de vue ». La
+//     cadence de pensee est celle de Noûs (2,2 s ; 0,55 s en besoin critique),
+//     avec la bascule de phase qui force une pensee, comme la reference.
 //  6. RemoveBuilding n'existe pas dans la reference — elle ne demolit jamais.
 //  7. Foyer minimal : `assignHomeToHousehold` sans famille (le proprietaire seul),
 //     `assignSheltersDaily` a minuit ; pas d'achat de maison (or), pas
@@ -46,14 +57,25 @@
 //  8. Tous les habitants sont des adultes sans metier de garde, sans famille, sans
 //     mode de vie. `jobPriority(rest)` vaut 18 - 2,5 = 15,5 pour TOUS les metiers
 //     du catalogue (rest y est toujours au rang 1) : la constante est reprise telle quelle.
+//     Idem `jobPriority(eat)` = 18 (rang 0 partout).
+//  9. Noûs, ce qui n'est pas porte : pas d'or ni de marche (buy_food ne gagne
+//     jamais ; `believedStock` = 0), pas de danger (flee ne gagne jamais), pas
+//     d'oubli des croyances (`staleAfterDays`), pas de mendicite (`begForFood`),
+//     pas de memoire d'echec (`noteGoalFailure`), pas d'agregat `market.stock`,
+//     pas de gisements (`spots`). Le stock ne porte que la nourriture.
+//     COMPORTEMENT DE LA REFERENCE, reproduit tel quel : un habitant qui a un
+//     foyer ou un abri est envoye CHEZ LUI pour `eat` (couches rythme et
+//     domestique), meme si sa reservation est au grenier ; il y mange « a vide »
+//     (la branche repas de tickNeeds baisse sa faim), et sa reservation expire.
 //
-// Parite bit a bit : prouvee pour les besoins, le rythme et la qualite du repos
-// (Anastasis.Sim.Parite.Besoins / .Rythme). La boucle assemblee est
+// Parite bit a bit : prouvee pour les besoins, le rythme, la qualite du repos et
+// la decision Noûs (Anastasis.Sim.Parite.Besoins / .Rythme / .Nous). La boucle assemblee est
 // deterministe, elle n'est PAS la trajectoire JS — l'ecart 1 suffit a l'interdire.
 
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Ai/AnastasisNous.h"
 #include "Life/AnastasisNeeds.h"
 #include "Life/AnastasisVillageRhythm.h"
 #include "World/AnastasisEntityTable.h"
@@ -69,15 +91,39 @@ namespace AnastasisVillage
 	/** Types de batiment que ce portage sait poser. Chaine = vocabulaire de la reference. */
 	inline const TCHAR* const WellType = TEXT("well");
 	inline const TCHAR* const HouseType = TEXT("house");
+	inline const TCHAR* const GranaryType = TEXT("granary");
 
 	/** Buts portes. `observer` est l'etat initial de createNpc. */
 	inline const TCHAR* const GoalObserver = TEXT("observer");
 	inline const TCHAR* const GoalDrink = TEXT("drink");
 	inline const TCHAR* const GoalRest = TEXT("rest");
+	inline const TCHAR* const GoalEat = TEXT("eat");
 
-	/** `NPC_AI` de npc.js. */
+	/** `NPC_AI` de npc.js (chemin classique) — conserve pour `aiThinkStagger`. */
 	inline constexpr double ThinkEvery = 0.12;
 	inline constexpr double ThinkEveryCritical = 0.045;
+
+	/** `jobPriority(npc, "eat") * 0.35` : eat est au rang 0 de chaque metier du catalogue. */
+	inline constexpr double EatJobPriorityBias = 18.0 * 0.35;
+
+	/** `DEPOT_PROFILES.granary.cap.food`. */
+	inline constexpr int32 GranaryFoodCap = 300;
+
+	/** `PERCEPTION` de ai/memory.js. */
+	inline constexpr double PerceptionRadius = 7.0;
+	inline constexpr double PerceptionScanInterval = 9.0;
+
+	/** `MEAL_RESERVATION` de mealReservation.js. */
+	namespace Meal
+	{
+		inline constexpr double TtlSeconds = 45.0;
+		inline constexpr double TtlMaxSeconds = 180.0;
+		inline constexpr double AbsoluteMaxSeconds = 120.0;
+		inline constexpr int32 MaxRenewals = 3;
+		inline constexpr double RenewalSeconds = 35.0;
+		inline constexpr double ProgressStallSeconds = 18.0;
+		inline constexpr double InteractionRadius = 2.2;
+	}
 
 	/** Rayon de puisage autour du CENTRE d'un puits (`WELL_REACH`). */
 	inline constexpr double WellReach = 2.5;
@@ -128,8 +174,58 @@ namespace AnastasisVillage
 		int32 HousePhase = 1;
 		/** Seuils persistes : le PNJ vise une porte, jamais le centre bloque. */
 		TArray<FPoint> AccessPoints;
+		/** `building.stock.food` — `{physical, reserved}`, reserved <= physical. Grenier seulement. */
+		int32 FoodPhysical = 0;
+		int32 FoodReserved = 0;
 
 		bool IsCompleted() const { return Progress >= 1.0; }
+		int32 FoodAvailable() const { return FMath::Max(0, FoodPhysical - FoodReserved); }
+	};
+
+	/** Une portion reservee (`sim.mealReservations.byId[...]`). */
+	struct FMealReservation
+	{
+		FString Id;
+		FString NpcId;
+		/** Vide pour une reservation d'inventaire. */
+		FString BuildingId;
+		/** "colony" ou "inventory". */
+		FString Source;
+		int32 Amount = 1;
+		double CreatedAt = 0.0;
+		double ExpiresAt = 0.0;
+		double AbsoluteExpiresAt = 0.0;
+		int32 Renewals = 0;
+		double LastProgressAt = 0.0;
+		double LastDistance = 0.0;
+	};
+
+	/** `npc.hungerAction` — la machine a etats du repas. */
+	struct FHungerAction
+	{
+		FString State = TEXT("pending");
+		FString TargetId;
+		double StartedAt = 0.0;
+		FString LastFailure;
+		double CooldownUntil = 0.0;
+		double Progress = 0.0;
+		FString ReservationId;
+		FString SourceBuildingId;
+		FString ExcludedType;
+	};
+
+	/** Une croyance de stock (`mind.beliefs.knownStocks[key]`) — ce que l'habitant CROIT. */
+	struct FStockBelief
+	{
+		FString Key;
+		FString Resource;
+		FString BuildingId;
+		FString Kind;
+		double X = 0.0;
+		double Y = 0.0;
+		double EstimatedAmount = 0.0;
+		double Confidence = 0.0;
+		int32 Day = 0;
 	};
 
 	/** `npc.inside` — present pendant qu'un habitant est DANS un batiment. */
@@ -158,6 +254,15 @@ namespace AnastasisVillage
 		double RestRowScore = 0.0;
 		/** Ligne `drink` : needs.drink + bonus puits + phaseBias. */
 		double DrinkRowScore = 0.0;
+		/** Ligne `eat` : needs.eat + jobPriority + phaseBias, puis biais Noûs. */
+		double EatRowScore = 0.0;
+		/** Tete de table apres tri, avant la porte de commit (peut etre un but non porte). */
+		FString TableWinner;
+		/** Decision Noûs au moment du choix, et ce que la porte a fait. */
+		FString NousType;
+		double NousScore = 0.0;
+		double NousUrgency = 0.0;
+		FString CommitGate;
 		/** Meilleur but non porte a cette phase, et son score (plancher + phaseBias). */
 		FString FloorGoal;
 		double FloorScore = 0.0;
@@ -208,9 +313,27 @@ namespace AnastasisVillage
 		double StuckTimer = 0.0;
 		int32 StuckStage = 0;
 
+		/** `npc.inventory.food`. */
+		int32 InventoryFood = 0;
+		FHungerAction HungerAction;
+		/** `mind.beliefs.knownStocks`, dans l'ordre d'insertion (celui d'un objet JS). */
+		TArray<FStockBelief> KnownStocks;
+		double LastScan = -999.0;
+		/** `npc.villagePhase` — la bascule force une pensee. */
+		FString VillagePhase;
+		double GoalSince = 0.0;
+		/** `npc._algoDebug` : la decision Noûs courante et son contexte. */
+		bool bHasAlgoDecision = false;
+		AnastasisNous::FDecision AlgoDecision;
+		AnastasisNous::FFoodContext AlgoContext;
+		bool bAlgoInertiaKeep = false;
+		FString AlgoInertiaReason;
+		FString AlgoMappedGoal;
+
 		/** Actes accomplis. Observation (la reference les compte ailleurs). */
 		int32 DrinksTaken = 0;
 		int32 RestsTaken = 0;
+		int32 MealsTaken = 0;
 		FDecisionTrace LastDecision;
 
 		/** `livingHome(npc)` = home || shelter. */
@@ -284,6 +407,16 @@ namespace AnastasisVillage
 		/** `sleepQuality(npc)`. */
 		static double SleepQualityOf(const FNpc& Npc);
 
+		/** `creditStock(building, "food", n)` — respecte la capacite. Rend la quantite ajoutee. */
+		int32 CreditFood(const FString& BuildingId, int32 Amount);
+
+		/** Registre des reservations, dans l'ordre d'insertion. */
+		const TArray<FMealReservation>& GetMealReservations() const { return MealReservations; }
+		const FMealReservation* FindMealReservation(const FString& NpcId) const;
+
+		/** `perceive(sim, npc, true)` — balayage force (utilise par SpawnNpc et les tests). */
+		void PerceiveNow(const FString& NpcId);
+
 		const TArray<FBuilding>& GetBuildings() const { return Buildings.GetItems(); }
 		const TArray<FNpc>& GetActors() const { return Actors.GetItems(); }
 		const FBuilding* FindBuilding(const FString& Id) const { return Buildings.FindById(Id); }
@@ -316,6 +449,39 @@ namespace AnastasisVillage
 	private:
 		void UpdateNpc(FNpc& Npc, double Dt);
 		void ChooseGoal(FNpc& Npc);
+		void CommitGoal(FNpc& Npc, const FString& Next, FDecisionTrace& Trace);
+		bool AssignTarget(FNpc& Npc, FDecisionTrace& Trace);
+
+		// Perception (ai/memory.js, branche nourriture).
+		void Perceive(FNpc& Npc, bool bForce);
+		AnastasisNous::FFoodContext PerceiveFoodContext(const FNpc& Npc) const;
+		int32 Day() const;
+
+		// Noûs (ai/algorithmic).
+		void ComputeAlgorithmicDecision(FNpc& Npc);
+		void ApplyAlgorithmicScoreBias(FNpc& Npc, TArray<TPair<FString, double>>& Rows);
+		FString ApplyAlgorithmicCommitGate(FNpc& Npc, const FString& Next, const FString& Previous, FString& OutGate);
+		void OnAlgorithmicGoalCommitted(FNpc& Npc, const FString& Previous, const FString& Next);
+		void TickAlgorithmicNpc();
+		/** Rend 1 (mange), 0 (echec), -1 (en route : `null` de la reference). */
+		int32 TryAlgorithmicEat(FNpc& Npc);
+		int32 RunHungerActionStep(FNpc& Npc, bool bAtFoodAccess, const FString& SourceBuildingId);
+		void FailHungerAction(FNpc& Npc, const FString& Reason, const FString& ExcludedType);
+		void CancelHungerAction(FNpc& Npc, const FString& Reason);
+		bool Eat(FNpc& Npc);
+
+		// Reservations (mealReservation.js).
+		bool ReserveMeal(FNpc& Npc, const FString& BuildingId, double TravelSeconds, double TtlSeconds, FString& OutReason);
+		FMealReservation* GetMealReservation(const FNpc& Npc);
+		bool ReleaseMeal(FNpc& Npc, const FString& Reason);
+		bool ConfirmMeal(FNpc& Npc, FString& OutReason, FString& OutSourceId);
+		FString MaybeRenewMealReservation(FNpc& Npc);
+		int32 ExpireMealReservations();
+		bool MealSourceAccessPoint(FNpc& Npc, FPoint& Out, bool& bOutBuilding);
+		bool IsNpcAtMealSource(FNpc& Npc);
+
+		bool EatTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
+		const FBuilding* MealPlace(const FNpc& Npc) const;
 		void Act(FNpc& Npc, double Dt);
 		bool Perform(FNpc& Npc);
 		void RedirectAfterFailure(FNpc& Npc);
@@ -333,7 +499,7 @@ namespace AnastasisVillage
 		const FBuilding* NearLivingHome(const FNpc& Npc) const;
 
 		bool TryEnterIndoorAction(FNpc& Npc);
-		const FBuilding* BuildingForIndoorAction(const FNpc& Npc) const;
+		const FBuilding* BuildingForIndoorAction(const FNpc& Npc, const FString& Goal) const;
 		const FBuilding* BuildingNearActor(const FNpc& Npc, double Radius) const;
 		bool EnterBuilding(FNpc& Npc, const FBuilding& Building, const FString& InActivity, double Duration);
 		void UpdateInside(FNpc& Npc);
@@ -363,6 +529,10 @@ namespace AnastasisVillage
 		int32 NextNpcId = 0;
 		/** `sim.time` du tick en cours (pose par UpdateActors). */
 		double Now = 0.0;
+		/** `sim.mealReservations` : ordre d'insertion = ordre de `Object.keys`. */
+		TArray<FMealReservation> MealReservations;
+		int32 MealSeq = 0;
+		double ReservationSweepAt = 0.0;
 		TAnastasisEntityTable<FBuilding> Buildings;
 		TAnastasisEntityTable<FNpc> Actors;
 	};
@@ -375,6 +545,12 @@ namespace AnastasisVillage
 
 	/** `BUILDINGS[type].housing` — places de logement du catalogue (0 = pas un logement). */
 	ANASTASISSIM_API int32 HousingOfType(const FString& Type);
+
+	/** `BUILDINGS[type].group === "food"` (grenier). */
+	ANASTASISSIM_API bool IsFoodGroupType(const FString& Type);
+
+	/** `computeMealTtlSeconds` ; TravelSeconds NaN = trajet inconnu. */
+	ANASTASISSIM_API double ComputeMealTtlSeconds(double TravelSeconds, double Base = Meal::TtlSeconds);
 
 	/** Buts de la table adulte qui n'ont PAS de boucle portee (ecart n°1). */
 	ANASTASISSIM_API const TArray<FString>& UnportedGoals();

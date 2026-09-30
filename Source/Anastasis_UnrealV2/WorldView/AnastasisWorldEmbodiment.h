@@ -5,6 +5,7 @@
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisWorldView.h"
 #include "WorldView/AnastasisEcologicalDressing.h"
+#include "WorldView/AnastasisPlaces.h"
 #include "AnastasisWorldEmbodiment.generated.h"
 
 class UHierarchicalInstancedStaticMeshComponent;
@@ -28,6 +29,10 @@ public:
     /** Forest grammar only; mesh references stay in the presentation registry. */
     UPROPERTY(EditAnywhere, Category="Anastasis|Ecology")
     FAnastasisForestDressingSettings ForestDressing;
+
+    /** WORLD_DRESSING_01 : lieux composes (AnastasisPlaces). Coupable par acteur, comme la foret. */
+    UPROPERTY(EditAnywhere, Category="Anastasis|Places")
+    bool bComposePlaces = true;
 
 #if WITH_EDITOR
 	/**
@@ -83,10 +88,29 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Terrain")
 	FVector GetTerrainForgeLandmark() const { return ForgeLandmark; }
 
+	/** WORLD_DRESSING_01 : un "id|x|y|z|rayon" par lieu compose, pour viser les cameras de preuve. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Places")
+	TArray<FString> GetPlaceReport() const { return PlaceReport; }
+
 protected:
+	/** Lieux composes (AnastasisPlaces) : un HISM par piece, transitoires, rebatis a chaque incarnation. */
 	UPROPERTY()
+	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> PlaceMeshes;
+	TArray<FString> PlaceReport;
+	/** Compose les lieux sur le sol rendu ; false = lieux coupes (plan vide). */
+	bool ComposePlaces(const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop,
+		const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource, AnastasisPlaces::FInputs& In, AnastasisPlaces::FPlan& Places);
+	void EmbodyPlaces(const AnastasisPlaces::FInputs& In, const AnastasisPlaces::FPlan& Places, bool bEnabled,
+		const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource, int32 SupersededRuins);
+
+	// Components are RF_Transient: persisting their references writes null into the map.
+	// Keep constructor-created subobjects on reload; rebuild generated dressing instead.
+	UPROPERTY(Transient)
 	TObjectPtr<UProceduralMeshComponent> ExperimentalSurface;
-	UPROPERTY()
+	/** HORIZON_RING_001 : terrain lointain raccorde au bord forge, sans collision. */
+	UPROPERTY(Transient)
+	TObjectPtr<UProceduralMeshComponent> HorizonSurface;
+	UPROPERTY(Transient)
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> TerrainMeshes[7];
 
 	/**
@@ -94,7 +118,7 @@ protected:
 	 * demand from the presentation registry instead of in the constructor: the mesh set is
 	 * data now, so it is not known until EmbodyCrop reads it.
 	 */
-	UPROPERTY()
+	UPROPERTY(Transient)
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> DressingMeshes;
 
 	/** "<ArchetypeId>_v<VariantIndex>" -> index into DressingMeshes. */
