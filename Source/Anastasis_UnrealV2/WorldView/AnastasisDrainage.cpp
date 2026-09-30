@@ -29,10 +29,13 @@ static TAutoConsoleVariable<int32> CVarDrainageDebug(
 	TEXT("Drainage network debug lines: 0 off, 1 width, 2 depth, 3 velocity, 4 Strahler order. Applied on embodiment."),
 	ECVF_Default);
 
-namespace
+// Espace nomme, pas anonyme : en build unity, plusieurs .cpp partagent une unite de
+// traduction, et un SmoothStep anonyme de meme signature que celui de TERRAIN_FORGE
+// entrerait en collision le jour ou les deux fichiers tombent dans le meme lot. Imbrique
+// dans AnastasisDrainage : visible des seules definitions de ce module, sans using global.
+namespace AnastasisDrainage::Detail
 {
 using AnastasisWorldView::FWorldVisualSnapshot;
-using namespace AnastasisDrainage;
 
 AnastasisDrainage::FNetwork GActiveNetwork;
 
@@ -286,6 +289,10 @@ struct FSeg
 	int32 River = 0;
 	int32 K = 0; // point de depart
 };
+}
+namespace AnastasisDrainage
+{
+using namespace Detail;
 }
 
 bool AnastasisDrainage::IsEnabled()

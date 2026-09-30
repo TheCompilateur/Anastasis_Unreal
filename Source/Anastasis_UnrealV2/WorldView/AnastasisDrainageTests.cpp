@@ -6,7 +6,7 @@
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisWorldView.h"
 
-namespace
+namespace AnastasisDrainageTestDetail
 {
 using namespace AnastasisWorldView;
 
@@ -54,11 +54,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisDrainageNetwork, "Anastasis.Terrain.D
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnastasisDrainageNetwork::RunTest(const FString&)
 {
-	FWorldVisualSnapshot S;
+	AnastasisWorldView::FWorldVisualSnapshot S;
 	AnastasisTerrainForge::FMesh M;
 	AnastasisDrainage::FNetwork Net;
-	if (!TestTrue(TEXT("Human_Geography_V2 world drains"), Drain(true, S, M, Net))) return false;
-	ExpectCoherent(*this, Net, M);
+	if (!TestTrue(TEXT("Human_Geography_V2 world drains"), AnastasisDrainageTestDetail::Drain(true, S, M, Net))) return false;
+	AnastasisDrainageTestDetail::ExpectCoherent(*this, Net, M);
 
 	// Largeur et profondeur croissent de la source a l'embouchure, sur chaque riviere de plus de 300 m.
 	for (const AnastasisDrainage::FRiver& River : Net.Rivers)
@@ -76,11 +76,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisDrainageOriginalForms, "Anastasis.Ter
 bool FAnastasisDrainageOriginalForms::RunTest(const FString&)
 {
 	// La couche ne depend pas des rivieres ecrites : le relief corrige seul draine aussi.
-	FWorldVisualSnapshot S;
+	AnastasisWorldView::FWorldVisualSnapshot S;
 	AnastasisTerrainForge::FMesh M;
 	AnastasisDrainage::FNetwork Net;
-	if (!TestTrue(TEXT("original-forms world drains"), Drain(false, S, M, Net))) return false;
-	ExpectCoherent(*this, Net, M);
+	if (!TestTrue(TEXT("original-forms world drains"), AnastasisDrainageTestDetail::Drain(false, S, M, Net))) return false;
+	AnastasisDrainageTestDetail::ExpectCoherent(*this, Net, M);
 	for (const AnastasisDrainage::FRiver& River : Net.Rivers) TestFalse(TEXT("no authored river without the layer"), River.bAuthored);
 	return true;
 }
@@ -89,12 +89,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisDrainageAuthored, "Anastasis.Terrain.
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnastasisDrainageAuthored::RunTest(const FString&)
 {
-	FWorldVisualSnapshot S;
+	AnastasisWorldView::FWorldVisualSnapshot S;
 	AnastasisTerrainForge::FMesh M;
 	AnastasisDrainage::FNetwork Net;
-	if (!TestTrue(TEXT("drains"), Drain(true, S, M, Net))) return false;
+	if (!TestTrue(TEXT("drains"), AnastasisDrainageTestDetail::Drain(true, S, M, Net))) return false;
 	AnastasisTerrainForge::SetActive(M);
-	const double Unit = TileWorldSize * S.SpatialScale;
+	const double Unit = AnastasisWorldView::TileWorldSize * S.SpatialScale;
 	int32 Probed = 0, Wet = 0;
 	for (const TArray<FVector>& Poly : AnastasisHumanGeography::AuthoredRivers())
 	{
@@ -122,11 +122,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisDrainageDeterminism, "Anastasis.Terra
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnastasisDrainageDeterminism::RunTest(const FString&)
 {
-	FWorldVisualSnapshot S;
+	AnastasisWorldView::FWorldVisualSnapshot S;
 	AnastasisTerrainForge::FMesh A, B;
-	if (!TestTrue(TEXT("forge"), Forge(true, S, A))) return false;
+	if (!TestTrue(TEXT("forge"), AnastasisDrainageTestDetail::Forge(true, S, A))) return false;
 	B = A;
-	const FWorldVisualSnapshot Before = S;
+	const AnastasisWorldView::FWorldVisualSnapshot Before = S;
 	AnastasisDrainage::FNetwork NA, NB;
 	if (!TestTrue(TEXT("first run"), AnastasisDrainage::Apply(S, A, NA))) return false;
 	if (!TestTrue(TEXT("second run"), AnastasisDrainage::Apply(S, B, NB))) return false;
