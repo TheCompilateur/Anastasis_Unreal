@@ -29,3 +29,13 @@ tools\unreal\hydro-network-capture.ps1 -Label hgoff -States "1" -PreCmds "anasta
 
 Ce que ces images ne prouvent pas : l'aspect de l'eau (matériau inchangé), la marche à pied
 (aucune session joueur), un autre seed que 12345.
+
+## Passe 2
+
+| Fichier | Vue |
+|---|---|
+| `pass2_aerial_top`, `pass2_aerial_oblique` | lacs et mers arrondis, cuvettes comblées, initiation aire × pente² |
+| `pass2_close_upland_outlet`, `pass2_close_lake` | lacs d'altitude et lac écrit arrondis |
+| `pass2_original_forms_top` | même passe, `anastasis.Terrain.HumanGeography 0` |
+
+`network_seed12345.json` est celui de la passe 2.

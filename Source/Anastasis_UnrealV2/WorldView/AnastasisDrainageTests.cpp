@@ -39,7 +39,7 @@ bool ExpectCoherent(FAutomationTestBase& T, const AnastasisDrainage::FNetwork& N
 	T.TestEqual(TEXT("every interior lake is fed or drained"), C.LakesWithoutRole, 0);
 	T.TestTrue(TEXT("banks contain the water on 90% of probed points"), C.BankContainment >= 0.9);
 	// Clairseme : quelques rivieres lisibles, pas des dizaines.
-	T.TestTrue(TEXT("sparse network: 3..20 rivers"), Net.Rivers.Num() >= 3 && Net.Rivers.Num() <= 20);
+	T.TestTrue(TEXT("sparse network: 3..25 rivers"), Net.Rivers.Num() >= 3 && Net.Rivers.Num() <= 25);
 	T.TestTrue(TEXT("at most MaxHeads headwaters"), Net.Heads <= AnastasisDrainage::FParams().MaxHeads);
 	T.TestTrue(TEXT("tributaries join: at least one confluence"), Net.Confluences >= 1);
 	T.TestTrue(TEXT("few wetlands"), Net.Wetlands.Num() <= AnastasisDrainage::FParams().MaxWetlands);

@@ -217,6 +217,8 @@ struct FLakeWork
 	/** Touche une riviere ecrite de Human_Geography_V2 : niveau et rive d'origine gardes. */
 	bool bAuthored = false;
 	int32 Spill = INDEX_NONE;
+	/** Lac dans lequel celui-ci deborde directement, sans chenal entre les deux. */
+	int32 SpillsInto = INDEX_NONE;
 };
 
 struct FRiverWork
@@ -281,6 +283,43 @@ void SmoothXY(TArray<FPt>& Pts, int32 Passes, bool bPinLast)
 		}
 		if (!bPinLast && Pts.Num() >= 2) Pts.Last().P = 0.5 * (Copy.Last().P + Copy[Pts.Num() - 2].P);
 	}
+}
+
+/**
+ * Garde la plus grande composante 4-connexe de Cells ; renvoie les autres sommets. Un lac est
+ * un seul plan d'eau : les creux voisins qui passent sous son niveau sans le rejoindre ne sont
+ * pas le lac, ce seraient des flaques isolees.
+ */
+TArray<int32> KeepLargestComponent(const FGrid& G, TArray<int32>& Cells)
+{
+	TArray<int32> Dropped;
+	if (Cells.Num() < 2) return Dropped;
+	TMap<int32, int32> Label;
+	for (const int32 I : Cells) Label.Add(I, INDEX_NONE);
+	int32 Best = INDEX_NONE, BestSize = 0, Next = 0;
+	for (const int32 Start : Cells)
+	{
+		if (Label[Start] != INDEX_NONE) continue;
+		TArray<int32> Queue = {Start};
+		Label[Start] = Next;
+		for (int32 Q = 0; Q < Queue.Num(); ++Q)
+		{
+			const int32 I = Queue[Q];
+			for (int32 K = 0; K < 4; ++K)
+			{
+				const int32 X = I % G.W + Off4X[K], Y = I / G.W + Off4Y[K];
+				if (!G.In(X, Y)) continue;
+				int32* L = Label.Find(Y * G.W + X);
+				if (L && *L == INDEX_NONE) { *L = Next; Queue.Add(Y * G.W + X); }
+			}
+		}
+		if (Queue.Num() > BestSize) { BestSize = Queue.Num(); Best = Next; }
+		++Next;
+	}
+	TArray<int32> Kept;
+	for (const int32 I : Cells) (Label[I] == Best ? Kept : Dropped).Add(I);
+	Cells = MoveTemp(Kept);
+	return Dropped;
 }
 
 /** Segment de riviere indexe pour le tampon de creusement. */
@@ -506,6 +545,72 @@ bool AnastasisDrainage::Apply(
 			Lakes.Add(MoveTemp(Lake));
 		}
 	}
+	// Contours arrondis : un lac herite ses bords des tuiles de simulation (marches de 20 m,
+	// angles droits). Le masque est floute (trois passes de boite, ~gaussienne de 15 m) puis
+	// seuille a 0.5 : les coins s'arrondissent, les bras plus etroits que ~30 m tombent.
+	// Les mers de bord aussi : le flou est normalise par les echantillons DANS la grille, donc
+	// l'eau ne recule pas du bord de carte. Un sommet qui quitte un lac est memorise pour
+	// etre rendu a la terre au-dessus du niveau.
+	TArray<int32> LeftLake;
+	LeftLake.Init(INDEX_NONE, N);
+	{
+		const int32 Radius = FMath::Max(1, FMath::RoundToInt(1500.0 / G.S));
+		for (int32 L = 0; L < Lakes.Num(); ++L)
+		{
+			FLakeWork& Lake = Lakes[L];
+			int32 X0 = G.W, Y0 = G.H, X1 = 0, Y1 = 0;
+			for (const int32 I : Lake.Cells)
+			{
+				X0 = FMath::Min(X0, I % G.W); X1 = FMath::Max(X1, I % G.W);
+				Y0 = FMath::Min(Y0, I / G.W); Y1 = FMath::Max(Y1, I / G.W);
+			}
+			X0 = FMath::Max(0, X0 - 3 * Radius); Y0 = FMath::Max(0, Y0 - 3 * Radius);
+			X1 = FMath::Min(G.W - 1, X1 + 3 * Radius); Y1 = FMath::Min(G.H - 1, Y1 + 3 * Radius);
+			const int32 BW = X1 - X0 + 1, BH = Y1 - Y0 + 1;
+			TArray<float> M, T;
+			M.Init(0.0f, BW * BH);
+			T.Init(0.0f, BW * BH);
+			for (const int32 I : Lake.Cells) M[(I / G.W - Y0) * BW + (I % G.W - X0)] = 1.0f;
+			for (int32 Pass = 0; Pass < 3; ++Pass)
+			{
+				for (int32 Y = 0; Y < BH; ++Y)
+				{
+					for (int32 X = 0; X < BW; ++X)
+					{
+						float Sum = 0.0f;
+						int32 Count = 0;
+						for (int32 D = -Radius; D <= Radius; ++D) { const int32 XX = X + D; if (XX >= 0 && XX < BW) { Sum += M[Y * BW + XX]; ++Count; } }
+						T[Y * BW + X] = Sum / Count;
+					}
+				}
+				for (int32 Y = 0; Y < BH; ++Y)
+				{
+					for (int32 X = 0; X < BW; ++X)
+					{
+						float Sum = 0.0f;
+						int32 Count = 0;
+						for (int32 D = -Radius; D <= Radius; ++D) { const int32 YY = Y + D; if (YY >= 0 && YY < BH) { Sum += T[YY * BW + X]; ++Count; } }
+						M[Y * BW + X] = Sum / Count;
+					}
+				}
+			}
+			TArray<int32> Cells;
+			for (int32 Y = 0; Y < BH; ++Y)
+			{
+				for (int32 X = 0; X < BW; ++X)
+				{
+					const int32 I = (Y0 + Y) * G.W + (X0 + X);
+					if (M[Y * BW + X] >= 0.5f && (LakeOf[I] == L || LakeOf[I] == INDEX_NONE)) Cells.Add(I);
+				}
+			}
+			// Un lac que le flou efface presque entierement garde son masque : mieux anguleux qu'absent.
+			KeepLargestComponent(G, Cells);
+			if (Cells.Num() < Lake.Cells.Num() / 4) continue;
+			for (const int32 I : Lake.Cells) { LakeOf[I] = INDEX_NONE; LeftLake[I] = L; }
+			for (const int32 I : Cells) { LakeOf[I] = L; LeftLake[I] = INDEX_NONE; }
+			Lake.Cells = MoveTemp(Cells);
+		}
+	}
 	auto KeepsShore = [&Lakes](int32 L) { return L >= 0 && (Lakes[L].bBorder || Lakes[L].bAuthored); };
 
 	// --- 2. Reparation. (a) La forge ecrase le relief pres de l'eau de simulation
@@ -597,6 +702,73 @@ bool AnastasisDrainage::Apply(
 		Ring.Sort();
 		Lake.Level = Ring.Num() ? Ring[Ring.Num() / 10] - 50.0 : SeaZ;
 	}
+	// Ce que le contour arrondi rend a la terre sort de l'eau : au moins 40 cm au-dessus du lac.
+	for (int32 I = 0; I < N; ++I)
+	{
+		if (LeftLake[I] != INDEX_NONE && LakeOf[I] == INDEX_NONE) R[I] = FMath::Max(R[I], Lakes[LeftLake[I]].Level + 40.0);
+	}
+
+	// Cuvettes closes du relief repare (forge, erosion, halos de tranchee) : un trou sans
+	// exutoire rend une tache sombre et casse l'ecoulement. Mesurees sur la surface de
+	// routage (rivieres ecrites comprises : la plaine centrale se draine par elles).
+	// Grande et profonde (>= LakeMinAreaM2, >= 3 m, <= 15 ha) : lac de bassin ferme, a son
+	// niveau de debordement moins 50 cm, contour naturel. Sinon : comblee jusqu'au col.
+	// Plus grande encore : laissee aux rivieres, qui franchissent le seuil en s'encaissant.
+	{
+		TArray<double> Surf = R;
+		for (int32 I = 0; I < N; ++I)
+		{
+			if (LakeOf[I] >= 0) Surf[I] = Lakes[LakeOf[I]].Level;
+			if (AuthDist[I] < G.S * 1.2) Surf[I] = FMath::Min(Surf[I], AuthZ[I] - 300.0);
+		}
+		const TArray<double> Fill = PriorityFlood(G, Surf);
+		TArray<uint8> Seen;
+		Seen.SetNumZeroed(N);
+		for (int32 Start = 0; Start < N; ++Start)
+		{
+			if (Seen[Start] || LakeOf[Start] >= 0 || Fill[Start] - Surf[Start] <= 1.0) continue;
+			TArray<int32> Cells = {Start};
+			Seen[Start] = 1;
+			double Depth = 0.0, Spill = TNumericLimits<double>::Max();
+			bool bAuthoredIn = false, bNearEdge = false;
+			for (int32 Q = 0; Q < Cells.Num(); ++Q)
+			{
+				const int32 I = Cells[Q];
+				Depth = FMath::Max(Depth, Fill[I] - Surf[I]);
+				Spill = FMath::Min(Spill, Fill[I]);
+				bAuthoredIn |= AuthDist[I] < G.S * 2.0;
+				bNearEdge |= G.EdgeDist(I) < FMath::RoundToInt(10000.0 / G.S);
+				for (int32 K = 0; K < 4; ++K)
+				{
+					const int32 X = I % G.W + Off4X[K], Y = I / G.W + Off4Y[K];
+					if (!G.In(X, Y)) continue;
+					const int32 J = Y * G.W + X;
+					if (!Seen[J] && LakeOf[J] < 0 && Fill[J] - Surf[J] > 1.0) { Seen[J] = 1; Cells.Add(J); }
+				}
+			}
+			if (Depth < 50.0) continue;
+			const double Area = Cells.Num() * CellM2;
+			if (Area > 150000.0) continue;
+			// Pres du bord, une cuvette est la douve que laisse la transition de bord de la forge
+			// entre le rempart et la limite de carte : on la comble, on n'y met pas de lac.
+			if (!bAuthoredIn && !bNearEdge && Depth >= 300.0 && Area >= Params.LakeMinAreaM2)
+			{
+				FLakeWork Lake;
+				Lake.Level = Spill - 50.0;
+				for (const int32 I : Cells) if (Surf[I] < Lake.Level) Lake.Cells.Add(I);
+				for (const int32 I : KeepLargestComponent(G, Lake.Cells)) R[I] = FMath::Max(R[I], Fill[I]);
+				if (Lake.Cells.Num() == 0) continue;
+				for (const int32 I : Lake.Cells) LakeOf[I] = Lakes.Num();
+				Lakes.Add(MoveTemp(Lake));
+				++Out.BasinLakes;
+			}
+			else
+			{
+				for (const int32 I : Cells) R[I] = FMath::Max(R[I], Fill[I]);
+				++Out.FilledPits;
+			}
+		}
+	}
 
 	// --- 3. Routage. Surface : relief repare, lacs a niveau, rivieres ecrites brulees.
 	TArray<double> Routing = R;
@@ -669,8 +841,23 @@ bool AnastasisDrainage::Apply(
 		}
 	}
 
-	// --- 4. Chenaux : seuil d'aire drainee releve jusqu'a MaxHeads tetes.
-	double A0 = Params.ChannelAreaM2 / CellM2;
+	// --- 4. Chenaux : critere aire x pente^2 (Montgomery & Dietrich). Un versant raide fait
+	// naitre un ruisseau avec peu d'aire drainee ; un plat en demande beaucoup -- sinon la
+	// plaine se couvre de lignes paralleles, droites, qui ne suivent aucune pente. Aire
+	// plancher ChannelAreaM2 ; au-dela de ChannelBigAreaM2 un cours d'eau existe quelle que
+	// soit la pente. Le seuil aire x pente^2 est releve jusqu'a MaxHeads tetes.
+	TArray<double> LocalSlope;
+	LocalSlope.SetNumUninitialized(N);
+	for (int32 I = 0; I < N; ++I)
+	{
+		const int32 X = I % G.W, Y = I / G.W, D = 3;
+		const double DX = R[Y * G.W + FMath::Min(X + D, G.W - 1)] - R[Y * G.W + FMath::Max(X - D, 0)];
+		const double DY = R[FMath::Min(Y + D, G.H - 1) * G.W + X] - R[FMath::Max(Y - D, 0) * G.W + X];
+		LocalSlope[I] = FMath::Sqrt(DX * DX + DY * DY) / (2.0 * D * G.S);
+	}
+	const double A0 = Params.ChannelAreaM2 / CellM2;
+	const double ABig = Params.ChannelBigAreaM2 / CellM2;
+	double AreaSlope = Params.ChannelAreaSlopeM2;
 	// Les tetes naissent a l'interieur : le versant exterieur du rempart, entre sa crete et
 	// le bord du monde, donnerait des ruisseaux paralleles au bord qui ne drainent rien.
 	const int32 EdgeMargin = FMath::RoundToInt(10000.0 / G.S);
@@ -682,18 +869,22 @@ bool AnastasisDrainage::Apply(
 		Up.SetNumZeroed(N);
 		for (int32 I = 0; I < N; ++I)
 		{
-			Channel[I] = Acc[I] >= A0 && LakeOf[I] < 0 && G.EdgeDist(I) >= EdgeMargin ? 1 : 0;
+			const bool bInitiates = Acc[I] >= ABig || Acc[I] * CellM2 * FMath::Square(LocalSlope[I]) >= AreaSlope;
+			Channel[I] = Acc[I] >= A0 && bInitiates && LakeOf[I] < 0 && G.EdgeDist(I) >= EdgeMargin ? 1 : 0;
 		}
 		for (int32 I = 0; I < N; ++I)
 		{
-			if (Down[I] >= 0 && Acc[I] >= A0 && (Channel[I] || LakeOf[I] >= 0)) Up[Down[I]] = 1;
+			if (Down[I] >= 0 && (Channel[I] || (LakeOf[I] >= 0 && Acc[I] >= A0))) Up[Down[I]] = 1;
 		}
 		int32 Heads = 0;
 		for (int32 I = 0; I < N; ++I) if (Channel[I] && !Up[I]) ++Heads;
 		if (Heads <= Params.MaxHeads) break;
-		A0 *= 1.15;
+		AreaSlope *= 1.15;
 	}
-	Out.ChannelAreaM2 = A0 * CellM2;
+	// Reference de la geometrie hydraulique (largeur, profondeur), fixe : elle ne suit pas le
+	// seuil d'initiation, sinon relever celui-ci elargirait toutes les rivieres.
+	Out.ChannelAreaM2 = Params.WidthRefAreaM2;
+	Out.ChannelAreaSlopeM2 = AreaSlope;
 	// Une riviere ecrite reste une riviere sur tout son trace, meme la ou l'aire drainee
 	// n'atteint pas le seuil : on ne supprime pas un cours d'eau existant.
 	for (int32 I = 0; I < N; ++I)
@@ -707,11 +898,15 @@ bool AnastasisDrainage::Apply(
 	}
 	// Un lac interieur deborde : son exutoire suit l'ecoulement depuis le seuil jusqu'au
 	// reseau, meme sous le seuil d'aire. Sinon ce serait une mare posee sans role.
-	for (const FLakeWork& Lake : Lakes)
+	for (int32 L = 0; L < Lakes.Num(); ++L)
 	{
+		FLakeWork& Lake = Lakes[L];
 		if (Lake.bBorder || Lake.bAuthored || Lake.Spill == INDEX_NONE) continue;
 		int32 C = Down[Lake.Spill], Guard = 0;
+		const int32 First = C;
 		while (C >= 0 && Guard++ < N && !Channel[C] && LakeOf[C] < 0) { Channel[C] = 1; C = Down[C]; }
+		// Chapelet de lacs : le seuil donne directement dans le lac suivant. C'est un exutoire.
+		if (C == First && C >= 0 && LakeOf[C] >= 0) Lake.SpillsInto = LakeOf[C];
 	}
 
 	// --- 5. Decomposition en rivieres : tronc = branche de plus grande aire a chaque confluence.
@@ -800,7 +995,8 @@ bool AnastasisDrainage::Apply(
 				}
 				int32 NearEdge = 0;
 				for (const int32 C : River.Cells) if (G.EdgeDist(C) < Margin) ++NearEdge;
-				const bool bEdgeHugger = NearEdge * 2 > River.Cells.Num();
+				// L'exutoire d'un lac reste, meme le long du bord : sans lui le lac n'a plus de role.
+				const bool bEdgeHugger = River.SourceLake == INDEX_NONE && NearEdge * 2 > River.Cells.Num();
 				const bool bShort = River.Parent != INDEX_NONE && River.SourceLake == INDEX_NONE && River.Cells.Num() * CellM < Params.MinTributaryM;
 				// Moignon : quelques cellules entre un lit ecrit et un lac, ou sur la rive d'une mer.
 				const bool bStub = River.SourceLake == INDEX_NONE && River.Cells.Num() * CellM < 60.0;
@@ -1277,8 +1473,10 @@ bool AnastasisDrainage::Apply(
 			const FLakeWork& Lake = Lakes[L];
 			// Lac interieur : cuvette sous son niveau. Pas le fond de tranchee d'origine, creuse
 			// sous la mer : sous un niveau releve de 20 m, il ferait des falaises.
-			Ground[I] = (Lake.bBorder || Lake.bAuthored) ? Z[I]
-				: Lake.Level - FMath::Min(450.0, 45.0 * LakeDepthCells[I]);
+			const double Bowl = Lake.Level - FMath::Min(450.0, 45.0 * LakeDepthCells[I]);
+			// Mer et lac ecrit gardent leur fond d'origine, plus profond ; ce que l'arrondi leur
+			// ajoute est creuse en cuvette. Lac interieur : cuvette partout.
+			Ground[I] = (Lake.bBorder || Lake.bAuthored) ? FMath::Min(Z[I], Bowl) : Bowl;
 			Water[I] = Lake.Level;
 		}
 		const FVector2D P(G.WX(I), G.WY(I));
@@ -1568,6 +1766,12 @@ bool AnastasisDrainage::Apply(
 		if (River.MouthLake >= 0) ++Out.Lakes[River.MouthLake].Inflows;
 		if (River.SourceLake >= 0) ++Out.Lakes[River.SourceLake].Outflows;
 	}
+	for (int32 L = 0; L < Lakes.Num(); ++L)
+	{
+		if (Lakes[L].SpillsInto == INDEX_NONE) continue;
+		++Out.Lakes[L].Outflows;
+		++Out.Lakes[Lakes[L].SpillsInto].Inflows;
+	}
 	Out.Riparian.SetNumUninitialized(N);
 	for (int32 I = 0; I < N; ++I) Out.Riparian[I] = static_cast<float>(Wetness[I]);
 	Out.GridW = G.W;
@@ -1720,10 +1924,10 @@ FString AnastasisDrainage::Describe(const FNetwork& Network)
 	int32 Interior = 0;
 	for (const FLake& Lake : Network.Lakes) Interior += Lake.bBorder ? 0 : 1;
 	return FString::Printf(
-		TEXT("rivers=%d heads=%d confluences=%d max_order=%d length_m=%.0f width_m=[%.1f,%.1f] mouths(river/lake/border)=%d/%d/%d lakes=%d interior_lakes=%d wetlands=%d channel_area_m2=%.0f repaired_water_vertices=%d kept_water_vertices=%d ms=%.0f"),
+		TEXT("rivers=%d heads=%d confluences=%d max_order=%d length_m=%.0f width_m=[%.1f,%.1f] mouths(river/lake/border)=%d/%d/%d lakes=%d interior_lakes=%d wetlands=%d area_slope_m2=%.0f basin_lakes=%d filled_pits=%d repaired_water_vertices=%d kept_water_vertices=%d ms=%.0f"),
 		Network.Rivers.Num(), Network.Heads, Network.Confluences, MaxOrder, Length,
 		Network.Rivers.Num() ? MinWidth / 100.0 : 0.0, MaxWidth / 100.0, ToRiver, ToLake, ToBorder,
-		Network.Lakes.Num(), Interior, Network.Wetlands.Num(), Network.ChannelAreaM2,
+		Network.Lakes.Num(), Interior, Network.Wetlands.Num(), Network.ChannelAreaSlopeM2, Network.BasinLakes, Network.FilledPits,
 		Network.RepairedWaterVertices, Network.KeptWaterVertices, Network.MilliSeconds);
 }
 
