@@ -4,6 +4,7 @@ param(
   [switch]$TerrainTests
 )
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 if($root -eq 'C:\dev\ANASTASIS_UNREAL' -and $Mode -ne 'Verify'){throw 'Use an isolated worktree for authored map changes.'}
 $evidenceDir=[IO.Path]::GetFullPath($Out)
@@ -27,7 +28,7 @@ if($TerrainTests -and $Mode -ne 'Verify'){throw 'TerrainTests requires Verify.'}
 $log=Join-Path $evidenceDir ($Mode.ToLower()+'.log')
 $argsList=@(('"'+$root+'\Anastasis_UnrealV2.uproject"'),'-windowed','-resx=1600','-resy=900','-unattended','-nosplash','-nosound','-NoLiveCoding','-ini:EditorSettings:[/Script/UnrealEd.EditorPerformanceSettings]:bThrottleCPUWhenNotForeground=False',('-abslog="'+$log+'"'),('-ExecCmds="py '+$wrapper.Replace('\','/')+'"'))
 if($TerrainTests){$argsList+=@('-testexit="Automation Test Queue Empty"','-LogCmds="LogAutomationTest Log"')}
-$p=Start-Process 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe' -ArgumentList $argsList -WindowStyle Hidden -PassThru
+$p=Start-AnastasisEditor 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe' $argsList
 Write-Output ('WORLD_DRESSING_PID::'+$p.Id)
 $deadline=(Get-Date).AddMinutes(12)
 while(-not $p.HasExited -and (Get-Date) -lt $deadline){Start-Sleep -Seconds 2;$p.Refresh()}

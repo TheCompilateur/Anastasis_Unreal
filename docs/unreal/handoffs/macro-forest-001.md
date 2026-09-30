@@ -1,4 +1,46 @@
-# macro-forest-001 — forêt de la vallée actuelle
+# macro-forest-001 — passe de forme forestière du 2026-09-30
+
+MISSION: Affiner les arbres existants dans une direction stylisée haut de gamme, de près et à distance. Worktree réutilisé après la livraison macro initiale; base de cette passe: `ee575f8aba1249edce9b90463c7f15c167720a89`.
+
+FILES_OWNED:
+- `tools/unreal/create_tree_asset.py`
+- `tools/unreal/capture-forest-walk.py`
+- `Content/Anastasis/Vegetation/SM_Tree_*_01.uasset` (les huit variantes existantes et Generic, neuf fichiers)
+- `Content/Anastasis/Materials/M_AnastasisBark.uasset`
+- `Content/Anastasis/Materials/M_AnastasisVegetation.uasset` (régénéré par la recette, graphe fonctionnel conservé)
+- `AGENTS.md` (index de l'outil de capture)
+- cette fiche
+
+COMMIT: BRANCH_HEAD
+
+Réutilisation: grammaire GeometryScript, palette, deux matériaux, registre et HISM du projet. Aucun nouveau système de placement. Les troncs sont affinés, avec contreforts de racines; les couronnes reçoivent des rameaux et feuilles pliées opaques. L'écorce obtient des fissures procédurales et une normale dérivée, sans texture externe. La graine de forme est fixée par nom de variante. Les neuf bornes Z restent [-50,+50], pour préserver le contrat d'ancrage. Aucun Source/, Config/, map, simulateur, terrain, bâtiment ou PNJ modifié.
+
+Trois LOD par arbre: géométrie proche, réduction à 50% à la taille écran .22, enveloppe lointaine composée à .055. L'enveloppe lointaine évite la perte de couverture observée en supprimant simplement 93% des feuilles. Conifère canopée: 12534 / 6267 / 558 triangles; feuillu canopée: 9610 / 4804 / 450. Les tailles de meshes ne sont pas des triangles effectivement soumis au GPU.
+
+MEC: génération complète `RESULT::PASS meshes=9`, sauvegardes et rechargement confirmés. Suite ciblée complète: 40 PASS, 0 KNOWN_EXPECTED_FAILURE, 0 FAIL, 0 incomplet, sortie 0. Filtres: `Anastasis.Ecology+Anastasis.Terrain+Anastasis.Presentation+Anastasis.Places`. Inclut `TreePivotConvention`, `TreeMaterialSlots`, `MacroForestCanonicalRelief` et `HumanGeography.CollisionAndDressing` (5/5 points, erreur maximale 0.000195 cm, arbre maximal 2707.8 cm). Index des outils: aucun Missing/Stale. Pas de modification C++ dans cette passe; Editor compilé sur la base indiquée au début du travail.
+
+SCN: OBSERVED/PARTIAL. Trois vues fixes comparables en éditeur, 1600x900: vallée, rive, intérieur. 16120 arbres dans les six HISM existants. Captures finales terminées, mêmes caméras que le témoin. Les feuilles, rameaux, contreforts et fissures sont visibles; les masses lointaines restent présentes. Sol nu, petits buissons anciens, ombres très sombres et raccords de LOD en mouvement restent à travailler. Ce n'est pas une certification artistique AAA.
+
+Preuves hors Git, sous `C:\Users\alex_\.codex\visualizations\2026\09\29\01a0ef4d-f7a0-72c0-8f4d-cc4c8234f6c4\forest-aaa\`:
+- `generate-6.log`: génération complète finale, sortie 0, en éditeur vivant avec `-nullrhi` (pas un commandlet Python).
+- `before/{valley,edge,interior}.png` et `final/{valley,edge,interior}.png`: comparaison retenue. La quatrième ancienne caméra crown visait trop haut et est exclue.
+- `final/capture.log`, `final/report.json`, `comparison-cameras.json`: identité du worktree, nombre d'instances, LOD rechargés, caméras, fin du run.
+- `verified/capture.log`, `verified/report.json`, `verified/exit-code.txt` et les trois PNG: seconde ouverture complète, sortie 0, mêmes 16120 arbres et mêmes LOD. C'est le run de livraison. Les anciens champs `instance_transform_sha256` de ces deux rapports utilisaient la représentation texte des structs Unreal et ne constituent pas une preuve de répétabilité interprocessus; l'outil est corrigé pour sérialiser les nombres triés. Pas de claim de répétabilité fondé sur ces anciens champs.
+- `automation.log`, `tests.json`: résultats ciblés, classés par `automation-log.ps1` et le registre officiel.
+
+La génération 5 a échoué par épuisement mémoire de la machine (0.03 GiB virtuel disponible, plusieurs éditeurs concurrents). La génération 6 a réécrit les neuf assets et réussi. Aucun autre éditeur fermé. Le run visuel `final` contient des ensures UE de détection d'accès concurrents au démarrage, avant le script; il a ensuite produit les trois images et marqué completed=true, mais son processus a rendu -1073741819 après fermeture du log. Les images sont observées, la fermeture de ce premier processus n'est pas PASS. Le contrôle `verified`, sans changement d'assets, a produit les trois captures puis fermé avec sortie 0. Aucune erreur de compilation du matériau observée. Pas de seal de santé globale moteur.
+
+PLY: UNKNOWN. Aucune marche jouée ni validation humaine. PERF: UNKNOWN; les temps de callback de l'éditeur incluent la charge concurrente de la machine et ne permettent pas de conclure sur le coût GPU. L'ancienne clé `resident_lod0_triangle_upper_bound` des essais est mal nommée: il s'agissait d'une somme instance×triangles LOD0. L'outil livré la nomme `instance_weighted_lod0_triangle_upper_bound`; ce n'est ni la mémoire résidente, ni une mesure de soumission.
+
+INTEGRATION_RISK: assets binaires partagés avec tout autre chantier d'arbres/matériaux. Intégrer la recette et les onze assets ensemble. Ne pas régénérer depuis une ancienne recette. Génération dans un éditeur dédié; elle refuse un commandlet avant toute écriture. Aucun seal canonique ni intégration revendiqué pour cette passe.
+
+NEXT: composer le sol forestier avec les éléments existants, régler la lecture des ombres puis vérifier les transitions en mouvement et mesurer le GPU sur une machine disponible.
+
+---
+
+## Archive de la première passe macro, intégrée avant cette passe
+
+Les preuves ci-dessous décrivent la livraison antérieure, pas les nouveaux assets.
 
 MISSION: Première passe de macro végétation, sans modifier la topographie ni le simulateur PNJ.
 

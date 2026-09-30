@@ -1,5 +1,6 @@
 param([switch]$Rebuild, [int]$TimeoutSec = 300)
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'editor-launch.ps1')
 # Root deduit de l'emplacement du script, comme capture-slice.ps1 : un agent doit
 # pouvoir forger SON asset dans SON worktree.
 $Root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
@@ -21,7 +22,7 @@ $launchArgs = @(
   ('-abslog="' + $log + '"'),
   ('-ExecCmds="py ' + $py + '"')
 )
-$p = Start-Process $Editor -ArgumentList $launchArgs -PassThru
+$p = Start-AnastasisEditor $Editor $launchArgs
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
 $p.Refresh()
 if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force; throw 'SHORE_MATERIAL::FAIL editeur bloque' }

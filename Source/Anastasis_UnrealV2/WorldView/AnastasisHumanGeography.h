@@ -16,6 +16,9 @@ struct FSample
     double RiverWeight = 0;
 };
 FSample Evaluate(double X, double Y, double OriginalHeight);
+/** Authored river centrelines, upstream first: XY in the same tile coordinates as Evaluate,
+ * Z = water height in metres of the unscaled relief. Read by HYDRO_NETWORK_001. */
+TArray<TArray<FVector>> AuthoredRivers();
 void Apply(const AnastasisWorldView::FWorldVisualSnapshot& Snapshot,
     AnastasisTerrainSurface::FGeometry& Geometry, int32 Width, int32 Height);
 }

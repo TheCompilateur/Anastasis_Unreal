@@ -80,6 +80,9 @@ bool Apply(
 bool SampleHeight(const FMesh& Mesh, double WorldX, double WorldY, double& OutZ);
 bool SampleActiveWater(double WorldX, double WorldY, double& OutZ);
 
+/** Normales par sommet recalculees depuis les triangles, comme a la fin d'Apply. */
+void RecomputeNormals(AnastasisTerrainSurface::FGeometry& Geometry);
+
 void SetActive(const FMesh& Mesh);
 void ClearActive();
 /** Échantillon du sol réellement rendu si un Apply est actif, sinon false. */

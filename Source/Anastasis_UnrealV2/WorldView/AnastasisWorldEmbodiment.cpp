@@ -4,7 +4,9 @@
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisTerrainForge.h"
+#include "WorldView/AnastasisTerrainHorizon.h"
 #include "WorldView/AnastasisHumanGeography.h"
+#include "WorldView/AnastasisDrainage.h"
 #include "WorldView/AnastasisPlaces.h"
 
 #include "Anastasis_UnrealV2.h"
@@ -62,6 +64,15 @@ static TAutoConsoleVariable<int32> CVarShoreline(
 static TAutoConsoleVariable<int32> CVarGroundMaterial(
     TEXT("anastasis.Terrain.GroundMaterial"), 1,
     TEXT("0=materiau de tranche historique (couleur de sommet plate), 1=sol morphologique MI_AnastasisGround (defaut); applique a l'incarnation."),
+    ECVF_Default);
+
+// HORIZON_RING_001. Le bord du monde rendu : 0 = rien au-dela des 96 tuiles (le sol de
+// planete du SkyAtmosphere, presque noir, remplit le bas de l'horizon), 1 = anneau de
+// terrain lointain raccorde au bord forge. N'existe que sur le monde ENTIER forge : un
+// decoupage partiel a des voisins reels, pas un horizon.
+static TAutoConsoleVariable<int32> CVarTerrainHorizon(
+    TEXT("anastasis.Terrain.Horizon"), 1,
+    TEXT("0=nothing beyond the map edge, 1=distant terrain ring around the forged world (default); applied on embodiment."),
     ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarWorldViewSeed(
@@ -190,6 +201,14 @@ AAnastasisWorldEmbodiment::AAnastasisWorldEmbodiment()
 	ExperimentalSurface->SetCanEverAffectNavigation(false);
 	ExperimentalSurface->SetCastShadow(true);
 	ExperimentalSurface->SetVisibility(false);
+
+	// Anneau lointain : decor pur, jamais marche -- ni collision ni navigation.
+	HorizonSurface = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("HorizonTerrain"));
+	HorizonSurface->SetupAttachment(Root);
+	HorizonSurface->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HorizonSurface->SetCanEverAffectNavigation(false);
+	HorizonSurface->SetCastShadow(true);
+	HorizonSurface->SetVisibility(false);
 
 	// The level holds no world truth: every tile is regenerated from the seed at load. Transient
 	// keeps the instances OnConstruction builds in the editor out of the .umap, which would
@@ -402,6 +421,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
             Z=AnastasisTerrainSurface::WaterPlaneZ;
             return true;
         };
+        Habitat.SampleRiparian = [](double X, double Y, double& W) { return AnastasisDrainage::RiparianAt(X, Y, W); };
         const bool bMacro = ForestDressing.bMacroForest && CVarMacroForest.GetValueOnGameThread() != 0;
         if (!AnastasisEcologicalDressing::Build(CanonicalSource, ForestDressing, ForestPlan, Error,
             bMacro ? &Habitat : nullptr))
@@ -655,6 +675,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
     bool bSurfaceBuilt = false;
 
     if (ExperimentalSurface) ExperimentalSurface->SetVisibility(false);
+    if (HorizonSurface) { HorizonSurface->ClearAllMeshSections(); HorizonSurface->SetVisibility(false); }
     for (auto& Mesh : TerrainMeshes) if (Mesh) { Mesh->SetVisibility(true); Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); }
     const int32 SurfaceMode = CVarTerrainSurface.GetValueOnGameThread();
     if (SurfaceMode == 1 || SurfaceMode == 2)
@@ -706,6 +727,54 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 // connaitre SHORELINE_FORGE_001. On les remplit donc ici, sur le maillage
                 // REELLEMENT rendu -- ce qui vaut mieux que l'ancien : la marge suit
                 // desormais le relief tessele, pas le pas de tuile de 100 uu.
+                // HYDRO_NETWORK_001 : le reseau de drainage remplace les tranchees au niveau de
+                // la mer par des rivieres qui descendent. Mode 2 seulement : la tranche scellee
+                // du mode 1 reste bit a bit celle de WORLD_SLICE_006.
+                AnastasisDrainage::FNetwork Drainage;
+                if (SurfaceMode == 2 && AnastasisDrainage::IsEnabled())
+                {
+                    AnastasisDrainage::FParams DrainageParams;
+                    if (ForgeMesh.bBasinFound || ForgeMesh.bHumanGeography) DrainageParams.Protected.Add(FVector2D(ForgeMesh.BasinX, ForgeMesh.BasinY));
+                    if (ForgeMesh.bLandmarkFound) DrainageParams.Protected.Add(FVector2D(ForgeMesh.LandmarkX, ForgeMesh.LandmarkY));
+                    if (AnastasisDrainage::Apply(Crop, ForgeMesh, Drainage, DrainageParams))
+                    {
+                        Geometry = ForgeMesh.Geometry;
+                        AnastasisTerrainForge::SetActive(ForgeMesh);
+                        const AnastasisDrainage::FCheck Check = AnastasisDrainage::Check(Drainage, ForgeMesh);
+                        UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_DRAINAGE enabled=1 %s"), *AnastasisDrainage::Describe(Drainage));
+                        UE_LOG(LogAnastasis_UnrealV2, Display,
+                            TEXT("ANASTASIS_DRAINAGE check uphill=%d narrowing=%d confluence_narrower=%d dangling_mouths=%d isolated_water=%d lakes_without_role=%d bank_containment=%.3f"),
+                            Check.UphillSteps, Check.NarrowingSteps, Check.ConfluenceNarrower, Check.DanglingMouths,
+                            Check.IsolatedWaterBodies, Check.LakesWithoutRole, Check.BankContainment);
+                        for (int32 RiverIndex = 0; RiverIndex < Drainage.Rivers.Num(); ++RiverIndex)
+                        {
+                            const AnastasisDrainage::FRiver& River = Drainage.Rivers[RiverIndex];
+                            const auto& A = River.Points[0];
+                            const auto& B = River.Points.Last();
+                            UE_LOG(LogAnastasis_UnrealV2, Display,
+                                TEXT("ANASTASIS_DRAINAGE river=%d order=%d mouth=%s parent=%d source_lake=%d mouth_lake=%d authored=%d length_m=%.0f width_m=%.1f->%.1f depth_m=%.2f->%.2f velocity_ms=%.2f->%.2f water_z=%.0f->%.0f"),
+                                RiverIndex, River.Order,
+                                River.Mouth == AnastasisDrainage::EMouth::River ? TEXT("river") : River.Mouth == AnastasisDrainage::EMouth::Lake ? TEXT("lake") : TEXT("border"),
+                                River.Parent, River.SourceLake, River.MouthLake, River.bAuthored ? 1 : 0, River.LengthM,
+                                A.Width / 100.0, B.Width / 100.0, A.Depth / 100.0, B.Depth / 100.0, A.Velocity, B.Velocity,
+                                A.Location.Z, B.Location.Z);
+                        }
+                        for (int32 LakeIndex = 0; LakeIndex < Drainage.Lakes.Num(); ++LakeIndex)
+                        {
+                            const AnastasisDrainage::FLake& Lake = Drainage.Lakes[LakeIndex];
+                            UE_LOG(LogAnastasis_UnrealV2, Display,
+                                TEXT("ANASTASIS_DRAINAGE lake=%d border=%d surface_z=%.0f cells=%d inflows=%d outflows=%d at=(%.0f,%.0f)"),
+                                LakeIndex, Lake.bBorder ? 1 : 0, Lake.SurfaceZ, Lake.Cells, Lake.Inflows, Lake.Outflows, Lake.Centroid.X, Lake.Centroid.Y);
+                        }
+                    }
+                }
+                else
+                {
+                    UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_DRAINAGE enabled=0"));
+                }
+                AnastasisDrainage::SetActive(Drainage);
+                AnastasisDrainage::DumpIfRequested(Drainage);
+                AnastasisDrainage::DrawDebug(GetWorld(), Drainage, AnastasisDrainage::DebugMode());
                 AnastasisTerrainSurface::FillShorelineChannels(Crop, Geometry);
                 ForgeBasin = FVector(ForgeMesh.BasinX, ForgeMesh.BasinY, ForgeMesh.BasinZ);
                 ForgeLandmark = FVector(ForgeMesh.LandmarkX, ForgeMesh.LandmarkY, ForgeMesh.LandmarkZ);
@@ -769,6 +838,54 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 ExperimentalSurface->SetMaterial(1, ShoreMaterial);
             }
             ExperimentalSurface->SetVisibility(true);
+            // HORIZON_RING_001 : seulement quand Crop EST le monde -- ses bords sont alors
+            // les vrais bords, et le maillage forge porte le pourtour que l'anneau reprend.
+            const bool bWholeWorld = Crop.OriginX == 0 && Crop.OriginY == 0
+                && Crop.W == Crop.SourceW && Crop.H == Crop.SourceH;
+            if (HorizonSurface && bForged && SurfaceMode == 2 && bWholeWorld
+                && CVarTerrainHorizon.GetValueOnGameThread() != 0)
+            {
+                AnastasisTerrainHorizon::FRing Ring;
+                // Geometry, pas ForgeMesh.Geometry : c'est elle qui porte les canaux de rive
+                // (FillShorelineChannels ci-dessus), que l'anneau 0 doit reprendre.
+                if (AnastasisTerrainHorizon::Build(ForgeMesh, Crop.Seed, Ring, &Geometry))
+                {
+                    const auto& RG = Ring.Geometry;
+                    HorizonSurface->CreateMeshSection_LinearColor(0, RG.Vertices, RG.Triangles,
+                        RG.Normals, RG.UV0, RG.UV1, TArray<FVector2D>{}, TArray<FVector2D>{},
+                        RG.Colors, TArray<FProcMeshTangent>{}, false);
+                    if (SurfaceMaterial)
+                    {
+                        HorizonSurface->SetMaterial(0, SurfaceMaterial);
+                    }
+                    // Section 1 : la rivière qui sort de la carte, meme nappe et meme
+                    // materiau que la section 1 de la carte, qu'elle prolonge.
+                    if (RG.WaterTriangles.Num() > 0)
+                    {
+                        TArray<FLinearColor> RingWaterColors;
+                        RingWaterColors.Init(FLinearColor(0.043f, 0.176f, 0.290f, 1.0f), RG.WaterVertices.Num());
+                        HorizonSurface->CreateMeshSection_LinearColor(1, RG.WaterVertices, RG.WaterTriangles, RG.WaterNormals,
+                            bShoreline ? RG.WaterUV0 : TArray<FVector2D>{},
+                            bShoreline ? RG.WaterUV1 : TArray<FVector2D>{},
+                            TArray<FVector2D>{}, TArray<FVector2D>{},
+                            RingWaterColors, TArray<FProcMeshTangent>{}, false);
+                        if (ShoreMaterial)
+                        {
+                            HorizonSurface->SetMaterial(1, ShoreMaterial);
+                        }
+                    }
+                    HorizonSurface->SetVisibility(true);
+                    UE_LOG(LogAnastasis_UnrealV2, Display,
+                        TEXT("ANASTASIS_TERRAIN_HORIZON enabled=1 perimeter=%d rings=%d vertices=%d triangles=%d water_triangles=%d edge_water=%d outer_m=%.0f skirt_m=%.0f z=[%.0f,%.0f]"),
+                        Ring.Perimeter, Ring.Rings, RG.Vertices.Num(), RG.Triangles.Num() / 3, RG.WaterTriangles.Num() / 3,
+                        Ring.EdgeWater, Ring.Distances[Ring.Rings - 2] / 100.0, Ring.Distances.Last() / 100.0, Ring.MinZ, Ring.MaxZ);
+                }
+            }
+            else
+            {
+                UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TERRAIN_HORIZON enabled=0 forged=%d whole_world=%d"),
+                    bForged ? 1 : 0, bWholeWorld ? 1 : 0);
+            }
             for (auto& Mesh : TerrainMeshes) if (Mesh) { Mesh->SetVisibility(false); Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); }
             BuiltSurfaceCrop = Crop;
             bSurfaceBuilt = true;

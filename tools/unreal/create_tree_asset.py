@@ -44,9 +44,13 @@ vert et le tronc cesserait d'exister visuellement.
 Signatures confirmees contre CE build (UE 5.8.2, CL 56702186) -- ne pas
 supposer que la doc Epic d'une autre version correspond.
 
-Lancer headless :
-  UnrealEditor-Cmd.exe <uproject> -run=pythonscript -script="tools/unreal/create_tree_asset.py"
+Lancer dans un editeur dedie (la reduction LOD exige StaticMeshEditor) :
+  UnrealEditor.exe <uproject> -RenderOffscreen -ExecCmds="py <chemin absolu de ce script>"
+Ou dans la console Python de cet editeur. Le commandlet Python est refuse
+avant toute ecriture. Fermer l'editeur apres la generation si lance en batch.
 """
+import math
+import random
 import unreal
 
 PACKAGE_PATH = "/Game/Anastasis/Vegetation"
@@ -436,18 +440,115 @@ ALIAS_OF_GENERIC = "SM_Tree_Conifer_Canopy_01"
 GENERIC_NAME = "SM_Tree_Generic_01"
 
 
+def branch_between(mesh, start, end, radius, tip):
+    delta = [end[i] - start[i] for i in range(3)]
+    length = math.sqrt(sum(v * v for v in delta))
+    return taper(mesh, radius, tip, 0, length, steps=8,
+                 location=unreal.Vector(*start),
+                 rotator=unreal.Rotator(pitch=-math.degrees(math.acos(delta[2] / length)),
+                                       yaw=math.degrees(math.atan2(delta[1], delta[0]))), prim=PRIM_WOOD)
+
+
+def leaf_blades(centres, color, rng):
+    """Opaque folded blades: real silhouette gaps, no alpha overdraw or external texture.
+
+    Positions and palette are recipe-seeded. Four triangles per blade, with a raised
+    central vein; broad crown volumes become small readable groups at human height.
+    """
+    vertices, triangles, colors, uv = [], [], [], []
+    for cx, cy, cz, size in centres:
+        angle = rng.random() * math.tau
+        tilt = rng.uniform(-0.65, 0.65)
+        axis = (math.cos(angle), math.sin(angle), tilt)
+        side = (-math.sin(angle), math.cos(angle), rng.uniform(-0.25, 0.25))
+        base = len(vertices)
+        for along, across, lift, u, v in ((-1, 0, 0, 0.5, 0), (0, .58, 0, 1, .5),
+                                         (1, 0, 0, .5, 1), (0, -.58, 0, 0, .5),
+                                         (0, 0, .16, .5, .5)):
+            vertices.append(unreal.Vector(cx + size*(along*axis[0]+across*side[0]),
+                                          cy + size*(along*axis[1]+across*side[1]),
+                                          cz + size*(along*axis[2]+across*side[2]+lift)))
+            uv.append(unreal.Vector2D(u,v))
+        tint = rng.uniform(.80, 1.18)
+        colors.extend([unreal.LinearColor(color.r*tint, color.g*tint, color.b*tint, 1)]*5)
+        for i in range(4): triangles.append(unreal.IntVector(base+4,base+(i+1)%4,base+i))
+    buffers = unreal.GeometryScriptSimpleMeshBuffers(vertices=vertices,triangles=triangles,
+                                                     vertex_colors=colors,uv0=uv)
+    mesh, unused = unreal.GeometryScript_MeshEdits.append_buffers_to_mesh(
+        unreal.DynamicMesh(), buffers, material_id=SLOT_FOLIAGE)
+    return mesh
+
+
+def living_crown(spec, rng):
+    """Keep the authored crown envelope, articulate it into boughs and leaf sprays."""
+    foliage = unreal.DynamicMesh()
+    wood = unreal.DynamicMesh()
+    blades = []
+    color = spec['foliage']
+    if spec['lobes']:
+        for radius,cx,cy,cz,squash in spec['lobes']:
+            wood = branch_between(wood,(0,0,-18),(cx,cy,cz),.72,.22)
+            # Small inner groups carry volume; disconnected outer blades carry the edge.
+            for k in range(7):
+                theta = k * 2.399963 + rng.uniform(-.15,.15)
+                z = 1 - 2*(k+.5)/7
+                ring = math.sqrt(max(0,1-z*z))
+                px,py,pz = cx+radius*.62*ring*math.cos(theta),cy+radius*.62*ring*math.sin(theta),cz+radius*.62*z*squash
+                part = lobe(unreal.DynamicMesh(),radius*rng.uniform(.18,.25),px,py,pz,.8)
+                foliage = merge(foliage,coloured(part,unreal.LinearColor(color.r*.88,color.g*.88,color.b*.88,1)))
+            for k in range(220):
+                theta = k*2.399963
+                z = 1-2*(k+.5)/220
+                ring = math.sqrt(max(0,1-z*z))
+                shell = rng.uniform(.68,1.02)
+                blades.append((cx+radius*shell*ring*math.cos(theta),cy+radius*shell*ring*math.sin(theta),
+                               cz+radius*shell*z*squash,radius*rng.uniform(.105,.155)))
+    else:
+        # Thin sprays transmit light. Closed ellipsoids here create black stacked
+        # plates from below, even with a two-sided foliage material.
+        for tier,(radius,top,z0,z1) in enumerate(spec['tiers']):
+            for layer in range(3):
+                fraction=(layer+rng.uniform(.1,.5))/3
+                reach=radius*(1-fraction)+top*fraction
+                z=z0+(z1-z0)*fraction
+                for b in range(7):
+                    angle=b*math.tau/7+tier*.83+layer*.61+rng.uniform(-.2,.2)
+                    length=reach*rng.uniform(.8,1.1)
+                    ex,ey=length*math.cos(angle),length*math.sin(angle)
+                    bz=z+rng.uniform(-2,2)
+                    wood=branch_between(wood,(0,0,bz+2),(ex,ey,bz-1.5),.30,.08)
+                    for k in range(24):
+                        t=rng.uniform(.22,1.05)
+                        spread=rng.uniform(-1,1)*(length*.23*math.sin(min(t,1)*math.pi)+.4)
+                        px=ex*t-math.sin(angle)*spread
+                        py=ey*t+math.cos(angle)*spread
+                        pz=bz+1.5*math.sin(t*math.pi)-1.8*t+rng.uniform(-1.2,1.2)
+                        blades.append((px,py,pz,max(.8,length*rng.uniform(.12,.18))))
+    foliage=merge(foliage,leaf_blades(blades,color,rng))
+    return foliage,coloured(wood,spec['bark'])
+
+
 def build_family(spec):
     parts = []
-    trunk = build_trunk(spec["trunk"], spec["bark"])
+    rng = random.Random(spec['name'] + ':forest-walk-001')
+    slender = [(s[0]*.55,s[1]*.55,*s[2:]) for s in spec['trunk']]
+    trunk = build_trunk(slender, spec["bark"])
     if trunk is not None:
         parts.append(trunk)
-    limbs = build_limbs(spec["limbs"], spec["bark"])
+    limbs = build_limbs([(s[0]*.55,s[1]*.55,*s[2:]) for s in spec['limbs']], spec["bark"])
     if limbs is not None:
         parts.append(limbs)
-    if spec["tiers"]:
-        parts.append(build_tiers(spec["tiers"], spec["foliage"]))
-    if spec["lobes"]:
-        parts.append(build_crown_lobes(spec["lobes"], spec["foliage"]))
+    foliage, twigs = living_crown(spec,rng)
+    parts.extend((foliage,twigs))
+    if slender:
+        roots=unreal.DynamicMesh()
+        radius=slender[0][0]
+        for k in range(6):
+            angle=k*math.tau/6+.25
+            roots=branch_between(roots,(0,0,-45),(radius*2.1*math.cos(angle),radius*2.1*math.sin(angle),-49.3),radius*.48,.18)
+        if spec['tiers']:
+            roots=taper(roots,slender[-1][1],.15,slender[-1][3],49,steps=9,prim=PRIM_WOOD)
+        parts.append(coloured(roots,spec['bark']))
 
     mesh = unreal.DynamicMesh()
     for part in parts:
@@ -458,7 +559,34 @@ def build_family(spec):
     return shade(normalise(mesh, spec["name"]))
 
 
-def save_static_mesh(mesh, asset_path):
+def distant_crown(spec):
+    """Closed crown envelopes below 5.5% screen height preserve forest coverage.
+
+    Decimating disconnected leaf sprays deletes coverage rather than detail. Use
+    the existing authored tier/lobe envelopes at this distance, with cheap offset
+    groups; this mesh is never the close view.
+    """
+    mesh = unreal.DynamicMesh()
+    trunk = build_trunk([(s[0]*.55,s[1]*.55,*s[2:]) for s in spec['trunk']], spec['bark'])
+    if trunk is not None:
+        mesh = merge(mesh, trunk)
+    else:
+        mesh = merge(mesh, build_limbs(spec['limbs'], spec['bark']))
+    crown = unreal.DynamicMesh()
+    for tier, (radius, top, z0, z1) in enumerate(spec['tiers']):
+        for k in range(3):
+            angle = k*math.tau/3 + tier*.8
+            part = taper(unreal.DynamicMesh(), radius*.65, top*.40, z0, z1, steps=7,
+                         location=unreal.Vector(radius*.35*math.cos(angle),
+                                                radius*.35*math.sin(angle), z0))
+            crown = merge(crown, part)
+    for radius, cx, cy, cz, squash in spec['lobes']:
+        crown = merge(crown, lobe(unreal.DynamicMesh(), radius, cx, cy, cz, squash))
+    mesh = merge(mesh, coloured(crown, spec['foliage']))
+    return shade(normalise(mesh, spec['name'] + ' distant'))
+
+
+def save_static_mesh(mesh, asset_path, far_mesh):
     if unreal.EditorAssetLibrary.does_asset_exist(asset_path):
         unreal.EditorAssetLibrary.delete_asset(asset_path)
 
@@ -505,6 +633,34 @@ def save_static_mesh(mesh, asset_path):
             asset, unreal.ScriptingCollisionShapeType.NDOP10_X)
     except Exception as exc:  # noqa: BLE001 -- best effort, comme la version precedente
         log("WARN collision simple refusee sur %s: %s" % (asset_path, exc))
+
+    # Detail belongs near the camera. Explicit screen thresholds and measured output;
+    # HISM chooses the LOD, no per-tree actor or distance polling is introduced.
+    reductions = unreal.StaticMeshReductionOptions()
+    reductions.auto_compute_lod_screen_size = False
+    reductions.reduction_settings = [unreal.StaticMeshReductionSettings(percent_triangles=p,screen_size=s)
+                                    for p,s in ((1.0,1.0),(.50,.22),(.07,.055))]
+    subsystem=unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
+    if subsystem is None:
+        editors=unreal.get_editor_subsystem(unreal.AssetEditorSubsystem)
+        if editors is None: raise RuntimeError('Tree LOD generation requires a live editor, not a Python commandlet')
+        editors.open_editor_for_assets([asset])
+        subsystem=unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
+        editors.close_all_editors_for_asset(asset)
+    if subsystem is None: raise RuntimeError('StaticMeshEditor module did not provide its LOD subsystem')
+    lod_count=subsystem.set_lods(asset,reductions)
+    if lod_count != 3: raise RuntimeError('%s: expected 3 LODs, got %s'%(asset_path,lod_count))
+    copy_options = unreal.GeometryScriptCopyMeshToAssetOptions(enable_recompute_tangents=True)
+    unused, outcome = unreal.GeometryScript_AssetUtils.copy_mesh_to_static_mesh(
+        far_mesh, asset, copy_options, unreal.GeometryScriptMeshWriteLOD(lod_index=2))
+    if outcome != unreal.GeometryScriptOutcomePins.SUCCESS:
+        raise RuntimeError('%s: distant LOD copy failed: %s' % (asset_path, outcome))
+    far_settings = subsystem.get_lod_reduction_settings(asset, 2)
+    far_settings.percent_triangles = 1.0
+    far_settings.percent_vertices = 1.0
+    far_settings.base_lod_model = 2
+    subsystem.set_lod_reduction_settings(asset, 2, far_settings)
+    log('LODS %s triangles=%s'%(asset_path,[asset.get_num_triangles(i) for i in range(3)]))
 
     unreal.EditorAssetLibrary.save_asset(asset.get_path_name())
     bounds = asset.get_bounding_box()
@@ -682,6 +838,42 @@ def ensure_bark_material():
             wired = 'output=' + repr(out_name)
             break
 
+    # Broad vertical fissures plus fine grain. UVs come from the recipe primitives;
+    # palette still comes from vertex colours. Derivatives give a world-space normal
+    # without a new texture dependency or geometry on distant trunks.
+    uv = mel.create_material_expression(mat, unreal.MaterialExpressionTextureCoordinate, -1100, -120)
+    position = mel.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -1100, 100)
+    normal = mel.create_material_expression(mat, unreal.MaterialExpressionVertexNormalWS, -1100, 260)
+    genome = '''
+        float2 q = UV * float2(42.0, 7.0);
+        float bend = sin(q.y*1.7)*0.16 + sin(q.y*4.1+q.x*0.19)*0.09;
+        float ridge = pow(saturate(0.5+0.5*sin((q.x+bend)*6.283185)), 5.0);
+        float grain = sin(q.x*31.0+sin(q.y*7.0))*sin(q.y*18.0+q.x);
+        float h = ridge*0.65 + grain*0.055;
+    '''
+    for description,code,prop in (
+        ('Bark fissure colour',genome+'return Colour*(0.72+ridge*0.42+grain*0.06);',unreal.MaterialProperty.MP_BASE_COLOR),
+        ('Bark fissure normal',genome+'''
+            float3 n=normalize(Normal);
+            float3 a=cross(ddy(Position),n), b=cross(n,ddx(Position));
+            float det=dot(ddx(Position),a);
+            float3 g=sign(det)*(ddx(h)*a+ddy(h)*b);
+            return normalize(max(abs(det),0.000001)*n-g*1.5);
+        ''',unreal.MaterialProperty.MP_NORMAL)):
+        node=mel.create_material_expression(mat,unreal.MaterialExpressionCustom,-450,-100 if prop==unreal.MaterialProperty.MP_BASE_COLOR else 100)
+        node.set_editor_property('description',description)
+        node.set_editor_property('code',code)
+        node.set_editor_property('output_type',unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+        inputs=[]
+        for name in ('UV','Colour','Position','Normal'):
+            entry=unreal.CustomInput();entry.set_editor_property('input_name',name);inputs.append(entry)
+        node.set_editor_property('inputs',inputs)
+        for source,out_name,name in ((uv,'','UV'),(vc,'','Colour'),(position,'','Position'),(normal,'','Normal')):
+            if not mel.connect_material_expressions(source,out_name,node,name):
+                raise RuntimeError('Bark input not connected: '+name)
+        if not mel.connect_material_property(node,'',prop):raise RuntimeError('Bark property not connected')
+    mat.set_editor_property('tangent_space_normal',False)
+
     # Plus rugueux et moins speculaire que le feuillage : une ecorce humide
     # n'accroche pas la lumiere comme une feuille cireuse.
     rough = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -350, 260)
@@ -712,20 +904,24 @@ def ensure_bark_material():
 
 def main():
     log("start")
+    if unreal.get_editor_subsystem(unreal.AssetEditorSubsystem) is None:
+        raise RuntimeError('Tree generation requires a live editor; no assets were modified')
     ensure_material()
     ensure_bark_material()
 
     built = {}
     for spec in FAMILIES:
         mesh = build_family(spec)
+        far_mesh = distant_crown(spec)
         path = PACKAGE_PATH + "/" + spec["name"]
-        save_static_mesh(mesh, path)
-        built[spec["name"]] = mesh
+        save_static_mesh(mesh, path, far_mesh)
+        built[spec["name"]] = (mesh, far_mesh)
         log("  %s -- %s" % (spec["name"], spec["note"]))
 
     # L'alias garde le chemin du repli code vivant sans dupliquer une septieme
     # silhouette : c'est la meme geometrie, sous le nom que le C++ connait.
-    save_static_mesh(built[ALIAS_OF_GENERIC], PACKAGE_PATH + "/" + GENERIC_NAME)
+    mesh, far_mesh = built[ALIAS_OF_GENERIC]
+    save_static_mesh(mesh, PACKAGE_PATH + "/" + GENERIC_NAME, far_mesh)
     log("ALIAS %s <- %s" % (GENERIC_NAME, ALIAS_OF_GENERIC))
 
     log("RESULT::PASS meshes=%d" % (len(FAMILIES) + 1))

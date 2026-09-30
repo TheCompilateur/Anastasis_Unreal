@@ -4,6 +4,7 @@ param(
   [ValidateSet('0', '1')][string]$Mode = '1',
   [int]$TimeoutSec = 300)
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'editor-launch.ps1')
 # Root deduit de l'emplacement du script : la preuve doit porter sur les binaires
 # du worktree qui la produit, jamais sur ceux du canonique.
 $Root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
@@ -27,7 +28,7 @@ $launchArgs = @(
   ('-abslog="' + $log + '"'),
   ('-ExecCmds="py ' + $py + '"')
 )
-$p = Start-Process $Editor -ArgumentList $launchArgs -PassThru
+$p = Start-AnastasisEditor $Editor $launchArgs
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
 $p.Refresh()
 if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force; throw 'SHORE_CAPTURE::FAIL editeur bloque' }

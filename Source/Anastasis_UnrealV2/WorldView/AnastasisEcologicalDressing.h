@@ -62,6 +62,9 @@ struct FRenderedHabitat
 {
     TFunction<bool(double, double, double&)> SampleHeight;
     TFunction<bool(double, double, double&)> SampleWaterHeight;
+    /** Optional: rendered riparian wetness [0,1] at (X, Y) world (HYDRO_NETWORK_001). Thins the
+     * canopy along the rivers actually rendered, not only near the simulation's water tiles. */
+    TFunction<bool(double, double, double&)> SampleRiparian;
     FVector Basin = FVector::ZeroVector;
     bool bHasBasin = false;
 };

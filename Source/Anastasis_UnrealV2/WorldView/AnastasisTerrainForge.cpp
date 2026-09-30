@@ -387,6 +387,11 @@ void RebuildNormals(AnastasisTerrainSurface::FGeometry& G)
 }
 }
 
+void AnastasisTerrainForge::RecomputeNormals(AnastasisTerrainSurface::FGeometry& Geometry)
+{
+	RebuildNormals(Geometry);
+}
+
 void AnastasisTerrainForge::SetActive(const FMesh& Mesh)
 {
 	GActive = Mesh;
