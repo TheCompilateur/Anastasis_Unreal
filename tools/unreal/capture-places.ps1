@@ -2,6 +2,7 @@
 # Voir places-capture.py. Sortie : Saved\PlacesEvidence\<Label>\<lieu>_<vue>_<on|off>.png
 param([string]$Label='latest', [switch]$OnOnly, [switch]$All, [int]$TimeoutSec=1500)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 $Editor='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $dir=Join-Path $Root "Saved\PlacesEvidence\$Label"
@@ -21,7 +22,7 @@ $launchArgs=@(
  ('-abslog="'+$log+'"'),
  ('-ExecCmds="py '+$py+'"')
 )
-$p=Start-Process $Editor -ArgumentList $launchArgs -PassThru
+$p=Start-AnastasisEditor $Editor $launchArgs
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
 $p.Refresh()
 if(-not $p.HasExited){ Stop-Process -Id $p.Id -Force; throw 'CAPTURE::FAIL editeur bloque' }

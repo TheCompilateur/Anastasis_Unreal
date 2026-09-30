@@ -1,5 +1,6 @@
 param([ValidateSet('status','build','verify','editor','health','build-game')][string]$Command='status',[switch]$Force)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Canonical='C:\dev\ANASTASIS_UNREAL'
 $WorktreeRoot='C:\dev\ANASTASIS_WORKTREES'
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
@@ -115,8 +116,10 @@ try {
  }
  if($Command -eq 'editor'){
   # Port MCP propre a cette racine, sinon tous les editeurs se disputent 8000 : voir mcp-port.ps1.
-  Start-Process "$Engine/Engine/Binaries/Win64/UnrealEditor.exe" -ArgumentList @(('"'+$Project+'"'),"-ModelContextProtocolPort=$McpPort") -WindowStyle Hidden | Out-Null
-  Write-Output "EDITOR::START_REQUESTED (not a verification)`nMCP_URL::http://localhost:$McpPort/mcp"; exit 0
+  Start-AnastasisEditor "$Engine/Engine/Binaries/Win64/UnrealEditor.exe" @(('"'+$Project+'"'),"-ModelContextProtocolPort=$McpPort") | Out-Null
+  Write-Output "EDITOR::START_REQUESTED (not a verification)`nMCP_URL::http://localhost:$McpPort/mcp"
+  if($env:ANASTASIS_EDITOR_VISIBLE -ne '1'){Write-Output 'EDITOR::DISCRET hors ecran, sans focus -- ANASTASIS_EDITOR_VISIBLE=1 pour le voir (AGENTS.md)'}
+  exit 0
  }
  # UBT performs the incremental dependency check even when the fingerprint matches.
  BuildCanonical
@@ -128,7 +131,7 @@ try {
  if($busy.Count){
   Write-Output ('VERIFY::NOTE concurrent editors pids=' + (($busy | ForEach-Object Id) -join ','))
  }
- $proc=Start-Process "$Engine/Engine/Binaries/Win64/UnrealEditor.exe" -ArgumentList $launchArgs -WindowStyle Hidden -PassThru
+ $proc=Start-AnastasisEditor "$Engine/Engine/Binaries/Win64/UnrealEditor.exe" $launchArgs
  # 4 minutes was enough on a warm canonical DDC (01:28 PASS ~30s session). Cold
  # worktree DDC plus concurrent unattended editors on this machine timed out
  # still loading modules at 4:00 (2026-09-13 worktree verify). 12 minutes

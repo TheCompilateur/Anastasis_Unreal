@@ -6,6 +6,7 @@
 # Les deux sont orthogonaux : l'un deplace la camera, l'autre change une CVar.
 param([ValidateSet('0','1','2')][string]$Mode='1',[Parameter(Mandatory=$true)][string]$Out,[string]$RebuildMaterial='0',[ValidateSet('auto','world','slice')][string]$Cam='auto',[string]$CamLoc='',[string]$CamRot='',[string]$PreCmds='',[int]$TimeoutSec=300)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 $Editor='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $dir=Join-Path $Root 'Saved\SliceEvidence'
@@ -31,7 +32,7 @@ $launchArgs=@(
  ('-abslog="'+$log+'"'),
  ('-ExecCmds="'+$(if($PreCmds){$PreCmds+','}else{''})+'py '+$py+'"')
 )
-$p=Start-Process $Editor -ArgumentList $launchArgs -PassThru
+$p=Start-AnastasisEditor $Editor $launchArgs
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
 $p.Refresh()
 if(-not $p.HasExited){

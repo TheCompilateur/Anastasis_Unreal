@@ -3,6 +3,7 @@ param([Parameter(Mandatory=$true)][string]$Out,[int]$TimeoutSec=300)
 # l'editeur est lance, le script Python cadre et capture, puis se ferme lui-meme.
 # Le niveau n'est jamais sauve -- voir tools/unreal/capture-tree-lineup.py.
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 $Editor='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $dir=Join-Path $Root 'Saved\SliceEvidence'
@@ -24,7 +25,7 @@ $launchArgs=@(
  ('-abslog="'+$log+'"'),
  ('-ExecCmds="py '+$py+'"')
 )
-$p=Start-Process $Editor -ArgumentList $launchArgs -PassThru
+$p=Start-AnastasisEditor $Editor $launchArgs
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
 $p.Refresh()
 if(-not $p.HasExited){

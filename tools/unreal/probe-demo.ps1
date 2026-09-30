@@ -1,5 +1,6 @@
 param([string]$Mission = 'phaseg', [string]$PreCmds = '', [string]$Bookmark = 'OVERVIEW', [int]$TimeoutSec = 300)
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'editor-launch.ps1')
 # Le root est deduit de l'emplacement du script, comme capture-slice.ps1 : un agent
 # doit pouvoir prouver SON worktree. Coder en dur C:\dev\ANASTASIS_UNREAL faisait
 # tourner la preuve sur les binaires du canonique, donc sur un autre code que celui
@@ -25,7 +26,7 @@ $launchArgs = @(
   ('-abslog="' + $log + '"'),
   ('-ExecCmds="' + $exec + '"')
 )
-$p = Start-Process $Editor -ArgumentList $launchArgs -PassThru
+$p = Start-AnastasisEditor $Editor $launchArgs
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
 $p.Refresh()
 if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force; throw 'PROBE_DEMO::FAIL editeur bloque' }

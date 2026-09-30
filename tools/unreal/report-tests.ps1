@@ -16,6 +16,7 @@
 # Sortie : 0 si aucun FAIL et si le run est alle au bout, 1 sinon.
 param([string]$Filter = 'Anastasis')
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'editor-launch.ps1')
 . (Join-Path $PSScriptRoot 'automation-log.ps1')
 $Root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 $Engine = 'C:\Program Files\Epic Games\UE_5.8'
@@ -34,7 +35,7 @@ $launchArgs = @(
   ('-ExecCmds="Automation RunTests ' + $Filter + ';Quit"'),
   '-testexit="Automation Test Queue Empty"'
 )
-$p = Start-Process "$Engine\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" -ArgumentList $launchArgs -WindowStyle Hidden -PassThru
+$p = Start-AnastasisEditor "$Engine\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" $launchArgs
 $p | Wait-Process -Timeout 900 -ErrorAction SilentlyContinue
 $p.Refresh()
 if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force; throw 'TESTS::FAIL lanceur bloque' }

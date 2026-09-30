@@ -43,6 +43,7 @@ function Handoff-Path($m) { return (Join-Path (Path-Of $m) "docs\unreal\handoffs
 
 . (Join-Path $PSScriptRoot 'mcp-port.ps1')
 . (Join-Path $PSScriptRoot 'tools-index.ps1')
+. (Join-Path $PSScriptRoot 'editor-launch.ps1')
 
 # Enregistre, en portee locale Claude Code, le serveur MCP de l'editeur de CE worktree.
 # La portee locale (cle = chemin du worktree dans ~/.claude.json) prime sur le .mcp.json
@@ -186,6 +187,12 @@ switch ($Command) {
       Write-Output 'FAIL: index de tools/unreal/ dans AGENTS.md desynchronise'
       $index.Missing | ForEach-Object { Write-Output "    MISSING $_  (present, non indexe)" }
       $index.Stale | ForEach-Object { Write-Output "    STALE   $_  (indexe, absent)" }
+      exit 1
+    }
+    $raw = @(Find-RawEditorLaunch $path)
+    if ($raw.Count -gt 0) {
+      Write-Output 'FAIL: Unreal lance sans Start-AnastasisEditor (fenetre au premier plan devant Alexandre, AGENTS.md)'
+      $raw | ForEach-Object { Write-Output "    $_" }
       exit 1
     }
     & (Join-Path $path 'tools\unreal\anastasis-unreal.ps1') build

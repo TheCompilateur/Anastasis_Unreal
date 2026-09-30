@@ -1,5 +1,6 @@
 param([switch]$Rebuild, [int]$TimeoutSec = 600)
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'editor-launch.ps1')
 # Root deduit du script, comme capture-slice.ps1 et probe-demo.ps1 : un agent doit
 # pouvoir generer les assets de SON worktree, pas de la racine canonique.
 $Root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
@@ -16,7 +17,7 @@ $launchArgs = @(
   ('-abslog="' + $log + '"'),
   ('-ExecCmds="py ' + $py + '"')
 )
-$p = Start-Process $Editor -ArgumentList $launchArgs -PassThru -WindowStyle Hidden
+$p = Start-AnastasisEditor $Editor $launchArgs
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
 $p.Refresh()
 if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force; throw 'GROUND_MATERIAL::FAIL editeur bloque' }

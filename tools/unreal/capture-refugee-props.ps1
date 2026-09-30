@@ -1,5 +1,6 @@
 param([Parameter(Mandatory=$true)][string]$OutDir,[int]$TimeoutSec=900,[switch]$FinishOnly)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $project=Join-Path $root 'Anastasis_UnrealV2.uproject'
 $engine='C:\Program Files\Epic Games\UE_5.8'
@@ -17,7 +18,7 @@ $argsList=@(('"'+$project+'"'),'-windowed','-resx=1600','-resy=1000','-nosplash'
  '-unattended','-NoSound','-RenderOffscreen',
  '-ini:EditorSettings:[/Script/UnrealEd.EditorPerformanceSettings]:bThrottleCPUWhenNotForeground=False',
  ('-abslog="'+$log+'"'),('-ExecCmds="py '+$script+'"'))
-$p=Start-Process (Join-Path $engine 'Engine/Binaries/Win64/UnrealEditor.exe') -ArgumentList $argsList -WindowStyle Hidden -PassThru
+$p=Start-AnastasisEditor (Join-Path $engine 'Engine/Binaries/Win64/UnrealEditor.exe') $argsList
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
 $p.Refresh()
 if(-not $p.HasExited){Stop-Process -Id $p.Id;throw 'Own capture editor timed out'}

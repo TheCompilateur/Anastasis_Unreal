@@ -53,7 +53,7 @@ Cycle de vie, un outil unique : `tools\unreal\agent-worktree.ps1`
 |---|---|
 | `create -Mission <m>` | branche + worktree depuis `main`, port MCP du worktree enregistré |
 | `status` | tous les worktrees : modifications, avance/retard sur `main`, branches non intégrées |
-| `finish -Mission <m>` | portail de fin : index `tools/unreal/` à jour, build + `report-tests`, refuse de passer la main si du travail n'est pas commité |
+| `finish -Mission <m>` | portail de fin : index `tools/unreal/` à jour, aucun Unreal lancé hors `Start-AnastasisEditor`, build + `report-tests`, refuse de passer la main si du travail n'est pas commité |
 | `mcp -Mission <m>` | (ré)enregistre le port MCP d'un worktree existant côté Claude Code |
 | `integrate -Mission <m>` | rôle intégrateur : refuse si le canonique est sale, puis avance rapide de `main` |
 | `preflight` | avant un `verify`/seal : dit ce qui bloque et **ouvre une fenêtre** d'observation |
@@ -197,10 +197,32 @@ une raison de tuer l'éditeur d'un autre agent.
 Ce qui transite par ce plugin est « Licensed Technology » au sens de l'EULA Unreal (section 6(e)) :
 l'avertissement de démarrage est attendu (`known-log-patterns.txt`).
 
+## Éditeurs discrets — ne jamais lancer Unreal avec `Start-Process`
+
+Alexandre travaille sur la même machine. Le 2026-09-29, les éditeurs des agents s'ouvraient au premier
+plan devant lui ; il les fermait, et tuait sans le savoir la preuve en cours d'un agent (six fermetures,
+dont deux `report-tests`). Signature dans le log : `Window '… - Unreal Editor' being destroyed` puis
+`Cmd: QUIT_EDITOR`. Ce n'est ni un crash ni un test : relancer, ne pas chercher de régression.
+
+Tout lancement d'Unreal passe donc par `Start-AnastasisEditor` (`editor-launch.ps1`), jamais par
+`Start-Process` — `agent-worktree.ps1 finish` refuse la passation sinon (`Find-RawEditorLaunch`) :
+
+- la première fenêtre s'affiche **sans prendre le focus** ;
+- un gardien caché (`editor-window-guard.ps1`) envoie chaque fenêtre du processus hors de l'écran, au fond
+  de la pile, y compris celles ouvertes plus tard (PIE, Journal des messages), et **rend le focus** à la
+  fenêtre de l'utilisateur si l'éditeur le prend ;
+- pas de minimisation : Slate ne dessine plus une fenêtre minimisée, et les captures en dépendent. Les
+  captures gardent `bThrottleCPUWhenNotForeground=False`.
+
+L'objet rendu est un `System.Diagnostics.Process` : `Wait-Process`, `HasExited`, `ExitCode`, `Modules`
+fonctionnent comme avant. `ANASTASIS_EDITOR_VISIBLE=1` rétablit la fenêtre normale (pour regarder un
+éditeur travailler, ou débloquer une boîte de dialogue). `ANASTASIS_EDITOR_GUARD_LOG=<fichier>` journalise
+le gardien.
+
 ## Index de `tools/unreal/`
 
-Chaque `.ps1` lance l'éditeur de **son** worktree (racine déduite de son chemin) et pilote le `.py`
-associé. Un `.py` sans `.ps1` se lance dans un éditeur ouvert (`py <chemin>` en console) : son en-tête
+Chaque `.ps1` lance l'éditeur de **son** worktree (racine déduite de son chemin), discrètement (voir
+ci-dessus), et pilote le `.py` associé. Un `.py` sans `.ps1` se lance dans un éditeur ouvert (`py <chemin>` en console) : son en-tête
 dit comment. Sorties dans `Saved/SliceEvidence/` sauf mention contraire.
 
 Opérateur et portails :
@@ -211,6 +233,8 @@ Opérateur et portails :
 | `agent-worktree.ps1` | cycle de vie multi-agent : `create` / `status` / `finish` / `integrate` / `preflight` / `postflight` / `mcp` |
 | `mcp-port.ps1` | port MCP d'une racine, à dot-sourcer |
 | `tools-index.ps1` | contrôle cet index contre le dossier, à dot-sourcer : `finish` bloque, `health` passe YELLOW |
+| `editor-launch.ps1` | `Start-AnastasisEditor` : lancement d'Unreal sans focus, avec gardien, à dot-sourcer |
+| `editor-window-guard.ps1` | gardien lancé par `Start-AnastasisEditor` : fenêtres hors écran, focus rendu |
 | `report-tests.ps1` | suite `Anastasis`, classée PASS / KNOWN_EXPECTED_FAILURE / FAIL, refuse un run tronqué |
 | `project-health.ps1` | rapport de santé des preuves (appelé par `health`) ; absent ou périmé ≠ PASS |
 | `automation-log.ps1` | lecture de log d'automation partagée par les deux précédents, pas un point d'entrée |
