@@ -85,4 +85,5 @@ def pose(mode,view):
 
 r.setup=setup
 r.pose=pose
-r.start_capture()
+if __name__ == '__main__':
+    r.start_capture()

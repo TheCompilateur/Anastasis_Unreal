@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$OutDir,[int]$TimeoutSec=720,[ValidateSet('capture-reed-form.py','capture-shore-composition.py','capture-shore-contact.py')][string]$CaptureScript='capture-reed-form.py')
+param([Parameter(Mandatory=$true)][string]$OutDir,[int]$TimeoutSec=720,[ValidateSet('capture-reed-form.py','capture-shore-composition.py','capture-shore-contact.py','capture-shore-material.py')][string]$CaptureScript='capture-reed-form.py')
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $project=Join-Path $root 'Anastasis_UnrealV2.uproject'
