@@ -625,3 +625,82 @@ int32 UAnastasisSimulationDebugLibrary::CountMealsTaken(const UObject* WorldCont
 	for (const AnastasisVillage::FNpc& N : Sim->GetVillage().GetActors()) Meals += N.MealsTaken;
 	return Meals;
 }
+
+// One opt-in circuit. Uses an actual Food tile near the settlement, an empty
+// granary and one healthy adult. Repeating the command cannot inject/refill food.
+bool UAnastasisSimulationSubsystem::SeedFoodSupply()
+{
+	using namespace AnastasisVillage;
+	if (!Simulation.IsRunning()) return false;
+	auto& V = Simulation.GetVillage();
+	if (!V.GetFoodSources().IsEmpty() || !V.GetActors().IsEmpty() || !V.GetBuildings().IsEmpty())
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("FOOD_SUPPLY refused: start in an empty village; existing state preserved"));
+		return false;
+	}
+	const auto& W = Simulation.GetWorld();
+	TArray<int32> Candidates;
+	for (int32 I=0; I<W.Tiles.Num(); ++I)
+	{
+		const auto& T = W.Tiles[I];
+		if (T.Resource == AnastasisWorld::EResource::Food && T.Amount > 0 && !V.IsFootBlocked(T.X+0.5,T.Y+0.5)) Candidates.Add(I);
+	}
+	const auto Center=V.GetSettlement();
+	Candidates.StableSort([&](int32 A, int32 B)
+	{
+		const auto& X=W.Tiles[A]; const auto& Y=W.Tiles[B];
+		return FMath::Square(X.X-Center.X)+FMath::Square(X.Y-Center.Y) < FMath::Square(Y.X-Center.X)+FMath::Square(Y.Y-Center.Y);
+	});
+	for (int32 I:Candidates)
+	{
+		const auto& T=W.Tiles[I];
+		for (int32 DY=-4; DY<=4; ++DY) for (int32 DX=-4; DX<=4; ++DX)
+		{
+			if (FMath::Max(FMath::Abs(DX),FMath::Abs(DY))!=4) continue;
+			const int32 X=T.X+DX,Y=T.Y+DY;
+			if (V.IsFootBlocked(X+0.5,Y+0.5)) continue;
+			const FString B=V.AddBuilding(GranaryType,X,Y);
+			if(B.IsEmpty()) continue;
+			bool bReachable=false;
+			FPoint Start;
+			const AnastasisPath::FWorldNavSource Nav(V.GetNavGrid(),W);
+			for(const auto& Door:V.FindBuilding(B)->AccessPoints)
+			{
+				TArray<FPoint> Path;
+				if(AnastasisPath::FindPath(Nav,Door,{T.X+0.5,T.Y+0.5},{},Path)) {Start=Door;bReachable=true;break;}
+			}
+			if(!bReachable) {V.RemoveBuilding(B);continue;}
+			V.ActivateFoodSource(T.X,T.Y);
+			V.SetSettlement(Start.X,Start.Y);
+			AnastasisNeeds::FNeeds N; N.Hunger=10; N.Energy=95; N.Hygiene=95; N.Social=95; N.Leisure=95;
+			V.SpawnNpc(Start.X,Start.Y,N);
+			SyncVillagePresentation();
+			UE_LOG(LogAnastasis_UnrealV2,Display,TEXT("FOOD_SUPPLY ready source=(%d,%d) initial=%d depot=%s empty=1"),T.X,T.Y,T.Amount,*B);
+			FAnastasisVillagePresentation::LogStatus(V,Simulation.GetTime());
+			return true;
+		}
+	}
+	UE_LOG(LogAnastasis_UnrealV2,Warning,TEXT("FOOD_SUPPLY no reachable generated source"));
+	return false;
+}
+
+static FAutoConsoleCommandWithWorld CmdAnastasisFoodSupply(
+	TEXT("Anastasis.Village.FoodSupply"),
+	TEXT("Start one finite food circuit in an empty village: generated resource, empty granary, autonomous inhabitant. No refill."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		if(auto* Host=World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr) Host->SeedFoodSupply();
+	}));
+
+FString UAnastasisSimulationDebugLibrary::GetFoodSupplyStatus(const UObject* WorldContextObject)
+{
+	const auto* Sim=DebugSimulation(WorldContextObject);
+	if(!Sim) return TEXT("{}");
+	const auto& V=Sim->GetVillage();
+	int32 Initial=0,Remaining=0,Bag=0,Stored=0,Meals=0,Gathered=0,Delivered=0;
+	for(const auto& S:V.GetFoodSources()) {Initial+=S.Initial;Remaining+=S.Remaining;}
+	for(const auto& B:V.GetBuildings()) Stored+=B.FoodPhysical;
+	for(const auto& N:V.GetActors()) {Bag+=N.InventoryFood;Meals+=N.MealsTaken;Gathered+=N.GatheredFood;Delivered+=N.DeliveredFood;}
+	const auto* First = V.GetActors().IsEmpty() ? nullptr : &V.GetActors()[0];
+	return FString::Printf(TEXT("{\"x\":%.5f,\"y\":%.5f,\"time\":%.4f,\"initial\":%d,\"remaining\":%d,\"bag\":%d,\"stock\":%d,\"meals\":%d,\"gathered\":%d,\"delivered\":%d}"),First ? First->X : 0.0,First ? First->Y : 0.0,Sim->GetTime(),Initial,Remaining,Bag,Stored,Meals,Gathered,Delivered);
+}

@@ -59,7 +59,7 @@ namespace AnastasisVillage
 
 		bool IsPortedGoal(const FString& Goal)
 		{
-			return Goal == GoalEat || Goal == GoalRest || Goal == GoalDrink;
+			return Goal == GoalEat || Goal == GoalRest || Goal == GoalDrink || Goal == TEXT("gatherFood") || Goal == TEXT("deliver");
 		}
 
 		FString TargetKey(const FPoint& P)
@@ -138,8 +138,8 @@ namespace AnastasisVillage
 		// Table adulte de npc.js (adultScores), moins `eat`, `rest` et `drink`.
 		static const TArray<FString> Goals = {
 			TEXT("eatTogether"), TEXT("relax"), TEXT("relieve"),
-			TEXT("gatherWood"), TEXT("gatherStone"), TEXT("gatherFood"), TEXT("helpFarm"),
-			TEXT("sell"), TEXT("buy"), TEXT("build"), TEXT("craft"), TEXT("maintain"), TEXT("deliver"),
+			TEXT("gatherWood"), TEXT("gatherStone"), TEXT("helpFarm"),
+			TEXT("sell"), TEXT("buy"), TEXT("build"), TEXT("craft"), TEXT("maintain"),
 			TEXT("fetchInput"), TEXT("haulJob"), TEXT("aidHousehold"), TEXT("visitFamily"), TEXT("explore"),
 			TEXT("socialize"), TEXT("confront"), TEXT("shelterRain"), TEXT("closeWorkplace"),
 		};
@@ -159,6 +159,7 @@ namespace AnastasisVillage
 		NextBuildingId = 0;
 		NextNpcId = 0;
 		Now = 0.0;
+		FoodSources.Reset();
 		MealReservations.Reset();
 		MealSeq = 0;
 		ReservationSweepAt = 0.0;
@@ -956,6 +957,9 @@ namespace AnastasisVillage
 	bool FVillage::TryEnterIndoorAction(FNpc& Npc)
 	{
 		if (Npc.Inside.bActive || !IsDomesticGoal(Npc.Goal)) return false;
+		// Supply scenario: no hunger reduction by sitting in an empty granary.
+		// Preserve the reference-only granary/house fixtures when supply is inactive.
+		if (FoodSources.Num() > 0 && Npc.Goal == GoalEat && !FindMealReservation(Npc.Id)) return false;
 		const FBuilding* Building = NearLivingHome(Npc);
 		if (!Building) Building = BuildingForIndoorAction(Npc, Npc.Goal);
 		if (!Building)
@@ -1083,7 +1087,7 @@ namespace AnastasisVillage
 		else
 		{
 			const bool bDrinking = Npc.Goal == GoalDrink && !Npc.Inside.bActive && AtDrinkSpot(Npc.X, Npc.Y);
-			AnastasisNeeds::TickNeeds(Npc.Needs, Dt, bDrinking, /*bWorking=*/false);
+			AnastasisNeeds::TickNeeds(Npc.Needs, Dt, bDrinking, /*bWorking=*/Npc.Goal == TEXT("gatherFood"));
 		}
 
 		// Dedans : ni pensee, ni marche, seulement le temps qui passe.
@@ -1151,6 +1155,12 @@ namespace AnastasisVillage
 			if (G == GoalEat) Score = Trace.NeedScores.Eat + EatJobPriorityBias;
 			else if (G == GoalRest) Score = Trace.NeedScores.Rest + RestJobPriorityBias;
 			else if (G == GoalDrink) Score = Trace.NeedScores.Drink + (Wells > 0 ? 6.0 : 0.0);
+			// Bounded food-supply extension: known finite source + known depot.
+			// Existing Noûs urgency and phase biases still arbitrate needs.
+			if (FoodSources.Num() > 0 && G == TEXT("gatherFood"))
+				Score = Npc.InventoryFood == 0 && HasKnownFoodSource(Npc) && KnownFoodDepot(Npc) ? 85.0 : -1000.0;
+			if (FoodSources.Num() > 0 && G == TEXT("deliver"))
+				Score = Npc.InventoryFood > 0 && KnownFoodDepot(Npc) ? 100.0 + 5.0 * Npc.InventoryFood : -1000.0;
 			Score += AnastasisRhythm::PhaseBias(Phase, Subject, G);
 			Rows.Add(TPair<FString, double>(G, Score));
 		}
@@ -1180,7 +1190,12 @@ namespace AnastasisVillage
 			Trace.NousScore = Npc.AlgoDecision.Score;
 			Trace.NousUrgency = Npc.AlgoDecision.Urgency;
 		}
-		const FString Next = ApplyAlgorithmicCommitGate(Npc, Rows[0].Key, Npc.Goal, Trace.CommitGate);
+		FString Next = ApplyAlgorithmicCommitGate(Npc, Rows[0].Key, Npc.Goal, Trace.CommitGate);
+		// Finish a physical delivery before resuming gathering; urgent needs retain priority.
+		if (FoodSources.Num() > 0 && Npc.InventoryFood > 0 && KnownFoodDepot(Npc) && !NeedsCritical(Npc.Needs))
+			Next = TEXT("deliver");
+		if (FoodSources.Num() > 0 && Next == TEXT("gatherFood") && (!HasKnownFoodSource(Npc) || Npc.InventoryFood > 0 || !KnownFoodDepot(Npc)))
+			Next = GoalObserver;
 		CommitGoal(Npc, Next, Trace);
 	}
 
@@ -1212,6 +1227,7 @@ namespace AnastasisVillage
 		if (Npc.Goal == GoalDrink) bFound = DrinkTarget(Npc, Target, Source);
 		else if (Npc.Goal == GoalRest) bFound = RestTarget(Npc, Target, Source);
 		else if (Npc.Goal == GoalEat) bFound = EatTarget(Npc, Target, Source);
+		else if (Npc.Goal == TEXT("gatherFood") || Npc.Goal == TEXT("deliver")) bFound = FoodSupplyTarget(Npc, Target, Source);
 		else
 		{
 			Npc.bHasTarget = false;
@@ -1340,10 +1356,10 @@ namespace AnastasisVillage
 		}
 
 		Npc.WorkTimer += Dt;
-		if (Npc.WorkTimer < 1.0)
+		if (Npc.WorkTimer < (Npc.Goal == TEXT("gatherFood") ? 3.0 : 1.0))
 		{
 			// `waitingActivity` : « boit » ; pour rest, `restActivity`.
-			Npc.Activity = Npc.Goal == GoalDrink ? TEXT("boit") : Npc.Goal == GoalEat ? TEXT("mange") : RestActivity(IsNight());
+			Npc.Activity = Npc.Goal == TEXT("gatherFood") ? TEXT("cueille") : Npc.Goal == TEXT("deliver") ? TEXT("depose") : Npc.Goal == GoalDrink ? TEXT("boit") : Npc.Goal == GoalEat ? TEXT("mange") : RestActivity(IsNight());
 			return;
 		}
 		Npc.WorkTimer = 0.0;
@@ -1364,6 +1380,7 @@ namespace AnastasisVillage
 
 	bool FVillage::Perform(FNpc& Npc)
 	{
+		if (Npc.Goal == TEXT("gatherFood") || Npc.Goal == TEXT("deliver")) return PerformFoodSupply(Npc);
 		if (Npc.Goal == GoalDrink)
 		{
 			// `case "drink"` : setActivity("boit"), satisfyDrink, markDrink (gestuelle, non portee).
@@ -1618,6 +1635,16 @@ namespace AnastasisVillage
 		}
 		Writer.EndArray();
 
+		Writer.Key(TEXT("foodSources")).BeginArray(FoodSources.Num());
+		for (const FFoodSource& S : FoodSources)
+		{
+			Writer.BeginObject();
+			Writer.Key(TEXT("tile")).Number(S.TileIndex);
+			Writer.Key(TEXT("initial")).Number(S.Initial);
+			Writer.Key(TEXT("remaining")).Number(S.Remaining);
+			Writer.EndObject();
+		}
+		Writer.EndArray();
 		Writer.Key(TEXT("actors")).BeginArray(Actors.Num());
 		for (const FNpc& N : Actors.GetItems())
 		{
@@ -1665,6 +1692,14 @@ namespace AnastasisVillage
 			Writer.Key(TEXT("morale")).Number(N.Needs.Morale);
 			Writer.Key(TEXT("workTimer")).Number(N.WorkTimer);
 			Writer.Key(TEXT("inventoryFood")).Number(N.InventoryFood);
+			Writer.Key(TEXT("foodSource")).Number(N.FoodSourceIndex);
+			Writer.Key(TEXT("knownFood")).BeginArray(FoodSources.Num());
+			for (const FFoodSource& S : FoodSources)
+			{
+				const int32* Known = N.KnownFoodSources.Find(S.TileIndex);
+				if (Known) Writer.Number(*Known); else Writer.Null();
+			}
+			Writer.EndArray();
 			Writer.Key(TEXT("hungerAction")).String(N.HungerAction.State);
 			Writer.EndObject();
 		}
@@ -1725,6 +1760,11 @@ namespace AnastasisVillage
 	{
 		if (!bForce && Now - Npc.LastScan < PerceptionScanInterval) return;
 		Npc.LastScan = Now;
+		for (const FFoodSource& S : FoodSources)
+		{
+			if (Dist(Npc.X, Npc.Y, S.Position.X, S.Position.Y) <= PerceptionRadius)
+				Npc.KnownFoodSources.Add(S.TileIndex, S.Remaining);
+		}
 		const double CX = AnastasisJs::Floor(Npc.X);
 		const double CY = AnastasisJs::Floor(Npc.Y);
 		// `perceiveBeliefs` : un depot qui accepte la nourriture est une reserve VISIBLE.
