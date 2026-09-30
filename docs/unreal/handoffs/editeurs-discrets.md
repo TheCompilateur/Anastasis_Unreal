@@ -20,8 +20,8 @@ agent n'envoyait de fermeture (verifie : ni taskkill, ni CloseMainWindow, ni com
 - 17 lancements convertis dans 16 scripts : `anastasis-unreal.ps1` (verify, editor), `report-tests.ps1`,
   `capture-slice`, `capture-places`, `capture-reed-form`, `capture-shore-reeds`, `capture-terrain-forge`,
   `capture-terrain-relief`, `capture-tree-lineup`, `ground-material`, `measure-tree-cost`, `probe-demo`,
-  `shore-capture`, `shore-water`, `world-dressing-01`, et `capture-horizon` (arrive de main pendant
-  l'integration, avec un Start-Process)
+  `shore-capture`, `shore-water`, `world-dressing-01`, puis `capture-horizon` et `capture-refugee-props`
+  (arrives de main pendant l'integration, chacun avec un Start-Process) : 18 lancements, 17 scripts
 - `tools/unreal/agent-worktree.ps1` -- `finish` refuse tout lancement d'Unreal hors `Start-AnastasisEditor`
   (`Find-RawEditorLaunch`). Teste : 0 dans ce worktree, 17 sur 17 sur main avant integration.
 - `AGENTS.md` -- section « Éditeurs discrets », index des deux nouveaux scripts, table des commandes
