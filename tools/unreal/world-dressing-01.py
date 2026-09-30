@@ -16,7 +16,7 @@ les=unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 eas=unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 world=ues.get_editor_world()
 root=os.path.normcase(os.path.abspath(unreal.Paths.project_dir()))
-if root==os.path.normcase(r'C:\dev\ANASTASIS_UNREAL'):
+if root==os.path.normcase(r'C:\dev\ANASTASIS_UNREAL') and not VERIFY:
     raise RuntimeError('Composition belongs in an isolated worktree, never the integration root.')
 if not world.get_path_name().startswith('/Game/Anastasis/Maps/Lvl_AnastasisSlice.'):
     raise RuntimeError('Open Lvl_AnastasisSlice first.')

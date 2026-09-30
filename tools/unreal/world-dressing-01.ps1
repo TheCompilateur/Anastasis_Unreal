@@ -5,7 +5,7 @@ param(
 )
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
-if($root -eq 'C:\dev\ANASTASIS_UNREAL'){throw 'Use an isolated worktree for authored map changes.'}
+if($root -eq 'C:\dev\ANASTASIS_UNREAL' -and $Mode -ne 'Verify'){throw 'Use an isolated worktree for authored map changes.'}
 $evidenceDir=[IO.Path]::GetFullPath($Out)
 New-Item -ItemType Directory -Path $evidenceDir -Force | Out-Null
 $scriptPath=(Join-Path $PSScriptRoot 'world-dressing-01.py').Replace('\','/')
