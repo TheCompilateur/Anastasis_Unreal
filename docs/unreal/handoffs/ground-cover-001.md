@@ -23,9 +23,11 @@ BRANCH_HEAD
 
 ## MEC
 
-- BUILD: `BUILD::PASS` (`tools\unreal\anastasis-unreal.ps1 build`) ; unity : voir ci-dessous après rebase.
-- TESTS: `TESTS::PASS` — 153 PASS / 4 KNOWN_EXPECTED_FAILURE / 0 FAIL, 157 annoncés
-  (`tools\unreal\report-tests.ps1`), dont les nouveaux :
+- BUILD: `BUILD::PASS` (`agent-worktree.ps1 finish`, branche rebasée sur `main` e05875c).
+- UNITY: prouvé après commit et rebase — `Build.bat` direct sur arbre propre, aucune exclusion
+  adaptative, `Module.Anastasis_UnrealV2.{1,2,3}.cpp` recompilés, `Result: Succeeded`.
+- TESTS: `TESTS::PASS` — 163 PASS / 4 KNOWN_EXPECTED_FAILURE / 0 FAIL, 167 annoncés, 167 vus
+  (`finish` → `report-tests.ps1`, après rebase ; avant rebase : 153/4/0 sur 157), dont les nouveaux :
   - PASS `Anastasis.GroundCover.Determinism` (plan bit à bit, la graine le change, instances sur le sol lu)
   - PASS `Anastasis.GroundCover.SlopeBands` (plat : tall=3803 short=1069 ; 16° : tall=0 short=3743 ; 26° : 0)
   - PASS `Anastasis.GroundCover.WaterAndWetness` (rien sous l'eau ; laîches à < 5 m de la rivière : 512, prairie : 0 ; sol à 20 cm de la nappe : 100 % laîches)
