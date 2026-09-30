@@ -22,6 +22,7 @@ $LaunchArgs=@(
     ('-abslog="'+(Join-Path $Out 'capture.log')+'"'),
     ('-ExecCmds="py '+$Script+'"')
 )
-$Process=Start-Process 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe' -ArgumentList $LaunchArgs -WindowStyle Hidden -PassThru
+. (Join-Path $Root 'tools/unreal/editor-launch.ps1')
+$Process=Start-AnastasisEditor 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe' -ArgumentList $LaunchArgs
 Write-Output "WORLD_DRESSING_EDITOR_PID::$($Process.Id)"
 Write-Output "EVIDENCE::$Out"
