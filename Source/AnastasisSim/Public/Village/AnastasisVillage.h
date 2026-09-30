@@ -32,6 +32,16 @@
 // Quand une source est active, manger dedans exige une reservation : le repas
 // a vide de la reference ne doit pas masquer une rupture d'approvisionnement.
 //
+//   CUEILLIR ET LIVRER (gather-deliver-001) — le fermier dont le poste est le grenier
+//   il VOIT les champs (perceive : gisements, 7 tuiles, apres 1,5 tuile de marche)
+//   table : `gatherFood` calculee (resourceScore + faim * 0,15, facteur de travail,
+//   poste +22, fin de tache, trait, competence) ; cible : le gisement dont il se SOUVIENT
+//   A* + marche ; session de coups (0,36 s d'ancrage, periode 0,52-0,72 s, fatigue)
+//   chaque coup : tile.amount -= 2 ou 3 (saison) ; npc.inventory.food += autant
+//   sac > 9 : beginHaulToDepot -> `deliver` vers un seuil du grenier (son poste)
+//   au seuil, DEHORS (depot de son poste) ; 1 s ; deliver() : jusqu'a 12, dans la capacite
+//   building.stock.food.physical monte ; le sac se vide ; il redecide
+//
 // La maison apporte le mecanisme d'INTERIEUR (enterBuilding / updateInside /
 // exitBuilding) que reutiliseront manger, se soulager, se detendre, socialiser.
 // Elle apporte aussi le foyer (npc.home, npc.shelter, proprietaire, capacite)
@@ -42,7 +52,8 @@
 //  1. Table de decision : les 25 lignes de adultScores, dans l'ordre de la
 //     reference, triees de facon stable. `eat`, `rest`, `drink` sont calculees
 //     (needGoalScores + jobPriority / bonus puits + phaseBias) ; chaque but NON
-//     porte vaut `UnportedGoalsFloor` (42) + son vrai `phaseBias`. Noûs biaise
+//     porte vaut `UnportedGoalsFloor` (42) + son vrai `phaseBias` (pour un fermier,
+//     `gatherFood` et `deliver` sont calculees : ecart n°10). Noûs biaise
 //     TOUTES les lignes (applyAlgorithmicScoreBias) puis la porte de commit peut
 //     forcer `eat` ou `rest`. Un but non porte qui gagne donne `observer`. Sans `goalNoise`
 //     (le bruit consomme `sim.rng()` dans l'ordre de TOUTE la table), sans
@@ -77,6 +88,32 @@
 //     foyer ou un abri est envoye CHEZ LUI pour `eat` (couches rythme et
 //     domestique), meme si sa reservation est au grenier ; il y mange « a vide »
 //     (la branche repas de tickNeeds baisse sa faim), et sa reservation expire.
+// 10. Metiers : `settler` (defaut) et `farmer`, embauche par AssignWorkplace au
+//     grenier (le marche de l'emploi n'est pas porte). Les lignes `gatherFood` et
+//     `deliver` ne sont CALCULEES que pour un fermier dont le poste est un grenier
+//     acheve ; pour les autres elles restent au plancher, et gagner donne `observer` :
+//     un sans-metier qui cueille finit par `sell` (or, marche), non porte.
+//     L'habitant n'a ni ambition, ni plan, ni technique ; sa nature est MOYENNE
+//     (corps, esprit, coeur 1, sans qualite) et son trait est « gardien », ses
+//     competences valent 1 avant la teinte du trait : ce sont des options
+//     legales de createNpc, pas des tirages.
+// 11. Recolte : pas de rate de coup (`rollCraftMiss` tire `sim.rng`), pas
+//     d'exploration quand il ne connait aucun gisement (`exploreTarget` tire
+//     `sim.rng`) : sans gisement connu il vaque. Pas de rumeurs (on-dit), pas de
+//     danger, pas de repousse des champs (`regrowFieldsDaily`). La reference
+//     ecrit dans `sim.tiles` ; ici le monde genere reste IMMUABLE et le village
+//     tient l'etat vivant des tuiles touchees (LiveTileAt) — memes lectures, memes
+//     valeurs. La tuile epuisee reste un champ, en jachere ; le rendu ne suit pas.
+// 12. Livraison : seulement a SON depot (le grenier de son poste). Sans poste,
+//     la reference livre au marche ou vend : non porte, il vaque. Le stock de
+//     marche (`sim.market.stock.food`, lu par la pression morale) est la somme
+//     des stocks physiques, recalculee a la lecture — la reference la reconstruit
+//     a chaque repas confirme et chaque livraison, les seules mutations ici.
+// 14. Cohabitation avec l'extension food-supply (non fidele, voir plus haut) : elle
+//     ne s'applique qu'aux habitants qui ne sont PAS le fermier d'un grenier ; une
+//     tuile ouverte par ActivateFoodSource n'a qu'une verite, son registre fini.
+// 13. Reference : `fee66ae`, commitee. Sa copie de travail porte, NON commitee,
+//     `load > 11` au lieu de `load > 9` pour rentrer livrer : non suivi.
 //
 // Parite bit a bit : prouvee pour les besoins, le rythme, la qualite du repos et
 // la decision Noûs (Anastasis.Sim.Parite.Besoins / .Rythme / .Nous). La boucle assemblee est
@@ -88,6 +125,7 @@
 #include "Ai/AnastasisNous.h"
 #include "Life/AnastasisNeeds.h"
 #include "Life/AnastasisVillageRhythm.h"
+#include "Work/AnastasisGather.h"
 #include "World/AnastasisEntityTable.h"
 #include "World/AnastasisNavGrid.h"
 #include "World/AnastasisPathfinding.h"
@@ -108,6 +146,9 @@ namespace AnastasisVillage
 	inline const TCHAR* const GoalDrink = TEXT("drink");
 	inline const TCHAR* const GoalRest = TEXT("rest");
 	inline const TCHAR* const GoalEat = TEXT("eat");
+	/** Portes pour un fermier dont le poste est un grenier (ecart n°10). */
+	inline const TCHAR* const GoalGatherFood = AnastasisGather::GoalGatherFood;
+	inline const TCHAR* const GoalDeliver = AnastasisGather::GoalDeliver;
 
 	/** `NPC_AI` de npc.js (chemin classique) — conserve pour `aiThinkStagger`. */
 	inline constexpr double ThinkEvery = 0.12;
@@ -248,6 +289,37 @@ namespace AnastasisVillage
 		int32 Day = 0;
 	};
 
+	/** Un gisement dont l'habitant se souvient (`mind.spots[key]`). */
+	struct FResourceSpot
+	{
+		/** `"x,y"` — la cle de la reference. */
+		FString Key;
+		/** Centre de la tuile (x + 0,5). */
+		double X = 0.0;
+		double Y = 0.0;
+		/** "food", "wood", "stone". */
+		FString Resource;
+		int32 Amount = 0;
+		int32 Day = 0;
+		bool bHearsay = false;
+	};
+
+	/** `npc.workSession` — la session de coups de metier, ancree a une tuile. */
+	struct FWorkSession
+	{
+		bool bActive = false;
+		FString CraftId;
+		int32 TileX = 0;
+		int32 TileY = 0;
+		/** `postIndex` : poste pris dans la parcelle, -1 = pas encore. */
+		int32 PostIndex = -1;
+		double ArrivedAt = 0.0;
+		double NextSwingAt = 0.0;
+		int32 SwingsDone = 0;
+		/** < 0 = null. */
+		double LastSwingAt = -1.0;
+	};
+
 	/** `npc.inside` — present pendant qu'un habitant est DANS un batiment. */
 	struct FInside
 	{
@@ -276,6 +348,14 @@ namespace AnastasisVillage
 		double DrinkRowScore = 0.0;
 		/** Ligne `eat` : needs.eat + jobPriority + phaseBias, puis biais Noûs. */
 		double EatRowScore = 0.0;
+		/** Lignes calculees d'un fermier (ecart n°10), apres biais Noûs ; NaN sinon ou retiree. */
+		double GatherRowScore = std::numeric_limits<double>::quiet_NaN();
+		double DeliverRowScore = std::numeric_limits<double>::quiet_NaN();
+		/** Les memes lignes AVANT le biais Noûs : adultScores seul. */
+		double GatherRowTable = std::numeric_limits<double>::quiet_NaN();
+		double DeliverRowTable = std::numeric_limits<double>::quiet_NaN();
+		/** Facteur de travail (`moralPressure.effectiveWork * phase.work * ...`), NaN hors fermier. */
+		double WorkFactor = std::numeric_limits<double>::quiet_NaN();
 		/** Tete de table apres tri, avant la porte de commit (peut etre un but non porte). */
 		FString TableWinner;
 		/** Decision Noûs au moment du choix, et ce que la porte a fait. */
@@ -291,6 +371,16 @@ namespace AnastasisVillage
 		FString BuildingId;
 		/** D'ou vient la cible : well, shore, home, shelter, housing, open-shelter, settlement, none. */
 		FString TargetSource;
+	};
+
+	/** Ce que les lignes de travail d'un fermier partagent a une decision. */
+	struct FWorkRowContext
+	{
+		/** `believedStock(sim, npc).food`. */
+		double Believed = 0.0;
+		bool bMealBlocked = false;
+		/** `workFactor` d'adultScores, avant `survivalWorkFactor`. */
+		double WorkFactor = 0.0;
 	};
 
 	/** Habitant — les champs de createNpc que les boucles lisent ou ecrivent. */
@@ -340,6 +430,24 @@ namespace AnastasisVillage
 		int32 FoodSourceIndex = INDEX_NONE;
 		/** Locally perceived source quantities; zero means observed exhausted. */
 		TMap<int32, int32> KnownFoodSources;
+
+		/** `npc.jobId`, `npc.workplace` (PAR IDENTIFIANT). */
+		FString JobId = AnastasisGather::JobSettler;
+		FString WorkplaceId;
+		/** Index dans `TRAITS` ; « gardien » par defaut (ecart n°10). */
+		int32 TraitIndex = AnastasisGather::DefaultTraitIndex;
+		/** `npc.skill` et `npc.skills.gather`, `npc.skills.trade` (teintes par le trait). */
+		double Skill = 1.0;
+		double SkillGather = 1.0;
+		double SkillTrade = 1.0;
+		/** `mind.spots`, dans l'ordre d'insertion. */
+		TArray<FResourceSpot> Spots;
+		/** `mind.scanX`, `mind.scanY` : ou il se tenait au dernier balayage des tuiles. */
+		double ScanX = -999.0;
+		double ScanY = -999.0;
+		FWorkSession WorkSession;
+		/** Observation : nombre de livraisons faites (les quantites : GatheredFood, DeliveredFood). */
+		int32 Deliveries = 0;
 		FHungerAction HungerAction;
 		/** `mind.beliefs.knownStocks`, dans l'ordre d'insertion (celui d'un objet JS). */
 		TArray<FStockBelief> KnownStocks;
@@ -413,6 +521,26 @@ namespace AnastasisVillage
 
 		/** `assignSheltersDaily` — appele par l'hote a minuit. Rend le nombre d'abrites. */
 		int32 AssignSheltersDaily();
+
+		/**
+		 * Embauche (ecart n°10) : `npc.jobId`, `npc.workplace`. Seul le fermier au
+		 * grenier acheve est accepte — le catalogue y admet steward, farmer, porter.
+		 */
+		bool AssignWorkplace(const FString& NpcId, const FString& JobId, const FString& BuildingId);
+
+		/** Fermier dont le poste est un grenier acheve : ses lignes gatherFood / deliver sont calculees. */
+		bool IsGranaryWorker(const FNpc& Npc) const;
+
+		/** `sim.market.stock.food` : la somme des stocks physiques (ecart n°12). */
+		int32 MarketFood() const;
+
+		/**
+		 * La tuile telle qu'elle est MAINTENANT : la generation, puis ce que la recolte
+		 * en a fait (`tile.amount -= taken`, `depleteTile`). Le monde genere reste
+		 * immuable ; le village tient l'etat vivant des tuiles touchees. Une tuile
+		 * ouverte par l'extension food-supply lit son registre (une seule verite).
+		 */
+		AnastasisWorld::FTile LiveTileAt(int32 TileX, int32 TileY) const;
 
 		/** `for (const npc of this.actors) updateNpc(this, npc, dt)` — Time = temps de sim APRES avance. */
 		void UpdateActors(double Time, double Dt);
@@ -554,7 +682,31 @@ namespace AnastasisVillage
 		void ResolveStuckActor(FNpc& Npc, const FPoint& Target);
 		void ClearNavigation(FNpc& Npc);
 
+		// Recolte et livraison (npc.js, craftWork.js, fieldWorkPosts.js, memory.js).
+		bool IsPortedGoalFor(const FNpc& Npc, const FString& Goal) const;
+		/** Ligne `gatherFood` ou `deliver` d'adultScores pour un fermier, rythme compris. */
+		double WorkRowScore(const FNpc& Npc, const FString& Goal, double PhaseBias, const FWorkRowContext& Work) const;
+		void ScanTiles(FNpc& Npc, int32 CX, int32 CY, bool bForce);
+		bool GatherTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
+		bool DeliverTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
+		/** `progressCraftGather` : 1 = working, 2 = done, 0 = false. */
+		int32 ProgressCraftGather(FNpc& Npc);
+		/** Index de la premiere tuile de la ressource dans le 3 x 3 de l'habitant, -1 sinon. */
+		int32 ResourceTileNear(const FNpc& Npc, AnastasisWorld::EResource Resource) const;
+		AnastasisWorld::FTile LiveTile(int32 Index) const;
+		/** `tile.amount -= taken` sur l'etat vivant (ou le registre food-supply). */
+		void TakeFromTile(int32 Index, int32 Taken);
+		void EnsureCraftSession(FNpc& Npc, int32 TileX, int32 TileY);
+		FPoint FieldWorkTarget(FNpc& Npc, const AnastasisWorld::FTile& Tile);
+		uint32 ClaimedFieldPosts(const FNpc& Npc, int32 TileX, int32 TileY) const;
+		void DepleteTile(int32 Index);
+		void BeginHaulToDepot(FNpc& Npc);
+		bool Deliver(FNpc& Npc);
+		static void ClearWorkSession(FNpc& Npc);
+
 		const AnastasisWorld::FWorld* World = nullptr;
+		/** Tuiles touchees par la recolte : index -> etat vivant. Ecrit seulement par TakeFromTile / DepleteTile. */
+		TMap<int32, AnastasisWorld::FTile> LiveTiles;
 		AnastasisNav::FNavGrid Nav;
 		int32 NavVersion = 0;
 		FPoint Settlement;
