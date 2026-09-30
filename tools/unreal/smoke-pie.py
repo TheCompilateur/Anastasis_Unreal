@@ -15,7 +15,7 @@ def tick(dt):
     elif phase == 1 and s.is_in_play_in_editor():
         phase = 2
         unreal.log('CANONICAL_PIE_ACTIVE')
-    elif phase == 2 and elapsed > 15:
+    elif phase == 2 and elapsed > 25:
         phase = 3
         s.editor_request_end_play()
         unreal.log('CANONICAL_PIE_END_REQUESTED')

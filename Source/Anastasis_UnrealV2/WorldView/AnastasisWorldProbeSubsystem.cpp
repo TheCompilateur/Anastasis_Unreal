@@ -993,10 +993,12 @@ TSharedRef<FJsonObject> UAnastasisWorldProbeSubsystem::BuildSnapshotObject() con
 		TerrainObj->SetNumberField(TEXT("crop_w"), Plan.W);
 		TerrainObj->SetNumberField(TEXT("crop_h"), Plan.H);
 		TerrainObj->SetNumberField(TEXT("tile_count"), Plan.TileCount);
+		TerrainObj->SetNumberField(TEXT("spatial_scale"), Plan.SpatialScale);
+		TerrainObj->SetBoolField(TEXT("human_geography_v2"), Embodiment->GetSnapshot().bHumanGeography);
 		TerrainObj->SetNumberField(TEXT("instance_count"), Embodiment->GetInstanceCount());
 		TerrainObj->SetNumberField(TEXT("dressing_instance_count"), Embodiment->GetDressingInstanceCount());
-		TerrainObj->SetNumberField(TEXT("min_alt_uu"), Plan.MinAlt * AnastasisWorldView::AltitudeScale);
-		TerrainObj->SetNumberField(TEXT("max_alt_uu"), Plan.MaxAlt * AnastasisWorldView::AltitudeScale);
+		TerrainObj->SetNumberField(TEXT("min_alt_uu"), AnastasisWorldView::AltitudeToUnreal(Plan.MinAlt, Plan.SpatialScale));
+		TerrainObj->SetNumberField(TEXT("max_alt_uu"), AnastasisWorldView::AltitudeToUnreal(Plan.MaxAlt, Plan.SpatialScale));
 
 		TSharedRef<FJsonObject> CountsObj = MakeShared<FJsonObject>();
 		for (int32 TypeIndex = 0; TypeIndex < AnastasisWorld::TileTypeCount; ++TypeIndex)
@@ -1411,7 +1413,7 @@ FString UAnastasisWorldProbeSubsystem::InspectTile(int32 TileX, int32 TileY)
 		return WriteInspectionObject(TEXT("inspect_tile"), Root);
 	}
 
-	const FVector UnrealLocation = AnastasisWorldView::TileToUnreal(Tile->X, Tile->Y, Tile->Alt);
+	const FVector UnrealLocation = AnastasisWorldView::TileToUnreal(Tile->X, Tile->Y, Tile->Alt, Embodiment->GetSnapshot().SpatialScale);
 	const FBox& ActiveBounds = Embodiment->GetActiveFootprintBounds();
 
 	TSharedRef<FJsonObject> TileObj = MakeShared<FJsonObject>();
@@ -1422,7 +1424,7 @@ FString UAnastasisWorldProbeSubsystem::InspectTile(int32 TileX, int32 TileY)
 	TileObj->SetStringField(TEXT("resource"), ResourceName(Tile->Resource));
 	TileObj->SetNumberField(TEXT("amount"), Tile->Amount);
 	TileObj->SetNumberField(TEXT("alt"), Tile->Alt);
-	TileObj->SetNumberField(TEXT("alt_uu"), Tile->Alt * AnastasisWorldView::AltitudeScale);
+	TileObj->SetNumberField(TEXT("alt_uu"), AnastasisWorldView::AltitudeToUnreal(Tile->Alt, Embodiment->GetSnapshot().SpatialScale));
 	TileObj->SetNumberField(TEXT("shade"), Tile->Shade);
 	TileObj->SetNumberField(TEXT("shore"), Tile->Shore);
 	TileObj->SetNumberField(TEXT("wetness"), Tile->Wetness);

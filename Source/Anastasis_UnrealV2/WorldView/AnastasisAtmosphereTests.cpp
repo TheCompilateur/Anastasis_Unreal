@@ -6,6 +6,7 @@
 #include "Engine/ExponentialHeightFog.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "HAL/IConsoleManager.h"
 #include "WorldView/AnastasisAtmosphereProfile.h"
 #include "WorldView/AnastasisAtmosphereResolver.h"
 #include "WorldView/AnastasisWorldAtmosphere.h"
@@ -253,6 +254,56 @@ bool FAnastasisAtmosphereIdempotence::RunTest(const FString&)
 
 	TestEqual(TEXT("the world is left as it was found: suns"), CountActors<ADirectionalLight>(World), SunsBefore);
 	TestEqual(TEXT("the world is left as it was found: fog"), CountActors<AExponentialHeightFog>(World), FogsBefore);
+
+	return true;
+}
+
+/**
+ * ATMOSPHERE_003. The post-process volume above pins the CAMERA's exposure; it says nothing to
+ * Lumen's cached lighting (surface cache, SkyLight real-time capture), which pre-exposes against
+ * its own EV window before writing into a limited-range buffer. Left at the engine default (4.0
+ * EV) against this project's fixed EV100=14, that window clips -- the exact on-screen warning
+ * Apply() is meant to silence. This locks the fix: the CVar must track the profile's exposure,
+ * not some value picked once and forgotten.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisAtmosphereCachedLightingPreExposure, "Anastasis.Atmosphere.CachedLightingPreExposure", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisAtmosphereCachedLightingPreExposure::RunTest(const FString&)
+{
+	UWorld* World = FindAtmosphereAutomationWorld();
+	if (!World)
+	{
+		AddInfo(TEXT("no editor/game world available; not exercised"));
+		return true;
+	}
+
+	IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.EyeAdaptation.CachedLightingPreExposure"));
+	if (!TestNotNull(TEXT("the engine still exposes this cvar"), CVar))
+	{
+		return false;
+	}
+	const float BeforeValue = CVar->GetFloat();
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	Params.ObjectFlags |= RF_Transient;
+
+	AAnastasisWorldAtmosphere* Atmosphere = World->SpawnActor<AAnastasisWorldAtmosphere>(
+		AAnastasisWorldAtmosphere::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+	if (!TestNotNull(TEXT("atmosphere actor spawns"), Atmosphere))
+	{
+		return false;
+	}
+	TestTrue(TEXT("apply runs"), Atmosphere->Apply());
+
+	const UAnastasisAtmosphereProfile& Profile = AnastasisAtmosphere::GetProfile();
+	if (Profile.bFixedExposure)
+	{
+		TestEqual(TEXT("cached lighting pre-exposure tracks the profile's EV100"), CVar->GetFloat(), Profile.ExposureEV100);
+	}
+
+	Atmosphere->DestroySpawnedActors();
+	Atmosphere->Destroy();
+	CVar->Set(BeforeValue, ECVF_SetByCode);
 
 	return true;
 }

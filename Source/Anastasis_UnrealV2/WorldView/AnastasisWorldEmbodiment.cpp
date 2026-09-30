@@ -4,6 +4,7 @@
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisTerrainForge.h"
+#include "WorldView/AnastasisHumanGeography.h"
 
 
 #include "Anastasis_UnrealV2.h"
@@ -14,6 +15,9 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldView/AnastasisWorldDebugVisual.h"
+
+static TAutoConsoleVariable<float> CVarWorldScale(TEXT("anastasis.WorldView.Scale"), 5.0f, TEXT("Physical scale of forged full-world presentation; 1=380m corrected source, 5=1900m. Applied on embodiment."), ECVF_Default);
+static TAutoConsoleVariable<int32> CVarHumanGeography(TEXT("anastasis.Terrain.HumanGeography"), 1, TEXT("Human_Geography_V2: reversible authored macro terrain for seed 12345. 0=original forms, 1=V2. Applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarEcologicalDressing(
     TEXT("anastasis.Dressing.Ecology"), 1,
@@ -330,7 +334,9 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 		// elle n'est donc plus au-dessus du sol qu'elle vise. On releve le lift depuis la
 		// transform du resolver -- on ne le recalcule pas, pour ne pas creer une deuxieme
 		// source de verite sur le pivot -- et on rebase ce lift sur le sol reel.
-		const FVector Placed = InstanceTransform.GetLocation();
+		FVector Placed = InstanceTransform.GetLocation();
+		Placed.X *= Plan.SpatialScale;
+		Placed.Y *= Plan.SpatialScale;
 		const double TileGroundZ = Plan.Alts[Index] * AnastasisWorldView::AltitudeScale;
 		const double PivotLift = Placed.Z - TileGroundZ;
 
@@ -352,6 +358,8 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 			GroundZ = TileGroundZ + AnastasisWorldDebugVisual::SlabTopOffsetZ;
 		}
 
+		double WaterZ = AnastasisTerrainSurface::WaterPlaneZ;
+		if (Snapshot.bHumanGeography && AnastasisTerrainForge::SampleActiveWater(Placed.X, Placed.Y, WaterZ) && GroundZ <= WaterZ + 25.0) continue;
 		InstanceTransform.SetLocation(FVector(Placed.X, Placed.Y, GroundZ + PivotLift));
 		Mesh->AddInstance(InstanceTransform, false);
 		++DressingInstanceCount;
@@ -386,6 +394,8 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 if (!(AnastasisTerrainForge::SampleActive(P.Ground.X, P.Ground.Y, GroundZ)
                     || AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, P.Ground.X, P.Ground.Y, GroundZ)))
                     continue;
+                double WaterZ = AnastasisTerrainSurface::WaterPlaneZ;
+                if (Snapshot.bHumanGeography && AnastasisTerrainForge::SampleActiveWater(P.Ground.X, P.Ground.Y, WaterZ) && GroundZ <= WaterZ + 25.0) continue;
                 const auto& T = CanonicalSource.Tiles[P.SourceIndex];
                 const EAnastasisStatureClass Stature = StatureForLayer(P.Layer, P.VisualSeed, T.X, T.Y);
                 // Species comes from the site, not from a blind draw: Shade carries altitude
@@ -493,7 +503,12 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
 		}
 	}
 
-	const auto CanonicalSource = AnastasisWorldView::CaptureCanonicalWorld(Seed);
+	auto CanonicalSource = AnastasisWorldView::CaptureCanonicalWorld(Seed);
+	if (CVarTerrainSurface.GetValueOnGameThread() == 2 && CVarTerrainForge.GetValueOnGameThread() != 0)
+	{
+		CanonicalSource.SpatialScale = FMath::Clamp(static_cast<double>(CVarWorldScale.GetValueOnGameThread()), 1.0, 20.0);
+		CanonicalSource.bHumanGeography = CVarHumanGeography.GetValueOnGameThread() != 0;
+	}
 	Snapshot = AnastasisWorldView::CropSnapshot(
 		CanonicalSource,
 		OriginX,
@@ -551,7 +566,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
     bool bSurfaceBuilt = false;
 
     if (ExperimentalSurface) ExperimentalSurface->SetVisibility(false);
-    for (auto& Mesh : TerrainMeshes) if (Mesh) Mesh->SetVisibility(true);
+    for (auto& Mesh : TerrainMeshes) if (Mesh) { Mesh->SetVisibility(true); Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); }
     const int32 SurfaceMode = CVarTerrainSurface.GetValueOnGameThread();
     if (SurfaceMode == 1 || SurfaceMode == 2)
     {
@@ -568,9 +583,29 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
         AnastasisTerrainSurface::FGeometry Geometry;
         if (AnastasisTerrainSurface::Build(Crop, Geometry))
         {
+            // TERRAIN_FORGE lit pente/Laplacien au bord fin de Crop. Mode 2 incarne un
+            // decoupage LIBRE du monde canonique : ses bords sont de vrais bords de chunk,
+            // pas le bord du monde, et CanonicalSource a les tuiles voisines pour les
+            // couvrir -- sans elles, ANASTASIS_TERRAIN_FORGE clampait un voisin manquant sur
+            // lui-meme et pouvait y lire une convexite fictive (pic sur pente raide, cf.
+            // TERRAIN_FORGE_CHUNK_SEAM). Mode 1 est la tranche scellee WORLD_SLICE_006 et
+            // doit rester bit-a-bit identique : elle ne recoit jamais de halo.
+            AnastasisWorldView::FWorldVisualSnapshot HaloCrop;
+            bool bHaveHaloCrop = false;
+            if (SurfaceMode == 2)
+            {
+                const int32 Margin = AnastasisTerrainForge::HaloTiles;
+                const int32 HaloX0 = FMath::Max(0, Crop.OriginX - Margin);
+                const int32 HaloY0 = FMath::Max(0, Crop.OriginY - Margin);
+                const int32 HaloX1 = FMath::Min(CanonicalSource.W, Crop.OriginX + Crop.W + Margin);
+                const int32 HaloY1 = FMath::Min(CanonicalSource.H, Crop.OriginY + Crop.H + Margin);
+                HaloCrop = AnastasisWorldView::CropSnapshot(
+                    CanonicalSource, HaloX0, HaloY0, HaloX1 - HaloX0, HaloY1 - HaloY0);
+                bHaveHaloCrop = HaloCrop.Tiles.Num() == (HaloX1 - HaloX0) * (HaloY1 - HaloY0);
+            }
             AnastasisTerrainForge::FMesh ForgeMesh;
             const bool bForged = CVarTerrainForge.GetValueOnGameThread() != 0
-                && AnastasisTerrainForge::Apply(Crop, Geometry, ForgeMesh);
+                && AnastasisTerrainForge::Apply(Crop, Geometry, ForgeMesh, bHaveHaloCrop ? &HaloCrop : nullptr);
             if (!bForged)
             {
                 AnastasisTerrainForge::ClearActive();
@@ -593,6 +628,8 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                     ForgeMesh.BasinX, ForgeMesh.BasinY, ForgeMesh.BasinZ,
                     ForgeMesh.LandmarkX, ForgeMesh.LandmarkY, ForgeMesh.LandmarkZ);
             }
+            UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_HUMAN_GEOGRAPHY layer=Human_Geography_V2 enabled=%d spatial_scale=%.1f extent_m=%.1fx%.1f simulation_unchanged=1"),
+                ForgeMesh.bHumanGeography ? 1 : 0, Crop.SpatialScale, (Crop.W-1)*AnastasisWorldView::TileWorldSize*Crop.SpatialScale/100.0, (Crop.H-1)*AnastasisWorldView::TileWorldSize*Crop.SpatialScale/100.0);
             // Section 0 : relief. La couleur de sommet porte la TEINTE semantique du sol ;
             // depuis GROUND_SURFACE_001 elle ne porte plus seule toute la semantique --
             // les familles de surface et l'humidite passent par UV0/UV1. Le Forge ayant
@@ -643,7 +680,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 ExperimentalSurface->SetMaterial(1, ShoreMaterial);
             }
             ExperimentalSurface->SetVisibility(true);
-            for (auto& Mesh : TerrainMeshes) if (Mesh) Mesh->SetVisibility(false);
+            for (auto& Mesh : TerrainMeshes) if (Mesh) { Mesh->SetVisibility(false); Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); }
             BuiltSurfaceCrop = Crop;
             bSurfaceBuilt = true;
             // Emprise reelle = ce qui est reellement rendu, pas Plan : en mode 1 la tranche

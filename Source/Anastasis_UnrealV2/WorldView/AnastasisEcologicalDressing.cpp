@@ -46,14 +46,14 @@ bool GroundAt(const FWorldVisualSnapshot& S, double X, double Y,
     for (const auto& O : Offsets)
     {
         const double PX = X + O.X, PY = Y + O.Y;
-        const FVisualTile* Tile = FindTile(S, FMath::FloorToInt(PX / TileWorldSize), FMath::FloorToInt(PY / TileWorldSize));
+        const FVisualTile* Tile = FindTile(S, FMath::FloorToInt(PX / (TileWorldSize * S.SpatialScale)), FMath::FloorToInt(PY / (TileWorldSize * S.SpatialScale)));
         double H;
         if (!Tile || !Habitat(Tile->Type) || !AnastasisTerrainSurface::SampleHeight(S, PX, PY, H)
             || H <= AnastasisTerrainSurface::WaterPlaneZ + C.WaterClearanceUU) return false;
     }
     if (!AnastasisTerrainSurface::SampleHeight(S, X, Y, Z)) return false;
     // Exact triangle gradient, same B-C diagonal as TerrainSurface::Build/SampleHeight.
-    const double U = X / TileWorldSize - 0.5, V = Y / TileWorldSize - 0.5;
+    const double U = X / (TileWorldSize * S.SpatialScale) - 0.5, V = Y / (TileWorldSize * S.SpatialScale) - 0.5;
     const int32 IX = FMath::Min(FMath::FloorToInt(U), S.W - 2);
     const int32 IY = FMath::Min(FMath::FloorToInt(V), S.H - 2);
     const int32 A = IY * S.W + IX, B = A + 1, CC = A + S.W, D = CC + 1;
@@ -99,7 +99,7 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
     }
     if (!C.bEnabled) return true;
     FPlan Result;
-    const double Spacing = C.MinimumSpacing * TileWorldSize;
+    const double Spacing = C.MinimumSpacing * TileWorldSize * S.SpatialScale;
     TMap<FIntPoint, TArray<FVector2D>> Occupied;
     const int32 Radius = FMath::CeilToInt(C.EdgeRadius);
     for (const auto& T : S.Tiles)
@@ -129,11 +129,11 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
             if (Unit(Hash(Seed,T.X,T.Y,3)) >= Probability) continue;
             FPlacement P;
             double Z, Slope;
-            if (!GroundAt(S, X * TileWorldSize, Y * TileWorldSize, C, Z, Slope))
+            if (!GroundAt(S, X * TileWorldSize * S.SpatialScale, Y * TileWorldSize * S.SpatialScale, C, Z, Slope))
             { ++Result.RejectedWaterOrFootprint; continue; }
             if (Slope > C.MaxSlopeDegrees)
             { ++Result.RejectedSlope; continue; }
-            const FVector2D XY(X * TileWorldSize, Y * TileWorldSize);
+            const FVector2D XY(X * TileWorldSize * S.SpatialScale, Y * TileWorldSize * S.SpatialScale);
             const FIntPoint Cell(FMath::FloorToInt(XY.X / Spacing), FMath::FloorToInt(XY.Y / Spacing));
             bool Near=false;
             for (int32 DY=-1; DY<=1; ++DY)

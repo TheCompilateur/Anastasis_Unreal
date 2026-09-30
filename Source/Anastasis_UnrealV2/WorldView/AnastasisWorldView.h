@@ -15,8 +15,19 @@
  */
 namespace AnastasisWorldView
 {
-	/** Unreal units (cm) per simulation tile. Tile (0,0) occupies [0, TileWorldSize). P1.5 diagnostic; Lot 4.5 freeze. */
-	inline constexpr double TileWorldSize = 100.0;
+	/**
+	 * Unreal units (cm) per simulation tile. Tile (0,0) occupies [0, TileWorldSize).
+	 *
+	 * 400 = 4 m, choisi par Alexandre le 2026-09-29 (TERRAIN_RELIEF_001). La valeur
+	 * precedente, 100 (1 m), etait une echelle de DIAGNOSTIC (P1.5), gelee sans etre
+	 * choisie : "Lot 4.5 does not pick a player scale". A 1 m, le monde faisait 96 m,
+	 * une riviere d'une tuile faisait 1 m de large, et la marche qu'une tuile de terre a
+	 * +0.2 d'altitude fait au-dessus d'une tuile d'eau montait a 72 degres une fois le
+	 * relief exagere : aucune erosion ne pouvait adoucir les berges sans raboter les
+	 * collines ou combler les rivieres (mesure). A 4 m, la meme marche fait 37 degres.
+	 * AltitudeScale ne change pas : les hauteurs restent, les pentes s'adoucissent.
+	 */
+	inline constexpr double TileWorldSize = 400.0;
 
 	/** Simulation altitude 1.0 maps to this many Unreal units on Z. SeaLevel 0.275 -> 275 UU. */
 	inline constexpr double AltitudeScale = 1000.0;
@@ -54,6 +65,9 @@ namespace AnastasisWorldView
 
 	struct FWorldVisualSnapshot
 	{
+		// Presentation coordinates only; simulation fields are never rescaled.
+		double SpatialScale = 1.0;
+		bool bHumanGeography = false;
 		uint32 Seed = 0;
 		int32 SourceW = 0;
 		int32 SourceH = 0;
@@ -80,6 +94,7 @@ namespace AnastasisWorldView
 	/** Unreal spatialization of a snapshot. Not debug art. */
 	struct FPlan
 	{
+		double SpatialScale = 1.0;
 		uint32 Seed = 0;
 		int32 SourceW = 0;
 		int32 SourceH = 0;
@@ -97,12 +112,17 @@ namespace AnastasisWorldView
 	};
 
 	/** SIM (x, y, alt) -> UE (X, Y, Z). Origin: tile centers; axes: SimX->UEX, SimY->UEY, Alt->UEZ. */
-	inline FVector TileToUnreal(int32 TileX, int32 TileY, double Alt)
+	inline double AltitudeToUnreal(double Alt, double SpatialScale = 1.0)
+	{
+		return AnastasisWorld::SeaLevel * AltitudeScale + (Alt - AnastasisWorld::SeaLevel) * AltitudeScale * SpatialScale;
+	}
+
+	inline FVector TileToUnreal(int32 TileX, int32 TileY, double Alt, double SpatialScale = 1.0)
 	{
 		return FVector(
-			(static_cast<double>(TileX) + 0.5) * TileWorldSize,
-			(static_cast<double>(TileY) + 0.5) * TileWorldSize,
-			Alt * AltitudeScale);
+			(static_cast<double>(TileX) + 0.5) * TileWorldSize * SpatialScale,
+			(static_cast<double>(TileY) + 0.5) * TileWorldSize * SpatialScale,
+			AltitudeToUnreal(Alt, SpatialScale));
 	}
 
 	FVisualTile MakeVisualTile(const AnastasisWorld::FTile& Tile, int32 SourceIndex);

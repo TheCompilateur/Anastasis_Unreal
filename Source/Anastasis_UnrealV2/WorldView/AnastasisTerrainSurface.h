@@ -61,19 +61,23 @@ inline constexpr int32 TrianglesFor(int32 W, int32 H) { return 2 * (W - 1) * (H 
  * l'eau franche. Le test a echoue exactement la-dessus.
  *
  * Depuis, TERRAIN_FORGE tessele le relief et exagere le fond immerge (DepthExag
- * 1.7) : sur le maillage REELLEMENT rendu, l'eau descend a 614 uu. Une
- * justification en "deux tiers du maximum" n'a donc plus aucun sens -- elle
- * donnerait 400 uu et noierait toute la rive dans une seule teinte.
+ * 1.7) : sur le maillage REELLEMENT rendu, l'eau descendait a 614 uu -- dont une
+ * part etait de la terre que l'affutage enfoncait sous la nappe. Une justification
+ * en "deux tiers du maximum" n'a donc aucun sens : le maximum est un extreme, pas
+ * la rive, et il a bouge de 614 a 155 uu sans que la rive change.
  *
  * 60 uu est cale sur la DISTRIBUTION, et sur son debut : c'est la ou est la rive.
- * Deciles de profondeur du maillage forge (TERRAIN_SHORELINE_FORGED_DEPTHS) :
+ * Deciles de profondeur du maillage forge (TERRAIN_SHORELINE_FORGED_DEPTHS),
+ * re-mesures apres TERRAIN_RELIEF_001 etape 3 (bicubique, affutage coupe, erosion) :
  *
- *     p10=11.1  p20=21.7  p30=30.6  p40=35.5  p50=41.2
- *     p60=47.0  p70=54.0  p80=62.5  p90=78.6        max=614
+ *     p10=11.4  p20=22.6  p30=32.8  p40=38.0  p50=44.5
+ *     p60=51.0  p70=59.0  p80=68.9  p90=81.6        max=154.7
+ *
+ * (Forge d'origine : p70=54.0 p80=62.5 p90=78.6 max=614, 3641 francs sur 16234.)
  *
  * A 60 uu, la marge couvre les sept premiers deciles de l'eau du monde et le
- * dernier quart reste de l'eau franche -- un etat reellement occupe (3641 sommets
- * sur 16234 immerges), pas une limite jamais atteinte. La bande de limon, elle,
+ * reste est de l'eau franche -- un etat reellement occupe (4457 sommets sur 15350
+ * immerges), pas une limite jamais atteinte. La bande de limon, elle,
  * occupe 0.10 a 0.32 de ce span selon la platitude, soit 6 a 19 uu : elle se
  * ferme avant le p20. C'est un bord d'eau, pas un lac brun.
  *
@@ -171,6 +175,8 @@ struct FGeometry
      */
     TArray<FVector2D> WaterUV0;
     TArray<FVector2D> WaterUV1;
+    /** Optional geometry-owned river flow, distinct from simulation FlowAmt. */
+    TArray<float> RiverFlow;
 
     /**
      * Canaux morphologiques lus par le materiau de sol. La couleur de sommet ne peut

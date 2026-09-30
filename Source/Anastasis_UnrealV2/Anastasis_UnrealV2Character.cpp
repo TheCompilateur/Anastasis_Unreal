@@ -60,7 +60,7 @@ void AAnastasis_UnrealV2Character::SetupPlayerInputComponent(UInputComponent* Pl
 
 		// Looking/Aiming
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AAnastasis_UnrealV2Character::LookInput);
-		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AAnastasis_UnrealV2Character::LookInput);
+		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AAnastasis_UnrealV2Character::MouseLookInput);
 	}
 	else
 	{
@@ -103,6 +103,15 @@ void AAnastasis_UnrealV2Character::LookInput(const FInputActionValue& Value)
 	// pass the axis values to the aim input
 	DoAim(LookAxisVector.X, LookAxisVector.Y);
 
+}
+
+void AAnastasis_UnrealV2Character::MouseLookInput(const FInputActionValue& Value)
+{
+	// get the Vector2D look axis (raw pixel delta -- no engine-side scaling anymore)
+	FVector2D LookAxisVector = Value.Get<FVector2D>();
+
+	// apply our own sensitivity so mouse feel is explicit and framerate-independent
+	DoAim(LookAxisVector.X * MouseSensitivity, LookAxisVector.Y * MouseSensitivity);
 }
 
 void AAnastasis_UnrealV2Character::DoAim(float Yaw, float Pitch)

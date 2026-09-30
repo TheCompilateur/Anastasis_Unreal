@@ -14,9 +14,10 @@
 #   agent-worktree.ps1 integrate  -Mission world-slice-007
 #   agent-worktree.ps1 preflight
 #   agent-worktree.ps1 postflight
+#   agent-worktree.ps1 mcp        -Mission world-slice-007
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet('create', 'status', 'finish', 'integrate', 'preflight', 'postflight')]
+  [ValidateSet('create', 'status', 'finish', 'integrate', 'preflight', 'postflight', 'mcp')]
   [string]$Command,
   [string]$Mission,
   [string]$From = 'main'
@@ -39,6 +40,33 @@ function Require-Mission {
 function Branch-Of($m) { return "agent/$m" }
 function Path-Of($m) { return (Join-Path $WorktreeRoot $m) }
 function Handoff-Path($m) { return (Join-Path (Path-Of $m) "docs\unreal\handoffs\$m.md") }
+
+. (Join-Path $PSScriptRoot 'mcp-port.ps1')
+. (Join-Path $PSScriptRoot 'tools-index.ps1')
+
+# Enregistre, en portee locale Claude Code, le serveur MCP de l'editeur de CE worktree.
+# La portee locale (cle = chemin du worktree dans ~/.claude.json) prime sur le .mcp.json
+# du projet, qui vise 8000, le port du canonique. Codex n'a pas d'equivalent par projet.
+function Register-Mcp($m) {
+  $path = Path-Of $m
+  $url = "http://localhost:$(Get-AnastasisMcpPort $path)/mcp"
+  Write-Output "MCP_URL::$url"
+  if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+    Write-Output 'MCP_CLIENT::NON_ENREGISTRE (claude introuvable). A la main, depuis le worktree :'
+    Write-Output "    claude mcp add --scope local --transport http unreal $url"
+    return
+  }
+  # PowerShell 5.1 : sous 'Stop', le stderr d'un exe natif devient une erreur fatale.
+  # Or `remove` ecrit sur stderr des qu'il n'y a rien a retirer, le cas d'un create.
+  $ErrorActionPreference = 'Continue'
+  Push-Location -LiteralPath $path
+  try {
+    & claude mcp remove --scope local unreal 2>$null | Out-Null
+    & claude mcp add --scope local --transport http unreal $url 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { Write-Output 'MCP_CLIENT::ENREGISTRE (Claude Code, portee locale)' }
+    else { Write-Output "MCP_CLIENT::ECHEC claude mcp add (code $LASTEXITCODE)" }
+  } finally { Pop-Location }
+}
 
 # Fichiers dont une modification pendant une fenetre de verify invalide la preuve.
 function Source-Fingerprint {
@@ -99,6 +127,15 @@ switch ($Command) {
     Write-Output ''
     Write-Output 'Fiche de passation requise avant finish :'
     Write-Output "  Copy-Item docs\unreal\handoffs\_TEMPLATE.md docs\unreal\handoffs\$Mission.md"
+    Write-Output ''
+    Register-Mcp $Mission
+    Write-Output '  Editeur de ce worktree sur ce port : tools\unreal\anastasis-unreal.ps1 editor'
+  }
+
+  'mcp' {
+    Require-Mission
+    if (-not (Test-Path (Path-Of $Mission))) { Fail "FAIL: worktree introuvable -> $(Path-Of $Mission)" }
+    Register-Mcp $Mission
   }
 
   'status' {
@@ -144,6 +181,13 @@ switch ($Command) {
       exit 1
     }
     Write-Output "=== Portail de fin de mission : $Mission ==="
+    $index = Test-AnastasisToolsIndex $path
+    if (($index.Missing.Count + $index.Stale.Count) -gt 0) {
+      Write-Output 'FAIL: index de tools/unreal/ dans AGENTS.md desynchronise'
+      $index.Missing | ForEach-Object { Write-Output "    MISSING $_  (present, non indexe)" }
+      $index.Stale | ForEach-Object { Write-Output "    STALE   $_  (indexe, absent)" }
+      exit 1
+    }
     & (Join-Path $path 'tools\unreal\anastasis-unreal.ps1') build
     if ($LASTEXITCODE -ne 0) { Fail 'FAIL: build' }
     & (Join-Path $path 'tools\unreal\report-tests.ps1')

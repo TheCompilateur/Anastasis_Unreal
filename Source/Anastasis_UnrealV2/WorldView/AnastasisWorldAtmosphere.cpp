@@ -228,6 +228,20 @@ bool AAnastasisWorldAtmosphere::Apply()
 			ExposureVolume->Settings.bOverride_AutoExposureMaxBrightness = true;
 			ExposureVolume->Settings.AutoExposureMaxBrightness = Profile.ExposureEV100;
 		}
+
+		// Pinning the post-process exposure above says nothing to Lumen's CACHED lighting
+		// (surface cache, and the SkyLight's real-time-captured cubemap): that path pre-exposes
+		// values against its own EV window -- 4.0 EV by default -- before storing them in a
+		// limited-range buffer. At this project's fixed EV100=14 (75000 lux sun), that window is
+		// far too narrow and the cached lighting clips, which is exactly the on-screen warning
+		// ("adjust r.EyeAdaptation.CachedLightingPreExposure to match expected exposure range in
+		// project"). Matching it to ExposureEV100 is that adjustment, kept here instead of an
+		// .ini so it stays one profile edit away like every other exposure knob.
+		if (IConsoleVariable* CachedLightingPreExposure =
+			IConsoleManager::Get().FindConsoleVariable(TEXT("r.EyeAdaptation.CachedLightingPreExposure")))
+		{
+			CachedLightingPreExposure->Set(Profile.ExposureEV100, ECVF_SetByCode);
+		}
 	}
 
 	LastSummary = FString::Printf(

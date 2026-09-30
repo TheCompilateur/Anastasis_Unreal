@@ -1,4 +1,5 @@
 #include "WorldView/AnastasisTerrainForge.h"
+#include "WorldView/AnastasisHumanGeography.h"
 
 #include "HAL/IConsoleManager.h"
 #include "Math/NumericLimits.h"
@@ -14,6 +15,84 @@ static TAutoConsoleVariable<float> CVarForgeExaggerate(
 	TEXT("anastasis.Terrain.Forge.Exaggerate"),
 	3.6f,
 	TEXT("Vertical exaggeration of land above sea. Water plane stays at SeaLevel."),
+	ECVF_Default);
+
+// TERRAIN_RELIEF_001 -- terrasses et escarpements coupes par defaut.
+//
+// Les deux passes jugent la pente AVANT l'exageration verticale (SlopeDeg vient de S,
+// pente de l'altitude brute), mais le relief rendu est ensuite multiplie par LocalExag,
+// jusqu'a 3.6. Une "pente de 6 a 24 degres" visee par les terrasses est donc rendue
+// jusqu'a atan(3.6 * tan 24) ~ 58 degres : la quantification par palier de 0.016
+// (~58 uu) y dessine un escalier, pas des banquettes agricoles. L'escarpement, lui,
+// redresse ce qui est deja rendu au-dela de 50 degres : il fabrique des parois.
+//
+// Gardes en variables plutot que supprimes : c'est ce qui permet la capture avant /
+// apres dans un seul build, et le test qui mesure l'escalier contre sa propre source.
+static TAutoConsoleVariable<int32> CVarForgeTerraces(
+	TEXT("anastasis.Terrain.Forge.Terraces"),
+	0,
+	TEXT("1 = quantize hillsides and the basin rim into terraces (legacy TERRAIN_FORGE). 0 = off."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarForgeEscarpments(
+	TEXT("anastasis.Terrain.Forge.Escarpments"),
+	0,
+	TEXT("1 = steepen steep convex breaks into escarpments (legacy TERRAIN_FORGE). 0 = off."),
+	ECVF_Default);
+
+// TERRAIN_RELIEF_001, etape 2.
+//
+// Bicubic : l'altitude fine etait un bilineaire de la grille de tuiles. Un bilineaire
+// est continu mais sa pente saute sur chaque ligne de tuile : le maillage fin porte
+// donc un pli tous les 1 m, et son Laplacien n'est non nul QUE sur ces lignes.
+//
+// Sharpen : la passe "macro" ajoutait 1.35 x Laplacien positif (et 0.95 x negatif),
+// puis affutait le point haut. Sur un bilineaire, ce Laplacien est concentre aux noeuds
+// de tuile, et il est enorme a cote des chenaux que l'hydrologie creuse d'une tuile de
+// large : la tuile de terre qui borde le chenal lit une convexite forte et monte en
+// lame. C'est la frange de pics le long de l'eau des captures de l'etape 1.
+static TAutoConsoleVariable<int32> CVarForgeBicubic(
+	TEXT("anastasis.Terrain.Forge.Bicubic"),
+	1,
+	TEXT("1 = clamped Catmull-Rom altitude between tiles. 0 = bilinear (legacy, creases on every tile line)."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarForgeSharpen(
+	TEXT("anastasis.Terrain.Forge.Sharpen"),
+	0,
+	TEXT("1 = Laplacian ridge/bowl amplification and landmark peak sharpening (legacy TERRAIN_FORGE). 0 = off."),
+	ECVF_Default);
+
+// TERRAIN_RELIEF_001, etape 3 -- erosion thermique sur la hauteur RENDUE.
+//
+// Apres les etapes 1 et 2, un sommet de terre sur cinq est encore rendu au-dela de 60
+// degres. Aucune passe ne les fabrique plus : c'est l'exageration (x3.6 sur des tuiles
+// de 1 m) qui transforme une pente de simulation ordinaire en paroi. L'erosion travaille
+// donc APRES l'exageration, en unites Unreal, sur la pente que le joueur voit -- c'est la
+// correction de l'erreur de fond des terrasses, qui jugeaient la pente avant.
+//
+// Talus : au-dela de cet angle, la matiere glisse vers les voisins plus bas ; en dessous,
+// rien ne bouge. Conservative : ce qu'une paroi perd se depose a son pied. L'eau n'y
+// participe pas (la rive appartient a l'etape suivante).
+//
+// Valeurs MESUREES (balayage exageration x talus x iterations, seed 12345) :
+//  - quel que soit le reglage, 0 % de la terre a plus d'une tuile de l'eau reste
+//    au-dela de 60 degres ; les ~3 % restants sont tous des berges.
+//  - baisser Exaggerate n'apporte donc rien a l'interieur et coute du relief (point haut
+//    1156 uu a x3.6, 986 a x2.8) : Exaggerate reste a 3.6.
+//  - 40 degres : sous l'angle marchable du personnage (44.76) avec une marge ; a 45,
+//    la terre se tasse pile au seuil. 300 iterations : 600 ne change plus rien
+//    (>45 degres 3.6 % -> 3.3 %) pour deux fois le cout.
+static TAutoConsoleVariable<float> CVarForgeTalusDeg(
+	TEXT("anastasis.Terrain.Forge.TalusDeg"),
+	40.0f,
+	TEXT("Thermal erosion talus angle in degrees, on the rendered surface. 0 = off."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarForgeErosionIterations(
+	TEXT("anastasis.Terrain.Forge.ErosionIterations"),
+	300,
+	TEXT("Thermal erosion iterations. 0 = off."),
 	ECVF_Default);
 
 namespace
@@ -62,6 +141,61 @@ void BilinearSample(
 	const int32 NX = FMath::Clamp(FMath::RoundToInt(U), 0, W - 1);
 	const int32 NY = FMath::Clamp(FMath::RoundToInt(V), 0, H - 1);
 	bWater = CoarseTile(Crop, NX, NY).Type == ETileType::Water;
+}
+
+double CatmullRom(double P0, double P1, double P2, double P3, double T)
+{
+	return P1 + 0.5 * T * (P2 - P0 + T * (2.0 * P0 - 5.0 * P1 + 4.0 * P2 - P3 + T * (3.0 * (P1 - P2) + P3 - P0)));
+}
+
+/**
+ * Altitude au point (U,V), en coordonnees de tuile LOCALES a Source.
+ *
+ * Bicubique : Catmull-Rom sur 4x4 tuiles, borne au min/max des 4 tuiles de la cellule.
+ * Catmull-Rom passe par chaque tuile (l'altitude de simulation reste exacte au centre de
+ * tuile) et sa pente est continue d'une cellule a l'autre : plus de pli sur les lignes de
+ * tuile. La borne interdit tout extremum nouveau : sans elle, le bord d'un chenal creuse
+ * d'une tuile de large fait "sonner" la spline -- une bosse au-dessus de la berge, un creux
+ * sous le lit. C'est exactement l'artefact que cette etape retire, il ne doit pas revenir
+ * par l'interpolation. Prix de la borne : un sommet dont le maximum tombe entre deux tuiles
+ * est ecrete a la valeur de sa tuile la plus haute, comme le faisait deja le bilineaire.
+ *
+ * Portee : une tuile de plus que le bilineaire de chaque cote. C'est ce qui fixe
+ * AnastasisTerrainForge::HaloTiles a 2.
+ */
+double SampleAlt(const FWorldVisualSnapshot& Source, double U, double V, bool bBicubic)
+{
+	const int32 W = Source.W, H = Source.H;
+	const int32 X = FMath::Clamp(static_cast<int32>(FMath::FloorToDouble(U)), 0, W - 2);
+	const int32 Y = FMath::Clamp(static_cast<int32>(FMath::FloorToDouble(V)), 0, H - 2);
+	const double Fx = FMath::Clamp(U - static_cast<double>(X), 0.0, 1.0);
+	const double Fy = FMath::Clamp(V - static_cast<double>(Y), 0.0, 1.0);
+	auto A = [&Source, W, H](int32 I, int32 J) -> double
+	{
+		return Source.Tiles[FMath::Clamp(J, 0, H - 1) * W + FMath::Clamp(I, 0, W - 1)].Alt;
+	};
+	const double A00 = A(X, Y), A10 = A(X + 1, Y), A01 = A(X, Y + 1), A11 = A(X + 1, Y + 1);
+	if (!bBicubic)
+	{
+		// Meme formule, meme ordre d'operations que BilinearSample : bit a bit la forge
+		// d'avant. Les terrasses arrondissent l'altitude (Floor) ; un ecart d'un ULP y
+		// change une marche entiere, et la reference de l'etape 1 ne se reproduirait plus.
+		const double W00 = (1.0 - Fx) * (1.0 - Fy);
+		const double W10 = Fx * (1.0 - Fy);
+		const double W01 = (1.0 - Fx) * Fy;
+		const double W11 = Fx * Fy;
+		return A00 * W00 + A10 * W10 + A01 * W01 + A11 * W11;
+	}
+	double Rows[4];
+	for (int32 K = 0; K < 4; ++K)
+	{
+		const int32 J = Y - 1 + K;
+		Rows[K] = CatmullRom(A(X - 1, J), A(X, J), A(X + 1, J), A(X + 2, J), Fx);
+	}
+	const double Value = CatmullRom(Rows[0], Rows[1], Rows[2], Rows[3], Fy);
+	const double Lo = FMath::Min(FMath::Min(A00, A10), FMath::Min(A01, A11));
+	const double Hi = FMath::Max(FMath::Max(A00, A10), FMath::Max(A01, A11));
+	return FMath::Clamp(Value, Lo, Hi);
 }
 
 ETileType NearestType(const FWorldVisualSnapshot& Crop, double U, double V)
@@ -116,6 +250,121 @@ FVector2D BilinearUV(const TArray<FVector2D>& Channel, int32 CoarseW, int32 Coar
 					   FMath::Lerp(Channel[C], Channel[D], Fx), Fy);
 }
 
+/**
+ * Erosion thermique de Jacobi sur Z (uu) des sommets de terre d'une grille FineW x FineH.
+ *
+ * A chaque iteration, un sommet dont la chute vers un voisin depasse le talus
+ * (tan(Talus) x distance) cede une part de son plus grand exces, repartie entre les
+ * voisins en exces au prorata. Jacobi (tous les transferts lus sur l'etat precedent) et
+ * ordre de parcours fixe : le resultat est deterministe. La somme des Z de terre est
+ * conservee. Les sommets d'eau ne donnent ni ne recoivent : ils restent fixes.
+ *
+ * Renvoie le nombre d'iterations effectuees (arret anticipe quand plus rien ne depasse).
+ */
+int32 ThermalErode(TArray<FVector>& Vertices, const TArray<uint8>& Water, int32 W, int32 H,
+	double Spacing, double TalusDeg, int32 Iterations)
+{
+	const int32 N = W * H;
+	const int32 OffX[8] = {1, -1, 0, 0, 1, 1, -1, -1};
+	const int32 OffY[8] = {0, 0, 1, -1, 1, -1, 1, -1};
+	const double Tan = FMath::Tan(FMath::DegreesToRadians(TalusDeg));
+	double Limit[8];
+	for (int32 K = 0; K < 8; ++K)
+	{
+		Limit[K] = Tan * Spacing * (K < 4 ? 1.0 : UE_DOUBLE_SQRT_2);
+	}
+	// 0.4 et pas 0.5 : en Jacobi, un sommet peut recevoir de plusieurs voisins pendant
+	// qu'il cede ; ceder la moitie de l'exces le fait osciller en damier sur les parois.
+	constexpr double Rate = 0.4;
+	// En dessous d'un centieme d'uu, un transfert ne se voit plus : on s'arrete.
+	constexpr double Settled = 0.01;
+
+	TArray<double> Z;
+	TArray<double> Delta;
+	Z.SetNumUninitialized(N);
+	Delta.SetNumZeroed(N);
+	for (int32 I = 0; I < N; ++I)
+	{
+		Z[I] = Vertices[I].Z;
+	}
+
+	// Balayage complet a chaque iteration. Une liste active triee (seuls les voisinages
+	// qui ont bouge) donne le meme resultat bit a bit mais a ete MESUREE deux fois plus
+	// lente : une paroi qui s'effondre en cascade garde son tablier actif sur des
+	// centaines d'iterations, et le tri de la liste coute plus qu'il n'epargne.
+	int32 Done = 0;
+	for (; Done < Iterations; ++Done)
+	{
+		bool bMoved = false;
+		for (int32 I = 0; I < N; ++I)
+		{
+			if (Water[I])
+			{
+				continue;
+			}
+			const int32 X = I % W;
+			const int32 Y = I / W;
+			double Excess[8];
+			int32 Neighbour[8];
+			double Total = 0.0, Max = 0.0;
+			for (int32 K = 0; K < 8; ++K)
+			{
+				Excess[K] = 0.0;
+				const int32 NX = X + OffX[K], NY = Y + OffY[K];
+				if (NX < 0 || NY < 0 || NX >= W || NY >= H)
+				{
+					continue;
+				}
+				const int32 NI = NY * W + NX;
+				if (Water[NI])
+				{
+					continue;
+				}
+				const double E = Z[I] - Z[NI] - Limit[K];
+				if (E > 0.0)
+				{
+					Excess[K] = E;
+					Neighbour[K] = NI;
+					Total += E;
+					Max = FMath::Max(Max, E);
+				}
+			}
+			if (Max <= Settled)
+			{
+				continue;
+			}
+			bMoved = true;
+			const double Move = Rate * Max;
+			Delta[I] -= Move;
+			for (int32 K = 0; K < 8; ++K)
+			{
+				if (Excess[K] > 0.0)
+				{
+					Delta[Neighbour[K]] += Move * Excess[K] / Total;
+				}
+			}
+		}
+		if (!bMoved)
+		{
+			break;
+		}
+		for (int32 I = 0; I < N; ++I)
+		{
+			Z[I] += Delta[I];
+			Delta[I] = 0.0;
+		}
+	}
+
+	for (int32 I = 0; I < N; ++I)
+	{
+		if (!Water[I])
+		{
+			Vertices[I].Z = Z[I];
+		}
+	}
+	return Done;
+}
+
 void RebuildNormals(AnastasisTerrainSurface::FGeometry& G)
 {
 	G.Normals.SetNum(G.Vertices.Num());
@@ -159,10 +408,27 @@ bool AnastasisTerrainForge::SampleActive(double WorldX, double WorldY, double& O
 	return SampleHeight(GActive, WorldX, WorldY, OutZ);
 }
 
+bool AnastasisTerrainForge::SampleActiveWater(double WorldX, double WorldY, double& OutZ)
+{
+    if (!GActiveValid) return false;
+    const double Step = AnastasisWorldView::TileWorldSize * GActive.SpatialScale;
+    const double U = (WorldX / Step - 0.5 - GActive.OriginX) * GActive.Subdiv;
+    const double V = (WorldY / Step - 0.5 - GActive.OriginY) * GActive.Subdiv;
+    if (!FMath::IsFinite(U) || !FMath::IsFinite(V) || U < 0 || V < 0 || U > GActive.FineW-1 || V > GActive.FineH-1) return false;
+    const int32 X = FMath::Min(FMath::FloorToInt(U), GActive.FineW-2), Y = FMath::Min(FMath::FloorToInt(V), GActive.FineH-2);
+    const int32 A=Y*GActive.FineW+X, B=A+1, C=A+GActive.FineW, D=C+1;
+    const auto& W=GActive.Geometry.WaterVertices;
+    if (!W.IsValidIndex(D)) return false;
+    const double Fx=U-X, Fy=V-Y;
+    OutZ = Fx+Fy<=1 ? W[A].Z+Fx*(W[B].Z-W[A].Z)+Fy*(W[C].Z-W[A].Z)
+        : W[D].Z+(1-Fx)*(W[C].Z-W[D].Z)+(1-Fy)*(W[B].Z-W[D].Z);
+    return true;
+}
+
 bool AnastasisTerrainForge::SampleHeight(const FMesh& Mesh, double WorldX, double WorldY, double& OutZ)
 {
 	OutZ = 0.0;
-	if (Mesh.FineW < 2 || Mesh.FineH < 2 || Mesh.Subdiv < 1)
+	if (Mesh.FineW < 2 || Mesh.FineH < 2 || Mesh.Subdiv < 1 || !FMath::IsFinite(Mesh.SpatialScale) || Mesh.SpatialScale <= 0)
 	{
 		return false;
 	}
@@ -174,8 +440,8 @@ bool AnastasisTerrainForge::SampleHeight(const FMesh& Mesh, double WorldX, doubl
 	{
 		return false;
 	}
-	const double U = WorldX / AnastasisWorldView::TileWorldSize - 0.5 - static_cast<double>(Mesh.OriginX);
-	const double V = WorldY / AnastasisWorldView::TileWorldSize - 0.5 - static_cast<double>(Mesh.OriginY);
+	const double U = WorldX / (AnastasisWorldView::TileWorldSize * Mesh.SpatialScale) - 0.5 - static_cast<double>(Mesh.OriginX);
+	const double V = WorldY / (AnastasisWorldView::TileWorldSize * Mesh.SpatialScale) - 0.5 - static_cast<double>(Mesh.OriginY);
 	const double FineU = U * static_cast<double>(Mesh.Subdiv);
 	const double FineV = V * static_cast<double>(Mesh.Subdiv);
 	if (FineU < 0.0 || FineV < 0.0 || FineU > static_cast<double>(Mesh.FineW - 1) || FineV > static_cast<double>(Mesh.FineH - 1))
@@ -200,18 +466,30 @@ bool AnastasisTerrainForge::SampleHeight(const FMesh& Mesh, double WorldX, doubl
 bool AnastasisTerrainForge::Apply(
 	const FWorldVisualSnapshot& Crop,
 	AnastasisTerrainSurface::FGeometry& InOut,
-	FMesh& OutMeta)
+	FMesh& OutMeta,
+	const FWorldVisualSnapshot* HaloCrop,
+	TArray<double>* OutLaplacian)
 {
 	OutMeta = FMesh{};
 	const int32 CoarseW = Crop.W;
 	const int32 CoarseH = Crop.H;
-	if (CoarseW < 2 || CoarseH < 2 || InOut.Vertices.Num() != CoarseW * CoarseH)
+	if (!FMath::IsFinite(Crop.SpatialScale) || Crop.SpatialScale <= 0 || CoarseW < 2 || CoarseH < 2 || InOut.Vertices.Num() != CoarseW * CoarseH)
 	{
 		return false;
 	}
 
 	const int32 Subdiv = FMath::Clamp(CVarForgeSubdiv.GetValueOnGameThread(), 2, 6);
 	const double Exaggerate = FMath::Clamp(static_cast<double>(CVarForgeExaggerate.GetValueOnGameThread()), 1.0, 8.0);
+	const bool bTerraces = CVarForgeTerraces.GetValueOnGameThread() != 0;
+	const bool bEscarpments = CVarForgeEscarpments.GetValueOnGameThread() != 0;
+	const bool bBicubic = CVarForgeBicubic.GetValueOnGameThread() != 0;
+	const bool bSharpen = CVarForgeSharpen.GetValueOnGameThread() != 0;
+	// L'altitude fine se lit dans le halo quand il existe : au bord de Crop, le stencil
+	// bicubique a besoin des tuiles voisines, et sans elles la derniere cellule du chunk
+	// ne raccorderait pas a celle du monde entier (cf. Anastasis.Terrain.Forge.ChunkSeam).
+	const FWorldVisualSnapshot& AltSource = HaloCrop ? *HaloCrop : Crop;
+	const double AltDX = static_cast<double>(Crop.OriginX - AltSource.OriginX);
+	const double AltDY = static_cast<double>(Crop.OriginY - AltSource.OriginY);
 	const int32 FineW = (CoarseW - 1) * Subdiv + 1;
 	const int32 FineH = (CoarseH - 1) * Subdiv + 1;
 	const int32 FineN = FineW * FineH;
@@ -241,7 +519,7 @@ bool AnastasisTerrainForge::Apply(
 			double Alt = 0.0, Sh = 0.0, We = 0.0;
 			bool bWater = false;
 			BilinearSample(Crop, U, V, Alt, Sh, We, bWater);
-			H[I] = Alt;
+			H[I] = SampleAlt(AltSource, U + AltDX, V + AltDY, bBicubic);
 			Shore[I] = Sh;
 			Wet[I] = We;
 			Water[I] = bWater ? 1 : 0;
@@ -250,27 +528,64 @@ bool AnastasisTerrainForge::Apply(
 		}
 	}
 
-	auto At = [FineW, FineH, FineN](const TArray<double>& G, int32 X, int32 Y) -> double
+	// Voisin fin (X,Y), meme hors de [0,FineW)x[0,FineH). Au bord de Crop, ce n'est PAS
+	// forcement le bord du MONDE : si HaloCrop couvre ce point, on lit son vrai voisin de
+	// tuile au lieu de dupliquer le sommet du bord sur lui-meme. OutReliable, si fourni,
+	// dit lequel des deux vient de se produire -- c'est ce qui distingue un vrai bord du
+	// monde (clamp legitime, aucune tuile voisine n'existe) d'un bord de chunk que le
+	// halo couvre (clamp evitable).
+	auto At = [&H, &Crop, HaloCrop, FineW, FineH, InvSub, bBicubic](int32 X, int32 Y, bool* OutReliable = nullptr) -> double
 	{
-		X = FMath::Clamp(X, 0, FineW - 1);
-		Y = FMath::Clamp(Y, 0, FineH - 1);
-		return G[Y * FineW + X];
+		if (X >= 0 && X < FineW && Y >= 0 && Y < FineH)
+		{
+			if (OutReliable) { *OutReliable = true; }
+			return H[Y * FineW + X];
+		}
+		if (HaloCrop)
+		{
+			const double U = static_cast<double>(X) * InvSub + static_cast<double>(Crop.OriginX - HaloCrop->OriginX);
+			const double V = static_cast<double>(Y) * InvSub + static_cast<double>(Crop.OriginY - HaloCrop->OriginY);
+			if (U >= 0.0 && V >= 0.0 && U <= static_cast<double>(HaloCrop->W - 1) && V <= static_cast<double>(HaloCrop->H - 1))
+			{
+				if (OutReliable) { *OutReliable = true; }
+				return SampleAlt(*HaloCrop, U, V, bBicubic);
+			}
+		}
+		if (OutReliable) { *OutReliable = false; }
+		const int32 CX = FMath::Clamp(X, 0, FineW - 1);
+		const int32 CY = FMath::Clamp(Y, 0, FineH - 1);
+		return H[CY * FineW + CX];
 	};
 
 	TArray<double> Slope;
 	TArray<double> Lap;
+	// Vrai seulement pour les cellules de bord dont AU MOINS un voisin de Lap/Slope a du
+	// retomber sur le clamp-sur-soi (pas de halo a cet endroit) : c'est la, et seulement
+	// la, qu'un Laplacien peut mentir sur la convexite du relief.
+	TArray<uint8> LapUnreliable;
 	Slope.SetNumUninitialized(FineN);
 	Lap.SetNumUninitialized(FineN);
+	LapUnreliable.SetNumZeroed(FineN);
 	for (int32 JY = 0; JY < FineH; ++JY)
 	{
 		for (int32 IX = 0; IX < FineW; ++IX)
 		{
 			const int32 I = JY * FineW + IX;
-			const double Dx = At(H, IX + 1, JY) - At(H, IX - 1, JY);
-			const double Dy = At(H, IX, JY + 1) - At(H, IX, JY - 1);
+			bool bReliableLeft = true, bReliableRight = true, bReliableDown = true, bReliableUp = true;
+			const double Left = At(IX - 1, JY, &bReliableLeft);
+			const double Right = At(IX + 1, JY, &bReliableRight);
+			const double Down = At(IX, JY - 1, &bReliableDown);
+			const double Up = At(IX, JY + 1, &bReliableUp);
+			const double Dx = Right - Left;
+			const double Dy = Up - Down;
 			Slope[I] = FMath::Sqrt(Dx * Dx + Dy * Dy) * 0.5 * static_cast<double>(Subdiv);
-			Lap[I] = 4.0 * H[I] - At(H, IX - 1, JY) - At(H, IX + 1, JY) - At(H, IX, JY - 1) - At(H, IX, JY + 1);
+			Lap[I] = 4.0 * H[I] - Left - Right - Down - Up;
+			LapUnreliable[I] = (bReliableLeft && bReliableRight && bReliableDown && bReliableUp) ? 0 : 1;
 		}
+	}
+	if (OutLaplacian)
+	{
+		*OutLaplacian = Lap;
 	}
 
 	// D8 accumulation on the fine height field — drainage for ravine carving, not hydrology color.
@@ -335,8 +650,11 @@ bool AnastasisTerrainForge::Apply(
 			const double Acc = static_cast<double>(Accum[I]);
 
 			// Macro: ridges rise, bowls drop — existing masses, not new continents.
-			Alt += FMath::Max(L, 0.0) * 1.35;
-			Alt += FMath::Min(L, 0.0) * 0.95;
+			if (bSharpen)
+			{
+				Alt += FMath::Max(L, 0.0) * 1.35;
+				Alt += FMath::Min(L, 0.0) * 0.95;
+			}
 
 			// Ravines follow drainage. Keep them off the wet coastal shelf.
 			const double Ravine = SmoothStep(8.0, 40.0, Acc) * (1.0 - SmoothStep(0.35, 0.75, Sh));
@@ -344,7 +662,7 @@ bool AnastasisTerrainForge::Apply(
 
 			// Terraces on usable hillsides — agricultural benches, not a staircase everywhere.
 			const double SlopeDeg = FMath::RadiansToDegrees(FMath::Atan(S * AnastasisWorldView::AltitudeScale / AnastasisWorldView::TileWorldSize));
-			if (SlopeDeg > 6.0 && SlopeDeg < 24.0 && Sh < 0.5)
+			if (bTerraces && SlopeDeg > 6.0 && SlopeDeg < 24.0 && Sh < 0.5)
 			{
 				const double Step = 0.016;
 				const double Rel = (Alt - Sea) / Step;
@@ -354,9 +672,14 @@ bool AnastasisTerrainForge::Apply(
 			}
 
 			// Escarpments: steepen already-steep convex breaks.
-			if (SlopeDeg > 18.0 && L > 0.0)
+			if (bEscarpments && SlopeDeg > 18.0 && L > 0.0)
 			{
-				Alt += SmoothStep(18.0, 28.0, SlopeDeg) * 0.012 * L * 8.0;
+				// LapUnreliable is only set where a neighbour truly had no data (world edge,
+				// no HaloCrop covering it) and got duplicated onto itself instead — the one
+				// case where L can read as spuriously convex. Elsewhere (interior, or a chunk
+				// border HaloCrop covers) L is the real Laplacian and gets the full effect.
+				const double EdgeFade = LapUnreliable[I] ? 0.0 : 1.0;
+				Alt += SmoothStep(18.0, 28.0, SlopeDeg) * 0.012 * L * 8.0 * EdgeFade;
 			}
 
 			// Meso roughness only on slopes, never as a uniform blanket.
@@ -446,7 +769,7 @@ bool AnastasisTerrainForge::Apply(
 			Forged[I] = FMath::Lerp(Forged[I], Target, 0.58);
 		}
 		// Secondary terraces around the basin — buildable shoulders, not a village yet.
-		for (int32 I = 0; I < FineN; ++I)
+		for (int32 I = 0; bTerraces && I < FineN; ++I)
 		{
 			if (BasinMask[I] || Water[I] || !Buildable[I])
 			{
@@ -466,8 +789,9 @@ bool AnastasisTerrainForge::Apply(
 		}
 	}
 
-	// Landmark high ground: keep the peak, sharpen its shoulders.
-	if (LandmarkI != INDEX_NONE)
+	// Landmark high ground: keep the peak, sharpen its shoulders. Le point haut reste
+	// identifie (les cameras et le bassin s'y referent) ; seul l'affutage est coupe.
+	if (bSharpen && LandmarkI != INDEX_NONE)
 	{
 		const int32 LX = LandmarkI % FineW;
 		const int32 LY = LandmarkI / FineW;
@@ -510,14 +834,14 @@ bool AnastasisTerrainForge::Apply(
 			const double V = static_cast<double>(JY) * InvSub;
 			const double TileX = static_cast<double>(Crop.OriginX) + U;
 			const double TileY = static_cast<double>(Crop.OriginY) + V;
-			const double WorldX = (TileX + 0.5) * AnastasisWorldView::TileWorldSize;
-			const double WorldY = (TileY + 0.5) * AnastasisWorldView::TileWorldSize;
+			const double WorldX = (TileX + 0.5) * AnastasisWorldView::TileWorldSize * Crop.SpatialScale;
+			const double WorldY = (TileY + 0.5) * AnastasisWorldView::TileWorldSize * Crop.SpatialScale;
 
 			double Z;
 			if (Water[I])
 			{
 				const double DepthExag = 1.7;
-				Z = SeaZ + (H[I] - Sea) * AnastasisWorldView::AltitudeScale * DepthExag;
+				Z = SeaZ + (H[I] - Sea) * AnastasisWorldView::AltitudeScale * Crop.SpatialScale * DepthExag;
 			}
 			else
 			{
@@ -527,7 +851,7 @@ bool AnastasisTerrainForge::Apply(
 				const double EdgeDist = static_cast<double>(FMath::Min(FMath::Min(IX, JY), FMath::Min(FineW - 1 - IX, FineH - 1 - JY)));
 				const double Interior = SmoothStep(static_cast<double>(Subdiv) * 2.0, static_cast<double>(Subdiv) * 10.0, EdgeDist);
 				const double LocalExag = FMath::Lerp(1.55, Exaggerate, Interior) * FMath::Lerp(1.0, 0.42, ShoreBlend);
-				Z = SeaZ + Above * AnastasisWorldView::AltitudeScale * LocalExag;
+				Z = SeaZ + Above * AnastasisWorldView::AltitudeScale * Crop.SpatialScale * LocalExag;
 			}
 
 			Result.Vertices.Add(FVector(WorldX, WorldY, Z));
@@ -539,9 +863,20 @@ bool AnastasisTerrainForge::Apply(
 			const int32 CX = FMath::Clamp(FMath::RoundToInt(U), 0, CoarseW - 1);
 			const int32 CY = FMath::Clamp(FMath::RoundToInt(V), 0, CoarseH - 1);
 			Result.SourceIndices.Add(Crop.Tiles[CY * CoarseW + CX].SourceIndex);
-			MinZ = FMath::Min(MinZ, Z);
-			MaxZ = FMath::Max(MaxZ, Z);
 		}
+	}
+
+	const double TalusDeg = FMath::Clamp(static_cast<double>(CVarForgeTalusDeg.GetValueOnGameThread()), 0.0, 89.0);
+	const int32 ErosionIterations = FMath::Clamp(CVarForgeErosionIterations.GetValueOnGameThread(), 0, 2000);
+	if (TalusDeg > 0.0 && ErosionIterations > 0)
+	{
+		ThermalErode(Result.Vertices, Water, FineW, FineH,
+			AnastasisWorldView::TileWorldSize * Crop.SpatialScale * InvSub, TalusDeg, ErosionIterations);
+	}
+	for (const FVector& P : Result.Vertices)
+	{
+		MinZ = FMath::Min(MinZ, P.Z);
+		MaxZ = FMath::Max(MaxZ, P.Z);
 	}
 
 	for (int32 JY = 0; JY < FineH - 1; ++JY)
@@ -557,10 +892,19 @@ bool AnastasisTerrainForge::Apply(
 		}
 	}
 
+	if (Crop.bHumanGeography && Crop.Seed == AnastasisWorldView::ReferenceSeed)
+	{
+		AnastasisHumanGeography::Apply(Crop, Result, FineW, FineH);
+		MinZ = TNumericLimits<double>::Max();
+		MaxZ = TNumericLimits<double>::Lowest();
+		for (const FVector& P : Result.Vertices) { MinZ = FMath::Min(MinZ, P.Z); MaxZ = FMath::Max(MaxZ, P.Z); }
+	}
 	Result.WaterNormals.Init(FVector::UpVector, FineN);
 	RebuildNormals(Result);
 
 	OutMeta.Geometry = MoveTemp(Result);
+	OutMeta.SpatialScale = Crop.SpatialScale;
+	OutMeta.bHumanGeography = Crop.bHumanGeography && Crop.Seed == AnastasisWorldView::ReferenceSeed;
 	OutMeta.CoarseW = CoarseW;
 	OutMeta.CoarseH = CoarseH;
 	OutMeta.Subdiv = Subdiv;
@@ -585,6 +929,12 @@ bool AnastasisTerrainForge::Apply(
 		OutMeta.LandmarkZ = OutMeta.Geometry.Vertices[LandmarkI].Z;
 	}
 
+	if (OutMeta.bHumanGeography)
+	{
+		OutMeta.BasinX = 53.0 * AnastasisWorldView::TileWorldSize * Crop.SpatialScale;
+		OutMeta.BasinY = 53.0 * AnastasisWorldView::TileWorldSize * Crop.SpatialScale;
+		SampleHeight(OutMeta, OutMeta.BasinX, OutMeta.BasinY, OutMeta.BasinZ);
+	}
 	InOut = OutMeta.Geometry;
 	SetActive(OutMeta);
 	return true;

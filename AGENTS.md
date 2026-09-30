@@ -51,9 +51,10 @@ Cycle de vie, un outil unique : `tools\unreal\agent-worktree.ps1`
 
 | Commande | Rôle |
 |---|---|
-| `create -Mission <m>` | branche + worktree depuis `main` |
+| `create -Mission <m>` | branche + worktree depuis `main`, port MCP du worktree enregistré |
 | `status` | tous les worktrees : modifications, avance/retard sur `main`, branches non intégrées |
-| `finish -Mission <m>` | portail de fin : build + `report-tests`, refuse de passer la main si du travail n'est pas commité |
+| `finish -Mission <m>` | portail de fin : index `tools/unreal/` à jour, build + `report-tests`, refuse de passer la main si du travail n'est pas commité |
+| `mcp -Mission <m>` | (ré)enregistre le port MCP d'un worktree existant côté Claude Code |
 | `integrate -Mission <m>` | rôle intégrateur : refuse si le canonique est sale, puis avance rapide de `main` |
 | `preflight` | avant un `verify`/seal : dit ce qui bloque et **ouvre une fenêtre** d'observation |
 | `postflight` | après : échoue si source, config ou `HEAD` ont bougé pendant la fenêtre |
@@ -162,7 +163,102 @@ tools\unreal\anastasis-unreal.ps1 verify   # build + éditeur dédié + smoke PI
 tools\unreal\anastasis-unreal.ps1 editor   # lance l'éditeur (pas une vérification)
 ```
 
-Le script refuse de tourner hors de la racine canonique et valide l'identité moteur (5.8.2 / CL 56702186).
+Le script refuse de tourner hors de la racine canonique ou d'un worktree sous `C:\dev\ANASTASIS_WORKTREES`,
+et valide l'identité moteur (5.8.2 / CL 56702186).
+
+## Éditeur vivant : MCP Unreal
+
+Le plugin `ModelContextProtocol` (expérimental, UE 5.8) démarre avec l'éditeur un serveur MCP sur
+`http://localhost:8000/mcp` (`Config/DefaultEditorPerProjectUserSettings.ini`). `.mcp.json` le déclare
+pour Claude Code ; la première session demande d'approuver le serveur `unreal`.
+
+La recherche d'outils est active : le serveur n'expose que 3 méta-outils. `list_toolsets` liste les
+groupes (`EditorToolset`, `StateTreeToolset`, `AutomationTestToolset`, `AnastasisInspectTools`…) et on
+ne charge que celui dont on a besoin. `AnastasisInspectTools` (`Content/Python/anastasis_toolset/`)
+est en lecture seule : snapshot de session, acteurs, tuile, établissement, `verify_world_contract`.
+
+**Un port par racine.** Sans argument, tout éditeur vise 8000 et le premier levé le garde : un agent
+croirait inspecter son éditeur et parlerait à celui d'un autre. `mcp-port.ps1` donne donc à chaque
+racine son port — 8000 pour le canonique, un port stable dans 8100–8899 dérivé du nom de mission pour
+un worktree :
+
+- `anastasis-unreal.ps1 editor` lance l'éditeur sur le port de sa racine ; `status` et `editor` affichent `MCP_URL::`.
+- `agent-worktree.ps1 create` enregistre ce port côté Claude Code en portée locale, qui prime sur `.mcp.json`.
+  Pour un worktree créé avant : `agent-worktree.ps1 mcp -Mission <m>`, puis nouvelle session.
+- Les éditeurs lancés par les autres scripts (`verify`, `report-tests`, captures) gardent 8000.
+
+**Le contrôle reste obligatoire.** Deux missions peuvent tomber sur le même port, et un éditeur batch
+peut tenir 8000. Avant toute inspection, appeler `get_session_snapshot` et comparer `project_dir` à ta
+racine. S'il ne correspond pas, tu inspectes l'éditeur d'un autre agent : ne rien en conclure sur ton code.
+
+Serveur injoignable = aucun éditeur ouvert, ou éditeur qui n'a pas démarré son serveur. Ce n'est jamais
+une raison de tuer l'éditeur d'un autre agent.
+
+Ce qui transite par ce plugin est « Licensed Technology » au sens de l'EULA Unreal (section 6(e)) :
+l'avertissement de démarrage est attendu (`known-log-patterns.txt`).
+
+## Index de `tools/unreal/`
+
+Chaque `.ps1` lance l'éditeur de **son** worktree (racine déduite de son chemin) et pilote le `.py`
+associé. Un `.py` sans `.ps1` se lance dans un éditeur ouvert (`py <chemin>` en console) : son en-tête
+dit comment. Sorties dans `Saved/SliceEvidence/` sauf mention contraire.
+
+Opérateur et portails :
+
+| Script | Rôle |
+|---|---|
+| `anastasis-unreal.ps1` | `status` / `build` / `build-game` / `verify` / `health` / `editor` |
+| `agent-worktree.ps1` | cycle de vie multi-agent : `create` / `status` / `finish` / `integrate` / `preflight` / `postflight` / `mcp` |
+| `mcp-port.ps1` | port MCP d'une racine, à dot-sourcer |
+| `tools-index.ps1` | contrôle cet index contre le dossier, à dot-sourcer : `finish` bloque, `health` passe YELLOW |
+| `report-tests.ps1` | suite `Anastasis`, classée PASS / KNOWN_EXPECTED_FAILURE / FAIL, refuse un run tronqué |
+| `project-health.ps1` | rapport de santé des preuves (appelé par `health`) ; absent ou périmé ≠ PASS |
+| `automation-log.ps1` | lecture de log d'automation partagée par les deux précédents, pas un point d'entrée |
+| `scheduled-verify.ps1` | run nocturne (Planificateur de tâches) : `verify` puis `report-tests` |
+| `smoke-pie.py` | smoke PIE lancé par `verify` |
+| `known-expected-failures.txt` | registre KNOWN_EXPECTED_FAILURE — sur mandat seulement |
+| `known-log-patterns.txt` | baseline des Error/Warning connus du log éditeur — idem |
+
+Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
+
+| Script | Rôle |
+|---|---|
+| `capture-slice.ps1` + `observe-slice.py` | capture viewport de `Lvl_AnastasisSlice` ; `-PreCmds` pour un A/B sur une seule CVar. `-RebuildMaterial 1` réécrit le matériau |
+| `probe-demo.ps1` + `probe-demo.py` | preuve PIE : snapshot monde + capture par bookmark (défauts connus : `ATMOSPHERE_002.md`) |
+| `asset_agent_probe.py` | preuve PIE partagée par les missions d'asset, un bookmark par run |
+| `first-building-pie.py` | preuve PIE du premier bâtiment : pilote `Anastasis.Village.*` en console (puits, habitants, retraits), lecture par les lignes `ANASTASIS_VILLAGE` du log |
+| `house-rest-pie.py` | preuve PIE de la maison : `Anastasis.Village.FirstHouse`, une nuit de sommeil, retrait d'un dormeur puis de la maison occupée |
+| `shore-capture.ps1` + `shore-capture.py` | A/B visuel du bord d'eau, cadrage sur une rive |
+| `capture-terrain-forge.ps1` + `terrain-forge-capture.py` | captures avant/après du relief → `Saved/TerrainForgeEvidence/` |
+| `capture-terrain-relief.ps1` + `terrain-relief-capture.py` | avant/après d'une étape de la forge de relief (`-Step 1/2/3/scale`), dressing masqué → `Saved/TerrainReliefEvidence/` |
+| `capture-human-geography.py` | comparaison du relief corrige et de Human_Geography_V2 : export des maillages et vues a 170 cm ; sortie via ANASTASIS_HUMAN_EVIDENCE ; ferme l'editeur dedie |
+| `capture-reed-form.ps1` + `capture-reed-form.py` | comparaison des formes de roseaux dans une scene temporaire |
+| `capture-shore-reeds.ps1` + `capture-shore-reeds.py` | comparaison de silhouettes et proportions de roseaux sur la rive |
+| `capture-tree-lineup.ps1` + `capture-tree-lineup.py` | planche de stature de la grammaire d'arbres |
+| `astral-observe.py` | A/B lumière du jour fixe, Ecology seule variable |
+| `measure-tree-cost.ps1` + `measure-tree-cost.py` | triangles, LOD, instances HISM réellement soumis |
+| `inspect_presentation_registry.py` | dump de `DA_AnastasisPresentation` |
+| `introspect_geoscript.py` | docstrings des fonctions GeometryScript utilisées |
+
+Sources d'autorité d'assets — **écrivent** dans `Content/`. Sauf mention, ils créent l'asset s'il
+manque puis se contentent de le vérifier ; `*_REBUILD=1` le régénère et écrase toute retouche manuelle :
+
+| Script | Asset |
+|---|---|
+| `observe-slice.py` | `M_AnastasisSlice`, `Lvl_AnastasisSlice` |
+| `ground-material.ps1` + `.py` | `M_AnastasisGround`, `MI_AnastasisGround` |
+| `shore-water.ps1` + `.py` | `M_AnastasisShoreWater` |
+| `presentation-registry.py` | `DA_AnastasisPresentation` |
+| `atmosphere-profile.py` | `DA_AnastasisAtmosphere` |
+| `create_tree_asset.py` | `SM_Tree_*`, `M_AnastasisVegetation` — régénérés à **chaque** run |
+| `create-reed-form.py` | recette isolee de roseaux courbes ; cree les assets de la variante |
+| `create_ruin_asset.py` | `SM_Ruin_Generic_01` |
+| `set_presentation_meshes.py` | câble un mesh par archétype dans `DA_AnastasisPresentation` |
+| `set_tree_grammar.py` | entrée FOREST du registre (variantes d'arbres) |
+| `set_ruin_variant.py` | entrée Ruin — généralisé depuis par `set_presentation_meshes.py` |
+
+Retoucher un de ces assets à la main dans l'éditeur ne survit pas au prochain rebuild : la valeur
+se change dans le script.
 
 ## Tests
 
