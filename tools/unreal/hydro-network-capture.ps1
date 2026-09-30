@@ -7,6 +7,7 @@
 # -PreCmds "a 1;b 2" : commandes console avant chaque incarnation.
 param([string]$Label='default', [string]$States='0,1', [string]$Shots='', [int]$Debug=0, [string]$PreCmds='', [int]$TimeoutSec=600)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 $Editor='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $dir=Join-Path $Root "Saved\HydroNetworkEvidence\$Label"
@@ -28,7 +29,8 @@ $launchArgs=@(
  ('-abslog="'+$log+'"'),
  ('-ExecCmds="py '+$py+'"')
 )
-$p=Start-Process $Editor -ArgumentList $launchArgs -PassThru
+# Editeur discret : pas de fenetre au premier plan, pas de vol de focus (editor-launch.ps1).
+$p=Start-AnastasisEditor $Editor $launchArgs
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
 $p.Refresh()
 if(-not $p.HasExited){
