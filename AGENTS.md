@@ -299,6 +299,13 @@ se change dans le script.
 | `create-refugee-props.py` | Cree quatre accessoires de refugies et leur materiau dans RefugeeProps008. |
 | `capture-refugee-props.ps1` + `capture-refugee-props.py` | Capture en studio les quatre objets, sans sauvegarder de niveau. |
 
+### Camp shelter 009
+
+| Script | Role |
+|---|---|
+| `create-camp-shelter.py` | Abri de toile statique, recette CampShelter009. |
+| `capture-camp-shelter.ps1` + `capture-camp-shelter.py` | Trois vues de l'abri avec les accessoires existants, aucun niveau sauve. |
+
 ## Tests
 
 ```powershell
