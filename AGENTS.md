@@ -213,3 +213,48 @@ concerné ne sont pas verts. Citer les noms de tests et les valeurs, pas « ça 
 `PLAYER` reste **NOT_IMPLEMENTED**. Ne pas le commencer sans mandat explicite d'Alexandre.
 
 Voir `ANASTASIS_CANONICAL_PROJECT.md` et `docs/unreal/UNREAL_CANONICAL_STATE.md`.
+
+## Index de `tools/unreal/`
+
+Index du contenu de ce worktree. Les recettes de creation ecrivent dans Content ; les captures utilisent leur chemin de sortie documente.
+
+| Script | Role |
+|---|---|
+| `anastasis-unreal.ps1` | `status` / `build` / `build-game` / `verify` / `health` / `editor` |
+| `agent-worktree.ps1` | cycle de vie multi-agent : `create` / `status` / `finish` / `integrate` / `preflight` / `postflight` / `mcp` |
+| `report-tests.ps1` | suite `Anastasis`, classée PASS / KNOWN_EXPECTED_FAILURE / FAIL, refuse un run tronqué |
+| `project-health.ps1` | rapport de santé des preuves (appelé par `health`) ; absent ou périmé ≠ PASS |
+| `automation-log.ps1` | lecture de log d'automation partagée par les deux précédents, pas un point d'entrée |
+| `scheduled-verify.ps1` | run nocturne (Planificateur de tâches) : `verify` puis `report-tests` |
+| `smoke-pie.py` | smoke PIE lancé par `verify` |
+| `known-expected-failures.txt` | registre KNOWN_EXPECTED_FAILURE — sur mandat seulement |
+| `known-log-patterns.txt` | baseline des Error/Warning connus du log éditeur — idem |
+| `capture-slice.ps1` + `observe-slice.py` | capture viewport de `Lvl_AnastasisSlice` ; `-PreCmds` pour un A/B sur une seule CVar. `-RebuildMaterial 1` réécrit le matériau |
+| `probe-demo.ps1` + `probe-demo.py` | preuve PIE : snapshot monde + capture par bookmark (défauts connus : `ATMOSPHERE_002.md`) |
+| `asset_agent_probe.py` | preuve PIE partagée par les missions d'asset, un bookmark par run |
+| `shore-capture.ps1` + `shore-capture.py` | A/B visuel du bord d'eau, cadrage sur une rive |
+| `capture-terrain-forge.ps1` + `terrain-forge-capture.py` | captures avant/après du relief → `Saved/TerrainForgeEvidence/` |
+| `capture-terrain-relief.ps1` + `terrain-relief-capture.py` | avant/après d'une étape de la forge de relief (`-Step 1/2/3/scale`), dressing masqué → `Saved/TerrainReliefEvidence/` |
+| `capture-reed-form.ps1` + `capture-reed-form.py` | comparaison des formes de roseaux dans une scene temporaire |
+| `capture-tree-lineup.ps1` + `capture-tree-lineup.py` | planche de stature de la grammaire d'arbres |
+| `astral-observe.py` | A/B lumière du jour fixe, Ecology seule variable |
+| `measure-tree-cost.ps1` + `measure-tree-cost.py` | triangles, LOD, instances HISM réellement soumis |
+| `inspect_presentation_registry.py` | dump de `DA_AnastasisPresentation` |
+| `introspect_geoscript.py` | docstrings des fonctions GeometryScript utilisées |
+| `observe-slice.py` | `M_AnastasisSlice`, `Lvl_AnastasisSlice` |
+| `ground-material.ps1` + `.py` | `M_AnastasisGround`, `MI_AnastasisGround` |
+| `shore-water.ps1` + `.py` | `M_AnastasisShoreWater` |
+| `presentation-registry.py` | `DA_AnastasisPresentation` |
+| `atmosphere-profile.py` | `DA_AnastasisAtmosphere` |
+| `create_tree_asset.py` | `SM_Tree_*`, `M_AnastasisVegetation` — régénérés à **chaque** run |
+| `create-reed-form.py` | recette isolee de roseaux courbes ; cree les assets de la variante |
+| `create_ruin_asset.py` | `SM_Ruin_Generic_01` |
+| `set_presentation_meshes.py` | câble un mesh par archétype dans `DA_AnastasisPresentation` |
+| `set_tree_grammar.py` | entrée FOREST du registre (variantes d'arbres) |
+| `set_ruin_variant.py` | entrée Ruin — généralisé depuis par `set_presentation_meshes.py` |
+| `capture-refugee-props.ps1` | Lance la creation/relecture des quatre props et neuf captures dans un editeur dedie ; sortie -OutDir. |
+| `capture-refugee-props.py` | Scene studio temporaire : planche + deux angles par prop, sans sauvegarde de niveau. |
+| `capture-shore-composition.py` | Compare les placements de roseaux, reutilise capture-reed-form.ps1 ; sortie ANASTASIS_REED_FORM_OUT. |
+| `capture-shore-contact.py` | Compare ShoreProfile 0/1 avec placements fixes ; pilote par capture-reed-form.ps1. |
+| `capture-shore-material.py` | Compare les matieres sol/eau et diagnostique la nappe masquee ; pilote par capture-reed-form.ps1. |
+| `create-refugee-props.py` | Cree quatre StaticMesh et leur materiau dans RefugeeProps008 ; geometrie pure testable, refuse la derive de recette. |
