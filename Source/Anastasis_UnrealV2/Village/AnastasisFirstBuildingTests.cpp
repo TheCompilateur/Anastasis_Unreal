@@ -192,4 +192,67 @@ bool FAnastasisHousePresentationTest::RunTest(const FString&)
 	return true;
 }
 
+/**
+ * Le grenier : building-N (granary) -> acteur Kind Granary, Smart Object
+ * `Activity.Eat`. Le stock et les reservations restent dans la simulation.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAnastasisGranaryPresentationTest,
+	"Anastasis.Village.FirstBuilding.GrenierPresentation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAnastasisGranaryPresentationTest::RunTest(const FString&)
+{
+	UWorld* World = AnastasisFirstBuildingTest::FindWorld();
+	UAnastasisVillageInteractionSubsystem* Rooms = World ? World->GetSubsystem<UAnastasisVillageInteractionSubsystem>() : nullptr;
+	if (!TestNotNull(TEXT("village interaction subsystem"), Rooms))
+	{
+		return false;
+	}
+
+	FAnastasisSimulation Sim;
+	Sim.Reset(AnastasisWorldView::ReferenceSeed, AnastasisWorldView::ReferenceWidth, AnastasisWorldView::ReferenceHeight);
+	AnastasisVillage::FVillage& Village = Sim.GetVillage();
+	FString GranaryId;
+	for (int32 R = 0; R < 30 && GranaryId.IsEmpty(); ++R)
+	{
+		for (int32 DY = -R; DY <= R && GranaryId.IsEmpty(); ++DY)
+		{
+			for (int32 DX = -R; DX <= R && GranaryId.IsEmpty(); ++DX)
+			{
+				GranaryId = Village.AddBuilding(AnastasisVillage::GranaryType, 56 + DX, 40 + DY);
+			}
+		}
+	}
+	if (!TestFalse(TEXT("grenier pose dans la simulation"), GranaryId.IsEmpty()))
+	{
+		return false;
+	}
+	Village.CreditFood(GranaryId, 12);
+	const AnastasisVillage::FBuilding Record = *Village.FindBuilding(GranaryId);
+
+	FAnastasisVillagePresentation Presentation;
+	TestEqual(TEXT("un acteur cree"), Presentation.Sync(Village, Sim.GetWorld(), *Rooms), 1);
+	AAnastasisVillageBuilding* Actor = Presentation.FindActor(GranaryId);
+	if (!TestNotNull(TEXT("acteur reflete"), Actor))
+	{
+		return false;
+	}
+	TestEqual(TEXT("SimId = building-N"), Actor->GetSimId(), FName(*GranaryId));
+	TestTrue(TEXT("type Granary"), Actor->GetKind() == EAnastasisVillageBuildingKind::Granary);
+	const FVector Expected = FAnastasisVillagePresentation::SimToUnreal(Sim.GetWorld(), Record.X + 0.5, Record.Y + 0.5, World);
+	TestTrue(TEXT("pose au centre de sa tuile"), Actor->GetActorLocation().Equals(Expected, 0.01));
+	const FAnastasisVillageQueryResult Eat = Rooms->FindNearestInteraction(
+		TAG_Anastasis_Activity_Eat,
+		Expected,
+		static_cast<float>(AnastasisWorldView::TileWorldSize * 3.0));
+	TestEqual(TEXT("Activity.Eat remonte a building-N"), Eat.SimId, FName(*GranaryId));
+
+	TestTrue(TEXT("RemoveBuilding"), Village.RemoveBuilding(GranaryId));
+	TestEqual(TEXT("un acteur detruit"), Presentation.Sync(Village, Sim.GetWorld(), *Rooms), 1);
+	TestNull(TEXT("plus d'acteur"), Presentation.FindActor(GranaryId));
+	Presentation.Clear(Rooms);
+	return true;
+}
+
 #endif

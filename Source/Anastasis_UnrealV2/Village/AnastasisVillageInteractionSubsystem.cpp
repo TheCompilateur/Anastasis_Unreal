@@ -19,6 +19,7 @@ void UAnastasisVillageInteractionSubsystem::Initialize(FSubsystemCollectionBase&
 	HouseDef = MakeDefinition(EAnastasisVillageBuildingKind::House);
 	WellDef = MakeDefinition(EAnastasisVillageBuildingKind::Well);
 	WorkshopDef = MakeDefinition(EAnastasisVillageBuildingKind::Workshop);
+	GranaryDef = MakeDefinition(EAnastasisVillageBuildingKind::Granary);
 }
 
 FGameplayTag UAnastasisVillageInteractionSubsystem::ActivityTagFor(EAnastasisVillageBuildingKind Kind)
@@ -28,6 +29,7 @@ FGameplayTag UAnastasisVillageInteractionSubsystem::ActivityTagFor(EAnastasisVil
 	case EAnastasisVillageBuildingKind::House: return TAG_Anastasis_Activity_Sleep;
 	case EAnastasisVillageBuildingKind::Well: return TAG_Anastasis_Activity_Drink;
 	case EAnastasisVillageBuildingKind::Workshop: return TAG_Anastasis_Activity_Work;
+	case EAnastasisVillageBuildingKind::Granary: return TAG_Anastasis_Activity_Eat;
 	}
 	return TAG_Anastasis_Activity_Sleep;
 }
@@ -39,6 +41,7 @@ FGameplayTag UAnastasisVillageInteractionSubsystem::BuildingTagFor(EAnastasisVil
 	case EAnastasisVillageBuildingKind::House: return TAG_Anastasis_Building_House;
 	case EAnastasisVillageBuildingKind::Well: return TAG_Anastasis_Building_Well;
 	case EAnastasisVillageBuildingKind::Workshop: return TAG_Anastasis_Building_Workshop;
+	case EAnastasisVillageBuildingKind::Granary: return TAG_Anastasis_Building_Granary;
 	}
 	return TAG_Anastasis_Building_House;
 }
@@ -50,6 +53,7 @@ USmartObjectDefinition* UAnastasisVillageInteractionSubsystem::DefinitionFor(EAn
 	case EAnastasisVillageBuildingKind::House: return HouseDef;
 	case EAnastasisVillageBuildingKind::Well: return WellDef;
 	case EAnastasisVillageBuildingKind::Workshop: return WorkshopDef;
+	case EAnastasisVillageBuildingKind::Granary: return GranaryDef;
 	}
 	return HouseDef;
 }

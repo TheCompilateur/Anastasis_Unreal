@@ -19,3 +19,4 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Anastasis_Building_Farm);
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Anastasis_Building_Tavern);
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Anastasis_Building_Well);
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Anastasis_Building_Workshop);
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Anastasis_Building_Granary);

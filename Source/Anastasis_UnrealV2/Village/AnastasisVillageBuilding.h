@@ -13,7 +13,8 @@ enum class EAnastasisVillageBuildingKind : uint8
 {
 	House,
 	Well,
-	Workshop
+	Workshop,
+	Granary
 };
 
 /**

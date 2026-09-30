@@ -24,7 +24,42 @@ namespace AnastasisVillage
 		/** Types connus du catalogue porte (`BUILDINGS[type]` existe). */
 		bool IsKnownType(const FString& Type)
 		{
-			return Type == WellType || Type == HouseType;
+			return Type == WellType || Type == HouseType || Type == GranaryType;
+		}
+
+		/** `DOMESTIC_GOALS` restreint aux buts portes : rest, eat. */
+		bool IsDomesticGoal(const FString& Goal)
+		{
+			return Goal == GoalRest || Goal == GoalEat;
+		}
+
+		/** `WORKISH` de bridge.js. */
+		bool IsWorkish(const FString& Goal)
+		{
+			static const TCHAR* const Goals[] = {
+				TEXT("gatherWood"), TEXT("gatherStone"), TEXT("gatherFood"), TEXT("build"), TEXT("craft"),
+				TEXT("maintain"), TEXT("deliver"), TEXT("sell"), TEXT("buy"), TEXT("helpFarm"),
+				TEXT("haulJob"), TEXT("fetchInput"), TEXT("apprentice"),
+			};
+			for (const TCHAR* G : Goals)
+			{
+				if (Goal == G) return true;
+			}
+			return false;
+		}
+
+		/** Ordre de la table adulte (adultScores, npc.js:1112-1141). */
+		const TCHAR* const AdultTable[] = {
+			TEXT("eat"), TEXT("eatTogether"), TEXT("rest"), TEXT("relax"), TEXT("relieve"), TEXT("drink"),
+			TEXT("gatherWood"), TEXT("gatherStone"), TEXT("gatherFood"), TEXT("helpFarm"), TEXT("sell"),
+			TEXT("buy"), TEXT("build"), TEXT("craft"), TEXT("maintain"), TEXT("deliver"), TEXT("fetchInput"),
+			TEXT("haulJob"), TEXT("aidHousehold"), TEXT("visitFamily"), TEXT("explore"), TEXT("socialize"),
+			TEXT("confront"), TEXT("shelterRain"), TEXT("closeWorkplace"),
+		};
+
+		bool IsPortedGoal(const FString& Goal)
+		{
+			return Goal == GoalEat || Goal == GoalRest || Goal == GoalDrink;
 		}
 
 		FString TargetKey(const FPoint& P)
@@ -82,11 +117,27 @@ namespace AnastasisVillage
 		return 0;
 	}
 
+	bool IsFoodGroupType(const FString& Type)
+	{
+		// catalog.js : granary `group: "food"`. Le puits est civique, la maison un logement.
+		return Type == GranaryType;
+	}
+
+	double ComputeMealTtlSeconds(double TravelSeconds, double Base)
+	{
+		if (!FMath::IsFinite(TravelSeconds) || TravelSeconds < 0.0)
+		{
+			return FMath::Max(5.0, Base);
+		}
+		const double WithMargin = TravelSeconds * 1.5 + 20.0;
+		return FMath::Max(5.0, FMath::Min(Meal::TtlMaxSeconds, FMath::Max(Base, WithMargin)));
+	}
+
 	const TArray<FString>& UnportedGoals()
 	{
-		// Table adulte de npc.js (adultScores), moins `rest` et `drink`.
+		// Table adulte de npc.js (adultScores), moins `eat`, `rest` et `drink`.
 		static const TArray<FString> Goals = {
-			TEXT("eat"), TEXT("eatTogether"), TEXT("relax"), TEXT("relieve"),
+			TEXT("eatTogether"), TEXT("relax"), TEXT("relieve"),
 			TEXT("gatherWood"), TEXT("gatherStone"), TEXT("gatherFood"), TEXT("helpFarm"),
 			TEXT("sell"), TEXT("buy"), TEXT("build"), TEXT("craft"), TEXT("maintain"), TEXT("deliver"),
 			TEXT("fetchInput"), TEXT("haulJob"), TEXT("aidHousehold"), TEXT("visitFamily"), TEXT("explore"),
@@ -108,6 +159,9 @@ namespace AnastasisVillage
 		NextBuildingId = 0;
 		NextNpcId = 0;
 		Now = 0.0;
+		MealReservations.Reset();
+		MealSeq = 0;
+		ReservationSweepAt = 0.0;
 		Buildings = TAnastasisEntityTable<FBuilding>();
 		Actors = TAnastasisEntityTable<FNpc>();
 	}
@@ -186,6 +240,10 @@ namespace AnastasisVillage
 			AnastasisNav::RebuildMoveCosts(Nav, *World);
 		}
 		++NavVersion;
+
+		// Reservations sur ce grenier : la reference les lache au prochain renouvellement
+		// ou balayage (« source_gone ») ; ici tout de suite. Le stock est parti avec lui.
+		MealReservations.RemoveAll([&](const FMealReservation& R) { return R.BuildingId == Id; });
 
 		// Aucune reference morte : dedans, foyer, abri, cible, chemin.
 		for (FNpc& Npc : Actors.GetItemsMutable())
@@ -816,9 +874,9 @@ namespace AnastasisVillage
 		return Best;
 	}
 
-	const FBuilding* FVillage::BuildingForIndoorAction(const FNpc& Npc) const
+	const FBuilding* FVillage::BuildingForIndoorAction(const FNpc& Npc, const FString& Goal) const
 	{
-		// Foyer d'abord : dormir se fait DANS la maison ou l'abri.
+		// Foyer d'abord : dormir, manger se font DANS la maison ou l'abri.
 		const FString& Living = Npc.LivingHomeId();
 		if (!Living.IsEmpty())
 		{
@@ -834,8 +892,13 @@ namespace AnastasisVillage
 		if (!Building || Building->Progress < 1.0) return nullptr;
 		if (!IsKnownType(Building->Type)) return nullptr;
 		const bool bAtOwn = !Living.IsEmpty() && Living == Building->Id;
-		// `if (goal === "rest" || goal === "relieve") return afford(atOwn || data.housing)`.
 		// AUCUN controle de proprietaire ni de capacite : c'est la reference.
+		if (Goal == GoalEat)
+		{
+			// `afford(atOwn || data.group === "food" || data.group === "trade" || data.housing)`.
+			return bAtOwn || IsFoodGroupType(Building->Type) || HousingOfType(Building->Type) > 0 ? Building : nullptr;
+		}
+		// `if (goal === "rest" || goal === "relieve") return afford(atOwn || data.housing)`.
 		return bAtOwn || HousingOfType(Building->Type) > 0 ? Building : nullptr;
 	}
 
@@ -892,9 +955,9 @@ namespace AnastasisVillage
 
 	bool FVillage::TryEnterIndoorAction(FNpc& Npc)
 	{
-		if (Npc.Inside.bActive || Npc.Goal != GoalRest) return false;
+		if (Npc.Inside.bActive || !IsDomesticGoal(Npc.Goal)) return false;
 		const FBuilding* Building = NearLivingHome(Npc);
-		if (!Building) Building = BuildingForIndoorAction(Npc);
+		if (!Building) Building = BuildingForIndoorAction(Npc, Npc.Goal);
 		if (!Building)
 		{
 			// Au seuil du foyer meme si son centre est un peu loin.
@@ -908,6 +971,11 @@ namespace AnastasisVillage
 			}
 		}
 		if (!Building) return false;
+		if (Npc.Goal == GoalEat)
+		{
+			// `indoorNeedDuration(eat)` = eatDuration ; `waitingActivity(eat)` = « mange ».
+			return EnterBuilding(Npc, *Building, TEXT("mange"), AnastasisNeeds::Constants::EatDuration);
+		}
 		// `indoorNeedDuration(rest)` : la nuit se decide UNE fois, a l'entree.
 		const bool bNight = IsNight();
 		const double Duration = bNight ? AnastasisNeeds::Constants::SleepDuration : AnastasisNeeds::Constants::NapDuration;
@@ -945,6 +1013,11 @@ namespace AnastasisVillage
 		Npc.Needs = Needs;
 		const FString Id = Npc.Id;
 		Actors.Add(MoveTemp(Npc));
+		// `spawnNpc` : `perceive(this, npc, true)`.
+		if (World)
+		{
+			PerceiveNow(Id);
+		}
 		return Id;
 	}
 
@@ -953,6 +1026,12 @@ namespace AnastasisVillage
 		if (!Actors.FindById(Id))
 		{
 			return false;
+		}
+		// Sa reservation rend la portion au stock (`expireMealReservations`, branche
+		// « habitant disparu » de la reference, appliquee tout de suite).
+		if (FNpc* Leaving = Actors.FindById(Id))
+		{
+			ReleaseMeal(*Leaving, TEXT("npc_removed"));
 		}
 		// Un proprietaire qui disparait libere sa maison : la reference le fait a la
 		// mort (mortality.js) ; sans cela la maison resterait close pour toujours.
@@ -997,6 +1076,10 @@ namespace AnastasisVillage
 		{
 			AnastasisNeeds::TickNeedsRestInside(Npc.Needs, Dt, IsNight(), SleepQualityOf(Npc));
 		}
+		else if (Npc.Inside.bActive && Npc.Inside.Goal == GoalEat)
+		{
+			AnastasisNeeds::TickNeedsEatInside(Npc.Needs, Dt);
+		}
 		else
 		{
 			const bool bDrinking = Npc.Goal == GoalDrink && !Npc.Inside.bActive && AtDrinkSpot(Npc.X, Npc.Y);
@@ -1010,15 +1093,29 @@ namespace AnastasisVillage
 			return;
 		}
 
+		// `syncVillagePhase` : la bascule de phase force une pensee.
+		const FString PhaseNow = AnastasisRhythm::PhaseId(AnastasisRhythm::VillagePhase(AnastasisRhythm::DayFracOf(Now)));
+		const bool bPhaseFlip = !Npc.VillagePhase.IsEmpty() && Npc.VillagePhase != PhaseNow;
+		Npc.VillagePhase = PhaseNow;
+
 		const bool bCritical = NeedsCritical(Npc.Needs);
+		// Noûs actif : `tickAlgorithmicNpc` a chaque mise a jour d'habitant, comme la reference.
+		TickAlgorithmicNpc();
 		if (Npc.AiThinkAt < 0.0)
 		{
-			Npc.AiThinkAt = Now + AiThinkStagger(Npc.Id);
+			const double Base = AnastasisNous::DecisionIntervalSeconds(bCritical);
+			Npc.AiThinkAt = Now + AnastasisNous::DeterministicAlgoStagger(Npc.Id, Base);
+		}
+		if (bPhaseFlip)
+		{
+			Npc.AiThinkAt = Now;
 		}
 		if (Now >= Npc.AiThinkAt)
 		{
-			Npc.AiThinkAt = Now + (bCritical ? ThinkEveryCritical : ThinkEvery);
-			// `perceive` n'est pas porte (croyances). Reconsideration seulement sans cible (ecart n°2).
+			Npc.AiThinkAt = Now + AnastasisNous::DecisionIntervalSeconds(bCritical);
+			Perceive(Npc, false);
+			ComputeAlgorithmicDecision(Npc);
+			// Reconsideration seulement sans cible (ecart n°2).
 			if (!Npc.bHasTarget)
 			{
 				ChooseGoal(Npc);
@@ -1043,65 +1140,101 @@ namespace AnastasisVillage
 		Trace.Time = Now;
 		Trace.Phase = AnastasisRhythm::PhaseId(Phase);
 		Trace.NeedScores = AnastasisNeeds::NeedGoalScores(Npc.Needs, Wells, /*CompletedTaverns=*/0);
-		// Lignes de adultScores, puis `rhythmBias` = `phaseBias` (ecart n°1 pour le reste).
-		Trace.RestRowScore = Trace.NeedScores.Rest + RestJobPriorityBias
-			+ AnastasisRhythm::PhaseBias(Phase, Subject, GoalRest);
-		Trace.DrinkRowScore = Trace.NeedScores.Drink + (Wells > 0 ? 6.0 : 0.0)
-			+ AnastasisRhythm::PhaseBias(Phase, Subject, GoalDrink);
+
+		// adultScores : les 25 lignes, dans l'ordre de la reference, puis
+		// `rhythmBias` (= phaseBias). Les buts non portes valent 42 avant rythme.
+		TArray<TPair<FString, double>> Rows;
+		for (const TCHAR* Goal : AdultTable)
+		{
+			const FString G = Goal;
+			double Score = UnportedGoalsFloor;
+			if (G == GoalEat) Score = Trace.NeedScores.Eat + EatJobPriorityBias;
+			else if (G == GoalRest) Score = Trace.NeedScores.Rest + RestJobPriorityBias;
+			else if (G == GoalDrink) Score = Trace.NeedScores.Drink + (Wells > 0 ? 6.0 : 0.0);
+			Score += AnastasisRhythm::PhaseBias(Phase, Subject, G);
+			Rows.Add(TPair<FString, double>(G, Score));
+		}
+
+		// commitGoalChoice : (collant non porte) Noûs biaise la table avant le tri.
+		ApplyAlgorithmicScoreBias(Npc, Rows);
+
 		Trace.FloorScore = -AnastasisNav::Infinity;
-		for (const FString& Goal : UnportedGoals())
+		for (const TPair<FString, double>& Row : Rows)
 		{
-			const double Score = UnportedGoalsFloor + AnastasisRhythm::PhaseBias(Phase, Subject, Goal);
-			if (Score > Trace.FloorScore)
+			if (Row.Key == GoalEat) Trace.EatRowScore = Row.Value;
+			else if (Row.Key == GoalRest) Trace.RestRowScore = Row.Value;
+			else if (Row.Key == GoalDrink) Trace.DrinkRowScore = Row.Value;
+			else if (Row.Value > Trace.FloorScore)
 			{
-				Trace.FloorScore = Score;
-				Trace.FloorGoal = Goal;
+				Trace.FloorScore = Row.Value;
+				Trace.FloorGoal = Row.Key;
 			}
 		}
 
-		// Ordre de la table : rest avant drink ; un but porte ne l'emporte que
-		// s'il depasse strictement le meilleur but non porte.
-		FString Wanted;
-		double Best = Trace.FloorScore;
-		if (Trace.RestRowScore > Best)
+		// `scores.sort((a, b) => b.score - a.score)` : tri STABLE.
+		Rows.StableSort([](const TPair<FString, double>& A, const TPair<FString, double>& B) { return A.Value > B.Value; });
+		Trace.TableWinner = Rows[0].Key;
+		if (Npc.bHasAlgoDecision)
 		{
-			Best = Trace.RestRowScore;
-			Wanted = GoalRest;
+			Trace.NousType = Npc.AlgoDecision.Type;
+			Trace.NousScore = Npc.AlgoDecision.Score;
+			Trace.NousUrgency = Npc.AlgoDecision.Urgency;
 		}
-		if (Trace.DrinkRowScore > Best)
-		{
-			Best = Trace.DrinkRowScore;
-			Wanted = GoalDrink;
-		}
+		const FString Next = ApplyAlgorithmicCommitGate(Npc, Rows[0].Key, Npc.Goal, Trace.CommitGate);
+		CommitGoal(Npc, Next, Trace);
+	}
 
+	void FVillage::CommitGoal(FNpc& Npc, const FString& Next, FDecisionTrace& Trace)
+	{
+		const FString Previous = Npc.Goal;
+		// Un but non porte qui gagne ne fait rien : `observer`.
+		const FString NewGoal = IsPortedGoal(Next) ? Next : FString(GoalObserver);
 		Npc.DestBuildingId.Reset();
-		if (!Wanted.IsEmpty())
+		Npc.Goal = NewGoal;
+		OnAlgorithmicGoalCommitted(Npc, Previous, NewGoal);
+		if (NewGoal != Previous)
 		{
-			FPoint Target;
-			FString Source;
-			const bool bFound = Wanted == GoalDrink
-				? DrinkTarget(Npc, Target, Source)
-				: RestTarget(Npc, Target, Source);
-			Trace.TargetSource = Source;
-			if (bFound)
-			{
-				if (Npc.Goal != Wanted) Npc.WorkTimer = 0.0;
-				Npc.Goal = Wanted;
-				Npc.bHasTarget = true;
-				Npc.Target = Target;
-				Npc.DoorStuckAt = 0.0;
-				Npc.DoorApproachAt = 0.0;
-				Trace.Winner = Wanted;
-				Trace.BuildingId = Npc.DestBuildingId;
-				Npc.LastDecision = MoveTemp(Trace);
-				return;
-			}
+			Npc.GoalSince = Now;
+			Npc.DoorStuckAt = 0.0;
+			Npc.WorkTimer = 0.0;
 		}
-
-		Npc.Goal = GoalObserver;
-		Npc.bHasTarget = false;
-		Trace.Winner = GoalObserver;
+		AssignTarget(Npc, Trace);
+		Trace.Winner = Npc.Goal;
+		Trace.BuildingId = Npc.DestBuildingId;
 		Npc.LastDecision = MoveTemp(Trace);
+	}
+
+	bool FVillage::AssignTarget(FNpc& Npc, FDecisionTrace& Trace)
+	{
+		FPoint Target;
+		FString Source;
+		bool bFound = false;
+		if (Npc.Goal == GoalDrink) bFound = DrinkTarget(Npc, Target, Source);
+		else if (Npc.Goal == GoalRest) bFound = RestTarget(Npc, Target, Source);
+		else if (Npc.Goal == GoalEat) bFound = EatTarget(Npc, Target, Source);
+		else
+		{
+			Npc.bHasTarget = false;
+			return false;
+		}
+		Trace.TargetSource = Source;
+		if (!bFound)
+		{
+			// La reference trouve toujours une cible (repli au camp) ; ici, sans eau ni
+			// logement atteignable, l'habitant vaque.
+			if (Npc.Goal == GoalEat)
+			{
+				ReleaseMeal(Npc, TEXT("no_target"));
+			}
+			Npc.Goal = GoalObserver;
+			Npc.bHasTarget = false;
+			return false;
+		}
+		Npc.bHasTarget = true;
+		Npc.Target = Target;
+		Npc.DoorStuckAt = 0.0;
+		Npc.DoorApproachAt = 0.0;
+		return true;
 	}
 
 	void FVillage::RedirectAfterFailure(FNpc& Npc)
@@ -1125,7 +1258,7 @@ namespace AnastasisVillage
 		Npc.DoorApproachAt = 0.0;
 		ClearNavigation(Npc);
 		Npc.PathCooldown = 0.6;
-		if (Npc.Goal == GoalRest || Npc.Goal == GoalDrink)
+		if (Npc.Goal == GoalRest || Npc.Goal == GoalDrink || Npc.Goal == GoalEat)
 		{
 			if (Perform(Npc))
 			{
@@ -1160,7 +1293,7 @@ namespace AnastasisVillage
 			return;
 		}
 
-		if (Npc.Goal == GoalRest)
+		if (IsDomesticGoal(Npc.Goal))
 		{
 			if (TryEnterIndoorAction(Npc))
 			{
@@ -1179,7 +1312,7 @@ namespace AnastasisVillage
 					Npc.bHasTarget = true;
 					Npc.Target = Access;
 				}
-				Npc.Activity = RestActivity(IsNight());
+				Npc.Activity = Npc.Goal == GoalEat ? TEXT("mange") : RestActivity(IsNight());
 				const bool bAtDoor = bAccess && Dist(Npc.X, Npc.Y, Access.X, Access.Y) <= DoorAccessRadius;
 				if (!bAccess || !bAtDoor)
 				{
@@ -1198,7 +1331,7 @@ namespace AnastasisVillage
 		Npc.DoorStuckAt = 0.0;
 		Npc.DoorApproachAt = 0.0;
 
-		if (Npc.Goal != GoalDrink && Npc.Goal != GoalRest)
+		if (!IsPortedGoal(Npc.Goal))
 		{
 			// But non porte : il n'accomplit rien. La reference ferait `perform`.
 			Npc.Activity = TEXT("attend");
@@ -1210,7 +1343,7 @@ namespace AnastasisVillage
 		if (Npc.WorkTimer < 1.0)
 		{
 			// `waitingActivity` : « boit » ; pour rest, `restActivity`.
-			Npc.Activity = Npc.Goal == GoalDrink ? TEXT("boit") : RestActivity(IsNight());
+			Npc.Activity = Npc.Goal == GoalDrink ? TEXT("boit") : Npc.Goal == GoalEat ? TEXT("mange") : RestActivity(IsNight());
 			return;
 		}
 		Npc.WorkTimer = 0.0;
@@ -1238,6 +1371,12 @@ namespace AnastasisVillage
 			AnastasisNeeds::SatisfyDrink(Npc.Needs);
 			++Npc.DrinksTaken;
 			return true;
+		}
+		if (Npc.Goal == GoalEat)
+		{
+			// `case "eat"` : setActivity("mange"), eat().
+			Npc.Activity = TEXT("mange");
+			return Eat(Npc);
 		}
 		if (Npc.Goal == GoalRest)
 		{
@@ -1419,7 +1558,7 @@ namespace AnastasisVillage
 		}
 		// `_navAbandon` -> redirectDomesticDoorFailure (foyer) ou redirectAfterFailure.
 		++Npc.FailedActions;
-		if (Npc.Goal == GoalRest && !Npc.LivingHomeId().IsEmpty())
+		if (IsDomesticGoal(Npc.Goal) && !Npc.LivingHomeId().IsEmpty())
 		{
 			RedirectDomesticDoorFailure(Npc);
 		}
@@ -1436,7 +1575,7 @@ namespace AnastasisVillage
 		TArray<FString> Users;
 		for (const FNpc& Npc : Actors.GetItems())
 		{
-			const bool bHeading = (Npc.Goal == GoalDrink || Npc.Goal == GoalRest) && Npc.DestBuildingId == BuildingId;
+			const bool bHeading = IsPortedGoal(Npc.Goal) && Npc.DestBuildingId == BuildingId;
 			const bool bInside = Npc.Inside.bActive && Npc.Inside.BuildingId == BuildingId;
 			if (bHeading || bInside)
 			{
@@ -1462,6 +1601,10 @@ namespace AnastasisVillage
 			Writer.Key(TEXT("owner"));
 			if (B.Owner.IsEmpty()) Writer.Null(); else Writer.String(B.Owner);
 			Writer.Key(TEXT("housePhase")).Number(B.HousePhase);
+			Writer.Key(TEXT("food")).BeginObject();
+			Writer.Key(TEXT("physical")).Number(B.FoodPhysical);
+			Writer.Key(TEXT("reserved")).Number(B.FoodReserved);
+			Writer.EndObject();
 			Writer.Key(TEXT("accessPoints")).BeginArray(B.AccessPoints.Num());
 			for (const FPoint& P : B.AccessPoints)
 			{
@@ -1521,10 +1664,911 @@ namespace AnastasisVillage
 			Writer.Key(TEXT("health")).Number(N.Needs.Health);
 			Writer.Key(TEXT("morale")).Number(N.Needs.Morale);
 			Writer.Key(TEXT("workTimer")).Number(N.WorkTimer);
+			Writer.Key(TEXT("inventoryFood")).Number(N.InventoryFood);
+			Writer.Key(TEXT("hungerAction")).String(N.HungerAction.State);
+			Writer.EndObject();
+		}
+		Writer.EndArray();
+
+		Writer.Key(TEXT("mealReservations")).BeginArray(MealReservations.Num());
+		for (const FMealReservation& R : MealReservations)
+		{
+			Writer.BeginObject();
+			Writer.Key(TEXT("id")).String(R.Id);
+			Writer.Key(TEXT("npcId")).String(R.NpcId);
+			Writer.Key(TEXT("buildingId"));
+			if (R.BuildingId.IsEmpty()) Writer.Null(); else Writer.String(R.BuildingId);
+			Writer.Key(TEXT("expiresAt")).Number(R.ExpiresAt);
 			Writer.EndObject();
 		}
 		Writer.EndArray();
 		Writer.EndObject();
 		return Writer.Digest();
+	}
+
+	// --- Stock (sim/transport/stockLedger.js, nourriture seulement) -------------
+
+	int32 FVillage::CreditFood(const FString& BuildingId, int32 Amount)
+	{
+		FBuilding* B = Buildings.FindById(BuildingId);
+		// `creditStock` : entier, positif, batiment qui accepte la nourriture, dans la capacite.
+		Amount = FMath::Max(0, Amount);
+		if (!B || Amount <= 0 || B->Type != GranaryType || !B->IsCompleted()) return 0;
+		const int32 Room = FMath::Max(0, GranaryFoodCap - B->FoodPhysical);
+		const int32 Added = FMath::Min(Room, Amount);
+		B->FoodPhysical += Added;
+		return Added;
+	}
+
+	const FMealReservation* FVillage::FindMealReservation(const FString& NpcId) const
+	{
+		return MealReservations.FindByPredicate([&](const FMealReservation& R) { return R.NpcId == NpcId; });
+	}
+
+	// --- Perception (ai/memory.js, branche nourriture) ---------------------------
+
+	int32 FVillage::Day() const
+	{
+		// `day = 1 + floor(time / DAY_LENGTH)`, comme l'hote.
+		return 1 + static_cast<int32>(AnastasisJs::Floor(Now / AnastasisRhythm::DayLength));
+	}
+
+	void FVillage::PerceiveNow(const FString& NpcId)
+	{
+		if (FNpc* Npc = Actors.FindById(NpcId))
+		{
+			Perceive(*Npc, true);
+		}
+	}
+
+	void FVillage::Perceive(FNpc& Npc, bool bForce)
+	{
+		if (!bForce && Now - Npc.LastScan < PerceptionScanInterval) return;
+		Npc.LastScan = Now;
+		const double CX = AnastasisJs::Floor(Npc.X);
+		const double CY = AnastasisJs::Floor(Npc.Y);
+		// `perceiveBeliefs` : un depot qui accepte la nourriture est une reserve VISIBLE.
+		for (const FBuilding& B : Buildings.GetItems())
+		{
+			if (B.Progress < 1.0 || B.Type != GranaryType) continue;
+			const double BX = B.X + 0.5;
+			const double BY = B.Y + 0.5;
+			if (FMath::Abs(BX - CX) > PerceptionRadius + 1.0 || FMath::Abs(BY - CY) > PerceptionRadius + 1.0) continue;
+			if (Dist(Npc.X, Npc.Y, BX, BY) > PerceptionRadius + 0.75) continue;
+			// `noteStockBelief` -> `rememberBeliefEntry`.
+			const FString Key = FString::Printf(TEXT("stock:food:%s"), *B.Id);
+			FStockBelief* Known = Npc.KnownStocks.FindByPredicate([&](const FStockBelief& E) { return E.Key == Key; });
+			if (!Known)
+			{
+				FStockBelief Entry;
+				Entry.Key = Key;
+				Entry.Resource = TEXT("food");
+				Entry.BuildingId = B.Id;
+				Entry.Kind = B.Type;
+				Entry.X = BX;
+				Entry.Y = BY;
+				Entry.EstimatedAmount = FMath::Max(0.0, static_cast<double>(B.FoodPhysical));
+				Entry.Confidence = 0.9;
+				Entry.Day = Day();
+				Npc.KnownStocks.Add(Entry);
+			}
+			else
+			{
+				Known->X = BX;
+				Known->Y = BY;
+				Known->Kind = B.Type;
+				Known->BuildingId = B.Id;
+				Known->EstimatedAmount = FMath::Max(0.0, static_cast<double>(B.FoodPhysical));
+				Known->Confidence = FMath::Max(Known->Confidence, 0.9);
+				Known->Day = Day();
+			}
+		}
+	}
+
+	AnastasisNous::FFoodContext FVillage::PerceiveFoodContext(const FNpc& Npc) const
+	{
+		AnastasisNous::FFoodContext C;
+		C.Hunger = Npc.Needs.Hunger;
+		C.InventoryFood = Npc.InventoryFood;
+		C.BelievedFood = 0.0; // `believedStock` lit la croyance de marche : pas de marche porte.
+		C.Gold = 0;
+		C.bDangerNear = false;
+
+		// `listKnownFoodSources` : croyances seulement, jamais le stock vrai.
+		struct FKnown
+		{
+			const FStockBelief* Entry;
+			double Distance;
+			int32 AgeDays;
+			double Rank;
+		};
+		TArray<FKnown> Known;
+		const int32 Today = Day();
+		for (const FStockBelief& E : Npc.KnownStocks)
+		{
+			if (E.Resource != TEXT("food") || E.BuildingId.IsEmpty()) continue;
+			const int32 Age = FMath::Max(0, Today - E.Day);
+			const double D = JsHypot(E.X - Npc.X, E.Y - Npc.Y);
+			const double Est = FMath::Max(0.0, E.EstimatedAmount);
+			const double Rank = AnastasisNous::Clamp01(E.Confidence) * 100.0 + Est * 0.05 - D * 0.4 - Age * 2.0;
+			Known.Add({ &E, D, Age, Rank });
+		}
+		Known.StableSort([](const FKnown& A, const FKnown& B) { return A.Rank > B.Rank; });
+
+		const FMealReservation* Reservation = FindMealReservation(Npc.Id);
+		C.BestSourceDistance = NAN;
+		if (Known.Num() > 0)
+		{
+			const FKnown& Best = Known[0];
+			C.BestSourceBuildingId = Best.Entry->BuildingId;
+			C.BestSourceDistance = Best.Distance;
+			C.BestSourceEstimated = FMath::Max(0.0, Best.Entry->EstimatedAmount);
+			C.BestSourceConfidence = AnastasisNous::Clamp01(Best.Entry->Confidence);
+		}
+		if (C.InventoryFood > 0) C.Certainty = 1.0;
+		else if (Reservation) C.Certainty = 0.95;
+		else if (Known.Num() > 0) C.Certainty = AnastasisNous::Clamp01(C.BestSourceConfidence * (1.0 - FMath::Min(0.5, Known[0].AgeDays * 0.08)));
+		else C.Certainty = 0.08; // ni croyance de marche, ni gisement : non portes
+		return C;
+	}
+
+	// --- Reservations (ai/algorithmic/mealReservation.js) ------------------------
+
+	FMealReservation* FVillage::GetMealReservation(const FNpc& Npc)
+	{
+		return MealReservations.FindByPredicate([&](const FMealReservation& R) { return R.NpcId == Npc.Id; });
+	}
+
+	bool FVillage::ReserveMeal(FNpc& Npc, const FString& BuildingId, double TravelSeconds, double TtlSeconds, FString& OutReason)
+	{
+		if (FMealReservation* Existing = GetMealReservation(Npc))
+		{
+			if (Existing->ExpiresAt > Now)
+			{
+				if (BuildingId.IsEmpty() || Existing->BuildingId == BuildingId || Existing->Source == TEXT("inventory"))
+				{
+					OutReason = TEXT("already_reserved");
+					return true;
+				}
+			}
+			ReleaseMeal(Npc, TEXT("stale_replace"));
+		}
+
+		if (Npc.InventoryFood > 0)
+		{
+			const double Ttl = ComputeMealTtlSeconds(0.0, 20.0);
+			FMealReservation R;
+			R.Id = FString::Printf(TEXT("meal_%d"), ++MealSeq);
+			R.NpcId = Npc.Id;
+			R.Source = TEXT("inventory");
+			R.CreatedAt = Now;
+			R.ExpiresAt = Now + Ttl;
+			R.AbsoluteExpiresAt = Now + Meal::AbsoluteMaxSeconds;
+			R.LastProgressAt = Now;
+			MealReservations.Add(R);
+			OutReason = TEXT("inventory");
+			return true;
+		}
+
+		FBuilding* Source = BuildingId.IsEmpty() ? nullptr : Buildings.FindById(BuildingId);
+		if (!Source)
+		{
+			OutReason = TEXT("no_known_source");
+			return false;
+		}
+		// `reserveStock(source, "food", 1)` : seulement sur le disponible.
+		if (Source->FoodAvailable() < 1)
+		{
+			OutReason = TEXT("unavailable");
+			return false;
+		}
+		Source->FoodReserved += 1;
+
+		const double Ttl = FMath::IsNaN(TtlSeconds) ? ComputeMealTtlSeconds(TravelSeconds) : FMath::Max(5.0, TtlSeconds);
+		FPoint Access;
+		const FString SourceId = Source->Id;
+		const double Dist0 = BuildingAccessPointById(SourceId, &Npc, Access) ? JsHypot(Npc.X - Access.X, Npc.Y - Access.Y) : 0.0;
+
+		FMealReservation R;
+		R.Id = FString::Printf(TEXT("meal_%d"), ++MealSeq);
+		R.NpcId = Npc.Id;
+		R.BuildingId = SourceId;
+		R.Source = TEXT("colony");
+		R.Amount = 1;
+		R.CreatedAt = Now;
+		R.ExpiresAt = Now + Ttl;
+		R.AbsoluteExpiresAt = Now + Meal::AbsoluteMaxSeconds;
+		R.LastProgressAt = Now;
+		R.LastDistance = Dist0;
+		MealReservations.Add(R);
+		OutReason = TEXT("colony_reserved");
+		return true;
+	}
+
+	bool FVillage::ReleaseMeal(FNpc& Npc, const FString& /*Reason*/)
+	{
+		const int32 Index = MealReservations.IndexOfByPredicate([&](const FMealReservation& R) { return R.NpcId == Npc.Id; });
+		if (Index == INDEX_NONE) return false;
+		const FMealReservation& R = MealReservations[Index];
+		if (R.Source == TEXT("colony") && !R.BuildingId.IsEmpty())
+		{
+			if (FBuilding* B = Buildings.FindById(R.BuildingId))
+			{
+				// `releaseStock` : jamais plus que le reserve.
+				B->FoodReserved -= FMath::Min(B->FoodReserved, R.Amount);
+			}
+		}
+		MealReservations.RemoveAt(Index);
+		return true;
+	}
+
+	bool FVillage::ConfirmMeal(FNpc& Npc, FString& OutReason, FString& OutSourceId)
+	{
+		FMealReservation* R = GetMealReservation(Npc);
+		if (!R)
+		{
+			OutReason = TEXT("no_reservation");
+			return false;
+		}
+		if (R->Source == TEXT("inventory"))
+		{
+			ReleaseMeal(Npc, TEXT("confirmed_inventory"));
+			OutReason = TEXT("inventory");
+			OutSourceId = TEXT("inventory");
+			return true;
+		}
+		FBuilding* B = Buildings.FindById(R->BuildingId);
+		if (!B)
+		{
+			ReleaseMeal(Npc, TEXT("source_gone"));
+			OutReason = TEXT("source_gone");
+			return false;
+		}
+		// `takeReserved` : debite physique ET reserve ensemble.
+		const int32 Taken = FMath::Min3(B->FoodReserved, B->FoodPhysical, R->Amount);
+		if (Taken <= 0)
+		{
+			ReleaseMeal(Npc, TEXT("take_failed"));
+			OutReason = TEXT("take_failed");
+			return false;
+		}
+		B->FoodReserved -= Taken;
+		B->FoodPhysical -= Taken;
+		Npc.InventoryFood += Taken;
+		OutSourceId = R->BuildingId;
+		OutReason = TEXT("colony_taken");
+		MealReservations.RemoveAll([&](const FMealReservation& E) { return E.NpcId == Npc.Id; });
+		return true;
+	}
+
+	FString FVillage::MaybeRenewMealReservation(FNpc& Npc)
+	{
+		FMealReservation* R = GetMealReservation(Npc);
+		if (!R) return TEXT("none");
+		if (R->Source != TEXT("colony") || R->BuildingId.IsEmpty()) return TEXT("inventory");
+		if (R->AbsoluteExpiresAt <= Now)
+		{
+			ReleaseMeal(Npc, TEXT("absolute_timeout"));
+			return TEXT("absolute_timeout");
+		}
+		if (!Buildings.FindById(R->BuildingId))
+		{
+			ReleaseMeal(Npc, TEXT("source_gone"));
+			return TEXT("source_gone");
+		}
+		FPoint Access;
+		const FString BuildingId = R->BuildingId;
+		const bool bAccess = BuildingAccessPointById(BuildingId, &Npc, Access);
+		R = GetMealReservation(Npc); // BuildingAccessPoint ne touche pas le registre, mais restons prudents
+		if (!R) return TEXT("none");
+		const double Distance = bAccess ? JsHypot(Npc.X - Access.X, Npc.Y - Access.Y) : R->LastDistance;
+		const double Last = FMath::IsFinite(R->LastDistance) ? R->LastDistance : Distance;
+		const bool bProgressed = Distance < Last - 0.15;
+		if (bProgressed)
+		{
+			R->LastDistance = Distance;
+			R->LastProgressAt = Now;
+			if (R->ExpiresAt - Now < 25.0 && R->Renewals < Meal::MaxRenewals)
+			{
+				++R->Renewals;
+				R->ExpiresAt = FMath::Min(R->AbsoluteExpiresAt, Now + Meal::RenewalSeconds);
+				return TEXT("progress");
+			}
+			return TEXT("progress_no_need");
+		}
+		const double Since = R->LastProgressAt != 0.0 ? R->LastProgressAt : R->CreatedAt;
+		if (Now - Since > Meal::ProgressStallSeconds) return TEXT("stalled");
+		return TEXT("no_progress");
+	}
+
+	int32 FVillage::ExpireMealReservations()
+	{
+		int32 Expired = 0;
+		TArray<FString> Ids;
+		for (const FMealReservation& R : MealReservations) Ids.Add(R.Id);
+		for (const FString& Id : Ids)
+		{
+			FMealReservation* R = MealReservations.FindByPredicate([&](const FMealReservation& E) { return E.Id == Id; });
+			if (!R) continue;
+			const double HardAt = R->AbsoluteExpiresAt != 0.0 ? R->AbsoluteExpiresAt : R->ExpiresAt;
+			const bool bHard = HardAt <= Now;
+			const bool bSoft = R->ExpiresAt <= Now;
+			if (!bHard && !bSoft) continue;
+			if (FNpc* Npc = Actors.FindById(R->NpcId))
+			{
+				if (!bHard && bSoft && MaybeRenewMealReservation(*Npc) == TEXT("progress"))
+				{
+					continue;
+				}
+				ReleaseMeal(*Npc, bHard ? TEXT("absolute_timeout") : TEXT("expired"));
+			}
+			else
+			{
+				if (R->Source == TEXT("colony"))
+				{
+					if (FBuilding* B = Buildings.FindById(R->BuildingId))
+					{
+						B->FoodReserved -= FMath::Min(B->FoodReserved, R->Amount);
+					}
+				}
+				MealReservations.RemoveAll([&](const FMealReservation& E) { return E.Id == Id; });
+			}
+			++Expired;
+		}
+		return Expired;
+	}
+
+	bool FVillage::MealSourceAccessPoint(FNpc& Npc, FPoint& Out, bool& bOutBuilding)
+	{
+		bOutBuilding = false;
+		const FMealReservation* R = GetMealReservation(Npc);
+		if (!R) return false;
+		if (R->Source == TEXT("inventory"))
+		{
+			Out = { Npc.X, Npc.Y };
+			return true;
+		}
+		const FString BuildingId = R->BuildingId;
+		const FBuilding* B = Buildings.FindById(BuildingId);
+		if (!B) return false;
+		bOutBuilding = true;
+		if (BuildingAccessPointById(BuildingId, &Npc, Out)) return true;
+		Out = { B->X + 0.5, B->Y + 0.5 };
+		return true;
+	}
+
+	bool FVillage::IsNpcAtMealSource(FNpc& Npc)
+	{
+		const FMealReservation* R = GetMealReservation(Npc);
+		if (!R) return false;
+		if (R->Source == TEXT("inventory")) return Npc.InventoryFood > 0;
+		if (Npc.Inside.bActive && Npc.Inside.BuildingId == R->BuildingId) return true;
+		FPoint Access;
+		bool bBuilding = false;
+		if (!MealSourceAccessPoint(Npc, Access, bBuilding)) return false;
+		return JsHypot(Npc.X - Access.X, Npc.Y - Access.Y) <= Meal::InteractionRadius;
+	}
+
+	// --- Action faim (ai/algorithmic/hungerAction.js) ----------------------------
+
+	void FVillage::FailHungerAction(FNpc& Npc, const FString& Reason, const FString& ExcludedType)
+	{
+		ReleaseMeal(Npc, Reason);
+		FHungerAction& A = Npc.HungerAction;
+		A.State = TEXT("failed");
+		A.LastFailure = Reason;
+		A.CooldownUntil = Now + AnastasisNous::FailureCooldownSeconds;
+		A.ExcludedType = ExcludedType;
+		A.Progress = 0.0;
+	}
+
+	void FVillage::CancelHungerAction(FNpc& Npc, const FString& Reason)
+	{
+		FHungerAction& A = Npc.HungerAction;
+		if (A.State != TEXT("completed") && A.State != TEXT("failed") && A.State != TEXT("cancelled"))
+		{
+			ReleaseMeal(Npc, Reason);
+		}
+		A.State = TEXT("cancelled");
+		A.LastFailure = Reason;
+		A.CooldownUntil = Now + AnastasisNous::FailureCooldownSeconds * 0.5;
+		A.ExcludedType = TEXT("seek_food");
+	}
+
+	int32 FVillage::RunHungerActionStep(FNpc& Npc, bool bAtFoodAccess, const FString& SourceBuildingId)
+	{
+		FHungerAction& A = Npc.HungerAction;
+		if (A.CooldownUntil > Now && A.State == TEXT("failed"))
+		{
+			return 0; // "cooldown"
+		}
+
+		if (A.State == TEXT("pending") || A.State == TEXT("completed") || A.State == TEXT("cancelled") || A.State == TEXT("failed"))
+		{
+			const bool bWasFailed = A.State == TEXT("failed");
+			A.State = TEXT("reserving");
+			A.StartedAt = Now;
+			A.Progress = 0.0;
+			if (!bWasFailed) A.LastFailure.Reset();
+			A.SourceBuildingId = !SourceBuildingId.IsEmpty() ? SourceBuildingId : A.SourceBuildingId;
+		}
+
+		if (A.State == TEXT("reserving"))
+		{
+			const FString BuildingId = !SourceBuildingId.IsEmpty() ? SourceBuildingId : A.SourceBuildingId;
+			FString Reason;
+			const bool bOk = ReserveMeal(Npc, BuildingId, NAN, ComputeMealTtlSeconds(NAN), Reason);
+			if (!bOk && Npc.InventoryFood <= 0)
+			{
+				FailHungerAction(Npc, Reason.IsEmpty() ? TEXT("reserve_failed") : Reason, TEXT("seek_food"));
+				return 0;
+			}
+			const FMealReservation* R = GetMealReservation(Npc);
+			A.State = TEXT("navigating");
+			A.TargetId = R ? (!R->BuildingId.IsEmpty() ? R->BuildingId : R->Source) : FString(TEXT("inventory"));
+			A.ReservationId = R ? R->Id : FString();
+			A.SourceBuildingId = R ? R->BuildingId : FString();
+			A.Progress = 0.1;
+		}
+
+		if (A.State == TEXT("navigating"))
+		{
+			MaybeRenewMealReservation(Npc);
+			const FMealReservation* R = GetMealReservation(Npc);
+			if (!R && Npc.InventoryFood <= 0)
+			{
+				FailHungerAction(Npc, TEXT("reservation_lost"), TEXT("seek_food"));
+				return 0;
+			}
+			const bool bArrived = bAtFoodAccess || IsNpcAtMealSource(Npc);
+			R = GetMealReservation(Npc);
+			if (Npc.InventoryFood > 0 && R && R->Source == TEXT("inventory"))
+			{
+				A.State = TEXT("interacting");
+			}
+			else if (bArrived)
+			{
+				A.State = TEXT("interacting");
+				A.Progress = 0.85;
+			}
+			else
+			{
+				A.Progress = FMath::Min(0.8, (A.Progress != 0.0 ? A.Progress : 0.1) + 0.04);
+				return -1; // en route
+			}
+		}
+
+		if (A.State == TEXT("interacting") || A.State == TEXT("consuming"))
+		{
+			// Garde physique : pas de consommation a distance.
+			const FMealReservation* R = GetMealReservation(Npc);
+			if (R && R->Source == TEXT("colony"))
+			{
+				const FString ReservedBuilding = R->BuildingId;
+				if (!IsNpcAtMealSource(Npc) && !bAtFoodAccess)
+				{
+					A.State = TEXT("navigating");
+					return -1;
+				}
+				if (!A.SourceBuildingId.IsEmpty() && !ReservedBuilding.IsEmpty() && A.SourceBuildingId != ReservedBuilding)
+				{
+					FailHungerAction(Npc, TEXT("source_mismatch"), TEXT("seek_food"));
+					return 0;
+				}
+			}
+
+			A.State = TEXT("consuming");
+			if (Npc.InventoryFood <= 0)
+			{
+				FString Reason;
+				FString SourceId;
+				if (!ConfirmMeal(Npc, Reason, SourceId))
+				{
+					FailHungerAction(Npc, Reason.IsEmpty() ? TEXT("confirm_failed") : Reason, TEXT("seek_food"));
+					return 0;
+				}
+			}
+			else if (GetMealReservation(Npc))
+			{
+				ReleaseMeal(Npc, TEXT("consume_inventory"));
+			}
+
+			if (Npc.InventoryFood <= 0)
+			{
+				FailHungerAction(Npc, TEXT("empty_after_confirm"), TEXT("seek_food"));
+				return 0;
+			}
+
+			Npc.InventoryFood -= 1;
+			const FString& Living = Npc.LivingHomeId();
+			const bool bAtHome = !Living.IsEmpty() && Npc.Inside.bActive && Npc.Inside.BuildingId == Living;
+			AnastasisNeeds::SatisfyEat(Npc.Needs, Npc.Inside.bActive, bAtHome);
+			// `recordAteFood` : memoire d'episode, non portee.
+
+			A.State = TEXT("completed");
+			A.Progress = 1.0;
+			A.LastFailure.Reset();
+			A.ExcludedType.Reset();
+			A.ReservationId.Reset();
+			return 1;
+		}
+		return 0; // "noop"
+	}
+
+	int32 FVillage::TryAlgorithmicEat(FNpc& Npc)
+	{
+		const bool bArrived = IsNpcAtMealSource(Npc);
+		const FString Source = !Npc.HungerAction.SourceBuildingId.IsEmpty()
+			? Npc.HungerAction.SourceBuildingId
+			: (Npc.bHasAlgoDecision ? AnastasisNous::DecisionSourceBuildingId(Npc.AlgoDecision) : FString());
+		return RunHungerActionStep(Npc, bArrived, Source);
+	}
+
+	bool FVillage::Eat(FNpc& Npc)
+	{
+		// Noûs : reservation -> arrivee physique -> confirmation -> consommation.
+		IsNpcAtMealSource(Npc); // `atAccess`, calcule une premiere fois par la reference
+		const int32 Result = TryAlgorithmicEat(Npc);
+		if (Result == 1)
+		{
+			++Npc.MealsTaken;
+			return true;
+		}
+		if (Result == 0)
+		{
+			// `begForFood` et `noteGoalFailure` : non portes. La pensee est avancee.
+			Npc.AiThinkAt = Now;
+			return false;
+		}
+		// `null` : encore en route — ne pas consommer a distance.
+		Npc.Activity = TEXT("marche");
+		return true;
+	}
+
+	// --- Pont Noûs (ai/algorithmic/runtime.js, bridge.js) ------------------------
+
+	void FVillage::ComputeAlgorithmicDecision(FNpc& Npc)
+	{
+		TArray<FString> Exclude;
+		const FHungerAction& A = Npc.HungerAction;
+		if (A.CooldownUntil > Now && !A.ExcludedType.IsEmpty())
+		{
+			Exclude.Add(A.ExcludedType);
+		}
+		const AnastasisNous::FFoodContext Context = PerceiveFoodContext(Npc);
+		AnastasisNous::FHungerSubject Subject;
+		Subject.Energy = Npc.Needs.Energy;
+		Subject.Speed = Npc.Speed;
+		Subject.HomeId = Npc.HomeId;
+		const AnastasisNous::FScored Scored = AnastasisNous::ScoreHungerCandidates(Context, Subject, Now, Exclude);
+
+		bool bHasChosen = Scored.bHasBest;
+		AnastasisNous::FDecision Chosen = Scored.Best;
+		bool bKeep = false;
+		FString Reason = TEXT("disabled");
+		if (Npc.bHasAlgoDecision && bHasChosen)
+		{
+			const AnastasisNous::FDecision Current = Npc.AlgoDecision;
+			const double Since = Current.CreatedAt != 0.0 ? Current.CreatedAt : Npc.GoalSince;
+			const double Elapsed = Now - Since;
+			const double CooldownLeft = FMath::Max(0.0, A.CooldownUntil - Now);
+			if (Exclude.Contains(Current.Type) && Chosen.Type != Current.Type)
+			{
+				bKeep = false;
+				Reason = TEXT("cooldown_forced_switch");
+			}
+			else
+			{
+				bKeep = AnastasisNous::EvaluateInertia(&Current, &Chosen, Elapsed, CooldownLeft, 0.0, Reason);
+				if (bKeep && !Exclude.Contains(Current.Type))
+				{
+					Chosen = Current;
+				}
+			}
+		}
+		Npc.bHasAlgoDecision = bHasChosen;
+		Npc.AlgoDecision = Chosen;
+		Npc.AlgoContext = Context;
+		Npc.bAlgoInertiaKeep = bKeep;
+		Npc.AlgoInertiaReason = Reason;
+		Npc.AlgoMappedGoal = bHasChosen ? AnastasisNous::DecisionToNpcGoal(Chosen) : FString();
+	}
+
+	void FVillage::ApplyAlgorithmicScoreBias(FNpc& Npc, TArray<TPair<FString, double>>& Rows)
+	{
+		if (!Npc.bHasAlgoDecision)
+		{
+			ComputeAlgorithmicDecision(Npc);
+		}
+		if (!Npc.bHasAlgoDecision) return;
+
+		auto Bump = [&](const TCHAR* Goal, double Delta)
+		{
+			if (Delta == 0.0) return;
+			for (TPair<FString, double>& Row : Rows)
+			{
+				if (Row.Key == Goal)
+				{
+					Row.Value += Delta;
+					return;
+				}
+			}
+		};
+
+		const AnastasisNous::FDecision& D = Npc.AlgoDecision;
+		const double Urgency = D.Urgency;
+		const double Strength = D.Score * AnastasisNous::BridgeScoreScale + Urgency * AnastasisNous::BridgeUrgencyExtra;
+
+		const FHungerAction& A = Npc.HungerAction;
+		const bool bCooling = A.CooldownUntil > Now && A.State == TEXT("failed");
+		if (bCooling)
+		{
+			Bump(TEXT("eat"), -AnastasisNous::BridgeFailureEatPenalty);
+			Bump(TEXT("eatTogether"), -AnastasisNous::BridgeFailureEatPenalty * 0.7);
+			Bump(TEXT("gatherFood"), AnastasisNous::BridgeFailureGatherBoost);
+			Bump(TEXT("buy"), AnastasisNous::BridgeFailureGatherBoost * 0.5);
+		}
+
+		if (D.Type == TEXT("eat") || D.Type == TEXT("seek_food"))
+		{
+			const bool bReserved = FindMealReservation(Npc.Id) != nullptr;
+			const bool bHasInv = Npc.AlgoContext.InventoryFood > 0 || Npc.InventoryFood > 0;
+			const bool bKnownBuilding = !D.SourceBuildingId.IsEmpty() || !Npc.AlgoContext.BestSourceBuildingId.IsEmpty();
+			if (bHasInv || bReserved || bKnownBuilding)
+			{
+				Bump(TEXT("eat"), Strength);
+				Bump(TEXT("eatTogether"), Strength * 0.45);
+			}
+			else
+			{
+				Bump(TEXT("gatherFood"), Strength * 0.85 + AnastasisNous::BridgeSeekGatherBoost);
+				Bump(TEXT("buy"), Strength * 0.55);
+				Bump(TEXT("eat"), -AnastasisNous::BridgeWorkSuppressEat);
+			}
+			if (Urgency >= 0.55)
+			{
+				for (TPair<FString, double>& Row : Rows)
+				{
+					if (IsWorkish(Row.Key) && Row.Key != TEXT("gatherFood") && Row.Key != TEXT("buy"))
+					{
+						const double Delta = -Urgency * AnastasisNous::BridgeWorkSuppressEat;
+						if (Delta != 0.0) Row.Value += Delta;
+					}
+				}
+			}
+		}
+		else if (D.Type == TEXT("buy_food"))
+		{
+			Bump(TEXT("buy"), Strength);
+			Bump(TEXT("eat"), Strength * 0.35);
+		}
+		else if (D.Type == TEXT("sleep"))
+		{
+			Bump(TEXT("rest"), Strength);
+		}
+		else if (D.Type == TEXT("work"))
+		{
+			if (IsWorkish(Npc.Goal))
+			{
+				Bump(*Npc.Goal, AnastasisNous::BridgeInertiaKeepBonus * (1.0 - Urgency));
+			}
+			if (Urgency < 0.45)
+			{
+				Bump(TEXT("eat"), -AnastasisNous::BridgeWorkSuppressEat * 0.6);
+			}
+		}
+
+		if (Npc.bAlgoInertiaKeep && !Npc.Goal.IsEmpty())
+		{
+			// `observer` n'est pas une ligne : rien a pousser, comme un but absent de la table.
+			Bump(*Npc.Goal, AnastasisNous::BridgeInertiaKeepBonus);
+		}
+		else if (!Npc.AlgoMappedGoal.IsEmpty() && AnastasisNous::IsUrgentInterrupt(Urgency))
+		{
+			Bump(*Npc.AlgoMappedGoal, Strength * 0.5);
+		}
+	}
+
+	FString FVillage::ApplyAlgorithmicCommitGate(FNpc& Npc, const FString& Next, const FString& Previous, FString& OutGate)
+	{
+		if (!Npc.bHasAlgoDecision) return Next;
+		const AnastasisNous::FDecision& D = Npc.AlgoDecision;
+		const double Urgency = D.Urgency;
+		const FString& Mapped = Npc.AlgoMappedGoal;
+
+		if (Npc.bAlgoInertiaKeep && !Previous.IsEmpty() && Previous == Next)
+		{
+			return Next;
+		}
+		if (Npc.bAlgoInertiaKeep && !Previous.IsEmpty() && !AnastasisNous::IsUrgentInterrupt(Urgency))
+		{
+			if (Previous == TEXT("eat") || Previous == TEXT("eatTogether") || IsWorkish(Previous))
+			{
+				const bool bCooling = Npc.HungerAction.CooldownUntil > Now;
+				if (!(Previous.StartsWith(TEXT("eat")) && bCooling))
+				{
+					OutGate = FString::Printf(TEXT("%s->%s (%s)"), *Next, *Previous, *Npc.AlgoInertiaReason);
+					return Previous;
+				}
+			}
+		}
+		if (D.Type == TEXT("flee")) return Next;
+		if (Mapped.IsEmpty() || !AnastasisNous::IsUrgentInterrupt(Urgency)) return Next;
+		if (Mapped == Next) return Next;
+		if ((D.Type == TEXT("eat") || D.Type == TEXT("seek_food")) && Mapped == TEXT("eat"))
+		{
+			if (Npc.Needs.Hunger >= AnastasisNeeds::Constants::HungerCritical || Urgency >= AnastasisNous::UrgencyInterruptAt)
+			{
+				OutGate = FString::Printf(TEXT("%s->eat (urgency_hunger)"), *Next);
+				return TEXT("eat");
+			}
+		}
+		if (D.Type == TEXT("sleep") && Mapped == TEXT("rest") && Urgency >= 0.85)
+		{
+			OutGate = FString::Printf(TEXT("%s->rest (urgency_fatigue)"), *Next);
+			return TEXT("rest");
+		}
+		return Next;
+	}
+
+	void FVillage::OnAlgorithmicGoalCommitted(FNpc& Npc, const FString& Previous, const FString& Next)
+	{
+		const bool bEatGoals = Next == TEXT("eat") || Next == TEXT("eatTogether");
+		const bool bWasEat = Previous == TEXT("eat") || Previous == TEXT("eatTogether");
+		if (bEatGoals)
+		{
+			const AnastasisNous::FDecision* D = Npc.bHasAlgoDecision ? &Npc.AlgoDecision : nullptr;
+			const FString SourceBuildingId = D ? AnastasisNous::DecisionSourceBuildingId(*D) : FString();
+			// `metadata.travelSeconds ?? expectedDuration ?? null` : le trajet du candidat
+			// (seek_food : distance / vitesse ; eat : 0), sinon sa duree attendue.
+			double Travel = NAN;
+			if (D)
+			{
+				const bool bHasTravelMeta = D->Type == TEXT("eat") || D->Type == TEXT("seek_food");
+				Travel = bHasTravelMeta && !FMath::IsNaN(D->TravelSeconds) ? D->TravelSeconds : D->ExpectedDuration;
+			}
+			FString Reason;
+			const bool bOk = Npc.InventoryFood > 0
+				? ReserveMeal(Npc, FString(), 0.0, NAN, Reason)
+				: ReserveMeal(Npc, SourceBuildingId, Travel, ComputeMealTtlSeconds(Travel), Reason);
+			FHungerAction& A = Npc.HungerAction;
+			if (bOk)
+			{
+				const FMealReservation* R = GetMealReservation(Npc);
+				A.State = TEXT("navigating");
+				A.TargetId = R ? (!R->BuildingId.IsEmpty() ? R->BuildingId : R->Source) : FString(TEXT("inventory"));
+				A.StartedAt = Now;
+				A.Progress = 0.05;
+				A.ReservationId = R ? R->Id : FString();
+				A.SourceBuildingId = R ? R->BuildingId : FString();
+				A.LastFailure.Reset();
+			}
+			else
+			{
+				FailHungerAction(Npc, Reason.IsEmpty() ? TEXT("reserve_failed") : Reason, TEXT("seek_food"));
+				A.StartedAt = Now;
+				A.Progress = 0.0;
+				A.ReservationId.Reset();
+				A.SourceBuildingId = SourceBuildingId;
+			}
+		}
+		else if (bWasEat)
+		{
+			ReleaseMeal(Npc, TEXT("goal_changed"));
+			CancelHungerAction(Npc, TEXT("goal_changed"));
+		}
+	}
+
+	void FVillage::TickAlgorithmicNpc()
+	{
+		// Renouvellement pour les habitants en trajet de repas.
+		for (FNpc& Npc : Actors.GetItemsMutable())
+		{
+			if (Npc.Goal == GoalEat)
+			{
+				MaybeRenewMealReservation(Npc);
+			}
+		}
+		if (Now - ReservationSweepAt >= AnastasisNous::ReservationSweepSeconds)
+		{
+			ReservationSweepAt = Now;
+			ExpireMealReservations();
+		}
+	}
+
+	// --- Cible du repas --------------------------------------------------------------
+
+	const FBuilding* FVillage::MealPlace(const FNpc& Npc) const
+	{
+		if (!Npc.HomeId.IsEmpty())
+		{
+			if (const FBuilding* Home = Buildings.FindById(Npc.HomeId)) return Home;
+		}
+		if (!Npc.ShelterId.IsEmpty())
+		{
+			if (const FBuilding* Shelter = Buildings.FindById(Npc.ShelterId)) return Shelter;
+		}
+		// Taverne, marche, groupe « food » ou « trade » : le grenier seul existe ici.
+		const FBuilding* Best = nullptr;
+		double BestDist = AnastasisNav::Infinity;
+		for (const FBuilding& B : Buildings.GetItems())
+		{
+			if (B.Progress < 1.0 || !IsFoodGroupType(B.Type)) continue;
+			if (!Best) Best = &B;
+			const double DX = (B.X + 0.5) - Npc.X;
+			const double DY = (B.Y + 0.5) - Npc.Y;
+			const double D = DX * DX + DY * DY;
+			if (D < BestDist)
+			{
+				BestDist = D;
+				Best = &B;
+			}
+		}
+		return Best;
+	}
+
+	bool FVillage::EatTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource)
+	{
+		bool bHave = false;
+		// Base (`assignTarget`, branche eat) : la source reservee.
+		FPoint Meal;
+		bool bBuilding = false;
+		if (MealSourceAccessPoint(Npc, Meal, bBuilding) && bBuilding)
+		{
+			OutTarget = Meal;
+			OutSource = TEXT("reserved");
+			bHave = true;
+		}
+		else if (Npc.InventoryFood > 0 && !Npc.HomeId.IsEmpty() && BuildingAccessPointById(Npc.HomeId, &Npc, OutTarget))
+		{
+			OutSource = TEXT("home-food");
+			bHave = true;
+		}
+		// `marketAccessPoint` : sans marche, `accessPointNear(plannedMarketPos)` ; le site
+		// du marche n'est pas porte : le camp.
+		else if (AccessPointNear(Settlement.X, Settlement.Y, &Npc, OutTarget))
+		{
+			OutSource = TEXT("market-site");
+			bHave = true;
+		}
+
+		// Couche rythme (`rhythmTarget`, branche eat) : `mealPlace`.
+		if (const FBuilding* Place = MealPlace(Npc))
+		{
+			FPoint Access;
+			if (BuildingAccessPointById(Place->Id, &Npc, Access))
+			{
+				OutTarget = Access;
+				OutSource = TEXT("meal-place");
+				bHave = true;
+			}
+		}
+
+		// Couche domestique : le foyer, sinon un abri ouvert — AVANT le grenier.
+		const FString Living = Npc.LivingHomeId();
+		FPoint Domestic;
+		if (!Living.IsEmpty())
+		{
+			if (BuildingAccessPointById(Living, &Npc, Domestic))
+			{
+				OutTarget = Domestic;
+				OutSource = Living == Npc.HomeId ? TEXT("home") : TEXT("shelter");
+				bHave = true;
+			}
+		}
+		else if (const FBuilding* Open = FindOpenShelter(Npc))
+		{
+			if (BuildingAccessPointById(Open->Id, &Npc, Domestic))
+			{
+				OutTarget = Domestic;
+				OutSource = TEXT("open-shelter");
+				bHave = true;
+			}
+		}
+		if (!bHave)
+		{
+			OutSource = TEXT("none");
+		}
+		return bHave;
 	}
 }

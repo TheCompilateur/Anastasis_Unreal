@@ -143,6 +143,41 @@ export default {
     },
 
     {
+      name: "TickNeedsEat",
+      comment: "tickNeeds, branche interieure eat (grenier mission granary-eat-001)",
+      args: ["double", "double", "double", "double", "double", "double", "double", "double", "double"],
+      ret: METRES,
+      inputs: croiser(HABITANTS, DTS).map(([h, dt]) => [...h, dt]),
+      call: (mod, a) => {
+        const npc = npcDe(a.slice(0, 8), "eat");
+        npc.inside = { goal: "eat", buildingId: "b9" };
+        mod.tickNeeds(simJour(0.42), npc, a[8]);
+        return npc;
+      },
+    },
+
+    {
+      name: "SatisfyEat",
+      comment: "satisfyEat : dedans / dehors, foyer / ailleurs",
+      args: ["double", "double", "double", "double", "double", "int"],
+      ret: [
+        { name: "hunger", type: "double" },
+        { name: "morale", type: "double" },
+        { name: "leisure", type: "double" },
+        { name: "health", type: "double" },
+        { name: "hygiene", type: "double" },
+      ],
+      inputs: croiser([[90, 50, 60, 70, 40], [30, 0, 97, 97, 98], [12, 99, 10, 50, 60], [70, 20, 40, 20, 5]], [0, 1, 2, 3, 4])
+        .map(([[hunger, morale, leisure, health, hygiene], lieu]) => [hunger, morale, leisure, health, hygiene, lieu]),
+      call: (mod, [hunger, morale, leisure, health, hygiene, lieu]) => {
+        const npc = npcLieu({ hunger, energy: 70, social: 60, leisure, hygiene, thirst: 10, health, morale, starvingDays: 2 }, lieu);
+        if (npc.inside) npc.inside.goal = "eat";
+        mod.satisfyEat(npc);
+        return npc;
+      },
+    },
+
+    {
       name: "SatisfyDrink",
       comment: "satisfyDrink, moral nul compris (npc.morale || 50)",
       args: ["double", "double", "double", "double"],

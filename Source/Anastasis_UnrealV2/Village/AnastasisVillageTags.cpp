@@ -13,3 +13,4 @@ UE_DEFINE_GAMEPLAY_TAG(TAG_Anastasis_Building_Farm, "Building.Farm");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Anastasis_Building_Tavern, "Building.Tavern");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Anastasis_Building_Well, "Building.Well");
 UE_DEFINE_GAMEPLAY_TAG(TAG_Anastasis_Building_Workshop, "Building.Workshop");
+UE_DEFINE_GAMEPLAY_TAG(TAG_Anastasis_Building_Granary, "Building.Granary");
