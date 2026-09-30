@@ -119,7 +119,7 @@ double CoverLobeAt(double DayFrac, double Peak, double Sigma)
 		D = 1.0 - D;
 	}
 	const double S = JsMax(0.04, Sigma);
-	return FMath::Exp(-(D * D) / (2.0 * S * S));
+	return AnastasisJs::Exp(-(D * D) / (2.0 * S * S));
 }
 
 double WinterSnowAt(ESeason Season, double Cover, double Rain)

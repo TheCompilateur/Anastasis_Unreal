@@ -363,6 +363,25 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock")
 	float DayElevationDegrees = 10.0f;
 
+	/**
+	 * Night vision, not night grading. Under moonlight the eye is scotopic: colour fades and
+	 * the white point adapts to the light there is. Second day/night capture (2026-09-30): a
+	 * physically warm 4100 K moon, shown at full saturation, read as a dim ochre DAY, and the
+	 * twilight fog as a magenta wash. Saturation and white balance follow the same elevation
+	 * curve as exposure; at day both are exactly the engine's neutral (1, 6500 K).
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float NightColorSaturation = 0.45f;
+
+	/**
+	 * White-balance temperature at night. UE renders a light white when WhiteTemp matches its
+	 * temperature: at the moon's own 4100 K the moonlight comes out NEUTRAL, the adapted eye's
+	 * view -- neither the ochre of an uncorrected warm source nor a blue night, which would need
+	 * a white point well below the moon's.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock", meta = (ClampMin = "1500.0", ClampMax = "15000.0"))
+	float NightWhiteTemp = 4100.0f;
+
 	/** Weather drives clouds and fog. False = the realism layer's fixed fair-weather sky. */
 	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock")
 	bool bWeatherDrivesSky = true;
@@ -378,6 +397,25 @@ public:
 	/** Global fog density multiplier = 1 + gain * humidity (weatherHumidityAt): wet air after rain is thicker air. */
 	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock", meta = (ClampMin = "0.0", ClampMax = "10.0"))
 	float FogHumidityGain = 1.5f;
+
+	/**
+	 * Mist pockets with a high sun, as a fraction of their night/dawn strength. First
+	 * day/night capture: at 1 (the ATMOSPHERE_002 constant), a clear summer noon still stood
+	 * the valley camera in a white-out. Radiation fog burns off; a trace lingers.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float MistMiddayFactor = 0.15f;
+
+	/** Sun elevation (deg) at which the mist has burnt off down to MistMiddayFactor. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock", meta = (ClampMin = "1.0", ClampMax = "60.0"))
+	float MistBurnOffElevationDegrees = 25.0f;
+
+	/**
+	 * Vertical scale of a mist pocket relative to its radius. A sphere 240 m wide reads as a
+	 * cotton ball from any height; valley mist is a bank, far wider than it is thick.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock", meta = (ClampMin = "0.05", ClampMax = "1.0"))
+	float MistVerticalScale = 0.3f;
 
 	// --- Exposure --------------------------------------------------------------------
 

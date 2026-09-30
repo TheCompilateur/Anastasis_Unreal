@@ -50,6 +50,11 @@ namespace AnastasisSkyClock
 		/** Degrees above the horizon (negative below). */
 		double SunElevationDegrees = 0.0;
 		double ExposureEV100 = 14.0;
+		/** 0 at night, 1 in full day: the smoothstep in sun elevation that exposure also follows. */
+		double Daylight = 1.0;
+		/** Post-process colour saturation and white-balance temperature for night vision (1 and 6500 K in daylight). */
+		double ColorSaturation = 1.0;
+		double WhiteTemp = 6500.0;
 		AnastasisWeather::FWeather Weather;
 		double Humidity = 0.0;
 		double Wetness = 0.0;
@@ -81,4 +86,26 @@ namespace AnastasisSkyClock
 
 	/** Global fog density multiplier for a humidity in [0,1]. 1 in dry air. */
 	double FogDensityScaleFor(const UAnastasisAtmosphereProfile& Profile, double Humidity);
+
+	/**
+	 * Scale of the height fog's authored inscattering LUMINANCE at this exposure.
+	 *
+	 * FogInscatteringColor is an absolute luminance (cd/m2) authored against the day's EV100.
+	 * Left constant, it is negligible at noon and a glowing white band at night: exposed at
+	 * EV -1 it lands 2^15 times brighter. First day/night capture, 2026-09-30, showed exactly
+	 * that. The light the exposure follows is the light the fog scatters: 2^(EV - DayEV).
+	 */
+	double FogInscatteringScaleFor(double ExposureEV100, double DayEV100);
+
+	/**
+	 * Strength of the wetness-driven mist pockets at this instant, as a multiplier of their
+	 * ATMOSPHERE_002 extinction. Valley and river mist is radiation fog: it forms in the still,
+	 * cool hours and burns off as the sun climbs. So:
+	 *   - full strength with the sun at or below the horizon, MistMiddayFactor with it above
+	 *     MistBurnOffElevationDegrees, smoothstep between (dawn and dusk are symmetric in sun
+	 *     height, the evening mist comes back as the sun sets);
+	 *   - humid air after rain thickens it (x (1 + humidity)), wind disperses it (x (1 - 0.6 wind)).
+	 * The WHERE stays the simulation's wetness field; this only says WHEN and how much.
+	 */
+	double MistFactorFor(const UAnastasisAtmosphereProfile& Profile, const FSkyState& State);
 }

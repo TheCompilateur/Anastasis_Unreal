@@ -293,6 +293,12 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 			{
 				CachedLightingPreExposure->Set(EV, ECVF_SetByCode);
 			}
+			// Night vision on the same curve: colour fades and the white point follows the moon.
+			const float Sat = static_cast<float>(LastSky.ColorSaturation);
+			ExposureVolume->Settings.bOverride_ColorSaturation = true;
+			ExposureVolume->Settings.ColorSaturation = FVector4(Sat, Sat, Sat, 1.0f);
+			ExposureVolume->Settings.bOverride_WhiteTemp = true;
+			ExposureVolume->Settings.WhiteTemp = static_cast<float>(LastSky.WhiteTemp);
 			LastExposureWritten = EV;
 		}
 	}
@@ -309,7 +315,32 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 			{
 				FogComponent->SetFogDensity(Density);
 			}
+
+			// The authored inscattering is an absolute luminance tuned for the day's EV: it has
+			// to dim with the light, or the night fog glows (see FogInscatteringScaleFor).
+			const float Inscatter = static_cast<float>(AnastasisSkyClock::FogInscatteringScaleFor(LastSky.ExposureEV100, Profile.ExposureEV100));
+			const FLinearColor Scattered = Profile.FogInscatteringColor * Inscatter;
+			if (!FogComponent->FogInscatteringLuminance.Equals(Scattered, 1e-7f))
+			{
+				FogComponent->SetFogInscatteringColor(Scattered);
+			}
 		}
+	}
+
+	// --- Mist: where is the simulation's wetness, when and how much is the sky's --------
+	const float MistFactor = static_cast<float>(AnastasisSkyClock::MistFactorFor(Profile, LastSky));
+	if (FMath::Abs(MistFactor - LastMistFactor) > 0.002f)
+	{
+		for (int32 I = 0; I < MistVolumes.Num(); ++I)
+		{
+			ULocalFogVolumeComponent* Component = IsValid(MistVolumes[I]) ? MistVolumes[I]->GetComponent() : nullptr;
+			if (Component && MistBaseExtinction.IsValidIndex(I))
+			{
+				Component->SetRadialFogExtinction(MistBaseExtinction[I] * MistFactor);
+				Component->SetHeightFogExtinction(MistBaseExtinction[I] * MistFactor);
+			}
+		}
+		LastMistFactor = MistFactor;
 	}
 	if (UVolumetricCloudComponent* CloudComponent = Cloud ? Cloud->FindComponentByClass<UVolumetricCloudComponent>() : nullptr)
 	{
@@ -339,12 +370,12 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 		LastLoggedPhase = Phase;
 		UE_LOG(LogAnastasis_UnrealV2, Display,
 			TEXT("ANASTASIS_SKY day=%.0f hour=%.2f phase=%s season=%s decl=%.2f sun_elev=%.2f moon_elev=%.2f ev100=%.2f ")
-			TEXT("cover=%.3f rain=%.3f snow=%.3f humidity=%.3f wind=%.3f weather=%d"),
+			TEXT("cover=%.3f rain=%.3f snow=%.3f humidity=%.3f wind=%.3f weather=%d mist_factor=%.3f"),
 			LastSky.Day, LastSky.Hours, *Phase, AnastasisWeather::SeasonId(LastSky.Weather.Season),
 			LastSky.DeclinationDegrees, LastSky.SunElevationDegrees,
 			AnastasisSkyClock::ElevationOf(LastSky.MoonRotation), LastSky.ExposureEV100,
 			LastSky.Weather.Cover, LastSky.Weather.Rain, LastSky.Weather.Snow, LastSky.Humidity,
-			LastSky.Weather.Wind, bWeather ? 1 : 0);
+			LastSky.Weather.Wind, bWeather ? 1 : 0, MistFactor);
 	}
 }
 
@@ -635,6 +666,9 @@ bool AAnastasisWorldAtmosphere::Apply()
 			ExposureVolume->Settings.AutoExposureMinBrightness = Profile.ExposureEV100;
 			ExposureVolume->Settings.bOverride_AutoExposureMaxBrightness = true;
 			ExposureVolume->Settings.AutoExposureMaxBrightness = Profile.ExposureEV100;
+			// Night vision belongs to the sky clock (UpdateSky); the fixed rig never set it.
+			ExposureVolume->Settings.bOverride_ColorSaturation = false;
+			ExposureVolume->Settings.bOverride_WhiteTemp = false;
 		}
 
 		// Pinning the post-process exposure above says nothing to Lumen's CACHED lighting
@@ -711,6 +745,8 @@ int32 AAnastasisWorldAtmosphere::ApplyMist()
 		}
 	}
 	MistVolumes.Reset();
+	MistBaseExtinction.Reset();
+	LastMistFactor = -1.0f;
 
 	// The CVar is the A/B switch: without a way to turn the mist off from outside the data,
 	// "the mist changed this image" would be an assertion rather than a measurement.
@@ -790,14 +826,16 @@ int32 AAnastasisWorldAtmosphere::ApplyMist()
 		// by the transform, so the radius we want has to go through that constant rather than
 		// be written as a world size.
 		const double Scale = Pocket.RadiusUU / static_cast<double>(ULocalFogVolumeComponent::GetBaseVolumeSize());
-		Volume->SetActorScale3D(FVector(Scale));
+		// Under the sky clock a pocket is a bank, not a dome (MistVerticalScale). With the clock
+		// off it keeps its ATMOSPHERE_002 sphere, so Sky.Clock 0 stays the image it was.
+		Volume->SetActorScale3D(FVector(Scale, Scale, bSkyClockActive ? Scale * Profile.MistVerticalScale : Scale));
 
+		// Thickness follows wetness: the wettest cell gets MistMaxExtinction, a cell barely over
+		// the threshold gets almost nothing. Identical pockets everywhere would be decoration;
+		// this is the simulation showing through.
+		const float Extinction = static_cast<float>(Pocket.Density01) * Profile.MistMaxExtinction;
 		if (ULocalFogVolumeComponent* Component = Volume->GetComponent())
 		{
-			// Thickness follows wetness: the wettest cell gets MistMaxExtinction, a cell
-			// barely over the threshold gets almost nothing. Identical pockets everywhere
-			// would be decoration; this is the simulation showing through.
-			const float Extinction = static_cast<float>(Pocket.Density01) * Profile.MistMaxExtinction;
 			Component->SetRadialFogExtinction(Extinction);
 			Component->SetHeightFogExtinction(Extinction);
 			Component->SetHeightFogFalloff(Profile.MistHeightFalloff);
@@ -806,6 +844,14 @@ int32 AAnastasisWorldAtmosphere::ApplyMist()
 		}
 
 		MistVolumes.Add(Volume);
+		MistBaseExtinction.Add(Extinction);
+	}
+
+	// The clock decides how much of that mist the hour and the weather allow: apply it now
+	// rather than leave a full-strength field on screen until the next tick.
+	if (bSkyClockActive)
+	{
+		UpdateSky(Profile, /*bForceLog*/ false);
 	}
 
 	UE_LOG(LogAnastasis_UnrealV2, Display,

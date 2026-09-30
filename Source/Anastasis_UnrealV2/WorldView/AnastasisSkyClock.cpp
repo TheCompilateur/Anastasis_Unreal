@@ -51,6 +51,11 @@ FSkyState Evaluate(const UAnastasisAtmosphereProfile& Profile, const double SimT
 
 	State.ExposureEV100 = ExposureForSunElevation(State.SunElevationDegrees, Profile.ExposureEV100,
 		Profile.NightExposureEV100, Profile.NightElevationDegrees, Profile.DayElevationDegrees);
+	// The same curve, as a 0..1 daylight factor: night vision fades in exactly as the exposure drops.
+	State.Daylight = ExposureForSunElevation(State.SunElevationDegrees, 1.0, 0.0,
+		Profile.NightElevationDegrees, Profile.DayElevationDegrees);
+	State.ColorSaturation = FMath::Lerp(static_cast<double>(Profile.NightColorSaturation), 1.0, State.Daylight);
+	State.WhiteTemp = FMath::Lerp(static_cast<double>(Profile.NightWhiteTemp), 6500.0, State.Daylight);
 
 	// The renderer's call in the reference: with the hour, so a front can build and clear within a day.
 	State.Weather = AnastasisWeather::WeatherAt(Seed, State.Day, nullptr, State.DayFrac);
@@ -68,6 +73,22 @@ double CloudCoverageFor(const UAnastasisAtmosphereProfile& Profile, const double
 double FogDensityScaleFor(const UAnastasisAtmosphereProfile& Profile, const double Humidity)
 {
 	return 1.0 + Profile.FogHumidityGain * FMath::Clamp(Humidity, 0.0, 1.0);
+}
+
+double FogInscatteringScaleFor(const double ExposureEV100, const double DayEV100)
+{
+	return FMath::Pow(2.0, FMath::Min(0.0, ExposureEV100 - DayEV100));
+}
+
+double MistFactorFor(const UAnastasisAtmosphereProfile& Profile, const FSkyState& State)
+{
+	const double Span = FMath::Max(1e-3, static_cast<double>(Profile.MistBurnOffElevationDegrees));
+	const double T = FMath::Clamp(State.SunElevationDegrees / Span, 0.0, 1.0);
+	const double BurnOff = T * T * (3.0 - 2.0 * T);
+	const double Diurnal = FMath::Lerp(1.0, static_cast<double>(Profile.MistMiddayFactor), BurnOff);
+	const double Humid = 1.0 + FMath::Clamp(State.Humidity, 0.0, 1.0);
+	const double Wind = 1.0 - 0.6 * FMath::Clamp(State.Weather.Wind, 0.0, 1.0);
+	return FMath::Clamp(Diurnal * Humid * Wind, 0.0, 2.0);
 }
 
 }

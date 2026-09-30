@@ -186,6 +186,10 @@ protected:
 	UPROPERTY()
 	TObjectPtr<class UMaterialInstanceDynamic> CloudMaterialInstance;
 
+	/** Each pocket's ATMOSPHERE_002 extinction, parallel to MistVolumes: the clock scales from it, never compounds. */
+	TArray<float> MistBaseExtinction;
+	float LastMistFactor = -1.0f;
+
 	AnastasisSkyClock::FSkyState LastSky;
 	bool bSkyClockActive = false;
 	FString LastLoggedPhase;

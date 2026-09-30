@@ -1,0 +1,78 @@
+﻿ANASTASIS_SKY day=1 hour=10.08 phase=morning season=spring decl=0.00 sun_elev=41.40 moon_elev=-41.40 ev100=14.00 cover=0.168 rain=0.035 snow=0.000 humidity=0.037 wind=0.457 weather=1 mist_factor=0.113
+ANASTASIS_ATMOSPHERE applied=1 profile=asset sun_source=explicit sun_pitch=-41.403 sun_yaw=-39.962 lux=75000.0 fog=1 fog_density=0.0120 ev100=14.00 adopted=4 spawned=1 realism=1 moon=1 clouds=1 volumetric_fog=1
+SKY_PIE_SAMPLE real=2.7 sim_time=37.800 village_phase=morning
+ANASTASIS_SKY day=1 hour=11.50 phase=midday season=spring decl=0.00 sun_elev=48.44 moon_elev=-48.44 ev100=14.00 cover=0.124 rain=0.035 snow=0.000 humidity=0.027 wind=0.457 weather=1 mist_factor=0.112
+ANASTASIS_SKY day=1 hour=13.50 phase=afternoon season=spring decl=0.00 sun_elev=44.19 moon_elev=-44.19 ev100=14.00 cover=0.061 rain=0.035 snow=0.000 humidity=0.024 wind=0.457 weather=1 mist_factor=0.112
+SKY_PIE_SAMPLE real=7.7 sim_time=53.967 village_phase=afternoon
+ANASTASIS_SKY day=1 hour=17.50 phase=evening season=spring decl=0.00 sun_elev=5.63 moon_elev=-5.63 ev100=12.46 cover=0.009 rain=0.035 snow=0.000 humidity=0.024 wind=0.457 weather=1 mist_factor=0.662
+SKY_PIE_SAMPLE real=12.7 sim_time=77.300 village_phase=evening
+ANASTASIS_SKY day=1 hour=21.01 phase=night season=spring decl=0.00 sun_elev=-32.38 moon_elev=32.38 ev100=-1.00 cover=0.006 rain=0.035 snow=0.000 humidity=0.024 wind=0.457 weather=1 mist_factor=0.744
+SKY_PIE_SAMPLE real=17.8 sim_time=104.967 village_phase=night
+ANASTASIS_SKY day=2 hour=5.01 phase=dawn season=spring decl=1.23 sun_elev=-10.29 moon_elev=10.29 ev100=-0.74 cover=0.505 rain=0.035 snow=0.000 humidity=0.111 wind=0.195 weather=1 mist_factor=0.981
+ANASTASIS_SKY day=2 hour=7.01 phase=morning season=spring decl=1.23 sun_elev=12.23 moon_elev=-12.23 ev100=14.00 cover=0.489 rain=0.035 snow=0.000 humidity=0.108 wind=0.195 weather=1 mist_factor=0.576
+SKY_PIE_SAMPLE real=22.8 sim_time=128.300 village_phase=morning
+ANASTASIS_SKY day=2 hour=11.50 phase=midday season=spring decl=1.23 sun_elev=49.66 moon_elev=-49.66 ev100=14.00 cover=0.486 rain=0.035 snow=0.000 humidity=0.107 wind=0.195 weather=1 mist_factor=0.147
+ANASTASIS_SKY day=2 hour=13.50 phase=afternoon season=spring decl=1.23 sun_elev=45.31 moon_elev=-45.31 ev100=14.00 cover=0.492 rain=0.035 snow=0.000 humidity=0.108 wind=0.195 weather=1 mist_factor=0.147
+SKY_PIE_SAMPLE real=27.8 sim_time=153.133 village_phase=afternoon
+ANASTASIS_SKY day=2 hour=17.50 phase=evening season=spring decl=1.23 sun_elev=6.44 moon_elev=-6.44 ev100=12.95 cover=0.570 rain=0.035 snow=0.000 humidity=0.125 wind=0.195 weather=1 mist_factor=0.855
+ANASTASIS_SKY day=2 hour=21.01 phase=night season=spring decl=1.23 sun_elev=-31.42 moon_elev=31.42 ev100=-1.00 cover=0.686 rain=0.035 snow=0.000 humidity=0.151 wind=0.195 weather=1 mist_factor=1.016
+SKY_PIE_SAMPLE real=32.8 sim_time=176.467 village_phase=night
+ANASTASIS_SKY day=3 hour=5.01 phase=dawn season=spring decl=2.45 sun_elev=-9.47 moon_elev=9.47 ev100=-0.45 cover=0.659 rain=0.035 snow=0.000 humidity=0.161 wind=0.504 weather=1 mist_factor=0.810
+ANASTASIS_SKY day=3 hour=7.01 phase=morning season=spring decl=2.45 sun_elev=13.05 moon_elev=-13.05 ev100=14.00 cover=0.630 rain=0.035 snow=0.000 humidity=0.161 wind=0.504 weather=1 mist_factor=0.443
+SKY_PIE_SAMPLE real=37.8 sim_time=215.133 village_phase=morning
+ANASTASIS_SKY day=3 hour=11.50 phase=midday season=spring decl=2.45 sun_elev=50.87 moon_elev=-50.87 ev100=14.00 cover=0.621 rain=0.035 snow=0.000 humidity=0.137 wind=0.504 weather=1 mist_factor=0.119
+ANASTASIS_SKY day=3 hour=13.50 phase=afternoon season=spring decl=2.45 sun_elev=46.43 moon_elev=-46.43 ev100=14.00 cover=0.621 rain=0.035 snow=0.000 humidity=0.137 wind=0.504 weather=1 mist_factor=0.119
+ANASTASIS_SKY day=3 hour=17.50 phase=evening season=spring decl=2.45 sun_elev=7.24 moon_elev=-7.24 ev100=13.35 cover=0.627 rain=0.035 snow=0.000 humidity=0.138 wind=0.504 weather=1 mist_factor=0.657
+SKY_PIE_SAMPLE real=42.9 sim_time=255.800 village_phase=evening
+ANASTASIS_SKY day=3 hour=21.01 phase=night season=spring decl=2.45 sun_elev=-30.46 moon_elev=30.46 ev100=-1.00 cover=0.690 rain=0.035 snow=0.000 humidity=0.152 wind=0.504 weather=1 mist_factor=0.804
+ANASTASIS_SKY day=4 hour=5.01 phase=dawn season=spring decl=3.67 sun_elev=-8.65 moon_elev=8.65 ev100=-0.06 cover=0.736 rain=0.094 snow=0.000 humidity=0.436 wind=0.163 weather=1 mist_factor=1.296
+ANASTASIS_SKY day=4 hour=7.01 phase=morning season=spring decl=3.67 sun_elev=13.85 moon_elev=-13.85 ev100=14.00 cover=0.716 rain=0.035 snow=0.000 humidity=0.240 wind=0.163 weather=1 mist_factor=0.567
+SKY_PIE_SAMPLE real=47.9 sim_time=299.467 village_phase=morning
+ANASTASIS_SKY day=4 hour=11.50 phase=midday season=spring decl=3.67 sun_elev=52.07 moon_elev=-52.07 ev100=14.00 cover=0.714 rain=0.035 snow=0.000 humidity=0.157 wind=0.163 weather=1 mist_factor=0.157
+ANASTASIS_SKY day=4 hour=13.50 phase=afternoon season=spring decl=3.67 sun_elev=47.53 moon_elev=-47.53 ev100=14.00 cover=0.714 rain=0.035 snow=0.000 humidity=0.157 wind=0.163 weather=1 mist_factor=0.157
+ANASTASIS_SKY day=4 hour=17.50 phase=evening season=spring decl=3.67 sun_elev=8.04 moon_elev=-8.04 ev100=13.66 cover=0.753 rain=0.155 snow=0.000 humidity=0.166 wind=0.163 weather=1 mist_factor=0.834
+SKY_PIE_SAMPLE real=52.9 sim_time=336.800 village_phase=evening
+ANASTASIS_SKY day=4 hour=21.01 phase=night season=spring decl=3.67 sun_elev=-29.50 moon_elev=29.50 ev100=-1.00 cover=1.000 rain=1.000 snow=0.000 humidity=0.700 wind=0.163 weather=1 mist_factor=1.534
+ANASTASIS_SKY day=5 hour=5.01 phase=dawn season=spring decl=4.87 sun_elev=-7.84 moon_elev=7.84 ev100=0.41 cover=0.597 rain=0.035 snow=0.000 humidity=0.131 wind=0.214 weather=1 mist_factor=0.986
+SKY_PIE_SAMPLE real=57.9 sim_time=381.633 village_phase=dawn
+ANASTASIS_SKY day=5 hour=7.01 phase=morning season=spring decl=4.87 sun_elev=14.65 moon_elev=-14.65 ev100=14.00 cover=0.646 rain=0.035 snow=0.000 humidity=0.142 wind=0.214 weather=1 mist_factor=0.464
+ANASTASIS_SKY day=5 hour=11.50 phase=midday season=spring decl=4.87 sun_elev=53.26 moon_elev=-53.26 ev100=14.00 cover=0.740 rain=0.106 snow=0.000 humidity=0.163 wind=0.214 weather=1 mist_factor=0.152
+ANASTASIS_SKY day=5 hour=13.50 phase=afternoon season=spring decl=4.87 sun_elev=48.62 moon_elev=-48.62 ev100=14.00 cover=0.708 rain=0.035 snow=0.000 humidity=0.156 wind=0.214 weather=1 mist_factor=0.151
+SKY_PIE_SAMPLE real=63.0 sim_time=420.633 village_phase=afternoon
+ANASTASIS_SKY day=5 hour=17.50 phase=evening season=spring decl=4.87 sun_elev=8.83 moon_elev=-8.83 ev100=13.88 cover=0.599 rain=0.035 snow=0.000 humidity=0.132 wind=0.214 weather=1 mist_factor=0.747
+ANASTASIS_SKY day=5 hour=21.01 phase=night season=spring decl=4.87 sun_elev=-28.54 moon_elev=28.54 ev100=-1.00 cover=0.566 rain=0.035 snow=0.000 humidity=0.125 wind=0.214 weather=1 mist_factor=0.980
+SKY_PIE_SAMPLE real=68.0 sim_time=460.133 village_phase=night
+ANASTASIS_SKY day=6 hour=5.01 phase=dawn season=spring decl=6.07 sun_elev=-7.03 moon_elev=7.03 ev100=0.95 cover=0.171 rain=0.035 snow=0.000 humidity=0.038 wind=0.210 weather=1 mist_factor=0.907
+ANASTASIS_SKY day=6 hour=7.01 phase=morning season=spring decl=6.07 sun_elev=15.43 moon_elev=-15.43 ev100=14.00 cover=0.091 rain=0.035 snow=0.000 humidity=0.024 wind=0.210 weather=1 mist_factor=0.384
+ANASTASIS_SKY day=6 hour=11.50 phase=midday season=spring decl=6.07 sun_elev=54.43 moon_elev=-54.43 ev100=14.00 cover=0.051 rain=0.035 snow=0.000 humidity=0.024 wind=0.210 weather=1 mist_factor=0.134
+ANASTASIS_SKY day=6 hour=13.50 phase=afternoon season=spring decl=6.07 sun_elev=49.69 moon_elev=-49.69 ev100=14.00 cover=0.050 rain=0.035 snow=0.000 humidity=0.024 wind=0.210 weather=1 mist_factor=0.134
+SKY_PIE_SAMPLE real=73.0 sim_time=509.967 village_phase=afternoon
+ANASTASIS_SKY day=6 hour=17.50 phase=evening season=spring decl=6.07 sun_elev=9.61 moon_elev=-9.61 ev100=13.99 cover=0.050 rain=0.035 snow=0.000 humidity=0.024 wind=0.210 weather=1 mist_factor=0.645
+ANASTASIS_SKY day=6 hour=21.01 phase=night season=spring decl=6.07 sun_elev=-27.59 moon_elev=27.59 ev100=-1.00 cover=0.061 rain=0.035 snow=0.000 humidity=0.024 wind=0.210 weather=1 mist_factor=0.896
+ANASTASIS_SKY day=7 hour=5.01 phase=dawn season=spring decl=7.24 sun_elev=-6.23 moon_elev=6.23 ev100=1.55 cover=0.117 rain=0.035 snow=0.000 humidity=0.026 wind=0.734 weather=1 mist_factor=0.574
+SKY_PIE_SAMPLE real=78.0 sim_time=559.467 village_phase=dawn
+ANASTASIS_SKY day=7 hour=7.01 phase=morning season=spring decl=7.24 sun_elev=16.20 moon_elev=-16.20 ev100=14.00 cover=0.117 rain=0.035 snow=0.000 humidity=0.026 wind=0.734 weather=1 mist_factor=0.225
+ANASTASIS_SKY day=7 hour=11.50 phase=midday season=spring decl=7.24 sun_elev=55.59 moon_elev=-55.59 ev100=14.00 cover=0.124 rain=0.035 snow=0.000 humidity=0.027 wind=0.734 weather=1 mist_factor=0.086
+ANASTASIS_SKY day=7 hour=13.50 phase=afternoon season=spring decl=7.24 sun_elev=50.74 moon_elev=-50.74 ev100=14.00 cover=0.139 rain=0.035 snow=0.000 humidity=0.030 wind=0.734 weather=1 mist_factor=0.087
+ANASTASIS_SKY day=7 hour=17.50 phase=evening season=spring decl=7.24 sun_elev=10.37 moon_elev=-10.37 ev100=14.00 cover=0.174 rain=0.035 snow=0.000 humidity=0.038 wind=0.734 weather=1 mist_factor=0.397
+SKY_PIE_SAMPLE real=83.0 sim_time=609.467 village_phase=evening
+ANASTASIS_SKY day=7 hour=21.01 phase=night season=spring decl=7.24 sun_elev=-26.65 moon_elev=26.65 ev100=-1.00 cover=0.148 rain=0.035 snow=0.000 humidity=0.033 wind=0.734 weather=1 mist_factor=0.578
+ANASTASIS_SKY day=8 hour=5.01 phase=dawn season=spring decl=8.40 sun_elev=-5.44 moon_elev=5.44 ev100=2.20 cover=0.802 rain=0.330 snow=0.000 humidity=0.231 wind=0.073 weather=1 mist_factor=1.177
+SKY_PIE_SAMPLE real=88.0 sim_time=654.967 village_phase=dawn
+ANASTASIS_SKY day=8 hour=7.01 phase=morning season=spring decl=8.40 sun_elev=16.95 moon_elev=-16.95 ev100=14.00 cover=0.910 rain=0.715 snow=0.000 humidity=0.500 wind=0.073 weather=1 mist_factor=0.513
+ANASTASIS_SKY day=8 hour=11.50 phase=midday season=spring decl=8.40 sun_elev=56.73 moon_elev=-56.73 ev100=14.00 cover=1.000 rain=1.000 snow=0.000 humidity=0.700 wind=0.073 weather=1 mist_factor=0.244
+ANASTASIS_SKY day=8 hour=13.50 phase=afternoon season=spring decl=8.40 sun_elev=51.76 moon_elev=-51.76 ev100=14.00 cover=0.912 rain=0.722 snow=0.000 humidity=0.506 wind=0.073 weather=1 mist_factor=0.216
+SKY_PIE_SAMPLE real=93.1 sim_time=695.467 village_phase=afternoon
+ANASTASIS_SKY day=8 hour=17.50 phase=evening season=spring decl=8.40 sun_elev=11.12 moon_elev=-11.12 ev100=14.00 cover=0.758 rain=0.171 snow=0.000 humidity=0.290 wind=0.073 weather=1 mist_factor=0.796
+ANASTASIS_SKY day=8 hour=21.01 phase=night season=spring decl=8.40 sun_elev=-25.72 moon_elev=25.72 ev100=-1.00 cover=0.746 rain=0.129 snow=0.000 humidity=0.164 wind=0.073 weather=1 mist_factor=1.113
+ANASTASIS_SKY day=9 hour=5.01 phase=dawn season=spring decl=9.53 sun_elev=-4.67 moon_elev=4.67 ev100=2.88 cover=0.568 rain=0.035 snow=0.000 humidity=0.125 wind=0.612 weather=1 mist_factor=0.712
+SKY_PIE_SAMPLE real=98.1 sim_time=739.300 village_phase=dawn
+ANASTASIS_SKY day=9 hour=7.01 phase=morning season=spring decl=9.53 sun_elev=17.69 moon_elev=-17.69 ev100=14.00 cover=0.781 rain=0.253 snow=0.000 humidity=0.177 wind=0.612 weather=1 mist_factor=0.242
+ANASTASIS_SKY day=9 hour=11.50 phase=midday season=spring decl=9.53 sun_elev=57.85 moon_elev=-57.85 ev100=14.00 cover=0.782 rain=0.255 snow=0.000 humidity=0.179 wind=0.612 weather=1 mist_factor=0.112
+ANASTASIS_SKY day=9 hour=13.50 phase=afternoon season=spring decl=9.53 sun_elev=52.76 moon_elev=-52.76 ev100=14.00 cover=0.568 rain=0.035 snow=0.000 humidity=0.125 wind=0.612 weather=1 mist_factor=0.107
+SKY_PIE_SAMPLE real=103.1 sim_time=780.300 village_phase=afternoon
+ANASTASIS_SKY day=9 hour=17.50 phase=evening season=spring decl=9.53 sun_elev=11.85 moon_elev=-11.85 ev100=14.00 cover=0.397 rain=0.035 snow=0.000 humidity=0.087 wind=0.612 weather=1 mist_factor=0.418
+ANASTASIS_SKY day=9 hour=21.01 phase=night season=spring decl=9.53 sun_elev=-24.80 moon_elev=24.80 ev100=-1.00 cover=0.388 rain=0.035 snow=0.000 humidity=0.085 wind=0.612 weather=1 mist_factor=0.687
+ANASTASIS_SKY day=10 hour=5.01 phase=dawn season=spring decl=10.64 sun_elev=-3.92 moon_elev=3.92 ev100=3.59 cover=0.259 rain=0.035 snow=0.000 humidity=0.057 wind=0.190 weather=1 mist_factor=0.936
+SKY_PIE_SAMPLE real=108.1 sim_time=829.967 village_phase=dawn
+ANASTASIS_SKY day=10 hour=7.01 phase=morning season=spring decl=10.64 sun_elev=18.40 moon_elev=-18.40 ev100=14.00 cover=0.340 rain=0.035 snow=0.000 humidity=0.075 wind=0.190 weather=1 mist_factor=0.282

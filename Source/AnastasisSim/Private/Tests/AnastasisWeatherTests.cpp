@@ -42,9 +42,13 @@ namespace AnastasisWeatherParity
 	}
 
 	/**
-	 * Compare un champ. `bLibm` : le champ traverse Math.exp / cos / sin, dont le CRT MSVC
-	 * n'est pas bit-identique a V8 (meme cause que la divergence connue de `Parite.Fbm`) :
-	 * 4 ULP sont toleres ET comptes. Tout autre champ est exige au bit pres.
+	 * Compare un champ. Tout est exige au bit pres -- y compris ce qui traverse Math.exp,
+	 * que le portage calcule avec l'exp de fdlibm, celle de V8 (AnastasisJs::Exp). Seuls
+	 * `dirX` / `dirZ` (`bLibm`) passent par Math.cos / Math.sin, que V8 ne prend pas au CRT
+	 * MSVC : 4 ULP y sont toleres ET comptes, meme cause que la divergence connue de
+	 * `Parite.Fbm`. Mesure du 2026-09-30 : 39 valeurs a 1 ULP, toutes sur dirX / dirZ.
+	 * Premier run, avec l'exp du CRT : 2 echecs a 6 et 8 ULP sur `cover` et `rain` (une
+	 * soustraction de grandeurs voisines amplifie l'ulp d'exp) -- d'ou le portage de fdlibm.
 	 */
 	struct FTally
 	{
@@ -79,13 +83,13 @@ namespace AnastasisWeatherParity
 			}
 		};
 
-		Field(TEXT("cover"), W.Cover, V.AttenduCoverBits, true);
+		Field(TEXT("cover"), W.Cover, V.AttenduCoverBits, false);
 		Field(TEXT("coverBase"), W.CoverBase, V.AttenduCoverBaseBits, false);
-		Field(TEXT("rain"), W.Rain, V.AttenduRainBits, true);
-		Field(TEXT("snow"), W.Snow, V.AttenduSnowBits, true);
-		Field(TEXT("frost"), W.Frost, V.AttenduFrostBits, true);
-		Field(TEXT("precip"), W.Precip, V.AttenduPrecipBits, true);
-		Field(TEXT("clearing"), W.Clearing, V.AttenduClearingBits, true);
+		Field(TEXT("rain"), W.Rain, V.AttenduRainBits, false);
+		Field(TEXT("snow"), W.Snow, V.AttenduSnowBits, false);
+		Field(TEXT("frost"), W.Frost, V.AttenduFrostBits, false);
+		Field(TEXT("precip"), W.Precip, V.AttenduPrecipBits, false);
+		Field(TEXT("clearing"), W.Clearing, V.AttenduClearingBits, false);
 		Field(TEXT("peak"), W.Peak, V.AttenduPeakBits, false);
 		Field(TEXT("wind"), W.Wind, V.AttenduWindBits, false);
 		Field(TEXT("windDir"), W.WindDir, V.AttenduWindDirBits, false);
@@ -170,7 +174,7 @@ bool FAnastasisParityWeatherTest::RunTest(const FString&)
 				++T.NotBitExact;
 				T.MaxUlp = FMath::Max(T.MaxUlp, Ulp);
 			}
-			if (Ulp > LibmUlpTolerance)
+			if (Ulp != 0)
 			{
 				++T.Failures;
 				AddError(FString::Printf(TEXT("WetnessHumidity[%d].%s : %.17g attendu %.17g (%lld ulp)"),

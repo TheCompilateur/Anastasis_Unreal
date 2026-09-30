@@ -67,8 +67,19 @@ def trace(a, b):
 
 
 def ground(x, y):
-    t = trace(V(x, y, 200000), V(x, y, -200000))
-    return t[4].z if t else None
+    """Le SOL, pas la cime : on reprend le trace sous chaque impact qui n'est pas le terrain
+    procedural (arbres et rochers sont des HISM qui bloquent aussi). Premiere capture : les
+    yeux de crete etaient poses sur la canopee."""
+    top = 200000.0
+    for _ in range(12):
+        t = trace(V(x, y, top), V(x, y, -200000))
+        if not t:
+            return None
+        comp = t[10]
+        if comp and 'Procedural' in comp.get_class().get_name():
+            return t[4].z
+        top = t[4].z - 5.0
+    return None
 
 
 # Emprise et relief, lus sur le sol trace : grille de 24 x 24.
@@ -100,10 +111,17 @@ def sightline(e, az):
     return ((t[4] - e).length() if t else L), V(e.x + d.x, e.y + d.y, e.z + d.z)
 
 
-def longest_view(pool):
+def open_sky(e):
+    """Pas de canopee au-dessus de l'oeil : premiere capture, crete et contre-jour etaient dans le feuillage."""
+    return trace(e, V(e.x, e.y, e.z + 4000)) is None
+
+
+def longest_view(pool, need_sky=True):
     best = None
     for s in pool:
         e = eye(s)
+        if need_sky and not open_sky(e):
+            continue
         for k in range(24):
             dist, tgt = sightline(e, k * 15.0)
             if best is None or dist > best[0]:
@@ -112,8 +130,8 @@ def longest_view(pool):
 
 
 n = len(samples)
-valley = longest_view(samples[:max(1, n // 5)])
-ridge = longest_view(samples[-max(1, n // 10):])
+valley = longest_view(samples[:max(1, n // 5)]) or longest_view(samples[:max(1, n // 5)], False)
+ridge = longest_view(samples[-max(1, n // 10):]) or longest_view(samples[-max(1, n // 10):], False)
 unreal.log('SKY_VIEWS valley_sight=%.0f ridge_sight=%.0f' % (valley[0], ridge[0]))
 
 views = [('ov_sw', V(-W * 0.16, -W * 0.16, W * 0.42), V(W * 0.55, W * 0.55, 0)),

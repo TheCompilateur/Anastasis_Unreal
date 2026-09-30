@@ -140,6 +140,17 @@ bool FAnastasisSkyClockSeasonsAndExposure::RunTest(const FString&)
 		Previous = EV;
 	}
 	TestTrue(TEXT("exposure never darkens as the sun rises"), bMonotonic);
+
+	// Night vision: neutral by day, faded and white-balanced to the moon by night -- and a
+	// moon-adapted white point, never a blue grade (it stays warmer than 4000 K).
+	const AnastasisSkyClock::FSkyState Noon = AnastasisSkyClock::Evaluate(*Profile, AnastasisSkyClock::SimTimeFor(1.0, 12.0), 12345u);
+	const AnastasisSkyClock::FSkyState Midnight = AnastasisSkyClock::Evaluate(*Profile, AnastasisSkyClock::SimTimeFor(1.0, 0.0), 12345u);
+	TestEqual(TEXT("day: engine-neutral saturation"), Noon.ColorSaturation, 1.0, 1e-12);
+	TestEqual(TEXT("day: engine-neutral white point"), Noon.WhiteTemp, 6500.0, 1e-9);
+	TestEqual(TEXT("night: the profile's night saturation"), Midnight.ColorSaturation, static_cast<double>(Profile->NightColorSaturation), 1e-6);
+	TestTrue(TEXT("night: colour fades"), Midnight.ColorSaturation < 0.6);
+	TestTrue(TEXT("night: white point adapts toward the moon, not to a blue grade"),
+		Midnight.WhiteTemp < 6500.0 && Midnight.WhiteTemp > 4000.0);
 	return true;
 }
 
@@ -176,6 +187,50 @@ bool FAnastasisSkyClockWeatherIsTheSimulations::RunTest(const FString&)
 	TestTrue(TEXT("more cover, more coverage"), AnastasisSkyClock::CloudCoverageFor(*Profile, 0.7) > AnastasisSkyClock::CloudCoverageFor(*Profile, 0.3));
 	TestEqual(TEXT("dry air leaves the fog at the profile density"), AnastasisSkyClock::FogDensityScaleFor(*Profile, 0.0), 1.0, 1e-12);
 	TestTrue(TEXT("humid air thickens the fog"), AnastasisSkyClock::FogDensityScaleFor(*Profile, 0.7) > 1.0);
+	return true;
+}
+
+/**
+ * The two night defects of the first day/night capture (2026-09-30), locked as rules:
+ *   - the fog's authored luminance follows the exposure, so at night it is (almost) gone
+ *     instead of glowing 2^15 times too bright, and at day it is exactly the authored value;
+ *   - the mist is radiation fog: full at night and dawn, burnt off under a high sun, thicker
+ *     in humid air, thinner in wind.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisSkyClockFogAndMistFollowTheLight, "Anastasis.Sky.Clock.FogAndMistFollowTheLight", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisSkyClockFogAndMistFollowTheLight::RunTest(const FString&)
+{
+	const UAnastasisAtmosphereProfile* Profile = UAnastasisAtmosphereProfile::CreateCodeDefaults(GetTransientPackage());
+	const double DayEV = Profile->ExposureEV100;
+	TestEqual(TEXT("day: authored fog luminance, unscaled"), AnastasisSkyClock::FogInscatteringScaleFor(DayEV, DayEV), 1.0, 1e-12);
+	TestTrue(TEXT("night: fog luminance follows the 15-stop drop"),
+		AnastasisSkyClock::FogInscatteringScaleFor(Profile->NightExposureEV100, DayEV) < 1e-4);
+	TestEqual(TEXT("never brighter than authored"), AnastasisSkyClock::FogInscatteringScaleFor(DayEV + 3.0, DayEV), 1.0, 1e-12);
+
+	auto At = [Profile](double Day, double Hours)
+	{
+		return AnastasisSkyClock::Evaluate(*Profile, AnastasisSkyClock::SimTimeFor(Day, Hours), 12345u);
+	};
+	// Calm, dry reference state, varied one factor at a time.
+	AnastasisSkyClock::FSkyState Dawn = At(34.0, 5.5);
+	AnastasisSkyClock::FSkyState Noon = At(34.0, 13.0);
+	for (AnastasisSkyClock::FSkyState* S : {&Dawn, &Noon})
+	{
+		S->Humidity = 0.0;
+		S->Weather.Wind = 0.0;
+	}
+	const double MistDawn = AnastasisSkyClock::MistFactorFor(*Profile, Dawn);
+	const double MistNoon = AnastasisSkyClock::MistFactorFor(*Profile, Noon);
+	AddInfo(FString::Printf(TEXT("ANASTASIS_SKY_MIST dawn=%.3f noon=%.3f"), MistDawn, MistNoon));
+	TestTrue(TEXT("the sun burns the mist off: noon well below dawn"), MistNoon < 0.5 * MistDawn);
+	TestEqual(TEXT("a high sun leaves the profile's midday trace"), MistNoon, static_cast<double>(Profile->MistMiddayFactor), 1e-6);
+
+	AnastasisSkyClock::FSkyState Humid = Dawn;
+	Humid.Humidity = 0.7;
+	TestTrue(TEXT("humid air thickens the mist"), AnastasisSkyClock::MistFactorFor(*Profile, Humid) > MistDawn);
+	AnastasisSkyClock::FSkyState Windy = Dawn;
+	Windy.Weather.Wind = 0.8;
+	TestTrue(TEXT("wind disperses the mist"), AnastasisSkyClock::MistFactorFor(*Profile, Windy) < MistDawn);
 	return true;
 }
 
