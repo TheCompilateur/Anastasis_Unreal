@@ -18,6 +18,9 @@ $py=(Join-Path $Root 'tools/unreal/capture-tree-lineup.py').Replace('\','/')
 $launchArgs=@(
  ('"'+(Join-Path $Root 'Anastasis_UnrealV2.uproject')+'"'),
  '-windowed','-resx=1280','-resy=720','-nosplash','-NoLiveCoding',
+ # Sans le focus, l'editeur coupe le rendu de ses viewports et HighResShot n'est jamais
+ # servi (cf. capture-terrain-relief.ps1). Surcharge en memoire, rien dans Saved/Config.
+ '-ini:EditorSettings:[/Script/UnrealEd.EditorPerformanceSettings]:bThrottleCPUWhenNotForeground=False',
  ('-abslog="'+$log+'"'),
  ('-ExecCmds="py '+$py+'"')
 )
