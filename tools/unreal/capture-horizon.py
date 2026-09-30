@@ -5,6 +5,7 @@ Lance par capture-horizon.ps1, une fois par etat. Variables d'environnement :
   ANASTASIS_HORIZON_CVAR  valeur de anastasis.Terrain.Horizon (0 = rien au-dela du bord)
   ANASTASIS_HORIZON_TAG   suffixe des images (A, B...)
   ANASTASIS_HORIZON_PRE   commandes console en plus, separees par ';' (etape brume)
+  ANASTASIS_HORIZON_ATMOSPHERE  1 = appliquer le profil d'atmosphere comme en PIE
 
 Cinq cameras, calees sur la carte REELLE (bornes du composant ExperimentalTerrain, pas
 de l'acteur, que l'anneau agrandit) et sur le bassin / le point haut de la forge :
@@ -46,6 +47,28 @@ cls = unreal.load_class(None, '/Script/Anastasis_UnrealV2.AnastasisWorldEmbodime
 found = unreal.GameplayStatics.get_all_actors_of_class(world, cls)
 actor = found[0] if len(found) > 0 else eas.spawn_actor_from_class(cls, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
 actor.call_method('EmbodyCanonical', args=(12345,))
+
+# ANASTASIS_HORIZON_ATMOSPHERE=1 : l'atmosphere du JEU, pas celle du niveau. En PIE, le
+# GameMode fait Apply() (soleil, ciel, brume, exposition du profil DA_AnastasisAtmosphere)
+# puis ApplyMist() apres l'incarnation ; l'editeur, lui, montre l'eclairage enregistre
+# dans la map. Meme ordre ici, rien n'est sauve.
+if os.environ.get('ANASTASIS_HORIZON_ATMOSPHERE', '0') == '1':
+    acls = unreal.load_class(None, '/Script/Anastasis_UnrealV2.AnastasisWorldAtmosphere')
+    atmo = eas.spawn_actor_from_class(acls, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
+    applied = atmo.call_method('Apply')
+    pockets = atmo.call_method('ApplyMist')
+    unreal.log('HORIZON_ATMOSPHERE applied=%s mist_pockets=%s' % (applied, pockets))
+for fog in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.ExponentialHeightFog):
+    fc = fog.get_component_by_class(unreal.ExponentialHeightFogComponent)
+    unreal.log('HORIZON_FOG %s z=%.0f density=%.4f falloff=%.3f start=%.0f max_opacity=%.2f volumetric=%s' % (
+        fog.get_name(), fog.get_actor_location().z, fc.get_editor_property('fog_density'),
+        fc.get_editor_property('fog_height_falloff'), fc.get_editor_property('start_distance'),
+        fc.get_editor_property('fog_max_opacity'), fc.get_editor_property('enable_volumetric_fog')))
+for sky in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SkyAtmosphere):
+    sc = sky.get_component_by_class(unreal.SkyAtmosphereComponent)
+    unreal.log('HORIZON_SKY %s aerial_scale=%.2f height_fog_contribution=%.2f' % (
+        sky.get_name(), sc.get_editor_property('aerial_pespective_view_distance_scale'),
+        sc.get_editor_property('height_fog_contribution')))
 basin = actor.call_method('GetTerrainForgeBasin')
 landmark = actor.call_method('GetTerrainForgeLandmark')
 

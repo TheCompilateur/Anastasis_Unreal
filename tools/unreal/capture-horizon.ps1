@@ -4,7 +4,10 @@
 #
 # -PreCmds 'cmd1;cmd2' : commandes console appliquees aux DEUX etats (etape brume :
 # l'anneau reste la seule variable entre A et B, ou fixer -States B pour un seul etat).
-param([string]$Label='ring', [string]$PreCmds='', [ValidateSet('AB','B')][string]$States='AB', [int]$TimeoutSec=480)
+#
+# -Atmosphere : applique le profil DA_AnastasisAtmosphere comme le GameMode en PIE (soleil,
+# ciel, brume, exposition, poches de brume) ; sans lui, l'image est l'eclairage du niveau.
+param([string]$Label='ring', [string]$PreCmds='', [ValidateSet('AB','B')][string]$States='AB', [switch]$Atmosphere, [int]$TimeoutSec=480)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
@@ -20,6 +23,7 @@ foreach ($state in $plan) {
  $env:ANASTASIS_HORIZON_CVAR=$state[0]
  $env:ANASTASIS_HORIZON_TAG=$state[1]
  $env:ANASTASIS_HORIZON_PRE=$PreCmds
+ $env:ANASTASIS_HORIZON_ATMOSPHERE= if ($Atmosphere) { '1' } else { '0' }
  $launchArgs=@(
   ('"'+(Join-Path $Root 'Anastasis_UnrealV2.uproject')+'"'),
   '-windowed','-resx=1280','-resy=720','-nosplash','-NoLiveCoding',
@@ -33,7 +37,7 @@ foreach ($state in $plan) {
  $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
  $p.Refresh()
  if(-not $p.HasExited){ Stop-Process -Id $p.Id -Force; throw "CAPTURE::FAIL editeur bloque ($($state[1]))" }
- Select-String -Path $log -Pattern 'HORIZON_(VIEW|SHOT|COMPLETE|MAP)|ANASTASIS_TERRAIN_HORIZON' | ForEach-Object { ($_.Line -replace '^\[[^\]]*\]\[[ 0-9]*\]','') }
+ Select-String -Path $log -Pattern 'HORIZON_(VIEW|SHOT|COMPLETE|MAP|ATMOSPHERE|FOG|SKY)|ANASTASIS_TERRAIN_HORIZON|ANASTASIS_ATMOSPHERE ' | ForEach-Object { ($_.Line -replace '^\[[^\]]*\]\[[ 0-9]*\]','') }
 }
 
 # Vide = le sol de planete du SkyAtmosphere : bleu nuit (16,30,50 a 67,96,129 en
