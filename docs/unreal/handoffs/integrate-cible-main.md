@@ -26,6 +26,8 @@ agent : integrate aurait avance cette branche et reecrit sa copie de travail. Il
 - `tools/unreal/test-agent-worktree.ps1` (nouveau) -- banc d'essai sur depot jetable sous %TEMP%.
 - `AGENTS.md` -- tables `integrate` / `prune`, index.
 - `docs/unreal/OPERATIONS.md` -- etapes 4 et 6 de la passe d'integration.
+- `docs/unreal/PIEGES_UNREAL.md` (nouveau) -- pieges ranges par leur signature dans le log ; `AGENTS.md`
+  (section Preuve) y renvoie avant toute chasse a la regression. Documentation seule.
 
 ## COMMIT
 
