@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Sim/AnastasisSimulation.h"
+#include "Kismet/BlueprintFunctionLibrary.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "Village/AnastasisVillagePresentation.h"
 #include "AnastasisSimulationSubsystem.generated.h"
@@ -35,6 +36,14 @@ public:
 	 */
 	FString SeedFirstWell(int32 NpcCount, int32 TileX, int32 TileY);
 
+	/**
+	 * La maison (mission house-rest-001) : deux maisons pres de (TileX, TileY),
+	 * la premiere a un proprietaire, la seconde libre ; `NpcCount` habitants,
+	 * dont un proprietaire et les autres sans toit, abrites par
+	 * `assignSheltersDaily`. Rend l'identifiant de la maison possedee.
+	 */
+	FString SeedFirstHouse(int32 NpcCount, int32 TileX, int32 TileY);
+
 	/** Reflete les batiments de la simulation en acteurs. Appele a chaque Tick. */
 	int32 SyncVillagePresentation();
 	const FAnastasisVillagePresentation& GetVillagePresentation() const { return VillagePresentation; }
@@ -51,4 +60,28 @@ private:
 	int32 LoggedDay = 0;
 	/** True only after OnWorldBeginPlay. Tests ResetCanonical without the engine ticker. */
 	bool bPumpFromEngineTick = false;
+};
+
+/**
+ * Lecteurs de debug pour les scripts de preuve Python (tools/unreal/*-pie.py).
+ * Python ne sait pas atteindre un sous-systeme de monde : USubsystemBlueprintLibrary
+ * est reservee aux noeuds Blueprint internes. Lecture seule, rien ne decide ici.
+ */
+UCLASS()
+class UAnastasisSimulationDebugLibrary : public UBlueprintFunctionLibrary
+{
+	GENERATED_BODY()
+
+public:
+	/** Temps de simulation (s) de l'hote de ce monde, -1 sans hote. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static double GetSimulationTime(const UObject* WorldContextObject);
+
+	/** Phase commune du village ("night", "dawn"...), vide sans hote. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetVillagePhase(const UObject* WorldContextObject);
+
+	/** Habitants dedans ce batiment (`npc.inside`), -1 sans hote. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static int32 CountInside(const UObject* WorldContextObject, const FString& BuildingId);
 };

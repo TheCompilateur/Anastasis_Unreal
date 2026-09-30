@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 
 #include "Life/AnastasisNeeds.h"
+#include "Life/AnastasisVillageRhythm.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -38,6 +39,23 @@ namespace AnastasisNeedsParity
 		N.Morale = NeedsFromBits(M);
 		return N;
 	}
+
+	/** Les cas de lieu de tools/migration/parity/needs.mjs (`npcLieu`). */
+	struct FLieu
+	{
+		FString Inside;
+		FString Home;
+		FString Shelter;
+	};
+
+	FLieu LieuOf(int32 Case)
+	{
+		FLieu Out;
+		if (Case >= 2) Out.Inside = Case == 3 ? TEXT("b2") : TEXT("b1");
+		if (Case == 1 || Case == 2 || Case == 3) Out.Home = TEXT("b1");
+		if (Case == 4) Out.Shelter = TEXT("b1");
+		return Out;
+	}
 }
 
 /**
@@ -54,6 +72,8 @@ bool FAnastasisParityNeedsTest::RunTest(const FString&)
 	using AnastasisNeedsParity::NeedsFromBits;
 	using AnastasisNeedsParity::NeedsToBits;
 	using AnastasisNeedsParity::NeedsFromVector;
+	using AnastasisNeedsParity::FLieu;
+	using AnastasisNeedsParity::LieuOf;
 	using namespace AnastasisNeedsParity::Vecteurs;
 	int32 Failures = 0;
 	auto Check = [&](const TCHAR* Case, int32 Index, const TCHAR* Field, double Got, uint64 Expected)
@@ -107,6 +127,42 @@ bool FAnastasisParityNeedsTest::RunTest(const FString&)
 		Check(TEXT("TickNeeds"), I, TEXT("morale"), N.Morale, V.AttenduMoraleBits);
 	}
 
+	for (int32 I = 0; I < UE_ARRAY_COUNT(TickNeedsRestVectors); ++I)
+	{
+		const FTickNeedsRestVector& V = TickNeedsRestVectors[I];
+		AnastasisNeeds::FNeeds N = NeedsFromVector(V.A0Bits, V.A1Bits, V.A2Bits, V.A3Bits, V.A4Bits, V.A5Bits, V.A6Bits, V.A7Bits);
+		const bool bNight = AnastasisRhythm::VillagePhase(NeedsFromBits(V.A8Bits)) == AnastasisRhythm::EPhase::Night;
+		// Foyer (lieu 2) ou chez autrui (lieu 3) : la qualite vient de sleepQuality.
+		const FLieu Lieu = LieuOf(V.A9 != 0 ? 2 : 3);
+		const double Quality = AnastasisNeeds::SleepQuality(Lieu.Inside, Lieu.Home, Lieu.Shelter);
+		AnastasisNeeds::TickNeedsRestInside(N, NeedsFromBits(V.A10Bits), bNight, Quality);
+		Check(TEXT("TickNeedsRest"), I, TEXT("hunger"), N.Hunger, V.AttenduHungerBits);
+		Check(TEXT("TickNeedsRest"), I, TEXT("energy"), N.Energy, V.AttenduEnergyBits);
+		Check(TEXT("TickNeedsRest"), I, TEXT("social"), N.Social, V.AttenduSocialBits);
+		Check(TEXT("TickNeedsRest"), I, TEXT("leisure"), N.Leisure, V.AttenduLeisureBits);
+		Check(TEXT("TickNeedsRest"), I, TEXT("hygiene"), N.Hygiene, V.AttenduHygieneBits);
+		Check(TEXT("TickNeedsRest"), I, TEXT("thirst"), N.Thirst, V.AttenduThirstBits);
+		Check(TEXT("TickNeedsRest"), I, TEXT("health"), N.Health, V.AttenduHealthBits);
+		Check(TEXT("TickNeedsRest"), I, TEXT("morale"), N.Morale, V.AttenduMoraleBits);
+	}
+
+	for (int32 I = 0; I < UE_ARRAY_COUNT(SatisfyRestVectors); ++I)
+	{
+		const FSatisfyRestVector& V = SatisfyRestVectors[I];
+		AnastasisNeeds::FNeeds N;
+		N.Energy = NeedsFromBits(V.A0Bits);
+		N.Leisure = NeedsFromBits(V.A1Bits);
+		N.Morale = NeedsFromBits(V.A2Bits);
+		const bool bNight = AnastasisRhythm::VillagePhase(NeedsFromBits(V.A3Bits)) == AnastasisRhythm::EPhase::Night;
+		const FLieu Lieu = LieuOf(V.A4);
+		const FString Living = !Lieu.Home.IsEmpty() ? Lieu.Home : Lieu.Shelter;
+		const bool bAtHome = !Living.IsEmpty() && Lieu.Inside == Living; // `isAtHome`
+		AnastasisNeeds::SatisfyRest(N, bNight, AnastasisNeeds::SleepQuality(Lieu.Inside, Lieu.Home, Lieu.Shelter), !Lieu.Inside.IsEmpty(), bAtHome);
+		Check(TEXT("SatisfyRest"), I, TEXT("energy"), N.Energy, V.AttenduEnergyBits);
+		Check(TEXT("SatisfyRest"), I, TEXT("leisure"), N.Leisure, V.AttenduLeisureBits);
+		Check(TEXT("SatisfyRest"), I, TEXT("morale"), N.Morale, V.AttenduMoraleBits);
+	}
+
 	for (int32 I = 0; I < UE_ARRAY_COUNT(SatisfyDrinkVectors); ++I)
 	{
 		const FSatisfyDrinkVector& V = SatisfyDrinkVectors[I];
@@ -123,7 +179,8 @@ bool FAnastasisParityNeedsTest::RunTest(const FString&)
 	}
 
 	const int32 Total = UE_ARRAY_COUNT(UrgeScoreVectors) + UE_ARRAY_COUNT(NeedGoalScoresVectors)
-		+ UE_ARRAY_COUNT(TickNeedsVectors) + UE_ARRAY_COUNT(SatisfyDrinkVectors);
+		+ UE_ARRAY_COUNT(TickNeedsVectors) + UE_ARRAY_COUNT(SatisfyDrinkVectors)
+		+ UE_ARRAY_COUNT(TickNeedsRestVectors) + UE_ARRAY_COUNT(SatisfyRestVectors);
 	AddInfo(FString::Printf(TEXT("Besoins : %d vecteurs, %d ecarts"), Total, Failures));
 	return Failures == 0;
 }

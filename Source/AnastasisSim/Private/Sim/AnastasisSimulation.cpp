@@ -94,6 +94,10 @@ uint64 FAnastasisSimulation::TileFingerprint() const
 void FAnastasisSimulation::OnNewDay(bool bDefer)
 {
 	++NewDayCount;
+	// Section critique de minuit, « eco + logements » : de la reference n'est porte
+	// que `assignSheltersDaily` (les sans-toit recoivent un lit). Achats de maison,
+	// agrandissements, loyers : economie, non portee.
+	Village.AssignSheltersDaily();
 	// Eco / life / clio : NOT_IMPLEMENTED. La file reste vide, que defer soit
 	// true (tick runtime) ou false (appel direct / verifies).
 	if (!bDefer)

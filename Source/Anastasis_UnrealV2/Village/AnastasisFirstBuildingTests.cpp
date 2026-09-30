@@ -129,4 +129,67 @@ bool FAnastasisFirstBuildingPresentationTest::RunTest(const FString&)
 	return true;
 }
 
+/**
+ * La maison suit le meme chemin : building-N (house) -> acteur Kind House, Smart
+ * Object `Activity.Sleep` de `main` ; le foyer et l'interieur restent dans la
+ * simulation, l'acteur ne les porte pas.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAnastasisHousePresentationTest,
+	"Anastasis.Village.FirstBuilding.MaisonPresentation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAnastasisHousePresentationTest::RunTest(const FString&)
+{
+	UWorld* World = AnastasisFirstBuildingTest::FindWorld();
+	UAnastasisVillageInteractionSubsystem* Rooms = World ? World->GetSubsystem<UAnastasisVillageInteractionSubsystem>() : nullptr;
+	if (!TestNotNull(TEXT("village interaction subsystem"), Rooms))
+	{
+		return false;
+	}
+
+	FAnastasisSimulation Sim;
+	Sim.Reset(AnastasisWorldView::ReferenceSeed, AnastasisWorldView::ReferenceWidth, AnastasisWorldView::ReferenceHeight);
+	AnastasisVillage::FVillage& Village = Sim.GetVillage();
+	FString HouseId;
+	for (int32 R = 0; R < 30 && HouseId.IsEmpty(); ++R)
+	{
+		for (int32 DY = -R; DY <= R && HouseId.IsEmpty(); ++DY)
+		{
+			for (int32 DX = -R; DX <= R && HouseId.IsEmpty(); ++DX)
+			{
+				HouseId = Village.AddBuilding(AnastasisVillage::HouseType, 40 + DX, 40 + DY);
+			}
+		}
+	}
+	if (!TestFalse(TEXT("maison posee dans la simulation"), HouseId.IsEmpty()))
+	{
+		return false;
+	}
+	const AnastasisVillage::FBuilding Record = *Village.FindBuilding(HouseId);
+
+	FAnastasisVillagePresentation Presentation;
+	TestEqual(TEXT("un acteur cree"), Presentation.Sync(Village, Sim.GetWorld(), *Rooms), 1);
+	AAnastasisVillageBuilding* Actor = Presentation.FindActor(HouseId);
+	if (!TestNotNull(TEXT("acteur reflete"), Actor))
+	{
+		return false;
+	}
+	TestEqual(TEXT("SimId = building-N"), Actor->GetSimId(), FName(*HouseId));
+	TestTrue(TEXT("type House"), Actor->GetKind() == EAnastasisVillageBuildingKind::House);
+	const FVector Expected = FAnastasisVillagePresentation::SimToUnreal(Sim.GetWorld(), Record.X + 0.5, Record.Y + 0.5, World);
+	TestTrue(TEXT("pose au centre de sa tuile"), Actor->GetActorLocation().Equals(Expected, 0.01));
+	const FAnastasisVillageQueryResult Sleep = Rooms->FindNearestInteraction(
+		TAG_Anastasis_Activity_Sleep,
+		Expected,
+		static_cast<float>(AnastasisWorldView::TileWorldSize * 3.0));
+	TestEqual(TEXT("Activity.Sleep remonte a building-N"), Sleep.SimId, FName(*HouseId));
+
+	TestTrue(TEXT("RemoveBuilding"), Village.RemoveBuilding(HouseId));
+	TestEqual(TEXT("un acteur detruit"), Presentation.Sync(Village, Sim.GetWorld(), *Rooms), 1);
+	TestNull(TEXT("plus d'acteur"), Presentation.FindActor(HouseId));
+	Presentation.Clear(Rooms);
+	return true;
+}
+
 #endif

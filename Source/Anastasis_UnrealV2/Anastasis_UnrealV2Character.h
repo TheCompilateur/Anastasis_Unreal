@@ -48,7 +48,13 @@ protected:
 	/** Mouse Look Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	class UInputAction* MouseLookAction;
-	
+
+	/** Extra mouse look multiplier on top of the engine's own MouseX/MouseY AxisConfig
+	 *  sensitivity (Config/DefaultInput.ini). Keep at 1.0 unless you want to tune feel
+	 *  without touching the ini -- it stacks multiplicatively with that base sensitivity. */
+	UPROPERTY(EditAnywhere, Category ="Input", meta = (ClampMin = "0.0"))
+	float MouseSensitivity = 1.0f;
+
 public:
 	AAnastasis_UnrealV2Character();
 
@@ -59,6 +65,9 @@ protected:
 
 	/** Called from Input Actions for looking input */
 	void LookInput(const FInputActionValue& Value);
+
+	/** Called from Input Actions for mouse looking input */
+	void MouseLookInput(const FInputActionValue& Value);
 
 	/** Handles aim inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")

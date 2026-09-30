@@ -5,10 +5,9 @@
 // Ce sont des fonctions a entrees et sorties scalaires, donc declarees ici
 // plutot qu'ecrites dans un generateur dedie.
 //
-// Hors perimetre, et pourquoi : les branches interieures de tickNeeds exigent
-// `npc.inside` (chantier domestique, non porte). Les entrees ci-dessous ne les
-// empruntent jamais — un but "rest" SANS interieur passe par la branche par
-// defaut, exactement comme dans la reference.
+// La maison (mission house-rest-001) ajoute la branche interieure `rest` de
+// tickNeeds, satisfyRest et sleepQuality. Les autres branches interieures
+// (relieve / eat / socialize / relax) n'ont pas encore de boucle.
 
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,6 +54,21 @@ const simPour = (auPointDEau) => ({
 
 const DTS = [1 / 60, 0.5, 3];
 
+// Fractions de jour : nuit (0.05, 0.9), aube, matin, midi, apres-midi, soir,
+// et les deux bords de la nuit (21h pile, 5h pile).
+const FRACS = [0.05, 0.25, 0.42, 0.5, 0.65, 0.8, 0.875, 0.8749, 0.20833333333333334, 0.9];
+
+// Cas de lieu pour sleepQuality / satisfyRest :
+//   0 dehors sans toit | 1 dehors avec toit | 2 dans son foyer | 3 chez autrui | 4 dans son abri
+const LIEUX = [0, 1, 2, 3, 4];
+const npcLieu = (npc, lieu) => {
+  npc.inside = lieu >= 2 ? { goal: "rest", buildingId: lieu === 3 ? "b2" : "b1" } : null;
+  npc.home = lieu === 1 || lieu === 2 || lieu === 3 ? { id: "b1" } : null;
+  npc.shelter = lieu === 4 ? { id: "b1" } : null;
+  return npc;
+};
+const simJour = (frac) => ({ dayFrac: () => frac, time: frac * 90, buildings: [] });
+
 export default {
   module: "src/life/needs.js",
   out: join(RACINE, "Source", "AnastasisSim", "Private", "Tests", "AnastasisNeedsVectors.inl"),
@@ -91,6 +105,39 @@ export default {
       call: (mod, a) => {
         const npc = npcDe(a.slice(0, 8), a[8]);
         mod.tickNeeds(simPour(a[9]), npc, a[10]);
+        return npc;
+      },
+    },
+
+    {
+      name: "TickNeedsRest",
+      comment: "tickNeeds, branche interieure rest (nuit / sieste, foyer / ailleurs)",
+      args: ["double", "double", "double", "double", "double", "double", "double", "double", "double", "bool", "double"],
+      ret: METRES,
+      inputs: croiser(HABITANTS, FRACS.filter((_, i) => i % 3 === 0 || i === 1), [true, false], DTS)
+        .map(([h, frac, foyer, dt]) => [...h, frac, foyer, dt]),
+      call: (mod, a) => {
+        const npc = npcDe(a.slice(0, 8), "rest");
+        npcLieu(npc, a[9] ? 2 : 3);
+        mod.tickNeeds(simJour(a[8]), npc, a[10]);
+        return npc;
+      },
+    },
+
+    {
+      name: "SatisfyRest",
+      comment: "satisfyRest : nuit / jour, dedans / dehors, foyer / abri / ailleurs",
+      args: ["double", "double", "double", "double", "int"],
+      ret: [
+        { name: "energy", type: "double" },
+        { name: "leisure", type: "double" },
+        { name: "morale", type: "double" },
+      ],
+      inputs: croiser([[5, 20, 40], [40, 60, 0], [80, 97, 55], [99, 100, 99]], [0.05, 0.42, 0.9], LIEUX)
+        .map(([[energy, leisure, morale], frac, lieu]) => [energy, leisure, morale, frac, lieu]),
+      call: (mod, [energy, leisure, morale, frac, lieu]) => {
+        const npc = npcLieu({ hunger: 10, energy, social: 60, leisure, hygiene: 60, thirst: 10, health: 90, morale, jobId: "farmer", starvingDays: 0 }, lieu);
+        mod.satisfyRest(simJour(frac), npc);
         return npc;
       },
     },
