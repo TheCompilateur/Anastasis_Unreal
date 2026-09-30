@@ -164,9 +164,70 @@ Preuves brutes sous
   `Comparison_Baseline_V2.json` et leurs rapports Markdown dans ce meme dossier ;
 - `regeneration_source_before.json`, `regeneration_postcheck.json`.
 
+## Preuve commune du village — 2026-09-30
+
+Mandat : observer ensemble quatre habitants, un puits, deux logements et un grenier,
+pendant deux jours simules, sans commande corrective apres l'assemblage. Aucun code
+runtime nouveau : seules les commandes existantes FirstHouse / FirstWell / FirstGranary
+sont composees dans un editeur PIE dedie. Base mesuree : `ee575f8`.
+
+Protocole initial : seed 12345, Speed=1, FirstHouse 4 47 47, FirstWell 0 49 48,
+FirstGranary 0 96 50 48. Deux jours = 180 secondes de simulation, jour de 90 secondes.
+L'implantation recherche ses cases libres : positions effectives dans les logs.
+355 snapshots : quatre habitants et quatre batiments dans chacun. Aucun apport de
+nourriture, retrait, teleportation d'habitant ou changement de besoin apres le depart.
+Le deplacement de la camera d'observation ne commande pas les habitants.
+
+| Habitant | Boissons confirmees | Repos confirmes | Repas avec consommation confirmee |
+|---|---:|---:|---:|
+| npc-0 | 2 | 6 | 0 |
+| npc-1 | 1 | 9 | 2 |
+| npc-2 | 1 | 9 | 0 |
+| npc-3 | 0 | 30 | 0 |
+
+- RUN COMPLETE : 180,000 secondes observees. Stock 96 -> 94 ; invariant
+  `stock = 96 - repas comptabilises` vrai dans les 355 snapshots.
+- Quatre recuperations d'energie observees. Trois habitants boivent ; trois ont
+  une baisse de faim. npc-3 termine energie=100, faim=48,84, soif=46,32, sante=100,
+  encore au repos. Ce run ne prouve ni mortalite ni rupture de survie.
+- npc-0 et npc-2 reduisent leur faim a domicile sans repas comptabilise, inventaire
+  alimentaire nul. Cela rejoint la dette "foyer avant grenier" de GRANARY_EAT_001.
+- L'urgence de sommeil conservee de npc-3 reste elevee malgre energie=100.
+  L'inertie perimee est une hypothese causale soutenue par la trace et la dette
+  documentee ; pas un effet de correction demontre par A/B.
+- Les vitesses echantillonnees atteignent environ 80 m par seconde simulee
+  (4 tuiles/s x 20 m/tuile). Il s'agit des marqueurs projetes, pas d'une marche humaine.
+- Navigation physique / evitement des obstacles 3D : UNKNOWN. Aucun NavigationData
+  charge ; le deplacement observe suit la grille de simulation et sa projection.
+
+SCN : controle visuel separe de 24 secondes, meme assemblage, capture standard
+`Shot showui` : etiquettes superposees et tronquees, marqueurs de debug peu lisibles.
+Critere de lisibilite NON SATISFAIT dans ces vues. Les HighResShot du run de deux
+jours ne montrent pas le debug et ne fondent pas ce verdict. Aucun PLY humain.
+
+Verification : build canonique `BUILD::PASS::CACHED`, empreintes sources/modules
+inchangees depuis le build valide. HEAD et fichiers suivis Source/Config/Python/Maps
+stables, etat dirty des cartes inchange, git propre apres la preuve. Aucun nouveau
+run de suite automation ; aucun ajout au registre KNOWN_EXPECTED_FAILURE.
+Les editeurs de preuve se sont fermes. Le PID de l'editeur utilisateur initial
+n'etait plus present a la fin ; sa fermeture n'a pas ete observee ni attribuee.
+
+Preuves locales dans le dossier de preuves deja cite :
+- `village_common_probe.py`, `analyze_village_common.py`, `village_common.log` ;
+- `village_common/Run.json`, `Analysis.json`, `Snapshots.json` ;
+- `village_common_visual_probe.py`, `village_common_visual.log` ;
+- `village_common_visual/overview_008.png`, `ground_014.png`, `Run.json` ;
+- `village_common_preflight.json`, `village_common_postflight.json`.
+Deux tentatives de lancement preliminaires sont exclues : sortie prematuree du
+mode ExecutePythonScript, puis mauvais accesseur Python de CameraActor. Journaux
+conserves sous `village_common_bootstrap.log` et `village_common_camera_error.*`.
+Les preuves generees et scripts experimentaux restent hors Git ; ce commit ne
+modifie que cette fiche de passation, pas les mecanismes observes.
+
 ## STOP
 
-Integration et comparaison geometrique canonique terminees. Aucun push de ce lot.
-NEXT : valider la lisibilite au sol de V2 puis la navigation effective sur une
-fixture autorisee. NavMesh, parcours joueur et viabilite du village restent UNKNOWN.
-Terrain, assets, Player et travaux voisins restent hors du lot auditeur.
+Auditeur integre ; comparaison geometrique et preuve commune terminees.
+Le critere de village autonome et lisible n'est pas valide par cette campagne.
+NEXT : A/B borne du recalcul d'urgence d'une decision Nous conservee, en respectant
+la reference JS. Puis verifier le lien nourriture physique -> soulagement de faim.
+Ces corrections ne sont pas implementees par la mission d'audit. Aucun push demande.
