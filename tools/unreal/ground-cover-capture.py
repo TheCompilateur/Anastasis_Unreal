@@ -5,14 +5,29 @@ coordonnees de tuiles de la carte ; l'etat "off" (anastasis.Dressing.GroundCover
 capture aux memes cameras, dans la meme session : l'A/B ne mesure que l'herbe. Les traces
 visent le sol : l'herbe n'a pas de collision, la camera ne s'y pose donc jamais.
 
-Pour chaque vue, la duree de frame est mesuree pendant l'attente (p50 / p95) : la preuve de
-cout est prise la ou l'image est prise.
+Pour chaque vue, la duree de frame est mesuree pendant l'attente (p50 / p95), avec les temps
+game thread / render thread / GPU de stat unit (GetFrameTimingsMs) : la duree de frame de
+l'editeur mesure surtout la charge des AUTRES processus de la machine (v4 : la meme vue
+sans ombres sortait plus lente qu'avec) ; le GPU mesure la scene.
 
-ANASTASIS_GROUND_OUT   dossier de sortie (obligatoire)
+La vue hors_vallee est choisie parmi les touffes REELLEMENT posees (HISM GroundCover_*) loin
+des ellipses de la vallee ecrite : elle prouve que la carte entiere est couverte.
+
+ANASTASIS_GROUND_OUT     dossier de sortie (obligatoire)
+ANASTASIS_GROUND_STATES  etats captures, dans l'ordre, le premier doit poser l'herbe
+                         (defaut "on,off") : on | off | noshadow | on2
 """
 import os, time, math, json, unreal
 
 OUT = os.environ.get('ANASTASIS_GROUND_OUT')
+STATE_CMDS = {
+    'on': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1'),
+    'off': ('anastasis.Dressing.GroundCover 0', 'anastasis.GroundCover.Shadows 1'),
+    'noshadow': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 0'),
+    # Repetition de "on" en fin de serie : l'ecart on / on2 mesure la derive de la machine.
+    'on2': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1'),
+}
+states = [x.strip() for x in os.environ.get('ANASTASIS_GROUND_STATES', 'on,off').split(',') if x.strip()]
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
 SEED = 12345
 V = unreal.Vector
@@ -33,6 +48,8 @@ def finish(msg, error=False):
 try:
     if not OUT:
         raise RuntimeError('ANASTASIS_GROUND_OUT manquant')
+    if not states or any(x not in STATE_CMDS for x in states) or states[0] == 'off':
+        raise RuntimeError('ANASTASIS_GROUND_STATES invalide : %r' % states)
     os.makedirs(OUT, exist_ok=True)
     les.load_level(LEVEL)
     world = ues.get_editor_world()
@@ -40,7 +57,7 @@ try:
     def cmd(c):
         unreal.SystemLibrary.execute_console_command(world, c)
 
-    for c in ('ShowFlag.Sprites 0', 'ShowFlag.Grid 0', 'viewmode lit', 'anastasis.Dressing.GroundCover 1'):
+    for c in ('ShowFlag.Sprites 0', 'ShowFlag.Grid 0', 'viewmode lit') + STATE_CMDS[states[0]]:
         cmd(c)
     cls = unreal.load_class(None, '/Script/Anastasis_UnrealV2.AnastasisWorldEmbodiment')
     found = unreal.GameplayStatics.get_all_actors_of_class(world, cls)
@@ -92,6 +109,30 @@ try:
             if gz is not None:
                 plan.append(('hameau_eye', (ex / T, ey / T), 170, ((cx + vx / vd * rr * 1.5) / T, (cy + vy / vd * rr * 1.5) / T), 120))
             continue
+    # Hors vallee : une touffe lointaine posee loin des ellipses ecrites, oeil a 1,7 m au-dessus,
+    # regard vers le centre de la carte. Rien trouve = le masque ne couvre toujours que la vallee.
+    def valley_distance(tx, ty):
+        return min(((tx - 48) / 18) ** 2 + ((ty - 58) / 13) ** 2, ((tx - 62) / 15) ** 2 + ((ty - 47) / 12) ** 2,
+                   ((tx - 33) / 13) ** 2 + ((ty - 24) / 11) ** 2)
+
+    outside = None
+    for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
+        if outside or not comp.get_name().startswith('GroundCover_MeadowTall_Far'):
+            continue
+        n = comp.get_instance_count()
+        for i in range(0, n, max(1, n // 4000)):
+            got = comp.get_instance_transform(i, True)
+            xf = got[1] if isinstance(got, tuple) else got
+            tx, ty = xf.translation.x / T, xf.translation.y / T
+            if 8 < tx < 88 and 8 < ty < 88 and valley_distance(tx, ty) > 3.0:
+                outside = (tx, ty)
+                break
+    if outside:
+        dx, dy = 48.0 - outside[0], 48.0 - outside[1]
+        d = math.hypot(dx, dy) or 1.0
+        plan.append(('hors_vallee_eye', outside, 170, (outside[0] + dx / d * 3.0, outside[1] + dy / d * 3.0), 120))
+    unreal.log('GROUND_CAPTURE_OUTSIDE %s' % (('tile=%.1f,%.1f' % outside) if outside else 'NONE'))
+
     views = []
     for name, eye_t, lift, tgt_t, tlift in plan:
         eye, tgt = at(eye_t[0], eye_t[1], lift), at(tgt_t[0], tgt_t[1], tlift)
@@ -106,17 +147,17 @@ except Exception as exc:  # noqa: BLE001
     finish('GROUND_CAPTURE_FAIL %s' % exc, True)
     raise
 
-states = ['on', 'off']
 look = unreal.MathLibrary.find_look_at_rotation
 queue = [(states[0], v) for v in views]
 state_i = 0
 phase, mark, shot, first = 'boot', time.monotonic(), None, True
 frames = []
+timings = []
 metrics = {}
 
 
 def tick(dt):
-    global phase, mark, shot, first, state_i, queue, frames
+    global phase, mark, shot, first, state_i, queue, frames, timings
     try:
         el = time.monotonic() - mark
         try:
@@ -137,21 +178,28 @@ def tick(dt):
                         json.dump(metrics, f, indent=1)
                     finish('GROUND_CAPTURE_COMPLETE views=%d states=%d' % (len(views), len(states)))
                     return
-                cmd('anastasis.Dressing.GroundCover %d' % (1 if states[state_i] == 'on' else 0))
+                for c in STATE_CMDS[states[state_i]]:
+                    cmd(c)
                 actor.call_method('EmbodyCanonical', args=(SEED,))
                 queue = [(states[state_i], v) for v in views]
-                first, mark, frames = True, time.monotonic(), []
+                first, mark, frames, timings = True, time.monotonic(), [], []
                 return
             state, (name, eye, tgt) = queue[0]
             ues.set_level_viewport_camera_info(eye, look(eye, tgt))
             if el > 2:
                 frames.append(dt)
+                t = actor.call_method('GetFrameTimingsMs')
+                timings.append((t.x, t.y, t.z))
             # Premiere vue d'un etat : l'arbre asynchrone des HISM se construit encore.
             if el > (16 if first else 7):
                 f = sorted(frames) or [0.0]
                 metrics['%s_%s' % (name, state)] = {
                     'frame_ms_p50': 1000.0 * f[len(f) // 2], 'frame_ms_p95': 1000.0 * f[int(len(f) * 0.95) - 1 if len(f) > 1 else 0],
                     'frames': len(frames)}
+                if timings:
+                    for axis, key in ((0, 'game_ms_p50'), (1, 'render_ms_p50'), (2, 'gpu_ms_p50')):
+                        v = sorted(x[axis] for x in timings)
+                        metrics['%s_%s' % (name, state)][key] = v[len(v) // 2]
                 shot = os.path.join(OUT, '%s_%s.png' % (name, state)).replace('\\', '/')
                 if os.path.exists(shot):
                     os.remove(shot)
@@ -164,9 +212,11 @@ def tick(dt):
                 return
             if el > 1:
                 m = metrics['%s_%s' % (queue[0][1][0], queue[0][0])]
-                unreal.log('GROUND_SHOT_OK %s frame_ms_p50=%.1f p95=%.1f' % (os.path.basename(shot), m['frame_ms_p50'], m['frame_ms_p95']))
+                unreal.log('GROUND_SHOT_OK %s frame_ms_p50=%.1f p95=%.1f game=%.1f render=%.1f gpu=%.1f' % (
+                    os.path.basename(shot), m['frame_ms_p50'], m['frame_ms_p95'], m.get('game_ms_p50', -1),
+                    m.get('render_ms_p50', -1), m.get('gpu_ms_p50', -1)))
                 queue.pop(0)
-                first, frames = False, []
+                first, frames, timings = False, [], []
                 phase, mark = 'aim', time.monotonic()
     except Exception as exc:  # noqa: BLE001
         finish('GROUND_CAPTURE_FAIL tick %s' % exc, True)

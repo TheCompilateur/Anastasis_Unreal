@@ -53,9 +53,11 @@ UP_BLEND = 0.72
 # Seuils d'ecran des LOD. Une touffe de ~90 cm de rayon englobant : ~0.10 vers 16 m,
 # ~0.045 vers 36 m. Au-dela, le materiau l'enfonce (FADE_*) puis le HISM ne la soumet plus.
 LOD_SCREEN = (1.0, 0.10, 0.045)
-# Fondu de distance, en uu. Doit finir avant la distance de coupe du HISM
-# (AnastasisWorldEmbodiment::PlaceGroundCover, 11200) : sinon la touffe disparait d'un coup.
-# v2 finissait a 75 m : une lisiere d'herbe nette barrait chaque vue a hauteur d'homme.
+# Fondu de distance, en uu : PARAMETRES du materiau (FadeStart / FadeEnd). Chaque HISM les regle
+# par MID (AnastasisWorldEmbodiment::PlaceGroundCover) : touffes proches 40 -> 55 m, lointaines
+# 70 -> 105 m, chacune coupee juste apres. Les valeurs ci-dessous ne sont que les defauts du
+# materiau nu, alignes sur le tier lointain. v2 finissait a 75 m : une lisiere d'herbe nette
+# barrait chaque vue a hauteur d'homme.
 FADE_START = 7000.0
 FADE_END = 10500.0
 WIND_AMPLITUDE = 9.0
@@ -341,13 +343,13 @@ def save_static_mesh(meshes, asset_path, material):
 
 
 WIND_CODE = '''
-float fade = saturate((distance(Cam, Obj) - %(start).1f) / %(span).1f);
+float fade = saturate((distance(Cam, Obj) - FadeStart) / max(FadeEnd - FadeStart, 1.0));
 float phase = T * %(speed).2f + dot(Position.xy, float2(0.0021, 0.0013)) + Rand * 1.2;
 float gust = sin(phase) * 0.7 + sin(phase * 2.3 + 1.7) * 0.3;
 float k = Height * Height * (1.0 - fade);
 float3 wind = float3(gust, gust * 0.45, 0.0) * %(amp).1f * k;
 return wind + (Obj - Position) * fade;
-''' % {'start': FADE_START, 'span': FADE_END - FADE_START, 'speed': WIND_SPEED, 'amp': WIND_AMPLITUDE}
+''' % {'speed': WIND_SPEED, 'amp': WIND_AMPLITUDE}
 
 
 def ensure_material():
@@ -408,7 +410,9 @@ def ensure_material():
                ('Cam', unreal.MaterialExpressionCameraPositionWS, ''),
                ('T', unreal.MaterialExpressionTime, ''),
                ('Rand', unreal.MaterialExpressionPerInstanceRandom, ''),
-               ('Height', None, 'A'))
+               ('Height', None, 'A'),
+               ('FadeStart', 'FadeStart', FADE_START),
+               ('FadeEnd', 'FadeEnd', FADE_END))
     inputs = []
     for name, cls, out in sources:
         entry = unreal.CustomInput()
@@ -416,7 +420,14 @@ def ensure_material():
         inputs.append(entry)
     wind.set_editor_property('inputs', inputs)
     for i, (name, cls, out) in enumerate(sources):
-        node = vc if cls is None else mel.create_material_expression(mat, cls, -800, 520 + 70 * i)
+        if isinstance(cls, str):
+            # Parametre scalaire : le MID de chaque HISM le surcharge.
+            node = mel.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -800, 520 + 70 * i)
+            node.set_editor_property('parameter_name', cls)
+            node.set_editor_property('default_value', out)
+            out = ''
+        else:
+            node = vc if cls is None else mel.create_material_expression(mat, cls, -800, 520 + 70 * i)
         if not mel.connect_material_expressions(node, out, wind, name):
             raise RuntimeError('Entree du vent non cablee : ' + name)
     if not mel.connect_material_property(wind, '', unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET):

@@ -1,4 +1,5 @@
 #include "WorldView/AnastasisGroundCover.h"
+#include "Async/ParallelFor.h"
 
 // Espace nomme, pas anonyme : en build unity, un Smooth() anonyme d'un autre fichier du meme
 // lot entre en collision (cf. AnastasisDrainage.cpp).
@@ -150,8 +151,16 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 	// sans evaluer ses cellules une a une. La decision par cellule reste celle du masque.
 	const int32 Block = FMath::Max(1, FMath::CeilToInt(2000.0 / C.CellUU));
 
-	for (int32 BY = 0; BY < CellsY; BY += Block)
+	// Une rangee de blocs par tache : les echantillonneurs sont en lecture seule (forge, drainage,
+	// geographie ecrite), et les rangees sont fusionnees DANS L'ORDRE -- le plan ne depend ni du
+	// nombre de coeurs ni de l'ordonnancement. Toute la carte : ~2,5 M candidates.
+	const int32 BlockRows = (CellsY + Block - 1) / Block;
+	TArray<FPlan> Rows;
+	Rows.SetNum(BlockRows);
+	ParallelFor(BlockRows, [&](int32 RowIndex)
 	{
+		FPlan& Row = Rows[RowIndex];
+		const int32 BY = RowIndex * Block;
 		for (int32 BX = 0; BX < CellsX; BX += Block)
 		{
 			double BlockMask = 0.0;
@@ -171,11 +180,11 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 			{
 				for (int32 GX = BX; GX < FMath::Min(BX + Block, CellsX); ++GX)
 				{
-					++Out.Candidates;
+					++Row.Candidates;
 					const double X = In.Bounds.Min.X + (GX + Unit(Hash(In.Seed, GX, GY, 11))) * C.CellUU;
 					const double Y = In.Bounds.Min.Y + (GY + Unit(Hash(In.Seed, GX, GY, 12))) * C.CellUU;
 					const double Mask = FMath::Clamp(In.Mask(X, Y), 0.0, 1.0);
-					if (!(Mask >= C.MinMask)) { ++Out.RejectedMask; continue; }
+					if (!(Mask >= C.MinMask)) { ++Row.RejectedMask; continue; }
 
 					double Z, East, West, North, South;
 					if (!In.SampleHeight(X, Y, Z) || !In.SampleHeight(X + R, Y, East) || !In.SampleHeight(X - R, Y, West)
@@ -183,7 +192,7 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 						|| !FMath::IsFinite(Z) || !FMath::IsFinite(East) || !FMath::IsFinite(West)
 						|| !FMath::IsFinite(North) || !FMath::IsFinite(South))
 					{
-						++Out.RejectedGround;
+						++Row.RejectedGround;
 						continue;
 					}
 
@@ -202,7 +211,7 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 							Lowest = FMath::Min(Lowest, Heights[K] - W);
 							bDry = Heights[K] > W + C.WaterClearanceUU;
 						}
-						if (!bDry) { ++Out.RejectedWater; continue; }
+						if (!bDry) { ++Row.RejectedWater; continue; }
 						AboveWater = Lowest;
 					}
 
@@ -211,10 +220,10 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 					const double DX = FMath::Max(FMath::Abs(East - Z), FMath::Abs(West - Z)) / R;
 					const double DY = FMath::Max(FMath::Abs(North - Z), FMath::Abs(South - Z)) / R;
 					const double Slope = FMath::RadiansToDegrees(FMath::Atan(FMath::Sqrt(DX * DX + DY * DY)));
-					if (Slope > C.MaxSlopeDegrees) { ++Out.RejectedSlope; continue; }
+					if (Slope > C.MaxSlopeDegrees) { ++Row.RejectedSlope; continue; }
 
 					const double CrownDistance = Canopy.Nearest(X, Y);
-					if (CrownDistance < C.CanopyExclusion) { ++Out.RejectedCanopy; continue; }
+					if (CrownDistance < C.CanopyExclusion) { ++Row.RejectedCanopy; continue; }
 					const double Shade = C.CanopyShade > C.CanopyExclusion
 						? 1.0 - Smooth((CrownDistance - C.CanopyExclusion) / (C.CanopyShade - C.CanopyExclusion))
 						: 0.0;
@@ -245,7 +254,7 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 						* (1.0 - 0.45 * Smooth((Slope - 12.0) / 8.0))
 						* (1.0 - 0.75 * Shade)
 						* Trampled;
-					if (Unit(Hash(In.Seed, GX, GY, 13)) >= Density) { ++Out.RejectedDensity; continue; }
+					if (Unit(Hash(In.Seed, GX, GY, 13)) >= Density) { ++Row.RejectedDensity; continue; }
 
 					// Famille. Humidite d'abord (laiches), puis la pente decide haute ou basse ;
 					// une seconde tache melange les hauteurs sur le plat : "hauteurs melees", pas un gazon.
@@ -266,8 +275,7 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 						Family = Unit(Hash(In.Seed, GX, GY, 15)) < TallChance ? EFamily::MeadowTall : EFamily::MeadowShort;
 					}
 
-					if (Out.Instances.Num() >= C.MaxInstances) { Out.bTruncated = true; return true; }
-					FPlacement& P = Out.Instances.AddDefaulted_GetRef();
+					FPlacement& P = Row.Instances.AddDefaulted_GetRef();
 					P.Ground = FVector(X, Y, Z);
 					P.Normal = FVector(-(East - West) / (2.0 * R), -(North - South) / (2.0 * R), 1.0).GetSafeNormal();
 					P.Yaw = 360.0 * Unit(Hash(In.Seed, GX, GY, 16));
@@ -276,10 +284,27 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 					P.SlopeDegrees = Slope;
 					P.Wetness = Wet;
 					P.Family = Family;
-					++Out.Counts[static_cast<int32>(Family)];
+					P.Thin = Unit(Hash(In.Seed, GX, GY, 18));
 				}
 			}
 		}
+	});
+	for (FPlan& Row : Rows)
+	{
+		Out.Candidates += Row.Candidates;
+		Out.RejectedMask += Row.RejectedMask;
+		Out.RejectedGround += Row.RejectedGround;
+		Out.RejectedWater += Row.RejectedWater;
+		Out.RejectedSlope += Row.RejectedSlope;
+		Out.RejectedCanopy += Row.RejectedCanopy;
+		Out.RejectedDensity += Row.RejectedDensity;
+		for (const FPlacement& P : Row.Instances)
+		{
+			if (Out.Instances.Num() >= C.MaxInstances) { Out.bTruncated = true; break; }
+			Out.Instances.Add(P);
+			++Out.Counts[static_cast<int32>(P.Family)];
+		}
+		Row.Instances.Empty();
 	}
 	return true;
 }

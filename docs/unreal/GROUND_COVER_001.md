@@ -1,9 +1,9 @@
 # GROUND_COVER_001 — la strate herbacée des espaces ouverts
 
 Première passe d'herbe sur la carte. Jusqu'ici, entre les arbres il n'y avait rien : les tuiles
-`Grass` recevaient une couleur, aucune plante. Cette passe pose trois familles d'herbe sur les
-espaces ouverts de la vallée écrite (Human_Geography_V2), sur le sol et l'eau **réellement
-rendus** (forge + drainage), après les arbres.
+`Grass` recevaient une couleur, aucune plante. Cette passe pose trois familles d'herbe sur **toute
+la carte**, sur le sol et l'eau **réellement rendus** (forge + drainage), après les arbres :
+987 627 touffes, dont 690 560 hors de la vallée écrite, pour ~+1,5-2 ms de frame.
 
 ## Les familles, lues sur les planches
 
@@ -27,45 +27,61 @@ Ce que toutes les planches montrent, et que les règles portent :
 - **fondu, pas de coupure** : la densité baisse avec la pente (12→20°) et à l'approche des
   couronnes (0,8 → 1,6 rayon), l'herbe haute y cède la place à la rase.
 
+## Où l'herbe a le droit d'exister
+
+Masque = max(poids de vallée Human_Geography_V2, ouverture de la tuile de simulation interpolée
+entre centres de tuiles). Ouverture : prairie / champ 1 ; broussaille, forêt 0,8 (les couronnes
+posées excluent le sous-bois, une trouée de forêt est une clairière) ; eau de simulation 0,8
+(le drainage en a rendu l'essentiel à la terre, la vraie nappe est refusée par la règle d'eau) ;
+ruine 0,4 ; roche 0,2 (lande = H6). Les v1-v3 ne lisaient que la vallée : hors vallées, rien.
+
 ## Code
 
 | Fichier | Rôle |
 |---|---|
-| `WorldView/AnastasisGroundCover.{h,cpp}` | règles pures et déterministes : `Build(FInputs, FSettings, FPlan&)`. Aucune dépendance UObject |
+| `WorldView/AnastasisGroundCover.{h,cpp}` | règles pures et déterministes : `Build(FInputs, FSettings, FPlan&)`, parallèle par rangées de blocs, fusion dans l'ordre. Aucune dépendance UObject |
 | `WorldView/AnastasisGroundCoverTests.cpp` | `Anastasis.GroundCover.*` |
-| `WorldView/AnastasisWorldEmbodiment.{h,cpp}` | `PlaceGroundCover` après la forêt : sol `AnastasisTerrainForge::SampleActive`, eau `SampleActiveWater`, humidité `AnastasisDrainage::RiparianAt`, masque `AnastasisPlaces::ValleyWeightAt`, couronnes réellement posées, hameau en clairière piétinée |
+| `WorldView/AnastasisWorldEmbodiment.{h,cpp}` | `PlaceGroundCover` après la forêt : sol `AnastasisTerrainForge::SampleActive`, eau `SampleActiveWater`, humidité `AnastasisDrainage::RiparianAt`, masque ci-dessus, couronnes réellement posées, hameau en clairière piétinée ; `GetFrameTimingsMs` (métrologie) |
 | `tools/unreal/create-ground-cover.{ps1,py}` | source d'autorité des trois touffes et de `M_AnastasisGrass` |
-| `tools/unreal/capture-ground-cover.ps1` + `ground-cover-capture.py` | A/B `anastasis.Dressing.GroundCover 1/0` |
+| `tools/unreal/capture-ground-cover.ps1` + `ground-cover-capture.py` | A/B `-States on,off,on2,noshadow`, frame et temps GPU par vue |
 
-CVar : `anastasis.Dressing.GroundCover` (1 par défaut ; 0 = sol nu, pour l'A/B). Journal :
-`ANASTASIS_GROUND_COVER tall= short= sedge= placed= candidates= refused_*= plan_ms= total_ms=`.
+CVars (appliquées à l'incarnation) : `anastasis.Dressing.GroundCover` (1 ; 0 = sol nu, pour
+l'A/B), `anastasis.GroundCover.Shadows` (1 ; ombres des touffes proches). Journal :
+`ANASTASIS_GROUND_COVER tall= short= sedge= placed= near= far= chunks= outside_valley= ... plan_ms= total_ms=`.
 
-Rendu : un HISM par famille, `GroundCover_<Famille>`, vidé puis rempli à chaque incarnation
-(jamais détruit : cf. assertion `InstanceReorderTable`), sans collision ni navigation, ombres
-portées actives, coupé à 112 m. La touffe suit 70 % de la pente et s'enfonce du reste.
+## Rendu et coût
+
+- **Tuiles de 160 m.** Un HISM par (famille, tier, tuile) — 683 sur la carte de référence —
+  avec une distance d'affichage de primitive (coupe + demi-diagonale) : le moteur écarte d'un
+  bloc les tuiles loin de l'œil. En v4, six HISM couvrant toute la carte coûtaient +12 ms dans
+  chaque vue, même vide : le coût suivait le nombre total d'instances, pas ce qui est visible.
+- **Éclaircie de distance.** Deux tiers par famille : proche (66 %, ombres portées, fondu
+  40 → 55 m) et lointain (34 %, ×1,25, sans ombres, fondu 70 → 105 m). Bornes passées au
+  matériau par MID (`FadeStart` / `FadeEnd`).
+- Vidé puis rempli à chaque incarnation, jamais détruit (assertion `InstanceReorderTable`),
+  sans collision ni navigation. La touffe suit 70 % de la pente et s'enfonce du reste.
+- Mesures : `docs/visual/ground-cover-001/README.md`. Ombres coupées = aucun gain mesurable.
 
 `M_AnastasisGrass` : couleur de sommet, feuillage deux faces, normale monde × `TwoSidedSign`
 (sans elle, la face arrière d'une lame rendait noire), vent en WPO (hauteur², vagues de position,
-déphasé par instance), fondu de distance 70 → 105 m (la touffe s'enfonce vers son pivot).
+déphasé par instance), fondu de distance paramétré (la touffe s'enfonce vers son pivot).
 
 Touffes : lames opaques en arc, sans texture, groupées en sous-touffes plus un remplissage
-uniforme ; LOD écrits à la main (45 % puis 30 % des lames, élargies), pas réduits.
+uniforme ; LOD écrits à la main (45 % puis 30 % des lames, élargies), pas réduits. Le générateur
+ouvre l'éditeur sur `/Engine/Maps/Entry` : sur la carte de démarrage, les touffes posées
+verrouillaient les assets à régénérer.
 
 ## Limites connues
 
-- **Le sol sous l'herbe** (`MI_AnastasisGround`, autre chantier) est un vert-jaune pâle uniforme :
-  entre deux touffes et au-delà du fondu, c'est lui qu'on voit. La lecture lointaine d'une prairie
-  (EZ5, vue aérienne) relève du matériau de sol, pas de cette passe.
-- **Vue oblique / aérienne** : l'herbe est coupée à 112 m ; de haut elle ne compte pas.
+- **Le sol sous l'herbe** (`MI_AnastasisGround`, autre chantier) perce entre les touffes : vert
+  pâle en vallée, sableux ailleurs. La lecture lointaine d'une prairie relève du matériau de sol.
+- **Vue oblique / aérienne** : l'herbe est coupée à 108 m ; de haut elle ne compte pas.
 - **Pentes > 20°** : nues jusqu'à H6 (lande).
-- **Hameau** : sur la carte réelle, le hameau composé est sur un replat sableux hors du masque
-  de vallée : aucune herbe n'y pousse, la clairière piétinée (règle testée par
-  `CanopyAndClearing`) n'y a donc aucun effet visible.
-- **Coût** : frame p50 +3 à +14 ms selon la vue (lisière en enfilade : 10,7 → 24,7 ms, p95
-  103 ms), mesuré sur une machine partagée — voir `docs/visual/ground-cover-001/README.md`.
-  Leviers non essayés : ombres portées coupées sur l'herbe, LOD0 plus court, touffes LOD2
-  en simple carte, distance de coupe par famille.
+- **Hameau** : sur un replat sableux où l'herbe est rare ; la clairière piétinée (règle testée
+  par `CanopyAndClearing`) n'y a pas d'effet visible.
+- **Incarnation** : +1,4 à 2 s (plan 0,35-0,55 s en parallèle, le reste pour remplir les HISM) ;
+  ~1 M d'instances en mémoire dans tout éditeur ouvert sur `Lvl_AnastasisSlice`.
+- **Temps render thread** non mesuré (`GRenderThreadTime` vaut 0 dans l'éditeur).
 - **Crash Python à la fermeture** des éditeurs de capture (`python311.dll`, après
   `GROUND_CAPTURE_COMPLETE` et `QUIT_EDITOR`) : même signature dans les journaux de
-  `places-capture.py` (world-dressing-claude-01, env-realism-001). Préexistant au modèle de
-  script ; les images sont déjà écrites.
+  `places-capture.py`. Préexistant au modèle de script ; les images sont déjà écrites.

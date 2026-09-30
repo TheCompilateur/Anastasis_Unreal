@@ -16,6 +16,8 @@
 #include "Engine/StaticMesh.h"
 #include "HAL/IConsoleManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "RenderTimer.h"
+#include "DynamicRHI.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WorldView/AnastasisWorldDebugVisual.h"
 
@@ -39,6 +41,11 @@ static TAutoConsoleVariable<int32> CVarMacroForest(
 static TAutoConsoleVariable<int32> CVarGroundCover(
     TEXT("anastasis.Dressing.GroundCover"), 1,
     TEXT("0=sol nu entre les arbres, 1=prairies haute, basse et humide sur les espaces ouverts de la vallee ; applique a l'incarnation."), ECVF_Default);
+
+// Ombres portees des touffes proches (les lointaines n'en portent jamais). Bouton de mesure du cout.
+static TAutoConsoleVariable<int32> CVarGroundCoverShadows(
+    TEXT("anastasis.GroundCover.Shadows"), 1,
+    TEXT("0=herbe sans ombres portees, 1=ombres des touffes proches (< 55 m) ; applique a l'incarnation."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
@@ -549,6 +556,50 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	EmbodyPlaces(PlaceInputs, Places, bPlaces, CanonicalSource, SupersededRuins);
 }
 
+namespace AnastasisGroundCoverEmbody
+{
+/** Ouverture d'une tuile de simulation : ou une prairie a le droit d'exister, avant pente, eau et couronnes. */
+double TileOpenness(AnastasisWorld::ETileType Type)
+{
+	using AnastasisWorld::ETileType;
+	switch (Type)
+	{
+	case ETileType::Grass: case ETileType::Field: return 1.0;
+	// Foret : les couronnes posees excluent deja le sous-bois ; une trouee de foret est une clairiere.
+	case ETileType::Scrub: case ETileType::Forest: return 0.8;
+	// Eau de simulation : le drainage en a rendu l'essentiel a la terre (HYDRO_NETWORK_001) ;
+	// la vraie nappe rendue est refusee par la regle d'eau, pas par le type de tuile.
+	case ETileType::Water: return 0.8;
+	case ETileType::Ruin: return 0.4;
+	// Roche : la lande d'eboulis (H6) viendra ; une prairie n'y est qu'une exception.
+	case ETileType::Stone: return 0.2;
+	default: return 0.0;
+	}
+}
+
+/** Ouverture interpolee entre centres de tuiles : pas de marche de 20 m a la frontiere d'une tuile. */
+double OpennessAt(const AnastasisWorldView::FWorldVisualSnapshot& S, double X, double Y)
+{
+	const double T = AnastasisWorldView::TileWorldSize * S.SpatialScale;
+	const double U = X / T - 0.5, V = Y / T - 0.5;
+	const int32 IX = FMath::FloorToInt(U), IY = FMath::FloorToInt(V);
+	const double FX = U - IX, FY = V - IY;
+	double Sum = 0.0, Weight = 0.0;
+	for (int32 DY = 0; DY <= 1; ++DY)
+	{
+		for (int32 DX = 0; DX <= 1; ++DX)
+		{
+			const AnastasisWorldView::FVisualTile* Tile = AnastasisWorldView::FindTile(S, IX + DX, IY + DY);
+			if (!Tile) continue;
+			const double W = (DX ? FX : 1.0 - FX) * (DY ? FY : 1.0 - FY);
+			Sum += W * TileOpenness(Tile->Type);
+			Weight += W;
+		}
+	}
+	return Weight > 0.0 ? Sum / Weight : 0.0;
+}
+}
+
 void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,
 	const AnastasisPlaces::FPlan& Places, const TArray<FVector>& Canopy, bool bEnabled)
 {
@@ -560,11 +611,15 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 		if (IsValid(M)) M->ClearInstances();
 	}
 	GroundCoverMeshes.RemoveAll([](const TObjectPtr<UHierarchicalInstancedStaticMeshComponent>& M) { return !IsValid(M); });
-	// Le masque des espaces ouverts est la vallee ecrite de Human_Geography_V2 : sans elle, rien a lire.
-	if (!bEnabled || CVarGroundCover.GetValueOnGameThread() == 0 || !CanonicalSource.bHumanGeography)
+	// Le sol rendu est la condition : sans forge active, il n'y a pas de sol ou poser une touffe.
+	const double T = AnastasisWorldView::TileWorldSize * CanonicalSource.SpatialScale;
+	double Probe;
+	const bool bGround = AnastasisTerrainForge::SampleActive((CanonicalSource.OriginX + CanonicalSource.W * 0.5) * T,
+		(CanonicalSource.OriginY + CanonicalSource.H * 0.5) * T, Probe);
+	if (!bEnabled || CVarGroundCover.GetValueOnGameThread() == 0 || !bGround)
 	{
-		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_GROUND_COVER enabled=0 ecology=%d human_geography=%d"),
-			bEnabled, CanonicalSource.bHumanGeography);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_GROUND_COVER enabled=0 ecology=%d rendered_ground=%d"),
+			bEnabled, bGround);
 		return;
 	}
 	const double Start = FPlatformTime::Seconds();
@@ -573,8 +628,13 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 	In.SampleHeight = [](double X, double Y, double& Z) { return AnastasisTerrainForge::SampleActive(X, Y, Z); };
 	In.SampleWaterHeight = [](double X, double Y, double& Z) { return AnastasisTerrainForge::SampleActiveWater(X, Y, Z); };
 	In.SampleWetness = [](double X, double Y, double& W) { return AnastasisDrainage::RiparianAt(X, Y, W); };
-	In.Mask = [&CanonicalSource](double X, double Y) { return AnastasisPlaces::ValleyWeightAt(CanonicalSource, X, Y); };
-	const double T = AnastasisWorldView::TileWorldSize * CanonicalSource.SpatialScale;
+	// Toute la carte : l'ouverture des tuiles, relevee a 1 dans la vallee ecrite (Human_Geography_V2).
+	// v1-v3 ne lisaient que la vallee : les espaces ouverts hors vallees restaient nus.
+	In.Mask = [&CanonicalSource](double X, double Y)
+	{
+		return FMath::Max(AnastasisPlaces::ValleyWeightAt(CanonicalSource, X, Y),
+			AnastasisGroundCoverEmbody::OpennessAt(CanonicalSource, X, Y));
+	};
 	In.Bounds = FBox2D(FVector2D(CanonicalSource.OriginX * T, CanonicalSource.OriginY * T),
 		FVector2D((CanonicalSource.OriginX + CanonicalSource.W) * T, (CanonicalSource.OriginY + CanonicalSource.H) * T));
 	In.Canopy = Canopy;
@@ -593,25 +653,78 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 	}
 	const double PlanMs = (FPlatformTime::Seconds() - Start) * 1000.0;
 
-	// Fondu de distance : M_AnastasisGrass enfonce la touffe vers son pivot entre 70 et 110 m
-	// (FADE_START / FADE_END de create-ground-cover.py) ; au-dela, le HISM ne la soumet plus.
-	// v2 finissait a 75 m : une lisiere d'herbe nette barrait chaque vue a hauteur d'homme.
-	constexpr int32 CullStart = 7000, CullEnd = 11200;
-	TArray<FTransform> Batches[GC::FamilyCount];
-	for (int32 F = 0; F < GC::FamilyCount; ++F) Batches[F].Reserve(Cover.Counts[F]);
-	int32 Missing = 0, Placed = 0;
-	UHierarchicalInstancedStaticMeshComponent* Components[GC::FamilyCount] = {};
+	// ECLAIRCIE DE DISTANCE. Deux tiers par famille (chacun decoupe en tuiles, plus bas) :
+	//   proche   : 1 - FarShare des touffes, ombres portees, fondues vers leur pivot entre 40 et 55 m ;
+	//   lointain : FarShare des touffes, agrandies, sans ombres, fondues entre 70 et 105 m.
+	// Pres de l'oeil, toutes les touffes ; au loin, une sur trois, plus grande : a incidence
+	// rasante les touffes se recouvrent, la couverture a l'ecran tient, et le nombre d'instances
+	// soumises au-dela de 55 m est divise par trois. Les bornes de fondu passent au materiau par
+	// MID (FadeStart / FadeEnd de M_AnastasisGrass) ; la coupe du HISM suit la fin du fondu.
+	constexpr double FarShare = 0.34, FarScale = 1.25;
+	struct FTier { const TCHAR* Suffix; double FadeStart, FadeEnd; int32 CullEnd; bool bShadow; };
+	const bool bShadows = CVarGroundCoverShadows.GetValueOnGameThread() != 0;
+	const FTier Tiers[2] = {{TEXT("Near"), 4000.0, 5500.0, 5700, bShadows}, {TEXT("Far"), 7000.0, 10500.0, 10800, false}};
+
+	// TUILES DE 160 M. v4 posait ~1 M d'instances dans six HISM couvrant toute la carte : +12 ms de
+	// frame (1,5 ms de GPU seulement), les memes dans chaque vue, hameau compris -- le cout suivait
+	// le NOMBRE d'instances, pas ce qui est visible : chaque frame parcourait les six arbres de
+	// clusters entiers. Un HISM par tuile, famille et tier, avec une distance d'affichage de
+	// primitive : le moteur ecarte d'un bloc les tuiles loin de l'oeil, seules les voisines sont
+	// parcourues. La distance est mesuree au centre des bornes : coupe + demi-diagonale.
+	constexpr double ChunkUU = 16000.0;
+	const double ChunkReach = ChunkUU * 0.5 * UE_SQRT_2;
+	UStaticMesh* Meshes[GC::FamilyCount] = {};
+	UMaterialInstanceDynamic* Mids[GC::FamilyCount][2] = {};
 	double MeshRadius[GC::FamilyCount] = {};
+	int32 Missing = 0, Placed = 0, OutsideValley = 0, Chunks = 0;
 	for (int32 F = 0; F < GC::FamilyCount; ++F)
 	{
-		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *GC::MeshPath(static_cast<GC::EFamily>(F)));
-		if (!Mesh) { ++Missing; continue; }
-		const FName Name(*FString::Printf(TEXT("GroundCover_%s"), GC::FamilyName(static_cast<GC::EFamily>(F))));
-		UHierarchicalInstancedStaticMeshComponent* Made = nullptr;
-		for (UHierarchicalInstancedStaticMeshComponent* M : GroundCoverMeshes)
+		Meshes[F] = LoadObject<UStaticMesh>(nullptr, *GC::MeshPath(static_cast<GC::EFamily>(F)));
+		if (!Meshes[F]) { ++Missing; continue; }
+		const FBox Bounds = Meshes[F]->GetBoundingBox();
+		MeshRadius[F] = FVector2D(Bounds.GetExtent().X, Bounds.GetExtent().Y).GetMax();
+		if (UMaterialInterface* Base = Meshes[F]->GetMaterial(0))
 		{
-			if (M->GetFName() == Name) Made = M;
+			for (int32 K = 0; K < 2; ++K)
+			{
+				Mids[F][K] = UMaterialInstanceDynamic::Create(Base, this);
+				Mids[F][K]->SetScalarParameterValue(TEXT("FadeStart"), Tiers[K].FadeStart);
+				Mids[F][K]->SetScalarParameterValue(TEXT("FadeEnd"), Tiers[K].FadeEnd);
+			}
 		}
+	}
+	// Cle : famille, tier, tuile. Ordre de remplissage = ordre du plan : deterministe.
+	const auto KeyOf = [](int32 F, int32 K, int32 CX, int32 CY)
+	{
+		return (static_cast<uint64>(F * 2 + K) << 32) | (static_cast<uint64>(CX & 0xFFFF) << 16) | static_cast<uint64>(CY & 0xFFFF);
+	};
+	TMap<uint64, TArray<FTransform>> Batches;
+	for (const GC::FPlacement& P : Cover.Instances)
+	{
+		const int32 F = static_cast<int32>(P.Family);
+		if (!Meshes[F]) continue;
+		const int32 K = P.Thin < FarShare ? 1 : 0;
+		const double Scale = P.Scale * (K == 1 ? FarScale : 1.0);
+		// La touffe suit 70 % de la pente : l'herbe pousse vers le ciel, mais une touffe
+		// droite sur 20 degres flotterait cote aval. Le reste est rattrape en l'enfoncant.
+		const FVector Up = FMath::Lerp(FVector::UpVector, P.Normal, 0.7).GetSafeNormal();
+		const double Residual = FMath::Acos(FMath::Clamp(FVector::DotProduct(Up, P.Normal), -1.0, 1.0));
+		const double Sink = 2.0 + MeshRadius[F] * Scale * FMath::Tan(Residual);
+		const FQuat Rotation = FQuat::FindBetweenNormals(FVector::UpVector, Up) * FQuat(FVector::UpVector, FMath::DegreesToRadians(P.Yaw));
+		const int32 CX = FMath::FloorToInt(P.Ground.X / ChunkUU), CY = FMath::FloorToInt(P.Ground.Y / ChunkUU);
+		Batches.FindOrAdd(KeyOf(F, K, CX, CY)).Add(FTransform(Rotation, P.Ground - FVector(0, 0, Sink), FVector(Scale)));
+		OutsideValley += AnastasisPlaces::ValleyWeightAt(CanonicalSource, P.Ground.X, P.Ground.Y) < 0.05 ? 1 : 0;
+	}
+	TMap<FName, UHierarchicalInstancedStaticMeshComponent*> Existing;
+	for (UHierarchicalInstancedStaticMeshComponent* M : GroundCoverMeshes) Existing.Add(M->GetFName(), M);
+	int32 PerTier[2] = {};
+	for (TPair<uint64, TArray<FTransform>>& Batch : Batches)
+	{
+		const int32 FK = static_cast<int32>(Batch.Key >> 32), F = FK / 2, K = FK % 2;
+		const int32 CX = static_cast<int16>((Batch.Key >> 16) & 0xFFFF), CY = static_cast<int16>(Batch.Key & 0xFFFF);
+		const FTier& Tier = Tiers[K];
+		const FName Name(*FString::Printf(TEXT("GroundCover_%s_%s_%d_%d"), GC::FamilyName(static_cast<GC::EFamily>(F)), Tier.Suffix, CX, CY));
+		UHierarchicalInstancedStaticMeshComponent* Made = Existing.FindRef(Name);
 		if (!Made)
 		{
 			Made = NewObject<UHierarchicalInstancedStaticMeshComponent>(this,
@@ -623,40 +736,33 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 			Made->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			Made->SetGenerateOverlapEvents(false);
 			Made->SetCanEverAffectNavigation(false);
-			Made->SetCastShadow(true);
 			Made->RegisterComponent();
 			GroundCoverMeshes.Add(Made);
 		}
-		Made->SetStaticMesh(Mesh);
-		Made->SetCullDistances(CullStart, CullEnd);
-		Components[F] = Made;
-		const FBox Bounds = Mesh->GetBoundingBox();
-		MeshRadius[F] = FVector2D(Bounds.GetExtent().X, Bounds.GetExtent().Y).GetMax();
-	}
-	for (const GC::FPlacement& P : Cover.Instances)
-	{
-		const int32 F = static_cast<int32>(P.Family);
-		if (!Components[F]) continue;
-		// La touffe suit 70 % de la pente : l'herbe pousse vers le ciel, mais une touffe
-		// droite sur 20 degres flotterait cote aval. Le reste est rattrape en l'enfoncant.
-		const FVector Up = FMath::Lerp(FVector::UpVector, P.Normal, 0.7).GetSafeNormal();
-		const double Residual = FMath::Acos(FMath::Clamp(FVector::DotProduct(Up, P.Normal), -1.0, 1.0));
-		const double Sink = 2.0 + MeshRadius[F] * P.Scale * FMath::Tan(Residual);
-		const FQuat Rotation = FQuat::FindBetweenNormals(FVector::UpVector, Up) * FQuat(FVector::UpVector, FMath::DegreesToRadians(P.Yaw));
-		Batches[F].Add(FTransform(Rotation, P.Ground - FVector(0, 0, Sink), FVector(P.Scale)));
-	}
-	for (int32 F = 0; F < GC::FamilyCount; ++F)
-	{
-		if (!Components[F] || Batches[F].Num() == 0) continue;
-		Components[F]->AddInstances(Batches[F], false, false, false);
-		Components[F]->MarkRenderStateDirty();
-		Placed += Batches[F].Num();
+		Made->SetStaticMesh(Meshes[F]);
+		Made->SetCastShadow(Tier.bShadow);
+		Made->SetCullDistances(static_cast<int32>(Tier.FadeStart), Tier.CullEnd);
+		Made->LDMaxDrawDistance = static_cast<float>(Tier.CullEnd + ChunkReach);
+		Made->SetCachedMaxDrawDistance(Made->LDMaxDrawDistance);
+		if (Mids[F][K]) Made->SetMaterial(0, Mids[F][K]);
+		Made->AddInstances(Batch.Value, false, false, false);
+		Made->MarkRenderStateDirty();
+		Placed += Batch.Value.Num();
+		PerTier[K] += Batch.Value.Num();
+		++Chunks;
 	}
 	UE_LOG(LogAnastasis_UnrealV2, Display,
-		TEXT("ANASTASIS_GROUND_COVER enabled=1 tall=%d short=%d sedge=%d placed=%d candidates=%d refused_mask=%d refused_ground=%d refused_water=%d refused_slope=%d refused_canopy=%d refused_density=%d crowns=%d clearings=%d truncated=%d missing_meshes=%d plan_ms=%.1f total_ms=%.1f"),
-		Cover.Counts[0], Cover.Counts[1], Cover.Counts[2], Placed, Cover.Candidates, Cover.RejectedMask, Cover.RejectedGround,
-		Cover.RejectedWater, Cover.RejectedSlope, Cover.RejectedCanopy, Cover.RejectedDensity, Canopy.Num(), In.Clearings.Num(),
-		Cover.bTruncated, Missing, PlanMs, (FPlatformTime::Seconds() - Start) * 1000.0);
+		TEXT("ANASTASIS_GROUND_COVER enabled=1 tall=%d short=%d sedge=%d placed=%d near=%d far=%d chunks=%d outside_valley=%d shadows=%d candidates=%d refused_mask=%d refused_ground=%d refused_water=%d refused_slope=%d refused_canopy=%d refused_density=%d crowns=%d clearings=%d truncated=%d missing_meshes=%d plan_ms=%.1f total_ms=%.1f"),
+		Cover.Counts[0], Cover.Counts[1], Cover.Counts[2], Placed, PerTier[0], PerTier[1], Chunks, OutsideValley, bShadows,
+		Cover.Candidates, Cover.RejectedMask, Cover.RejectedGround, Cover.RejectedWater, Cover.RejectedSlope,
+		Cover.RejectedCanopy, Cover.RejectedDensity, Canopy.Num(), In.Clearings.Num(), Cover.bTruncated, Missing,
+		PlanMs, (FPlatformTime::Seconds() - Start) * 1000.0);
+}
+
+FVector AAnastasisWorldEmbodiment::GetFrameTimingsMs() const
+{
+	return FVector(FPlatformTime::ToMilliseconds(GGameThreadTime), FPlatformTime::ToMilliseconds(GRenderThreadTime),
+		FPlatformTime::ToMilliseconds(RHIGetGPUFrameCycles(0)));
 }
 
 bool AAnastasisWorldEmbodiment::ComposePlaces(const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop,

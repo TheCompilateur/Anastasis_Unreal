@@ -1,7 +1,7 @@
-# GROUND_COVER_001 -- A/B de la strate herbacee (anastasis.Dressing.GroundCover 1 puis 0) aux
-# memes cameras, dans la meme session. Voir ground-cover-capture.py.
+# GROUND_COVER_001 -- A/B de la strate herbacee aux memes cameras, dans la meme session.
+# -States "on,off" (defaut) ; "on,noshadow,off" mesure aussi le cout des ombres. Voir ground-cover-capture.py.
 # Sortie : Saved\GroundCoverEvidence\<Label>\<vue>_<on|off>.png + ground-cover.json
-param([string]$Label='latest', [int]$TimeoutSec=1500)
+param([string]$Label='latest', [string]$States='on,off', [int]$TimeoutSec=1500)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
@@ -11,6 +11,7 @@ New-Item -ItemType Directory -Force $dir | Out-Null
 $log=Join-Path $dir 'capture.log'
 if(Test-Path $log){Remove-Item $log}
 $env:ANASTASIS_GROUND_OUT=$dir
+$env:ANASTASIS_GROUND_STATES=$States
 $py=(Join-Path $Root 'tools\unreal\ground-cover-capture.py').Replace('\','/')
 $launchArgs=@(
  ('"'+(Join-Path $Root 'Anastasis_UnrealV2.uproject')+'"'),
@@ -24,7 +25,7 @@ $p=Start-AnastasisEditor $Editor $launchArgs
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
 $p.Refresh()
 if(-not $p.HasExited){ Stop-Process -Id $p.Id -Force; throw 'CAPTURE::FAIL editeur bloque' }
-Select-String -Path $log -Pattern 'ANASTASIS_GROUND_COVER |ANASTASIS_ECOLOGY_COST|GROUND_CAPTURE|GROUND_SHOT' |
+Select-String -Path $log -Pattern 'ANASTASIS_GROUND_COVER |GROUND_CAPTURE|GROUND_SHOT' |
   ForEach-Object { ($_.Line -replace '^\[[^\]]*\]\[[ 0-9]*\]','') } | Select-Object -Unique
 if(-not (Select-String -Path $log -Pattern 'GROUND_CAPTURE_COMPLETE' -Quiet)){ throw 'CAPTURE::FAIL capture incomplete' }
 Write-Output ('CAPTURE::PASS ' + $dir)

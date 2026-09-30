@@ -92,6 +92,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Places")
 	TArray<FString> GetPlaceReport() const { return PlaceReport; }
 
+	/**
+	 * GROUND_COVER_001, metrologie : temps game thread, render thread et GPU de la derniere frame
+	 * (ms), ceux de stat unit. La duree de frame de l'editeur mesure surtout la charge des autres
+	 * processus de la machine ; ces trois-la mesurent ce que la scene coute.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Anastasis|Metrology")
+	FVector GetFrameTimingsMs() const;
+
 protected:
 	/** Lieux composes (AnastasisPlaces) : un HISM par piece, transitoires, rebatis a chaque incarnation. */
 	UPROPERTY()

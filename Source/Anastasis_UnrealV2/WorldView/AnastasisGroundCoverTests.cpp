@@ -39,8 +39,11 @@ bool FAnastasisGroundCoverDeterminism::RunTest(const FString&)
 	for (int32 I = 0; bSame && I < A.Instances.Num(); ++I)
 	{
 		bSame = A.Instances[I].Ground.Equals(B.Instances[I].Ground, 0.0) && A.Instances[I].Family == B.Instances[I].Family
-			&& A.Instances[I].Yaw == B.Instances[I].Yaw && A.Instances[I].Scale == B.Instances[I].Scale;
+			&& A.Instances[I].Yaw == B.Instances[I].Yaw && A.Instances[I].Scale == B.Instances[I].Scale
+			&& A.Instances[I].Thin == B.Instances[I].Thin && A.Instances[I].Thin >= 0.0 && A.Instances[I].Thin < 1.0;
 	}
+	// Build est parallele (une rangee de blocs par tache) : deux passes egales prouvent aussi que
+	// la fusion ne depend pas de l'ordonnancement.
 	TestTrue(TEXT("identical plans"), bSame);
 
 	AnastasisGroundCover::FInputs Other = In;

@@ -57,8 +57,8 @@ struct FSettings
 	double CanopyExclusion = 0.8;
 	double ScaleMin = 0.8;
 	double ScaleMax = 1.2;
-	/** Garde-fou de cout : au-dela, la passe s'arrete et le dit. */
-	int32 MaxInstances = 450000;
+	/** Garde-fou de cout : au-dela, la passe s'arrete et le dit. Toute la carte : ~1 M attendu. */
+	int32 MaxInstances = 1500000;
 };
 
 /** Zone pietinee (hameau) : densite multipliee par Keep, herbe rase seulement. */
@@ -97,6 +97,8 @@ struct FPlacement
 	double SlopeDegrees = 0.0;
 	double Wetness = 0.0;
 	EFamily Family = EFamily::MeadowTall;
+	/** Tirage [0,1) propre a la touffe : decide si elle reste visible au loin (eclaircie de distance). */
+	double Thin = 0.0;
 };
 
 struct FPlan
