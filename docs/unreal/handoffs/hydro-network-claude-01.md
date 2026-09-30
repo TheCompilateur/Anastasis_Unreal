@@ -24,6 +24,10 @@ BRANCH_HEAD
 ## MEC
 
 - BUILD: `BUILD::PASS` (`tools\unreal\anastasis-unreal.ps1 build`, worktree, code final)
+- UNITY: prouvé après commit — `Build.bat` direct, fichiers touchés sans changement de contenu,
+  aucune exclusion adaptative, `Module.Anastasis_UnrealV2.1.cpp` recompilé, `Result: Succeeded`.
+  Les helpers vivent dans `AnastasisDrainage::Detail` (pas d'espace anonyme : pas de collision
+  de `SmoothStep` avec TERRAIN_FORGE dans un même lot unity).
 - TESTS: `TESTS::PASS` — 135 PASS / 4 KNOWN_EXPECTED_FAILURE / 0 FAIL, 139 annoncés
   (`tools\unreal\report-tests.ps1`), dont les nouveaux :
   - PASS `Anastasis.Terrain.Drainage.Network` (HG actif : tous les contrôles à 0, containment ≥ 0.9, clairsemé, Strahler ≥ 2, largeur et eau décroissantes de la source à l'embouchure)
