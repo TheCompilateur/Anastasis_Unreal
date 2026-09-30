@@ -107,6 +107,9 @@ protected:
 	// Keep constructor-created subobjects on reload; rebuild generated dressing instead.
 	UPROPERTY(Transient)
 	TObjectPtr<UProceduralMeshComponent> ExperimentalSurface;
+	/** HORIZON_RING_001 : terrain lointain raccorde au bord forge, sans collision. */
+	UPROPERTY(Transient)
+	TObjectPtr<UProceduralMeshComponent> HorizonSurface;
 	UPROPERTY(Transient)
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> TerrainMeshes[7];
 

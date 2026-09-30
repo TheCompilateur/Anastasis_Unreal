@@ -233,6 +233,7 @@ Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
 | `shore-capture.ps1` + `shore-capture.py` | A/B visuel du bord d'eau, cadrage sur une rive |
 | `capture-terrain-forge.ps1` + `terrain-forge-capture.py` | captures avant/après du relief → `Saved/TerrainForgeEvidence/` |
 | `capture-terrain-relief.ps1` + `terrain-relief-capture.py` | avant/après d'une étape de la forge de relief (`-Step 1/2/3/scale`), dressing masqué → `Saved/TerrainReliefEvidence/` |
+| `capture-horizon.ps1` + `capture-horizon.py` | A/B de l'horizon (`anastasis.Terrain.Horizon` 0 puis 1), cinq vues calées sur la carte, part de pixels « vide » par image ; `-PreCmds` pour l'étape brume → `Saved/HorizonEvidence/<Label>/` |
 | `capture-places.ps1` + `places-capture.py` | lieux composés (`AnastasisPlaces`) : vue lointaine et vues à 1,7 m par lieu, lieux actifs puis coupés aux mêmes caméras (`-OnOnly`, `-All`) → `Saved/PlacesEvidence/<Label>/` |
 | `capture-human-geography.py` | comparaison du relief corrige et de Human_Geography_V2 : export des maillages et vues a 170 cm ; sortie via ANASTASIS_HUMAN_EVIDENCE ; ferme l'editeur dedie |
 | `capture-macro-forest.py` | A/B forestier sur Human_Geography_V2, ouverture par defaut, empreintes des instances et du terrain ; sortie via ANASTASIS_FOREST_OUT ; aucun asset sauve |
