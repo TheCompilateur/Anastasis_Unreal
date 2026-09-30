@@ -141,7 +141,7 @@ bool FAnastasisMacroForestHabitat::RunTest(const FString&)
     constexpr double TileUU=AnastasisWorldView::TileWorldSize;
     H.Basin = FVector(48*TileUU,48*TileUU,800);
     H.SampleHeight = [](double X,double Y,double& Z) { Z=800; return X>=TileUU*0.5 && Y>=TileUU*0.5 && X<=TileUU*95.5 && Y<=TileUU*95.5; };
-    FPlan P, Repeat;
+    AnastasisEcologicalDressing::FPlan P, Repeat;
     FString E;
     TestTrue(TEXT("rendered upland rock habitat"),Build(S,C,P,E,&H));
     TestTrue(TEXT("mountain forest reachable beyond semantic forest"),P.Instances.Num()>100);
@@ -203,7 +203,7 @@ bool FAnastasisMacroForestCanonical::RunTest(const FString&)
         H.Basin=FVector(M.BasinX,M.BasinY,M.BasinZ);
         H.bHasBasin=M.bBasinFound;
         FAnastasisForestDressingSettings C;
-        FPlan P, B;
+        AnastasisEcologicalDressing::FPlan P, B;
         FString E;
         TestTrue(TEXT("macro build"),Build(S,C,P,E,&H));
         TestTrue(TEXT("macro repeat"),Build(S,C,B,E,&H));
