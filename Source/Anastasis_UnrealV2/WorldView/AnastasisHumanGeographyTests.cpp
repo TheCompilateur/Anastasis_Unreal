@@ -185,6 +185,9 @@ bool FHumanGeographyCollision::RunTest(const FString&)
     for(auto* H:HISMs)
     {
         if(H->GetName().StartsWith(TEXT("Tiles_"))){if(H->GetCollisionEnabled()!=ECollisionEnabled::NoCollision)++HiddenColliders;continue;}
+        // Lieux composes (AnastasisPlaces) : leur echelle est une taille en metres sur des meshes
+        // normalises a 1 m (un chene de 21 m = echelle 21), constante, sans lien avec SpatialScale.
+        if(H->GetName().StartsWith(TEXT("Place_"))){Instances+=H->GetInstanceCount();continue;}
         Instances+=H->GetInstanceCount();
         for(int32 I=0;I<H->GetInstanceCount();++I){FTransform T;H->GetInstanceTransform(I,T,true);MaxObjectScale=FMath::Max(MaxObjectScale,T.GetScale3D().GetMax());}
     }

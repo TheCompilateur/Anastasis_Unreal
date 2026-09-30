@@ -5,7 +5,7 @@
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisTerrainForge.h"
 #include "WorldView/AnastasisHumanGeography.h"
-
+#include "WorldView/AnastasisPlaces.h"
 
 #include "Anastasis_UnrealV2.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
@@ -22,6 +22,11 @@ static TAutoConsoleVariable<int32> CVarHumanGeography(TEXT("anastasis.Terrain.Hu
 static TAutoConsoleVariable<int32> CVarEcologicalDressing(
     TEXT("anastasis.Dressing.Ecology"), 1,
     TEXT("0=legacy tile dressing, 1=forest grammar on continuous terrain; applied on embodiment."), ECVF_Default);
+
+// WORLD_DRESSING_01. Coupable pour les captures A/B : meme monde, meme dressing, sans les lieux.
+static TAutoConsoleVariable<int32> CVarPlaces(
+    TEXT("anastasis.Dressing.Places"), 1,
+    TEXT("0=aucun lieu compose, 1=lieux lus dans la geographie (source, col, guet, hameau...) ; applique a l'incarnation."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
@@ -289,6 +294,12 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	int32 UngroundedTiles = 0;
     const double DressingStart = FPlatformTime::Seconds();
     const bool bEcology = SurfaceCrop && ForestDressing.bEnabled && CVarEcologicalDressing.GetValueOnGameThread() != 0;
+    // Les lieux sont composes AVANT le dressing par tuile : une ruine composee (hameau,
+    // vestiges) remplace le moignon generique de ses tuiles au lieu de s'y superposer.
+    AnastasisPlaces::FInputs PlaceInputs;
+    AnastasisPlaces::FPlan Places;
+    const bool bPlaces = ComposePlaces(SurfaceCrop, CanonicalSource, PlaceInputs, Places);
+    int32 SupersededRuins = 0;
     TSet<UHierarchicalInstancedStaticMeshComponent*> Prepared;
     auto Prepare = [&](const AnastasisPresentation::FResolvedPresentation& R)
     {
@@ -316,6 +327,11 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	{
 		const AnastasisWorldView::FVisualTile& SourceTile = Snapshot.Tiles[Index];
         if (bEcology && SourceTile.Type == AnastasisWorld::ETileType::Forest) continue;
+        if (bPlaces && SourceTile.Type == AnastasisWorld::ETileType::Ruin && AnastasisPlaces::SupersedesTile(Places, SourceTile.SourceIndex))
+        {
+            ++SupersededRuins;
+            continue;
+        }
 		AnastasisPresentation::FResolvedPresentation Resolved;
 		if (!AnastasisPresentation::ResolvePresentation(
 				Plan.Types[Index], Seed, SourceTile.X, SourceTile.Y, Resolved))
@@ -476,6 +492,56 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	UE_LOG(LogAnastasis_UnrealV2, Display,
 		TEXT("ANASTASIS_DRESSING ground=%s instances=%d refused_ungrounded=%d"),
 		SurfaceCrop ? TEXT("surface") : TEXT("slab"), DressingInstanceCount, UngroundedTiles);
+	EmbodyPlaces(PlaceInputs, Places, bPlaces, CanonicalSource, SupersededRuins);
+}
+
+bool AAnastasisWorldEmbodiment::ComposePlaces(const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop,
+	const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource, AnastasisPlaces::FInputs& In, AnastasisPlaces::FPlan& Places)
+{
+	In.Source = &CanonicalSource;
+	// Le sol et l'eau REELLEMENT rendus : un lieu se lit sur ce qu'on voit, pas sur la tuile.
+	In.Ground = [SurfaceCrop](double X, double Y, double& Z)
+	{
+		return AnastasisTerrainForge::SampleActive(X, Y, Z)
+			|| (SurfaceCrop && AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, X, Y, Z));
+	};
+	In.Water = [](double X, double Y, double& Z) { return AnastasisTerrainForge::SampleActiveWater(X, Y, Z); };
+	// Bassin et point haut ne valent que si la forge a tourne pour CETTE incarnation :
+	// forge coupee, les membres gardent les valeurs du passage precedent.
+	double Probe = 0.0;
+	const bool bForged = AnastasisTerrainForge::SampleActive(ForgeLandmark.X, ForgeLandmark.Y, Probe);
+	In.bLandmark = bForged && !ForgeLandmark.IsZero();
+	In.Landmark = ForgeLandmark;
+	In.bBasin = bForged && !ForgeBasin.IsZero();
+	In.Basin = ForgeBasin;
+	FString Error;
+	const bool bEnabled = SurfaceCrop && bComposePlaces && CVarPlaces.GetValueOnGameThread() != 0;
+	if (bEnabled && !AnastasisPlaces::Compose(In, Places, Error))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_PLACES rejected=%s"), *Error);
+	}
+	return bEnabled;
+}
+
+void AAnastasisWorldEmbodiment::EmbodyPlaces(const AnastasisPlaces::FInputs& In, const AnastasisPlaces::FPlan& Places,
+	bool bEnabled, const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource, int32 SupersededRuins)
+{
+	PlaceReport.Reset();
+	// Plan vide si coupe : Embody vide alors les composants du passage precedent.
+	const AnastasisPlaces::FEmbodyResult Result = AnastasisPlaces::Embody(*this, Places, In, BaseShapeMaterial, PlaceMeshes);
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_PLACES enabled=%d places=%d pieces=%d instances=%d components=%d ungrounded=%d missing_meshes=%d superseded_ruin_tiles=%d missing=[%s]"),
+		bEnabled, Places.Places.Num(), Places.Pieces.Num(), Result.Instances, PlaceMeshes.Num(), Result.Ungrounded,
+		Result.MissingMeshes, SupersededRuins, *FString::Join(Places.Missing, TEXT(",")));
+	const double T = AnastasisWorldView::TileWorldSize * CanonicalSource.SpatialScale;
+	for (int32 I = 0; I < Places.Places.Num(); ++I)
+	{
+		const AnastasisPlaces::FPlace& P = Places.Places[I];
+		const FVector L = Result.PlaceLocations.IsValidIndex(I) ? Result.PlaceLocations[I] : FVector(P.Center, 0.0);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLACE id=%s name=\"%s\" at=(%.0f,%.0f,%.0f) tile=(%.1f,%.1f) radius_uu=%.0f pieces=%d"),
+			*P.Id, *P.Name, L.X, L.Y, L.Z, P.Center.X / T, P.Center.Y / T, P.Radius, P.NumPieces);
+		PlaceReport.Add(FString::Printf(TEXT("%s|%.0f|%.0f|%.0f|%.0f"), *P.Id, L.X, L.Y, L.Z, P.Radius));
+	}
 }
 
 bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 OriginY, int32 Width, int32 Height)
