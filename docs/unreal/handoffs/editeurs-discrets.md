@@ -17,11 +17,14 @@ agent n'envoyait de fermeture (verifie : ni taskkill, ni CloseMainWindow, ni com
   lance le gardien ; rend un `System.Diagnostics.Process` (handle garde : ExitCode lisible)
 - `tools/unreal/editor-window-guard.ps1` (nouveau) -- fenetres du processus hors ecran, au fond, sans
   activation, y compris les tardives ; rend le focus a la fenetre de l'utilisateur (AttachThreadInput)
-- 16 lancements convertis dans 15 scripts : `anastasis-unreal.ps1` (verify, editor), `report-tests.ps1`,
+- 17 lancements convertis dans 16 scripts : `anastasis-unreal.ps1` (verify, editor), `report-tests.ps1`,
   `capture-slice`, `capture-places`, `capture-reed-form`, `capture-shore-reeds`, `capture-terrain-forge`,
   `capture-terrain-relief`, `capture-tree-lineup`, `ground-material`, `measure-tree-cost`, `probe-demo`,
-  `shore-capture`, `shore-water`, `world-dressing-01`
-- `AGENTS.md` -- section « Éditeurs discrets », index des deux nouveaux scripts
+  `shore-capture`, `shore-water`, `world-dressing-01`, et `capture-horizon` (arrive de main pendant
+  l'integration, avec un Start-Process)
+- `tools/unreal/agent-worktree.ps1` -- `finish` refuse tout lancement d'Unreal hors `Start-AnastasisEditor`
+  (`Find-RawEditorLaunch`). Teste : 0 dans ce worktree, 17 sur 17 sur main avant integration.
+- `AGENTS.md` -- section « Éditeurs discrets », index des deux nouveaux scripts, table des commandes
 
 ## COMMIT
 
@@ -62,7 +65,9 @@ N/A -- PLAYER non touche.
 - Une boite de dialogue modale est desormais hors ecran : un editeur qui en attend une expire au
   timeout de son script au lieu d'etre vue. `ANASTASIS_EDITOR_VISIBLE=1` pour la voir.
 - La fenetre principale peut rester ~1,6 s a l'ecran quand l'editeur tarde a traiter le deplacement.
-- Tout nouveau lanceur doit utiliser `Start-AnastasisEditor` ; rien ne l'impose encore mecaniquement.
+- Tout nouveau lanceur doit utiliser `Start-AnastasisEditor` : `finish` l'impose dans `tools/unreal/`.
+  Une branche integree sans passer par `finish` (ou une integration de plusieurs branches) peut encore
+  en apporter un ; relancer `Find-RawEditorLaunch` sur le resultat.
 - Hors perimetre, observe : un run temoin a echoue par `E_OUTOFMEMORY` a la creation du swapchain
   D3D12 alors que trois editeurs d'agents et deux builds tournaient en parallele. L'editeur de
   `env-realism-001` (PID 652) est reste bloque sur une fenetre « Error » pendant toute la mission.

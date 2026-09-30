@@ -89,3 +89,16 @@ function Start-AnastasisEditor {
   Start-Process powershell.exe -WindowStyle Hidden -ArgumentList $guardArgs | Out-Null
   return $p
 }
+
+# Lancements d'Unreal qui contournent Start-AnastasisEditor dans tools/unreal/. Appele par
+# `agent-worktree.ps1 finish`, qui refuse la passation s'il en trouve : une heure apres
+# l'ecriture de cette regle, capture-horizon.ps1 arrivait sur main avec un Start-Process.
+function Find-RawEditorLaunch([string]$Root) {
+  $skip = @('editor-launch.ps1', 'editor-window-guard.ps1')
+  # Chemin entre guillemets (avec espaces : 'C:\Program Files\...'), chemin nu, ou variable $Editor.
+  $pattern = 'Start-Process\s+(''[^'']*UnrealEditor|"[^"]*UnrealEditor|\S*UnrealEditor|\$editor\b)'
+  foreach ($f in Get-ChildItem (Join-Path $Root 'tools\unreal') -Filter *.ps1 -File) {
+    if ($skip -contains $f.Name) { continue }
+    Select-String -LiteralPath $f.FullName -Pattern $pattern | ForEach-Object { "$($f.Name):$($_.LineNumber)" }
+  }
+}

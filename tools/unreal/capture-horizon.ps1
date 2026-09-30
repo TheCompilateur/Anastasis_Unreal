@@ -6,6 +6,7 @@
 # l'anneau reste la seule variable entre A et B, ou fixer -States B pour un seul etat).
 param([string]$Label='ring', [string]$PreCmds='', [ValidateSet('AB','B')][string]$States='AB', [int]$TimeoutSec=480)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 $Editor='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $dir=Join-Path $Root "Saved\HorizonEvidence\$Label"
@@ -28,7 +29,7 @@ foreach ($state in $plan) {
   ('-abslog="'+$log+'"'),
   ('-ExecCmds="py '+$py+'"')
  )
- $p=Start-Process $Editor -ArgumentList $launchArgs -PassThru
+ $p=Start-AnastasisEditor $Editor $launchArgs
  $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
  $p.Refresh()
  if(-not $p.HasExited){ Stop-Process -Id $p.Id -Force; throw "CAPTURE::FAIL editeur bloque ($($state[1]))" }

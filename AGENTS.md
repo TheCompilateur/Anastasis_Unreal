@@ -53,7 +53,7 @@ Cycle de vie, un outil unique : `tools\unreal\agent-worktree.ps1`
 |---|---|
 | `create -Mission <m>` | branche + worktree depuis `main`, port MCP du worktree enregistré |
 | `status` | tous les worktrees : modifications, avance/retard sur `main`, branches non intégrées |
-| `finish -Mission <m>` | portail de fin : index `tools/unreal/` à jour, build + `report-tests`, refuse de passer la main si du travail n'est pas commité |
+| `finish -Mission <m>` | portail de fin : index `tools/unreal/` à jour, aucun Unreal lancé hors `Start-AnastasisEditor`, build + `report-tests`, refuse de passer la main si du travail n'est pas commité |
 | `mcp -Mission <m>` | (ré)enregistre le port MCP d'un worktree existant côté Claude Code |
 | `integrate -Mission <m>` | rôle intégrateur : refuse si le canonique est sale, puis avance rapide de `main` |
 | `preflight` | avant un `verify`/seal : dit ce qui bloque et **ouvre une fenêtre** d'observation |
@@ -205,7 +205,7 @@ dont deux `report-tests`). Signature dans le log : `Window '… - Unreal Editor'
 `Cmd: QUIT_EDITOR`. Ce n'est ni un crash ni un test : relancer, ne pas chercher de régression.
 
 Tout lancement d'Unreal passe donc par `Start-AnastasisEditor` (`editor-launch.ps1`), jamais par
-`Start-Process` :
+`Start-Process` — `agent-worktree.ps1 finish` refuse la passation sinon (`Find-RawEditorLaunch`) :
 
 - la première fenêtre s'affiche **sans prendre le focus** ;
 - un gardien caché (`editor-window-guard.ps1`) envoie chaque fenêtre du processus hors de l'écran, au fond
