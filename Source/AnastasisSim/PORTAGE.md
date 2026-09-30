@@ -199,6 +199,19 @@ elles restent au plancher. Le monde généré reste immuable : le village tient 
 tuiles récoltées (`LiveTileAt`). L'extension food-supply-001 (non fidèle) cohabite pour les autres
 habitants.
 
+### Fait — la repousse des champs, et l'endurance (mission field-regrow-001)
+
+| Unreal | Source JS (`fee66ae`) | Preuve |
+| --- | --- | --- |
+| `Work/AnastasisFields.h/.cpp` | `simulation.js` regrowFieldsDaily, regrowFieldTile, FIELD_FOOD_CAP / FIELD_REGEN_PER_DAY ; `fieldCrops.js` fieldSeasonRegenAmount, dailyChance, rotateFieldCropId, ensureFieldCropReady | `Parite.Repousse`, 686 vecteurs |
+| `Village/AnastasisVillage.*` (ajout) | regrowFieldsDaily sur l'état vivant des tuiles | `Village.Repousse.*` |
+| `Sim/AnastasisSimulation.*` (ajout) | `enqueueDayDeferred` : `landRegen` en tête (regrowForestDaily sans effet dans la référence) | `Village.Repousse.Hote` |
+
+`Anastasis.Sim.Village.Endurance` fait vivre puits, maison, grenier et fermiers 8 jours : la
+nourriture est conservée, personne n'a faim, et la limite de la table réduite apparaît — sans
+`socialize`, la solitude devient critique au jour 3 et le travail s'arrête. Détail :
+`docs/unreal/FIELD_REGROW_001.md`.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules
