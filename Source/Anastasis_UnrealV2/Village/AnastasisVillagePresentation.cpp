@@ -224,6 +224,14 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 			0.f);
 	}
 
+	for (const auto& S : Village.GetFoodSources())
+	{
+		const FVector Base = SimToUnreal(SimWorld, S.Position.X, S.Position.Y, World);
+		const FColor Color = S.Remaining > 0 ? FColor::Green : FColor(130, 90, 60);
+		DrawDebugCylinder(World, Base, Base + FVector(0,0,80), 160, 16, Color, false, 0.f, 0, 4.f);
+		DrawDebugString(World, Base + FVector(0,0,180), FString::Printf(TEXT("Cueillette %d/%d%s"), S.Remaining, S.Initial, S.Remaining == 0 ? TEXT(" - epuisee") : TEXT("")), nullptr, Color, 0.f);
+	}
+
 	for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
 	{
 		const FVector Pos = SimToUnreal(SimWorld, Npc.X, Npc.Y, World) + FVector(0, 0, Tile * 0.25);
@@ -233,6 +241,11 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 			? FColor(80, 120, 255)
 			: FLinearColor::LerpUsingHSV(FLinearColor::Green, FLinearColor::Red, Thirst01).ToFColor(true);
 		DrawDebugSphere(World, Pos, Tile * (Npc.Inside.bActive ? 0.1 : 0.18), 10, Color, false, 0.f, 0, 3.f);
+		if (Npc.InventoryFood > 0)
+		{
+			DrawDebugBox(World, Pos + FVector(60,0,40), FVector(30,30,30), FColor::Yellow, false, 0.f, 0, 4.f);
+			DrawDebugString(World, Pos + FVector(0,0,180), FString::Printf(TEXT("Sac: %d portions"),Npc.InventoryFood), nullptr,FColor::Yellow,0.f);
+		}
 		if (Npc.bHasTarget)
 		{
 			DrawDebugLine(World, Pos, SimToUnreal(SimWorld, Npc.Target.X, Npc.Target.Y, World) + FVector(0, 0, Tile * 0.25), Color, false, 0.f, 0, 2.f);

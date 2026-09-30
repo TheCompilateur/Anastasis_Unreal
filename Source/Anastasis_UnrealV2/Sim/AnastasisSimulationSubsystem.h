@@ -51,6 +51,7 @@ public:
 	 * reference, un habitant qui a un foyer va manger chez lui (HOUSE -> eat).
 	 */
 	FString SeedFirstGranary(int32 NpcCount, int32 Food, int32 TileX, int32 TileY);
+	bool SeedFoodSupply();
 
 	/** Reflete les batiments de la simulation en acteurs. Appele a chaque Tick. */
 	int32 SyncVillagePresentation();
@@ -100,4 +101,8 @@ public:
 	/** Total des repas confirmes par les habitants presents, -1 sans hote. */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static int32 CountMealsTaken(const UObject* WorldContextObject);
+
+	/** Read-only finite-food accounting for PIE evidence. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetFoodSupplyStatus(const UObject* WorldContextObject);
 };

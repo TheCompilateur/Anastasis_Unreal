@@ -22,6 +22,16 @@
 //   inventaire +1 -1, satisfyEat
 //   building.stock.food.physical baisse ; npc.hunger baisse
 //
+// FOOD SUPPLY (food-supply-001), extension opt-in : ActivateFoodSource lit une
+// tuile Food generee et ouvre un registre fini (la generation reste immuable).
+// Perception locale -> gatherFood (3 s, 2 portions) -> inventaire -> deliver
+// au seuil du grenier -> CreditFood accepte / debit du sac -> repas reserve.
+// Ecarts explicites : pas de craft session / outil / metier / progression JS ;
+// scores bornes de collecte/livraison (85 et 100+5*sac), pas de regeneration.
+// Ce circuit est une extension deterministe, PAS un portage de trajectoire JS.
+// Quand une source est active, manger dedans exige une reservation : le repas
+// a vide de la reference ne doit pas masquer une rupture d'approvisionnement.
+//
 // La maison apporte le mecanisme d'INTERIEUR (enterBuilding / updateInside /
 // exitBuilding) que reutiliseront manger, se soulager, se detendre, socialiser.
 // Elle apporte aussi le foyer (npc.home, npc.shelter, proprietaire, capacite)
@@ -182,6 +192,16 @@ namespace AnastasisVillage
 		int32 FoodAvailable() const { return FMath::Max(0, FoodPhysical - FoodReserved); }
 	};
 
+	/** Finite food ledger over an immutable generated tile. Only this ledger is consumed.
+	 * No regrowth; reactivating a tile never refills it. */
+	struct FFoodSource
+	{
+		int32 TileIndex = INDEX_NONE;
+		FPoint Position;
+		int32 Initial = 0;
+		int32 Remaining = 0;
+	};
+
 	/** Une portion reservee (`sim.mealReservations.byId[...]`). */
 	struct FMealReservation
 	{
@@ -315,6 +335,11 @@ namespace AnastasisVillage
 
 		/** `npc.inventory.food`. */
 		int32 InventoryFood = 0;
+		int32 GatheredFood = 0;
+		int32 DeliveredFood = 0;
+		int32 FoodSourceIndex = INDEX_NONE;
+		/** Locally perceived source quantities; zero means observed exhausted. */
+		TMap<int32, int32> KnownFoodSources;
 		FHungerAction HungerAction;
 		/** `mind.beliefs.knownStocks`, dans l'ordre d'insertion (celui d'un objet JS). */
 		TArray<FStockBelief> KnownStocks;
@@ -410,6 +435,10 @@ namespace AnastasisVillage
 		/** `creditStock(building, "food", n)` — respecte la capacite. Rend la quantite ajoutee. */
 		int32 CreditFood(const FString& BuildingId, int32 Amount);
 
+		/** Activate an existing generated Food tile, once; no injected stock. */
+		bool ActivateFoodSource(int32 TileX, int32 TileY);
+		const TArray<FFoodSource>& GetFoodSources() const { return FoodSources; }
+
 		/** Registre des reservations, dans l'ordre d'insertion. */
 		const TArray<FMealReservation>& GetMealReservations() const { return MealReservations; }
 		const FMealReservation* FindMealReservation(const FString& NpcId) const;
@@ -449,6 +478,10 @@ namespace AnastasisVillage
 	private:
 		void UpdateNpc(FNpc& Npc, double Dt);
 		void ChooseGoal(FNpc& Npc);
+		bool FoodSupplyTarget(FNpc& Npc, FPoint& Out, FString& Source);
+		bool PerformFoodSupply(FNpc& Npc);
+		bool HasKnownFoodSource(const FNpc& Npc) const;
+		const FBuilding* KnownFoodDepot(const FNpc& Npc) const;
 		void CommitGoal(FNpc& Npc, const FString& Next, FDecisionTrace& Trace);
 		bool AssignTarget(FNpc& Npc, FDecisionTrace& Trace);
 
@@ -531,6 +564,7 @@ namespace AnastasisVillage
 		double Now = 0.0;
 		/** `sim.mealReservations` : ordre d'insertion = ordre de `Object.keys`. */
 		TArray<FMealReservation> MealReservations;
+		TArray<FFoodSource> FoodSources;
 		int32 MealSeq = 0;
 		double ReservationSweepAt = 0.0;
 		TAnastasisEntityTable<FBuilding> Buildings;
