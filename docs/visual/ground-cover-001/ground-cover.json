@@ -1,0 +1,72 @@
+{
+ "prairie_eye_on": {
+  "frame_ms_p50": 17.38150045275688,
+  "frame_ms_p95": 37.8699004650116,
+  "frames": 677
+ },
+ "prairie_low_on": {
+  "frame_ms_p50": 20.073700696229935,
+  "frame_ms_p95": 48.69190230965614,
+  "frames": 189
+ },
+ "riviere_eye_on": {
+  "frame_ms_p50": 19.814200699329376,
+  "frame_ms_p95": 40.958501398563385,
+  "frames": 221
+ },
+ "lisiere_eye_on": {
+  "frame_ms_p50": 24.71039816737175,
+  "frame_ms_p95": 103.48080098628998,
+  "frames": 134
+ },
+ "vallee_b_eye_on": {
+  "frame_ms_p50": 17.06339791417122,
+  "frame_ms_p95": 38.66469860076904,
+  "frames": 249
+ },
+ "oblique_on": {
+  "frame_ms_p50": 17.514802515506744,
+  "frame_ms_p95": 38.94119709730148,
+  "frames": 242
+ },
+ "hameau_eye_on": {
+  "frame_ms_p50": 17.797697335481644,
+  "frame_ms_p95": 41.79150238633156,
+  "frames": 230
+ },
+ "prairie_eye_off": {
+  "frame_ms_p50": 14.169998466968536,
+  "frame_ms_p95": 22.632401436567307,
+  "frames": 917
+ },
+ "prairie_low_off": {
+  "frame_ms_p50": 14.96889814734459,
+  "frame_ms_p95": 19.850999116897583,
+  "frames": 324
+ },
+ "riviere_eye_off": {
+  "frame_ms_p50": 12.609899044036865,
+  "frame_ms_p95": 17.750002443790436,
+  "frames": 382
+ },
+ "lisiere_eye_off": {
+  "frame_ms_p50": 10.670199990272522,
+  "frame_ms_p95": 14.171499758958817,
+  "frames": 461
+ },
+ "vallee_b_eye_off": {
+  "frame_ms_p50": 11.965099722146988,
+  "frame_ms_p95": 17.271801829338074,
+  "frames": 400
+ },
+ "oblique_off": {
+  "frame_ms_p50": 11.947497725486755,
+  "frame_ms_p95": 16.61119982600212,
+  "frames": 398
+ },
+ "hameau_eye_off": {
+  "frame_ms_p50": 12.66380026936531,
+  "frame_ms_p95": 16.651898622512817,
+  "frames": 383
+ }
+}

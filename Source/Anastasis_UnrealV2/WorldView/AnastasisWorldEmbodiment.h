@@ -97,6 +97,12 @@ protected:
 	UPROPERTY()
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> PlaceMeshes;
 	TArray<FString> PlaceReport;
+	/** GROUND_COVER_001 : un HISM par famille d'herbe, transitoires, vides puis reremplis a chaque incarnation. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> GroundCoverMeshes;
+	/** Strate herbacee des espaces ouverts, posee apres les arbres (Canopy = couronnes posees : X, Y, rayon). */
+	void PlaceGroundCover(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,
+		const AnastasisPlaces::FPlan& Places, const TArray<FVector>& Canopy, bool bEnabled);
 	/** Compose les lieux sur le sol rendu ; false = lieux coupes (plan vide). */
 	bool ComposePlaces(const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop,
 		const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource, AnastasisPlaces::FInputs& In, AnastasisPlaces::FPlan& Places);

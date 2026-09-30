@@ -311,6 +311,13 @@ se change dans le script.
 | `create-camp-shelter.py` | Abri de toile statique, recette CampShelter009. |
 | `capture-camp-shelter.ps1` + `capture-camp-shelter.py` | Trois vues de l'abri avec les accessoires existants, aucun niveau sauve. |
 
+### Strate herbacee (GROUND_COVER_001)
+
+| Script | Role |
+|---|---|
+| `create-ground-cover.ps1` + `create-ground-cover.py` | **ecrit** dans `Content/` : les trois touffes `SM_Grass_MeadowTall/MeadowShort/Sedge_01` (`/Game/Anastasis/GroundCover`) et `M_AnastasisGrass`, regeneres a chaque run ; editeur dedie qui se ferme |
+| `capture-ground-cover.ps1` + `ground-cover-capture.py` | A/B de l'herbe (`anastasis.Dressing.GroundCover 1/0`) aux memes cameras : prairie, riviere, lisiere, vallee B, oblique, hameau ; frame p50/p95 par vue → `Saved/GroundCoverEvidence/<Label>/` |
+
 ## Tests
 
 ```powershell
