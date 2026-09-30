@@ -55,7 +55,8 @@ Cycle de vie, un outil unique : `tools\unreal\agent-worktree.ps1`
 | `status` | tous les worktrees : modifications, avance/retard sur `main`, branches non intégrées |
 | `finish -Mission <m>` | portail de fin : index `tools/unreal/` à jour, aucun Unreal lancé hors `Start-AnastasisEditor`, build + `report-tests`, refuse de passer la main si du travail n'est pas commité |
 | `mcp -Mission <m>` | (ré)enregistre le port MCP d'un worktree existant côté Claude Code |
-| `integrate -Mission <m>` | rôle intégrateur : refuse si le canonique est sale, puis avance rapide de `main` |
+| `integrate -Mission <m>` | rôle intégrateur : avance rapide de **`main`** (jamais de la branche extraite du canonique), après avoir rejoué index et lancements Unreal sur l'arbre versé ; canonique hors `main` → copie de travail intacte |
+| `prune -Mission <m>` | après versement : worktree, branche et enregistrement MCP local supprimés ; refuse si un commit manque à `main` ou si le worktree n'est pas propre |
 | `preflight` | avant un `verify`/seal : dit ce qui bloque et **ouvre une fenêtre** d'observation |
 | `postflight` | après : échoue si source, config ou `HEAD` ont bougé pendant la fenêtre |
 
@@ -230,7 +231,8 @@ Opérateur et portails :
 | Script | Rôle |
 |---|---|
 | `anastasis-unreal.ps1` | `status` / `build` / `build-game` / `verify` / `health` / `editor` |
-| `agent-worktree.ps1` | cycle de vie multi-agent : `create` / `status` / `finish` / `integrate` / `preflight` / `postflight` / `mcp` |
+| `agent-worktree.ps1` | cycle de vie multi-agent : `create` / `status` / `finish` / `integrate` / `prune` / `preflight` / `postflight` / `mcp` |
+| `test-agent-worktree.ps1` | banc d'essai de `integrate` / `prune` sur un dépôt jetable (13 contrôles) ; à relancer après toute modification de `agent-worktree.ps1` |
 | `mcp-port.ps1` | port MCP d'une racine, à dot-sourcer |
 | `tools-index.ps1` | contrôle cet index contre le dossier, à dot-sourcer : `finish` bloque, `health` passe YELLOW |
 | `editor-launch.ps1` | `Start-AnastasisEditor` : lancement d'Unreal sans focus, avec gardien, à dot-sourcer |
@@ -253,6 +255,7 @@ Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
 | `first-building-pie.py` | preuve PIE du premier bâtiment : pilote `Anastasis.Village.*` en console (puits, habitants, retraits), lecture par les lignes `ANASTASIS_VILLAGE` du log |
 | `house-rest-pie.py` | preuve PIE de la maison : `Anastasis.Village.FirstHouse`, une nuit de sommeil, retrait d'un dormeur puis de la maison occupée |
 | `granary-eat-pie.py` | preuve PIE du grenier (Noûs) : `Anastasis.Village.FirstGranary`, repas confirmés, stock qui baisse, démolition avec réservations en cours |
+| `gather-deliver-pie.ps1` + `gather-deliver-pie.py` | preuve PIE du fermier au grenier : `Anastasis.Village.FirstFarmer`, recolte, retour, livraisons, conservation a chaque echantillon, une capture par etape → `Saved/SliceEvidence/gather-deliver/` ; aucun asset sauve |
 | `food-supply-pie.py` | preuve PIE du circuit vivrier fini : prise, depot, repas, epuisement et conservation ; sortie via ANASTASIS_FOOD_OUT ; aucun asset sauvegarde |
 | `hydro-network-capture.ps1` + `hydro-network-capture.py` | A/B du reseau de drainage (`anastasis.Terrain.Drainage 0/1`) : vues zenithale, oblique et gros plans, export de la grille relief + nappe et du reseau JSON, `-Debug 1..4` pour les lignes largeur / profondeur / vitesse / ordre → `Saved/HydroNetworkEvidence/<Label>/` |
 | `shore-capture.ps1` + `shore-capture.py` | A/B visuel du bord d'eau, cadrage sur une rive |
@@ -351,6 +354,10 @@ Le bruit `Condition failed` au démarrage est sensible à la culture de l'édite
 
 Un changement C++ n'est pas fini tant que `build` n'est pas `BUILD::PASS` et que les tests du chantier
 concerné ne sont pas verts. Citer les noms de tests et les valeurs, pas « ça marche ».
+
+Un run qui échoue sans rapport évident avec ton changement : lire `docs/unreal/PIEGES_UNREAL.md` **avant**
+de chercher une régression. Éditeur fermé de l'extérieur, mémoire vidéo saturée, capture sans focus,
+build vert en non-unity : chaque piège y est rangé par sa signature dans le log.
 
 ## État
 

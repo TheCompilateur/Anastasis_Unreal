@@ -232,6 +232,30 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 		DrawDebugString(World, Base + FVector(0,0,180), FString::Printf(TEXT("Cueillette %d/%d%s"), S.Remaining, S.Initial, S.Remaining == 0 ? TEXT(" - epuisee") : TEXT("")), nullptr, Color, 0.f);
 	}
 
+	// Champs autour de chaque grenier, dans leur etat VIVANT (le monde genere ne bouge pas) :
+	// vert tant qu'il reste a cueillir, hauteur = quantite ; brun une fois epuise.
+	for (const AnastasisVillage::FBuilding& Building : Village.GetBuildings())
+	{
+		if (Building.Type != AnastasisVillage::GranaryType) continue;
+		const int32 GX = FMath::FloorToInt32(Building.X);
+		const int32 GY = FMath::FloorToInt32(Building.Y);
+		for (int32 Y = FMath::Max(0, GY - 8); Y <= FMath::Min(SimWorld.H - 1, GY + 8); ++Y)
+		{
+			for (int32 X = FMath::Max(0, GX - 8); X <= FMath::Min(SimWorld.W - 1, GX + 8); ++X)
+			{
+				if (SimWorld.Tiles[Y * SimWorld.W + X].Resource != AnastasisWorld::EResource::Food) continue;
+				const AnastasisWorld::FTile Live = Village.LiveTileAt(X, Y);
+				const bool bLeft = Live.Resource == AnastasisWorld::EResource::Food && Live.Amount > 0;
+				const double Height = bLeft ? Tile * 0.02 * Live.Amount : Tile * 0.02;
+				const FVector Base = SimToUnreal(SimWorld, X + 0.5, Y + 0.5, World);
+				DrawDebugBox(World, Base + FVector(0, 0, Height * 0.5), FVector(Tile * 0.45, Tile * 0.45, Height * 0.5),
+					bLeft ? FColor::Green : FColor(130, 90, 60), false, 0.f, 0, 3.f);
+				DrawDebugString(World, Base + FVector(0, 0, Height + 30.0), bLeft ? FString::FromInt(Live.Amount) : FString(TEXT("jachere")),
+					nullptr, bLeft ? FColor::Green : FColor(130, 90, 60), 0.f);
+			}
+		}
+	}
+
 	for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
 	{
 		const FVector Pos = SimToUnreal(SimWorld, Npc.X, Npc.Y, World) + FVector(0, 0, Tile * 0.25);

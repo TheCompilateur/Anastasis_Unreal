@@ -53,6 +53,16 @@ public:
 	FString SeedFirstGranary(int32 NpcCount, int32 Food, int32 TileX, int32 TileY);
 	bool SeedFoodSupply();
 
+	/**
+	 * Le fermier (mission gather-deliver-001) : le champ genere le plus proche de
+	 * (TileX, TileY), un grenier VIDE a 3-4 cases (seuil qui atteint le champ),
+	 * `FarmerCount` fermiers poses au seuil et embauches au grenier. Ils voient le
+	 * champ ; la table de la reference les envoie cueillir puis livrer.
+	 */
+	FString SeedFirstFarmer(int32 FarmerCount, int32 TileX, int32 TileY);
+	const FString& GetFarmerGranaryId() const { return FarmerGranaryId; }
+	FIntPoint GetFarmerField() const { return FarmerField; }
+
 	/** Reflete les batiments de la simulation en acteurs. Appele a chaque Tick. */
 	int32 SyncVillagePresentation();
 	const FAnastasisVillagePresentation& GetVillagePresentation() const { return VillagePresentation; }
@@ -66,6 +76,8 @@ private:
 
 	FAnastasisSimulation Simulation;
 	FAnastasisVillagePresentation VillagePresentation;
+	FString FarmerGranaryId;
+	FIntPoint FarmerField = FIntPoint(-1, -1);
 	int32 LoggedDay = 0;
 	/** True only after OnWorldBeginPlay. Tests ResetCanonical without the engine ticker. */
 	bool bPumpFromEngineTick = false;
@@ -105,4 +117,12 @@ public:
 	/** Read-only finite-food accounting for PIE evidence. */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetFoodSupplyStatus(const UObject* WorldContextObject);
+
+	/**
+	 * Etat du fermier pose par FirstFarmer, en JSON : temps, nourriture aux champs
+	 * (tout le monde, etat vivant), sacs, stocks, repas, livraisons, but du premier
+	 * fermier, positions Unreal du grenier, du champ et du fermier.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetGatherStatus(const UObject* WorldContextObject);
 };

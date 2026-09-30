@@ -119,11 +119,15 @@ l'assemblage n'etait l'affaire de personne.
    Donc : apres le versement (etape 4) et **avant** de pousser, relancer `anastasis-unreal.ps1 build`
    dans la racine canonique, dont l'arbre est propre. C'est le seul build qui voie vraiment l'assemblage.
    Le gate pre-push le fait deja -- mais le savoir evite de decouvrir l'echec au moment de pousser.
-4. Verser : `ANASTASIS_INTEGRATION=1 git -C <racine-canonique> merge --ff-only agent/trunk-integration`. Refuser si ce n'est pas un
-   fast-forward — sinon quelqu'un a bouge `main` pendant la passe et il faut la refaire.
+4. Verser : `tools\unreal\agent-worktree.ps1 integrate -Mission trunk-integration`. Il refuse si ce n'est pas un
+   fast-forward — sinon quelqu'un a bouge `main` pendant la passe et il faut la refaire —, rejoue l'index de
+   `tools/unreal/` et le controle des lancements Unreal sur l'arbre verse, pose `ANASTASIS_INTEGRATION=1`, et
+   deplace **`main`** : `merge --ff-only` si le canonique est sur `main`, sinon `fetch . <branche>:main`, qui ne
+   touche ni la copie de travail ni la branche extraite. Avant le 2026-09-30, le `merge --ff-only` visait la
+   branche extraite du canonique, quelle qu'elle soit : le 29, c'etait la branche d'un autre agent.
 5. Pousser immediatement (voir ci-dessous).
-6. Elaguer branches et worktrees dont tous les commits sont dans `main` :
-   `git rev-list --count main..<branche>` == 0 et `git -C <worktree> status --porcelain` vide.
+6. Elaguer : `tools\unreal\agent-worktree.ps1 prune -Mission <m>` pour chaque branche dont tous les commits sont
+   dans `main` (worktree propre exige). Pas `git branch -d` : il compare a la branche extraite, pas a `main`.
 
 ### Avant de compiler ou de verser
 

@@ -22,7 +22,7 @@
 // etat — un A*, un hacheur, une boucle de tick — demandent un generateur
 // dedie, et c'est normal: leur difficulte est ailleurs que dans la plomberie.
 
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
@@ -142,24 +142,36 @@ const majuscule = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
 /**
  * Genere le `.inl` d'une declaration.
  *
- * @param spec { module, out, cases, ref? }
+ * @param spec { module | modules, out, cases, ref? }
+ *
+ * `modules` ({ nom: chemin }) sert quand une boucle traverse plusieurs fichiers
+ * de la reference : `call` recoit alors `{ nom: module }` au lieu d'un module.
  */
 export async function genererVecteurs(spec, options = {}) {
   const REF = (options.ref ?? spec.ref ?? "C:/dev/Jeux IV Kingdoms")
     .split(String.fromCharCode(92)).join("/");
-  const mod = await import(pathToFileURL(join(REF, spec.module)).href);
+  const charger = (chemin) => import(pathToFileURL(join(REF, chemin)).href);
+  const mod = spec.modules
+    ? Object.fromEntries(await Promise.all(
+      Object.entries(spec.modules).map(async ([nom, chemin]) => [nom, await charger(chemin)]),
+    ))
+    : await charger(spec.module);
+  const provenance = spec.modules ? Object.values(spec.modules).join(", ") : spec.module;
 
   let tete = "inconnu";
   try {
     tete = execFileSync("git", ["-C", REF, "log", "-1", "--format=%h"], { encoding: "utf8" }).trim();
-  } catch { /* depot sans git: la provenance sera moins precise */ }
+  } catch {
+    // Extraction sans git (`git archive <commit>`) : elle porte sa provenance dans `.tete`.
+    try { tete = readFileSync(join(REF, ".tete"), "utf8").trim(); } catch { /* provenance inconnue */ }
+  }
 
   const lignes = [];
   const emit = (s = "") => lignes.push(s);
   emit("// GENERE AUTOMATIQUEMENT - ne pas editer a la main.");
   emit("// Source: tools/migration/gen-parity.mjs");
   emit(`// Declaration: ${spec.declaration ?? "(inconnue)"}`);
-  emit(`// Reference: ${spec.module} @ ${tete}`);
+  emit(`// Reference: ${provenance} @ ${tete}`);
   emit("//");
   emit("// Les valeurs attendues viennent de la reference EXECUTEE, et les doubles de");
   emit("// leur motif binaire: un litteral decimal perdrait le dernier bit, et c'est");

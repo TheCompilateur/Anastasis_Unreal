@@ -30,7 +30,7 @@ public:
 	/** Secondes de simulation par jour. Identique a export const DAY_LENGTH. */
 	static constexpr double DayLength = 90.0;
 
-	/** Soft cap jobs / tick. Identique a DAY_DEFERRED_JOBS_PER_TICK. File encore vide. */
+	/** Soft cap jobs / tick. Identique a DAY_DEFERRED_JOBS_PER_TICK. Seul `landRegen` est porte. */
 	static constexpr int32 DayDeferredJobsPerTick = 2;
 
 	FAnastasisSimulation();
@@ -60,6 +60,8 @@ public:
 	double GetTime() const { return Time; }
 	int32 GetNewDayCount() const { return NewDayCount; }
 	int32 GetDeferredRemaining() const { return DeferredRemaining; }
+	/** Tuiles de champ regarnies par le dernier `landRegen` (regrowFieldsDaily). */
+	int32 GetLastRegrownFields() const { return LastRegrownFields; }
 	double GetAccumulator() const { return Accumulator; }
 
 	const AnastasisWorld::FWorld& GetWorld() const { return World; }
@@ -74,6 +76,8 @@ public:
 private:
 	void OnNewDay(bool bDefer);
 	void ProcessDayDeferred(int32 MaxJobs);
+	/** Tete de la file de minuit : `regrowFieldsDaily` (regrowForestDaily est sans effet dans la reference). */
+	void RunLandRegen();
 
 	bool bBootDeferred = true;
 	uint32 Seed = 0;
@@ -81,6 +85,8 @@ private:
 	int32 Day = 0;
 	int32 NewDayCount = 0;
 	int32 DeferredRemaining = 0;
+	bool bLandRegenPending = false;
+	int32 LastRegrownFields = 0;
 	double Accumulator = 0.0;
 	AnastasisWorld::FWorld World;
 	/** Pointe sur `World` : l'hote n'est ni copie ni deplace (voir les declarations supprimees). */

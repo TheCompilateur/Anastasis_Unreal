@@ -183,6 +183,35 @@ La table compte les 25 lignes d'`adultScores` ; `eat`, `rest`, `drink` sont calc
 valent 42 + `phaseBias`, et Noûs les biaise toutes. La cadence de pensée est celle de Noûs pour tous
 les buts (2,2 s ; 0,55 s en crise).
 
+### Fait — tranche verticale : cueillir puis livrer (mission gather-deliver-001)
+
+Le seul chemin fidèle « champ → grenier » de la référence : un **fermier** dont le poste est le
+grenier. Un sans-métier qui cueille finit par vendre au marché (or), non porté. Détail :
+`docs/unreal/GATHER_DELIVER_001.md`.
+
+| Unreal | Source JS (`fee66ae`) | Preuve |
+| --- | --- | --- |
+| `Work/AnastasisGather.h/.cpp` | `npc.js` (resourceScore nourriture, deliveryScore dépôt, completionBias, traitGoalBias, jobPriority, workplaceGoalBias au grenier, mealPathBlocked, survivalWorkFactor, shouldHaulGatherLoad), `memory.js` (presumedNoise, believedStock), `needs.js` (workWillFactor), `moralPressure.js`, `craftWork.js` (swingPeriodFor, yieldPerSwing), `craftFatigue.js`, `fieldCrops.js`, `fieldWorkPosts.js`, `skills.js`, `content.js` TRAITS, `metiers/catalog.js` farmer/settler | `Parite.Recolte`, 2011 vecteurs |
+| `Village/AnastasisVillage.*` (ajouts) | `perceive` (gisements, `rememberSpot`, `trimMemory`, `forgetEmptied`), `recallResource`, `progressCraftGather`, `ensureCraftSession`, `fieldWorkTarget` / `claimedFieldPosts`, `resourceTileNear`, `depleteTile`, `beginHaulToDepot`, `deliver` (branche dépôt), `applyGoalEligibility`, `atPost` 1,25 | `Village.Recolte.*` |
+
+La table calcule `gatherFood` et `deliver` pour le fermier au grenier seulement ; pour les autres
+elles restent au plancher. Le monde généré reste immuable : le village tient l'état vivant des
+tuiles récoltées (`LiveTileAt`). L'extension food-supply-001 (non fidèle) cohabite pour les autres
+habitants.
+
+### Fait — la repousse des champs, et l'endurance (mission field-regrow-001)
+
+| Unreal | Source JS (`fee66ae`) | Preuve |
+| --- | --- | --- |
+| `Work/AnastasisFields.h/.cpp` | `simulation.js` regrowFieldsDaily, regrowFieldTile, FIELD_FOOD_CAP / FIELD_REGEN_PER_DAY ; `fieldCrops.js` fieldSeasonRegenAmount, dailyChance, rotateFieldCropId, ensureFieldCropReady | `Parite.Repousse`, 686 vecteurs |
+| `Village/AnastasisVillage.*` (ajout) | regrowFieldsDaily sur l'état vivant des tuiles | `Village.Repousse.*` |
+| `Sim/AnastasisSimulation.*` (ajout) | `enqueueDayDeferred` : `landRegen` en tête (regrowForestDaily sans effet dans la référence) | `Village.Repousse.Hote` |
+
+`Anastasis.Sim.Village.Endurance` fait vivre puits, maison, grenier et fermiers 8 jours : la
+nourriture est conservée, personne n'a faim, et la limite de la table réduite apparaît — sans
+`socialize`, la solitude devient critique au jour 3 et le travail s'arrête. Détail :
+`docs/unreal/FIELD_REGROW_001.md`.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

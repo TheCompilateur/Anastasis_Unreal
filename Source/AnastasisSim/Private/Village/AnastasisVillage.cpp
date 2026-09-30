@@ -4,6 +4,7 @@
 #include "Core/AnastasisSimMath.h"
 #include "Core/AnastasisStateDigest.h"
 #include "World/AnastasisWorld.h"
+#include "Work/AnastasisFields.h"
 
 namespace AnastasisVillage
 {
@@ -161,6 +162,8 @@ namespace AnastasisVillage
 		Now = 0.0;
 		FoodSources.Reset();
 		MealReservations.Reset();
+		LiveTiles.Reset();
+		RegrownFood = 0;
 		MealSeq = 0;
 		ReservationSweepAt = 0.0;
 		Buildings = TAnastasisEntityTable<FBuilding>();
@@ -270,6 +273,14 @@ namespace AnastasisVillage
 			if (Npc.DestBuildingId == Id)
 			{
 				bLostPlace = true;
+			}
+			if (Npc.WorkplaceId == Id)
+			{
+				// Plus de poste : plus de depot ou livrer, plus de recolte pour lui (ecart n°10).
+				// Le sac reste plein ; le metier reste, sans lieu.
+				Npc.WorkplaceId.Reset();
+				ClearWorkSession(Npc);
+				if (Npc.Goal == GoalGatherFood || Npc.Goal == GoalDeliver) bLostPlace = true;
 			}
 			if (bLostPlace)
 			{
@@ -975,15 +986,17 @@ namespace AnastasisVillage
 			}
 		}
 		if (!Building) return false;
+		// Poste de service : rester un peu plus longtemps (on « tient » le lieu).
+		const double AtPost = !Npc.WorkplaceId.IsEmpty() && Npc.WorkplaceId == Building->Id ? 1.25 : 1.0;
 		if (Npc.Goal == GoalEat)
 		{
 			// `indoorNeedDuration(eat)` = eatDuration ; `waitingActivity(eat)` = « mange ».
-			return EnterBuilding(Npc, *Building, TEXT("mange"), AnastasisNeeds::Constants::EatDuration);
+			return EnterBuilding(Npc, *Building, TEXT("mange"), AnastasisNeeds::Constants::EatDuration * AtPost);
 		}
 		// `indoorNeedDuration(rest)` : la nuit se decide UNE fois, a l'entree.
 		const bool bNight = IsNight();
 		const double Duration = bNight ? AnastasisNeeds::Constants::SleepDuration : AnastasisNeeds::Constants::NapDuration;
-		return EnterBuilding(Npc, *Building, RestActivity(bNight), Duration);
+		return EnterBuilding(Npc, *Building, RestActivity(bNight), Duration * AtPost);
 	}
 
 	void FVillage::UpdateInside(FNpc& Npc)
@@ -1015,6 +1028,10 @@ namespace AnastasisVillage
 		Npc.Y = InY;
 		Npc.Speed = Speed;
 		Npc.Needs = Needs;
+		// createNpc : competences fournies a 1, teintees par le trait (ecart n°10).
+		const AnastasisGather::FTrait& Trait = AnastasisGather::TraitAt(Npc.TraitIndex);
+		Npc.SkillGather = AnastasisGather::TintedGatherSkill(Trait);
+		Npc.SkillTrade = AnastasisGather::TintedTradeSkill(Trait);
 		const FString Id = Npc.Id;
 		Actors.Add(MoveTemp(Npc));
 		// `spawnNpc` : `perceive(this, npc, true)`.
@@ -1044,6 +1061,43 @@ namespace AnastasisVillage
 			if (B.Owner == Id) B.Owner.Reset();
 		}
 		return Actors.RemoveById(Id);
+	}
+
+	bool FVillage::AssignWorkplace(const FString& NpcId, const FString& JobId, const FString& BuildingId)
+	{
+		FNpc* Npc = Actors.FindById(NpcId);
+		const FBuilding* B = Buildings.FindById(BuildingId);
+		if (!Npc || !B || !B->IsCompleted() || B->Type != GranaryType || JobId != AnastasisGather::JobFarmer)
+		{
+			return false;
+		}
+		Npc->JobId = JobId;
+		Npc->WorkplaceId = BuildingId;
+		return true;
+	}
+
+	bool FVillage::IsGranaryWorker(const FNpc& Npc) const
+	{
+		if (Npc.JobId != AnastasisGather::JobFarmer || Npc.WorkplaceId.IsEmpty()) return false;
+		const FBuilding* B = Buildings.FindById(Npc.WorkplaceId);
+		return B && B->IsCompleted() && B->Type == GranaryType;
+	}
+
+	int32 FVillage::MarketFood() const
+	{
+		// `rebuildMarketAggregate` : somme des `stock.food.physical` de tous les batiments.
+		int32 Total = 0;
+		for (const FBuilding& B : Buildings.GetItems())
+		{
+			Total += B.FoodPhysical;
+		}
+		return Total;
+	}
+
+	bool FVillage::IsPortedGoalFor(const FNpc& Npc, const FString& Goal) const
+	{
+		if (IsPortedGoal(Goal)) return true;
+		return (Goal == GoalGatherFood || Goal == GoalDeliver) && IsGranaryWorker(Npc);
 	}
 
 	void FVillage::UpdateActors(double Time, double Dt)
@@ -1087,7 +1141,12 @@ namespace AnastasisVillage
 		else
 		{
 			const bool bDrinking = Npc.Goal == GoalDrink && !Npc.Inside.bActive && AtDrinkSpot(Npc.X, Npc.Y);
-			AnastasisNeeds::TickNeeds(Npc.Needs, Dt, bDrinking, /*bWorking=*/Npc.Goal == TEXT("gatherFood"));
+			// `WORK_GOALS.has(npc.goal) && !npc.inside` pour le fermier (recolter, livrer) ;
+			// l'extension food-supply garde sa regle (collecte seule).
+			const bool bWorking = IsGranaryWorker(Npc)
+				? (Npc.Goal == GoalGatherFood || Npc.Goal == GoalDeliver) && !Npc.Inside.bActive
+				: Npc.Goal == TEXT("gatherFood");
+			AnastasisNeeds::TickNeeds(Npc.Needs, Dt, bDrinking, bWorking);
 		}
 
 		// Dedans : ni pensee, ni marche, seulement le temps qui passe.
@@ -1145,6 +1204,22 @@ namespace AnastasisVillage
 		Trace.Phase = AnastasisRhythm::PhaseId(Phase);
 		Trace.NeedScores = AnastasisNeeds::NeedGoalScores(Npc.Needs, Wells, /*CompletedTaverns=*/0);
 
+		// Fermier au grenier (ecart n°10) : ses lignes de travail sont calculees.
+		const bool bWorker = IsGranaryWorker(Npc);
+		FWorkRowContext Work;
+		if (bWorker)
+		{
+			// s = believedStock : sans souvenir de marche, la presomption bruitee.
+			Work.Believed = AnastasisGather::BelievedFoodPresumed(Npc.Id);
+			Work.bMealBlocked = AnastasisGather::MealPathBlocked(Npc.Needs.Hunger, Npc.InventoryFood, Work.Believed);
+			// `pressure.effectiveWork * phaseWorkFactor * elderWorkFactor * natureWorkFactor`,
+			// adulte (1) de nature moyenne (0,92 + corps * 0,08).
+			const double NatureWorkFactor = Clamp(0.92 + 1.0 * 0.08, 0.72, 1.22);
+			Work.WorkFactor = AnastasisGather::MoralEffectiveWork(Npc.Needs, MarketFood(), Day())
+				* AnastasisRhythm::PhaseWork(Phase) * 1.0 * NatureWorkFactor;
+			Trace.WorkFactor = Work.WorkFactor;
+		}
+
 		// adultScores : les 25 lignes, dans l'ordre de la reference, puis
 		// `rhythmBias` (= phaseBias). Les buts non portes valent 42 avant rythme.
 		TArray<TPair<FString, double>> Rows;
@@ -1155,6 +1230,13 @@ namespace AnastasisVillage
 			if (G == GoalEat) Score = Trace.NeedScores.Eat + EatJobPriorityBias;
 			else if (G == GoalRest) Score = Trace.NeedScores.Rest + RestJobPriorityBias;
 			else if (G == GoalDrink) Score = Trace.NeedScores.Drink + (Wells > 0 ? 6.0 : 0.0);
+			else if (bWorker && (G == GoalGatherFood || G == GoalDeliver))
+			{
+				const double Row = WorkRowScore(Npc, G, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work);
+				(G == GoalGatherFood ? Trace.GatherRowTable : Trace.DeliverRowTable) = Row;
+				Rows.Add(TPair<FString, double>(G, Row));
+				continue;
+			}
 			// Bounded food-supply extension: known finite source + known depot.
 			// Existing Noûs urgency and phase biases still arbitrate needs.
 			if (FoodSources.Num() > 0 && G == TEXT("gatherFood"))
@@ -1167,6 +1249,11 @@ namespace AnastasisVillage
 
 		// commitGoalChoice : (collant non porte) Noûs biaise la table avant le tri.
 		ApplyAlgorithmicScoreBias(Npc, Rows);
+		// `applyGoalEligibility` : `deliver` n'est candidat qu'avec une charge.
+		if (Npc.InventoryFood <= 0)
+		{
+			Rows.RemoveAll([](const TPair<FString, double>& Row) { return Row.Key == GoalDeliver; });
+		}
 
 		Trace.FloorScore = -AnastasisNav::Infinity;
 		for (const TPair<FString, double>& Row : Rows)
@@ -1174,6 +1261,8 @@ namespace AnastasisVillage
 			if (Row.Key == GoalEat) Trace.EatRowScore = Row.Value;
 			else if (Row.Key == GoalRest) Trace.RestRowScore = Row.Value;
 			else if (Row.Key == GoalDrink) Trace.DrinkRowScore = Row.Value;
+			else if (bWorker && Row.Key == GoalGatherFood) Trace.GatherRowScore = Row.Value;
+			else if (bWorker && Row.Key == GoalDeliver) Trace.DeliverRowScore = Row.Value;
 			else if (Row.Value > Trace.FloorScore)
 			{
 				Trace.FloorScore = Row.Value;
@@ -1192,9 +1281,10 @@ namespace AnastasisVillage
 		}
 		FString Next = ApplyAlgorithmicCommitGate(Npc, Rows[0].Key, Npc.Goal, Trace.CommitGate);
 		// Finish a physical delivery before resuming gathering; urgent needs retain priority.
-		if (FoodSources.Num() > 0 && Npc.InventoryFood > 0 && KnownFoodDepot(Npc) && !NeedsCritical(Npc.Needs))
+		// (Extension food-supply seulement : le fermier du grenier suit la reference.)
+		if (!bWorker && FoodSources.Num() > 0 && Npc.InventoryFood > 0 && KnownFoodDepot(Npc) && !NeedsCritical(Npc.Needs))
 			Next = TEXT("deliver");
-		if (FoodSources.Num() > 0 && Next == TEXT("gatherFood") && (!HasKnownFoodSource(Npc) || Npc.InventoryFood > 0 || !KnownFoodDepot(Npc)))
+		if (!bWorker && FoodSources.Num() > 0 && Next == TEXT("gatherFood") && (!HasKnownFoodSource(Npc) || Npc.InventoryFood > 0 || !KnownFoodDepot(Npc)))
 			Next = GoalObserver;
 		CommitGoal(Npc, Next, Trace);
 	}
@@ -1203,7 +1293,7 @@ namespace AnastasisVillage
 	{
 		const FString Previous = Npc.Goal;
 		// Un but non porte qui gagne ne fait rien : `observer`.
-		const FString NewGoal = IsPortedGoal(Next) ? Next : FString(GoalObserver);
+		const FString NewGoal = IsPortedGoalFor(Npc, Next) ? Next : FString(GoalObserver);
 		Npc.DestBuildingId.Reset();
 		Npc.Goal = NewGoal;
 		OnAlgorithmicGoalCommitted(Npc, Previous, NewGoal);
@@ -1227,6 +1317,8 @@ namespace AnastasisVillage
 		if (Npc.Goal == GoalDrink) bFound = DrinkTarget(Npc, Target, Source);
 		else if (Npc.Goal == GoalRest) bFound = RestTarget(Npc, Target, Source);
 		else if (Npc.Goal == GoalEat) bFound = EatTarget(Npc, Target, Source);
+		else if (IsGranaryWorker(Npc) && Npc.Goal == GoalGatherFood) bFound = GatherTarget(Npc, Target, Source);
+		else if (IsGranaryWorker(Npc) && Npc.Goal == GoalDeliver) bFound = DeliverTarget(Npc, Target, Source);
 		else if (Npc.Goal == TEXT("gatherFood") || Npc.Goal == TEXT("deliver")) bFound = FoodSupplyTarget(Npc, Target, Source);
 		else
 		{
@@ -1304,6 +1396,8 @@ namespace AnastasisVillage
 	{
 		if (Npc.bHasTarget && !ReachedMoveTarget(Npc, Npc.Target))
 		{
+			// `if (!CRAFT_GOALS.has(npc.goal)) clearWorkSession(npc)`.
+			if (Npc.Goal != GoalGatherFood) ClearWorkSession(Npc);
 			Npc.Activity = TEXT("marche");
 			MoveActor(Npc, Npc.Target, Dt);
 			return;
@@ -1347,7 +1441,7 @@ namespace AnastasisVillage
 		Npc.DoorStuckAt = 0.0;
 		Npc.DoorApproachAt = 0.0;
 
-		if (!IsPortedGoal(Npc.Goal))
+		if (!IsPortedGoalFor(Npc, Npc.Goal))
 		{
 			// But non porte : il n'accomplit rien. La reference ferait `perform`.
 			Npc.Activity = TEXT("attend");
@@ -1355,11 +1449,32 @@ namespace AnastasisVillage
 			return;
 		}
 
+		// Sessions multi-coups hors du gate workTimer (collecte du fermier).
+		if (Npc.Goal == GoalGatherFood && IsGranaryWorker(Npc))
+		{
+			if (ProgressCraftGather(Npc) != 0)
+			{
+				Npc.FailedActions = 0;
+				return;
+			}
+			Npc.Activity = TEXT("attend");
+			if (++Npc.FailedActions >= 3) RedirectAfterFailure(Npc);
+			return;
+		}
+		if (Npc.WorkSession.bActive) ClearWorkSession(Npc);
+
+		// Livrer a son propre depot : DEHORS, au seuil (`DEPOT_OUTSIDE`), jamais d'entree.
 		Npc.WorkTimer += Dt;
 		if (Npc.WorkTimer < (Npc.Goal == TEXT("gatherFood") ? 3.0 : 1.0))
 		{
-			// `waitingActivity` : « boit » ; pour rest, `restActivity`.
-			Npc.Activity = Npc.Goal == TEXT("gatherFood") ? TEXT("cueille") : Npc.Goal == TEXT("deliver") ? TEXT("depose") : Npc.Goal == GoalDrink ? TEXT("boit") : Npc.Goal == GoalEat ? TEXT("mange") : RestActivity(IsNight());
+			// `waitingActivity` : « boit », « mange », « livre » ; pour rest, `restActivity`.
+			// L'extension food-supply garde ses mots (« cueille », « depose »).
+			const bool bWorker = IsGranaryWorker(Npc);
+			Npc.Activity = Npc.Goal == GoalDrink ? TEXT("boit")
+				: Npc.Goal == GoalEat ? TEXT("mange")
+				: Npc.Goal == GoalDeliver ? (bWorker ? TEXT("livre") : TEXT("depose"))
+				: Npc.Goal == GoalGatherFood ? TEXT("cueille")
+				: RestActivity(IsNight());
 			return;
 		}
 		Npc.WorkTimer = 0.0;
@@ -1380,7 +1495,8 @@ namespace AnastasisVillage
 
 	bool FVillage::Perform(FNpc& Npc)
 	{
-		if (Npc.Goal == TEXT("gatherFood") || Npc.Goal == TEXT("deliver")) return PerformFoodSupply(Npc);
+		// Extension food-supply : tout habitant qui n'est pas le fermier du grenier.
+		if ((Npc.Goal == GoalGatherFood || Npc.Goal == GoalDeliver) && !IsGranaryWorker(Npc)) return PerformFoodSupply(Npc);
 		if (Npc.Goal == GoalDrink)
 		{
 			// `case "drink"` : setActivity("boit"), satisfyDrink, markDrink (gestuelle, non portee).
@@ -1394,6 +1510,12 @@ namespace AnastasisVillage
 			// `case "eat"` : setActivity("mange"), eat().
 			Npc.Activity = TEXT("mange");
 			return Eat(Npc);
+		}
+		if (Npc.Goal == GoalDeliver)
+		{
+			// `case "deliver"` : setActivity("livre"), deliver().
+			Npc.Activity = TEXT("livre");
+			return Deliver(Npc);
 		}
 		if (Npc.Goal == GoalRest)
 		{
@@ -1592,7 +1714,7 @@ namespace AnastasisVillage
 		TArray<FString> Users;
 		for (const FNpc& Npc : Actors.GetItems())
 		{
-			const bool bHeading = IsPortedGoal(Npc.Goal) && Npc.DestBuildingId == BuildingId;
+			const bool bHeading = IsPortedGoalFor(Npc, Npc.Goal) && Npc.DestBuildingId == BuildingId;
 			const bool bInside = Npc.Inside.bActive && Npc.Inside.BuildingId == BuildingId;
 			if (bHeading || bInside)
 			{
@@ -1701,6 +1823,58 @@ namespace AnastasisVillage
 			}
 			Writer.EndArray();
 			Writer.Key(TEXT("hungerAction")).String(N.HungerAction.State);
+			Writer.Key(TEXT("jobId")).String(N.JobId);
+			Writer.Key(TEXT("workplaceId"));
+			if (N.WorkplaceId.IsEmpty()) Writer.Null(); else Writer.String(N.WorkplaceId);
+			Writer.Key(TEXT("skill")).Number(N.Skill);
+			Writer.Key(TEXT("skills")).BeginObject();
+			Writer.Key(TEXT("gather")).Number(N.SkillGather);
+			Writer.Key(TEXT("trade")).Number(N.SkillTrade);
+			Writer.EndObject();
+			Writer.Key(TEXT("workSession"));
+			if (N.WorkSession.bActive)
+			{
+				Writer.BeginObject();
+				Writer.Key(TEXT("craftId")).String(N.WorkSession.CraftId);
+				Writer.Key(TEXT("tileX")).Number(N.WorkSession.TileX);
+				Writer.Key(TEXT("tileY")).Number(N.WorkSession.TileY);
+				Writer.Key(TEXT("postIndex")).Number(N.WorkSession.PostIndex);
+				Writer.Key(TEXT("nextSwingAt")).Number(N.WorkSession.NextSwingAt);
+				Writer.Key(TEXT("swingsDone")).Number(N.WorkSession.SwingsDone);
+				Writer.EndObject();
+			}
+			else
+			{
+				Writer.Null();
+			}
+			Writer.Key(TEXT("spots")).BeginArray(N.Spots.Num());
+			for (const FResourceSpot& Spot : N.Spots)
+			{
+				Writer.BeginObject();
+				Writer.Key(TEXT("key")).String(Spot.Key);
+				Writer.Key(TEXT("resource")).String(Spot.Resource);
+				Writer.Key(TEXT("amount")).Number(Spot.Amount);
+				Writer.Key(TEXT("day")).Number(Spot.Day);
+				Writer.EndObject();
+			}
+			Writer.EndArray();
+			Writer.EndObject();
+		}
+		Writer.EndArray();
+
+		TArray<int32> Touched;
+		LiveTiles.GetKeys(Touched);
+		Touched.Sort();
+		Writer.Key(TEXT("liveTiles")).BeginArray(Touched.Num());
+		for (const int32 Index : Touched)
+		{
+			const AnastasisWorld::FTile& T = LiveTiles[Index];
+			Writer.BeginObject();
+			Writer.Key(TEXT("index")).Number(Index);
+			Writer.Key(TEXT("type")).Number(static_cast<int32>(T.Type));
+			Writer.Key(TEXT("resource")).Number(static_cast<int32>(T.Resource));
+			Writer.Key(TEXT("amount")).Number(T.Amount);
+			Writer.Key(TEXT("cropId")).Number(static_cast<int32>(T.CropId));
 			Writer.EndObject();
 		}
 		Writer.EndArray();
@@ -1803,6 +1977,8 @@ namespace AnastasisVillage
 				Known->Day = Day();
 			}
 		}
+		// Puis les gisements sous ses yeux, s'il a assez bouge.
+		ScanTiles(Npc, FloorInt(Npc.X), FloorInt(Npc.Y), bForce);
 	}
 
 	AnastasisNous::FFoodContext FVillage::PerceiveFoodContext(const FNpc& Npc) const
@@ -2610,5 +2786,490 @@ namespace AnastasisVillage
 			OutSource = TEXT("none");
 		}
 		return bHave;
+	}
+
+	// --- Recolte et livraison (npc.js, craftWork.js, fieldWorkPosts.js, memory.js) ---
+
+	namespace
+	{
+		int32 TileIndexOf(const AnastasisWorld::FWorld* World, int32 X, int32 Y)
+		{
+			if (!World || X < 0 || Y < 0 || X >= World->W || Y >= World->H) return INDEX_NONE;
+			return Y * World->W + X;
+		}
+
+		const TCHAR* ResourceName(AnastasisWorld::EResource Resource)
+		{
+			switch (Resource)
+			{
+			case AnastasisWorld::EResource::Stone: return TEXT("stone");
+			case AnastasisWorld::EResource::Wood: return TEXT("wood");
+			case AnastasisWorld::EResource::Food: return TEXT("food");
+			default: return TEXT("");
+			}
+		}
+
+		/** `trimMemory` : au-dela de 26 gisements, on lache un souvenir de la ressource la plus connue. */
+		void TrimSpots(TArray<FResourceSpot>& Spots)
+		{
+			if (Spots.Num() <= AnastasisGather::SpotCapacity) return;
+			// `counts` : un objet JS, cles dans l'ordre de premiere apparition.
+			TArray<TPair<FString, int32>> Counts;
+			for (const FResourceSpot& Spot : Spots)
+			{
+				TPair<FString, int32>* Entry = Counts.FindByPredicate([&](const TPair<FString, int32>& C) { return C.Key == Spot.Resource; });
+				if (Entry) ++Entry->Value;
+				else Counts.Add(TPair<FString, int32>(Spot.Resource, 1));
+			}
+			int32 Dominant = 0;
+			for (int32 I = 1; I < Counts.Num(); ++I)
+			{
+				if (Counts[I].Value > Counts[Dominant].Value) Dominant = I;
+			}
+			int32 Worst = 0;
+			double WorstRank = AnastasisNav::Infinity;
+			for (int32 I = 0; I < Spots.Num(); ++I)
+			{
+				if (Spots[I].Resource != Counts[Dominant].Key) continue;
+				// On lache les on-dit en premier.
+				const double Rank = Spots[I].Day - (Spots[I].bHearsay ? 2 : 0);
+				if (Rank < WorstRank)
+				{
+					WorstRank = Rank;
+					Worst = I;
+				}
+			}
+			Spots.RemoveAt(Worst);
+		}
+	}
+
+	double FVillage::WorkRowScore(const FNpc& Npc, const FString& Goal, double PhaseBias, const FWorkRowContext& Work) const
+	{
+		namespace G = AnastasisGather;
+		const G::FTrait& Trait = G::TraitAt(Npc.TraitIndex);
+		// `inventoryLoad` : la nourriture est la seule charge portee ; le grenier la prend (depotResourceOf).
+		const int32 Load = Npc.InventoryFood;
+		const int32 DepotLoad = Npc.InventoryFood;
+		const FString SessionGoal = Npc.WorkSession.bActive && Npc.WorkSession.CraftId == TEXT("farm") ? FString(GoalGatherFood) : FString();
+		double Score = 0.0;
+		double DomainSkill = 1.0;
+		if (Goal == GoalGatherFood)
+		{
+			// `(resourceScore + npc.hunger * 0.15 + goalNoise(sim, 14)) * wf("gatherFood")` — sans bruit (ecart n°1).
+			const double Base = G::ResourceScoreFood(Actors.Num(), Work.Believed, Npc.JobId, Trait.Gather, Npc.InventoryFood, Npc.Needs.Hunger)
+				+ Npc.Needs.Hunger * 0.15;
+			Score = Base * G::SurvivalWorkFactor(Goal, Work.WorkFactor, Work.bMealBlocked);
+			DomainSkill = Npc.SkillGather;
+		}
+		else
+		{
+			// `deliveryScore(sim, npc, s) * wf("deliver")`.
+			Score = G::DeliveryScoreDepot(Npc.JobId, DepotLoad) * G::SurvivalWorkFactor(Goal, Work.WorkFactor, Work.bMealBlocked);
+			DomainSkill = Npc.SkillTrade;
+		}
+		// Les biais, dans l'ordre d'adultScores. Nuls ici et omis : statut, mode de vie,
+		// age, district, foyer, episodes, scenes, humeur, plans, meteo, nature (moyenne),
+		// memoire sociale et d'echec, ordres, prevision, risque, urgence collective.
+		Score += PhaseBias;
+		Score += G::GranaryWorkplaceGoalBias(Npc.JobId, Goal, Npc.InventoryFood);
+		Score += G::CompletionBias(Goal, Load, DepotLoad, SessionGoal, NeedsCritical(Npc.Needs));
+		Score += G::TraitGoalBias(Trait, Goal);
+		Score += G::SkillGoalBias(DomainSkill);
+		return Score;
+	}
+
+	void FVillage::ClearWorkSession(FNpc& Npc)
+	{
+		Npc.WorkSession = FWorkSession();
+	}
+
+	void FVillage::ScanTiles(FNpc& Npc, int32 CX, int32 CY, bool bForce)
+	{
+		if (!World) return;
+		// Le balayage des tuiles ne vaut que si l'habitant a bouge.
+		const double Moved = FMath::Abs(Npc.X - Npc.ScanX) + FMath::Abs(Npc.Y - Npc.ScanY);
+		if (!bForce && Moved < AnastasisGather::ScanMove) return;
+		Npc.ScanX = Npc.X;
+		Npc.ScanY = Npc.Y;
+
+		const int32 R = static_cast<int32>(PerceptionRadius);
+		const int32 MinX = FMath::Max(0, CX - R);
+		const int32 MaxX = FMath::Min(World->W - 1, CX + R);
+		const int32 MinY = FMath::Max(0, CY - R);
+		const int32 MaxY = FMath::Min(World->H - 1, CY + R);
+		const int32 Today = Day();
+		for (int32 Y = MinY; Y <= MaxY; ++Y)
+		{
+			for (int32 X = MinX; X <= MaxX; ++X)
+			{
+				const AnastasisWorld::FTile Tile = LiveTile(Y * World->W + X);
+				if (Tile.Resource == AnastasisWorld::EResource::None || Tile.Amount <= 0) continue;
+				// `rememberSpot` : deja en tete -> mis a jour ; sinon ajoute, puis `trimMemory`.
+				const FString Key = FString::Printf(TEXT("%d,%d"), X, Y);
+				if (FResourceSpot* Known = Npc.Spots.FindByPredicate([&](const FResourceSpot& S) { return S.Key == Key; }))
+				{
+					Known->Amount = Tile.Amount;
+					Known->Day = Today;
+					Known->bHearsay = false;
+					continue;
+				}
+				FResourceSpot Spot;
+				Spot.Key = Key;
+				Spot.X = X + 0.5;
+				Spot.Y = Y + 0.5;
+				Spot.Resource = ResourceName(Tile.Resource);
+				Spot.Amount = Tile.Amount;
+				Spot.Day = Today;
+				Npc.Spots.Add(MoveTemp(Spot));
+				TrimSpots(Npc.Spots);
+			}
+		}
+		// La berge (croyance d'eau) n'est pas portee : la soif lit la berge du monde.
+		// `forgetEmptied` : ce qu'il voit epuise, il l'efface.
+		Npc.Spots.RemoveAll([&](const FResourceSpot& Spot)
+		{
+			const int32 X = FloorInt(Spot.X);
+			const int32 Y = FloorInt(Spot.Y);
+			if (X < MinX || X > MaxX || Y < MinY || Y > MaxY) return false;
+			const AnastasisWorld::FTile Tile = LiveTile(Y * World->W + X);
+			return Spot.Resource != ResourceName(Tile.Resource) || Tile.Amount <= 0;
+		});
+	}
+
+	bool FVillage::GatherTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource)
+	{
+		// `recallOrSearch(sim, npc, "food")` : la doctrine de lisiere ne vise que le bois ;
+		// le grenier n'est pas un poste d'extraction (pas de cour) -> `recallResource`.
+		const FResourceSpot* Best = nullptr;
+		double BestScore = -AnastasisNav::Infinity;
+		const int32 Today = Day();
+		for (const FResourceSpot& Spot : Npc.Spots)
+		{
+			if (Spot.Resource != TEXT("food")) continue;
+			const int32 Age = Today - Spot.Day;
+			// `dangerPenaltyAt` : pas de zone de danger connue, 0.
+			const double Score = -Dist(Npc.X, Npc.Y, Spot.X, Spot.Y) - Age * 1.5
+				- (Spot.bHearsay ? AnastasisGather::HearsayPenalty : 0.0) - 0.0;
+			if (Score > BestScore)
+			{
+				BestScore = Score;
+				Best = &Spot;
+			}
+		}
+		if (!Best)
+		{
+			// `exploreTarget` tire `sim.rng` : non porte (ecart n°11).
+			OutSource = TEXT("none");
+			return false;
+		}
+		OutTarget = { Best->X, Best->Y };
+		OutSource = TEXT("spot");
+		return true;
+	}
+
+	bool FVillage::DeliverTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource)
+	{
+		// Sac du depot perso : retourner au poste (pas le marche).
+		FBuilding* Workplace = Npc.WorkplaceId.IsEmpty() ? nullptr : Buildings.FindById(Npc.WorkplaceId);
+		if (Workplace && Npc.InventoryFood > 0 && Workplace->Progress >= 1.0 && BuildingAccessPoint(*Workplace, &Npc, OutTarget))
+		{
+			OutSource = TEXT("workplace");
+			return true;
+		}
+		// `sim.deliveryPos(npc)` : marche, entrepot, camp — non portes (ecart n°12).
+		OutSource = TEXT("none");
+		return false;
+	}
+
+	AnastasisWorld::FTile FVillage::LiveTile(int32 Index) const
+	{
+		AnastasisWorld::FTile Tile = LiveTiles.Contains(Index) ? LiveTiles[Index] : World->Tiles[Index];
+		// Une tuile ouverte par l'extension food-supply : son registre fini fait foi.
+		if (const FFoodSource* Source = FoodSources.FindByPredicate([&](const FFoodSource& S) { return S.TileIndex == Index; }))
+		{
+			Tile.Amount = Source->Remaining;
+		}
+		return Tile;
+	}
+
+	AnastasisWorld::FTile FVillage::LiveTileAt(int32 TileX, int32 TileY) const
+	{
+		const int32 Index = TileIndexOf(World, TileX, TileY);
+		return Index == INDEX_NONE ? AnastasisWorld::FTile() : LiveTile(Index);
+	}
+
+	void FVillage::TakeFromTile(int32 Index, int32 Taken)
+	{
+		if (FFoodSource* Source = FoodSources.FindByPredicate([&](const FFoodSource& S) { return S.TileIndex == Index; }))
+		{
+			Source->Remaining -= Taken;
+		}
+		AnastasisWorld::FTile& Live = LiveTiles.FindOrAdd(Index, World->Tiles[Index]);
+		Live.Amount -= Taken;
+	}
+
+	int32 FVillage::ResourceTileNear(const FNpc& Npc, AnastasisWorld::EResource Resource) const
+	{
+		const int32 CX = FloorInt(Npc.X);
+		const int32 CY = FloorInt(Npc.Y);
+		for (int32 DY = -1; DY <= 1; ++DY)
+		{
+			for (int32 DX = -1; DX <= 1; ++DX)
+			{
+				const int32 Index = TileIndexOf(World, CX + DX, CY + DY);
+				if (Index == INDEX_NONE) continue;
+				const AnastasisWorld::FTile Tile = LiveTile(Index);
+				if (Tile.Resource != Resource || !(Tile.Amount > 0)) continue;
+				return Index;
+			}
+		}
+		return INDEX_NONE;
+	}
+
+	void FVillage::EnsureCraftSession(FNpc& Npc, int32 TileX, int32 TileY)
+	{
+		const FWorkSession& Existing = Npc.WorkSession;
+		if (Existing.bActive && Existing.CraftId == TEXT("farm") && Existing.TileX == TileX && Existing.TileY == TileY)
+		{
+			return;
+		}
+		// `craftToolSwitchSeconds(from, "farm")` : un seul metier porte, jamais de changement d'outil.
+		const double SwitchUntil = Now + 0.0;
+		FWorkSession Session;
+		Session.bActive = true;
+		Session.CraftId = TEXT("farm");
+		Session.TileX = TileX;
+		Session.TileY = TileY;
+		Session.ArrivedAt = Now;
+		Session.NextSwingAt = SwitchUntil + AnastasisGather::FarmArriveSeconds;
+		Npc.WorkSession = Session;
+	}
+
+	uint32 FVillage::ClaimedFieldPosts(const FNpc& Npc, int32 TileX, int32 TileY) const
+	{
+		namespace G = AnastasisGather;
+		uint32 Claimed = 0;
+		for (const FNpc& Other : Actors.GetItems())
+		{
+			if (&Other == &Npc || Other.Inside.bActive) continue;
+			bool bHas = false;
+			double PX = 0.0;
+			double PY = 0.0;
+			const FWorkSession& S = Other.WorkSession;
+			if (S.bActive && (S.CraftId == TEXT("tend") || S.CraftId == TEXT("farm")) && S.TileX == TileX && S.TileY == TileY)
+			{
+				if (S.PostIndex >= 0)
+				{
+					Claimed |= 1u << (S.PostIndex % G::FieldPostCount);
+					continue;
+				}
+				PX = Other.X;
+				PY = Other.Y;
+				bHas = true;
+			}
+			if (Other.bHasTarget && FMath::IsFinite(Other.Target.X) && FMath::IsFinite(Other.Target.Y)
+				&& FloorInt(Other.Target.X) == TileX && FloorInt(Other.Target.Y) == TileY)
+			{
+				PX = Other.Target.X;
+				PY = Other.Target.Y;
+				bHas = true;
+			}
+			if (!bHas) continue;
+			const int32 Index = G::NearestFieldPostIndex(TileX, TileY, PX, PY);
+			double PostX = 0.0;
+			double PostY = 0.0;
+			G::FieldPostWorld(TileX, TileY, Index, PostX, PostY);
+			if (JsHypot(PX - PostX, PY - PostY) < 0.38)
+			{
+				Claimed |= 1u << Index;
+			}
+		}
+		return Claimed;
+	}
+
+	FPoint FVillage::FieldWorkTarget(FNpc& Npc, const AnastasisWorld::FTile& Tile)
+	{
+		namespace G = AnastasisGather;
+		FWorkSession& S = Npc.WorkSession;
+		const bool bSameTile = S.bActive && S.TileX == Tile.X && S.TileY == Tile.Y;
+		FPoint Post;
+		if (bSameTile && S.PostIndex >= 0)
+		{
+			G::FieldPostWorld(Tile.X, Tile.Y, S.PostIndex, Post.X, Post.Y);
+			return Post;
+		}
+		const int32 Preferred = G::PreferredFieldPostIndex(Npc.Id, Tile.X, Tile.Y);
+		const int32 Index = G::FieldWorkPostIndex(Preferred, ClaimedFieldPosts(Npc, Tile.X, Tile.Y));
+		if (bSameTile)
+		{
+			S.PostIndex = Index;
+		}
+		G::FieldPostWorld(Tile.X, Tile.Y, Index, Post.X, Post.Y);
+		return Post;
+	}
+
+	void FVillage::DepleteTile(int32 Index)
+	{
+		using AnastasisWorld::ETileType;
+		// La branche foret (souches) ne sert qu'au bois : la nourriture pousse aux champs.
+		AnastasisWorld::FTile& Tile = LiveTiles.FindOrAdd(Index, World->Tiles[Index]);
+		const ETileType Before = Tile.Type;
+		Tile.Resource = AnastasisWorld::EResource::None;
+		Tile.Amount = 0;
+		if (Tile.Type == ETileType::Stone || Tile.Type == ETileType::Ruin || Tile.Type == ETileType::Scrub)
+		{
+			Tile.Type = ETileType::Grass;
+		}
+		else
+		{
+			Tile.Type = ETileType::Field;
+			// `ensureFieldFallow`.
+			Tile.CropId = AnastasisWorld::ECropId::Fallow;
+		}
+		// `syncTileMoveCost` : un changement de type change le cout de marche de la case.
+		if (Tile.Type != Before && !Nav.Blocked[Index])
+		{
+			Nav.MoveCost[Index] = AnastasisJs::StoreF32(AnastasisNav::TerrainMoveCostOf(&Tile, nullptr));
+		}
+	}
+
+	int32 FVillage::ProgressCraftGather(FNpc& Npc)
+	{
+		namespace G = AnastasisGather;
+		using AnastasisWorld::EResource;
+		int32 Index = INDEX_NONE;
+		if (Npc.WorkSession.bActive && Npc.WorkSession.CraftId == TEXT("farm"))
+		{
+			const int32 SessionIndex = TileIndexOf(World, Npc.WorkSession.TileX, Npc.WorkSession.TileY);
+			if (SessionIndex != INDEX_NONE)
+			{
+				const AnastasisWorld::FTile SessionTile = LiveTile(SessionIndex);
+				if (SessionTile.Resource == EResource::Food && SessionTile.Amount > 0) Index = SessionIndex;
+			}
+		}
+		if (Index == INDEX_NONE) Index = ResourceTileNear(Npc, EResource::Food);
+		if (Index == INDEX_NONE || LiveTile(Index).Amount <= 0)
+		{
+			// `noteGoalFailure(sim, npc, goal, "empty")` : memoire d'echec non portee.
+			ClearWorkSession(Npc);
+			return 0;
+		}
+		const AnastasisWorld::FTile Tile = LiveTile(Index);
+		EnsureCraftSession(Npc, Tile.X, Tile.Y);
+		// Champs : un poste stable dans la tuile, pas tous au centre.
+		Npc.Target = Tile.Type == AnastasisWorld::ETileType::Field
+			? FieldWorkTarget(Npc, Tile)
+			: FPoint{ Tile.X + 0.5, Tile.Y + 0.5 };
+		Npc.bHasTarget = true;
+		Npc.Activity = TEXT("recolte");
+		if (Now < Npc.WorkSession.NextSwingAt) return 1;
+
+		// `rollCraftMiss` tire `sim.rng` : pas de rate (ecart n°11).
+		int32 Taken = G::YieldPerSwingFarm(Npc.Skill);
+		if (Tile.Type == AnastasisWorld::ETileType::Field)
+		{
+			Taken = G::FieldSeasonGatherAmount(Taken, Day());
+		}
+		Taken = FMath::Min(Tile.Amount, Taken);
+		if (Taken <= 0)
+		{
+			ClearWorkSession(Npc);
+			return 0;
+		}
+		TakeFromTile(Index, Taken);
+		Npc.InventoryFood += Taken;
+		Npc.GatheredFood += Taken;
+		// `gainSkill(npc, 0.008)` : domaine du but, la cueillette.
+		G::GainDomainSkill(Npc.Skill, Npc.SkillGather, G::GatherSkillGain);
+		Npc.WorkSession.SwingsDone += 1;
+		Npc.WorkSession.LastSwingAt = Now;
+		Npc.WorkSession.NextSwingAt = Now + G::SwingPeriodFarm(Npc.Skill, Npc.WorkSession.SwingsDone, Npc.Needs.Energy);
+
+		if (LiveTile(Index).Amount <= 0)
+		{
+			DepleteTile(Index);
+		}
+		if (G::ShouldHaulGatherLoad(Npc.InventoryFood))
+		{
+			BeginHaulToDepot(Npc);
+			return 2;
+		}
+		const AnastasisWorld::FTile After = LiveTile(Index);
+		if (After.Resource == EResource::None || After.Amount <= 0)
+		{
+			ClearWorkSession(Npc);
+			return 2;
+		}
+		return 1;
+	}
+
+	void FVillage::BeginHaulToDepot(FNpc& Npc)
+	{
+		ClearWorkSession(Npc);
+		// `depotResourceOf(grenier)` = food : le sac va au poste.
+		FBuilding* Workplace = Npc.WorkplaceId.IsEmpty() ? nullptr : Buildings.FindById(Npc.WorkplaceId);
+		if (Workplace && Workplace->Type == GranaryType && Npc.InventoryFood > 0)
+		{
+			FPoint Access;
+			Npc.Goal = GoalDeliver;
+			Npc.bHasTarget = BuildingAccessPoint(*Workplace, &Npc, Access);
+			Npc.Target = Access;
+			ClearNavigation(Npc);
+			return;
+		}
+		// Sans depot : livrer au hub ou vendre au marche — non portes (ecart n°12).
+		Npc.Goal = GoalObserver;
+		Npc.bHasTarget = false;
+		Npc.DestBuildingId.Reset();
+		ClearNavigation(Npc);
+	}
+
+	bool FVillage::Deliver(FNpc& Npc)
+	{
+		// `atOwnWorkplace(npc, 3.2)` : poste acheve, centre a 3,2 tuiles au plus.
+		FBuilding* Workplace = Npc.WorkplaceId.IsEmpty() ? nullptr : Buildings.FindById(Npc.WorkplaceId);
+		const bool bAtOwn = Workplace && Workplace->Progress >= 1.0
+			&& JsHypot(Npc.X - (Workplace->X + 0.5), Npc.Y - (Workplace->Y + 0.5)) <= IndoorBuildingRadius;
+		// Hors de son poste, la reference livre au marche, a l'entrepot ou au camp :
+		// aucun n'existe dans ce portage, `deliver` echoue comme elle.
+		if (!bAtOwn || Workplace->Type != GranaryType) return false;
+		// `resourceWithCargo(npc, "food")`.
+		if (Npc.InventoryFood <= 0) return false;
+		const int32 Room = FMath::Max(0, GranaryFoodCap - Workplace->FoodPhysical);
+		const int32 Amount = FMath::Min(Room, FMath::Min(Npc.InventoryFood, AnastasisGather::DepotMaxBatch));
+		if (Amount <= 0) return false;
+		// `transferNpcToBuilding` puis `creditStock` (la place a deja ete comptee).
+		const int32 Moved = FMath::Min(Amount, FMath::Min(Npc.InventoryFood, Room));
+		if (Moved <= 0) return false;
+		Npc.InventoryFood -= Moved;
+		Workplace->FoodPhysical += Moved;
+		Npc.DeliveredFood += Moved;
+		++Npc.Deliveries;
+		Npc.Needs.Morale = Clamp(Npc.Needs.Morale + 1.0, 0.0, 100.0);
+		// `gainSkill(npc, 0.002)` : domaine du but, le marche.
+		AnastasisGather::GainDomainSkill(Npc.Skill, Npc.SkillTrade, AnastasisGather::DeliverSkillGain);
+		return true;
+	}
+
+	// --- Repousse des champs (simulation.js regrowFieldsDaily) -------------------
+
+	int32 FVillage::RegrowFieldsDaily(int32 Day)
+	{
+		if (!World) return 0;
+		int32 Grown = 0;
+		for (int32 Index = 0; Index < World->Tiles.Num(); ++Index)
+		{
+			if (World->Tiles[Index].Type != AnastasisWorld::ETileType::Field && !LiveTiles.Contains(Index)) continue;
+			if (FoodSources.ContainsByPredicate([&](const FFoodSource& S) { return S.TileIndex == Index; })) continue;
+			AnastasisWorld::FTile Tile = LiveTile(Index);
+			const int32 Before = Tile.Resource == AnastasisWorld::EResource::Food ? Tile.Amount : 0;
+			if (AnastasisFields::RegrowTileDaily(Tile, Day))
+			{
+				RegrownFood += Tile.Amount - Before;
+				LiveTiles.Add(Index, Tile);
+				++Grown;
+			}
+		}
+		return Grown;
 	}
 }

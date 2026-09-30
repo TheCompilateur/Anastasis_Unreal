@@ -704,3 +704,149 @@ FString UAnastasisSimulationDebugLibrary::GetFoodSupplyStatus(const UObject* Wor
 	const auto* First = V.GetActors().IsEmpty() ? nullptr : &V.GetActors()[0];
 	return FString::Printf(TEXT("{\"x\":%.5f,\"y\":%.5f,\"time\":%.4f,\"initial\":%d,\"remaining\":%d,\"bag\":%d,\"stock\":%d,\"meals\":%d,\"gathered\":%d,\"delivered\":%d}"),First ? First->X : 0.0,First ? First->Y : 0.0,Sim->GetTime(),Initial,Remaining,Bag,Stored,Meals,Gathered,Delivered);
 }
+
+// Le fermier au grenier (gather-deliver-001). Un champ genere, un grenier vide a
+// 3-4 cases dont un seuil atteint le champ, des fermiers embauches au seuil.
+FString UAnastasisSimulationSubsystem::SeedFirstFarmer(int32 FarmerCount, int32 TileX, int32 TileY)
+{
+	using namespace AnastasisVillage;
+	if (!Simulation.IsRunning())
+	{
+		return FString();
+	}
+	FVillage& V = Simulation.GetVillage();
+	const AnastasisWorld::FWorld& W = Simulation.GetWorld();
+	TArray<int32> Fields;
+	for (int32 I = 0; I < W.Tiles.Num(); ++I)
+	{
+		const AnastasisWorld::FTile Tile = V.LiveTileAt(W.Tiles[I].X, W.Tiles[I].Y);
+		if (Tile.Resource == AnastasisWorld::EResource::Food && Tile.Amount > 0 && !V.IsFootBlocked(Tile.X + 0.5, Tile.Y + 0.5)) Fields.Add(I);
+	}
+	Fields.StableSort([&](int32 A, int32 B)
+	{
+		const AnastasisWorld::FTile& TA = W.Tiles[A];
+		const AnastasisWorld::FTile& TB = W.Tiles[B];
+		return FMath::Square(TA.X - TileX) + FMath::Square(TA.Y - TileY) < FMath::Square(TB.X - TileX) + FMath::Square(TB.Y - TileY);
+	});
+	const AnastasisPath::FWorldNavSource NavSource(V.GetNavGrid(), W);
+	for (const int32 FieldIndex : Fields)
+	{
+		const AnastasisWorld::FTile& Field = W.Tiles[FieldIndex];
+		for (int32 R = 3; R <= 4; ++R)
+		{
+			for (int32 DY = -R; DY <= R; ++DY)
+			{
+				for (int32 DX = -R; DX <= R; ++DX)
+				{
+					if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) != R) continue;
+					const int32 X = Field.X + DX;
+					const int32 Y = Field.Y + DY;
+					if (X < 2 || Y < 2 || X > W.W - 3 || Y > W.H - 3) continue;
+					// Pas sur un champ : le grenier ne mange pas la recolte.
+					if (V.LiveTileAt(X, Y).Resource != AnastasisWorld::EResource::None || V.IsFootBlocked(X + 0.5, Y + 0.5)) continue;
+					const FString Granary = V.AddBuilding(GranaryType, X, Y, 1.0, Simulation.GetDay());
+					if (Granary.IsEmpty()) continue;
+					const FPoint* Door = nullptr;
+					for (const FPoint& P : V.FindBuilding(Granary)->AccessPoints)
+					{
+						TArray<FPoint> Path;
+						if (AnastasisPath::FindPath(NavSource, P, { Field.X + 0.5, Field.Y + 0.5 }, {}, Path))
+						{
+							Door = &P;
+							break;
+						}
+					}
+					if (!Door)
+					{
+						V.RemoveBuilding(Granary);
+						continue;
+					}
+					const FPoint Start = *Door;
+					for (int32 K = 0; K < FMath::Max(1, FarmerCount); ++K)
+					{
+						AnastasisNeeds::FNeeds N;
+						N.Hunger = 10.0;
+						N.Energy = 90.0;
+						N.Social = 80.0;
+						N.Leisure = 80.0;
+						N.Hygiene = 80.0;
+						N.Thirst = 5.0;
+						N.Health = 95.0;
+						N.Morale = 60.0;
+						const FString Id = V.SpawnNpc(Start.X, Start.Y, N);
+						V.AssignWorkplace(Id, AnastasisGather::JobFarmer, Granary);
+					}
+					FarmerGranaryId = Granary;
+					FarmerField = FIntPoint(Field.X, Field.Y);
+					SyncVillagePresentation();
+					UE_LOG(LogAnastasis_UnrealV2, Display,
+						TEXT("ANASTASIS_VILLAGE first farmer granary=%s at (%d,%d) field=(%d,%d) food=%d farmers=%d"),
+						*Granary, X, Y, Field.X, Field.Y, V.LiveTileAt(Field.X, Field.Y).Amount, FMath::Max(1, FarmerCount));
+					FAnastasisVillagePresentation::LogStatus(V, Simulation.GetTime());
+					return Granary;
+				}
+			}
+		}
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VILLAGE first farmer: no reachable generated field near (%d,%d)"), TileX, TileY);
+	return FString();
+}
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVillageFirstFarmer(
+	TEXT("Anastasis.Village.FirstFarmer"),
+	TEXT("Anastasis.Village.FirstFarmer [FarmerCount=1] [TileX] [TileY] - an empty granary near the generated field closest to a tile (default: settlement), and farmers hired there who gather then deliver."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		if (UAnastasisSimulationSubsystem* Host = VillageHost(World))
+		{
+			const AnastasisVillage::FPoint Settlement = Host->GetSimulation().GetVillage().GetSettlement();
+			const int32 Count = Args.IsValidIndex(0) ? FCString::Atoi(*Args[0]) : 1;
+			const int32 X = Args.IsValidIndex(1) ? FCString::Atoi(*Args[1]) : FMath::FloorToInt32(Settlement.X);
+			const int32 Y = Args.IsValidIndex(2) ? FCString::Atoi(*Args[2]) : FMath::FloorToInt32(Settlement.Y);
+			Host->SeedFirstFarmer(Count, X, Y);
+		}
+	}));
+
+FString UAnastasisSimulationDebugLibrary::GetGatherStatus(const UObject* WorldContextObject)
+{
+	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	const UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+	if (!Host || !Host->GetSimulation().IsRunning()) return TEXT("{}");
+	const FAnastasisSimulation& Sim = Host->GetSimulation();
+	const AnastasisVillage::FVillage& V = Sim.GetVillage();
+	const AnastasisWorld::FWorld& W = Sim.GetWorld();
+	const AnastasisVillage::FBuilding* Granary = V.FindBuilding(Host->GetFarmerGranaryId());
+	if (!Granary) return TEXT("{\"granary\":-1}");
+	int32 Field = 0;
+	for (const AnastasisWorld::FTile& Generated : W.Tiles)
+	{
+		const AnastasisWorld::FTile Tile = V.LiveTileAt(Generated.X, Generated.Y);
+		if (Tile.Resource == AnastasisWorld::EResource::Food) Field += Tile.Amount;
+	}
+	int32 Bag = 0, Stock = 0, Meals = 0, Deliveries = 0;
+	for (const AnastasisVillage::FBuilding& B : V.GetBuildings()) Stock += B.FoodPhysical;
+	const AnastasisVillage::FNpc* Farmer = nullptr;
+	for (const AnastasisVillage::FNpc& N : V.GetActors())
+	{
+		Bag += N.InventoryFood;
+		Meals += N.MealsTaken;
+		if (N.WorkplaceId == Granary->Id)
+		{
+			Deliveries += N.Deliveries;
+			if (!Farmer) Farmer = &N;
+		}
+	}
+	UWorld* PresentationWorld = const_cast<UWorld*>(World);
+	const FVector G = FAnastasisVillagePresentation::SimToUnreal(W, Granary->X + 0.5, Granary->Y + 0.5, PresentationWorld);
+	const FIntPoint FieldTile = Host->GetFarmerField();
+	const FVector F = FAnastasisVillagePresentation::SimToUnreal(W, FieldTile.X + 0.5, FieldTile.Y + 0.5, PresentationWorld);
+	const FVector N = Farmer ? FAnastasisVillagePresentation::SimToUnreal(W, Farmer->X, Farmer->Y, PresentationWorld) : G;
+	return FString::Printf(
+		TEXT("{\"time\":%.4f,\"granary\":%d,\"field\":%d,\"bag\":%d,\"stock\":%d,\"meals\":%d,\"deliveries\":%d,")
+		TEXT("\"goal\":\"%s\",\"activity\":\"%s\",\"session\":%s,")
+		TEXT("\"gx\":%.1f,\"gy\":%.1f,\"gz\":%.1f,\"fx\":%.1f,\"fy\":%.1f,\"fz\":%.1f,\"nx\":%.1f,\"ny\":%.1f,\"nz\":%.1f}"),
+		Sim.GetTime(), Granary->FoodPhysical, Field, Bag, Stock, Meals, Deliveries,
+		Farmer ? *Farmer->Goal : TEXT(""), Farmer ? *Farmer->Activity : TEXT(""),
+		Farmer && Farmer->WorkSession.bActive ? TEXT("true") : TEXT("false"),
+		G.X, G.Y, G.Z, F.X, F.Y, F.Z, N.X, N.Y, N.Z);
+}
