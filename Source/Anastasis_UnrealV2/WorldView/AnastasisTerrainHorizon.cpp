@@ -5,7 +5,9 @@
 
 namespace
 {
-double SmoothStep(double Edge0, double Edge1, double X)
+// Nom propre a ce fichier : en build unity, il partage l'unite de compilation avec
+// AnastasisTerrainForge.cpp, dont le namespace anonyme a deja un SmoothStep.
+double HorizonSmoothStep(double Edge0, double Edge1, double X)
 {
 	const double T = FMath::Clamp((X - Edge0) / FMath::Max(Edge1 - Edge0, 1.e-8), 0.0, 1.0);
 	return T * T * (3.0 - 2.0 * T);
@@ -28,9 +30,9 @@ double FarAltitude(double TileX, double TileY, double DistTiles, uint32 Seed)
 {
 	const double N1 = AnastasisWorldNoise::Fbm(TileX / 26.0, TileY / 26.0, static_cast<double>(Seed) + 1301.0);
 	const double N2 = AnastasisWorldNoise::Fbm(TileX / 85.0, TileY / 85.0, static_cast<double>(Seed) + 1777.0);
-	const double Hills = 0.15 + 1.1 * N1 * N1 * (1.0 - 0.7 * SmoothStep(60.0, 160.0, DistTiles));
+	const double Hills = 0.15 + 1.1 * N1 * N1 * (1.0 - 0.7 * HorizonSmoothStep(60.0, 160.0, DistTiles));
 	const double Ridge = 1.0 - FMath::Abs(2.0 * N2 - 1.0);
-	const double Range = SmoothStep(AnastasisTerrainHorizon::RangeStartTiles, AnastasisTerrainHorizon::RangeFullTiles, DistTiles)
+	const double Range = HorizonSmoothStep(AnastasisTerrainHorizon::RangeStartTiles, AnastasisTerrainHorizon::RangeFullTiles, DistTiles)
 		* (2.0 + 4.0 * Ridge * Ridge);
 	return Hills + Range;
 }
@@ -281,7 +283,7 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 		const double NY = E.Y <= MinY ? -1.0 : (E.Y >= MaxY ? 1.0 : 0.0);
 		const FVector2D Normal(E.X + NX * Dist, E.Y + NY * Dist);
 		const FVector2D Scaled(CX + (E.X - CX) * (SX + Dist) / SX, CY + (E.Y - CY) * (SY + Dist) / SY);
-		return FMath::Lerp(Normal, Scaled, SmoothStep(0.0, PerpendicularTiles * TileStep, Dist));
+		return FMath::Lerp(Normal, Scaled, HorizonSmoothStep(0.0, PerpendicularTiles * TileStep, Dist));
 	};
 
 	AnastasisTerrainSurface::FGeometry& G = Out.Geometry;
@@ -306,8 +308,8 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 		const double Dist = D[K];
 		const int32 Stride = 1 << Out.RingLevel[K];
 		const int32 Columns = P / Stride;
-		const double Blend = SmoothStep(0.0, BlendTiles * TileStep, Dist);
-		const double Range = SmoothStep(RangeStartTiles, RangeFullTiles, Dist / TileStep);
+		const double Blend = HorizonSmoothStep(0.0, BlendTiles * TileStep, Dist);
+		const double Range = HorizonSmoothStep(RangeStartTiles, RangeFullTiles, Dist / TileStep);
 		// Fenetre proportionnelle a la distance au bord, pas au rang de l'anneau : une
 		// colonne de plus tous les SmoothFineStepsPerColumn pas fins. Pres du bord c'est
 		// une extrusion pure (meme pente que la derniere rangee forgee), puis le profil
@@ -342,7 +344,7 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 				const double Far = SeaZ + AltStep * FarAltitude(NoiseAt.X / TileStep - 0.5, NoiseAt.Y / TileStep - 0.5, NDist / TileStep, Seed);
 				const double Base = ZMean.Mean(I, R);
 				const double River = WetMean.Mean(I, R)
-					* (1.0 - SmoothStep(RiverStartTiles, RiverEndTiles, NDist / TileStep));
+					* (1.0 - HorizonSmoothStep(RiverStartTiles, RiverEndTiles, NDist / TileStep));
 				double Level = SeaZ, Bed = SeaZ;
 				WaterAt(I, R, Level, Bed);
 				const double Target = FMath::Lerp(Far, Bed, River);
@@ -436,7 +438,7 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 			const double Depth = FMath::Clamp((G.WaterVertices[V].Z - X.Z) / AnastasisTerrainSurface::ShoreDepthSpan, 0.0, 1.0);
 			const double Flat = FMath::Clamp(static_cast<double>(G.Normals[V].Z), 0.0, 1.0);
 			const double Flow = bSeamChannels
-				? Rendered->WaterUV1[Edge[VertexColumn[V]]].X * (1.0 - SmoothStep(0.0, RiverStartTiles * TileStep, D[Out.RingOf(V)]))
+				? Rendered->WaterUV1[Edge[VertexColumn[V]]].X * (1.0 - HorizonSmoothStep(0.0, RiverStartTiles * TileStep, D[Out.RingOf(V)]))
 				: 0.0;
 			G.WaterUV0[V] = FVector2D(Depth, Flat);
 			G.WaterUV1[V] = FVector2D(Flow, 0.0);
