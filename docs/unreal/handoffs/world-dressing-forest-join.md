@@ -76,3 +76,23 @@ Tests exacts :
 - Anastasis.Terrain.Shoreline
 - Anastasis.Terrain.SlopeShade
 - Anastasis.Terrain.WorldExtent
+
+## Integration canonique — 2026-09-29 (Toronto)
+
+Autorisee explicitement : commit, integrate et push. Les sections precedentes decrivent la livraison isolee.
+Main 3cff2ec (lieux AnastasisPlaces, macro-foret, village et input existants) a ete reuni avec cette branche.
+Conflits resolus en conservant integralement le runtime de main et nos trois references UPROPERTY(Transient).
+La map de main n'avait pas change depuis afaf2b6. Aucun travail concurrent non commite n'est inclus.
+
+Etat runtime valide : 37afd87065387e72c881f48ad302862ab73381e3.
+Build du worktree commite propre : Succeeded, 17 actions, 31.47s.
+Build canonique propre : BUILD::PASS, 6 actions, 32.83s.
+Suite complete filtre Anastasis : 122 PASS, 4 KNOWN_EXPECTED_FAILURE du registre, 0 FAIL ; 126/126, aucun incomplet, TEST COMPLETE EXIT CODE 0.
+PREFLIGHT::PASS et POSTFLIGHT::PASS : aucune mutation de HEAD/source/config/content/tools pendant la preuve.
+SCN : reouverture canonique, 127 objets authored, 16120 arbres macro, 859 instances Place_* (20 entrees de rapport) ; sept vues inspectees. Les rochers du Col coexistent avec les Veilleurs ; les autres lieux restent presents. Empreinte terrain/eau inchangee.
+PLY et performances GPU restent UNKNOWN.
+
+Preuves : C:/Users/alex_/.codex/visualizations/2026/09/29/01a0ef53-d859-7fa3-ac79-36f073eb69a3/canonical-integration/
+(build-merged-worktree.log, build-canonical.log, capture-tests.log, tests.json, reload_report.json, existing-places.json, reload_*.png).
+Le mode Verify de world-dressing-01 est desormais autorise sur le canonique en lecture seule ; Preview et Save y restent refuses.
+Cette mise a jour de passation est documentaire, sans changement du runtime valide. Le dossier local .claude/ est exclu.
