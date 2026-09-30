@@ -185,6 +185,12 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
                     Opening *= 1.0-Smooth((Geo.ValleyWeight-0.20)/0.60);
                     Opening *= 1.0-Smooth(Geo.RiverWeight/0.50);
                 }
+                double Riparian = 0.0;
+                if (Rendered->SampleRiparian && Rendered->SampleRiparian(X * TileUU, Y * TileUU, Riparian))
+                {
+                    // Berges et plaines d'inondation : ripisylve claire, pas une foret close.
+                    Opening *= 1.0 - 0.8 * FMath::Clamp(Riparian, 0.0, 1.0);
+                }
                 if (Rendered->bHasBasin && C.BasinClearRadius > 0.0f)
                 {
                     const double Distance = FVector2D(X - Rendered->Basin.X / TileUU,

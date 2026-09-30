@@ -6,6 +6,7 @@
 #include "WorldView/AnastasisTerrainForge.h"
 #include "WorldView/AnastasisTerrainHorizon.h"
 #include "WorldView/AnastasisHumanGeography.h"
+#include "WorldView/AnastasisDrainage.h"
 #include "WorldView/AnastasisPlaces.h"
 
 #include "Anastasis_UnrealV2.h"
@@ -420,6 +421,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
             Z=AnastasisTerrainSurface::WaterPlaneZ;
             return true;
         };
+        Habitat.SampleRiparian = [](double X, double Y, double& W) { return AnastasisDrainage::RiparianAt(X, Y, W); };
         const bool bMacro = ForestDressing.bMacroForest && CVarMacroForest.GetValueOnGameThread() != 0;
         if (!AnastasisEcologicalDressing::Build(CanonicalSource, ForestDressing, ForestPlan, Error,
             bMacro ? &Habitat : nullptr))
@@ -725,6 +727,54 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 // connaitre SHORELINE_FORGE_001. On les remplit donc ici, sur le maillage
                 // REELLEMENT rendu -- ce qui vaut mieux que l'ancien : la marge suit
                 // desormais le relief tessele, pas le pas de tuile de 100 uu.
+                // HYDRO_NETWORK_001 : le reseau de drainage remplace les tranchees au niveau de
+                // la mer par des rivieres qui descendent. Mode 2 seulement : la tranche scellee
+                // du mode 1 reste bit a bit celle de WORLD_SLICE_006.
+                AnastasisDrainage::FNetwork Drainage;
+                if (SurfaceMode == 2 && AnastasisDrainage::IsEnabled())
+                {
+                    AnastasisDrainage::FParams DrainageParams;
+                    if (ForgeMesh.bBasinFound || ForgeMesh.bHumanGeography) DrainageParams.Protected.Add(FVector2D(ForgeMesh.BasinX, ForgeMesh.BasinY));
+                    if (ForgeMesh.bLandmarkFound) DrainageParams.Protected.Add(FVector2D(ForgeMesh.LandmarkX, ForgeMesh.LandmarkY));
+                    if (AnastasisDrainage::Apply(Crop, ForgeMesh, Drainage, DrainageParams))
+                    {
+                        Geometry = ForgeMesh.Geometry;
+                        AnastasisTerrainForge::SetActive(ForgeMesh);
+                        const AnastasisDrainage::FCheck Check = AnastasisDrainage::Check(Drainage, ForgeMesh);
+                        UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_DRAINAGE enabled=1 %s"), *AnastasisDrainage::Describe(Drainage));
+                        UE_LOG(LogAnastasis_UnrealV2, Display,
+                            TEXT("ANASTASIS_DRAINAGE check uphill=%d narrowing=%d confluence_narrower=%d dangling_mouths=%d isolated_water=%d lakes_without_role=%d bank_containment=%.3f"),
+                            Check.UphillSteps, Check.NarrowingSteps, Check.ConfluenceNarrower, Check.DanglingMouths,
+                            Check.IsolatedWaterBodies, Check.LakesWithoutRole, Check.BankContainment);
+                        for (int32 RiverIndex = 0; RiverIndex < Drainage.Rivers.Num(); ++RiverIndex)
+                        {
+                            const AnastasisDrainage::FRiver& River = Drainage.Rivers[RiverIndex];
+                            const auto& A = River.Points[0];
+                            const auto& B = River.Points.Last();
+                            UE_LOG(LogAnastasis_UnrealV2, Display,
+                                TEXT("ANASTASIS_DRAINAGE river=%d order=%d mouth=%s parent=%d source_lake=%d mouth_lake=%d authored=%d length_m=%.0f width_m=%.1f->%.1f depth_m=%.2f->%.2f velocity_ms=%.2f->%.2f water_z=%.0f->%.0f"),
+                                RiverIndex, River.Order,
+                                River.Mouth == AnastasisDrainage::EMouth::River ? TEXT("river") : River.Mouth == AnastasisDrainage::EMouth::Lake ? TEXT("lake") : TEXT("border"),
+                                River.Parent, River.SourceLake, River.MouthLake, River.bAuthored ? 1 : 0, River.LengthM,
+                                A.Width / 100.0, B.Width / 100.0, A.Depth / 100.0, B.Depth / 100.0, A.Velocity, B.Velocity,
+                                A.Location.Z, B.Location.Z);
+                        }
+                        for (int32 LakeIndex = 0; LakeIndex < Drainage.Lakes.Num(); ++LakeIndex)
+                        {
+                            const AnastasisDrainage::FLake& Lake = Drainage.Lakes[LakeIndex];
+                            UE_LOG(LogAnastasis_UnrealV2, Display,
+                                TEXT("ANASTASIS_DRAINAGE lake=%d border=%d surface_z=%.0f cells=%d inflows=%d outflows=%d at=(%.0f,%.0f)"),
+                                LakeIndex, Lake.bBorder ? 1 : 0, Lake.SurfaceZ, Lake.Cells, Lake.Inflows, Lake.Outflows, Lake.Centroid.X, Lake.Centroid.Y);
+                        }
+                    }
+                }
+                else
+                {
+                    UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_DRAINAGE enabled=0"));
+                }
+                AnastasisDrainage::SetActive(Drainage);
+                AnastasisDrainage::DumpIfRequested(Drainage);
+                AnastasisDrainage::DrawDebug(GetWorld(), Drainage, AnastasisDrainage::DebugMode());
                 AnastasisTerrainSurface::FillShorelineChannels(Crop, Geometry);
                 ForgeBasin = FVector(ForgeMesh.BasinX, ForgeMesh.BasinY, ForgeMesh.BasinZ);
                 ForgeLandmark = FVector(ForgeMesh.LandmarkX, ForgeMesh.LandmarkY, ForgeMesh.LandmarkZ);

@@ -254,6 +254,7 @@ Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
 | `house-rest-pie.py` | preuve PIE de la maison : `Anastasis.Village.FirstHouse`, une nuit de sommeil, retrait d'un dormeur puis de la maison occupée |
 | `granary-eat-pie.py` | preuve PIE du grenier (Noûs) : `Anastasis.Village.FirstGranary`, repas confirmés, stock qui baisse, démolition avec réservations en cours |
 | `food-supply-pie.py` | preuve PIE du circuit vivrier fini : prise, depot, repas, epuisement et conservation ; sortie via ANASTASIS_FOOD_OUT ; aucun asset sauvegarde |
+| `hydro-network-capture.ps1` + `hydro-network-capture.py` | A/B du reseau de drainage (`anastasis.Terrain.Drainage 0/1`) : vues zenithale, oblique et gros plans, export de la grille relief + nappe et du reseau JSON, `-Debug 1..4` pour les lignes largeur / profondeur / vitesse / ordre → `Saved/HydroNetworkEvidence/<Label>/` |
 | `shore-capture.ps1` + `shore-capture.py` | A/B visuel du bord d'eau, cadrage sur une rive |
 | `capture-terrain-forge.ps1` + `terrain-forge-capture.py` | captures avant/après du relief → `Saved/TerrainForgeEvidence/` |
 | `capture-terrain-relief.ps1` + `terrain-relief-capture.py` | avant/après d'une étape de la forge de relief (`-Step 1/2/3/scale`), dressing masqué → `Saved/TerrainReliefEvidence/` |

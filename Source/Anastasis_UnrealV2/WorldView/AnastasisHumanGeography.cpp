@@ -60,6 +60,11 @@ const TArray<FVector>& Pass()
 }
 }
 
+TArray<TArray<FVector>> AnastasisHumanGeography::AuthoredRivers()
+{
+    return {MainRiver(),LakeOutlet(),SecondaryBrook()};
+}
+
 AnastasisHumanGeography::FSample AnastasisHumanGeography::Evaluate(double X,double Y,double OriginalHeight)
 {
     FSample Out;Out.Height=OriginalHeight;
