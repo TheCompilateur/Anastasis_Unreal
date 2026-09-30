@@ -12,10 +12,11 @@ Aucune modification du canonique.
 - tools/unreal/capture-camp-shelter.ps1
 - AGENTS.md : trois entrees dans l'index.
 - docs/unreal/handoffs/camp-shelter-009.md
-- Packages locaux Content/Anastasis/CampShelter009/ (livraison ZIP).
+- Deux packages Content/Anastasis/CampShelter009/ suivis en Git LFS sur mandat d integration.
 
 ## COMMIT
-BRANCH_HEAD. Pas d'integration/push de ce nouveau lot sans mandat.
+BRANCH_HEAD. Mandat utilisateur : integre. Branche agent/camp-shelter-009-integration.
+Integration du lot seul dans main ; pas de placement automatique dans la carte.
 
 ## ASSET
 SM_Shelter_PatchedCanvas_01 et M_Shelter_LinenTimber.
