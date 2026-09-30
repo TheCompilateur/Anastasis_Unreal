@@ -314,3 +314,10 @@ concerné ne sont pas verts. Citer les noms de tests et les valeurs, pas « ça 
 `PLAYER` reste **NOT_IMPLEMENTED**. Ne pas le commencer sans mandat explicite d'Alexandre.
 
 Voir `ANASTASIS_CANONICAL_PROJECT.md` et `docs/unreal/UNREAL_CANONICAL_STATE.md`.
+
+## Refugee props 008
+
+| Script | Role |
+|---|---|
+| `create-refugee-props.py` | Cree quatre accessoires de refugies et leur materiau dans RefugeeProps008. |
+| `capture-refugee-props.ps1` + `capture-refugee-props.py` | Capture en studio les quatre objets, sans sauvegarder de niveau. |
