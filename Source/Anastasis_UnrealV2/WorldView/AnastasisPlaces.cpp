@@ -90,7 +90,7 @@ struct FComponent
 class FComposer
 {
 public:
-	FComposer(const FInputs& InInputs, FPlan& InOut)
+	FComposer(const AnastasisPlaces::FInputs& InInputs, AnastasisPlaces::FPlan& InOut)
 		: In(InInputs), S(*InInputs.Source), Out(InOut)
 		, T(AnastasisWorldView::TileWorldSize * InInputs.Source->SpatialScale)
 		, bHG(InInputs.Source->bHumanGeography && InInputs.Source->Seed == AnastasisWorldView::ReferenceSeed)
@@ -115,9 +115,9 @@ public:
 	}
 
 private:
-	const FInputs& In;
+	const AnastasisPlaces::FInputs& In;
 	const FWorldVisualSnapshot& S;
-	FPlan& Out;
+	AnastasisPlaces::FPlan& Out;
 	const double T;
 	const bool bHG;
 	/** Lieu proprietaire de chaque tuile : un lieu ne pose rien sur les tuiles d'un autre. */
@@ -280,7 +280,7 @@ private:
 	/** Ouvre un lieu. Radius > 0 reserve le disque ; un lieu etendu reserve ensuite ses tuiles. */
 	void Begin(EKind Kind, const FString& Id, const TCHAR* Name, const FVector2D& C, double Radius)
 	{
-		FPlace P;
+		AnastasisPlaces::FPlace P;
 		P.Kind = Kind;
 		P.Id = Id;
 		P.Name = Name;
@@ -292,7 +292,7 @@ private:
 	}
 	void End()
 	{
-		FPlace& P = Out.Places[Current];
+		AnastasisPlaces::FPlace& P = Out.Places[Current];
 		P.NumPieces = Out.Pieces.Num() - P.FirstPiece;
 		if (P.NumPieces == 0)
 		{
@@ -313,7 +313,7 @@ private:
 		double Tilt = 0.0, double Toward = 0.0, bool bFollow = false, int32 Variant = -1)
 	{
 		if (!InWorld(P) || !Dry(P) || Reserved(P) || Claimed(P)) return false;
-		FPiece Piece;
+		AnastasisPlaces::FPiece Piece;
 		Piece.Family = F;
 		const int32 Count = FMath::Max(1, Spec(F).Variants);
 		Piece.Variant = static_cast<uint8>(Variant >= 0 ? Variant % Count : R.RandRange(0, Count - 1));
@@ -1071,9 +1071,9 @@ double AnastasisPlaces::ValleyWeightAt(const AnastasisWorldView::FWorldVisualSna
 	return AnastasisHumanGeography::Evaluate(X / T, Y / T, 0.0).ValleyWeight;
 }
 
-bool AnastasisPlaces::Compose(const FInputs& In, FPlan& Out, FString& OutError)
+bool AnastasisPlaces::Compose(const AnastasisPlaces::FInputs& In, AnastasisPlaces::FPlan& Out, FString& OutError)
 {
-	Out = FPlan();
+	Out = AnastasisPlaces::FPlan();
 	if (!In.Source) { OutError = TEXT("places: no source snapshot"); return false; }
 	const auto& S = *In.Source;
 	if (S.W <= 0 || S.H <= 0 || S.Tiles.Num() != S.W * S.H) { OutError = TEXT("places: malformed snapshot"); return false; }
@@ -1083,7 +1083,7 @@ bool AnastasisPlaces::Compose(const FInputs& In, FPlan& Out, FString& OutError)
 	return true;
 }
 
-bool AnastasisPlaces::SupersedesTile(const FPlan& Plan, int32 SourceIndex)
+bool AnastasisPlaces::SupersedesTile(const AnastasisPlaces::FPlan& Plan, int32 SourceIndex)
 {
 	if (!Plan.TileOwner.IsValidIndex(SourceIndex)) return false;
 	const int32 Owner = Plan.TileOwner[SourceIndex];
@@ -1111,7 +1111,7 @@ FString AnastasisPlaces::MeshPath(EFamily Family, int32 Variant)
 	return FString::Printf(TEXT("/Game/Anastasis/%s.%s"), *Name, *Leaf);
 }
 
-AnastasisPlaces::FEmbodyResult AnastasisPlaces::Embody(AActor& Owner, const FPlan& Plan, const FInputs& In,
+AnastasisPlaces::FEmbodyResult AnastasisPlaces::Embody(AActor& Owner, const AnastasisPlaces::FPlan& Plan, const AnastasisPlaces::FInputs& In,
 	UMaterialInterface* ShapeMaterial, TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>>& Components)
 {
 	// Composants REUTILISES d'une incarnation a l'autre, retrouves par nom. Detruire puis
@@ -1126,7 +1126,7 @@ AnastasisPlaces::FEmbodyResult AnastasisPlaces::Embody(AActor& Owner, const FPla
 		Existing.Add(C->GetFName(), C);
 	}
 	Components.RemoveAll([](const TObjectPtr<UHierarchicalInstancedStaticMeshComponent>& C) { return !IsValid(C); });
-	FEmbodyResult Result;
+	AnastasisPlaces::FEmbodyResult Result;
 	TMap<uint32, UHierarchicalInstancedStaticMeshComponent*> ByKey;
 	TMap<UHierarchicalInstancedStaticMeshComponent*, TArray<FTransform>> Batches;
 	UMaterialInstanceDynamic* Tints[3] = {};
@@ -1143,7 +1143,7 @@ AnastasisPlaces::FEmbodyResult AnastasisPlaces::Embody(AActor& Owner, const FPla
 	};
 	auto Ground = [&](double X, double Y, double& Z) { return In.Ground(X, Y, Z); };
 
-	for (const FPiece& P : Plan.Pieces)
+	for (const AnastasisPlaces::FPiece& P : Plan.Pieces)
 	{
 		const uint32 Key = (static_cast<uint32>(P.Family) << 8) | P.Variant;
 		UHierarchicalInstancedStaticMeshComponent** Found = ByKey.Find(Key);
@@ -1224,7 +1224,7 @@ AnastasisPlaces::FEmbodyResult AnastasisPlaces::Embody(AActor& Owner, const FPla
 	// Un ajout par composant : un seul arbre a batir, pas un par instance.
 	for (TPair<UHierarchicalInstancedStaticMeshComponent*, TArray<FTransform>>& B : Batches) B.Key->AddInstances(B.Value, false);
 	for (UHierarchicalInstancedStaticMeshComponent* C : Components) C->MarkRenderStateDirty();
-	for (const FPlace& Pl : Plan.Places)
+	for (const AnastasisPlaces::FPlace& Pl : Plan.Places)
 	{
 		double Z = 0;
 		Ground(Pl.Center.X, Pl.Center.Y, Z);

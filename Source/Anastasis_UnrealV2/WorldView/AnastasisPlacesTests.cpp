@@ -50,9 +50,9 @@ struct FTestWorld
 		Z = Sea + (Metres * 100.0 - Sea) * S.SpatialScale;
 		return true;
 	}
-	FInputs Inputs() const
+	AnastasisPlaces::FInputs Inputs() const
 	{
-		FInputs In;
+		AnastasisPlaces::FInputs In;
 		In.Source = &S;
 		In.Ground = [this](double X, double Y, double& Z) { return Ground(X, Y, Z); };
 		In.Water = [this](double X, double Y, double& Z) { return Water(X, Y, Z); };
@@ -71,7 +71,7 @@ struct FTestWorld
 	}
 };
 
-bool SamePiece(const FPiece& A, const FPiece& B)
+bool SamePiece(const AnastasisPlaces::FPiece& A, const AnastasisPlaces::FPiece& B)
 {
 	return A.Family == B.Family && A.Variant == B.Variant && A.Place == B.Place && A.XY == B.XY && A.Yaw == B.Yaw
 		&& A.Scale == B.Scale && A.Sink == B.Sink && A.Tilt == B.Tilt && A.TiltToward == B.TiltToward && A.bFollowSlope == B.bFollowSlope;
@@ -84,8 +84,8 @@ bool FAnastasisPlacesCanonical::RunTest(const FString&)
 {
 	const FTestWorld W(true, 5.0);
 	const auto Before = W.S.Tiles;
-	const FInputs In = W.Inputs();
-	FPlan A, B;
+	const AnastasisPlaces::FInputs In = W.Inputs();
+	AnastasisPlaces::FPlan A, B;
 	FString E;
 	TestTrue(TEXT("plan A"), Compose(In, A, E));
 	TestTrue(TEXT("plan B"), Compose(In, B, E));
@@ -98,7 +98,7 @@ bool FAnastasisPlacesCanonical::RunTest(const FString&)
 	// Chaque lieu nomme de la graine canonique est trouve : c'est la promesse de la mission.
 	for (const EKind K : {EKind::Spring, EKind::Pass, EKind::Lookout, EKind::Crags, EKind::Hamlet, EKind::Marsh, EKind::OldTree, EKind::OldWood})
 	{
-		if (!A.Places.FindByPredicate([K](const FPlace& P) { return P.Kind == K && P.NumPieces > 0; }))
+		if (!A.Places.FindByPredicate([K](const AnastasisPlaces::FPlace& P) { return P.Kind == K && P.NumPieces > 0; }))
 		{
 			AddError(FString::Printf(TEXT("place kind %d missing; missing=[%s]"), static_cast<int32>(K), *FString::Join(A.Missing, TEXT(","))));
 		}
@@ -106,7 +106,7 @@ bool FAnastasisPlacesCanonical::RunTest(const FString&)
 	// Des lieux, pas une distribution : un plafond garde le dressing lisible et bon marche.
 	TestTrue(TEXT("bounded piece count"), A.Pieces.Num() > 100 && A.Pieces.Num() < 2500);
 	int32 Bad = 0;
-	for (const FPiece& P : A.Pieces)
+	for (const AnastasisPlaces::FPiece& P : A.Pieces)
 	{
 		double Z, Wz;
 		const bool bGround = W.Ground(P.XY.X, P.XY.Y, Z);
@@ -151,17 +151,17 @@ bool FAnastasisPlacesWithoutGeography::RunTest(const FString&)
 	// Sans geographie humaine, les lieux qui la lisent (source, col, marais, chene) se
 	// declarent absents au lieu d'etre inventes ; les autres lisent les tuiles seules.
 	const FTestWorld W(false, 1.0);
-	FPlan P;
+	AnastasisPlaces::FPlan P;
 	FString E;
 	TestTrue(TEXT("plan"), Compose(W.Inputs(), P, E));
 	for (const TCHAR* Id : {TEXT("source"), TEXT("col"), TEXT("marais"), TEXT("vieux_chene")})
 	{
 		TestTrue(FString::Printf(TEXT("%s reported missing"), Id), P.Missing.ContainsByPredicate([Id](const FString& M) { return M.StartsWith(Id); }));
-		TestFalse(FString::Printf(TEXT("%s not invented"), Id), P.Places.ContainsByPredicate([Id](const FPlace& Pl) { return Pl.Id == Id; }));
+		TestFalse(FString::Printf(TEXT("%s not invented"), Id), P.Places.ContainsByPredicate([Id](const AnastasisPlaces::FPlace& Pl) { return Pl.Id == Id; }));
 	}
 	for (const TCHAR* Id : {TEXT("guet"), TEXT("hameau"), TEXT("hautes_pierres"), TEXT("vieille_foret")})
 	{
-		TestTrue(FString::Printf(TEXT("%s from tiles alone"), Id), P.Places.ContainsByPredicate([Id](const FPlace& Pl) { return Pl.Id == Id; }));
+		TestTrue(FString::Printf(TEXT("%s from tiles alone"), Id), P.Places.ContainsByPredicate([Id](const AnastasisPlaces::FPlace& Pl) { return Pl.Id == Id; }));
 	}
 	return true;
 }
@@ -170,9 +170,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisPlacesInvalid, "Anastasis.Places.Reje
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnastasisPlacesInvalid::RunTest(const FString&)
 {
-	FPlan P;
+	AnastasisPlaces::FPlan P;
 	FString E;
-	FInputs In;
+	AnastasisPlaces::FInputs In;
 	TestFalse(TEXT("no source"), Compose(In, P, E));
 	const FTestWorld W(true, 5.0);
 	In.Source = &W.S;
