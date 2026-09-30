@@ -9,6 +9,8 @@ OUT=os.environ['WD01_OUT']
 SAVE=os.environ.get('WD01_SAVE','0')=='1'
 VERIFY=os.environ.get('WD01_VERIFY','0')=='1'
 TAG='WorldDressing01'
+# Local openings measured against the delivered macro forest; values are source tiles (20m).
+SITE_OFFSETS={'01_Les_Trois_Veilleurs':(.25,-1.0),'03_La_Memoire_de_Pierre':(1.5,-2.875)}
 ues=unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 les=unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 eas=unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
@@ -52,6 +54,7 @@ def mesh(name):
     return assets[name]
 placements=[];rejected=[];rng=random.Random(290901)
 def place(site,name,x,y,height,yaw=None,wide=1.0,sink=0.0,wet=False):
+    dx,dy=SITE_OFFSETS.get(site,(0,0));x+=dx;y+=dy
     X=x*2000;Y=y*2000;Z=sample(X,Y);W=sample(X,Y,water)
     # Wet reeds may stand in <=8cm water; woody roots and masonry remain dry.
     if Z<W+(-8 if wet else 20):rejected.append([site,x,y,'water']);return
@@ -132,7 +135,9 @@ report=dict(project=unreal.Paths.project_dir(),engine=unreal.SystemLibrary.get_e
 dump('reload_report.json' if VERIFY else 'placement_report.json',report)
 shots=[]
 def shot(name,xy,target,z=170,tz=170):
-    x,y=xy[0]*2000,xy[1]*2000;tx,ty=target[0]*2000,target[1]*2000
+    site='01_Les_Trois_Veilleurs' if name.startswith('veilleurs') else ('03_La_Memoire_de_Pierre' if name.startswith('memoire') else '')
+    dx,dy=SITE_OFFSETS.get(site,(0,0))
+    x,y=(xy[0]+dx)*2000,(xy[1]+dy)*2000;tx,ty=(target[0]+dx)*2000,(target[1]+dy)*2000
     shots.append((name,[x,y,sample(x,y)+z],[tx,ty,sample(tx,ty)+tz]))
 shot('veilleurs_ground',(42,33.2),(40.35,34.95),170,850)
 shot('veilleurs_air',(43,31),(40.25,35),6500,900)
