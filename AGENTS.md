@@ -266,6 +266,13 @@ manque puis se contentent de le vérifier ; `*_REBUILD=1` le régénère et écr
 Retoucher un de ces assets à la main dans l'éditeur ne survit pas au prochain rebuild : la valeur
 se change dans le script.
 
+### Refugee props 008
+
+| Script | Role |
+|---|---|
+| `create-refugee-props.py` | Cree quatre accessoires de refugies et leur materiau dans RefugeeProps008. |
+| `capture-refugee-props.ps1` + `capture-refugee-props.py` | Capture en studio les quatre objets, sans sauvegarder de niveau. |
+
 ## Tests
 
 ```powershell
