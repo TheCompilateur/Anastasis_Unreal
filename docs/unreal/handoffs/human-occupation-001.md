@@ -16,22 +16,24 @@ Micro-implantation visuelle dans le bassin habitable, dans un niveau isole. Troi
 
 ## COMMIT
 
-PENDING
+HEAD de agent/human-occupation-001 (rejeu inclus).
 
 ## MEC
 
-- BUILD: voir finish
+- BUILD: BUILD::PASS apres rebase (10 actions, 51 s).
 - TESTS: voir finish. La mission ne change pas le C++.
 - COMMANDS:
   - `tools\unreal\human-occupation-001.ps1 -Out Saved\HumanOccupationEvidence`
-  - Passe retenue, terrain d'avant rebase : HUMAN_OCCUPATION::PASS
+  - Rejeu apres rebase sur main : HUMAN_OCCUPATION::PASS
   - site 102000, 109000 cm, franc-bord 584 cm, relief 7,9 cm, berge a 3600 cm
-  - 16 StaticMeshActor, 28 decals, niveau sauve, Lvl_AnastasisSlice non sauvee
-  - frame pendant capture : 20 ms jeu, 52 ms GPU, machine chargee, pas un benchmark
+  - bassin 106000, 106000, z 882,4 cm — memes hauteurs qu'avant rebase
+  - 16 StaticMeshActor, 27 decals, niveau sauve, Lvl_AnastasisSlice non sauvee
+  - arbre debout le plus proche : 14581 cm (la passe foret de main a rapproche la lisiere)
+  - frame pendant capture : 14 ms jeu, 19 ms GPU, pas un benchmark
 
 ## SCN
 
-OBSERVED. Captures 1600x900 dans docs/visual/human-occupation-001 : sol, distance, riviere vers le groupe, groupe vers la foret, lisiere lointaine vers le groupe, heure 8 et 17,5. Le sentier est une suite de decals de terre, lisible depuis la riviere et d'en haut. L'arbre debout le plus proche cote interieur est a 186 m : la clairiere du bassin est deja vide.
+OBSERVED. Captures 1600x900 dans docs/visual/human-occupation-001, rejouees apres rebase : sol, distance, riviere vers le groupe, groupe vers la foret, lisiere vers le groupe, heure 8 et 17,5. Le sentier est une suite de decals de terre. L'arbre debout le plus proche cote interieur est a 146 m.
 
 ## PLY
 
@@ -39,7 +41,7 @@ UNKNOWN. Aucun joueur.
 
 ## INTEGRATION_RISK
 
-Nouveau .umap et un materiau de decal. Ne remplace pas Lvl_AnastasisSlice. Les hauteurs ont ete echantillonnees sur le terrain d'avant les passes foret/sol de main : rejouer la recette apres rebase, sinon les batiments peuvent flotter. AGENTS.md n'ajoute qu'une ligne d'index.
+Nouveau .umap et un materiau de decal. Ne remplace pas Lvl_AnastasisSlice. Recette rejouee apres rebase : le site et les hauteurs n'ont pas bouge, un decal de moins, lisiere a 146 m au lieu de 186 m. AGENTS.md n'ajoute qu'une ligne d'index.
 
 ## STOP
 
