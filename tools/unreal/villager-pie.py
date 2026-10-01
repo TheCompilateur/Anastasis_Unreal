@@ -4,13 +4,15 @@ existants, et une carte portrait par habitant -- rien d'autre.
 Lance par villager-pie.ps1 (editeur discret, rendu hors focus). Rien n'est sauve.
 Sortie : ANASTASIS_VILLAGER_PIE_OUT (defaut Saved/VillagerEvidence/pie).
 
-PIE sur Lvl_AnastasisSlice, puis `Anastasis.Village.FirstWell 12` : douze habitants autour du
-premier puits. A chaque echantillon (GetVillagerCards) :
+PIE sur Lvl_AnastasisSlice SANS AUCUNE COMMANDE : le village du lancement
+(`anastasis.Village.StartVillagers`, 12) doit deja montrer ses habitants, une carte chacun (00-demarrage).
+Puis `Anastasis.Village.FirstWell 12` : le scenario REMPLACE ce village (12 habitants, pas 24).
+A chaque echantillon (GetVillagerCards) :
   - une carte par habitant simule, ni plus ni moins ;
   - portraits tous differents (12 <= 24 portraits attribuables) ;
-  - adultes et aines seulement (la simulation n'a pas d'enfants) ;
+  - adultes et aines seulement (la simulation n'a pas d'enfants), jamais un portrait assis ;
   - carte cachee <=> habitant dedans.
-Prises : 01-proche (un habitant, carte seule), 02-debug (sa sphere de simulation + sa carte :
+Prises : 00-demarrage (le village du lancement), 01-proche (un habitant, carte seule), 02-debug (sa sphere de simulation + sa carte :
 memes pieds), 03-voisins (lui et son plus proche voisin) ; puis `Anastasis.Village.RemoveNpc` : la carte de l'habitant retire disparait.
 Une verification qui echoue echoue ; jamais de PASS raconte.
 """
@@ -25,6 +27,11 @@ ROOT = Path(unreal.Paths.project_dir())
 OUT = Path(os.environ.get('ANASTASIS_VILLAGER_PIE_OUT', str(ROOT / 'Saved' / 'VillagerEvidence' / 'pie')))
 OUT.mkdir(parents=True, exist_ok=True)
 NPC_COUNT = int(os.environ.get('ANASTASIS_VILLAGER_PIE_NPCS', '12'))
+START_COUNT = 12  # anastasis.Village.StartVillagers par defaut
+# Les portraits attribuables : debout, adultes et aines (ecrit par villager-png.py sheets).
+EXTRACT = ROOT / 'SourceArt' / 'Characters' / 'villager-extract.json'
+IN_GAME = {p['id'] for p in json.loads(EXTRACT.read_text(encoding='utf-8'))['people']
+           if p.get('in_game', True) and not p['category'].startswith('Child')}
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 DBG = unreal.AnastasisSimulationDebugLibrary
@@ -48,7 +55,7 @@ def finish(reason):
     if state['finished']:
         return
     state['finished'] = True
-    ok = not state['failures'] and all(s['written'] for s in state['shots']) and len(state['shots']) == 3
+    ok = not state['failures'] and all(s['written'] for s in state['shots']) and len(state['shots']) == 4
     report = {'pass': ok, 'reason': reason, 'failures': state['failures'], 'shots': state['shots'], 'checks': state['checks']}
     (OUT / 'villager-pie.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
     log(('PASS ' if ok else 'FAIL ') + reason + ('' if ok else ' ' + json.dumps(state['failures'])))
@@ -71,8 +78,8 @@ def check(c, label):
         errs.append('habitant sans carte')
     if len(set(looks)) != len(looks) and len(looks) <= 24:
         errs.append('portraits en double: %s' % sorted(looks))
-    if any(('_Adult_' not in l and '_Elder_' not in l) for l in looks if l):
-        errs.append('portrait hors adultes/aines: %s' % [l for l in looks if '_Child_' in l])
+    if any(l not in IN_GAME for l in looks if l):
+        errs.append('portrait non attribuable (enfant ou assis): %s' % [l for l in looks if l and l not in IN_GAME])
     if any(x['hidden'] != x['inside'] for x in v):
         errs.append('carte cachee != habitant dedans')
     state['checks'].append({'at': label, 'npcs': c.get('npcs'), 'cards': c.get('cards'), 'errors': errs})
@@ -86,18 +93,29 @@ def aim(target, offset):
     cam = state['camera']
     cam.set_actor_location(position, False, True)
     cam.set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(position, target), True)
+    # Le controleur reprend la vue de son pion quand celui-ci reapparait (02-debug filmait la vue du
+    # joueur, identique d'un run a l'autre) : on reimpose la camera de preuve a chaque cadrage.
+    world = ues.get_game_world()
+    pc = unreal.GameplayStatics.get_player_controller(world, 0) if world else None
+    if pc and pc.get_view_target() != cam:
+        log('VIEW_TARGET repris par le controleur, camera de preuve reimposee')
+        pc.set_view_target_with_blend(cam, 0.0)
 
 
 def existing_shots():
     return set(SHOTS_DIR.rglob('*.png')) if SHOTS_DIR.exists() else set()
 
 
-def shoot(world, name):
+def shoot(world, name, npc=None, offset=None):
+    """Fige la simulation, PUIS cadre : a la vitesse de la simulation (4 tuiles/s, 20 m la tuile), un
+    habitant qui marche quitte le cadre entre la lecture de sa position et le gel (00-demarrage, premier
+    run : image vide). La position est relue au tick suivant le gel."""
     path = OUT / (name + '.png')
     if path.exists():
         path.unlink()
     unreal.SystemLibrary.execute_console_command(world, 'anastasis.Sim.Speed 0')
-    state['pending'] = {'path': path, 'at': time.monotonic(), 'fired': False, 'before': existing_shots(), 'name': name}
+    state['pending'] = {'path': path, 'at': time.monotonic(), 'fired': False, 'before': existing_shots(), 'name': name,
+                        'npc': npc, 'offset': offset, 'aimed': npc is None}
     log('SHOT ' + name)
 
 
@@ -113,8 +131,9 @@ def tick(dt):
     if state['phase'] == 1:
         if not les.is_in_play_in_editor() or not world or DBG.get_simulation_time(world) < 0:
             return
+        # Aucune commande de scenario ici : le village doit deja etre la.
         for cmd in ('anastasis.Village.Debug 0', 'anastasis.Village.Portraits 1', 'showflag.Fog 0',
-                    'r.MotionBlurQuality 0', 'anastasis.Sim.Speed 2', 'Anastasis.Village.FirstWell %d' % NPC_COUNT):
+                    'r.MotionBlurQuality 0', 'anastasis.Sim.Speed 2'):
             unreal.SystemLibrary.execute_console_command(world, cmd)
         cams = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.CameraActor)
         state['camera'] = next((c for c in cams if c.get_actor_label() == 'VillagerProofCamera'), None)
@@ -129,6 +148,17 @@ def tick(dt):
 
     p = state['pending']
     if p is not None:
+        if not p['aimed']:
+            frozen = cards(world)
+            x = next((v for v in frozen.get('villagers', []) if v['npc'] == p['npc']), None)
+            if x:
+                aim(unreal.Vector(x['x'], x['y'], x['z'] + 110), p['offset'])
+            cam = state['camera'].get_actor_location() if state['camera'] else None
+            log('AIM %s npc=%s pos=%s hidden=%s camera=%s' % (p['name'], p['npc'],
+                (round(x['x']), round(x['y']), round(x['z'])) if x else None, x['hidden'] if x else None,
+                (round(cam.x), round(cam.y), round(cam.z)) if cam else None))
+            p['aimed'], p['at'] = True, time.monotonic()
+            return
         if not p['fired']:
             if time.monotonic() - p['at'] < 0.8:
                 return
@@ -152,7 +182,8 @@ def tick(dt):
         return
     if c['npcs'] == 0:
         if time.monotonic() - state['seeded_at'] > 20:
-            finish('FirstWell n\'a pose aucun habitant')
+            state['failures'].append('aucun habitant (etape %d)' % state['step'])
+            finish('village vide')
         return
     # Laisser les habitants se disperser un peu avant la premiere prise.
     if time.monotonic() - state['seeded_at'] < 6:
@@ -166,18 +197,29 @@ def tick(dt):
     def chest(x):
         return unreal.Vector(x['x'], x['y'], x['z'] + 110)
     if step == 0:
+        check(c, '00-demarrage')
+        if c['npcs'] != START_COUNT:
+            state['failures'].append('00-demarrage: %d habitants au lancement, %d attendus' % (c['npcs'], START_COUNT))
+        log('START ' + json.dumps(c))
+        log('FRAME 00-demarrage ' + near[0]['npc'] + ' ' + near[0]['look'])
+        shoot(world, '00-demarrage', near[0]['npc'], unreal.Vector(-300, -400, 60))
+    elif step == 1:
+        unreal.SystemLibrary.execute_console_command(world, 'Anastasis.Village.FirstWell %d' % NPC_COUNT)
+        log('SCENARIO FirstWell %d' % NPC_COUNT)
+        state['seeded_at'] = time.monotonic()
+    elif step == 2:
+        if c['npcs'] != NPC_COUNT:
+            state['failures'].append('01-scenario: %d habitants apres FirstWell %d (le village du lancement aurait du etre remplace)' % (c['npcs'], NPC_COUNT))
         check(c, '01-proche')
         log('CARDS ' + json.dumps(c))
-        aim(chest(near[0]), unreal.Vector(-260, -340, 40))
         log('FRAME 01-proche ' + near[0]['npc'] + ' ' + near[0]['look'])
-        shoot(world, '01-proche')
-    elif step == 1:
+        shoot(world, '01-proche', near[0]['npc'], unreal.Vector(-260, -340, 40))
+    elif step == 3:
         check(c, '02-debug')
         unreal.SystemLibrary.execute_console_command(world, 'anastasis.Village.Debug 1')
-        aim(chest(near[0]), unreal.Vector(-420, -540, 160))
         log('FRAME 02-debug ' + near[0]['npc'])
-        shoot(world, '02-debug')
-    elif step == 2:
+        shoot(world, '02-debug', near[0]['npc'], unreal.Vector(-420, -540, 160))
+    elif step == 4:
         unreal.SystemLibrary.execute_console_command(world, 'anastasis.Village.Debug 0')
         check(c, '03-voisins')
         # Deux habitants : le premier et son plus proche voisin, cadres ensemble.
@@ -187,12 +229,12 @@ def tick(dt):
         aim(mid, unreal.Vector(-0.6 * span, -0.8 * span, 0.25 * span))
         log('FRAME 03-voisins %s %s span=%.0f' % (a['npc'], b['npc'], span))
         shoot(world, '03-voisins')
-    elif step == 3:
+    elif step == 5:
         victim = v[0]['npc']
         state['removed'] = {'npc': victim, 'look': v[0]['look'], 'before': c['cards']}
         unreal.SystemLibrary.execute_console_command(world, 'Anastasis.Village.RemoveNpc ' + victim)
         log('REMOVE ' + victim)
-    elif step == 4:
+    elif step == 6:
         r = state['removed']
         gone = all(x['npc'] != r['npc'] for x in v)
         ok = gone and c['cards'] == r['before'] - 1 and check(c, '04-retrait')

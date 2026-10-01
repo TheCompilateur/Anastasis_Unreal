@@ -321,15 +321,17 @@ se change dans le script.
 
 ### Population visuelle (VILLAGER_PNG_001)
 
-Autorite : `SourceArt/Characters/villager-population.json` (un individu par entree, stature, physionomie).
-Les habitants simules portent un portrait ; la simulation n'en sait rien. Voir `docs/unreal/VILLAGER_PNG_001.md`.
+Autorite : les planches `SourceArt/Characters/Sheets/serie-*.png` et `SourceArt/Characters/villager-population.json`
+(qui est ou sur quelle planche, poses assises). Les habitants simules portent un portrait ; la simulation n'en sait rien.
+Au lancement, `anastasis.Village.StartVillagers` (12) habitants autour du premier puits ; le premier scenario
+`Anastasis.Village.First*` / `FoodSupply` remplace ce village. Voir `docs/unreal/VILLAGER_PNG_001.md`.
 
 | Script | Role |
 |---|---|
-| `villager-png.py` | **hors editeur** (Python systeme, Pillow + numpy) : `prompts` (fiche ChatGPT), `prep` (detourage `Raw/` → `SourceArt/Characters/PNG/<Categorie>/`, 512x1024, pieds alignes, stature du manifeste), `board` (planches → `docs/visual/villager-png-001/`), `check` (ressemblance silhouette / visage par paire) |
-| `import-villagers.ps1` + `import-villagers.py` | **ecrit** dans `Content/` : textures `/Game/Anastasis/Characters/PNG/<Categorie>/CHR_*` (BC7, sRGB, Character, Clamp, couverture alpha), `M_AnastasisVillager`, et `DA_AnastasisPresentation.Villagers` ; relit et verifie ; editeur dedie qui se ferme |
-| `villager-lineup.ps1` + `villager-lineup.py` | planche dans Unreal (vrais acteurs `AnastasisVillagerVisual`) : population entiere puis groupes de huit, sur un arc, temoin 180 cm → `Saved/VillagerEvidence/<Label>/` ; niveau jamais sauve |
-| `villager-pie.ps1` + `villager-pie.py` | preuve PIE : `Anastasis.Village.FirstWell 12`, une carte par habitant, portraits distincts, adultes et aines seulement, retrait suivi (`RemoveNpc`) → `Saved/VillagerEvidence/pie/` |
+| `villager-png.py` | **hors editeur** (Python systeme, Pillow + numpy) : `sheets` (decoupe des planches → `Raw/` + `villager-extract.json`, statures mesurees), `prep` (→ `SourceArt/Characters/PNG/<Categorie>/`, canevas 512x1024 = 128x256 cm, pieds alignes), `board` (planches → `docs/visual/villager-png-001/`), `check` (ressemblance silhouette / visage par paire) |
+| `import-villagers.ps1` + `import-villagers.py` | **ecrit** dans `Content/` : textures `/Game/Anastasis/Characters/PNG/<Categorie>/CHR_*` (BC7, sRGB, Character, Clamp, hors streaming, couverture alpha), `M_AnastasisVillager`, et `DA_AnastasisPresentation.Villagers` ; relit, verifie, refuse un materiau qui ne compile pas ; editeur dedie qui se ferme |
+| `villager-lineup.ps1` + `villager-lineup.py` | planche dans Unreal (vrais acteurs `AnastasisVillagerVisual`) : population entiere puis par groupe, sur un arc, temoin 180 cm → `Saved/VillagerEvidence/<Label>/` ; niveau jamais sauve |
+| `villager-pie.ps1` + `villager-pie.py` | preuve PIE : `Anastasis.Village.FirstWell 12`, une carte par habitant, portraits distincts, adultes et aines debout seulement, retrait suivi (`RemoveNpc`) → `Saved/VillagerEvidence/pie/` |
 
 ## Tests
 

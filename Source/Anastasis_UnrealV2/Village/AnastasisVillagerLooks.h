@@ -16,21 +16,24 @@
  */
 namespace AnastasisVillagerLooks
 {
-	/** Card canvas, shared with SourceArt/Characters/villager-population.json ("canvas"). */
-	inline constexpr double CanvasWidthCm = 100.0;
-	inline constexpr double CanvasHeightCm = 200.0;
+	/**
+	 * Card canvas, shared with SourceArt/Characters/villager-population.json ("canvas"): 512 x 1024 px
+	 * for 128 x 256 cm. Taller than a person on purpose: a guard's spear rises ~60 cm above his head.
+	 */
+	inline constexpr double CanvasWidthCm = 128.0;
+	inline constexpr double CanvasHeightCm = 256.0;
 	/** Feet sit 16 px above the bottom of a 1024 px canvas. */
 	inline constexpr double FootMarginCm = 16.0 * CanvasHeightCm / 1024.0;
 
-	/** May a portrait of this category be handed to a simulated villager today. */
+	/** May a portrait of this category be handed to a simulated villager today (bInGame aside). */
 	bool IsAssignableInVillage(EAnastasisVillagerCategory Category);
 
 	/**
 	 * Indices into `Looks` of the portraits a villager may wear. Each category is ordered by CRC
 	 * of LookId (independent of the asset order); the categories are then interleaved in
 	 * proportion to their size, so any first N villagers mirror the population's make-up
-	 * (8/8/4/4: man, woman, old man, old woman, man, woman...). Entries without a portrait are
-	 * left out.
+	 * (8/8/4/4: man, woman, old man, old woman, man, woman...). Entries without a portrait, or
+	 * marked !bInGame (a seated pose), are left out.
 	 */
 	TArray<int32> VillagePool(const TArray<FAnastasisVillagerLook>& Looks);
 

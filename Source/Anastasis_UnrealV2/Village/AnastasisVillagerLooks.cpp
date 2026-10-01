@@ -26,7 +26,7 @@ namespace AnastasisVillagerLooks
 		TSortedMap<uint8, TArray<int32>> Queues;
 		for (int32 Index = 0; Index < Looks.Num(); ++Index)
 		{
-			if (IsAssignableInVillage(Looks[Index].Category) && !Looks[Index].Portrait.IsNull())
+			if (IsAssignableInVillage(Looks[Index].Category) && Looks[Index].bInGame && !Looks[Index].Portrait.IsNull())
 			{
 				Queues.FindOrAdd(static_cast<uint8>(Looks[Index].Category)).Add(Index);
 			}

@@ -147,6 +147,12 @@ bool FAnastasisVillagerLookPoolTest::RunTest(const FString&)
 
 	Looks[Pool[0]].Portrait.Reset();
 	TestEqual(TEXT("une entree sans portrait sort du tirage"), VillagePool(Looks).Num(), 23);
+	Looks[Pool[1]].bInGame = false;
+	TestEqual(TEXT("un portrait assis (bInGame faux) sort du tirage"), VillagePool(Looks).Num(), 22);
+	for (int32 N = 0; N < 40; ++N)
+	{
+		TestTrue(TEXT("jamais attribue s'il est hors jeu"), Looks[PickLook(VillagePool(Looks), FString::Printf(TEXT("npc-%d"), N))].bInGame);
+	}
 	return true;
 }
 

@@ -153,7 +153,7 @@ enum class EAnastasisVillagerCategory : uint8
  * One individual of the visual population (VILLAGER_PNG_001): a cut-out PNG, one person.
  *
  * Every portrait shares the canvas of SourceArt/Characters/villager-population.json: 512 x 1024 px
- * for 100 x 200 cm, feet on the vertical axis, 16 px above the bottom edge. The person's
+ * for 128 x 256 cm, feet on the vertical axis, 16 px above the bottom edge. The person's
  * stature is therefore baked into the image, and every card is drawn at the same size.
  */
 USTRUCT(BlueprintType)
@@ -171,6 +171,14 @@ struct FAnastasisVillagerLook
 	/** Soft, like meshes: the registry stays loadable without pulling 32 textures in. */
 	UPROPERTY(EditAnywhere, Category = "Villagers")
 	TSoftObjectPtr<UTexture2D> Portrait;
+
+	/**
+	 * False: shown on the lineup, never handed to a simulated villager. A seated elder drawn on a
+	 * bench would glide across the village on it. Defaults to true, so data written before the
+	 * field existed keeps its meaning.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Villagers")
+	bool bInGame = true;
 };
 
 /** What one semantic type looks like. The simulation never sees this struct. */

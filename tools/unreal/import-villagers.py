@@ -18,6 +18,8 @@ import unreal
 
 ROOT = os.path.abspath(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()))
 MANIFEST = os.path.join(ROOT, 'SourceArt', 'Characters', 'villager-population.json')
+# La population : ecrite par `villager-png.py sheets` (ids, categories, statures, pose).
+EXTRACT = os.path.join(ROOT, 'SourceArt', 'Characters', 'villager-extract.json')
 SOURCE = os.path.join(ROOT, 'SourceArt', 'Characters', 'PNG')
 DEST = '/Game/Anastasis/Characters/PNG'
 MATERIAL_PATH = '/Game/Anastasis/Characters/M_AnastasisVillager'
@@ -30,6 +32,9 @@ CATEGORY_ENUM = {
 }
 
 FAILURES = []
+# bInGame : le binding Python d'UE 5.8 l'expose sous `game` (il retire `bIn`, pas seulement `b`),
+# vu au premier import de la population. On essaie les deux plutot que de parier.
+IN_GAME_NAMES = ['in_game', 'game']
 
 
 def log(msg):
@@ -39,6 +44,15 @@ def log(msg):
 def fail(msg):
     FAILURES.append(msg)
     unreal.log_error('VILLAGERS_IMPORT::FAIL ' + msg)
+
+
+def get_first(obj, names):
+    for name in names:
+        try:
+            return obj.get_editor_property(name)
+        except Exception:
+            continue
+    raise Exception('aucune propriete parmi ' + ','.join(names))
 
 
 def set_first(obj, names, value):
@@ -208,6 +222,8 @@ def write_registry(imported, material):
         look.set_editor_property('look_id', p['id'])
         look.set_editor_property('category', getattr(unreal.AnastasisVillagerCategory, CATEGORY_ENUM[p['category']]))
         look.set_editor_property('portrait', tex)
+        # Assis : sur la planche, jamais sur un habitant qui marche.
+        set_first(look, IN_GAME_NAMES, bool(p.get('in_game', True)))
         looks.append(look)
     reg.set_editor_property('villagers', looks)
     reg.set_editor_property('villager_material', material)
@@ -245,6 +261,7 @@ def verify(people, canvas):
             'clamp': tex.get_editor_property('address_x') == unreal.TextureAddress.TA_CLAMP,
             'hors_streaming': tex.get_editor_property('never_stream'),
             'categorie': look.get_editor_property('category') == getattr(unreal.AnastasisVillagerCategory, CATEGORY_ENUM[p['category']]),
+            'en_jeu': get_first(look, IN_GAME_NAMES) == bool(p.get('in_game', True)),
         }
         try:
             checks['couverture_alpha'] = bool(tex.get_editor_property('do_scale_mips_for_alpha_coverage'))
@@ -271,7 +288,12 @@ def verify(people, canvas):
 def main():
     with open(MANIFEST, encoding='utf-8') as f:
         manifest = json.load(f)
-    people = manifest['people']
+    if not os.path.exists(EXTRACT):
+        fail('population absente : lancer `python tools/unreal/villager-png.py sheets` puis `prep`')
+        people = []
+    else:
+        with open(EXTRACT, encoding='utf-8') as f:
+            people = json.load(f)['people']
     imported = import_portraits(people)
     if not imported:
         fail('aucun PNG traite dans ' + SOURCE + ' (lancer villager-png.py prep)')
@@ -279,7 +301,7 @@ def main():
         material = ensure_material(imported[0][1])
         write_registry(imported, material)
     counts, n = verify(people, manifest['canvas'])
-    log('POPULATION ' + ' '.join('%s=%d' % (c, counts.get(c, 0)) for c in CATEGORY_ENUM) + ' total=%d' % n)
+    log('POPULATION ' + ' '.join('%s=%d' % (c, counts.get(c, 0)) for c in CATEGORY_ENUM) + ' total=%d en_jeu=%d' % (n, sum(1 for p in people if p.get('in_game', True) and not p['category'].startswith('Child') and os.path.exists(os.path.join(SOURCE, p['category'], p['id'] + '.png')))))
     print('VILLAGERS_IMPORT::%s imported=%d registry=%d failures=%d' % ('PASS' if not FAILURES else 'FAIL', len(imported), n, len(FAILURES)))
     unreal.log('VILLAGERS_IMPORT::%s imported=%d registry=%d failures=%d' % ('PASS' if not FAILURES else 'FAIL', len(imported), n, len(FAILURES)))
 

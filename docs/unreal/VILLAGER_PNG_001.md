@@ -1,135 +1,150 @@
 # VILLAGER_PNG_001 -- une population visuelle pour les habitants simules
 
-Mission : donner un visage aux habitants de la simulation, par des PNG detoures, **sans toucher
-au simulateur**. 32 individus distincts : 8 hommes adultes, 8 femmes adultes, 4 hommes ages,
-4 femmes agees, 4 garcons, 4 filles.
+Mission : donner un visage aux habitants de la simulation, par des PNG detoures, **sans toucher au
+simulateur**, et les faire apparaitre dans le jeu.
+
+**Etat (2026-10-01)** : 104 individus decoupes des planches d'Alexandre, importes, attribues ; au
+lancement du jeu, 12 habitants portent deja leur portrait, sans aucune commande.
 
 ## 1. Ce qui existait (inspecte, pas suppose)
 
 | Question | Constat |
 |---|---|
-| Representation graphique des PNJ | **Aucune.** `FAnastasisVillagePresentation::DrawDebug` dessine une sphere de debug par habitant (couleur = soif) et une ligne de texte. `Sync` ne cree des acteurs que pour les batiments. Aucun sprite, billboard, Paper2D, widget ni texture de personnage dans `Source/` ou `Content/` ; seuls les Mannequins du template. |
-| Demographie dans le simulateur | **Aucune.** `AnastasisVillage::FNpc` n'a ni age, ni sexe, ni stade de vie, ni identifiant visuel. L'ecart n°8 de `AnastasisVillage.h` le declare : « Tous les habitants sont des adultes sans metier de garde, sans famille ». Attributs individuels : `Id` (`npc-N`), `JobId`, `TraitIndex`. |
-| Images de reference | Hors du projet Unreal : `C:\dev\Jeux IV Kingdoms\assets\references\npc\` (planche homme, planche femme, planche « PNJ integres au decor ») et `...\.worktrees\vanilla-unification\references\npc\` (+ 12 variantes low-poly). Planches de concept sur fond plein, un meme corps decline : des references de STYLE, pas une source de 32 individus. |
-| Ou ranger une table visuelle | `UAnastasisPresentationRegistry` (`DA_AnastasisPresentation`) : « l'asset qu'une passe artistique edite », inconnu de la simulation. Reutilise, pas de seconde architecture. |
+| Representation graphique des PNJ | **Aucune.** `FAnastasisVillagePresentation::DrawDebug` dessinait une sphere de debug par habitant. `Sync` ne creait des acteurs que pour les batiments. Aucun sprite, billboard, Paper2D ou texture de personnage. |
+| Demographie dans le simulateur | **Aucune.** `AnastasisVillage::FNpc` n'a ni age, ni sexe, ni stade de vie. Ecart n°8 de `AnastasisVillage.h` : « Tous les habitants sont des adultes ». |
+| Habitants au lancement | **Aucun.** `OnWorldBeginPlay` remet la simulation a zero sur un village vide ; les habitants n'existaient que par `Anastasis.Village.First*` en console. |
+| Ou ranger une table visuelle | `UAnastasisPresentationRegistry` (`DA_AnastasisPresentation`), deja « l'asset qu'une passe artistique edite ». Reutilise. |
 
-## 2. Decisions (prises avec Alexandre le 2026-09-30)
+## 2. Decisions (avec Alexandre, 2026-09-30 / 10-01)
 
-- **Source des images** : generees par Alexandre dans ChatGPT (l'outil des planches), un prompt par
-  individu tire du manifeste ; cette session n'a aucun generateur d'images. Fiche :
-  `docs/unreal/VILLAGER_PNG_001_PROMPTS.md`.
-- **Rattachement aux PNJ** : table de presentation seule, deterministe sur l'identifiant `npc-N`.
-  Les 32 portraits sont crees et visibles sur la planche ; **en jeu, seuls adultes et aines sont
-  attribues**, puisque la simulation n'a que des adultes. Les enfants entreront en jeu le jour ou
-  la simulation aura des enfants -- c'est une ligne dans `AnastasisVillagerLooks::IsAssignableInVillage`.
+- **Images** : planches dessinees par Alexandre (series 1, 2, 4, 5 : `SourceArt/Characters/Sheets/`),
+  decoupees ici. Elles font autorite : le manifeste dit ou est chacun.
+- **Rattachement** : table de presentation seule, deterministe sur `npc-N`. Toutes les categories
+  existent ; en jeu, seuls adultes et aines **debout** sont attribues (la simulation n'a que des
+  adultes ; un aine assis sur un banc glisserait a travers le village).
+- **Le jeu ne s'ouvre plus vide** : « fais tout ce qui doit etre fait pour que les PNJ apparaissent
+  dans le jeu ». Voir 3.4.
 
 ## 3. Chaine
 
 ```
-SourceArt/Characters/villager-population.json   autorite : id, categorie, age, stature, physionomie
-        | villager-png.py prompts       -> docs/unreal/VILLAGER_PNG_001_PROMPTS.md (ChatGPT)
-SourceArt/Characters/Raw/CHR_*.png               depot des images generees (jamais modifie)
-        | villager-png.py prep          -> SourceArt/Characters/PNG/<Categorie>/CHR_*.png
-        | villager-png.py board/check   -> docs/visual/villager-png-001/ ; ressemblance par paire
-        | import-villagers.ps1          -> /Game/Anastasis/Characters/PNG/<Categorie>/CHR_*
-        |                                  /Game/Anastasis/Characters/M_AnastasisVillager
-        |                                  DA_AnastasisPresentation.Villagers / .VillagerMaterial
-        v
+SourceArt/Characters/Sheets/serie-{1,2,4,5}.png   les planches (autorite)
+SourceArt/Characters/villager-population.json      panneaux, ids, poses assises, statures moyennes
+   | villager-png.py sheets  -> Raw/<id>.png (decoupe brute)  + villager-extract.json (statures mesurees)
+   | villager-png.py prep    -> PNG/<Categorie>/<id>.png      (canevas commun)
+   | villager-png.py board / check                            (planches, detecteur de clones)
+   | import-villagers.ps1    -> /Game/Anastasis/Characters/PNG/<Categorie>/CHR_*, M_AnastasisVillager,
+   |                            DA_AnastasisPresentation.Villagers / .VillagerMaterial
+   v
 UAnastasisSimulationSubsystem::Tick -> FAnastasisVillagePresentation::SyncVillagers
-        -> AAnastasisVillagerVisual (une carte par npc-N, pieds = SimToUnreal)
+   -> AAnastasisVillagerVisual (une carte par npc-N, pieds = SimToUnreal)
 ```
 
-**Canevas commun** : 512 x 1024 px = 100 x 200 cm, pieds sur l'axe vertical, 16 px au-dessus du
-bord bas. La stature du manifeste est appliquee au detourage (5,12 px/cm) : un enfant de 106 cm
-et un homme de 181 cm ont la meme carte, pas la meme taille. Une carte = toujours la meme taille
-monde.
+### 3.1 Decoupe des planches (`sheets`)
 
-**Detourage** (`prep`) : alpha natif s'il existe ; sinon fond uni modelise (quadratique, ajuste sur
-les bords), propagation depuis les bords, alpha des lisieres par projection sur l'axe
-fond -> couleur du sujet voisine, puis decontamination `F = (I - (1-a)B)/a` (plus de liseré clair).
-Trous fermes (main sur la hanche) retires seulement sur fond vert d'incrustation : sur un fond
-gris, une piece de lin ecru a la couleur du fond. Couleur saignee sous l'alpha nul (mips propres).
-Statut `A_REVOIR` si : sujet coupe par un bord, halo mesure, trous fermes non traites.
+- Chaque panneau est detoure **d'un bloc** sur son fond creme (modele de fond quadratique, propagation
+  depuis les bords), puis chaque piece va a l'etiquette `CHR_*` la plus proche. Couper en colonnes au
+  milieu de deux etiquettes coupait le sac de `M_Adult_005` et le baton de `M_Adult_006`. Une piece qui
+  couvre deux etiquettes (deux figures qui se touchent) serait coupee et signalee : aucune sur 104.
+- Etiquettes : bande de texte au bas du panneau (deux lignes en series 4 et 5), coupee aux k-1 plus
+  grands ecarts. Pire marge relevee : 8 px entre deux etiquettes contre 2 px dans une etiquette.
+- L'ombre portee du dessin est du **fond des la propagation** (meme teinte que le creme, plus sombre,
+  bas de la silhouette) : retiree apres coup, elle murait l'espace entre les jambes.
+- Trous fermes de la couleur exacte du fond perces (mailles des filets de peche).
+- Filets verticaux entre deux cases (serie 4) ecartes : moins de 5 px de large.
+- Stature = stature moyenne de la categorie x hauteur du **corps** dessinee / mediane du panneau
+  (la pointe d'une lance ne compte pas : premiere ligne assez large pour etre une tete). Assis :
+  72 % de la stature debout, le dessin ne disant rien (serie 5 dessine ses aines assis aussi hauts
+  qu'un aine debout).
 
-**Textures** : BC7 (contours d'un visage de 60 px), sRGB, groupe Character, Clamp, couverture alpha
-conservee dans les mips (seuil 0,5 = celui du masque). Verifie par relecture a chaque import.
+**Corrections de numerotation** (les planches portent des doublons) :
 
-**Carte** (`AAnastasisVillagerVisual`) : quad procedural (UV, normale et pivot explicites), materiau
-masque deux faces, lacet seul vers la camera du joueur (billboard cylindrique : reste debout sous
-une camera haute). Les portraits regardent a gauche ; marcher vers la droite de l'ecran retourne
-la carte (`Mirror`), l'arret garde le dernier sens. Habitant dedans -> carte cachee. Acteurs
-transients, jamais sauves.
+| Planche | Etiquettes | Ids retenus |
+|---|---|---|
+| serie 2, garcons | 004, 005, 006, 007, **007**, 008 | 004 a 009, dans l'ordre |
+| serie 4, filles | 009 a 014 (009 existe en serie 2) | 010 a 015 |
+| serie 5, garcons | 009 a 014 (009 existe en serie 2) | 010 a 015 |
 
-**Attribution** (`AnastasisVillagerLooks`) : pool = portraits adultes et aines ; chaque categorie
-ordonnee par CRC de l'id (independant de l'ordre d'import), puis les categories entrelacees en
-proportion de leur taille : homme, femme, homme age, femme agee, homme, femme... Tout village de N
-habitants reflete donc la population. `npc-N` -> N-ieme du pool modulo sa taille : les 24 premiers
-habitants ont 24 visages differents. Aucun tirage dans le RNG de la
-simulation, aucune ecriture : le digest du village ne peut pas en dependre (teste).
+### 3.2 Canevas et textures
 
-`anastasis.Village.Portraits 0` retire les cartes ; les spheres restent sous `anastasis.Village.Debug`.
+Canevas commun : 512 x 1024 px = **128 x 256 cm** (une lance de garde depasse la tete d'environ
+60 cm), pieds sur l'axe vertical, 16 px au-dessus du bord. Une carte = toujours la meme taille monde ;
+la stature est dans l'image. Textures BC7, sRGB, groupe Character, Clamp, **hors streaming** (104
+portraits ~70 Mo ; streames, la premiere apparition servait un mip flou), couverture alpha conservee
+dans les mips.
+
+### 3.3 La carte (`AAnastasisVillagerVisual`)
+
+Quad procedural (UV, normale, pivot explicites), materiau masque deux faces, lacet seul vers la camera
+(billboard cylindrique). Eclairee par une normale monde penchee vers le haut : comme le sol, jamais
+noire a contre-jour. Portrait tourne a gauche ; marcher vers la droite de l'ecran le retourne
+(`Mirror`). Dedans un batiment : cachee. Acteurs transients.
+
+### 3.4 Le village du lancement
+
+`anastasis.Village.StartVillagers` (12 ; 0 = village vide comme avant) : au debut de partie,
+`SeedFirstWell` -- le chemin existant des scenarios, aucun code de simulation neuf -- pose le puits et
+les habitants. Le premier scenario explicite (`FirstWell`, `FirstHouse`, `FirstGranary`, `FirstFarmer`,
+`FoodSupply`) **remplace** ce village : simulation remise a zero sur la meme graine, acteurs retires.
+Les preuves PIE des autres missions retrouvent donc exactement l'etat d'avant.
+
+### 3.5 Attribution (`AnastasisVillagerLooks`)
+
+Pool = portraits adultes et aines, `bInGame` (debout). Chaque categorie ordonnee par CRC de l'id,
+categories entrelacees en proportion : tout village de N habitants reflete la population (autant
+d'hommes que de femmes a toute taille paire, teste). `npc-N` -> N-ieme du pool : les 62 premiers
+habitants ont 62 visages differents. Aucun tirage dans le RNG de la simulation, aucune ecriture.
 
 ## 4. Code
 
-Aucun code de simulation PNJ n'a ete modifie (`Source/AnastasisSim/` intact).
-
-Presentation (`Source/Anastasis_UnrealV2/`) :
+**Aucun code de simulation PNJ n'a ete modifie** (`Source/AnastasisSim/` intact). Presentation et hote :
 
 | Fichier | Changement |
 |---|---|
-| `WorldView/AnastasisPresentationRegistry.h` | `EAnastasisVillagerCategory`, `FAnastasisVillagerLook`, `Villagers`, `VillagerMaterial` |
+| `WorldView/AnastasisPresentationRegistry.h` | `EAnastasisVillagerCategory`, `FAnastasisVillagerLook` (`bInGame`), `Villagers`, `VillagerMaterial` |
 | `Village/AnastasisVillagerLooks.h/.cpp` | attribution pure |
 | `Village/AnastasisVillagerVisual.h/.cpp` | la carte |
 | `Village/AnastasisVillagePresentation.h/.cpp` | `SyncVillagers`, `FindVillager`, `Clear` les retire |
-| `Sim/AnastasisSimulationSubsystem.h/.cpp` | appel dans `Tick`, CVar `anastasis.Village.Portraits`, `GetVillagerCards` (debug, lecture seule) |
+| `Sim/AnastasisSimulationSubsystem.h/.cpp` | appel dans `Tick`, CVars `anastasis.Village.Portraits` et `anastasis.Village.StartVillagers`, village du lancement et son remplacement, `GetVillagerCards` (debug, lecture seule) |
 | `Village/AnastasisVillagerTests.cpp` | `Anastasis.Village.Villagers.LookPool`, `.Presentation` |
 
-## 5. Preuves
-
-### 5.1 Chaine validee sur 32 portraits PROVISOIRES (2026-10-01)
-
-Les images de la population ne sont pas encore generees. La chaine a ete prouvee de bout en bout
-sur 32 silhouettes provisoires (formes plates, id ecrit dessus, nez vers la gauche pour lire
-l'orientation), **jamais commitees** : ni les PNG, ni les textures, ni le registre qui les reference.
-Ces preuves disent que la machinerie marche ; elles ne disent rien de la qualite artistique.
+## 5. Preuves (2026-10-01, valeurs relevees)
 
 | Preuve | Valeurs |
 |---|---|
-| `build` | `BUILD::PASS` (worktree, Editor Win64 Development) |
-| `villager-png.py prep` (banc synthetique) | fond gris, vert, alpha natif : `halo=0.000` partout ; tache claire de tunique conservee ; trou ferme bras/torse retire sur vert, signale `A_REVOIR` sur gris |
-| `villager-png.py check` (banc synthetique) | 8 silhouettes clonees par construction : toutes signalees (IoU silhouette jusqu'a 0,997) -- le detecteur voit les clones |
-| `import-villagers.ps1` | `VILLAGERS_IMPORT::PASS imported=32 registry=32 failures=0` ; chaque texture 512x1024 BC7 sRGB Character Clamp hors streaming couverture alpha ; `MATERIAL_OK` (0 echec apres la compilation finale) |
-| `Anastasis.Village.Villagers.LookPool` | Success |
-| `Anastasis.Village.Villagers.Presentation` | Success (digest du village identique avant/apres) |
-| `villager-lineup.ps1` | `VILLAGER_LINEUP::PASS shots=5/5` : cartes debout, detourees, ombre portee partant des pieds, statures lisibles contre le temoin 180 cm |
-| `villager-pie.ps1` | `VILLAGER_PIE PASS 12 habitants, 12 cartes, portraits distincts, retrait suivi` ; la sphere de debug de `npc-0` et sa carte coincident (02-debug) |
+| `villager-png.py sheets` | 104 figures, 0 fusion, 12 poses assises ; `SHEETS::TOTAL Adult_Male=24 Adult_Female=24 Elder_Male=13 Elder_Female=13 Child_Male=15 Child_Female=15 total=104 en_jeu=62` |
+| `villager-png.py prep` | 104 portraits ; 91 OK, 13 `A_REVOIR` sur le score de halo (0,16 a 0,22 pour un seuil de 0,15) : verifies a l'oeil sur fond sombre, ce sont les bords clairs du dessin (peau de mouton, voiles, lin), pas un liseré |
+| `villager-png.py check` | aucun visage proche (correlation max 0,85 garcons, 0,72 hommes ; seuil 0,92) ; 7 paires signalees sur la silhouette seule : 4 aines assis (hors jeu), robes longues |
+| `import-villagers.ps1` | `VILLAGERS_IMPORT::PASS imported=104 registry=104 failures=0`, `MATERIAL_OK` |
+| tests `Anastasis.Village` | 7/7 Success, dont `Villagers.LookPool` (pose assise exclue) et `Villagers.Presentation` (digest du village inchange) |
+| `villager-lineup.ps1 -Label population-v1` | `VILLAGER_LINEUP::PASS shots=13/13` (population entiere puis lots de douze) |
+| `villager-pie.ps1` | `VILLAGER_PIE PASS` : **12 habitants et 12 cartes au lancement, sans commande** (`00-demarrage`) ; `FirstWell 12` remplace ce village (12 habitants, pas 24) ; portraits distincts, aucun assis ; retrait suivi |
 
-Corrections apportees par ces runs, chacune vue avant d'etre corrigee :
+Images : `docs/visual/villager-png-001/` -- A a E planches hors moteur ; F `F_jeu_demarrage_sans_commande`,
+G sphere de simulation et carte aux memes pieds, H voisins devant le puits, I a K planches dans Unreal.
 
-1. Detourage : liseré clair d'un pixel (seuil absolu) -> alpha par projection, decontamination.
-2. Detourage : piece de lin clair percee sur fond gris -> trous fermes seulement sur fond vert ; la
-   fiche de prompts demande le vert en repli (envoyee corrigee a Alexandre).
-3. Materiau : `float4 -> float2` sur les UV (masques de canaux incomplets), et un `PASS` qui ne
-   verifiait pas la compilation -> quatre canaux explicites, le `.ps1` refuse un echec apres la
-   compilation finale.
-4. Eclairage : carte noire a contre-jour -> normale monde penchee vers le haut (eclairee comme le sol).
-5. Banc : scene au sol dans l'ombre de l'anneau d'horizon -> scene a 300 m, soleil fixe du banc.
-6. Attribution : un tri CRC seul donnait 8 femmes sur les 12 premiers habitants -> entrelacement
-   proportionnel, teste (autant d'hommes que de femmes a toute taille paire).
-7. Preuve PIE : camera sur le barycentre de 12 habitants disperses sur 280 m, cartes de dix pixels
-   -> cadrage sur un habitant ; et streaming des textures (mip flou a la premiere apparition) ->
-   portraits hors streaming.
+Ce que les runs ont corrige, chaque defaut vu avant d'etre corrige : liseré clair (alpha par
+projection) ; piece de lin percee sur fond gris ; materiau `float4 -> float2` et un `PASS` qui ne
+verifiait pas la compilation ; carte noire a contre-jour ; banc dans l'ombre de l'anneau d'horizon ;
+8 femmes sur 12 habitants (entrelacement) ; colonnes qui coupaient les objets portes ; ombres au sol
+qui muraient l'entre-jambes ; mailles de filet creme ; `bInGame` expose a Python sous `game` ; prises
+PIE vides (gel PUIS cadrage). La premiere prise `02-debug` vide n'a pas de cause etablie : le log ne
+montre aucune reprise de vue par le controleur ; elle est passee au run suivant, habitant immobile.
 
-### 5.2 Population reelle
+## 6. Limites connues
 
-A faire des que les images sont deposees dans `SourceArt/Characters/Raw/` :
-`villager-png.py prep` -> `board` -> `check` -> `import-villagers.ps1` -> `villager-lineup.ps1`
--> `villager-pie.ps1`, et ici les valeurs, les planches et le verdict « habitants ou clones ».
+- **Hommes adultes** : le groupe le plus repetitif des planches (bruns barbus de 30-40 ans, distingues
+  surtout par le couvre-chef et la silhouette). Le detecteur ne crie pas au clone ; l'oeil, un peu.
+- **Resolution** : figures de 160 a 300 px sur les planches, agrandies x2 a x3,5 : douces de pres.
+- **Vitesse** : un habitant avance de 4 tuiles/s, une tuile fait 20 m a l'ecran (400 cm x echelle 5) :
+  ~80 m/s a `anastasis.Sim.Speed 1`. Ecart d'echelle simulation/rendu anterieur a cette mission.
+- **Sens du regard** : les planches melangent figures tournees a gauche, de face, a droite ; la carte
+  suppose « a gauche » pour le miroir. Aucun retournement n'a ete impose (`overrides.facing`).
 
-## 6. Prochaines etapes (graphisme seulement)
+## 7. Prochaines etapes (graphisme seulement)
 
-- davantage d'individus par categorie (le pool cycle au-dela de 24 habitants) ;
-- vetements et metiers : une variante de portrait par metier du simulateur (`JobId` farmer -> outil, chapeau) ;
-- saisons (manteaux d'hiver), statuts sociaux, blessures, vieillissement ;
-- vues de dos et de profil pour une carte qui tourne a 8 directions au lieu d'un miroir ;
+- portraits par metier du simulateur (`JobId` farmer -> fourche, panier) ;
+- vues de dos et de profil (les planches en montrent) pour une carte a plusieurs directions ;
+- saisons, statuts sociaux, blessures, vieillissement ;
+- plus de diversite chez les hommes adultes (ages, carrures, glabres) ;
 - enfants en jeu des que la simulation en a.

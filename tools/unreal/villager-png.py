@@ -1,17 +1,23 @@
 """VILLAGER_PNG_001 -- chaine hors editeur des PNG d'habitants (Python systeme : Pillow + numpy).
 
-Toute la population est decrite dans SourceArt/Characters/villager-population.json ; ce script n'invente rien.
+Les habitants sont DESSINES sur les planches de SourceArt/Characters/Sheets/ ; le manifeste
+SourceArt/Characters/villager-population.json dit ou est chacun. Ce script n'invente personne.
 
-    python tools/unreal/villager-png.py prompts   # -> docs/unreal/VILLAGER_PNG_001_PROMPTS.md
-    python tools/unreal/villager-png.py prep      # SourceArt/Characters/Raw/<id>.png -> SourceArt/Characters/PNG/<Categorie>/<id>.png
+    python tools/unreal/villager-png.py sheets    # planches -> Raw/<id>.png + villager-extract.json (statures)
+    python tools/unreal/villager-png.py prep      # Raw/<id>.png -> PNG/<Categorie>/<id>.png (canevas commun)
     python tools/unreal/villager-png.py board     # planches de comparaison -> docs/visual/villager-png-001/
     python tools/unreal/villager-png.py check     # ressemblance silhouette / visage, par paire, par categorie
 
-prep : alpha natif s'il existe, sinon detourage d'un fond uni (modele de fond quadratique ajuste sur
-les bords, propagation depuis les bords, trous fermes captes s'ils ont la couleur exacte du fond).
-Puis decontamination des bords (plus de halo clair), recadrage, mise a l'echelle de la STATURE du
-manifeste (5,12 px/cm), pieds centres sur une meme ligne, saignement de couleur sous l'alpha nul
-(les mips d'Unreal ne ramenent pas de liseré sombre). Ne modifie jamais Raw/.
+sheets : chaque panneau est detoure sur son fond creme ; les etiquettes CHR_* sous les figures
+donnent les colonnes (coupees aux k-1 plus grands ecarts : les etiquettes de la serie 2 se touchent
+presque) ; l'ombre portee au sol du dessin est retiree (le moteur fait la sienne) ; une piece coupee
+par le bord de colonne est l'outil d'un voisin et part ; une figure qui regarde a droite est
+retournee (les cartes supposent un portrait tourne a gauche). Stature = stature moyenne de la
+categorie x hauteur du CORPS dessinee / mediane du panneau (la pointe d'une lance ne compte pas).
+
+prep : alpha natif s'il existe, sinon detourage d'un fond uni. Puis decontamination des bords,
+recadrage, mise a l'echelle du CORPS a la stature (4 px/cm), pieds centres sur une meme ligne,
+saignement de couleur sous l'alpha nul (mips propres). Ne modifie jamais Raw/.
 """
 
 import json
@@ -22,88 +28,22 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[2]
-MANIFEST = ROOT / "SourceArt" / "Characters" / "villager-population.json"
-RAW = ROOT / "SourceArt" / "Characters" / "Raw"
-OUT = ROOT / "SourceArt" / "Characters" / "PNG"
+CHARACTERS = ROOT / "SourceArt" / "Characters"
+MANIFEST = CHARACTERS / "villager-population.json"
+EXTRACT = CHARACTERS / "villager-extract.json"
+RAW = CHARACTERS / "Raw"
+OUT = CHARACTERS / "PNG"
 BOARDS = ROOT / "docs" / "visual" / "villager-png-001"
-PROMPTS = ROOT / "docs" / "unreal" / "VILLAGER_PNG_001_PROMPTS.md"
 
 CATEGORY_ORDER = ["Adult_Male", "Adult_Female", "Elder_Male", "Elder_Female", "Child_Male", "Child_Female"]
-CATEGORY_FR = {
-    "Adult_Male": "Hommes adultes", "Adult_Female": "Femmes adultes",
-    "Elder_Male": "Hommes ages", "Elder_Female": "Femmes agees",
-    "Child_Male": "Garcons", "Child_Female": "Filles",
-}
-
-STYLE = (
-    "Exactly one person, full body, alone. An ordinary villager of a Greek Byzantine village on the "
-    "Pontic coast of the Black Sea, shortly after 1204. Realistic, sober, hand-painted 3D game character "
-    "render with matte textures: same rendering style, lighting and level of detail as the attached "
-    "reference sheet, but a completely DIFFERENT person -- do not reuse the face, body or hair of the "
-    "reference or of any image generated before. Standing still in a relaxed natural pose, arms hanging "
-    "at the sides, hands empty unless stated, body and head turned three-quarters toward the LEFT side "
-    "of the image. Camera at chest height, no perspective distortion. The whole figure is visible from "
-    "the top of the head to the soles of the feet, centred, filling about 90% of the image height. Soft "
-    "daylight from the upper left. TRANSPARENT background (PNG with alpha); if transparency is "
-    "impossible, a plain flat uniform pure green chroma-key background (#00FF00) with no green light "
-    "spilling on the person. No floor, no ground, no cast "
-    "shadow, no text, no frame, no other object. Portrait format 1024x1536. Muted earthy natural-dye "
-    "palette (undyed wool and linen, ochre, faded madder red, faded woad blue, olive, brown leather); "
-    "clothes worn, mended, dusty. Not a hero and not fashion-beautiful: a real person who has lived. "
-    "No armour, no weapon, no jewellery, no fantasy, no anime, no cartoon, no chibi, no oversized head, "
-    "no saturated colours, nothing modern."
-)
 
 
 def load_manifest():
+    """Le manifeste, et sous "people" la population extraite (villager-extract.json, ecrit par sheets)."""
     with MANIFEST.open(encoding="utf-8") as f:
-        return json.load(f)
-
-
-def prompt_for(person):
-    return f"Full-body image of {person['person']}\n\n{STYLE}"
-
-
-# --------------------------------------------------------------------------------------------- prompts
-
-def cmd_prompts(m):
-    lines = [
-        "# VILLAGER_PNG_001 -- fiche de generation des 32 habitants",
-        "",
-        "Generee par `python tools/unreal/villager-png.py prompts` depuis `SourceArt/Characters/villager-population.json` :",
-        "ne pas editer a la main, changer le manifeste et regenerer.",
-        "",
-        "## Mode d'emploi",
-        "",
-        "1. **Une conversation ChatGPT neuve par categorie** (six au total) : dans une meme conversation, le",
-        "   generateur a tendance a reprendre le visage de l'image precedente.",
-        "2. Joindre **une** planche comme reference de style, sans plus :",
-        "   - hommes et garcons : `C:\\dev\\Jeux IV Kingdoms\\assets\\references\\npc\\planche-homme-modulaire-rts.png`",
-        "   - femmes et filles : `C:\\dev\\Jeux IV Kingdoms\\assets\\references\\npc\\planche-femme-modulaire-rts.png`",
-        "3. **Un prompt = une image = une personne.** Coller le bloc tel quel.",
-        "4. Avant d'enregistrer, comparer avec les precedents de la categorie. Si le visage ou la silhouette",
-        "   rappelle un autre habitant, ou la planche : repondre",
-        "   *\"Regenerate: completely different face and body, keep only the style.\"*",
-        "5. Verifier : corps entier (tete et pieds visibles), personne seule, pas de sol ni d'ombre portee.",
-        "6. Enregistrer sous le **nom exact** de l'en-tete (`CHR_M_Adult_001.png`...) dans",
-        "   `C:\\dev\\ANASTASIS_WORKTREES\\villager-png-001\\SourceArt\\Characters\\Raw\\`.",
-        "   Fond transparent, ou a defaut vert d'incrustation uni : les deux sont acceptes, le detourage est",
-        "   fait ensuite. Eviter un fond gris ou beige : il a la couleur du lin ecru.",
-        "7. Un depot partiel suffit pour commencer : chaque image deposee est traitee et verifiee.",
-        "",
-        "Statures en jeu (le PNG est remis a cette taille, les pieds sur une meme ligne) :",
-        "",
-        "| Id | Age | Stature |",
-        "|---|---|---|",
-    ]
-    for p in m["people"]:
-        lines.append(f"| `{p['id']}` | {p['age']} | {p['stature_cm']} cm |")
-    for cat in CATEGORY_ORDER:
-        lines += ["", f"## {CATEGORY_FR[cat]} (`{cat}`)", ""]
-        for p in (p for p in m["people"] if p["category"] == cat):
-            lines += [f"### {p['id']}.png", "", "```text", prompt_for(p), "```", ""]
-    PROMPTS.write_text("\n".join(lines), encoding="utf-8")
-    print(f"PROMPTS::WROTE {PROMPTS} ({len(m['people'])} prompts)")
+        m = json.load(f)
+    m["people"] = json.loads(EXTRACT.read_text(encoding="utf-8"))["people"] if EXTRACT.exists() else []
+    return m
 
 
 # ------------------------------------------------------------------------------------------------ prep
@@ -192,11 +132,15 @@ def key_flat_background(rgb):
     else:
         holes_left = 0
     background = outside | holes
+    return soft_alpha(rgb, bg, background), bg, (t_lo, t_hi, noise, chroma, holes_left)
+
+
+def soft_alpha(rgb, bg, background):
+    """Lisiere : un pixel de bord est un MELANGE I = a*F + (1-a)*B. Un seuil absolu sur |I-B| le
+    declare opaque des que le sujet est contraste, et le liseré clair reste. On estime F par la
+    couleur du sujet la plus proche (interieur etendu vers l'exterieur), puis a par projection
+    de I-B sur F-B."""
     subject = ~background
-    # Lisiere : un pixel de bord est un MELANGE I = a*F + (1-a)*B. Un seuil absolu sur |I-B| le
-    # declare opaque des que le sujet est contraste, et le liseré clair reste. On estime F par la
-    # couleur du sujet la plus proche (interieur etendu vers l'exterieur), puis a par projection
-    # de I-B sur F-B.
     alpha = subject.astype(np.float64)
     band = dilate_n(subject, 2) & ~erode(subject, 2)
     core = erode(subject, 3)
@@ -209,7 +153,7 @@ def key_flat_background(rgb):
         usable = band & (den > 25.0 ** 2)
         alpha[usable] = np.clip(a[usable], 0.0, 1.0)
     alpha[erode(background, 3)] = 0.0
-    return alpha, bg, (t_lo, t_hi, noise, chroma, holes_left)
+    return alpha
 
 
 def decontaminate(rgb, alpha, bg):
@@ -277,7 +221,8 @@ def prep_one(m, p):
     cv = m["canvas"]
     px_per_cm = cv["height"] / cv["cm_per_canvas_height"]
     target_h = p["stature_cm"] * px_per_cm
-    s = target_h / (y1 - y0)
+    # Le CORPS a la stature : une lance qui depasse la tete ne doit pas rapetisser le garde.
+    s = target_h / (y1 - body_top(solid))
 
     crop = np.dstack([fg[y0:y1, x0:x1], alpha[y0:y1, x0:x1, None] * 255.0]).clip(0, 255).astype(np.uint8)
     pil = Image.fromarray(crop, "RGBA").convert("RGBa")
@@ -350,6 +295,202 @@ def cmd_prep(m, only=None):
     print("PREP::TOTAL " + " ".join(f"{k}={v}" for k, v in counts.items()))
 
 
+# ---------------------------------------------------------------------------------------------- sheets
+
+def body_top(solid):
+    """Premiere ligne assez large pour etre une tete : une hampe, une pointe de lance ou les dents d'une
+    fourche au-dessus de la tete sont plus etroites (seuil 4,5 % de la hauteur de la silhouette)."""
+    rows = np.nonzero(solid.any(axis=1))[0]
+    y0, y1 = rows.min(), rows.max() + 1
+    widths = solid[y0:y1].sum(axis=1)
+    wide = np.nonzero(widths >= max(3.0, 0.045 * (y1 - y0)))[0]
+    return int(y0 + (wide[0] if len(wide) else 0))
+
+
+def components(mask):
+    """Composantes 4-connexes d'un masque, par le remplissage natif de Pillow."""
+    img = Image.fromarray(np.where(mask, 255, 0).astype(np.uint8)).copy()
+    out = []
+    while True:
+        arr = np.asarray(img)
+        left = np.argwhere(arr == 255)
+        if len(left) == 0:
+            return out
+        y, x = left[0]
+        ImageDraw.floodfill(img, (int(x), int(y)), 128, thresh=0)
+        comp = np.asarray(img) == 128
+        out.append(comp)
+        img.paste(64, mask=Image.fromarray((comp * 255).astype(np.uint8)))
+
+
+def label_band(fg, lines=1):
+    """Lignes de la bande d'etiquettes : les `lines` derniers blocs de lignes non vides, au bas du
+    panneau. Un bloc de moins de 5 lignes est un filet de cadre, pas du texte : on le saute."""
+    rows = fg.any(axis=1)
+    blocks = []
+    y = len(rows) - 1
+    while y >= 0 and len(blocks) < lines:
+        while y >= 0 and not rows[y]:
+            y -= 1
+        end = y
+        while y >= 0 and rows[y]:
+            y -= 1
+        if end - y >= 5:
+            blocks.append((y + 1, end))
+    return blocks[-1][0], blocks[0][1]
+
+
+def label_centres(fg_band, k):
+    """Centres des k etiquettes : la bande est coupee a ses k-1 plus grands ecarts horizontaux."""
+    cols = np.nonzero(fg_band.any(axis=0))[0]
+    gaps = np.diff(cols)
+    cut = sorted(np.argsort(gaps)[::-1][:k - 1])
+    starts = [cols[0]] + [cols[i + 1] for i in cut]
+    ends = [cols[i] for i in cut] + [cols[-1]]
+    return [(a + b) / 2.0 for a, b in zip(starts, ends)], [int(g) for g in sorted(gaps)[::-1][:k]]
+
+
+def key_sheet(rgb):
+    """Detourage d'une colonne de planche (fond creme uni, peint). Differences avec key_flat_background :
+
+    - l'ombre au sol du dessin est du FOND des la propagation : bas de la silhouette, meme teinte
+      que le fond, juste plus sombre. Retiree apres coup, elle murait l'espace entre les jambes,
+      qui restait creme (CHR_M_Adult_005, premier decoupage), et reliait deux voisins ;
+    - les trous fermes de la couleur exacte du fond sont perces : sur une planche le creme est
+      plat, un lin ecru a de la texture et de l'ombre, il ne tient pas trois erosions a moins de
+      t_lo du fond (une erosion suffit a ecarter un reflet d'un pixel ; les mailles d'un filet passent).
+    """
+    h, w = rgb.shape[:2]
+    rgb = rgb.astype(np.float64)
+    band = max(4, min(h, w) // 64)
+    border = np.zeros((h, w), bool)
+    border[:band, :] = border[-band:, :] = True
+    border[:, :band] = border[:, -band:] = True
+    med = np.median(rgb[border], axis=0)
+    border &= np.linalg.norm(rgb - med, axis=-1) < 40
+    bg = fit_background(rgb, border)
+    d = np.linalg.norm(rgb - bg, axis=-1)
+    noise = float(np.percentile(d[border], 99))
+    t_lo, t_hi = max(6.0, noise * 1.5), max(22.0, noise * 4.0)
+    rows = np.nonzero((d >= t_hi).any(axis=1))[0]
+    y0, y1 = (rows.min(), rows.max() + 1) if len(rows) else (0, h)
+    low = np.zeros((h, w), bool)
+    low[max(y0, y1 - int(0.12 * (y1 - y0))):] = True
+    ratio = rgb / np.maximum(bg, 1.0)
+    # Teinte du fond a 0,10 pres : 0,07 laissait des restes d'ombre contre les pieds (M_Elder_001).
+    shadow = low & (ratio.min(axis=-1) > 0.55) & (ratio.max(axis=-1) < 0.998)         & ((ratio.max(axis=-1) - ratio.min(axis=-1)) < 0.10)
+    candidate = (d < t_hi) | shadow
+    outside = propagate(border & candidate, candidate)
+    # Une erosion suffit : les mailles d'un filet de peche (M_Adult_009, M_Adult_014, M_Elder_010)
+    # font 2 a 5 px et restaient creme avec trois.
+    holes = ((d < t_lo) | shadow) & ~outside
+    holes = propagate(erode(holes, 1), holes)
+    background = outside | holes
+    return soft_alpha(rgb, bg, background), bg, int((shadow & background).sum())
+
+
+def extract_panel(rgb, centres, bounds):
+    """Detoure un panneau d'un bloc, puis donne chaque piece a l'etiquette la plus proche.
+
+    Couper en colonnes au milieu de deux etiquettes coupait le sac de CHR_M_Adult_005 et le baton de
+    CHR_M_Adult_006 (premier decoupage) : un objet porte deborde souvent du milieu. Ici une piece
+    entiere suit son centre de masse ; seule une piece qui couvre DEUX centres d'etiquette (deux
+    figures qui se touchent) est coupee au milieu, et c'est signale.
+    Rend {indice: (rgba de la taille du panneau, nb pieces ecartees, fusion)} et le nombre de pixels
+    d'ombre au sol retires."""
+    alpha, bg, shadow_px = key_sheet(rgb)
+    owned = [np.zeros(alpha.shape, bool) for _ in centres]
+    fused = [False] * len(centres)
+    for c in components(alpha > 0.5):
+        ys, xs = np.nonzero(c)
+        if xs.max() - xs.min() < 5 or len(xs) < 12:   # filet entre deux cases, poussiere
+            continue
+        inside = [i for i, cx in enumerate(centres) if xs.min() <= cx <= xs.max()]
+        heavy = [i for i in inside if (c[:, bounds[i]:bounds[i + 1]]).sum() > 0.15 * len(xs)]
+        if len(heavy) >= 2:
+            for i in heavy:
+                part = np.zeros_like(c)
+                part[:, bounds[i]:bounds[i + 1]] = c[:, bounds[i]:bounds[i + 1]]
+                owned[i] |= part
+                fused[i] = True
+            continue
+        cx = xs.mean()
+        owned[int(np.argmin([abs(cx - k) for k in centres]))] |= c
+    out = {}
+    for i, mask in enumerate(owned):
+        if not mask.any():
+            raise RuntimeError(f"figure {i + 1} : aucune piece")
+        pieces = sorted(components(mask), key=lambda c: -c.sum())
+        keep = pieces[0].copy()
+        dropped = 0
+        for c in pieces[1:]:
+            if c.sum() >= 0.004 * pieces[0].sum():
+                keep |= c
+            else:
+                dropped += 1
+        a = np.where(dilate_n(keep, 2), alpha, 0.0)
+        fg = decontaminate(rgb, a, bg)
+        out[i] = (np.dstack([fg, a * 255.0]).clip(0, 255).astype(np.uint8), dropped, fused[i])
+    return out, shadow_px
+
+
+def cmd_sheets(m):
+    RAW.mkdir(parents=True, exist_ok=True)
+    people = []
+    overrides = {k: v for k, v in m.get("overrides", {}).items() if not k.startswith("_")}
+    for sheet in m["sheets"]:
+        rgb_sheet = np.asarray(Image.open(CHARACTERS / sheet["file"]).convert("RGB")).astype(np.float64)
+        for panel in sheet["panels"]:
+            x0, y0, x1, y1 = panel["rect"]
+            rgb = rgb_sheet[y0:y1, x0:x1]
+            ids = panel["ids"]
+            bg_col = np.median(rgb[:6].reshape(-1, 3), axis=0)
+            fg = np.linalg.norm(rgb - bg_col, axis=-1) > 60
+            b0, b1 = label_band(fg, panel.get("label_lines", 1))
+            if not 6 <= b1 - b0 + 1 <= 24 * panel.get("label_lines", 1):
+                raise RuntimeError(f"{sheet['file']} {panel['category']} : bande d'etiquettes introuvable ({b0}-{b1})")
+            # Les centres se lisent sur la DERNIERE ligne d'etiquette (le role, en serie 4, est centre aussi).
+            centres, gaps = label_centres(fg[b1 - 4:b1 + 1], len(ids))
+            bounds = [0] + [int((a + b) / 2) for a, b in zip(centres, centres[1:])] + [x1 - x0]
+            figures = rgb[:max(0, b0 - 2)]
+            extracted, shadow_px = extract_panel(figures, centres, bounds)
+            measured = []
+            for i, pid in enumerate(ids):
+                rgba, dropped, cut = extracted[i]
+                solid = rgba[..., 3] > 25
+                ys, xs = np.nonzero(solid)
+                box = rgba[max(0, ys.min() - 3):ys.max() + 4, max(0, xs.min() - 3):xs.max() + 4]
+                box = np.pad(box, ((3, 3), (3, 3), (0, 0)))
+                o = overrides.get(pid, {})
+                if o.get("facing") == "right":
+                    box = box[:, ::-1]
+                Image.fromarray(np.ascontiguousarray(box), "RGBA").save(RAW / f"{pid}.png")
+                body = ys.max() + 1 - body_top(solid)
+                measured.append((pid, body, o, dropped, shadow_px, cut, box.shape))
+            standing = [b for _, b, o, *_ in measured if o.get("pose", "debout") == "debout"] or [b for _, b, *_ in measured]
+            median = float(np.median(standing))
+            mean_cm = m["categories"][panel["category"]]["stature_cm"]
+            for pid, body, o, dropped, shadow_px, cut, shape in measured:
+                # Assis, la figure est souvent dessinee aussi haute qu'un voisin debout (serie 5) :
+                # son dessin ne dit rien de sa taille. Assis = 72 % de la stature debout de la categorie.
+                stature = round(0.72 * mean_cm) if o.get("pose") == "assis" else round(mean_cm * body / median)
+                people.append({"id": pid, "category": panel["category"], "stature_cm": stature,
+                               "body_px": int(body), "sheet": sheet["file"],
+                               "in_game": o.get("pose", "debout") == "debout", "facing": o.get("facing", "left"),
+                               "pose": o.get("pose", "debout"), "note": o.get("note", "")})
+                print(f"SHEETS::{'A_REVOIR' if cut else 'OK'} {pid} corps={body}px stature={stature}cm "
+                      f"boite={shape[1]}x{shape[0]} pieces_ecartees={dropped}"
+                      + (" fusion_avec_un_voisin_coupee" if cut else "") + (f" pose={o['pose']}" if o.get("pose") else "")
+                      + (" retournee" if o.get("facing") == "right" else ""))
+            print(f"SHEETS::PANNEAU {sheet['file']} {panel['category']} n={len(ids)} ecarts_etiquettes={gaps} "
+                  f"mediane_corps={median:.0f}px ombre_retiree={shadow_px}px")
+    EXTRACT.write_text(json.dumps({"_doc": "Ecrit par villager-png.py sheets -- ne pas editer : changer le manifeste et relancer.",
+                                   "people": people}, indent=1, ensure_ascii=False), encoding="utf-8")
+    counts = {c: sum(1 for p in people if p["category"] == c) for c in CATEGORY_ORDER}
+    print("SHEETS::TOTAL " + " ".join(f"{c}={n}" for c, n in counts.items()) + f" total={len(people)}"
+          + f" en_jeu={sum(1 for p in people if p['in_game'] and not p['category'].startswith('Child'))}")
+
+
 # ----------------------------------------------------------------------------------------------- board
 
 def processed(m):
@@ -396,8 +537,7 @@ def lineup(items, bg, title, scale=0.5, silhouette=False):
 def head_crop(p, im, m):
     """Le haut de la silhouette sur ~1/7 de la stature : la tete, a echelle egale pour tous."""
     a = np.asarray(im)[..., 3] > 127
-    ys = np.nonzero(a.any(axis=1))[0]
-    top = ys.min()
+    top = body_top(a)
     px_per_cm = m["canvas"]["height"] / m["canvas"]["cm_per_canvas_height"]
     hh = int(28 * px_per_cm)
     row = a[top:top + hh]
@@ -481,8 +621,8 @@ def cmd_check(m):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2 or sys.argv[1] not in ("prompts", "prep", "board", "check"):
+    if len(sys.argv) < 2 or sys.argv[1] not in ("sheets", "prep", "board", "check"):
         print(__doc__)
         sys.exit(2)
     manifest = load_manifest()
-    {"prompts": cmd_prompts, "board": cmd_board, "check": cmd_check}.get(sys.argv[1], lambda mm: cmd_prep(mm, sys.argv[2:] or None))(manifest)
+    {"sheets": cmd_sheets, "board": cmd_board, "check": cmd_check}.get(sys.argv[1], lambda mm: cmd_prep(mm, sys.argv[2:] or None))(manifest)

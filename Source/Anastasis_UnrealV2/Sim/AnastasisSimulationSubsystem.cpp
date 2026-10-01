@@ -35,6 +35,12 @@ static TAutoConsoleVariable<int32> CVarVillagePortraits(
 	TEXT("1 = draw each simulated villager as its portrait card (VILLAGER_PNG_001). 0 = remove the cards; the debug spheres stay under anastasis.Village.Debug."),
 	ECVF_Default);
 
+static TAutoConsoleVariable<int32> CVarVillageStartVillagers(
+	TEXT("anastasis.Village.StartVillagers"),
+	12,
+	TEXT("Inhabitants placed around the first well when play begins (VILLAGER_PNG_001), so the game does not open on an empty world. 0 = empty village. The first explicit scenario command (FirstWell, FirstHouse, FirstGranary, FirstFarmer, FoodSupply) replaces this village."),
+	ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarSimOverlay(
 	TEXT("anastasis.Sim.Overlay"),
 	1,
@@ -64,6 +70,31 @@ void UAnastasisSimulationSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Super::OnWorldBeginPlay(InWorld);
 	ResetCanonical(SeedFromCVar());
 	bPumpFromEngineTick = true;
+
+	const int32 StartVillagers = CVarVillageStartVillagers.GetValueOnGameThread();
+	if (StartVillagers > 0)
+	{
+		// Le chemin existant des scenarios, rien de neuf dans la simulation.
+		const AnastasisVillage::FPoint Settlement = Simulation.GetVillage().GetSettlement();
+		const FString WellId = SeedFirstWell(StartVillagers, FMath::FloorToInt32(Settlement.X), FMath::FloorToInt32(Settlement.Y));
+		bStartVillage = !WellId.IsEmpty();
+		UE_LOG(LogAnastasis_UnrealV2, Display,
+			TEXT("ANASTASIS_VILLAGE start village: %s + %d inhabitants (anastasis.Village.StartVillagers; replaced by the first scenario command)"),
+			WellId.IsEmpty() ? TEXT("no well") : *WellId, Simulation.GetVillage().GetActors().Num());
+	}
+}
+
+void UAnastasisSimulationSubsystem::ReplaceStartVillage()
+{
+	if (!bStartVillage)
+	{
+		return;
+	}
+	bStartVillage = false;
+	UWorld* World = GetWorld();
+	VillagePresentation.Clear(World ? World->GetSubsystem<UAnastasisVillageInteractionSubsystem>() : nullptr);
+	ResetCanonical(Simulation.GetSeed());
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE start village replaced by an explicit scenario"));
 }
 
 void UAnastasisSimulationSubsystem::Deinitialize()
@@ -122,6 +153,7 @@ int32 UAnastasisSimulationSubsystem::SyncVillagePresentation()
 
 FString UAnastasisSimulationSubsystem::SeedFirstWell(int32 NpcCount, int32 TileX, int32 TileY)
 {
+	ReplaceStartVillage();
 	if (!Simulation.IsRunning())
 	{
 		return FString();
@@ -312,6 +344,7 @@ static FAutoConsoleCommandWithWorld CmdAnastasisSimStatus(
 
 FString UAnastasisSimulationSubsystem::SeedFirstHouse(int32 NpcCount, int32 TileX, int32 TileY)
 {
+	ReplaceStartVillage();
 	if (!Simulation.IsRunning())
 	{
 		return FString();
@@ -417,6 +450,7 @@ FString UAnastasisSimulationSubsystem::SeedFirstHouse(int32 NpcCount, int32 Tile
 
 FString UAnastasisSimulationSubsystem::SeedFirstGranary(int32 NpcCount, int32 Food, int32 TileX, int32 TileY)
 {
+	ReplaceStartVillage();
 	if (!Simulation.IsRunning())
 	{
 		return FString();
@@ -646,6 +680,7 @@ int32 UAnastasisSimulationDebugLibrary::CountMealsTaken(const UObject* WorldCont
 // granary and one healthy adult. Repeating the command cannot inject/refill food.
 bool UAnastasisSimulationSubsystem::SeedFoodSupply()
 {
+	ReplaceStartVillage();
 	using namespace AnastasisVillage;
 	if (!Simulation.IsRunning()) return false;
 	auto& V = Simulation.GetVillage();
@@ -725,6 +760,7 @@ FString UAnastasisSimulationDebugLibrary::GetFoodSupplyStatus(const UObject* Wor
 // 3-4 cases dont un seuil atteint le champ, des fermiers embauches au seuil.
 FString UAnastasisSimulationSubsystem::SeedFirstFarmer(int32 FarmerCount, int32 TileX, int32 TileY)
 {
+	ReplaceStartVillage();
 	using namespace AnastasisVillage;
 	if (!Simulation.IsRunning())
 	{

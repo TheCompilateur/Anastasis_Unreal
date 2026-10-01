@@ -64,13 +64,15 @@ def group(keys):
     return [l for l in looks if category_key(l) in keys]
 
 
-# (nom, sujets, resolution, rayon de l'arc)
+# (nom, sujets, resolution, rayon de l'arc). La population entiere d'abord (le village d'un coup
+# d'oeil), puis chaque categorie par lots de douze, assez pres pour juger les visages.
 SHOTS = [('A_population', looks, '3840x2160', max(600.0, SPACING * len(looks) / math.radians(70.0)))]
-for name, keys in (('B_hommes_adultes', ['ADULT_MALE']), ('C_femmes_adultes', ['ADULT_FEMALE']),
-                   ('D_aines', ['ELDER_MALE', 'ELDER_FEMALE']), ('E_enfants', ['CHILD_MALE', 'CHILD_FEMALE'])):
-    members = group(keys)
-    if members:
-        SHOTS.append((name, members, '2560x1440', max(380.0, SPACING * len(members) / math.radians(60.0))))
+for index, key in enumerate(ORDER):
+    members = group([key])
+    for k in range(0, len(members), 12):
+        chunk = members[k:k + 12]
+        SHOTS.append(('%s_%s_%d' % ('BCDEFG'[index], key.lower(), k // 12 + 1), chunk, '2560x1440',
+                      max(380.0, SPACING * len(chunk) / math.radians(60.0))))
 
 SPAWNED = []      # tout ce qui doit etre demonte avant de quitter
 CURRENT = []      # les cartes de la prise en cours

@@ -1,83 +1,419 @@
 {
-  "_doc": "VILLAGER_PNG_001 -- autorite de la population visuelle. Une entree = un individu. stature_cm fixe la hauteur du personnage dans le PNG normalise et dans le monde ; person decrit sa physionomie (le prompt de generation en est tire). Purement visuel : la simulation ne lit pas ce fichier.",
-  "canvas": { "width": 512, "height": 1024, "cm_per_canvas_height": 200, "foot_margin_px": 16 },
-  "categories": {
-    "Adult_Male":   { "sex": "M", "life_stage": "Adult", "in_game": true  },
-    "Adult_Female": { "sex": "F", "life_stage": "Adult", "in_game": true  },
-    "Elder_Male":   { "sex": "M", "life_stage": "Elder", "in_game": true  },
-    "Elder_Female": { "sex": "F", "life_stage": "Elder", "in_game": true  },
-    "Child_Male":   { "sex": "M", "life_stage": "Child", "in_game": false },
-    "Child_Female": { "sex": "F", "life_stage": "Child", "in_game": false }
+  "_doc": "VILLAGER_PNG_001 -- autorite de la population visuelle. Les individus sont DESSINES sur les planches de Sheets/ (series 1, 2, 4 et 5, fournies par Alexandre le 2026-10-01) ; ce fichier dit ou ils sont et qui ils sont. `villager-png.py sheets` les decoupe dans Raw/ et ecrit villager-extract.json (statures mesurees). Purement visuel : la simulation ne lit pas ce fichier.",
+  "canvas": {
+    "width": 512,
+    "height": 1024,
+    "cm_per_canvas_height": 256,
+    "foot_margin_px": 16
   },
-  "people": [
-    { "id": "CHR_M_Adult_001", "category": "Adult_Male", "age": 24, "stature_cm": 178,
-      "person": "a 24-year-old man, tall and lean, wiry. Long narrow face, prominent hooked nose, deep-set dark eyes, thick eyebrows almost joined in the middle, ears that stick out slightly. Short tight black curls. Only a sparse young beard on the chin, cheeks bare. Olive skin. Very upright posture. Knee-length undyed grey-beige wool tunic, rope belt, dark wool leggings, cloth-wrapped shoes." },
-    { "id": "CHR_M_Adult_002", "category": "Adult_Male", "age": 38, "stature_cm": 163,
-      "person": "a 38-year-old man, short and stocky, barrel chest, thick neck, heavy forearms. Wide square face, heavy jaw, broad flat nose once broken and bent to his left, small eyes under a low brow. Head shaved to dark stubble, receding hairline. Clean-shaven with a dark shadow of stubble. Deeply tanned weathered skin. Feet planted wide. Linen tunic with sleeves rolled up, sleeveless brown leather vest, leather belt, scuffed leather boots." },
-    { "id": "CHR_M_Adult_003", "category": "Adult_Male", "age": 31, "stature_cm": 172,
-      "person": "a 31-year-old man, medium height, average build with a slightly soft belly. Round face, full cheeks, small upturned nose, wide-set light hazel eyes, thin eyebrows, light freckles. Wavy chestnut-brown hair to the shoulders, tied back. Short neat full beard. Fair olive skin. Relaxed, slightly slouching. Faded woad-blue wool tunic, leather belt with a small pouch, brown leggings." },
-    { "id": "CHR_M_Adult_004", "category": "Adult_Male", "age": 45, "stature_cm": 181,
-      "person": "a 45-year-old man, tall, robust, broad-shouldered, heavy-boned, big hands. Long rectangular face, high cheekbones, strong aquiline nose, narrow grey eyes, bushy eyebrows, deep forehead lines. Dark hair cut short, grey at the temples. Long full dark beard streaked with grey. Ruddy weathered skin. Slight forward stoop of a lifelong labourer. Olive-green tunic under a heavy brown hooded wool cloak, hood down." },
-    { "id": "CHR_M_Adult_005", "category": "Adult_Male", "age": 27, "stature_cm": 166,
-      "person": "a 27-year-old man, short and very thin, narrow shoulders, one shoulder slightly higher than the other. Triangular face with a pointed chin, prominent cheekbones, hollow cheeks, small straight nose, large dark eyes, arched eyebrows. Thick straight black hair cut in a fringe. Thin moustache only, no beard. Light brown skin. Nervous, tense posture. Patched ochre tunic a size too large for him, rope belt." },
-    { "id": "CHR_M_Adult_006", "category": "Adult_Male", "age": 52, "stature_cm": 170,
-      "person": "a 52-year-old man, medium height, heavy, pot-bellied, rounded shoulders. Broad oval face, double chin, bulbous nose with small red veins, heavy-lidded eyes. Bald crown with a fringe of grey-brown hair around the sides. Clean-shaven. Ruddy cheeks. Leans back on his heels. Long calf-length tunic of faded madder red, wide cloth sash for a belt." },
-    { "id": "CHR_M_Adult_007", "category": "Adult_Male", "age": 34, "stature_cm": 176,
-      "person": "a 34-year-old man, tall, sinewy and athletic, long arms. Long oval face, square cleft chin, long straight nose, light green eyes, an old scar cutting through his left eyebrow. Short curly auburn hair. Short auburn beard, patchy and irregular on the cheeks. Pale skin, sunburnt nose. Confident upright stance. Short grey wool tunic, wool leggings cross-gartered with leather thongs, worn leather boots." },
-    { "id": "CHR_M_Adult_008", "category": "Adult_Male", "age": 41, "stature_cm": 168,
-      "person": "a 41-year-old man, medium-short, average build. Heart-shaped face, wide forehead, narrow jaw, thin long nose with a bump, close-set brown eyes, heavy bags under the eyes, large ears. Unkempt straight dark brown hair to the collar. Medium-length forked beard. Dark olive skin. Tired posture, head tilted slightly. Undyed beige linen tunic, dark green wool mantle thrown over one shoulder." },
-
-    { "id": "CHR_F_Adult_001", "category": "Adult_Female", "age": 22, "stature_cm": 166,
-      "person": "a 22-year-old woman, tall for her time, slim and long-limbed. Long oval face, high forehead, long straight nose, large almond-shaped dark eyes, thick straight eyebrows. Black hair in a single long braid over the shoulder, head uncovered. Olive skin. Very upright. Long undyed linen tunic to the ankles, narrow woven belt, leather shoes." },
-    { "id": "CHR_F_Adult_002", "category": "Adult_Female", "age": 36, "stature_cm": 152,
-      "person": "a 36-year-old woman, short, sturdy, wide-hipped, strong forearms. Round wide face, broad cheekbones, small snub nose, small eyes, hint of a double chin, ruddy cheeks. Brown hair hidden under an ochre kerchief knotted at the nape. Dark brown wool tunic to the ankles with a stained undyed apron." },
-    { "id": "CHR_F_Adult_003", "category": "Adult_Female", "age": 29, "stature_cm": 160,
-      "person": "a 29-year-old woman, medium height, average build. Square face, strong jaw, wide mouth, prominent straight nose, light hazel eyes, freckles across the nose. Wavy chestnut hair partly showing under a cream linen veil pushed back from the forehead. Fair skin. Relaxed stance. Long faded woad-blue tunic, leather belt." },
-    { "id": "CHR_F_Adult_004", "category": "Adult_Female", "age": 44, "stature_cm": 164,
-      "person": "a 44-year-old woman, medium-tall, thin, bony and angular. Long narrow face, sunken cheeks, sharp chin, hooked nose, deep lines from nose to mouth, small grey eyes, thin lips. Hair fully covered by a long dark brown veil falling over the shoulders. Weathered skin. Slightly hunched. Long charcoal-grey wool tunic, plain and severe." },
-    { "id": "CHR_F_Adult_005", "category": "Adult_Female", "age": 26, "stature_cm": 156,
-      "person": "a 26-year-old woman, short-medium, plump and soft-rounded. Round heart-shaped face, dimpled cheeks, small rounded nose, wide-set large brown eyes, thick arched eyebrows, a faint smile. Thick curly black hair in a low loose bun with escaping strands, head uncovered. Warm light-brown skin. Faded madder-red overdress over a cream underdress." },
-    { "id": "CHR_F_Adult_006", "category": "Adult_Female", "age": 33, "stature_cm": 170,
-      "person": "a 33-year-old woman, tall, broad-shouldered, strong and muscular. Rectangular face, heavy brow, broad nose, wide jaw, deep-set eyes with sun-squint lines. Dark blonde hair in two braids wrapped around the head. Tanned weathered skin. Solid upright stance. Olive-green wool tunic hitched up at the belt over a longer undyed undertunic, sturdy shoes." },
-    { "id": "CHR_F_Adult_007", "category": "Adult_Female", "age": 39, "stature_cm": 161,
-      "person": "a 39-year-old woman, medium height, average to slightly heavy. Oval face, visibly asymmetric: left eye a little smaller and lower than the right. Long thin nose, pronounced chin, faint pockmarks on the cheeks. Auburn-brown hair under a white linen headscarf tied at the nape. Pale skin. Head slightly tilted. Undyed grey-brown wool tunic, a wool shawl around the shoulders." },
-    { "id": "CHR_F_Adult_008", "category": "Adult_Female", "age": 48, "stature_cm": 150,
-      "person": "a 48-year-old woman, short, small and wiry, slightly bowed legs. Small triangular face, pointed chin, high cheekbones, small hooked nose, quick dark eyes with deep crow's feet. Black hair streaked with grey in a bun, under a loose ochre veil. Dark olive leathery skin. Rust-brown tunic, mended many times, visible patches." },
-
-    { "id": "CHR_M_Elder_001", "category": "Elder_Male", "age": 68, "stature_cm": 168,
-      "person": "a 68-year-old man, tall but stooped, thin, long arms. Long gaunt face, prominent cheekbones, large hooked nose, deep wrinkles, white bushy eyebrows. Bald on top, long thin white hair at the sides. Long flowing white beard. Pale skin with age spots. Leans on a plain wooden staff held in his right hand. Long dark brown wool tunic and a worn cloak." },
-    { "id": "CHR_M_Elder_002", "category": "Elder_Male", "age": 72, "stature_cm": 158,
-      "person": "a 72-year-old man, short, stocky and round, bow-legged. Wide round face, fleshy nose, small eyes nearly hidden in wrinkles, sagging jowls. Short stubbly grey hair. Clean-shaven with white stubble. Ruddy skin. Hunched. Undyed wool tunic with a sheepskin vest, fleece side out." },
-    { "id": "CHR_M_Elder_003", "category": "Elder_Male", "age": 63, "stature_cm": 168,
-      "person": "a 63-year-old man, medium height, lean, wiry, still strong. Square weathered face, hard jaw, flattened broken nose, left eyelid scarred and half closed. Thick grey hair cut short. Short grizzled salt-and-pepper beard. Deep tan, leathery skin. Upright, almost military bearing. Faded blue wool tunic, broad leather belt, old boots." },
-    { "id": "CHR_M_Elder_004", "category": "Elder_Male", "age": 77, "stature_cm": 152,
-      "person": "a 77-year-old man, small and frail, very thin, strongly bent spine. Narrow face, sunken toothless mouth, long thin nose, cloudy pale eyes, large ears. Sparse wispy white hair. Thin, irregular long white goatee. Papery pale skin. Walks with a short knotted cane in his left hand. Oversized grey wool cloak over a long tunic." },
-
-    { "id": "CHR_F_Elder_001", "category": "Elder_Female", "age": 66, "stature_cm": 155,
-      "person": "a 66-year-old woman, medium height, heavy-set and broad. Wide round face, deep laugh lines, broad nose, double chin. White hair under a long black veil. Olive skin with age spots. Upright but heavy. Long black wool tunic of a widow." },
-    { "id": "CHR_F_Elder_002", "category": "Elder_Female", "age": 74, "stature_cm": 140,
-      "person": "a 74-year-old woman, small, very thin, strongly hunched. Narrow deeply wrinkled face, hooked nose, sharp chin, sunken cheeks, small dark eyes. A thin grey braid showing under a loose cream kerchief. Dark leathery skin. Holds a walking stick in her right hand. Faded brown layered tunic and a heavy shawl." },
-    { "id": "CHR_F_Elder_003", "category": "Elder_Female", "age": 61, "stature_cm": 162,
-      "person": "a 61-year-old woman, tall, lean and dignified. Long oval face, high cheekbones, straight nose, fine wrinkles, light grey-blue eyes. Silver hair in a bun, uncovered, a dark blue veil resting on the shoulders. Pale skin. Very upright. Faded woad-blue long tunic, woven belt." },
-    { "id": "CHR_F_Elder_004", "category": "Elder_Female", "age": 69, "stature_cm": 150,
-      "person": "a 69-year-old woman, short, plump and soft. Round face, small upturned nose, many soft wrinkles, rosy cheeks, a mole on the chin. Frizzy iron-grey hair escaping an ochre headscarf. Slight stoop. Faded madder-red tunic with an undyed apron." },
-
-    { "id": "CHR_M_Child_001", "category": "Child_Male", "age": 6, "stature_cm": 112,
-      "person": "a 6-year-old boy, small and chubby, belly pushed forward. Round face, big cheeks, small nose, large dark eyes. Messy curly black hair. Olive skin. Short undyed wool tunic to the knees, barefoot." },
-    { "id": "CHR_M_Child_002", "category": "Child_Male", "age": 10, "stature_cm": 135,
-      "person": "a 10-year-old boy, skinny and long-limbed. Narrow face, ears sticking out, a long nose for his age, freckles. Light brown straight hair cut short and unevenly. Fair skin. Oversized ochre tunic with a rope belt, cloth-wrapped shoes." },
-    { "id": "CHR_M_Child_003", "category": "Child_Male", "age": 12, "stature_cm": 146,
-      "person": "a 12-year-old boy, sturdy and broad for his age. Square face, strong eyebrows, wide flat nose, serious expression. Straight dark hair in a bowl cut. Tanned skin. Grey wool tunic, wool leggings, a small hooded cape." },
-    { "id": "CHR_M_Child_004", "category": "Child_Male", "age": 8, "stature_cm": 125,
-      "person": "an 8-year-old boy, slight and shy, arms held close to the body. Oval face, pointed chin, big light hazel eyes, thin eyebrows. Wavy reddish-brown hair. Pale skin with sunburnt cheeks. Patched faded blue tunic, bare legs, leather shoes." },
-
-    { "id": "CHR_F_Child_001", "category": "Child_Female", "age": 5, "stature_cm": 106,
-      "person": "a 5-year-old girl, small and round. Round face, chubby cheeks, button nose. Dark curly hair in two short pigtails. Olive skin. Long cream linen tunic, barefoot." },
-    { "id": "CHR_F_Child_002", "category": "Child_Female", "age": 9, "stature_cm": 130,
-      "person": "a 9-year-old girl, thin. Long oval face, a long nose, large serious dark eyes, thick eyebrows. Long straight black hair in a single braid. Brown skin. Rust-brown tunic with a woven belt." },
-    { "id": "CHR_F_Child_003", "category": "Child_Female", "age": 11, "stature_cm": 142,
-      "person": "an 11-year-old girl, tall and lanky for her age. Heart-shaped face, freckles, wide mouth. Light brown hair loose to the shoulders under a small cream kerchief. Fair skin. Olive-green tunic with a small apron." },
-    { "id": "CHR_F_Child_004", "category": "Child_Female", "age": 7, "stature_cm": 118,
-      "person": "a 7-year-old girl, sturdy, slightly pigeon-toed. Square-ish face, broad nose, small eyes. Straight dark brown hair cut at chin length. Tanned skin. Faded madder-red tunic, leather shoes." }
-  ]
+  "categories": {
+    "Adult_Male": {
+      "sex": "M",
+      "life_stage": "Adult",
+      "stature_cm": 170
+    },
+    "Adult_Female": {
+      "sex": "F",
+      "life_stage": "Adult",
+      "stature_cm": 158
+    },
+    "Elder_Male": {
+      "sex": "M",
+      "life_stage": "Elder",
+      "stature_cm": 164
+    },
+    "Elder_Female": {
+      "sex": "F",
+      "life_stage": "Elder",
+      "stature_cm": 151
+    },
+    "Child_Male": {
+      "sex": "M",
+      "life_stage": "Child",
+      "stature_cm": 124
+    },
+    "Child_Female": {
+      "sex": "F",
+      "life_stage": "Child",
+      "stature_cm": 121
+    }
+  },
+  "sheets": [
+    {
+      "file": "Sheets/serie-1.png",
+      "panels": [
+        {
+          "category": "Adult_Male",
+          "rect": [
+            23,
+            156,
+            764,
+            506
+          ],
+          "ids": [
+            "CHR_M_Adult_001",
+            "CHR_M_Adult_002",
+            "CHR_M_Adult_003",
+            "CHR_M_Adult_004"
+          ]
+        },
+        {
+          "category": "Adult_Female",
+          "rect": [
+            773,
+            156,
+            1513,
+            506
+          ],
+          "ids": [
+            "CHR_F_Adult_001",
+            "CHR_F_Adult_002",
+            "CHR_F_Adult_003",
+            "CHR_F_Adult_004"
+          ]
+        },
+        {
+          "category": "Child_Male",
+          "rect": [
+            23,
+            548,
+            374,
+            843
+          ],
+          "ids": [
+            "CHR_M_Child_001",
+            "CHR_M_Child_002",
+            "CHR_M_Child_003"
+          ]
+        },
+        {
+          "category": "Child_Female",
+          "rect": [
+            383,
+            548,
+            764,
+            843
+          ],
+          "ids": [
+            "CHR_F_Child_001",
+            "CHR_F_Child_002",
+            "CHR_F_Child_003"
+          ]
+        },
+        {
+          "category": "Elder_Male",
+          "rect": [
+            772,
+            548,
+            1144,
+            843
+          ],
+          "ids": [
+            "CHR_M_Elder_001",
+            "CHR_M_Elder_002",
+            "CHR_M_Elder_003"
+          ]
+        },
+        {
+          "category": "Elder_Female",
+          "rect": [
+            1153,
+            548,
+            1513,
+            843
+          ],
+          "ids": [
+            "CHR_F_Elder_001",
+            "CHR_F_Elder_002",
+            "CHR_F_Elder_003"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "Sheets/serie-2.png",
+      "panels": [
+        {
+          "category": "Adult_Male",
+          "rect": [
+            8,
+            129,
+            779,
+            395
+          ],
+          "ids": [
+            "CHR_M_Adult_005",
+            "CHR_M_Adult_006",
+            "CHR_M_Adult_007",
+            "CHR_M_Adult_008",
+            "CHR_M_Adult_009",
+            "CHR_M_Adult_010",
+            "CHR_M_Adult_011",
+            "CHR_M_Adult_012"
+          ]
+        },
+        {
+          "category": "Adult_Female",
+          "rect": [
+            787,
+            131,
+            1527,
+            395
+          ],
+          "ids": [
+            "CHR_F_Adult_005",
+            "CHR_F_Adult_006",
+            "CHR_F_Adult_007",
+            "CHR_F_Adult_008",
+            "CHR_F_Adult_009",
+            "CHR_F_Adult_010",
+            "CHR_F_Adult_011",
+            "CHR_F_Adult_012"
+          ]
+        },
+        {
+          "category": "Child_Male",
+          "rect": [
+            7,
+            436,
+            441,
+            659
+          ],
+          "ids": [
+            "CHR_M_Child_004",
+            "CHR_M_Child_005",
+            "CHR_M_Child_006",
+            "CHR_M_Child_007",
+            "CHR_M_Child_008",
+            "CHR_M_Child_009"
+          ],
+          "_note": "la planche etiquette deux figures CHR_M_Child_007 : la 5e devient 008, la 6e (etiquetee 008) devient 009"
+        },
+        {
+          "category": "Child_Female",
+          "rect": [
+            447,
+            436,
+            850,
+            659
+          ],
+          "ids": [
+            "CHR_F_Child_004",
+            "CHR_F_Child_005",
+            "CHR_F_Child_006",
+            "CHR_F_Child_007",
+            "CHR_F_Child_008",
+            "CHR_F_Child_009"
+          ]
+        },
+        {
+          "category": "Elder_Male",
+          "rect": [
+            857,
+            437,
+            1190,
+            659
+          ],
+          "ids": [
+            "CHR_M_Elder_004",
+            "CHR_M_Elder_005",
+            "CHR_M_Elder_006",
+            "CHR_M_Elder_007"
+          ]
+        },
+        {
+          "category": "Elder_Female",
+          "rect": [
+            1196,
+            436,
+            1528,
+            659
+          ],
+          "ids": [
+            "CHR_F_Elder_004",
+            "CHR_F_Elder_005",
+            "CHR_F_Elder_006",
+            "CHR_F_Elder_007"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "Sheets/serie-4.png",
+      "panels": [
+        {
+          "category": "Adult_Female",
+          "rect": [
+            15,
+            108,
+            1433,
+            424
+          ],
+          "label_lines": 2,
+          "ids": [
+            "CHR_F_Adult_013",
+            "CHR_F_Adult_014",
+            "CHR_F_Adult_015",
+            "CHR_F_Adult_016",
+            "CHR_F_Adult_017",
+            "CHR_F_Adult_018",
+            "CHR_F_Adult_019",
+            "CHR_F_Adult_020",
+            "CHR_F_Adult_021",
+            "CHR_F_Adult_022",
+            "CHR_F_Adult_023",
+            "CHR_F_Adult_024"
+          ]
+        },
+        {
+          "category": "Child_Female",
+          "rect": [
+            15,
+            461,
+            593,
+            668
+          ],
+          "label_lines": 2,
+          "ids": [
+            "CHR_F_Child_010",
+            "CHR_F_Child_011",
+            "CHR_F_Child_012",
+            "CHR_F_Child_013",
+            "CHR_F_Child_014",
+            "CHR_F_Child_015"
+          ],
+          "_note": "la planche numerote ses filles 009-014 ; 009 existe deja (serie 2) : elles deviennent 010-015, dans l'ordre"
+        },
+        {
+          "category": "Elder_Female",
+          "rect": [
+            604,
+            461,
+            1433,
+            669
+          ],
+          "label_lines": 2,
+          "ids": [
+            "CHR_F_Elder_009",
+            "CHR_F_Elder_010",
+            "CHR_F_Elder_011",
+            "CHR_F_Elder_012",
+            "CHR_F_Elder_013",
+            "CHR_F_Elder_014"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "Sheets/serie-5.png",
+      "panels": [
+        {
+          "category": "Adult_Male",
+          "rect": [
+            14,
+            101,
+            1433,
+            390
+          ],
+          "label_lines": 2,
+          "ids": [
+            "CHR_M_Adult_013",
+            "CHR_M_Adult_014",
+            "CHR_M_Adult_015",
+            "CHR_M_Adult_016",
+            "CHR_M_Adult_017",
+            "CHR_M_Adult_018",
+            "CHR_M_Adult_019",
+            "CHR_M_Adult_020",
+            "CHR_M_Adult_021",
+            "CHR_M_Adult_022",
+            "CHR_M_Adult_023",
+            "CHR_M_Adult_024"
+          ]
+        },
+        {
+          "category": "Child_Male",
+          "rect": [
+            14,
+            428,
+            639,
+            631
+          ],
+          "label_lines": 2,
+          "ids": [
+            "CHR_M_Child_010",
+            "CHR_M_Child_011",
+            "CHR_M_Child_012",
+            "CHR_M_Child_013",
+            "CHR_M_Child_014",
+            "CHR_M_Child_015"
+          ],
+          "_note": "la planche numerote ses garcons 009-014 ; 009 existe deja (serie 2) : ils deviennent 010-015, dans l'ordre"
+        },
+        {
+          "category": "Elder_Male",
+          "rect": [
+            650,
+            428,
+            1433,
+            631
+          ],
+          "label_lines": 2,
+          "ids": [
+            "CHR_M_Elder_009",
+            "CHR_M_Elder_010",
+            "CHR_M_Elder_011",
+            "CHR_M_Elder_012",
+            "CHR_M_Elder_013",
+            "CHR_M_Elder_014"
+          ]
+        }
+      ]
+    }
+  ],
+  "overrides": {
+    "_doc": "pose 'assis' : portrait sur la planche, jamais attribue a un habitant qui marche ; stature = 72 % de la categorie. Releve a l'oeil sur les planches decoupees, 2026-10-01.",
+    "CHR_F_Elder_003": {
+      "pose": "assis"
+    },
+    "CHR_M_Elder_006": {
+      "pose": "assis"
+    },
+    "CHR_F_Elder_007": {
+      "pose": "assis"
+    },
+    "CHR_F_Elder_010": {
+      "pose": "assis"
+    },
+    "CHR_F_Elder_011": {
+      "pose": "assis"
+    },
+    "CHR_F_Elder_013": {
+      "pose": "assis"
+    },
+    "CHR_F_Elder_014": {
+      "pose": "assis"
+    },
+    "CHR_M_Elder_010": {
+      "pose": "assis"
+    },
+    "CHR_M_Elder_011": {
+      "pose": "assis"
+    },
+    "CHR_M_Elder_012": {
+      "pose": "assis"
+    },
+    "CHR_M_Elder_013": {
+      "pose": "assis"
+    },
+    "CHR_M_Elder_014": {
+      "pose": "assis"
+    },
+    "CHR_M_Child_001": {
+      "pose": "court"
+    },
+    "CHR_M_Child_006": {
+      "pose": "court"
+    }
+  }
 }
