@@ -109,6 +109,13 @@ trace sort au même format, et le comparateur marche sans changer une ligne.
 En attendant, il sert déjà à comparer deux états du dépôt JS entre eux — une refonte qui
 ne devait rien changer, une sauvegarde rechargée qui doit reprendre à l'identique.
 
+## Scénarios et masques (phase 3)
+
+Depuis `sim-scenario-001`, une trace peut partir d'un **scénario** — une sauvegarde JS chargée par
+`deserialize` — avec les systèmes non portés **masqués** de l'extérieur et un **périmètre** déclaré.
+Le comparateur refuse deux traces dont le scénario ou les masques diffèrent, et ne juge que le
+périmètre (`-sections`). Format, masques, autotest (10 cas) : `docs/migration/phase3/P3_SCENARIOS.md`.
+
 ## Une trace = un processus neuf
 
 Deux `new Simulation(graine)` dans le **même** processus divergent dès le tick 0 : les
