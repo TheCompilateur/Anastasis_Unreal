@@ -324,6 +324,10 @@ aura un état à décrire.
 
 ### Suite proposée — dans cet ordre
 
+**Depuis le 2026-10-01, la phase 3 fait autorité sur l'ordre** : `docs/migration/phase3/P3_PLAN.md`
+(la preuve d'abord, puis la table de décision complète, puis les vagues 5 et 6). La liste ci-dessous
+reste la carte des dépendances.
+
 L'ordre suit les dépendances réelles, pas l'intérêt du gameplay. Chaque étape doit
 arriver avec ses vecteurs de parité avant qu'on empile la suivante.
 
