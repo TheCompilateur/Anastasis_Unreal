@@ -215,10 +215,17 @@ struct FWaterRibbons
 	TArray<FVector> Vertices;
 	TArray<int32> Triangles;
 	TArray<FVector> Normals;
-	/** (distance le long du cours en m / 10, travers -1..1). */
+	/** (distance le long du cours en m / 10, travers -1 rive gauche .. +1 rive droite). */
 	TArray<FVector2D> UV0;
+	/**
+	 * RIVER_LOOK_001. X = courbure signee [-1,1] : positif = virage a gauche, donc la berge
+	 * exterieure est a droite (UV0.y > 0). Y reserve (0). Les lacs n'ont pas ce canal.
+	 */
+	TArray<FVector2D> UV1;
 	/** Sens du courant x vitesse normalisee [0,1] : lu par M_AnastasisWater (flowmap). */
 	TArray<FVector2D> UV2;
+	/** (profondeur au centre en metres, pente de la surface d'eau). 0 = inconnu (lacs). */
+	TArray<FVector2D> UV3;
 	TArray<FLinearColor> Colors;
 };
 

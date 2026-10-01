@@ -1419,7 +1419,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 if (Ribbons.Triangles.Num() > 0)
                 {
                     ExperimentalSurface->CreateMeshSection_LinearColor(2, Ribbons.Vertices, Ribbons.Triangles, Ribbons.Normals,
-                        Ribbons.UV0, TArray<FVector2D>{}, Ribbons.UV2, TArray<FVector2D>{},
+                        Ribbons.UV0, Ribbons.UV1, Ribbons.UV2, Ribbons.UV3,
                         Ribbons.Colors, TArray<FProcMeshTangent>{}, false);
                     if (ShoreMaterial) ExperimentalSurface->SetMaterial(2, ShoreMaterial);
                 }

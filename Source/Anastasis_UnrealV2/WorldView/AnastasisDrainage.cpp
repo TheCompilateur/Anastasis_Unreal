@@ -1842,11 +1842,27 @@ bool AnastasisDrainage::Apply(
 		Geo.Colors[I].A = bUnder ? 1.0f : 0.0f;
 		if (Params.bWaterLook && bUnder)
 		{
-			// Fond immerge : gravier clair au bord, vase sombre au large. Le bleu de tuile n'a
-			// plus de raison d'etre : c'est la nappe Single Layer Water qui absorbe la lumiere.
+			// Fond immerge. Le degrade profondeur (sable / gravier pres de la rive, vase au
+			// large) est module par deux taches de ~16 m, pour que le lit ne soit pas un
+			// aplat. Toutes ces teintes gardent B <= R - 0.04 : le test scelle refuse un
+			// fond peint en bleu de tuile. Le grain fin reste celui du materiau de sol.
+			auto Hash01 = [](int32 A, int32 B) -> float
+			{
+				uint32 H = static_cast<uint32>(A) * 374761393u ^ static_cast<uint32>(B) * 668265263u;
+				H = (H ^ (H >> 13)) * 1274126177u;
+				return static_cast<float>((H ^ (H >> 16)) & 0xFFFFu) / 65535.0f;
+			};
+			const int32 X0 = FMath::FloorToInt(Geo.Vertices[I].X / 1600.0);
+			const int32 Y0 = FMath::FloorToInt(Geo.Vertices[I].Y / 1600.0);
+			const float Coarse = Hash01(X0, Y0);
+			const float Fine = Hash01(X0 * 2 + 5, Y0 * 2 - 3);
 			const double Deep = SmoothStep(0.0, 180.0, Water[I] - Ground[I]);
-			const FLinearColor Gravel(0.30f, 0.27f, 0.20f), Silt(0.13f, 0.12f, 0.085f);
-			const FLinearColor Bed = FMath::Lerp(Gravel, Silt, static_cast<float>(Deep));
+			const FLinearColor Sand(0.40f, 0.34f, 0.22f);
+			const FLinearColor Gravel(0.29f, 0.26f, 0.19f);
+			const FLinearColor Silt(0.15f, 0.13f, 0.09f);
+			const FLinearColor Stone(0.22f, 0.20f, 0.15f);
+			FLinearColor Bed = FMath::Lerp(FMath::Lerp(Sand, Gravel, Coarse), FMath::Lerp(Silt, Stone, Fine * Fine), static_cast<float>(Deep));
+			if (Fine > 0.86f) Bed = FMath::Lerp(Bed, Stone, 0.45f * static_cast<float>(1.0 - Deep));
 			Geo.Colors[I] = FLinearColor(Bed.R, Bed.G, Bed.B, 1.0f);
 		}
 		if (Wet[I] && LakeOf[I] < 0) (bUnder ? Out.KeptWaterVertices : Out.RepairedWaterVertices) += 1;
@@ -2155,6 +2171,22 @@ void AnastasisDrainage::BuildRiverRibbons(const FNetwork& Network, FWaterRibbons
 			const FVector2D C(P.Location);
 			const FVector2D L = C + Normal * Half, R = C - Normal * Half;
 			const FVector2D Flow = Tangent * FMath::Clamp(P.Velocity / 3.0, 0.0, 1.0);
+			// Courbure signee : produit vectoriel des tangentes amont/aval, ramene a [-1,1].
+			// Un coude d'environ 25 deg sur 25 m vaut ~0.5. Positif = virage a gauche.
+			double Curv = 0.0;
+			if (K > 0 && K + 1 < Num)
+			{
+				const FVector2D Prev(River.Points[K - 1].Location);
+				const FVector2D Next(River.Points[K + 1].Location);
+				const FVector2D Here(P.Location);
+				const FVector2D InDir = (Here - Prev).GetSafeNormal();
+				const FVector2D OutDir = (Next - Here).GetSafeNormal();
+				const double Cross = InDir.X * OutDir.Y - InDir.Y * OutDir.X;
+				const double Chord = FVector2D::Distance(Prev, Next);
+				Curv = FMath::Clamp(Cross * 2800.0 / FMath::Max(Chord, 200.0), -1.0, 1.0);
+			}
+			const FVector2D Curve(Curv, 0.0);
+			const FVector2D Body(P.Depth / 100.0, P.Slope);
 			Out.Vertices.Add(FVector(L.X, L.Y, Z));
 			Out.Vertices.Add(FVector(R.X, R.Y, Z));
 			Out.UV0.Add(FVector2D(Arc / 1000.0, -1.0));
@@ -2162,7 +2194,9 @@ void AnastasisDrainage::BuildRiverRibbons(const FNetwork& Network, FWaterRibbons
 			for (int32 Side = 0; Side < 2; ++Side)
 			{
 				Out.Normals.Add(FVector::UpVector);
+				Out.UV1.Add(Curve);
 				Out.UV2.Add(Flow);
+				Out.UV3.Add(Body);
 				Out.Colors.Add(FLinearColor(0.043f, 0.176f, 0.290f, 1.0f));
 			}
 		}

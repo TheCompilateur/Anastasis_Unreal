@@ -179,6 +179,36 @@ bool FAnastasisDrainageWaterLook::RunTest(const FString&)
 	AnastasisDrainage::BuildRiverRibbons(Net, Ribbons);
 	TestTrue(TEXT("every river has a ribbon"), Ribbons.Triangles.Num() / 6 >= Net.Rivers.Num());
 	TestEqual(TEXT("one flow vector per vertex"), Ribbons.UV2.Num(), Ribbons.Vertices.Num());
+	TestEqual(TEXT("one curvature per vertex"), Ribbons.UV1.Num(), Ribbons.Vertices.Num());
+	TestEqual(TEXT("one depth and slope per vertex"), Ribbons.UV3.Num(), Ribbons.Vertices.Num());
+	float MaxAbsCurv = 0.0f;
+	float MinDepthM = 100.0f;
+	float MaxDepthM = 0.0f;
+	int32 BadChannel = 0;
+	for (int32 I = 0; I < Ribbons.Vertices.Num(); ++I)
+	{
+		const float Curv = static_cast<float>(Ribbons.UV1[I].X);
+		const float DepthM = static_cast<float>(Ribbons.UV3[I].X);
+		const float Slope = static_cast<float>(Ribbons.UV3[I].Y);
+		MaxAbsCurv = FMath::Max(MaxAbsCurv, FMath::Abs(Curv));
+		MinDepthM = FMath::Min(MinDepthM, DepthM);
+		MaxDepthM = FMath::Max(MaxDepthM, DepthM);
+		if (FMath::Abs(Curv) > 1.0f + 1.e-3f || DepthM < 0.05f || DepthM > 3.2f || Slope < 0.0f || Slope > 0.25f)
+		{
+			++BadChannel;
+		}
+		// Rive gauche UV0.y = -1, rive droite = +1. Les deux portent le meme courant.
+		if ((I % 2 == 0 && FMath::Abs(Ribbons.UV0[I].Y + 1.0) > 1.e-4)
+			|| (I % 2 == 1 && FMath::Abs(Ribbons.UV0[I].Y - 1.0) > 1.e-4)
+			|| !Ribbons.UV2[I].Equals(Ribbons.UV2[I & ~1], 1.e-4))
+		{
+			++BadChannel;
+		}
+	}
+	AddInfo(FString::Printf(TEXT("river_look curv=%.3f depth_m=[%.2f,%.2f]"), MaxAbsCurv, MinDepthM, MaxDepthM));
+	TestEqual(TEXT("curvature, depth and banks stay in range"), BadChannel, 0);
+	TestTrue(TEXT("a bend reaches the material"), MaxAbsCurv > 0.2f);
+	TestTrue(TEXT("depth varies along the rivers"), MaxDepthM - MinDepthM > 0.5f);
 	// Meme sens d'enroulement que la grille : visible du dessus.
 	auto CrossZ = [](const TArray<FVector>& V, const TArray<int32>& T, int32 I)
 	{

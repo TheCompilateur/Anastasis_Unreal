@@ -15,7 +15,17 @@ Water d'Unreal, sur n'importe quel maillage, sans le plugin Water :
     advectees par le courant en flowmap a deux phases.
 
 ENTREES (ecrites par AnastasisDrainage::BuildRiverRibbons) :
+    UV0.xy  distance le long du cours, travers -1 rive gauche .. +1 rive droite.
+    UV1.x   courbure signee [-1,1] (positif = virage a gauche).
     UV2.xy  sens du courant x vitesse normalisee [0,1] ; nul sur les lacs et la mer.
+    UV3.xy  profondeur au centre en metres, pente de la surface. 0 = inconnu.
+
+RIVER_LOOK_001. Les lacs (UV2 nul) gardent les cinq vagues d'avant. Les rivieres
+ajoutent un profil de vitesse (centre plus vite que les rives, exterieur de virage
+un peu plus vite), des traines alignees sur le courant, une absorption plus faible
+la ou l'eau est peu profonde, et de la mousse seulement la ou le courant, la pente
+ou le virage la justifient. Aucune couleur n'est codee par heure : le ciel et la
+lumiere restent ceux de la scene.
 
 Repli : anastasis.Terrain.WaterLook 0 rend l'eau avec M_AnastasisShoreWater, inchangee.
 
@@ -36,6 +46,8 @@ mel = unreal.MaterialEditingLibrary
 # 40 % : une riviere de jeu, pas un ocean). Flowmap a deux phases : deux echantillons
 # advectes par le courant, decales d'une demi-periode et fondus en triangle -- le motif
 # coule sans s'etirer a l'infini.
+# float4 : normale monde xyz, mousse en w. Les lacs (courant nul) sortent tot, sur
+# exactement les cinq vagues d'avant : le cout et le reflet des plans d'eau ne bougent pas.
 NORMAL_HLSL = r'''
 float2 p = P.xy * 0.01;
 float spd = saturate(length(Flow));
@@ -43,23 +55,88 @@ float ph0 = frac(T * 0.18);
 float ph1 = frac(T * 0.18 + 0.5);
 float w0 = 1.0 - abs(1.0 - 2.0 * ph0);
 float w1 = 1.0 - abs(1.0 - 2.0 * ph1);
-float2 adv = Flow * 7.0;
-float2 q0 = p - adv * ph0;
-float2 q1 = p - adv * ph1 + float2(17.3, 5.1);
-float amp = Calm * (1.0 + 2.2 * spd);
+if (spd < 0.012)
+{
+    float2 adv = Flow * 7.0;
+    float2 q0 = p - adv * ph0;
+    float2 q1 = p - adv * ph1 + float2(17.3, 5.1);
+    float amp = Calm * (1.0 + 2.2 * spd);
+    float2 g = 0;
+    float2 d; float k; float w;
+    d = float2(0.97, 0.24);  k = 7.85; w = 0.6 * sqrt(9.81 * k);
+    g += d * amp * 0.35 * (w0 * cos(k * dot(d, q0) - w * T) + w1 * cos(k * dot(d, q1) - w * T));
+    d = float2(0.62, 0.78);  k = 4.83; w = 0.6 * sqrt(9.81 * k);
+    g += d * amp * 0.55 * (w0 * cos(k * dot(d, q0) - w * T + 1.3) + w1 * cos(k * dot(d, q1) - w * T + 1.3));
+    d = float2(-0.45, 0.89); k = 2.99; w = 0.6 * sqrt(9.81 * k);
+    g += d * amp * 0.70 * (w0 * cos(k * dot(d, q0) - w * T + 2.1) + w1 * cos(k * dot(d, q1) - w * T + 2.1));
+    d = float2(0.86, -0.51); k = 1.85; w = 0.6 * sqrt(9.81 * k);
+    g += d * amp * 0.80 * (w0 * cos(k * dot(d, q0) - w * T + 4.0) + w1 * cos(k * dot(d, q1) - w * T + 4.0));
+    d = float2(-0.99, -0.12); k = 1.14; w = 0.6 * sqrt(9.81 * k);
+    g += d * amp * 0.60 * (w0 * cos(k * dot(d, q0) - w * T + 5.2) + w1 * cos(k * dot(d, q1) - w * T + 5.2));
+    return float4(normalize(float3(-g, 1.0)), 0);
+}
+
+float2 dir = Flow / spd;
+float2 perp = float2(-dir.y, dir.x);
+float across = clamp(Along.y, -1.0, 1.0);
+float center = saturate(1.0 - abs(across));
+float curv = clamp(Curve.x, -1.0, 1.0);
+float outer = saturate(curv * across);
+float inner = saturate(-curv * across);
+float profile = lerp(0.34, 1.0, pow(center, 0.55));
+profile *= lerp(1.0, 1.16, outer);
+profile *= lerp(1.0, 0.80, inner);
+float depthM = Body.x;
+float slope = max(Body.y, 0.0);
+float known = smoothstep(0.05, 0.20, depthM);
+
+float2 adv = Flow * (7.0 * profile);
+float2 q0 = p - adv * 0.45 * ph0;
+float2 q1 = p - adv * 0.45 * ph1 + float2(17.3, 5.1);
+float2 f0 = p - adv * 1.35 * ph0;
+float2 f1 = p - adv * 1.35 * ph1 + float2(4.2, 9.7);
+float ampL = Calm * (1.15 - 0.40 * spd);
+float ampS = Calm * (0.15 + 1.15 * spd) * lerp(0.55, 1.0, center);
 float2 g = 0;
 float2 d; float k; float w;
-d = float2(0.97, 0.24);  k = 7.85; w = 0.6 * sqrt(9.81 * k);
-g += d * amp * 0.35 * (w0 * cos(k * dot(d, q0) - w * T) + w1 * cos(k * dot(d, q1) - w * T));
-d = float2(0.62, 0.78);  k = 4.83; w = 0.6 * sqrt(9.81 * k);
-g += d * amp * 0.55 * (w0 * cos(k * dot(d, q0) - w * T + 1.3) + w1 * cos(k * dot(d, q1) - w * T + 1.3));
-d = float2(-0.45, 0.89); k = 2.99; w = 0.6 * sqrt(9.81 * k);
-g += d * amp * 0.70 * (w0 * cos(k * dot(d, q0) - w * T + 2.1) + w1 * cos(k * dot(d, q1) - w * T + 2.1));
-d = float2(0.86, -0.51); k = 1.85; w = 0.6 * sqrt(9.81 * k);
-g += d * amp * 0.80 * (w0 * cos(k * dot(d, q0) - w * T + 4.0) + w1 * cos(k * dot(d, q1) - w * T + 4.0));
-d = float2(-0.99, -0.12); k = 1.14; w = 0.6 * sqrt(9.81 * k);
-g += d * amp * 0.60 * (w0 * cos(k * dot(d, q0) - w * T + 5.2) + w1 * cos(k * dot(d, q1) - w * T + 5.2));
-return normalize(float3(-g, 1.0));
+
+d = normalize(dir * 0.45 + float2(0.86, -0.51)); k = 1.20; w = 0.35 * sqrt(9.81 * k);
+g += d * ampL * 0.85 * (w0 * cos(k * dot(d, q0) - w * T + 4.0) + w1 * cos(k * dot(d, q1) - w * T + 4.0));
+d = normalize(dir * 0.30 + float2(-0.45, 0.89)); k = 2.10; w = 0.40 * sqrt(9.81 * k);
+g += d * ampL * 0.65 * (w0 * cos(k * dot(d, q0) - w * T + 2.1) + w1 * cos(k * dot(d, q1) - w * T + 2.1));
+d = normalize(dir * 0.70 + perp * 0.25); k = 3.40; w = 0.50 * sqrt(9.81 * k);
+g += d * ampL * 0.40 * (w0 * cos(k * dot(d, q0) - w * T + 1.1) + w1 * cos(k * dot(d, q1) - w * T + 1.1));
+
+d = normalize(perp * 0.72 + dir * 0.55); k = 4.8;
+g += d * ampS * 0.34 * (w0 * cos(k * dot(d, f0) - 1.6 * T) + w1 * cos(k * dot(d, f1) - 1.6 * T));
+d = normalize(-perp * 0.55 + dir * 0.70); k = 7.6;
+g += d * ampS * 0.18 * (w0 * cos(k * dot(d, f0) - 2.4 * T + 1.7) + w1 * cos(k * dot(d, f1) - 2.4 * T + 1.7));
+
+float riffle = known * saturate((spd * profile - 0.28) / 0.40) * saturate((1.25 - depthM) / 0.85);
+float bank = smoothstep(0.78, 0.98, abs(across)) * saturate(spd * profile);
+float bend = smoothstep(0.22, 0.70, abs(curv)) * outer * saturate(spd * 1.6);
+float steep = known * smoothstep(0.012, 0.040, slope) * saturate(spd * 2.0) * saturate((1.8 - depthM) / 1.1);
+float patch = saturate(0.50 + 0.50 * sin(dot(dir, f0) * 0.55) * sin(dot(perp, f0) * 1.15 + 1.3));
+float foam = saturate(pow(saturate((riffle * 0.42 + bank * 0.10 + bend * 0.38 + steep * 0.28) * patch), 1.8));
+g += perp * foam * Calm * 6.0 * sin(dot(dir, f0) * 14.0);
+return float4(normalize(float3(-g, 1.0)), foam);
+'''
+
+# float2 : faible profondeur (x), supplement de rugosite hors mousse (y).
+SHADE_HLSL = r'''
+float spd = saturate(length(Flow));
+if (spd < 0.012) return float2(0, 0);
+float across = clamp(Along.y, -1.0, 1.0);
+float center = saturate(1.0 - abs(across));
+float curv = clamp(Curve.x, -1.0, 1.0);
+float inner = saturate(-curv * across);
+float depthM = Body.x;
+float known = smoothstep(0.05, 0.20, depthM);
+float shoal = known * saturate((1.15 - depthM) / 1.0);
+float edge = smoothstep(0.28, 0.90, abs(across));
+float shallowness = saturate(shoal * lerp(0.28, 0.72, edge) + edge * 0.22 + inner * 0.22);
+float roughAdd = (1.0 - center) * 0.016 + inner * 0.008;
+return float2(shallowness, roughAdd);
 '''
 
 
@@ -101,38 +178,133 @@ def build(mat=None):
     mat.set_editor_property('two_sided', False)
 
     wiring = {}
-    wpos = mel.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -1200, 0)
-    time = mel.create_material_expression(mat, unreal.MaterialExpressionTime, -1200, 120)
-    uv2 = mel.create_material_expression(mat, unreal.MaterialExpressionTextureCoordinate, -1200, 240)
-    uv2.set_editor_property('coordinate_index', 2)
-    calm = sparam(mat, 'WaveSlope', 0.05, -1200, 360)
 
-    normal = custom(mat, NORMAL_HLSL, 'WaterNormal', unreal.CustomMaterialOutputType.CMOT_FLOAT3,
-                    ('P', 'T', 'Flow', 'Calm'), -800, 120)
-    wiring['n_p'] = mel.connect_material_expressions(wpos, '', normal, 'P')
-    wiring['n_t'] = mel.connect_material_expressions(time, '', normal, 'T')
-    wiring['n_flow'] = mel.connect_material_expressions(uv2, '', normal, 'Flow')
-    wiring['n_calm'] = mel.connect_material_expressions(calm, '', normal, 'Calm')
-    wiring['normal'] = mel.connect_material_property(normal, '', unreal.MaterialProperty.MP_NORMAL)
+    def link(tag, src, src_pin, dst, dst_pin):
+        wiring[tag] = mel.connect_material_expressions(src, src_pin, dst, dst_pin)
+        return dst
 
-    base = vparam(mat, 'SurfaceColor', (0.02, 0.045, 0.05, 1.0), -500, -300)
-    rough = sparam(mat, 'Roughness', 0.035, -500, -180)
-    spec = sparam(mat, 'Specular', 0.5, -500, -100)
-    wiring['base_color'] = mel.connect_material_property(base, '', unreal.MaterialProperty.MP_BASE_COLOR)
-    wiring['roughness'] = mel.connect_material_property(rough, '', unreal.MaterialProperty.MP_ROUGHNESS)
-    wiring['specular'] = mel.connect_material_property(spec, '', unreal.MaterialProperty.MP_SPECULAR)
+    def coord(index, x, y):
+        node = mel.create_material_expression(mat, unreal.MaterialExpressionTextureCoordinate, x, y)
+        node.set_editor_property('coordinate_index', index)
+        return node
 
-    # Coefficients par metre. Absorption forte dans le rouge : l'eau verdit puis bleuit
-    # avec la profondeur ; diffusion faible et bleu-vert : une eau douce un peu chargee.
-    out = mel.create_material_expression(mat, unreal.MaterialExpressionSingleLayerWaterMaterialOutput, -100, 300)
-    absorption = vparam(mat, 'Absorption', (0.55, 0.16, 0.11, 1.0), -500, 260)
-    scattering = vparam(mat, 'Scattering', (0.015, 0.040, 0.048, 1.0), -500, 380)
-    phase = sparam(mat, 'PhaseG', 0.1, -500, 500)
-    behind = sparam(mat, 'ColorScaleBehindWater', 1.0, -500, 580)
-    wiring['absorption'] = mel.connect_material_expressions(absorption, '', out, 'AbsorptionCoefficients')
-    wiring['scattering'] = mel.connect_material_expressions(scattering, '', out, 'ScatteringCoefficients')
-    wiring['phase'] = mel.connect_material_expressions(phase, '', out, 'PhaseG')
-    wiring['behind'] = mel.connect_material_expressions(behind, '', out, 'ColorScaleBehindWater')
+    def mask(src, r, g, b, a, x, y):
+        node = mel.create_material_expression(mat, unreal.MaterialExpressionComponentMask, x, y)
+        node.set_editor_property('r', r)
+        node.set_editor_property('g', g)
+        node.set_editor_property('b', b)
+        node.set_editor_property('a', a)
+        link('mask_%d_%d' % (x, y), src, '', node, '')
+        return node
+
+    def mul(a, b, x, y):
+        node = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, x, y)
+        link('mulA_%d_%d' % (x, y), a, '', node, 'A')
+        link('mulB_%d_%d' % (x, y), b, '', node, 'B')
+        return node
+
+    def add(a, b, x, y):
+        node = mel.create_material_expression(mat, unreal.MaterialExpressionAdd, x, y)
+        link('addA_%d_%d' % (x, y), a, '', node, 'A')
+        link('addB_%d_%d' % (x, y), b, '', node, 'B')
+        return node
+
+    def lerp(a, b, alpha, x, y):
+        node = mel.create_material_expression(mat, unreal.MaterialExpressionLinearInterpolate, x, y)
+        link('lerpA_%d_%d' % (x, y), a, '', node, 'A')
+        link('lerpB_%d_%d' % (x, y), b, '', node, 'B')
+        link('lerpT_%d_%d' % (x, y), alpha, '', node, 'Alpha')
+        return node
+
+    def sat(a, x, y):
+        node = mel.create_material_expression(mat, unreal.MaterialExpressionSaturate, x, y)
+        link('sat_%d_%d' % (x, y), a, '', node, '')
+        return node
+
+    wpos = mel.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -1600, 0)
+    time = mel.create_material_expression(mat, unreal.MaterialExpressionTime, -1600, 80)
+    uv0 = coord(0, -1600, 180)
+    uv1 = coord(1, -1600, 280)
+    uv2 = coord(2, -1600, 380)
+    uv3 = coord(3, -1600, 480)
+    calm = sparam(mat, 'WaveSlope', 0.05, -1600, 600)
+    field_inputs = ('P', 'T', 'Flow', 'Along', 'Curve', 'Body', 'Calm')
+
+    normal = custom(mat, NORMAL_HLSL, 'WaterNormal', unreal.CustomMaterialOutputType.CMOT_FLOAT4,
+                    field_inputs, -1100, 80)
+    link('n_p', wpos, '', normal, 'P')
+    link('n_t', time, '', normal, 'T')
+    link('n_flow', uv2, '', normal, 'Flow')
+    link('n_along', uv0, '', normal, 'Along')
+    link('n_curve', uv1, '', normal, 'Curve')
+    link('n_body', uv3, '', normal, 'Body')
+    link('n_calm', calm, '', normal, 'Calm')
+    normal_rgb = mask(normal, True, True, True, False, -700, 0)
+    foam = mask(normal, False, False, False, True, -700, 120)
+    wiring['normal'] = mel.connect_material_property(normal_rgb, '', unreal.MaterialProperty.MP_NORMAL)
+
+    shade = custom(mat, SHADE_HLSL, 'WaterShade', unreal.CustomMaterialOutputType.CMOT_FLOAT2,
+                   ('Flow', 'Along', 'Curve', 'Body'), -1100, 420)
+    link('s_flow', uv2, '', shade, 'Flow')
+    link('s_along', uv0, '', shade, 'Along')
+    link('s_curve', uv1, '', shade, 'Curve')
+    link('s_body', uv3, '', shade, 'Body')
+    shallowness = mask(shade, True, False, False, False, -700, 400)
+    rough_add = mask(shade, False, True, False, False, -700, 480)
+
+    base = vparam(mat, 'SurfaceColor', (0.02, 0.045, 0.05, 1.0), -700, -280)
+    shallow = vparam(mat, 'ShallowColor', (0.11, 0.125, 0.075, 1.0), -700, -160)
+    foam_tint = vparam(mat, 'FoamTint', (0.58, 0.60, 0.56, 1.0), -700, -40)
+    shallow_blend = sparam(mat, 'ShallowBlend', 0.30, -400, -220)
+    foam_amount = sparam(mat, 'FoamTintAmount', 0.28, -400, -140)
+    base_shallow = lerp(base, shallow, mul(shallowness, shallow_blend, -200, -200), 0, -200)
+    base_final = lerp(base_shallow, foam_tint, mul(foam, foam_amount, -200, -80), 200, -140)
+    wiring['base_color'] = mel.connect_material_property(base_final, '', unreal.MaterialProperty.MP_BASE_COLOR)
+
+    rough = sparam(mat, 'Roughness', 0.035, -400, 40)
+    foam_rough = sparam(mat, 'FoamRoughness', 0.26, -400, 120)
+    rough_final = sat(add(add(rough, mul(foam, foam_rough, 0, 80), 200, 40), rough_add, 400, 80), 560, 60)
+    wiring['roughness'] = mel.connect_material_property(rough_final, '', unreal.MaterialProperty.MP_ROUGHNESS)
+
+    spec = sparam(mat, 'Specular', 0.5, -400, 220)
+    spec_on_foam = sparam(mat, 'SpecularOnFoam', 0.45, -400, 300)
+    spec_final = lerp(spec, mul(spec, spec_on_foam, 0, 260), foam, 220, 240)
+    wiring['specular'] = mel.connect_material_property(spec_final, '', unreal.MaterialProperty.MP_SPECULAR)
+
+    # Coefficients par metre. Au large : absorption d'avant (l'eau verdit puis bleuit).
+    # En eau peu profonde : absorption plus faible, diffusion un peu plus forte, le fond
+    # reste lisible. Rien de tout cela ne depend de l'heure.
+    # Le modele Single Layer Water n'accepte qu'un seul noeud de sortie. Une regeneration
+    # qui en laisserait un et en ajouterait un second fait tomber le materiau sur le
+    # damier par defaut en jeu (vu en SM6 : "can contain only one").
+    removed = 0
+    for expr in list(mel.get_material_expressions(mat)):
+        if expr is not None and expr.get_class().get_name() == 'MaterialExpressionSingleLayerWaterMaterialOutput':
+            mel.delete_material_expression(mat, expr)
+            removed += 1
+    unreal.log('WATER_MATERIAL_SLW_REMOVED %d' % removed)
+    out = mel.create_material_expression(mat, unreal.MaterialExpressionSingleLayerWaterMaterialOutput, 700, 420)
+    left = 0
+    for expr in list(mel.get_material_expressions(mat)):
+        if expr is not None and expr.get_class().get_name() == 'MaterialExpressionSingleLayerWaterMaterialOutput':
+            left += 1
+    unreal.log('WATER_MATERIAL_SLW_COUNT %d' % left)
+    if left != 1:
+        unreal.log_error('WATER_MATERIAL_SLW_COUNT_BAD %d' % left)
+    absorption = vparam(mat, 'Absorption', (0.55, 0.16, 0.11, 1.0), -400, 420)
+    scattering = vparam(mat, 'Scattering', (0.015, 0.040, 0.048, 1.0), -400, 540)
+    phase = sparam(mat, 'PhaseG', 0.1, -400, 660)
+    behind = sparam(mat, 'ColorScaleBehindWater', 1.0, -400, 740)
+    shallow_absorb = sparam(mat, 'ShallowAbsorb', 0.38, -400, 820)
+    shallow_scatter = sparam(mat, 'ShallowScatter', 1.65, -400, 900)
+    shallow_behind = sparam(mat, 'ShallowBehind', 1.12, -400, 980)
+    absorption_out = lerp(absorption, mul(absorption, shallow_absorb, 0, 460), shallowness, 250, 440)
+    scattering_out = lerp(scattering, mul(scattering, shallow_scatter, 0, 580), shallowness, 250, 560)
+    behind_out = lerp(behind, shallow_behind, shallowness, 250, 700)
+    link('absorption', absorption_out, '', out, 'AbsorptionCoefficients')
+    link('scattering', scattering_out, '', out, 'ScatteringCoefficients')
+    link('phase', phase, '', out, 'PhaseG')
+    link('behind', behind_out, '', out, 'ColorScaleBehindWater')
 
     unreal.log('WATER_MATERIAL_WIRING ' + ' '.join('%s=%s' % (k, wiring[k]) for k in sorted(wiring)))
     if not all(wiring.values()):
