@@ -37,6 +37,11 @@ tools\unreal\anastasis-unreal.ps1 build                         # premier build 
 2. Tout commiter.
 3. `tools\unreal\agent-worktree.ps1 finish -Mission <mission>` → attendre `HANDOFF_READY::YES`.
    Rapporter PASS / KNOWN_EXPECTED_FAILURE / FAIL séparément, jamais un total « vert ».
+   Une branche qui ne touche ni `Source/`, ni `Config/`, ni `Content/`, ni `Plugins/`, ni le `.uproject`
+   passe sans build ni tests (`BUILD::SKIP TESTS::SKIP`) : le dire tel quel, ce n'est pas un PASS.
+   `finish` marque le commit prouvé : un commit ajouté ensuite exige un nouveau `finish`.
+4. Plusieurs agents en parallèle : **ne pas intégrer soi-même**. S'arrêter à `HANDOFF_READY::YES` et
+   donner le nom de la mission à l'intégrateur (section 4).
 
 Si `finish` échoue :
 
@@ -51,6 +56,22 @@ Si `finish` échoue :
 | `EDITOR_GATE::WAIT` / `EDITOR_GATE::TIMEOUT` | porte mémoire (`AGENTS.md`) : trop d'éditeurs ou de RAM prise ; relancer plus tard, jamais `ANASTASIS_EDITOR_GATE=0` sans mandat |
 
 ## 4. Verser (rôle intégrateur, sur demande d'Alexandre)
+
+**File groupée, d'abord.** Une seule session intègre ; elle verse toutes les missions prêtes d'un coup :
+
+```powershell
+cd C:\dev\ANASTASIS_UNREAL
+tools\unreal\agent-worktree.ps1 integrate-batch -Missions mission-a,mission-b,mission-c
+```
+
+- Admises : les missions dont `finish` a passé sur leur commit actuel. Les autres sont listées
+  (`BATCH_REJECTED::`), avec la raison ; une mission en conflit est écartée, les autres passent.
+- Un seul portail (build + suite seulement si le lot touche Unreal), dans `ANASTASIS_WORKTREES\_integration`,
+  dont les binaires survivent d'un lot à l'autre : build incrémental.
+- `main a bouge pendant le lot` : relancer la même commande.
+- Une mission écartée pour conflit : `git rebase main` dans son worktree, `finish`, puis lot suivant.
+
+**Une mission seule** (la boucle d'avant, toujours valable) :
 
 `main` bouge plusieurs fois par heure. La boucle est normale :
 

@@ -104,4 +104,53 @@ $r1 = AW integrate -Mission t7
 $r = AW prune -Mission t7
 Check 'S7 prune apres integration' ($r1.Code -eq 0 -and $r.Code -eq 0 -and -not (Test-Path (Join-Path $wtRoot 't7')) -and -not (G rev-parse --verify --quiet agent/t7)) ($r1.Out + "`n" + $r.Out)
 
+# Mission complete sous $wtRoot : worktree, fiche de passation, commits.
+function NewMission($name, [scriptblock[]]$changes) {
+  G branch "agent/$name" main | Out-Null
+  $w = Join-Path $wtRoot $name
+  G worktree add -q $w "agent/$name" | Out-Null
+  New-Item -ItemType Directory -Force "$w\docs\unreal\handoffs" | Out-Null
+  Set-Content "$w\docs\unreal\handoffs\$name.md" "# HANDOFF: $name"
+  & git -C $w add -A 2>&1 | Out-Null; & git -C $w commit -q -m "$name fiche" 2>&1 | Out-Null
+  foreach ($c in $changes) { & $c $w; & git -C $w add -A 2>&1 | Out-Null; & git -C $w commit -q -m $name 2>&1 | Out-Null }
+  return $w
+}
+
+# 8. finish sans changement Unreal : ni build ni tests, HANDOFF_READY et marqueur sur le commit.
+$w8 = NewMission 'b1' @({ param($w) Set-Content "$w\doc-b1.md" 'b1' })
+$r = AW finish -Mission b1
+$marker = Join-Path $wtRoot '.handoff\b1.txt'
+Check 'S8 finish docs seulement : build et tests sautes' ($r.Code -eq 0 -and $r.Out -match 'TESTS::SKIP' -and $r.Out -match 'HANDOFF_READY::YES') $r.Out
+Check 'S8 marqueur HANDOFF_READY = commit de la branche' ((Test-Path $marker) -and ((Get-Content $marker -Raw).Trim() -eq (G rev-parse agent/b1)))
+
+# 9. finish avec un changement Unreal : le build est tente (il echoue sur ce depot sans moteur).
+$w9 = NewMission 'u1' @({ param($w) New-Item -ItemType Directory -Force "$w\Source" | Out-Null; Set-Content "$w\Source\x.cpp" '// x' })
+$r = AW finish -Mission u1
+Check 'S9 finish C++ : le build est tente, pas de HANDOFF_READY' ($r.Code -ne 0 -and $r.Out -match 'UNREAL_CHANGE::OUI' -and $r.Out -notmatch 'HANDOFF_READY::YES' -and -not (Test-Path (Join-Path $wtRoot '.handoff\u1.txt'))) $r.Out
+
+# 10. integrate-batch : b1 et b2 (deux commits dependants) prets, b3 sans finish, b4 en
+#     conflit avec b1 : main avance d'un coup avec b1 et b2, b3 et b4 sont ecartees.
+$w2 = NewMission 'b2' @({ param($w) Set-Content "$w\doc-b2.md" 'premier' }, { param($w) Set-Content "$w\doc-b2.md" 'second' })
+$null = AW finish -Mission b2
+$null = NewMission 'b3' @({ param($w) Set-Content "$w\doc-b3.md" 'b3' })
+$null = NewMission 'b4' @({ param($w) Set-Content "$w\doc-b1.md" 'autre contenu' })
+$null = AW finish -Mission b4
+$mainAvant = (G rev-parse main)
+$r = AW integrate-batch -Missions 'b1,b2,b3,b4'
+$apres = (G rev-parse main)
+Check 'S10 lot : main avance' ($r.Code -eq 0 -and $apres -ne $mainAvant -and $r.Out -match 'BATCH_INTEGRATED::b1, b2') $r.Out
+Check 'S10 lot : contenu de b1 et b2 dans main, dans l ordre' (((G show 'main:doc-b1.md') -eq 'b1') -and ((G show 'main:doc-b2.md') -eq 'second'))
+Check 'S10 lot : b3 ecartee (pas de finish)' ($r.Out -match 'BATCH_REJECTED::b3 : pas de HANDOFF_READY')
+Check 'S10 lot : b4 ecartee (conflit), main sans son contenu' ($r.Out -match 'BATCH_REJECTED::b4 : conflit' -and (G show 'main:doc-b1.md') -eq 'b1')
+Check 'S10 lot : un seul portail, sans build (docs seulement)' (([regex]::Matches($r.Out, 'TESTS::SKIP')).Count -eq 1)
+
+# 11. prune apres un lot : les commits sont dans main par contenu (copies), pas par identite.
+$r = AW prune -Mission b1
+Check 'S11 prune reconnait une mission versee par lot' ($r.Code -eq 0 -and -not (G rev-parse --verify --quiet agent/b1) -and -not (Test-Path $marker)) $r.Out
+
+# 12. Branche modifiee apres finish : refusee par le lot.
+& git -C $w2 commit -q --allow-empty -m 'apres finish' 2>&1 | Out-Null
+$r = AW integrate-batch -Missions 'b2'
+Check 'S12 lot : commit posterieur a finish refuse' ($r.Code -ne 0 -and $r.Out -match 'BATCH_REJECTED::b2 : pas de HANDOFF_READY') $r.Out
+
 Remove-Item $base -Recurse -Force -ErrorAction SilentlyContinue

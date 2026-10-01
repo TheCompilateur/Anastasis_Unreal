@@ -12,16 +12,20 @@
 #   agent-worktree.ps1 status
 #   agent-worktree.ps1 finish     -Mission world-slice-007
 #   agent-worktree.ps1 integrate  -Mission world-slice-007
+#   agent-worktree.ps1 integrate-batch -Missions mission-a,mission-b   (file d'integration groupee)
 #   agent-worktree.ps1 preflight
 #   agent-worktree.ps1 postflight
 #   agent-worktree.ps1 mcp        -Mission world-slice-007
 #   agent-worktree.ps1 prune      -Mission world-slice-007
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet('create', 'status', 'finish', 'integrate', 'preflight', 'postflight', 'mcp', 'prune')]
+  [ValidateSet('create', 'status', 'finish', 'integrate', 'integrate-batch', 'preflight', 'postflight', 'mcp', 'prune')]
   [string]$Command,
   [string]$Mission,
-  [string]$From = 'main'
+  [string[]]$Missions,
+  [string]$From = 'main',
+  # finish / integrate-batch : build et tests Unreal meme sans changement Unreal.
+  [switch]$Full
 )
 $ErrorActionPreference = 'Stop'
 
@@ -42,6 +46,19 @@ function Branch-Of($m) { return "agent/$m" }
 function Path-Of($m) { return (Join-Path $WorktreeRoot $m) }
 function Handoff-Path($m) { return (Join-Path (Path-Of $m) "docs\unreal\handoffs\$m.md") }
 
+# HANDOFF_READY, garde par mission : le commit sur lequel finish a passe. integrate-batch
+# n'admet une branche que si son commit actuel est celui-la. Hors des depots (aucun git).
+$HandoffDir = Join-Path $WorktreeRoot '.handoff'
+function Handoff-Marker($m) { return (Join-Path $HandoffDir "$m.txt") }
+
+# Un changement « Unreal » : ce que le build ou la suite d'automation peuvent juger. Une
+# branche qui ne touche que docs/, tools/migration/ ou des scripts n'a rien a leur montrer,
+# et leur passage coutait 15 a 20 min de porte memoire et d'editeur par mission
+# (2026-10-01 : des agents bloques plus de 30 min a integrer).
+function Test-UnrealPath([string]$p) {
+  return ($p -match '^(Source|Config|Content|Plugins)/' -or $p -match '\.uproject$')
+}
+
 # git sans que PowerShell 5.1 ne transforme son stderr en erreur fatale : `fetch`, `merge`,
 # `worktree` ecrivent leur progression sur stderr, et sous 'Stop' le script mourait en
 # plein versement. Rend le code de sortie et toute la sortie, en texte.
@@ -49,6 +66,81 @@ function Invoke-Git {
   $ErrorActionPreference = 'Continue'
   $out = @(& git @args 2>&1 | ForEach-Object { "$_" })
   return [PSCustomObject]@{ Code = $LASTEXITCODE; Out = $out }
+}
+
+# Fichiers Unreal touches par une plage de commits (`base..tete`) d'un depot.
+function Unreal-Changes([string]$repo, [string]$range) {
+  return @((Invoke-Git -C $repo diff --name-only $range).Out | Where-Object { $_ -and (Test-UnrealPath $_) })
+}
+
+# Le build et la suite d'un arbre, ou rien s'il n'y a pas de changement Unreal.
+# Ecrit son compte rendu et pose $script:GateOk.
+function Invoke-UnrealGate([string]$root, [string[]]$unreal) {
+  $script:GateOk = $false
+  if ($unreal.Count -eq 0 -and -not $Full) {
+    Write-Output 'UNREAL_CHANGE::NON (ni Source/, ni Config/, ni Content/, ni Plugins/, ni .uproject)'
+    Write-Output 'BUILD::SKIP  TESTS::SKIP  -- rien a montrer au build ni a la suite (-Full pour les forcer)'
+    $script:GateOk = $true
+    return
+  }
+  if ($unreal.Count -gt 0) { Write-Output "UNREAL_CHANGE::OUI ($($unreal.Count) fichier(s), par ex. $($unreal[0]))" }
+  & (Join-Path $root 'tools\unreal\anastasis-unreal.ps1') build
+  if ($LASTEXITCODE -ne 0) { Write-Output 'FAIL: build'; return }
+  & (Join-Path $root 'tools\unreal\report-tests.ps1')
+  if ($LASTEXITCODE -ne 0) { Write-Output 'FAIL: des tests sont en echec reel'; return }
+  $script:GateOk = $true
+}
+
+# Deplace refs/heads/main, et elle seule, par avance rapide vers $rev (integrate et
+# integrate-batch). Ne touche la copie de travail du canonique que s'il est sur main.
+# Ecrit son compte rendu et pose $script:MoveOk.
+function Move-Main([string]$rev) {
+  $script:MoveOk = $false
+  $current = (Invoke-Git -C $Canonical branch --show-current).Out[0]
+  $env:ANASTASIS_INTEGRATION = '1'
+  try {
+    if ($current -eq 'main') {
+      # L integrateur ne doit jamais perturber le travail en vol d un autre agent :
+      # refus precis, seulement si l integration touche un fichier modifie ici.
+      $dirty = @((Invoke-Git -C $Canonical status --porcelain --untracked-files=no).Out)
+      $incoming = @((Invoke-Git -C $Canonical diff --name-only "main..$rev").Out)
+      $localPaths = @($dirty | ForEach-Object { $_.Substring(3).Trim('"') })
+      $overlap = @($incoming | Where-Object { $localPaths -contains $_ })
+      if ($overlap.Count -gt 0) {
+        Write-Output 'FAIL: l integration ecraserait du travail en cours dans la racine canonique.'
+        $overlap | ForEach-Object { Write-Output ('    ' + $_) }
+        Write-Output 'Fais atterrir ce travail (commit) avant d integrer.'
+        return
+      }
+      $before = @((Invoke-Git -C $Canonical status --porcelain).Out)
+      $m = Invoke-Git -C $Canonical merge --ff-only $rev
+      if ($m.Code -ne 0) {
+        $m.Out | ForEach-Object { Write-Output ('    ' + $_) }
+        # Un refus du hook arrive en phase 'prepared', la copie de travail deja ecrite.
+        $after = @((Invoke-Git -C $Canonical status --porcelain).Out)
+        $new = @($after | Where-Object { $before -notcontains $_ })
+        if ($new.Count -gt 0) {
+          Write-Output "FAIL: versement refuse ET racine canonique salie ($($new.Count) entrees). A restaurer :"
+          $new | Select-Object -First 20 | ForEach-Object { Write-Output ('    ' + $_) }
+        } else {
+          Write-Output 'FAIL: versement refuse, racine canonique inchangee.'
+        }
+        return
+      }
+    } else {
+      # main n est extraite nulle part ici : on deplace la ref, sans toucher la copie de
+      # travail ni la branche extraite. fetch refuse de lui-meme un non-fast-forward, et une
+      # branche extraite dans un autre worktree.
+      Write-Output "NOTE: le canonique est sur '$current', pas sur main : copie de travail laissee intacte."
+      $f = Invoke-Git -C $Canonical fetch . "$($rev):main"
+      if ($f.Code -ne 0) {
+        $f.Out | ForEach-Object { Write-Output ('    ' + $_) }
+        Write-Output 'FAIL: deplacement de main refuse, rien n a change.'
+        return
+      }
+    }
+  } finally { Remove-Item Env:ANASTASIS_INTEGRATION -ErrorAction SilentlyContinue }
+  $script:MoveOk = $true
 }
 
 . (Join-Path $PSScriptRoot 'mcp-port.ps1')
@@ -214,10 +306,10 @@ switch ($Command) {
       Write-Output '    Fermeture propre : quit_editor() par MCP, ou Stop-Process -Id <pid> (c est le tien : son chemin est ce worktree).'
       exit 1
     }
-    & (Join-Path $path 'tools\unreal\anastasis-unreal.ps1') build
-    if ($LASTEXITCODE -ne 0) { Fail 'FAIL: build' }
-    & (Join-Path $path 'tools\unreal\report-tests.ps1')
-    if ($LASTEXITCODE -ne 0) { Fail 'FAIL: des tests sont en echec reel' }
+    # Build et suite seulement si la branche change quelque chose qu'ils jugent.
+    $mb = (Invoke-Git -C $path merge-base main HEAD).Out[0]
+    Invoke-UnrealGate $path @(Unreal-Changes $path "$mb..HEAD")
+    if (-not $script:GateOk) { exit 1 }
     $dirty = @(& git -C $path status --porcelain --untracked-files=all)
     Write-Output ''
     if ($dirty.Count -gt 0) {
@@ -227,8 +319,11 @@ switch ($Command) {
       Write-Output 'Un commit est l unite de passation : commit tout avant de passer la main.'
       exit 1
     }
+    New-Item -ItemType Directory -Force $HandoffDir | Out-Null
+    (Invoke-Git -C $path rev-parse HEAD).Out[0] | Set-Content (Handoff-Marker $Mission) -Encoding ascii
     Write-Output 'HANDOFF_READY::YES'
     Write-Output "Passation : tools\unreal\agent-worktree.ps1 integrate -Mission $Mission"
+    Write-Output "     ou, groupee : tools\unreal\agent-worktree.ps1 integrate-batch -Missions $Mission,<autres>"
   }
 
   'integrate' {
@@ -287,53 +382,124 @@ switch ($Command) {
     Write-Output 'CHECKS::PASS index tools/unreal, lancements Unreal'
 
     # 3. Deplacer main.
-    $env:ANASTASIS_INTEGRATION = '1'
-    try {
-      if ($current -eq 'main') {
-        # L integrateur ne doit jamais perturber le travail en vol d un autre agent :
-        # refus precis, seulement si l integration touche un fichier modifie ici.
-        $dirty = @((Invoke-Git -C $Canonical status --porcelain --untracked-files=no).Out)
-        $incoming = @((Invoke-Git -C $Canonical diff --name-only "main..$branch").Out)
-        $localPaths = @($dirty | ForEach-Object { $_.Substring(3).Trim('"') })
-        $overlap = @($incoming | Where-Object { $localPaths -contains $_ })
-        if ($overlap.Count -gt 0) {
-          Write-Output 'FAIL: l integration ecraserait du travail en cours dans la racine canonique.'
-          $overlap | ForEach-Object { Write-Output ('    ' + $_) }
-          Write-Output 'Fais atterrir ce travail (commit) avant d integrer.'
-          exit 1
-        }
-        $before = @((Invoke-Git -C $Canonical status --porcelain).Out)
-        $m = Invoke-Git -C $Canonical merge --ff-only $branch
-        if ($m.Code -ne 0) {
-          $m.Out | ForEach-Object { Write-Output ('    ' + $_) }
-          # Un refus du hook arrive en phase 'prepared', la copie de travail deja ecrite.
-          $after = @((Invoke-Git -C $Canonical status --porcelain).Out)
-          $new = @($after | Where-Object { $before -notcontains $_ })
-          if ($new.Count -gt 0) {
-            Write-Output "FAIL: versement refuse ET racine canonique salie ($($new.Count) entrees). A restaurer :"
-            $new | Select-Object -First 20 | ForEach-Object { Write-Output ('    ' + $_) }
-          } else {
-            Write-Output 'FAIL: versement refuse, racine canonique inchangee.'
-          }
-          exit 1
-        }
-      } else {
-        # main n est extraite nulle part ici : on deplace la ref, sans toucher la copie de
-        # travail ni la branche extraite. fetch refuse de lui-meme un non-fast-forward, et une
-        # branche extraite dans un autre worktree.
-        Write-Output "NOTE: le canonique est sur '$current', pas sur main : copie de travail laissee intacte."
-        $f = Invoke-Git -C $Canonical fetch . "$($branch):main"
-        if ($f.Code -ne 0) {
-          $f.Out | ForEach-Object { Write-Output ('    ' + $_) }
-          Fail 'FAIL: deplacement de main refuse, rien n a change.'
-        }
-      }
-    } finally { Remove-Item Env:ANASTASIS_INTEGRATION -ErrorAction SilentlyContinue }
+    Move-Main $branch
+    if (-not $script:MoveOk) { exit 1 }
     $mainAfter = (Invoke-Git -C $Canonical rev-parse main).Out[0]
     Write-Output "MAIN_AFTER::$mainAfter"
     Write-Output "INTEGRATED::$branch ($ahead commit(s))"
     Write-Output 'Ensuite : git push origin main (le pre-push compile le canonique), puis'
     Write-Output "          tools\unreal\agent-worktree.ps1 prune -Mission $Mission"
+  }
+
+  'integrate-batch' {
+    # File d'integration groupee (2026-10-01). Avant : chaque mission refaisait build + suite
+    # complete, puis `integrate` refusait des que main avait bouge -- avec beaucoup d'agents,
+    # chacun repartait au debut a chaque versement d'un autre. Ici : les missions pretes sont
+    # empilees sur main dans un worktree d'integration persistant, UN SEUL portail juge le
+    # sommet, et main avance d'un coup. Une seule session integratrice a la fois.
+    #
+    #   1. admission : la branche a passe finish SUR SON COMMIT ACTUEL (marqueur .handoff) ;
+    #   2. empilement : ses commits absents (par contenu) du sommet, copies dans l'ordre ;
+    #      un conflit ecarte la mission, les autres continuent ;
+    #   3. portail : index tools/unreal, lancements Unreal, puis build + suite seulement si
+    #      le lot touche Unreal (-Full pour les forcer) ;
+    #   4. main avance par avance rapide sur le sommet ; si main a bouge pendant le lot, rien
+    #      ne bouge et il suffit de relancer.
+    $list = @($Missions | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($list.Count -eq 0) { Fail 'FAIL: -Missions mission-a,mission-b est requis' }
+    foreach ($m in $list) {
+      if ($m -notmatch '^[a-z0-9][a-z0-9._-]*$') { Fail "FAIL: nom de mission invalide '$m'" }
+    }
+    $mainBefore = (Invoke-Git -C $Canonical rev-parse main).Out[0]
+    Write-Output "MAIN_BEFORE::$mainBefore"
+
+    # 1. Admission.
+    $ready = @()
+    $rejected = @()
+    foreach ($m in $list) {
+      $b = Branch-Of $m
+      if ((Invoke-Git -C $Canonical rev-parse --verify --quiet $b).Code -ne 0) { $rejected += "$m : branche introuvable"; continue }
+      $tip = (Invoke-Git -C $Canonical rev-parse $b).Out[0]
+      $marker = Handoff-Marker $m
+      $proved = if (Test-Path -LiteralPath $marker) { (Get-Content -LiteralPath $marker -Raw).Trim() } else { '' }
+      if ($proved -ne $tip) {
+        $rejected += "$m : pas de HANDOFF_READY sur son commit actuel $($tip.Substring(0, 7)) (relancer finish)"
+        continue
+      }
+      $ready += $m
+    }
+
+    # 2. Empilement, dans le worktree d'integration (persistant : ses Binaries survivent,
+    #    le build y est incremental d'un lot a l'autre).
+    $integ = Join-Path $WorktreeRoot '_integration'
+    $ib = 'integration/batch'
+    if ($ready.Count -gt 0) {
+      if (-not (Test-Path -LiteralPath $integ)) {
+        $w = Invoke-Git -C $Canonical worktree add -B $ib $integ main
+        if ($w.Code -ne 0) { $w.Out | ForEach-Object { Write-Output ('    ' + $_) }; Fail 'FAIL: worktree d integration' }
+      } else {
+        $o = @(Find-WorktreeEditor $integ)
+        if ($o.Count -gt 0) { Fail "FAIL: editeur ouvert sur $integ" }
+        $null = Invoke-Git -C $integ cherry-pick --abort
+        $c = Invoke-Git -C $integ checkout -q -f -B $ib main
+        if ($c.Code -ne 0) { $c.Out | ForEach-Object { Write-Output ('    ' + $_) }; Fail 'FAIL: remise a zero du worktree d integration' }
+        # Sans -x : Binaries/ et Intermediate/ (ignores) restent, le build reste incremental.
+        $null = Invoke-Git -C $integ clean -fdq
+      }
+    }
+    $applied = @()
+    foreach ($m in $ready) {
+      $b = Branch-Of $m
+      $before = (Invoke-Git -C $integ rev-parse HEAD).Out[0]
+      # Ce que la branche apporte et que le sommet n'a pas deja, PAR CONTENU : une branche
+      # empilee sur une autre du lot ne repasse pas les commits de sa base.
+      $commits = @((Invoke-Git -C $integ cherry HEAD $b).Out | Where-Object { $_ -like '+ *' } | ForEach-Object { $_.Substring(2).Trim() })
+      if ($commits.Count -eq 0) { Write-Output "NOTHING_TO_INTEGRATE::$b"; continue }
+      $p = Invoke-Git -C $integ cherry-pick @commits
+      if ($p.Code -ne 0) {
+        $null = Invoke-Git -C $integ cherry-pick --abort
+        $null = Invoke-Git -C $integ reset -q --hard $before
+        $rejected += "$m : conflit avec main ou une mission precedente du lot (rebase dans son worktree, puis finish)"
+        continue
+      }
+      $applied += [PSCustomObject]@{ Mission = $m; Commits = $commits.Count }
+    }
+    foreach ($r in $rejected) { Write-Output "BATCH_REJECTED::$r" }
+    if ($applied.Count -eq 0) { Write-Output 'BATCH::RIEN_A_VERSER'; exit 1 }
+    Write-Output ('BATCH_STACKED::' + (($applied | ForEach-Object { "$($_.Mission) ($($_.Commits))" }) -join ', '))
+
+    # 3. Le portail, une fois, sur l'arbre qui va devenir main.
+    $index = Test-AnastasisToolsIndex $integ
+    if (($index.Missing.Count + $index.Stale.Count) -gt 0) {
+      Write-Output 'FAIL: index de tools/unreal/ desynchronise dans le lot'
+      $index.Missing | ForEach-Object { Write-Output "    MISSING $_" }
+      $index.Stale | ForEach-Object { Write-Output "    STALE   $_" }
+      exit 1
+    }
+    $raw = @(Find-RawEditorLaunch $integ)
+    if ($raw.Count -gt 0) {
+      Write-Output 'FAIL: Unreal lance sans Start-AnastasisEditor dans le lot'
+      $raw | ForEach-Object { Write-Output "    $_" }
+      exit 1
+    }
+    Write-Output 'CHECKS::PASS index tools/unreal, lancements Unreal'
+    Invoke-UnrealGate $integ @(Unreal-Changes $integ "$mainBefore..HEAD")
+    if (-not $script:GateOk) { Write-Output 'BATCH::FAIL rien n a bouge (main intact)'; exit 1 }
+
+    # 4. Avance rapide de main sur le sommet du lot.
+    $mainNow = (Invoke-Git -C $Canonical rev-parse main).Out[0]
+    if ($mainNow -ne $mainBefore) {
+      Write-Output "FAIL: main a bouge pendant le lot ($($mainBefore.Substring(0, 7)) -> $($mainNow.Substring(0, 7))) : relancer integrate-batch"
+      exit 1
+    }
+    $top = (Invoke-Git -C $integ rev-parse HEAD).Out[0]
+    Move-Main $top
+    if (-not $script:MoveOk) { exit 1 }
+    $mainAfter = (Invoke-Git -C $Canonical rev-parse main).Out[0]
+    Write-Output "MAIN_AFTER::$mainAfter"
+    Write-Output ('BATCH_INTEGRATED::' + (($applied | ForEach-Object { $_.Mission }) -join ', '))
+    Write-Output 'Ensuite : git push origin main, puis pour chaque mission versee :'
+    $applied | ForEach-Object { Write-Output "          tools\unreal\agent-worktree.ps1 prune -Mission $($_.Mission)" }
   }
 
   'prune' {
@@ -344,7 +510,9 @@ switch ($Command) {
     $branch = Branch-Of $Mission
     $path = Path-Of $Mission
     if ((Invoke-Git -C $Canonical rev-parse --verify --quiet $branch).Code -ne 0) { Fail "FAIL: branche introuvable -> $branch" }
-    $outside = [int](Invoke-Git -C $Canonical rev-list --count "main..$branch").Out[0]
+    # Par CONTENU (`git cherry`) : integrate-batch verse des copies des commits de la
+    # branche, pas les commits eux-memes ; une copie dans main vaut versement.
+    $outside = @((Invoke-Git -C $Canonical cherry main $branch).Out | Where-Object { $_ -like '+ *' }).Count
     if ($outside -gt 0) { Fail "FAIL: $outside commit(s) de $branch absents de main : integrer d abord" }
     if (Test-Path -LiteralPath $path) {
       $dirty = @((Invoke-Git -C $path status --porcelain --untracked-files=all).Out)
@@ -368,6 +536,7 @@ switch ($Command) {
     }
     $b = Invoke-Git -C $Canonical branch -D $branch
     if ($b.Code -ne 0) { Fail ("FAIL: git branch -D`n" + ($b.Out -join "`n")) }
+    Remove-Item -LiteralPath (Handoff-Marker $Mission) -ErrorAction SilentlyContinue
     Write-Output "BRANCH_DELETED::$branch"
   }
 

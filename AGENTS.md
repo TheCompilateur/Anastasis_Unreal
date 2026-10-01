@@ -53,10 +53,11 @@ Cycle de vie, un outil unique : `tools\unreal\agent-worktree.ps1`
 |---|---|
 | `create -Mission <m>` | branche + worktree depuis `main`, port MCP du worktree enregistré |
 | `status` | tous les worktrees : modifications, avance/retard sur `main`, branches non intégrées |
-| `finish -Mission <m>` | portail de fin : index `tools/unreal/` à jour, aucun Unreal lancé hors `Start-AnastasisEditor`, aucun éditeur encore ouvert sur le worktree, build + `report-tests`, refuse de passer la main si du travail n'est pas commité |
+| `finish -Mission <m>` | portail de fin : index `tools/unreal/` à jour, aucun Unreal lancé hors `Start-AnastasisEditor`, aucun éditeur encore ouvert sur le worktree, build + `report-tests` **seulement si la branche touche `Source/`, `Config/`, `Content/`, `Plugins/` ou le `.uproject`** (`-Full` pour les forcer), refuse de passer la main si du travail n'est pas commité ; marque le commit prouvé (`ANASTASIS_WORKTREES\.handoff\<m>.txt`) |
 | `mcp -Mission <m>` | (ré)enregistre le port MCP d'un worktree existant côté Claude Code |
 | `integrate -Mission <m>` | rôle intégrateur : avance rapide de **`main`** (jamais de la branche extraite du canonique), après avoir rejoué index et lancements Unreal sur l'arbre versé ; canonique hors `main` → copie de travail intacte |
-| `prune -Mission <m>` | après versement : worktree, branche et enregistrement MCP local supprimés ; refuse si un commit manque à `main` ou si le worktree n'est pas propre |
+| `integrate-batch -Missions a,b,c` | rôle intégrateur, **file groupée** : admet les missions dont `finish` a passé sur le commit actuel, les empile sur `main` dans le worktree d'intégration persistant `ANASTASIS_WORKTREES\_integration` (une mission en conflit est écartée, les autres passent), **un seul** portail (index, lancements, build + suite si le lot touche Unreal), puis avance rapide de `main`. Une seule session intégratrice à la fois |
+| `prune -Mission <m>` | après versement : worktree, branche et enregistrement MCP local supprimés ; refuse si un commit manque à `main` (par contenu : une copie versée par lot compte) ou si le worktree n'est pas propre |
 | `preflight` | avant un `verify`/seal : dit ce qui bloque et **ouvre une fenêtre** d'observation |
 | `postflight` | après : échoue si source, config ou `HEAD` ont bougé pendant la fenêtre |
 
@@ -272,8 +273,8 @@ Opérateur et portails :
 | Script | Rôle |
 |---|---|
 | `anastasis-unreal.ps1` | `status` / `build` / `build-game` / `verify` / `health` / `editor` |
-| `agent-worktree.ps1` | cycle de vie multi-agent : `create` / `status` / `finish` / `integrate` / `prune` / `preflight` / `postflight` / `mcp` |
-| `test-agent-worktree.ps1` | banc d'essai de `integrate` / `prune` sur un dépôt jetable (13 contrôles) ; à relancer après toute modification de `agent-worktree.ps1` |
+| `agent-worktree.ps1` | cycle de vie multi-agent : `create` / `status` / `finish` / `integrate` / `integrate-batch` / `prune` / `preflight` / `postflight` / `mcp` |
+| `test-agent-worktree.ps1` | banc d'essai de `finish` (saut sans changement Unreal), `integrate`, `integrate-batch` et `prune` sur un dépôt jetable (23 contrôles) ; à relancer après toute modification de `agent-worktree.ps1` |
 | `mcp-port.ps1` | port MCP d'une racine, à dot-sourcer |
 | `tools-index.ps1` | contrôle cet index contre le dossier, à dot-sourcer : `finish` bloque, `health` passe YELLOW |
 | `editor-launch.ps1` | `Start-AnastasisEditor` : lancement d'Unreal sans focus, avec gardien, derrière la porte mémoire, à dot-sourcer |
