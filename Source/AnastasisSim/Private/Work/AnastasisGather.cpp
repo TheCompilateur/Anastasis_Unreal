@@ -268,6 +268,23 @@ namespace AnastasisGather
 		return Personal * WorkMul;
 	}
 
+	double MoralSocialMul(double Morale, int32 MarketFood, int32 Day)
+	{
+		using namespace AnastasisNeeds::Constants;
+		// `famine` et `cold` de moralPressure, comme pour effectiveWork.
+		double Famine = 1.0;
+		if (MarketFood < 20) Famine = 0.88;
+		else if (MarketFood < 60) Famine = 0.95;
+		const double Cold = FieldSeasonFromDay(Day) == 3 ? 0.86 : 1.0;
+		double Social = 1.0;
+		if (Morale < MoraleUrge) Social *= 1.12;
+		if (Morale < MoraleCritical) Social *= 1.08;
+		// Deuil (`griefRole === "actor"`) : non porte.
+		if (Famine < 0.9) Social *= 0.92;
+		if (Cold < 1.0) Social *= 0.94;
+		return AnastasisMath::Clamp(Social, 0.5, 1.2);
+	}
+
 	bool MealPathBlocked(double Hunger, int32 InventoryFood, double BelievedFood)
 	{
 		if (InventoryFood > 0) return false;

@@ -4,6 +4,15 @@
 
 namespace AnastasisNeeds
 {
+	namespace
+	{
+		/** `(npc.morale || 50)`. */
+		double MoraleOr50(double Morale)
+		{
+			return Morale != 0.0 && !FMath::IsNaN(Morale) ? Morale : 50.0;
+		}
+	}
+
 	using namespace Constants;
 	using AnastasisMath::Clamp;
 
@@ -127,6 +136,58 @@ namespace AnastasisNeeds
 		TickVitality(N, Dt);
 	}
 
+	void TickNeedsSocialize(FNeeds& N, double Dt, bool bInsideGoal)
+	{
+		constexpr double HydrationMul = 1.0;
+		constexpr double MetabolicMul = 1.0;
+		constexpr double FatigueAdaptationMul = 1.0;
+		N.Social = Clamp(N.Social + Dt * TalkSocialGain * (bInsideGoal ? 1.0 : 0.45), 0.0, 100.0);
+		N.Hunger = Clamp(N.Hunger + Dt * HungerRise * 0.7 * MetabolicMul, 0.0, 100.0);
+		N.Thirst = Clamp(N.Thirst + Dt * ThirstRise * 0.75 * HydrationMul, 0.0, 100.0);
+		N.Energy = Clamp(N.Energy - Dt * EnergyFall * 0.55 * MetabolicMul * FatigueAdaptationMul, 0.0, 100.0);
+		N.Leisure = Clamp(N.Leisure - Dt * LeisureFall * 0.4, 0.0, 100.0);
+		TickVitality(N, Dt);
+	}
+
+	void TickNeedsRelax(FNeeds& N, double Dt)
+	{
+		constexpr double HydrationMul = 1.0;
+		constexpr double MetabolicMul = 1.0;
+		N.Leisure = Clamp(N.Leisure + Dt * RelaxLeisureGain, 0.0, 100.0);
+		N.Energy = Clamp(N.Energy + Dt * RelaxEnergyGain, 0.0, 100.0);
+		N.Hunger = Clamp(N.Hunger + Dt * HungerRise * 0.55 * MetabolicMul, 0.0, 100.0);
+		N.Thirst = Clamp(N.Thirst + Dt * ThirstRise * 0.55 * HydrationMul, 0.0, 100.0);
+		N.Social = Clamp(N.Social - Dt * SocialFall * 0.35, 0.0, 100.0);
+		TickVitality(N, Dt);
+	}
+
+	void SatisfySocial(FNeeds& N, double Amount, bool bIndoor)
+	{
+		const double Gain = bIndoor ? Amount * 0.45 : Amount;
+		N.Social = Clamp(N.Social + Gain, 0.0, 100.0);
+		N.Morale = Clamp(MoraleOr50(N.Morale) + SocialMorale, 0.0, 100.0);
+		N.Leisure = Clamp(N.Leisure + (bIndoor ? 3.0 : 6.0), 0.0, 100.0);
+	}
+
+	void SatisfyRelax(FNeeds& N, bool bIndoor)
+	{
+		if (bIndoor)
+		{
+			constexpr double Target = 78.0;
+			if (N.Leisure < Target)
+			{
+				N.Leisure = Clamp(N.Leisure + (Target - N.Leisure) * 0.55, 0.0, 100.0);
+			}
+			N.Energy = Clamp(N.Energy + 6.0, 0.0, 100.0);
+		}
+		else
+		{
+			N.Leisure = Clamp(N.Leisure + LeisureRelief, 0.0, 100.0);
+			N.Energy = Clamp(N.Energy + 12.0, 0.0, 100.0);
+		}
+		N.Morale = Clamp(MoraleOr50(N.Morale) + LeisureMorale, 0.0, 100.0);
+	}
+
 	void TickVitality(FNeeds& N, double Dt)
 	{
 		const bool bStarving = N.Hunger >= StarvingAt;
@@ -147,15 +208,6 @@ namespace AnastasisNeeds
 		else if (N.Hunger < 50.0 && N.Thirst < 50.0 && N.Energy > 35.0 && N.Health < 100.0)
 		{
 			N.Health = Clamp(N.Health + Dt * HealthGain, 0.0, 100.0);
-		}
-	}
-
-	namespace
-	{
-		/** `(npc.morale || 50)`. */
-		double MoraleOr50(double Morale)
-		{
-			return Morale != 0.0 && !FMath::IsNaN(Morale) ? Morale : 50.0;
 		}
 	}
 

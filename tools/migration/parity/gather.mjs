@@ -146,15 +146,20 @@ export default {
     },
     {
       name: "Moral",
-      comment: "moralPressure(sim, npc).effectiveWork — sans colonie, sans deuil",
-      args: ["int", "int", "double"],
-      ret: "double",
-      inputs: croiser([0, 19, 20, 59, 60, 300], [0, 1, 30, 31, 61, 91, 120, 121], [0, 50]),
-      call: (m, [vivres, jour, faim]) => {
+      comment: "moralPressure(sim, npc) : effectiveWork et socialMul — sans colonie, sans deuil",
+      args: ["int", "int", "double", "double"],
+      ret: [
+        { name: "work", type: "double" },
+        { name: "social", type: "double" },
+      ],
+      inputs: croiser([0, 19, 20, 59, 60, 300], [0, 1, 30, 31, 61, 91, 120, 121], [0, 50], [60, 37.99, 38, 21.99, 22]),
+      call: (m, [vivres, jour, faim, moral]) => {
         const npc = habitant(m, "npc-0", 3);
         npc.hunger = faim;
+        npc.morale = moral;
         const sim = simMinimal(4, { day: jour, market: { stock: { food: vivres } } });
-        return m.moral.moralPressure(sim, npc).effectiveWork;
+        const p = m.moral.moralPressure(sim, npc);
+        return { work: p.effectiveWork, social: p.socialMul };
       },
     },
     {

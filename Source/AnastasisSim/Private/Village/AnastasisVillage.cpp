@@ -28,10 +28,18 @@ namespace AnastasisVillage
 			return Type == WellType || Type == HouseType || Type == GranaryType;
 		}
 
-		/** `DOMESTIC_GOALS` restreint aux buts portes : rest, eat. */
+		/** `DOMESTIC_GOALS` restreint aux buts portes : rest, eat, relax. */
 		bool IsDomesticGoal(const FString& Goal)
 		{
-			return Goal == GoalRest || Goal == GoalEat;
+			return Goal == GoalRest || Goal == GoalEat || Goal == GoalRelax;
+		}
+
+		/** Activite d'attente et d'interieur (`waitingActivity`). */
+		const TCHAR* DomesticActivity(const FString& Goal, bool bNight)
+		{
+			if (Goal == GoalEat) return TEXT("mange");
+			if (Goal == GoalRelax) return TEXT("relaxe");
+			return bNight ? TEXT("dort") : TEXT("repose");
 		}
 
 		/** `WORKISH` de bridge.js. */
@@ -60,7 +68,8 @@ namespace AnastasisVillage
 
 		bool IsPortedGoal(const FString& Goal)
 		{
-			return Goal == GoalEat || Goal == GoalRest || Goal == GoalDrink || Goal == TEXT("gatherFood") || Goal == TEXT("deliver");
+			return Goal == GoalEat || Goal == GoalRest || Goal == GoalDrink || Goal == TEXT("gatherFood") || Goal == TEXT("deliver")
+				|| Goal == TEXT("socialize") || Goal == TEXT("relax");
 		}
 
 		FString TargetKey(const FPoint& P)
@@ -136,13 +145,13 @@ namespace AnastasisVillage
 
 	const TArray<FString>& UnportedGoals()
 	{
-		// Table adulte de npc.js (adultScores), moins `eat`, `rest` et `drink`.
+		// Table adulte de npc.js (adultScores), moins `eat`, `rest`, `drink`, `socialize`, `relax`.
 		static const TArray<FString> Goals = {
-			TEXT("eatTogether"), TEXT("relax"), TEXT("relieve"),
+			TEXT("eatTogether"), TEXT("relieve"),
 			TEXT("gatherWood"), TEXT("gatherStone"), TEXT("helpFarm"),
 			TEXT("sell"), TEXT("buy"), TEXT("build"), TEXT("craft"), TEXT("maintain"),
 			TEXT("fetchInput"), TEXT("haulJob"), TEXT("aidHousehold"), TEXT("visitFamily"), TEXT("explore"),
-			TEXT("socialize"), TEXT("confront"), TEXT("shelterRain"), TEXT("closeWorkplace"),
+			TEXT("confront"), TEXT("shelterRain"), TEXT("closeWorkplace"),
 		};
 		return Goals;
 	}
@@ -910,7 +919,8 @@ namespace AnastasisVillage
 			// `afford(atOwn || data.group === "food" || data.group === "trade" || data.housing)`.
 			return bAtOwn || IsFoodGroupType(Building->Type) || HousingOfType(Building->Type) > 0 ? Building : nullptr;
 		}
-		// `if (goal === "rest" || goal === "relieve") return afford(atOwn || data.housing)`.
+		// `relax` : afford(atOwn || socialiser || trade || housing) — ni lieu de rencontre ni
+		// commerce dans ce portage. `rest` / `relieve` : afford(atOwn || housing).
 		return bAtOwn || HousingOfType(Building->Type) > 0 ? Building : nullptr;
 	}
 
@@ -992,6 +1002,11 @@ namespace AnastasisVillage
 		{
 			// `indoorNeedDuration(eat)` = eatDuration ; `waitingActivity(eat)` = « mange ».
 			return EnterBuilding(Npc, *Building, TEXT("mange"), AnastasisNeeds::Constants::EatDuration * AtPost);
+		}
+		if (Npc.Goal == GoalRelax)
+		{
+			// `indoorNeedDuration(relax)` = relaxDuration.
+			return EnterBuilding(Npc, *Building, TEXT("relaxe"), AnastasisNeeds::Constants::RelaxDuration * AtPost);
 		}
 		// `indoorNeedDuration(rest)` : la nuit se decide UNE fois, a l'entree.
 		const bool bNight = IsNight();
@@ -1138,6 +1153,15 @@ namespace AnastasisVillage
 		{
 			AnastasisNeeds::TickNeedsEatInside(Npc.Needs, Dt);
 		}
+		else if ((Npc.Inside.bActive && Npc.Inside.Goal == GoalSocialize) || Npc.Goal == GoalSocialize)
+		{
+			// `insideGoal === "socialize" || npc.goal === "socialize"` : dehors, gain x 0,45.
+			AnastasisNeeds::TickNeedsSocialize(Npc.Needs, Dt, Npc.Inside.bActive);
+		}
+		else if ((Npc.Inside.bActive && Npc.Inside.Goal == GoalRelax) || Npc.Goal == GoalRelax)
+		{
+			AnastasisNeeds::TickNeedsRelax(Npc.Needs, Dt);
+		}
 		else
 		{
 			const bool bDrinking = Npc.Goal == GoalDrink && !Npc.Inside.bActive && AtDrinkSpot(Npc.X, Npc.Y);
@@ -1230,6 +1254,12 @@ namespace AnastasisVillage
 			if (G == GoalEat) Score = Trace.NeedScores.Eat + EatJobPriorityBias;
 			else if (G == GoalRest) Score = Trace.NeedScores.Rest + RestJobPriorityBias;
 			else if (G == GoalDrink) Score = Trace.NeedScores.Drink + (Wells > 0 ? 6.0 : 0.0);
+			else if (G == GoalSocialize || G == GoalRelax)
+			{
+				const double Need = G == GoalSocialize ? Trace.NeedScores.Socialize : Trace.NeedScores.Relax;
+				Rows.Add(TPair<FString, double>(G, SocialRowScore(Npc, G, Need, AnastasisRhythm::PhaseBias(Phase, Subject, G))));
+				continue;
+			}
 			else if (bWorker && (G == GoalGatherFood || G == GoalDeliver))
 			{
 				const double Row = WorkRowScore(Npc, G, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work);
@@ -1261,6 +1291,8 @@ namespace AnastasisVillage
 			if (Row.Key == GoalEat) Trace.EatRowScore = Row.Value;
 			else if (Row.Key == GoalRest) Trace.RestRowScore = Row.Value;
 			else if (Row.Key == GoalDrink) Trace.DrinkRowScore = Row.Value;
+			else if (Row.Key == GoalSocialize) Trace.SocializeRowScore = Row.Value;
+			else if (Row.Key == GoalRelax) Trace.RelaxRowScore = Row.Value;
 			else if (bWorker && Row.Key == GoalGatherFood) Trace.GatherRowScore = Row.Value;
 			else if (bWorker && Row.Key == GoalDeliver) Trace.DeliverRowScore = Row.Value;
 			else if (Row.Value > Trace.FloorScore)
@@ -1317,6 +1349,8 @@ namespace AnastasisVillage
 		if (Npc.Goal == GoalDrink) bFound = DrinkTarget(Npc, Target, Source);
 		else if (Npc.Goal == GoalRest) bFound = RestTarget(Npc, Target, Source);
 		else if (Npc.Goal == GoalEat) bFound = EatTarget(Npc, Target, Source);
+		else if (Npc.Goal == GoalSocialize) bFound = SocializeTarget(Npc, Target, Source);
+		else if (Npc.Goal == GoalRelax) bFound = RelaxTarget(Npc, Target, Source);
 		else if (IsGranaryWorker(Npc) && Npc.Goal == GoalGatherFood) bFound = GatherTarget(Npc, Target, Source);
 		else if (IsGranaryWorker(Npc) && Npc.Goal == GoalDeliver) bFound = DeliverTarget(Npc, Target, Source);
 		else if (Npc.Goal == TEXT("gatherFood") || Npc.Goal == TEXT("deliver")) bFound = FoodSupplyTarget(Npc, Target, Source);
@@ -1366,7 +1400,7 @@ namespace AnastasisVillage
 		Npc.DoorApproachAt = 0.0;
 		ClearNavigation(Npc);
 		Npc.PathCooldown = 0.6;
-		if (Npc.Goal == GoalRest || Npc.Goal == GoalDrink || Npc.Goal == GoalEat)
+		if (Npc.Goal == GoalRest || Npc.Goal == GoalDrink || Npc.Goal == GoalEat || Npc.Goal == GoalRelax)
 		{
 			if (Perform(Npc))
 			{
@@ -1422,7 +1456,7 @@ namespace AnastasisVillage
 					Npc.bHasTarget = true;
 					Npc.Target = Access;
 				}
-				Npc.Activity = Npc.Goal == GoalEat ? TEXT("mange") : RestActivity(IsNight());
+				Npc.Activity = DomesticActivity(Npc.Goal, IsNight());
 				const bool bAtDoor = bAccess && Dist(Npc.X, Npc.Y, Access.X, Access.Y) <= DoorAccessRadius;
 				if (!bAccess || !bAtDoor)
 				{
@@ -1474,6 +1508,8 @@ namespace AnastasisVillage
 				: Npc.Goal == GoalEat ? TEXT("mange")
 				: Npc.Goal == GoalDeliver ? (bWorker ? TEXT("livre") : TEXT("depose"))
 				: Npc.Goal == GoalGatherFood ? TEXT("cueille")
+				: Npc.Goal == GoalSocialize ? TEXT("discute")
+				: Npc.Goal == GoalRelax ? TEXT("relaxe")
 				: RestActivity(IsNight());
 			return;
 		}
@@ -1510,6 +1546,24 @@ namespace AnastasisVillage
 			// `case "eat"` : setActivity("mange"), eat().
 			Npc.Activity = TEXT("mange");
 			return Eat(Npc);
+		}
+		if (Npc.Goal == GoalSocialize)
+		{
+			// `case "socialize"` : socialize(), branche sans compagnon (ecart n°15) :
+			// `satisfySocial(npc, NEEDS.socialAmbient)` puis moral +1.
+			Npc.Activity = TEXT("discute");
+			AnastasisNeeds::SatisfySocial(Npc.Needs, AnastasisNeeds::Constants::SocialAmbient, Npc.Inside.bActive);
+			Npc.Needs.Morale = Clamp(Npc.Needs.Morale + 1.0, 0.0, 100.0);
+			++Npc.SocialsTaken;
+			return true;
+		}
+		if (Npc.Goal == GoalRelax)
+		{
+			// `case "relax"` : setActivity("relaxe"), satisfyRelax (scene de foyer : non portee).
+			Npc.Activity = TEXT("relaxe");
+			AnastasisNeeds::SatisfyRelax(Npc.Needs, Npc.Inside.bActive);
+			++Npc.RelaxesTaken;
+			return true;
 		}
 		if (Npc.Goal == GoalDeliver)
 		{
@@ -3271,5 +3325,95 @@ namespace AnastasisVillage
 			}
 		}
 		return Grown;
+	}
+
+	// --- Socialiser, souffler (npc.js, villageRhythm.js, domestic.js) ---------------
+
+	double FVillage::SocialRowScore(const FNpc& Npc, const FString& Goal, double NeedScore, double PhaseBias) const
+	{
+		namespace G = AnastasisGather;
+		// `socialize` : needs.socialize + jobPriority + planBias + goalNoise ;
+		// `relax` : needs.relax + goalNoise + hearthInviteScore * 0,45. Ni plan, ni bruit, ni scene.
+		double Score = Goal == GoalSocialize ? NeedScore + G::JobPriority(Npc.JobId, Goal) : NeedScore;
+		Score += PhaseBias;
+		// workplaceGoalBias : 0 (aubergiste, pretre seulement) ; completionBias pour tous.
+		const int32 DepotLoad = IsGranaryWorker(Npc) ? Npc.InventoryFood : 0;
+		const FString SessionGoal = Npc.WorkSession.bActive && Npc.WorkSession.CraftId == TEXT("farm") ? FString(GoalGatherFood) : FString();
+		Score += G::CompletionBias(Goal, Npc.InventoryFood, DepotLoad, SessionGoal, NeedsCritical(Npc.Needs));
+		Score += G::TraitGoalBias(G::TraitAt(Npc.TraitIndex), Goal);
+		// natureGoalBias (coeur 1) et skillGoalBias (soin 1) : 0.
+		// « Pression morale : sociabilite (deuil / desespoir) sans ecraser les besoins. »
+		Score += (G::MoralSocialMul(Npc.Needs.Morale, MarketFood(), Day()) - 1.0) * 18.0;
+		return Score;
+	}
+
+	bool FVillage::SocialPos(FNpc& Npc, FPoint& OutTarget, FString& OutSource)
+	{
+		// `workCommutePos(socialize)` (aubergiste, pretre) et `districtSocialBuilding` : non portes.
+		// Le premier batiment acheve dont `function` = socialiser ou `dailyMorale` > 0 : le puits.
+		for (FBuilding& B : Buildings.GetItemsMutable())
+		{
+			if (B.Progress < 1.0 || B.Type != WellType) continue;
+			if (BuildingAccessPoint(B, &Npc, OutTarget))
+			{
+				OutSource = TEXT("well");
+				return true;
+			}
+		}
+		// `plazaMeetingPoint` (routes) puis `marketAccessPoint` (site du marche) : non portes.
+		if (AccessPointNear(Settlement.X, Settlement.Y, &Npc, OutTarget))
+		{
+			OutSource = TEXT("settlement");
+			return true;
+		}
+		OutSource = TEXT("none");
+		return false;
+	}
+
+	bool FVillage::SocializeTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource)
+	{
+		// Base `socialPos` ; rythme : soir et nuit -> taverne (aucune) puis socialPos ; midi ->
+		// premier puits acheve, sinon place / socialPos ; sinon socialPos. Tous menent au puits.
+		// Couches liens, memoire, age : sans relations, la cible de base.
+		return SocialPos(Npc, OutTarget, OutSource);
+	}
+
+	bool FVillage::RelaxTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource)
+	{
+		// Couche rythme (recouvre toujours la base) : soir avec un foyer -> le foyer ;
+		// midi -> le puits (ou socialPos) ; sinon foyer, sinon socialPos.
+		const AnastasisRhythm::EPhase Phase = AnastasisRhythm::VillagePhase(AnastasisRhythm::DayFracOf(Now));
+		bool bHave = false;
+		if (Phase != AnastasisRhythm::EPhase::Midday && !Npc.HomeId.IsEmpty() && BuildingAccessPointById(Npc.HomeId, &Npc, OutTarget))
+		{
+			bHave = true;
+			OutSource = TEXT("home");
+		}
+		if (!bHave)
+		{
+			bHave = SocialPos(Npc, OutTarget, OutSource);
+		}
+		// Couche domestique : le foyer ou l'abri, sinon un abri ouvert.
+		const FString Living = Npc.LivingHomeId();
+		FPoint Domestic;
+		if (!Living.IsEmpty())
+		{
+			if (BuildingAccessPointById(Living, &Npc, Domestic))
+			{
+				OutTarget = Domestic;
+				bHave = true;
+				OutSource = Living == Npc.HomeId ? TEXT("home") : TEXT("shelter");
+			}
+		}
+		else if (const FBuilding* Open = FindOpenShelter(Npc))
+		{
+			if (BuildingAccessPointById(Open->Id, &Npc, Domestic))
+			{
+				OutTarget = Domestic;
+				bHave = true;
+				OutSource = TEXT("open-shelter");
+			}
+		}
+		return bHave;
 	}
 }

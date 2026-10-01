@@ -345,7 +345,7 @@ bool FAnastasisVillageEnduranceTest::RunTest(const FString&)
 
 	const TArray<FIntPoint> Capable = FoodCapable(W);
 	const int64 Ledger = FoodLedger(V, Capable);
-	constexpr int32 DaysToRun = 8;
+	constexpr int32 DaysToRun = 12;
 	TArray<FString> Rows;
 	int32 LastDay = Sim.GetDay();
 	int32 MealsAtDayStart = 0;
@@ -362,6 +362,8 @@ bool FAnastasisVillageEnduranceTest::RunTest(const FString&)
 	double MaxThirst = 0.0;
 	double MinHealth = 100.0;
 	double MinEnergy = 100.0;
+	double MinSocial = 100.0;
+	double MinLeisure = 100.0;
 	const int32 Ticks = FMath::CeilToInt32(DaysToRun * FAnastasisSimulation::DayLength / Dt);
 	for (int32 I = 0; I < Ticks; ++I)
 	{
@@ -382,6 +384,8 @@ bool FAnastasisVillageEnduranceTest::RunTest(const FString&)
 			MaxThirst = FMath::Max(MaxThirst, N.Needs.Thirst);
 			MinHealth = FMath::Min(MinHealth, N.Needs.Health);
 			MinEnergy = FMath::Min(MinEnergy, N.Needs.Energy);
+			MinSocial = FMath::Min(MinSocial, N.Needs.Social);
+			MinLeisure = FMath::Min(MinLeisure, N.Needs.Leisure);
 		}
 		for (const FString& Id : Farmers)
 		{
@@ -409,8 +413,10 @@ bool FAnastasisVillageEnduranceTest::RunTest(const FString&)
 				Meals += N.MealsTaken;
 				Delivered += N.DeliveredFood;
 			}
-			// Le premier jour est entame (on demarre le matin) : il compte comme les autres.
-			DaysWithoutMeal += Meals == MealsAtDayStart ? 1 : 0;
+			// Le premier jour est entame (on demarre le matin) et tout le monde part rassasie
+			// (faim <= 40 : sous le seuil d'envie de bien des tables) : les repas comptent
+			// a partir du jour 2. Les livraisons, elles, comptent des le premier jour.
+			DaysWithoutMeal += LastDay >= 2 && Meals == MealsAtDayStart ? 1 : 0;
 			const bool bIdle = Delivered == DeliveredAtDayStart;
 			DaysWithoutDelivery += bIdle ? 1 : 0;
 			UnexplainedIdleDays += bIdle && !bFarmerCriticalToday ? 1 : 0;
@@ -442,14 +448,23 @@ bool FAnastasisVillageEnduranceTest::RunTest(const FString&)
 	AddInfo(FString::Printf(TEXT("sur %d jours : faim max %.1f, soif max %.1f, energie min %.1f, sante min %.1f"),
 		DaysToRun, MaxHunger, MaxThirst, MinEnergy, MinHealth));
 
-	TestEqual(TEXT("chaque jour, quelqu'un mange"), DaysWithoutMeal, 0);
+	TestEqual(TEXT("des le jour 2, chaque jour, quelqu'un mange"), DaysWithoutMeal, 0);
 	TestTrue(TEXT("personne ne meurt de faim ni de soif (sante > seuil critique)"), MinHealth > AnastasisNeeds::Constants::HealthCritical);
-	TestTrue(TEXT("les fermiers livrent tant qu'ils peuvent travailler (les premiers jours)"), FirstIdleDay != 1);
-	// LIMITE CONNUE de la table reduite : `socialize` n'est pas porte, le besoin social
-	// descend sans remede ; a 35 la solitude devient critique et la reference coupe
-	// tout travail (`workWillFactor` = 0). Le grenier ne recoit plus : c'est EXPLIQUE,
-	// jamais silencieux. Le jour ou `socialize` sera porte, ce compteur doit tomber a 0.
+	// field-regrow-001 avait trouve la limite : sans `socialize`, la solitude devenait
+	// critique au jour 3 et la reference coupait tout travail. Socialiser et souffler
+	// (social-relax-001) la levent : le grenier recoit chaque jour.
+	TestEqual(TEXT("chaque jour, le grenier recoit"), DaysWithoutDelivery, 0);
 	TestEqual(TEXT("aucun jour sans livraison n'est inexplique"), UnexplainedIdleDays, 0);
+	int32 Socials = 0;
+	int32 Relaxes = 0;
+	for (const FNpc& N : V.GetActors())
+	{
+		Socials += N.SocialsTaken;
+		Relaxes += N.RelaxesTaken;
+	}
+	TestTrue(TEXT("la solitude a un remede : on socialise"), Socials > 0);
+	TestTrue(TEXT("personne n'est en solitude critique durablement (social > 0)"), MinSocial > 0.0);
+	AddInfo(FString::Printf(TEXT("conversations %d, pauses %d, social min %.1f, loisir min %.1f"), Socials, Relaxes, MinSocial, MinLeisure));
 	AddInfo(FString::Printf(TEXT("jours sans livraison : %d (le premier : %d), tous expliques par un besoin critique d'un fermier"),
 		DaysWithoutDelivery, FirstIdleDay));
 	return true;

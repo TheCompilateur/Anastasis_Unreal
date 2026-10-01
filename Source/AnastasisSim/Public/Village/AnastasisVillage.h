@@ -109,6 +109,17 @@
 //     marche (`sim.market.stock.food`, lu par la pression morale) est la somme
 //     des stocks physiques, recalculee a la lecture — la reference la reconstruit
 //     a chaque repas confirme et chaque livraison, les seules mutations ici.
+// 15. Socialiser (social-relax-001) : la cible est `socialPos` (le premier batiment
+//     acheve qui rassemble — `dailyMorale` > 0 : le puits), le gain social court
+//     tant que le but est `socialize`, et l'action est la branche SANS COMPAGNON de
+//     `socialize()` (`satisfySocial(14)`, moral +1). La branche avec compagnon
+//     (relations, affinite, paroles, rumeurs et gisements partages, rencontres,
+//     conseils, visites) n'est pas portee : c'est le module des liens. Sans puits,
+//     la reference vise la place (routes) puis le marche : ici, le point d'acces
+//     pres de l'origine. Les couches liens / memoire / age de la cible rendent la
+//     cible de base faute de relations : c'est la reference.
+//     Se detendre : complet — chez soi (foyer, sinon abri ouvert), dedans 4,8 s ;
+//     sans toit, dehors ; `hearthInviteScore` (scene de foyer) vaut 0.
 // 14. Cohabitation avec l'extension food-supply (non fidele, voir plus haut) : elle
 //     ne s'applique qu'aux habitants qui ne sont PAS le fermier d'un grenier ; une
 //     tuile ouverte par ActivateFoodSource n'a qu'une verite, son registre fini.
@@ -146,6 +157,9 @@ namespace AnastasisVillage
 	inline const TCHAR* const GoalDrink = TEXT("drink");
 	inline const TCHAR* const GoalRest = TEXT("rest");
 	inline const TCHAR* const GoalEat = TEXT("eat");
+	/** Portes pour tous (social-relax-001) : la solitude et l'ennui ont un remede. */
+	inline const TCHAR* const GoalSocialize = TEXT("socialize");
+	inline const TCHAR* const GoalRelax = TEXT("relax");
 	/** Portes pour un fermier dont le poste est un grenier (ecart n°10). */
 	inline const TCHAR* const GoalGatherFood = AnastasisGather::GoalGatherFood;
 	inline const TCHAR* const GoalDeliver = AnastasisGather::GoalDeliver;
@@ -346,6 +360,9 @@ namespace AnastasisVillage
 		double RestRowScore = 0.0;
 		/** Ligne `drink` : needs.drink + bonus puits + phaseBias. */
 		double DrinkRowScore = 0.0;
+		/** Lignes `socialize` et `relax`, rythme et biais compris, apres biais Noûs. */
+		double SocializeRowScore = 0.0;
+		double RelaxRowScore = 0.0;
 		/** Ligne `eat` : needs.eat + jobPriority + phaseBias, puis biais Noûs. */
 		double EatRowScore = 0.0;
 		/** Lignes calculees d'un fermier (ecart n°10), apres biais Noûs ; NaN sinon ou retiree. */
@@ -467,6 +484,8 @@ namespace AnastasisVillage
 		int32 DrinksTaken = 0;
 		int32 RestsTaken = 0;
 		int32 MealsTaken = 0;
+		int32 SocialsTaken = 0;
+		int32 RelaxesTaken = 0;
 		FDecisionTrace LastDecision;
 
 		/** `livingHome(npc)` = home || shelter. */
@@ -694,6 +713,12 @@ namespace AnastasisVillage
 
 		// Recolte et livraison (npc.js, craftWork.js, fieldWorkPosts.js, memory.js).
 		bool IsPortedGoalFor(const FNpc& Npc, const FString& Goal) const;
+		/** Lignes `socialize` / `relax` d'adultScores (Phase, rythme et pression morale compris). */
+		double SocialRowScore(const FNpc& Npc, const FString& Goal, double NeedScore, double PhaseBias) const;
+		/** `sim.socialPos(npc)` : le premier batiment acheve qui rassemble, sinon l'origine. */
+		bool SocialPos(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
+		bool SocializeTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
+		bool RelaxTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
 		/** Ligne `gatherFood` ou `deliver` d'adultScores pour un fermier, rythme compris. */
 		double WorkRowScore(const FNpc& Npc, const FString& Goal, double PhaseBias, const FWorkRowContext& Work) const;
 		void ScanTiles(FNpc& Npc, int32 CX, int32 CY, bool bForce);

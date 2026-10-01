@@ -136,7 +136,10 @@ bool FAnastasisParityGatherTest::RunTest(const FString&)
 	for (int32 I = 0; I < UE_ARRAY_COUNT(MoralVectors); ++I)
 	{
 		const FMoralVector& V = MoralVectors[I];
-		CheckD(TEXT("Moral"), I, TEXT("effectiveWork"), G::MoralEffectiveWork(FixedNeeds(GatherFromBits(V.A2Bits)), V.A0, V.A1), V.AttenduBits);
+		AnastasisNeeds::FNeeds N = FixedNeeds(GatherFromBits(V.A2Bits));
+		N.Morale = GatherFromBits(V.A3Bits);
+		CheckD(TEXT("Moral"), I, TEXT("effectiveWork"), G::MoralEffectiveWork(N, V.A0, V.A1), V.AttenduWorkBits);
+		CheckD(TEXT("Moral"), I, TEXT("socialMul"), G::MoralSocialMul(N.Morale, V.A0, V.A1), V.AttenduSocialBits);
 	}
 
 	for (int32 I = 0; I < UE_ARRAY_COUNT(SwingVectors); ++I)

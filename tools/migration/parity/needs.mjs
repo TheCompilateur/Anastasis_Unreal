@@ -6,8 +6,10 @@
 // plutot qu'ecrites dans un generateur dedie.
 //
 // La maison (mission house-rest-001) ajoute la branche interieure `rest` de
-// tickNeeds, satisfyRest et sleepQuality. Les autres branches interieures
-// (relieve / eat / socialize / relax) n'ont pas encore de boucle.
+// tickNeeds, satisfyRest et sleepQuality. Le grenier ajoute la branche `eat`.
+// Socialiser et souffler (mission social-relax-001) ajoutent les branches
+// `socialize` et `relax` (dedans, ou dehors tant que c'est le but), satisfySocial
+// et satisfyRelax. Reste sans boucle : `relieve`.
 
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -193,6 +195,72 @@ export default {
       call: (mod, [thirst, hygiene, morale, health]) => {
         const npc = { hunger: 0, energy: 70, social: 60, leisure: 60, thirst, hygiene, morale, health, starvingDays: 0 };
         mod.satisfyDrink(npc);
+        return npc;
+      },
+    },
+
+    {
+      name: "TickNeedsSocial",
+      comment: "tickNeeds, branche socialize : dedans (insideGoal) ou dehors (but socialize, gain x 0,45)",
+      args: ["double", "double", "double", "double", "double", "double", "double", "double", "bool", "double"],
+      ret: METRES,
+      inputs: croiser(HABITANTS, [true, false], DTS).map(([h, dedans, dt]) => [...h, dedans, dt]),
+      call: (mod, a) => {
+        const npc = npcDe(a.slice(0, 8), "socialize");
+        npc.inside = a[8] ? { goal: "socialize", buildingId: "b9" } : null;
+        mod.tickNeeds(simPour(false), npc, a[9]);
+        return npc;
+      },
+    },
+
+    {
+      name: "TickNeedsRelax",
+      comment: "tickNeeds, branche relax : dedans ou dehors, meme formule",
+      args: ["double", "double", "double", "double", "double", "double", "double", "double", "bool", "double"],
+      ret: METRES,
+      inputs: croiser(HABITANTS, [true, false], DTS).map(([h, dedans, dt]) => [...h, dedans, dt]),
+      call: (mod, a) => {
+        const npc = npcDe(a.slice(0, 8), "relax");
+        npc.inside = a[8] ? { goal: "relax", buildingId: "b9" } : null;
+        mod.tickNeeds(simPour(false), npc, a[9]);
+        return npc;
+      },
+    },
+
+    {
+      name: "SatisfySocial",
+      comment: "satisfySocial(npc, amount) : ambiant 14, conversation 38 / 44, dedans / dehors",
+      args: ["double", "double", "double", "double", "bool"],
+      ret: [
+        { name: "social", type: "double" },
+        { name: "morale", type: "double" },
+        { name: "leisure", type: "double" },
+      ],
+      inputs: croiser([[0, 0, 0], [30, 22, 50], [70, 60, 97], [99, 100, 100]], [14, 38, 44], [true, false])
+        .map(([[social, morale, leisure], amount, dedans]) => [social, morale, leisure, amount, dedans]),
+      call: (mod, [social, morale, leisure, amount, dedans]) => {
+        const npc = { hunger: 10, energy: 60, social, leisure, hygiene: 60, thirst: 10, health: 90, morale, starvingDays: 0 };
+        npc.inside = dedans ? { goal: "socialize", buildingId: "b9" } : null;
+        mod.satisfySocial(npc, amount);
+        return npc;
+      },
+    },
+
+    {
+      name: "SatisfyRelax",
+      comment: "satisfyRelax(npc) : dedans vers 78 de loisir, dehors +46",
+      args: ["double", "double", "double", "bool"],
+      ret: [
+        { name: "leisure", type: "double" },
+        { name: "energy", type: "double" },
+        { name: "morale", type: "double" },
+      ],
+      inputs: croiser([[0, 10, 0], [40, 50, 30], [77.99, 95, 60], [78, 100, 98], [99, 97, 100]], [true, false])
+        .map(([[leisure, energy, morale], dedans]) => [leisure, energy, morale, dedans]),
+      call: (mod, [leisure, energy, morale, dedans]) => {
+        const npc = { hunger: 10, energy, social: 60, leisure, hygiene: 60, thirst: 10, health: 90, morale, starvingDays: 0 };
+        npc.inside = dedans ? { goal: "relax", buildingId: "b9" } : null;
+        mod.satisfyRelax(npc);
         return npc;
       },
     },

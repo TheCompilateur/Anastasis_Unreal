@@ -154,6 +154,12 @@ namespace AnastasisGather
 	 */
 	ANASTASISSIM_API double MoralEffectiveWork(const AnastasisNeeds::FNeeds& Needs, int32 MarketFood, int32 Day);
 
+	/**
+	 * `moralPressure(sim, npc).socialMul` : moral bas -> chercher compagnie (x1,12, x1,08),
+	 * famine et froid -> moins (x0,92, x0,94) ; borne [0,5 ; 1,2]. Sans deuil.
+	 */
+	ANASTASISSIM_API double MoralSocialMul(double Morale, int32 MarketFood, int32 Day);
+
 	/** `mealPathBlocked`, sans memoire d'echec de repas (non portee). */
 	ANASTASISSIM_API bool MealPathBlocked(double Hunger, int32 InventoryFood, double BelievedFood);
 

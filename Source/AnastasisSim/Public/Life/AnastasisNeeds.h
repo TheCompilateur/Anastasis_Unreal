@@ -82,6 +82,18 @@ namespace AnastasisNeeds
 		inline constexpr double DrinkMorale = 2.0;
 		/** `npc.health + 4` dans satisfyDrink — litteral de la reference. */
 		inline constexpr double DrinkHealth = 4.0;
+
+		/** Socialiser et souffler (`NEEDS`). */
+		inline constexpr double TalkSocialGain = 3.8;
+		inline constexpr double RelaxLeisureGain = 4.2;
+		inline constexpr double RelaxEnergyGain = 0.9;
+		inline constexpr double SocialRelief = 38.0;
+		inline constexpr double SocialAmbient = 14.0;
+		inline constexpr double SocialMorale = 4.0;
+		inline constexpr double LeisureRelief = 46.0;
+		inline constexpr double LeisureMorale = 5.0;
+		inline constexpr double SocialDuration = 3.6;
+		inline constexpr double RelaxDuration = 4.8;
 	}
 
 	/**
@@ -144,6 +156,21 @@ namespace AnastasisNeeds
 	ANASTASISSIM_API void TickNeedsEatInside(FNeeds& Needs, double Dt);
 
 	/** `tickVitality` — un seul drain a la fois : famine > soif > epuisement. */
+	/**
+	 * `tickNeeds`, branche `socialize` : dedans (`insideGoal`), ou dehors tant que le
+	 * but est `socialize` (gain x 0,45). Ni hygiene ni repos ne bougent ici.
+	 */
+	ANASTASISSIM_API void TickNeedsSocialize(FNeeds& N, double Dt, bool bInsideGoal);
+
+	/** `tickNeeds`, branche `relax` : dedans ou dehors, meme branche. */
+	ANASTASISSIM_API void TickNeedsRelax(FNeeds& N, double Dt);
+
+	/** `satisfySocial(npc, amount)` : dedans, gain x 0,45 et loisir +3 au lieu de +6. */
+	ANASTASISSIM_API void SatisfySocial(FNeeds& N, double Amount, bool bIndoor);
+
+	/** `satisfyRelax(npc)` : dedans vers 78 de loisir et +6 d'energie, dehors +46 et +12. */
+	ANASTASISSIM_API void SatisfyRelax(FNeeds& N, bool bIndoor);
+
 	ANASTASISSIM_API void TickVitality(FNeeds& Needs, double Dt);
 
 	/**

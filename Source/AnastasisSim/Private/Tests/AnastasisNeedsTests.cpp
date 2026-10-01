@@ -213,10 +213,69 @@ bool FAnastasisParityNeedsTest::RunTest(const FString&)
 		Check(TEXT("SatisfyDrink"), I, TEXT("health"), N.Health, V.AttenduHealthBits);
 	}
 
+	auto CheckAll = [&](const TCHAR* Case, int32 I, const AnastasisNeeds::FNeeds& N,
+		uint64 H, uint64 E, uint64 S, uint64 L, uint64 Y, uint64 T, uint64 He, uint64 M)
+	{
+		Check(Case, I, TEXT("hunger"), N.Hunger, H);
+		Check(Case, I, TEXT("energy"), N.Energy, E);
+		Check(Case, I, TEXT("social"), N.Social, S);
+		Check(Case, I, TEXT("leisure"), N.Leisure, L);
+		Check(Case, I, TEXT("hygiene"), N.Hygiene, Y);
+		Check(Case, I, TEXT("thirst"), N.Thirst, T);
+		Check(Case, I, TEXT("health"), N.Health, He);
+		Check(Case, I, TEXT("morale"), N.Morale, M);
+	};
+
+	for (int32 I = 0; I < UE_ARRAY_COUNT(TickNeedsSocialVectors); ++I)
+	{
+		const FTickNeedsSocialVector& V = TickNeedsSocialVectors[I];
+		AnastasisNeeds::FNeeds N = NeedsFromVector(V.A0Bits, V.A1Bits, V.A2Bits, V.A3Bits, V.A4Bits, V.A5Bits, V.A6Bits, V.A7Bits);
+		AnastasisNeeds::TickNeedsSocialize(N, NeedsFromBits(V.A9Bits), V.A8 != 0);
+		CheckAll(TEXT("TickNeedsSocial"), I, N, V.AttenduHungerBits, V.AttenduEnergyBits, V.AttenduSocialBits, V.AttenduLeisureBits,
+			V.AttenduHygieneBits, V.AttenduThirstBits, V.AttenduHealthBits, V.AttenduMoraleBits);
+	}
+
+	for (int32 I = 0; I < UE_ARRAY_COUNT(TickNeedsRelaxVectors); ++I)
+	{
+		const FTickNeedsRelaxVector& V = TickNeedsRelaxVectors[I];
+		AnastasisNeeds::FNeeds N = NeedsFromVector(V.A0Bits, V.A1Bits, V.A2Bits, V.A3Bits, V.A4Bits, V.A5Bits, V.A6Bits, V.A7Bits);
+		AnastasisNeeds::TickNeedsRelax(N, NeedsFromBits(V.A9Bits));
+		CheckAll(TEXT("TickNeedsRelax"), I, N, V.AttenduHungerBits, V.AttenduEnergyBits, V.AttenduSocialBits, V.AttenduLeisureBits,
+			V.AttenduHygieneBits, V.AttenduThirstBits, V.AttenduHealthBits, V.AttenduMoraleBits);
+	}
+
+	for (int32 I = 0; I < UE_ARRAY_COUNT(SatisfySocialVectors); ++I)
+	{
+		const FSatisfySocialVector& V = SatisfySocialVectors[I];
+		AnastasisNeeds::FNeeds N;
+		N.Social = NeedsFromBits(V.A0Bits);
+		N.Morale = NeedsFromBits(V.A1Bits);
+		N.Leisure = NeedsFromBits(V.A2Bits);
+		AnastasisNeeds::SatisfySocial(N, NeedsFromBits(V.A3Bits), V.A4 != 0);
+		Check(TEXT("SatisfySocial"), I, TEXT("social"), N.Social, V.AttenduSocialBits);
+		Check(TEXT("SatisfySocial"), I, TEXT("morale"), N.Morale, V.AttenduMoraleBits);
+		Check(TEXT("SatisfySocial"), I, TEXT("leisure"), N.Leisure, V.AttenduLeisureBits);
+	}
+
+	for (int32 I = 0; I < UE_ARRAY_COUNT(SatisfyRelaxVectors); ++I)
+	{
+		const FSatisfyRelaxVector& V = SatisfyRelaxVectors[I];
+		AnastasisNeeds::FNeeds N;
+		N.Leisure = NeedsFromBits(V.A0Bits);
+		N.Energy = NeedsFromBits(V.A1Bits);
+		N.Morale = NeedsFromBits(V.A2Bits);
+		AnastasisNeeds::SatisfyRelax(N, V.A3 != 0);
+		Check(TEXT("SatisfyRelax"), I, TEXT("leisure"), N.Leisure, V.AttenduLeisureBits);
+		Check(TEXT("SatisfyRelax"), I, TEXT("energy"), N.Energy, V.AttenduEnergyBits);
+		Check(TEXT("SatisfyRelax"), I, TEXT("morale"), N.Morale, V.AttenduMoraleBits);
+	}
+
 	const int32 Total = UE_ARRAY_COUNT(UrgeScoreVectors) + UE_ARRAY_COUNT(NeedGoalScoresVectors)
 		+ UE_ARRAY_COUNT(TickNeedsVectors) + UE_ARRAY_COUNT(SatisfyDrinkVectors)
 		+ UE_ARRAY_COUNT(TickNeedsRestVectors) + UE_ARRAY_COUNT(SatisfyRestVectors)
-		+ UE_ARRAY_COUNT(TickNeedsEatVectors) + UE_ARRAY_COUNT(SatisfyEatVectors);
+		+ UE_ARRAY_COUNT(TickNeedsEatVectors) + UE_ARRAY_COUNT(SatisfyEatVectors)
+		+ UE_ARRAY_COUNT(TickNeedsSocialVectors) + UE_ARRAY_COUNT(TickNeedsRelaxVectors)
+		+ UE_ARRAY_COUNT(SatisfySocialVectors) + UE_ARRAY_COUNT(SatisfyRelaxVectors);
 	AddInfo(FString::Printf(TEXT("Besoins : %d vecteurs, %d ecarts"), Total, Failures));
 	return Failures == 0;
 }
