@@ -118,6 +118,9 @@ protected:
 	void ScheduleOccupationTread();
 	bool bApplyingOccupationTread = false;
 	bool bOccupationTreadScheduled = false;
+	/** Huit heros a taille reelle, plus une enveloppe de canopee par massif. Transitoires. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> HeroCanopyMeshes;
 	/** FOREST_TERRAIN_P3 : maquis, ronces et rochers ; un HISM par mesh, transitoires, vides puis reremplis. */
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> UnderstoryMeshes;

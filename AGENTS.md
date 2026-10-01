@@ -335,6 +335,7 @@ manque puis se contentent de le vérifier ; `*_REBUILD=1` le régénère et écr
 | `presentation-registry.py` | `DA_AnastasisPresentation` |
 | `atmosphere-profile.py` | `DA_AnastasisAtmosphere` |
 | `create_tree_asset.py` | `SM_Tree_*` (grille pontique + 7 essences x 3 formes : pin d'Alep, cypres, chene vert, olivier, platane, pin noir, sapin de Cephalonie), `SM_Shrub_*` (lentisque, chene kermes, genet, ronce x 3), `M_AnastasisVegetation`, `M_AnastasisBark`, `M_AnastasisRock` — régénérés à **chaque** run |
+| `create-hero-trees.ps1` + `create-hero-trees.py` | **ecrit** `/Game/Anastasis/Vegetation/Hero/` : quatre heros a taille reelle (pin d'Alep, cypres, chene vert, olivier) et `SM_CanopyShell` ; ne touche pas `SM_Tree_*` ni les materiaux |
 | `create-reed-form.py` | recette isolee de roseaux courbes ; cree les assets de la variante |
 | `world-dressing-01.ps1` + `.py` | trois lieux composes sur Human Geography V2 ; Preview sans sauvegarde, Save ecrit les acteurs WD01 de Lvl_AnastasisSlice et MI_WeatheredStone, Verify relit la map ; preuves via -Out |
 | `human-occupation-001.ps1` + `.py` | micro-implantation dans le bassin habitable ; écrit `Lvl_HumanOccupation`, `M_HO_Tread` et `M_HO_Building`, ecarte l'herbe sur les tags HO01, ne sauvegarde pas `Lvl_AnastasisSlice` ; preuves via -Out |

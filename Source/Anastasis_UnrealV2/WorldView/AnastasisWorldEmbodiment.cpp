@@ -10,6 +10,7 @@
 #include "WorldView/AnastasisPlaces.h"
 #include "WorldView/AnastasisGroundCover.h"
 #include "WorldView/AnastasisForestStructure.h"
+#include "WorldView/AnastasisHeroCanopy.h"
 #include "WorldView/AnastasisUnderstory.h"
 #include "WorldView/AnastasisMicroEcology.h"
 #include "WorldView/AnastasisRiverbank.h"
@@ -76,6 +77,14 @@ static TAutoConsoleVariable<int32> CVarUnderstory(
 static TAutoConsoleVariable<int32> CVarUnderstoryInAutomation(
     TEXT("anastasis.Understory.InAutomation"), 0,
     TEXT("0=pas de maquis ni de rochers pendant les tests d'automatisation (defaut, comme l'herbe), 1=aussi sous automatisation."), ECVF_Default);
+
+// Huit specimens a taille reelle, et une enveloppe de canopee au-dela de 70 m. 0 = la foret de production seule.
+static TAutoConsoleVariable<int32> CVarHeroCanopy(
+	TEXT("anastasis.Dressing.HeroCanopy"), 1,
+	TEXT("0=meshes de production seuls, 1=huit heros (pin, cypres, chene, olivier) et enveloppe lointaine ; applique a l'incarnation."), ECVF_Default);
+static TAutoConsoleVariable<int32> CVarHeroCanopyInAutomation(
+	TEXT("anastasis.HeroCanopy.InAutomation"), 0,
+	TEXT("0=pas de heros ni d'enveloppe pendant les tests d'automatisation (defaut), 1=aussi sous automatisation."), ECVF_Default);
 
 // SOL SOUS L'HERBE. Coupable pour l'A/B : memes touffes, sol teinte ou non.
 // MICRO_ECOLOGY_001. Poches de berge, lisiere, sous-bois. 0 = le dressing deja en place, sans cette couche.
@@ -438,6 +447,10 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 			Mesh->ClearInstances();
 		}
 	}
+	for (UHierarchicalInstancedStaticMeshComponent* Mesh : HeroCanopyMeshes)
+	{
+		if (IsValid(Mesh)) Mesh->ClearInstances();
+	}
 
 	DressingInstanceCount = 0;
 	int32 UngroundedTiles = 0;
@@ -600,6 +613,21 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 ? ActiveFootprintBounds.Max.Z - AnastasisTerrainSurface::WaterPlaneZ : 0.0, 100.0);
             int32 SpeciesCounts[8] = {};
             int32 RealHeightTrees = 0;
+            struct FHeld
+            {
+                FTransform Pose;
+                UHierarchicalInstancedStaticMeshComponent* Mass = nullptr;
+                EAnastasisTreeSpecies Species = EAnastasisTreeSpecies::Any;
+                double HeightM = 0.0;
+                double Crown = 1.0;
+                double GroundZ = 0.0;
+                double Dryness = 0.0;
+                double Jitter = 0.0;
+                FVector2D Ground = FVector2D::ZeroVector;
+                FBox MassBounds;
+            };
+            TArray<FHeld> Held;
+            Held.Reserve(ForestPlan.Instances.Num());
             for (const auto& P : ForestPlan.Instances)
             {
                 double GroundZ;
@@ -640,17 +668,19 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 // Actual mesh bounds, not the resolver's 100uu primitive pivot convention.
                 const FBox MeshBounds = R.Mesh->GetBoundingBox();
                 const double MinZ = MeshBounds.Min.Z;
+                double HeightM = 0.0;
+                double Crown = 1.0;
                 if (R.HeightRangeM.Y > 0.0)
                 {
                     // FOREST_TERRAIN_P1 : UNE hauteur reelle -- l'etendue de l'espece, en metres,
                     // fois la maturite de l'arbre -- au lieu de trois enveloppes multipliees. La
                     // couronne varie en largeur independamment (+-12 %) : deux arbres de meme
                     // taille n'ont pas la meme silhouette.
-                    double HeightM = FMath::Lerp(static_cast<double>(R.HeightRangeM.X), static_cast<double>(R.HeightRangeM.Y),
+                    HeightM = FMath::Lerp(static_cast<double>(R.HeightRangeM.X), static_cast<double>(R.HeightRangeM.Y),
                         TreeUnit(P.VisualSeed, T.X, T.Y, 0x31u)) * P.Maturity;
                     if (Stature == EAnastasisStatureClass::Emergent) HeightM *= EmergentHeightBonus;
                     const double Vertical = HeightM * 100.0 / FMath::Max(MeshBounds.Max.Z - MinZ, 1.0);
-                    const double Crown = FMath::Lerp(0.88, 1.12, TreeUnit(P.VisualSeed, T.X, T.Y, 0x32u));
+                    Crown = FMath::Lerp(0.88, 1.12, TreeUnit(P.VisualSeed, T.X, T.Y, 0x32u));
                     Pose.SetScale3D(FVector(Vertical * Crown, Vertical * Crown, Vertical));
                     ++RealHeightTrees;
                 }
@@ -661,26 +691,194 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 // Large trunks stay plumb on steep ground; random yaw still varies the skyline.
                 if (bMacro) Pose.SetRotation(FRotator(0.0, Pose.Rotator().Yaw, 0.0).Quaternion());
                 Pose.SetLocation(FVector(P.Ground.X, P.Ground.Y, GroundZ - MinZ * Pose.GetScale3D().Z));
-                const int32 Instance = M->AddInstance(Pose, false);
-                // Secheresse du site [0,1] pour la teinte : seche loin de l'eau, verte sur la rive,
-                // avec une part individuelle -- deux voisins n'ont pas la meme couronne.
-                const double Dryness = FMath::Clamp(1.0 - FMath::Max(Site.Riparian, 1.5 * T.Wetness), 0.0, 1.0)
+                FHeld Tree;
+                Tree.Pose = Pose;
+                Tree.Mass = M;
+                Tree.Species = Species;
+                Tree.HeightM = HeightM;
+                Tree.Crown = Crown;
+                Tree.GroundZ = GroundZ;
+                Tree.Dryness = FMath::Clamp(1.0 - FMath::Max(Site.Riparian, 1.5 * T.Wetness), 0.0, 1.0)
                     * FMath::Lerp(0.55, 1.0, TreeUnit(P.VisualSeed, T.X, T.Y, 0x33u));
-                if (Instance != INDEX_NONE && M->NumCustomDataFloats >= 2)
-                {
-                    M->SetCustomDataValue(Instance, 0, static_cast<float>(Dryness), false);
-                    M->SetCustomDataValue(Instance, 1, static_cast<float>(TreeUnit(P.VisualSeed, T.X, T.Y, 0x34u) * 2.0 - 1.0), false);
-                }
+                Tree.Jitter = TreeUnit(P.VisualSeed, T.X, T.Y, 0x34u) * 2.0 - 1.0;
+                Tree.Ground = FVector2D(P.Ground.X, P.Ground.Y);
+                Tree.MassBounds = MeshBounds;
+                Held.Add(Tree);
                 ++SpeciesCounts[static_cast<uint8>(R.Species) & 7];
-                Canopy.Add(FVector(P.Ground.X, P.Ground.Y,
-                    FVector2D(MeshBounds.GetExtent().X, MeshBounds.GetExtent().Y).GetMax() * Pose.GetScale3D().X));
                 ++ForestLayerCounts[static_cast<uint8>(P.Layer)];
                 ++StatureCounts[static_cast<uint8>(Stature)];
                 ++FamilyCounts[static_cast<uint8>(Family)];
                 const double HeightUU = (MeshBounds.Max.Z - MinZ) * Pose.GetScale3D().Z;
                 TallestUU = FMath::Max(TallestUU, HeightUU);
                 ShortestUU = FMath::Min(ShortestUU, HeightUU);
+            }
+            const bool bHero = CVarHeroCanopy.GetValueOnGameThread() != 0
+                && !(GIsAutomationTesting && CVarHeroCanopyInAutomation.GetValueOnGameThread() == 0);
+            TArray<AnastasisHeroCanopy::FCandidate> HeroCandidates;
+            TArray<int32> HeroAt;
+            HeroAt.Init(INDEX_NONE, Held.Num());
+            int32 HeroPlaced = 0;
+            int32 ShellPlaced = 0;
+            int32 HeroMissing = 0;
+            if (bHero && Held.Num() > 0)
+            {
+                HeroCandidates.Reserve(Held.Num());
+                for (int32 Index = 0; Index < Held.Num(); ++Index)
+                {
+                    AnastasisHeroCanopy::FCandidate Candidate;
+                    Candidate.Index = Index;
+                    Candidate.Ground = Held[Index].Ground;
+                    Candidate.Species = static_cast<uint8>(Held[Index].Species);
+                    Candidate.Score = Held[Index].HeightM;
+                    HeroCandidates.Add(Candidate);
+                }
+                TArray<AnastasisHeroCanopy::FHero> Heroes;
+                TArray<AnastasisHeroCanopy::FShell> Shells;
+                AnastasisHeroCanopy::FReport HeroReport;
+                FString HeroError;
+                if (!AnastasisHeroCanopy::Build(HeroCandidates, Heroes, Shells, HeroReport, HeroError))
+                {
+                    UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_HERO_CANOPY rejected=%s"), *HeroError);
+                }
+                else
+                {
+                    auto MeshOf = [](uint8 Species) -> const TCHAR*
+                    {
+                        switch (Species)
+                        {
+                        case static_cast<uint8>(EAnastasisTreeSpecies::AleppoPine):
+                            return TEXT("/Game/Anastasis/Vegetation/Hero/SM_Hero_AleppoPine.SM_Hero_AleppoPine");
+                        case static_cast<uint8>(EAnastasisTreeSpecies::Cypress):
+                            return TEXT("/Game/Anastasis/Vegetation/Hero/SM_Hero_Cypress.SM_Hero_Cypress");
+                        case static_cast<uint8>(EAnastasisTreeSpecies::HolmOak):
+                            return TEXT("/Game/Anastasis/Vegetation/Hero/SM_Hero_HolmOak.SM_Hero_HolmOak");
+                        case static_cast<uint8>(EAnastasisTreeSpecies::Olive):
+                            return TEXT("/Game/Anastasis/Vegetation/Hero/SM_Hero_Olive.SM_Hero_Olive");
+                        default: return nullptr;
+                        }
+                    };
+                    TMap<FName, UHierarchicalInstancedStaticMeshComponent*> Existing;
+                    for (UHierarchicalInstancedStaticMeshComponent* Mesh : HeroCanopyMeshes)
+                    {
+                        if (IsValid(Mesh)) Existing.Add(Mesh->GetFName(), Mesh);
+                    }
+                    auto Ensure = [&](FName Name, UStaticMesh* Mesh, bool bCollide, bool bShadow, float MinDraw, float MaxDraw)
+                    {
+                        UHierarchicalInstancedStaticMeshComponent* Hism = Existing.FindRef(Name);
+                        if (!Hism)
+                        {
+                            Hism = NewObject<UHierarchicalInstancedStaticMeshComponent>(this, Name);
+                            Hism->SetFlags(RF_Transient);
+                            Hism->SetupAttachment(GetRootComponent());
+                            Hism->SetMobility(EComponentMobility::Movable);
+                            Hism->SetGenerateOverlapEvents(false);
+                            Hism->SetCanEverAffectNavigation(false);
+                            Hism->RegisterComponent();
+                            HeroCanopyMeshes.Add(Hism);
+                            Existing.Add(Name, Hism);
+                        }
+                        Hism->SetStaticMesh(Mesh);
+                        Hism->SetCollisionEnabled(bCollide ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+                        if (bCollide) Hism->SetCollisionProfileName(TEXT("BlockAll"));
+                        Hism->SetCastShadow(bShadow);
+                        Hism->MinDrawDistance = MinDraw;
+                        Hism->LDMaxDrawDistance = MaxDraw;
+                        const int32 FarEnd = FMath::TruncToInt(MaxDraw);
+                        Hism->SetCullDistances(FarEnd > 0 ? FarEnd * 3 / 4 : 0, FarEnd);
+                        if (Hism->NumCustomDataFloats != 2) Hism->SetNumCustomDataFloats(2);
+                        return Hism;
+                    };
+                    TMap<uint8, UHierarchicalInstancedStaticMeshComponent*> HeroMesh;
+                    for (const AnastasisHeroCanopy::FHero& Hero : Heroes)
+                    {
+                        const TCHAR* Path = MeshOf(Hero.Species);
+                        UStaticMesh* Mesh = Path ? LoadObject<UStaticMesh>(nullptr, Path) : nullptr;
+                        if (!Mesh)
+                        {
+                            ++HeroMissing;
+                            continue;
+                        }
+                        UHierarchicalInstancedStaticMeshComponent*& Slot = HeroMesh.FindOrAdd(Hero.Species);
+                        if (!Slot)
+                        {
+                            Slot = Ensure(*FString::Printf(TEXT("HeroSpecies_%d"), Hero.Species), Mesh, true, true, 0.0f, 0.0f);
+                        }
+                        const FHeld& Tree = Held[Hero.Index];
+                        const FBox Bounds = Mesh->GetBoundingBox();
+                        const double MeshHeight = FMath::Max(Bounds.Max.Z - Bounds.Min.Z, 1.0);
+                        const double Scale = Tree.HeightM * 100.0 / MeshHeight;
+                        FTransform Pose = Tree.Pose;
+                        Pose.SetScale3D(FVector(Scale * Tree.Crown, Scale * Tree.Crown, Scale));
+                        Pose.SetLocation(FVector(Tree.Ground.X, Tree.Ground.Y, Tree.GroundZ - Bounds.Min.Z * Scale));
+                        const int32 Instance = Slot->AddInstance(Pose, false);
+                        if (Instance != INDEX_NONE)
+                        {
+                            Slot->SetCustomDataValue(Instance, 0, static_cast<float>(Tree.Dryness), false);
+                            Slot->SetCustomDataValue(Instance, 1, static_cast<float>(Tree.Jitter), false);
+                        }
+                        HeroAt[Hero.Index] = Instance;
+                        Canopy.Add(FVector(Tree.Ground.X, Tree.Ground.Y,
+                            FVector2D(Bounds.GetExtent().X, Bounds.GetExtent().Y).GetMax() * Pose.GetScale3D().X));
+                        ++HeroPlaced;
+                        ++DressingInstanceCount;
+                    }
+                    UStaticMesh* ShellMesh = LoadObject<UStaticMesh>(nullptr,
+                        TEXT("/Game/Anastasis/Vegetation/Hero/SM_CanopyShell.SM_CanopyShell"));
+                    if (ShellMesh)
+                    {
+                        const FBox ShellBounds = ShellMesh->GetBoundingBox();
+                        const double ShellRadius = FMath::Max(FVector2D(ShellBounds.GetExtent().X, ShellBounds.GetExtent().Y).GetMax(), 1.0);
+                        TMap<uint64, UHierarchicalInstancedStaticMeshComponent*> Chunks;
+                        for (const AnastasisHeroCanopy::FShell& Shell : Shells)
+                        {
+                            double GroundZ = 0.0;
+                            double WaterZ = 0.0;
+                            if (!AnastasisTerrainForge::SampleActive(Shell.Center.X, Shell.Center.Y, GroundZ)) continue;
+                            if (AnastasisTerrainForge::SampleActiveWater(Shell.Center.X, Shell.Center.Y, WaterZ) && WaterZ > GroundZ + 4.0) continue;
+                            const int32 CX = FMath::FloorToInt(Shell.Center.X / 6000.0);
+                            const int32 CY = FMath::FloorToInt(Shell.Center.Y / 6000.0);
+                            const uint64 Key = (static_cast<uint64>(static_cast<uint32>(CX)) << 32) | static_cast<uint32>(CY);
+                            UHierarchicalInstancedStaticMeshComponent*& Chunk = Chunks.FindOrAdd(Key);
+                            if (!Chunk)
+                            {
+                                Chunk = Ensure(*FString::Printf(TEXT("CanopyShell_%d_%d"), CX, CY), ShellMesh, false, false, 7000.0f, 120000.0f);
+                            }
+                            const double Scale = Shell.RadiusCm / ShellRadius;
+                            const FVector Location(Shell.Center.X, Shell.Center.Y, GroundZ + Shell.RadiusCm * 0.22 - ShellBounds.Min.Z * Scale);
+                            Chunk->AddInstance(FTransform(FQuat::Identity, Location, FVector(Scale)), false);
+                            ++ShellPlaced;
+                        }
+                    }
+                    else if (Shells.Num() > 0)
+                    {
+                        ++HeroMissing;
+                    }
+                    UE_LOG(LogAnastasis_UnrealV2, Display,
+                        TEXT("ANASTASIS_HERO_CANOPY enabled=1 heroes=%d shells=%d placed_heroes=%d placed_shells=%d missing=%d"),
+                        HeroReport.Heroes, HeroReport.Shells, HeroPlaced, ShellPlaced, HeroMissing);
+                }
+            }
+            else
+            {
+                UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_HERO_CANOPY enabled=0"));
+            }
+            for (int32 Index = 0; Index < Held.Num(); ++Index)
+            {
+                if (HeroAt.IsValidIndex(Index) && HeroAt[Index] != INDEX_NONE) continue;
+                const FHeld& Tree = Held[Index];
+                const int32 Instance = Tree.Mass->AddInstance(Tree.Pose, false);
+                if (Instance != INDEX_NONE && Tree.Mass->NumCustomDataFloats >= 2)
+                {
+                    Tree.Mass->SetCustomDataValue(Instance, 0, static_cast<float>(Tree.Dryness), false);
+                    Tree.Mass->SetCustomDataValue(Instance, 1, static_cast<float>(Tree.Jitter), false);
+                }
+                Canopy.Add(FVector(Tree.Ground.X, Tree.Ground.Y,
+                    FVector2D(Tree.MassBounds.GetExtent().X, Tree.MassBounds.GetExtent().Y).GetMax() * Tree.Pose.GetScale3D().X));
                 ++DressingInstanceCount;
+            }
+            for (UHierarchicalInstancedStaticMeshComponent* Mesh : HeroCanopyMeshes)
+            {
+                if (IsValid(Mesh)) Mesh->MarkRenderStateDirty();
             }
             UE_LOG(LogAnastasis_UnrealV2, Display,
                 TEXT("ANASTASIS_ECOLOGY young=%d secondary=%d canopy=%d full_plan=%d refused_water_or_footprint=%d refused_slope=%d refused_spacing=%d macro=%d reserved_open=%d"),
