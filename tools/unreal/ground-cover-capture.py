@@ -115,23 +115,49 @@ try:
         return min(((tx - 48) / 18) ** 2 + ((ty - 58) / 13) ** 2, ((tx - 62) / 15) ** 2 + ((ty - 47) / 12) ** 2,
                    ((tx - 33) / 13) ** 2 + ((ty - 24) / 11) ** 2)
 
-    outside = None
+    def find_instance(prefix, accept):
+        # Premiere touffe acceptee parmi les HISM dont le nom commence par prefix (tuiles comprises).
+        for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
+            if not comp.get_name().startswith(prefix):
+                continue
+            n = comp.get_instance_count()
+            for i in range(0, n, max(1, n // 400)):
+                got = comp.get_instance_transform(i, True)
+                xf = got[1] if isinstance(got, tuple) else got
+                tx, ty = xf.translation.x / T, xf.translation.y / T
+                if 8 < tx < 88 and 8 < ty < 88 and accept(tx, ty):
+                    return (tx, ty)
+        return None
+
+    def toward_center(name, at_tile, lift):
+        dx, dy = 48.0 - at_tile[0], 48.0 - at_tile[1]
+        d = math.hypot(dx, dy) or 1.0
+        plan.append((name, at_tile, lift, (at_tile[0] + dx / d * 3.0, at_tile[1] + dy / d * 3.0), 120))
+
+    outside = find_instance('GroundCover_MeadowTall_Far', lambda tx, ty: valley_distance(tx, ty) > 3.0)
+    if outside:
+        toward_center('hors_vallee_eye', outside, 170)
+    unreal.log('GROUND_CAPTURE_OUTSIDE %s' % (('tile=%.1f,%.1f' % outside) if outside else 'NONE'))
+    # Lande (H6) : une touffe d'eboulis regardee depuis 20 m, oeil cote bord de carte, regard vers
+    # le centre (v1 : oeil POSE sur une callune en sous-bois, la lande sortait du cadre).
+    # La tuile de lande la plus fournie : une vue de lande la ou il y en a, pas la premiere venue.
+    heath, best = None, 0
     for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
-        if outside or not comp.get_name().startswith('GroundCover_MeadowTall_Far'):
+        name = comp.get_name()
+        if not (name.startswith('GroundCover_HeathTussock_Near') or name.startswith('GroundCover_Heather_Near')):
             continue
         n = comp.get_instance_count()
-        for i in range(0, n, max(1, n // 4000)):
-            got = comp.get_instance_transform(i, True)
+        if n > best:
+            got = comp.get_instance_transform(n // 2, True)
             xf = got[1] if isinstance(got, tuple) else got
             tx, ty = xf.translation.x / T, xf.translation.y / T
-            if 8 < tx < 88 and 8 < ty < 88 and valley_distance(tx, ty) > 3.0:
-                outside = (tx, ty)
-                break
-    if outside:
-        dx, dy = 48.0 - outside[0], 48.0 - outside[1]
+            if 8 < tx < 88 and 8 < ty < 88:
+                heath, best = (tx, ty), n
+    if heath:
+        dx, dy = 48.0 - heath[0], 48.0 - heath[1]
         d = math.hypot(dx, dy) or 1.0
-        plan.append(('hors_vallee_eye', outside, 170, (outside[0] + dx / d * 3.0, outside[1] + dy / d * 3.0), 120))
-    unreal.log('GROUND_CAPTURE_OUTSIDE %s' % (('tile=%.1f,%.1f' % outside) if outside else 'NONE'))
+        plan.append(('lande_eye', (heath[0] - dx / d, heath[1] - dy / d), 170, (heath[0] + dx / d * 0.5, heath[1] + dy / d * 0.5), 60))
+    unreal.log('GROUND_CAPTURE_LANDE %s' % (('tile=%.1f,%.1f' % heath) if heath else 'NONE'))
 
     views = []
     for name, eye_t, lift, tgt_t, tlift in plan:

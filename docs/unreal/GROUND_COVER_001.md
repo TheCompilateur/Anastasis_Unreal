@@ -15,9 +15,25 @@ la carte**, sur le sol et l'eau **réellement rendus** (forge + drainage), aprè
 | H2 `MeadowShort` — prairie basse | EZ5 « prairies basses », EZ2 « terre sèche, tassée » | 12-30 cm, plus verte, la terre perce | pente 10-20°, hameau piétiné, lisière ombragée |
 | H3 `Sedge` — prairie humide | EZ5 « prairie humide », EZ4 « prairies saturées », EZ2 « végétation rivulaire » | laîches 45-80 cm de lame retombant à ~35-60 cm, vert bleuté | humidité de rive ≥ 0,4 (drainage) ou sol à < 45 cm au-dessus de la nappe |
 
+| H6a `HeathTussock` — touffe d'éboulis | EZ1 « rochers, éboulis : affleurements » | graminée dure et serrée, 16-42 cm, 30 % de paille | versant 20-45°, partout |
+| H6b `Heather` — callune | EZ1 « pente subalpine : landes » | petit buisson raide brun-vert, épis mauves de fin d'été | versant 20-45°, 8 → 28 m au-dessus du fond de vallée |
+
 Pas encore faits, prévus : joncs de rive (H4, les roseaux existants tiennent l'eau), herbacées
-de sous-bois (H5), lande et touffes d'éboulis (H6). Au-delà de 20° et sous une couronne, cette
-passe ne pose donc rien.
+de sous-bois (H5). Au-delà de 45° (falaise) et sous une couronne, rien n'est posé.
+
+## Lande (H6)
+
+- **Bandes** : prairie 0-20°, lande 20-45°, fondu par tirage entre 18 et 22° (pas de courbe de
+  niveau). Densité 0,9 au pied → 0,3 à 45°, plancher de tache 35 %, ombre des couronnes à 50 %
+  (prairie : 75 %), touffes ×1,3.
+- **Habitat propre** (`LandeMask`) : roche, prairie, broussaille 1 ; forêt 0,7 ; eau de
+  simulation et ruine 0,6 ; champ 0,5. La roche, refusée à la prairie (0,2), est chez elle ici.
+- **Callune en haut** : hauteur au-dessus du fond de vallée habitable (bassin de la forge), pas de
+  la nappe — hors rivières le drainage pose la nappe à 1 m sous le sol partout.
+- **Mesuré, pas supposé** : `ANASTASIS_GROUND_SLOPES` journalise l'histogramme des pentes des
+  candidates sèches et les hauteurs de lande posées (p10/p50/p90) ; les seuils ci-dessus en
+  viennent. Preuves : `docs/visual/ground-cover-lande-001/`.
+- Lande nue au-delà de 45° ; versant ouest de la vallée A encore nu (non diagnostiqué).
 
 Ce que toutes les planches montrent, et que les règles portent :
 
@@ -30,7 +46,7 @@ Ce que toutes les planches montrent, et que les règles portent :
 ## Où l'herbe a le droit d'exister
 
 Masque = max(poids de vallée Human_Geography_V2, ouverture de la tuile de simulation interpolée
-entre centres de tuiles). Ouverture : prairie / champ 1 ; broussaille, forêt 0,8 (les couronnes
+entre centres de tuiles). Ouverture (prairie) : prairie / champ 1 ; broussaille, forêt 0,8 (les couronnes
 posées excluent le sous-bois, une trouée de forêt est une clairière) ; eau de simulation 0,8
 (le drainage en a rendu l'essentiel à la terre, la vraie nappe est refusée par la règle d'eau) ;
 ruine 0,4 ; roche 0,2 (lande = H6). Les v1-v3 ne lisaient que la vallée : hors vallées, rien.
@@ -76,7 +92,7 @@ verrouillaient les assets à régénérer.
 - **Le sol sous l'herbe** (`MI_AnastasisGround`, autre chantier) perce entre les touffes : vert
   pâle en vallée, sableux ailleurs. La lecture lointaine d'une prairie relève du matériau de sol.
 - **Vue oblique / aérienne** : l'herbe est coupée à 108 m ; de haut elle ne compte pas.
-- **Pentes > 20°** : nues jusqu'à H6 (lande).
+- **Pentes > 45°** : nues (falaise). Entre 20 et 45° : lande clairsemée, voir Lande (H6).
 - **Hameau** : sur un replat sableux où l'herbe est rare ; la clairière piétinée (règle testée
   par `CanopyAndClearing`) n'y a pas d'effet visible.
 - **Incarnation** : +1,4 à 2 s (plan 0,35-0,55 s en parallèle, le reste pour remplir les HISM) ;

@@ -74,18 +74,85 @@ bool FAnastasisGroundCoverSlopeBands::RunTest(const FString&)
 	TestTrue(TEXT("flat"), AnastasisGroundCover::Build(AnastasisGroundCoverTestFixture::OpenPlane(4.0), AnastasisGroundCover::FSettings(), Flat, Error));
 	TestTrue(TEXT("mid"), AnastasisGroundCover::Build(AnastasisGroundCoverTestFixture::OpenPlane(16.0), AnastasisGroundCover::FSettings(), Mid, Error));
 	TestTrue(TEXT("steep"), AnastasisGroundCover::Build(AnastasisGroundCoverTestFixture::OpenPlane(26.0), AnastasisGroundCover::FSettings(), Steep, Error));
-	AddInfo(FString::Printf(TEXT("flat tall=%d short=%d | 16deg tall=%d short=%d | 26deg=%d"),
+	AddInfo(FString::Printf(TEXT("flat tall=%d short=%d | 16deg tall=%d short=%d | 26deg all=%d"),
 		AnastasisGroundCoverTestFixture::Count(Flat, AnastasisGroundCover::EFamily::MeadowTall), AnastasisGroundCoverTestFixture::Count(Flat, AnastasisGroundCover::EFamily::MeadowShort),
 		AnastasisGroundCoverTestFixture::Count(Mid, AnastasisGroundCover::EFamily::MeadowTall), AnastasisGroundCoverTestFixture::Count(Mid, AnastasisGroundCover::EFamily::MeadowShort), Steep.Instances.Num()));
-	// Plan V2 : 0-10 prairie haute, 10-20 prairie basse, au-dela rien dans cette passe.
+	// Plan V2 : 0-10 prairie haute, 10-20 prairie basse, 20-45 lande, au-dela falaise nue.
 	TestTrue(TEXT("flat ground is mostly tall meadow"), AnastasisGroundCoverTestFixture::Count(Flat, AnastasisGroundCover::EFamily::MeadowTall) > 2 * AnastasisGroundCoverTestFixture::Count(Flat, AnastasisGroundCover::EFamily::MeadowShort));
 	TestTrue(TEXT("flat ground still mixes heights"), AnastasisGroundCoverTestFixture::Count(Flat, AnastasisGroundCover::EFamily::MeadowShort) > 0);
 	TestEqual(TEXT("16 deg holds no tall meadow"), AnastasisGroundCoverTestFixture::Count(Mid, AnastasisGroundCover::EFamily::MeadowTall), 0);
 	TestTrue(TEXT("16 deg holds short meadow"), AnastasisGroundCoverTestFixture::Count(Mid, AnastasisGroundCover::EFamily::MeadowShort) > 0);
 	TestTrue(TEXT("slope thins the cover"), Mid.Instances.Num() < Flat.Instances.Num());
-	TestEqual(TEXT("26 deg holds nothing"), Steep.Instances.Num(), 0);
-	TestTrue(TEXT("26 deg refused by slope"), Steep.RejectedSlope > 0);
+	const int32 SteepLande = AnastasisGroundCoverTestFixture::Count(Steep, AnastasisGroundCover::EFamily::HeathTussock)
+		+ AnastasisGroundCoverTestFixture::Count(Steep, AnastasisGroundCover::EFamily::Heather);
+	TestTrue(TEXT("26 deg holds lande"), SteepLande > 0);
+	TestEqual(TEXT("26 deg holds only lande"), SteepLande, Steep.Instances.Num());
+	TestEqual(TEXT("16 deg holds no lande"), AnastasisGroundCoverTestFixture::Count(Mid, AnastasisGroundCover::EFamily::HeathTussock)
+		+ AnastasisGroundCoverTestFixture::Count(Mid, AnastasisGroundCover::EFamily::Heather), 0);
+	AnastasisGroundCover::FPlan Cliff;
+	TestTrue(TEXT("cliff"), AnastasisGroundCover::Build(AnastasisGroundCoverTestFixture::OpenPlane(50.0), AnastasisGroundCover::FSettings(), Cliff, Error));
+	TestEqual(TEXT("50 deg holds nothing"), Cliff.Instances.Num(), 0);
+	TestTrue(TEXT("50 deg refused by slope"), Cliff.RejectedSlope > 0);
 	TestEqual(TEXT("dry plane holds no sedge"), AnastasisGroundCoverTestFixture::Count(Flat, AnastasisGroundCover::EFamily::Sedge) + AnastasisGroundCoverTestFixture::Count(Mid, AnastasisGroundCover::EFamily::Sedge), 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisGroundCoverLande, "Anastasis.GroundCover.Lande",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisGroundCoverLande::RunTest(const FString&)
+{
+	FString Error;
+	const AnastasisGroundCover::EFamily Heath = AnastasisGroundCover::EFamily::HeathTussock;
+	const AnastasisGroundCover::EFamily Heather = AnastasisGroundCover::EFamily::Heather;
+
+	// La lande lit son propre habitat : une roche sans prairie possible porte une lande...
+	AnastasisGroundCover::FInputs Rock = AnastasisGroundCoverTestFixture::OpenPlane(30.0);
+	Rock.Mask = [](double, double) { return 0.0; };
+	Rock.LandeMask = [](double, double) { return 1.0; };
+	AnastasisGroundCover::FPlan OnRock;
+	TestTrue(TEXT("rock builds"), AnastasisGroundCover::Build(Rock, AnastasisGroundCover::FSettings(), OnRock, Error));
+	const int32 RockLande = AnastasisGroundCoverTestFixture::Count(OnRock, Heath) + AnastasisGroundCoverTestFixture::Count(OnRock, Heather);
+	TestTrue(TEXT("rocky slope holds lande"), RockLande > 0 && RockLande == OnRock.Instances.Num());
+
+	// ... et un versant hors habitat de lande n'en porte pas, meme ouvert a la prairie.
+	AnastasisGroundCover::FInputs Closed = AnastasisGroundCoverTestFixture::OpenPlane(30.0);
+	Closed.LandeMask = [](double, double) { return 0.0; };
+	AnastasisGroundCover::FPlan None;
+	TestTrue(TEXT("closed builds"), AnastasisGroundCover::Build(Closed, AnastasisGroundCover::FSettings(), None, Error));
+	TestEqual(TEXT("no lande outside its habitat"), None.Instances.Num(), 0);
+
+	// Plus maigre que la prairie, et de plus en plus en montant.
+	AnastasisGroundCover::FPlan Meadow, Foot, High;
+	TestTrue(TEXT("meadow"), AnastasisGroundCover::Build(AnastasisGroundCoverTestFixture::OpenPlane(4.0), AnastasisGroundCover::FSettings(), Meadow, Error));
+	TestTrue(TEXT("foot"), AnastasisGroundCover::Build(AnastasisGroundCoverTestFixture::OpenPlane(24.0), AnastasisGroundCover::FSettings(), Foot, Error));
+	TestTrue(TEXT("high"), AnastasisGroundCover::Build(AnastasisGroundCoverTestFixture::OpenPlane(40.0), AnastasisGroundCover::FSettings(), High, Error));
+	AddInfo(FString::Printf(TEXT("meadow 4deg=%d lande 24deg=%d (heather=%d) 40deg=%d"), Meadow.Instances.Num(),
+		Foot.Instances.Num(), AnastasisGroundCoverTestFixture::Count(Foot, Heather), High.Instances.Num()));
+	TestTrue(TEXT("lande is sparser than meadow"), 2 * Foot.Instances.Num() < Meadow.Instances.Num());
+	TestTrue(TEXT("lande thins as it climbs"), High.Instances.Num() < Foot.Instances.Num() && High.Instances.Num() > 0);
+
+	// Callune en haut du versant, touffes d'eboulis en bas : versant de 24 deg sur 100 m, soit
+	// ~45 m de denivele au-dessus d'un fond de vallee pose au pied (Z = 1000). Bande 8-28 m.
+	AnastasisGroundCover::FInputs Valley = AnastasisGroundCoverTestFixture::OpenPlane(24.0);
+	Valley.bHasValleyFloor = true;
+	Valley.ValleyFloorZ = 1000.0;
+	AnastasisGroundCover::FPlan Hill;
+	TestTrue(TEXT("hill builds"), AnastasisGroundCover::Build(Valley, AnastasisGroundCover::FSettings(), Hill, Error));
+	int32 HeatherLow = 0, HeatherHigh = 0, TussockLow = 0;
+	for (const AnastasisGroundCover::FPlacement& P : Hill.Instances)
+	{
+		const bool bLow = P.Ground.Z - 1000.0 < 800.0, bHigh = P.Ground.Z - 1000.0 > 2800.0;
+		HeatherLow += bLow && P.Family == Heather;
+		HeatherHigh += bHigh && P.Family == Heather;
+		TussockLow += bLow && P.Family == Heath;
+	}
+	AddInfo(FString::Printf(TEXT("heather low=%d high=%d tussock low=%d"), HeatherLow, HeatherHigh, TussockLow));
+	TestEqual(TEXT("no heather within 8 m of the valley floor"), HeatherLow, 0);
+	TestTrue(TEXT("heather holds the upper slope, tussocks the foot"), HeatherHigh > 0 && TussockLow > 0);
+	AnastasisGroundCover::FInputs BadFloor = Valley;
+	BadFloor.ValleyFloorZ = std::numeric_limits<double>::quiet_NaN();
+	AnastasisGroundCover::FPlan Refused;
+	TestFalse(TEXT("non-finite valley floor is refused"), AnastasisGroundCover::Build(BadFloor, AnastasisGroundCover::FSettings(), Refused, Error));
 	return true;
 }
 
