@@ -344,6 +344,10 @@ Autorite : les planches `SourceArt/Characters/Sheets/serie-*.png` et `SourceArt/
 Au lancement, `anastasis.Village.StartVillagers` (12) habitants autour du premier puits ; le premier scenario
 `Anastasis.Village.First*` / `FoodSupply` remplace ce village. Voir `docs/unreal/VILLAGER_PNG_001.md`.
 
+**Rythme** : `anastasis.Sim.TimeScale` (0.0375 par defaut) ralentit le temps simule -- jour ~40 min, habitants
+~3 m/s. Une preuve PIE qui attend sur le temps simule pose `anastasis.Sim.TimeScale 1` avant le PIE.
+`anastasis.Sim.Speed 0` ne gele rien (`PumpFrame` lit < 1 comme 1) : geler par `TimeScale 0`.
+
 | Script | Role |
 |---|---|
 | `villager-png.py` | **hors editeur** (Python systeme, Pillow + numpy) : `sheets` (decoupe des planches → `Raw/` + `villager-extract.json`, statures mesurees), `prep` (→ `SourceArt/Characters/PNG/<Categorie>/`, canevas 512x1024 = 128x256 cm, pieds alignes), `board` (planches → `docs/visual/villager-png-001/`), `check` (ressemblance silhouette / visage par paire) |

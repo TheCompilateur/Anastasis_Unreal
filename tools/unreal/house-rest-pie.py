@@ -55,6 +55,8 @@ def tick(dt):
         return
     if phase == 0 and now - t0 > 3:
         phase = 1
+        # Temps simule au rythme JS (90 s par jour) : cette preuve attend sur le temps simule ; le jeu, lui, tourne a anastasis.Sim.TimeScale 0.0375 (villager-png-001, point 4).
+        unreal.SystemLibrary.execute_console_command(None, 'anastasis.Sim.TimeScale 1')
         les.editor_request_begin_play()
         unreal.log('HOUSE_REST_PIE_REQUESTED')
         return

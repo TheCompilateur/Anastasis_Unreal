@@ -57,7 +57,10 @@ carte. `PLAYER` reste NOT_IMPLEMENTED.
 - `DA_AnastasisPresentation.uasset` est binaire : une autre branche qui le modifie ne se fusionne pas ; il
   faudra rejouer `import-villagers.ps1` sur l'asset de l'autre.
 - `AnastasisVillagePresentation.h` : conflit de commentaire deja resolu avec village-buildings-001.
-- Vitesse apparente des habitants (~80 m/s a `Sim.Speed 1`) : ecart d'echelle anterieur, pas corrige ici.
+- **Rythme du jeu change (point 4)** : `anastasis.Sim.TimeScale` 0.0375 par defaut -- un jour dure ~40 min
+  reelles au lieu de 90 s, habitants ~3 m/s au lieu de 80 m/s. Toute preuve PIE qui attend sur le temps
+  simule doit poser `anastasis.Sim.TimeScale 1` (fait pour les neuf scripts existants de `tools/unreal/`).
+  `anastasis.Sim.Speed 0` ne gele pas : geler par `TimeScale 0`.
 - Avance rapide seulement.
 
 ## SUITE (critique d'Alexandre, point 1)
@@ -66,6 +69,12 @@ Portraits choisis par metier simule (`FAnastasisVillagerLook::Jobs`, pool par me
 carte redessinee a l'embauche) : un garde, un moine, une mere au bebe ne sont plus jamais attribues.
 `Anastasis.Village` 7/7 Success ; `VILLAGER_PIE PASS` avec `FirstFarmer 1` (fermier en portrait de
 fermier).
+
+## SUITE (critique d'Alexandre, point 4)
+
+`anastasis.Sim.TimeScale` 0.0375 et cartes interpolees entre les pas : en PIE, 2,99 m/s de moyenne et 19,5 cm
+au plus par frame a ~28 images/s (run 12:54) ; `VILLAGER_PIE PASS` (run 13:01, pointe 3,0 m/s). Neuf preuves PIE
+existantes posent `TimeScale 1`. `Anastasis.Village` 7/7 Success, dont l'interpolation.
 
 ## STOP
 

@@ -296,6 +296,32 @@ bool FAnastasisVillagerPresentationTest::RunTest(const FString&)
 	Village.FindNpcMutable(Ids[2])->JobId = TEXT("settler");
 	Presentation.SyncVillagers(Village, Sim.GetWorld(), World, *Registry, true);
 
+	// Interpolation entre deux pas : la carte suit la fraction du pas, sans sauter.
+	{
+		AnastasisVillage::FNpc* Walker = Village.FindNpcMutable(Ids[0]);
+		const FVector2D From(Walker->X, Walker->Y);
+		Presentation.SyncVillagers(Village, Sim.GetWorld(), World, *Registry, true, 1.0, true);
+		Walker->X += 0.5;
+		const FVector2D To(Walker->X, Walker->Y);
+		Presentation.SyncVillagers(Village, Sim.GetWorld(), World, *Registry, true, 0.25, true);
+		const FVector2D Quarter = FMath::Lerp(From, To, 0.25);
+		TestTrue(TEXT("un quart de pas : un quart du chemin"), Presentation.FindVillager(Ids[0])->GetActorLocation().Equals(
+			FAnastasisVillagePresentation::SimToUnreal(Sim.GetWorld(), Quarter.X, Quarter.Y, World), 0.5));
+		Presentation.SyncVillagers(Village, Sim.GetWorld(), World, *Registry, true, 0.75, false);
+		const FVector2D ThreeQuarters = FMath::Lerp(From, To, 0.75);
+		TestTrue(TEXT("trois quarts de pas, sans nouveau pas : trois quarts du chemin"), Presentation.FindVillager(Ids[0])->GetActorLocation().Equals(
+			FAnastasisVillagePresentation::SimToUnreal(Sim.GetWorld(), ThreeQuarters.X, ThreeQuarters.Y, World), 0.5));
+		Presentation.SyncVillagers(Village, Sim.GetWorld(), World, *Registry, true, 0.0, true);
+		TestTrue(TEXT("immobile apres un pas : la carte ne revient pas en arriere"), Presentation.FindVillager(Ids[0])->GetActorLocation().Equals(
+			FAnastasisVillagePresentation::SimToUnreal(Sim.GetWorld(), To.X, To.Y, World), 0.5));
+		Walker->X += 6.0;
+		Presentation.SyncVillagers(Village, Sim.GetWorld(), World, *Registry, true, 0.1, true);
+		TestTrue(TEXT("saut de 6 tuiles : pris tel quel, pas glisse"), Presentation.FindVillager(Ids[0])->GetActorLocation().Equals(
+			FAnastasisVillagePresentation::SimToUnreal(Sim.GetWorld(), Walker->X, Walker->Y, World), 0.5));
+		Walker->X = From.X;
+		Presentation.SyncVillagers(Village, Sim.GetWorld(), World, *Registry, true);
+	}
+
 	// Dedans : la position reste le seuil, la carte se cache.
 	Village.FindNpcMutable(Ids[1])->Inside.bActive = true;
 	Presentation.SyncVillagers(Village, Sim.GetWorld(), World, *Registry, true);

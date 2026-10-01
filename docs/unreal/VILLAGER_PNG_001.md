@@ -146,6 +146,37 @@ qui muraient l'entre-jambes ; mailles de filet creme ; `bInGame` expose a Python
 PIE vides (gel PUIS cadrage). La premiere prise `02-debug` vide n'a pas de cause etablie : le log ne
 montre aucune reprise de vue par le controleur ; elle est passee au run suivant, habitant immobile.
 
+### 5.3 Rythme (critique d'Alexandre, point 4)
+
+Mesure dans le code : `Npc.Speed` = 4 tuiles par seconde simulee (simulateur, parite JS : intouchable),
+un jour = 90 s simulees (`DayLength`), une tuile = 400 cm x `anastasis.WorldView.Scale` 5 = 20 m a l'ecran.
+4 x 20 = **80 m/s** a `anastasis.Sim.Speed 1`. Aucun reglage d'affichage seul ne donne une marche.
+
+Decision d'Alexandre (2026-10-01) : **jour d'environ 40 min, habitants a ~3 m/s**, terrain inchange.
+
+- `anastasis.Sim.TimeScale` (hote, `AnastasisSimulationSubsystem`) : secondes simulees donnees par seconde
+  reelle, avant `Sim.Speed`. Defaut **0,0375** = 3 m/s / (4 tuiles/s x 20 m) ; jour = 90 / 0,0375 = 2400 s.
+  Tout ralentit ensemble (marche, besoins, jour, ciel) : la simulation reste fidele a elle-meme.
+- **Interpolation** : la simulation avance par pas fixes de 1/60 s ; ralentie, un pas ne tombe que toutes les
+  ~27 frames et la carte sauterait de 1,3 m. L'hote reproduit l'accumulateur de `PumpFrame` (regles publiques
+  d'`AnastasisSimClock`) et la carte est posee entre la position d'avant le dernier pas et la courante, a la
+  fraction du pas en cours. Retard visuel : au plus un pas. Un saut de plus de 2 tuiles (scenario) est pris tel quel.
+- `TimeScale 0` gele vraiment. `anastasis.Sim.Speed 0` ne gelait rien : `PumpFrame` lit toute vitesse < 1
+  comme 1 (les anciennes preuves qui « gelaient » ainsi ne gelaient pas).
+- Les preuves PIE qui attendent sur le temps simule (`first-building`, `house-rest`, `granary-eat`,
+  `gather-deliver`, `food-supply`, `sky-clock`, `probe-demo`, `asset_agent_probe`, `astral-observe`) posent
+  `anastasis.Sim.TimeScale 1` avant le PIE : leur comportement d'avant, a l'identique. `smoke-pie` (verify)
+  garde le rythme du jeu.
+
+Mesures en PIE (`villager-pie.ps1`, village du lancement, `TimeScale` 0,0375), 2026-10-01 :
+
+| Run | Images/s | Vitesse moyenne | Pointe par frame | Plus grand saut en une frame | Verdict |
+|---|---|---|---|---|---|
+| 12:54 | ~28 | **2,99 m/s** | (diviseur faux, corrige ensuite) | **19,5 cm** (un pas de simulation ferait 133 cm) | interpolation prouvee |
+| 13:01 | ~1 (machine saturee) | 1,14 m/s (marche puis arret) | **3,0 m/s** | 120 cm sur une frame d'~1 s | `VILLAGER_PIE PASS` ; a 1 image/s saut et interpolation ne se distinguent pas |
+
+Premier habitant en marche 74 s apres le lancement (run 13:01) : la cadence de decision de Nous.
+
 ## 6. Limites connues
 
 - **Pose fixe quelle que soit l'activite** : le simulateur fait boire, manger, se reposer, se detendre ;
@@ -158,8 +189,9 @@ montre aucune reprise de vue par le controleur ; elle est passee au run suivant,
 - **Hommes adultes** : le groupe le plus repetitif des planches (bruns barbus de 30-40 ans, distingues
   surtout par le couvre-chef et la silhouette). Le detecteur ne crie pas au clone ; l'oeil, un peu.
 - **Resolution** : figures de 160 a 300 px sur les planches, agrandies x2 a x3,5 : douces de pres.
-- **Vitesse** : un habitant avance de 4 tuiles/s, une tuile fait 20 m a l'ecran (400 cm x echelle 5) :
-  ~80 m/s a `anastasis.Sim.Speed 1`. Ecart d'echelle simulation/rendu anterieur a cette mission.
+- **Decisions lentes** (consequence du point 4) : un habitant ne decide que toutes les 2,2 s simulees
+  (Nous), soit ~59 s reelles a `TimeScale 0.0375`. Au lancement, tout le monde attend environ une minute
+  avant de se mettre en marche.
 - **Sens du regard** : les planches melangent figures tournees a gauche, de face, a droite ; la carte
   suppose « a gauche » pour le miroir. Aucun retournement n'a ete impose (`overrides.facing`).
 

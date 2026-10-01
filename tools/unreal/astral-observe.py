@@ -103,6 +103,8 @@ def tick(dt):
         rebuild(1)
         results['repeat']=inventory()
         results['deterministic']=results['ecology']['hash']==results['repeat']['hash']
+        # Temps simule au rythme JS (90 s par jour) : cette preuve attend sur le temps simule ; le jeu, lui, tourne a anastasis.Sim.TimeScale 0.0375 (villager-png-001, point 4).
+        unreal.SystemLibrary.execute_console_command(None, 'anastasis.Sim.TimeScale 1')
         les.editor_request_begin_play()
         phase=5; mark=time.monotonic()
     elif phase==5 and les.is_in_play_in_editor():

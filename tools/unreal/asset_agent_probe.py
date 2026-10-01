@@ -48,6 +48,8 @@ def tick(dt):
     elapsed = time.monotonic() - t0
     if phase == 0 and elapsed > 2.0:
         phase = 1
+        # Temps simule au rythme JS (90 s par jour) : cette preuve attend sur le temps simule ; le jeu, lui, tourne a anastasis.Sim.TimeScale 0.0375 (villager-png-001, point 4).
+        unreal.SystemLibrary.execute_console_command(None, 'anastasis.Sim.TimeScale 1')
         les.editor_request_begin_play()
         unreal.log(LOG_PREFIX + '_PIE_REQUESTED')
     elif phase == 1 and les.is_in_play_in_editor():

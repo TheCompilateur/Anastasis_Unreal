@@ -6,6 +6,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
+#include "Core/AnastasisSimClock.h"
 #include "Village/AnastasisVillage.h"
 #include "Village/AnastasisVillageInteractionSubsystem.h"
 #include "Village/AnastasisVillagerVisual.h"
@@ -21,6 +22,12 @@ static TAutoConsoleVariable<float> CVarSimSpeed(
 	TEXT("anastasis.Sim.Speed"),
 	1.0f,
 	TEXT("Simulation speed scale (JS 1/2/5/10). Default 1 = JS realtime, a 90 s day. Set 10 in a proof that needs midnight quickly."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<float> CVarSimTimeScale(
+	TEXT("anastasis.Sim.TimeScale"),
+	0.0375f,
+	TEXT("Simulated seconds fed per real second, before anastasis.Sim.Speed (VILLAGER_PNG_001, point 4). 1 = JS realtime: a 90 s day, villagers at 4 tiles/s = 80 m/s on 20 m tiles. Default 0.0375: villagers ~3 m/s, a day ~40 min. 0 freezes the simulation (Sim.Speed 0 does not: PumpFrame reads any speed below 1 as 1). Proof scripts that wait on simulated time set 1."),
 	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarVillageDebug(
@@ -127,12 +134,28 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 	}
 
 	const double Speed = static_cast<double>(CVarSimSpeed.GetValueOnGameThread());
-	Simulation.PumpFrame(static_cast<double>(DeltaTime), Speed);
+	// Le temps simule avance plus lentement que le temps reel : sans cela un habitant (4 tuiles par
+	// seconde simulee, une tuile = 20 m a l'ecran) traverse le pre a 80 m/s. Tout ralentit ensemble --
+	// marche, besoins, jour, ciel -- la simulation reste fidele a elle-meme, seul le rythme change.
+	const double SimWall = static_cast<double>(DeltaTime)
+		* FMath::Clamp(static_cast<double>(CVarSimTimeScale.GetValueOnGameThread()), 0.0, 1.0);
+
+	// Miroir de l'accumulateur de PumpFrame (memes regles publiques d'AnastasisSimClock) : la fraction
+	// du pas en cours sert a interpoler les cartes. Un pas fixe vaut 1/60 s simulee ; ralenti, il ne
+	// tombe qu'une frame sur ~27 et les habitants sauteraient de 1,3 m a chaque pas.
+	const AnastasisSimClock::FStepPlan Plan = AnastasisSimClock::StepPlan(Speed);
+	PresentationAccumulator += FMath::Max(0.0, AnastasisSimClock::FrameDelta(SimWall * 1000.0).Dt)
+		* FMath::Max(1.0, AnastasisJs::NumberOr(Speed, 1.0));
+	const int32 Steps = Simulation.PumpFrame(SimWall, Speed);
+	PresentationAccumulator = FMath::Clamp(PresentationAccumulator - Steps * Plan.StepDt, 0.0,
+		Plan.StepDt * static_cast<double>(FMath::Max(1, Plan.TargetSteps)));
+	const double StepAlpha = Plan.StepDt > 0.0 ? FMath::Clamp(PresentationAccumulator / Plan.StepDt, 0.0, 1.0) : 1.0;
 	LogDayIfChanged();
 	SyncVillagePresentation();
 	VillagePresentation.SyncVillagers(
 		Simulation.GetVillage(), Simulation.GetWorld(), GetWorld(),
-		AnastasisPresentation::GetRegistry(), CVarVillagePortraits.GetValueOnGameThread() != 0);
+		AnastasisPresentation::GetRegistry(), CVarVillagePortraits.GetValueOnGameThread() != 0,
+		StepAlpha, Steps > 0);
 	if (CVarVillageDebug.GetValueOnGameThread() != 0)
 	{
 		FAnastasisVillagePresentation::DrawDebug(GetWorld(), Simulation.GetVillage(), Simulation.GetWorld());
