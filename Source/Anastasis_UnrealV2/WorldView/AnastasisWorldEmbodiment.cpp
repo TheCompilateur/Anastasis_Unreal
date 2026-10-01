@@ -11,6 +11,7 @@
 #include "WorldView/AnastasisGroundCover.h"
 #include "WorldView/AnastasisUnderstory.h"
 #include "WorldView/AnastasisMicroEcology.h"
+#include "WorldView/AnastasisRiverbank.h"
 
 #include "Anastasis_UnrealV2.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
@@ -90,6 +91,14 @@ static TAutoConsoleVariable<int32> CVarMicroEcologyInAutomation(
 static TAutoConsoleVariable<int32> CVarGroundCoverSoilTint(
     TEXT("anastasis.GroundCover.SoilTint"), 1,
     TEXT("0=sol non teinte sous l'herbe, 1=sol fonce et verdi sous la prairie, brun sous les laiches, terre sous la lande (defaut) ; applique a l'incarnation."), ECVF_Default);
+
+// RIVERBANK_LIFE_001 : rives vivantes. Coupable pour l'A/B : meme eau, rives peintes et peuplees ou non.
+static TAutoConsoleVariable<int32> CVarRiverbank(
+    TEXT("anastasis.Dressing.Riverbank"), 1,
+    TEXT("1=rives vivantes : vase et roseaux en eau calme, gravier et galets en eau vive (defaut), 0=la prairie touche l'eau ; applique a l'incarnation."), ECVF_Default);
+static TAutoConsoleVariable<int32> CVarRiverbankInAutomation(
+    TEXT("anastasis.Riverbank.InAutomation"), 0,
+    TEXT("0=pas d'instances de rive pendant les tests d'automatisation (defaut, comme l'herbe), 1=aussi sous automatisation ; applique a l'incarnation."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
@@ -693,6 +702,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	PlaceUnderstory(CanonicalSource, Canopy, bEcology);
 	PlaceGroundCover(CanonicalSource, Places, Canopy, bEcology);
 	PlaceMicroEcology(CanonicalSource, Places, Canopy, bEcology);
+	PlaceRiverbank(CanonicalSource, true);
 	EmbodyPlaces(PlaceInputs, Places, bPlaces, CanonicalSource, SupersededRuins);
 }
 
@@ -1176,6 +1186,137 @@ void AAnastasisWorldEmbodiment::PlaceMicroEcology(const AnastasisWorldView::FWor
 		PlanMs, (FPlatformTime::Seconds() - Start) * 1000.0);
 }
 
+void AAnastasisWorldEmbodiment::PlaceRiverbank(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource, bool bEnabled)
+{
+	namespace RB = AnastasisRiverbank;
+	// Vider, jamais detruire (assertion InstanceReorderTable, cf. PlaceGroundCover).
+	for (UHierarchicalInstancedStaticMeshComponent* M : RiverbankMeshes)
+	{
+		if (IsValid(M)) M->ClearInstances();
+	}
+	RiverbankMeshes.RemoveAll([](const TObjectPtr<UHierarchicalInstancedStaticMeshComponent>& M) { return !IsValid(M); });
+	const AnastasisDrainage::FNetwork& Network = AnastasisDrainage::GetActive();
+	const double T = AnastasisWorldView::TileWorldSize * CanonicalSource.SpatialScale;
+	double Probe;
+	const bool bGround = AnastasisTerrainForge::SampleActive((CanonicalSource.OriginX + CanonicalSource.W * 0.5) * T,
+		(CanonicalSource.OriginY + CanonicalSource.H * 0.5) * T, Probe);
+	const bool bAutomation = GIsAutomationTesting && CVarRiverbankInAutomation.GetValueOnGameThread() == 0;
+	if (!bEnabled || CVarRiverbank.GetValueOnGameThread() == 0 || !bGround || Network.GridW <= 0 || bAutomation)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_RIVERBANK enabled=0 rendered_ground=%d drainage=%d automation=%d"),
+			bGround, Network.GridW > 0, bAutomation);
+		return;
+	}
+	const double Start = FPlatformTime::Seconds();
+	RB::FSpeedField Speed;
+	RB::BuildSpeedField(Network, Speed);
+	RB::FInputs In;
+	In.SampleHeight = [](double X, double Y, double& Z) { return AnastasisTerrainForge::SampleActive(X, Y, Z); };
+	In.SampleWaterHeight = [](double X, double Y, double& Z) { return AnastasisTerrainForge::SampleActiveWater(X, Y, Z); };
+	In.Bounds = FBox2D(FVector2D(CanonicalSource.OriginX * T, CanonicalSource.OriginY * T),
+		FVector2D((CanonicalSource.OriginX + CanonicalSource.W) * T, (CanonicalSource.OriginY + CanonicalSource.H) * T));
+	In.Seed = CanonicalSource.Seed;
+	RB::FPlan BankPlan;
+	FString Error;
+	if (!RB::Build(In, Speed, RB::FSettings(), BankPlan, Error))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_RIVERBANK rejected=%s"), *Error);
+		return;
+	}
+
+	// Maillages existants : roseau (Ecotone, son materiau), galets et blocs
+	// (Rock, materiau de forme teinte en pierre mouillee, plus sombre que celle des affleurements).
+	struct FKind { AnastasisPlaces::EFamily Source; int32 Variants; int32 Cull; bool bShadow; bool bStone; };
+	const FKind Kinds[RB::FamilyCount] = {
+		{AnastasisPlaces::EFamily::Reed, 1, 9000, true, false},
+		{AnastasisPlaces::EFamily::RockLow, 3, 6000, false, true},
+		{AnastasisPlaces::EFamily::RockBoulder, 3, 20000, true, true},
+	};
+	UStaticMesh* Meshes[RB::FamilyCount][3] = {};
+	FBox MeshBounds[RB::FamilyCount][3];
+	int32 Missing = 0;
+	for (int32 F = 0; F < RB::FamilyCount; ++F)
+	{
+		for (int32 V = 0; V < Kinds[F].Variants; ++V)
+		{
+			Meshes[F][V] = LoadObject<UStaticMesh>(nullptr, *AnastasisPlaces::MeshPath(Kinds[F].Source, V));
+			if (Meshes[F][V]) MeshBounds[F][V] = Meshes[F][V]->GetBoundingBox();
+			else ++Missing;
+		}
+	}
+	UMaterialInstanceDynamic* WetStone = nullptr;
+	if (BaseShapeMaterial)
+	{
+		WetStone = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
+		WetStone->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.088f, 0.084f, 0.077f, 1.0f));
+	}
+	constexpr double ChunkUU = 16000.0;
+	const double ChunkReach = ChunkUU * 0.5 * UE_SQRT_2;
+	TMap<FName, TArray<FTransform>> Batches;
+	TMap<FName, TPair<int32, int32>> BatchKind;
+	for (const RB::FPlacement& P : BankPlan.Instances)
+	{
+		const int32 F = static_cast<int32>(P.Family);
+		const int32 V = FMath::Clamp(P.Variant, 0, Kinds[F].Variants - 1);
+		UStaticMesh* Mesh = Meshes[F][V];
+		if (!Mesh) continue;
+		const FBox& MB = MeshBounds[F][V];
+		const FQuat Yaw(FVector::UpVector, FMath::DegreesToRadians(P.Yaw));
+		const FVector TiltAxis(FMath::Cos(FMath::DegreesToRadians(P.TiltYaw)), FMath::Sin(FMath::DegreesToRadians(P.TiltYaw)), 0.0);
+		const FQuat Rotation = FQuat(TiltAxis, FMath::DegreesToRadians(P.Tilt)) * Yaw;
+		double Scale = P.Size;
+		FVector At = P.Location;
+		if (Kinds[F].bStone)
+		{
+			// Size = diametre vise : converti avec les bornes du maillage ; la pierre est posee par
+			// sa base puis enfoncee de Sink de sa hauteur -- un galet sort du sol, il n'y est pas pose.
+			const double Diameter = 2.0 * FMath::Max(MB.GetExtent().X, MB.GetExtent().Y);
+			Scale = Diameter > 1.0 ? P.Size / Diameter : 1.0;
+			At.Z = P.Location.Z - MB.Min.Z * Scale - P.Sink * MB.GetSize().Z * Scale;
+		}
+		const int32 CX = FMath::FloorToInt(At.X / ChunkUU), CY = FMath::FloorToInt(At.Y / ChunkUU);
+		const FName Name(*FString::Printf(TEXT("Riverbank_%s_%d_%d_%d"), RB::FamilyName(P.Family), V, CX, CY));
+		Batches.FindOrAdd(Name).Add(FTransform(Rotation, At, FVector(Scale)));
+		BatchKind.Add(Name, TPair<int32, int32>(F, V));
+	}
+	TMap<FName, UHierarchicalInstancedStaticMeshComponent*> Existing;
+	for (UHierarchicalInstancedStaticMeshComponent* M : RiverbankMeshes) Existing.Add(M->GetFName(), M);
+	int32 Placed = 0, Chunks = 0;
+	for (TPair<FName, TArray<FTransform>>& Batch : Batches)
+	{
+		const TPair<int32, int32> FV = BatchKind.FindChecked(Batch.Key);
+		const FKind& Kind = Kinds[FV.Key];
+		UHierarchicalInstancedStaticMeshComponent* Made = Existing.FindRef(Batch.Key);
+		if (!Made)
+		{
+			Made = NewObject<UHierarchicalInstancedStaticMeshComponent>(this,
+				MakeUniqueObjectName(this, UHierarchicalInstancedStaticMeshComponent::StaticClass(), Batch.Key));
+			Made->SetFlags(RF_Transient);
+			Made->SetupAttachment(GetRootComponent());
+			Made->SetMobility(EComponentMobility::Movable);
+			Made->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Made->SetGenerateOverlapEvents(false);
+			Made->SetCanEverAffectNavigation(false);
+			Made->RegisterComponent();
+			RiverbankMeshes.Add(Made);
+		}
+		Made->SetStaticMesh(Meshes[FV.Key][FV.Value]);
+		if (Kind.bStone && WetStone) Made->SetMaterial(0, WetStone);
+		Made->SetCastShadow(Kind.bShadow);
+		Made->SetCullDistances(static_cast<int32>(Kind.Cull * 0.8), Kind.Cull);
+		Made->LDMaxDrawDistance = static_cast<float>(Kind.Cull + ChunkReach);
+		Made->SetCachedMaxDrawDistance(Made->LDMaxDrawDistance);
+		Made->AddInstances(Batch.Value, false, false, false);
+		Made->MarkRenderStateDirty();
+		Placed += Batch.Value.Num();
+		++Chunks;
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_RIVERBANK enabled=1 reeds=%d reed_clumps=%d cobbles=%d boulders=%d placed=%d chunks=%d calm_shore=%d fast_shore=%d truncated=%d missing_meshes=%d plan_ms=%.1f total_ms=%.1f"),
+		BankPlan.Counts[0], BankPlan.ReedClumps, BankPlan.Counts[1], BankPlan.Counts[2], Placed, Chunks, BankPlan.CalmShore, BankPlan.FastShore,
+		BankPlan.bTruncated, Missing, BankPlan.MilliSeconds, (FPlatformTime::Seconds() - Start) * 1000.0);
+}
+
 FVector AAnastasisWorldEmbodiment::GetFrameTimingsMs() const
 {
 	return FVector(FPlatformTime::ToMilliseconds(GGameThreadTime), FPlatformTime::ToMilliseconds(GRenderThreadTime),
@@ -1442,6 +1583,25 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             // UV0/UV1 portent la morphologie lue par le materiau de sol (cf. FGeometry).
             // La surcharge a quatre canaux est la seule qui les accepte ; UV2/UV3 restent
             // vides parce que rien d'honnete ne reste a y mettre.
+            // RIVERBANK_LIFE_001 : bandes de rive peintes dans la couleur de sommet AVANT la
+            // section de sol -- la teinte sous l'herbe la relit ensuite depuis la section.
+            // Seulement si la grille du drainage actif est bien celle de ce sol.
+            {
+                const AnastasisDrainage::FNetwork& BankNetwork = AnastasisDrainage::GetActive();
+                if (CVarRiverbank.GetValueOnGameThread() != 0 && BankNetwork.GridW > 0
+                    && Geometry.Vertices.Num() == BankNetwork.GridW * BankNetwork.GridH)
+                {
+                    AnastasisRiverbank::FSpeedField Speed;
+                    AnastasisRiverbank::BuildSpeedField(BankNetwork, Speed);
+                    const AnastasisRiverbank::FPaintResult Paint = AnastasisRiverbank::PaintBanks(Speed, AnastasisRiverbank::FSettings(), Geometry);
+                    UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_RIVERBANK_PAINT enabled=1 mud_vertices=%d gravel_vertices=%d"),
+                        Paint.MudVertices, Paint.GravelVertices);
+                }
+                else
+                {
+                    UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_RIVERBANK_PAINT enabled=0"));
+                }
+            }
             ExperimentalSurface->CreateMeshSection_LinearColor(0, Geometry.Vertices, Geometry.Triangles,
                 Geometry.Normals, Geometry.UV0, Geometry.UV1, TArray<FVector2D>{}, TArray<FVector2D>{},
                 Geometry.Colors, TArray<FProcMeshTangent>{}, true);

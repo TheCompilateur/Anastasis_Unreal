@@ -121,6 +121,11 @@ protected:
 		const AnastasisPlaces::FPlan& Places, const TArray<FVector>& Canopy, bool bEnabled);
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> MicroEcologyMeshes;
+	/** RIVERBANK_LIFE_001 : un HISM par famille de rive et tuile, vides puis reremplis a chaque incarnation. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> RiverbankMeshes;
+	/** Roseaux, galets et blocs, poses sur le sol et l'eau rendus (AnastasisRiverbank). */
+	void PlaceRiverbank(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource, bool bEnabled);
 	/** Compose les lieux sur le sol rendu ; false = lieux coupes (plan vide). */
 	bool ComposePlaces(const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop,
 		const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource, AnastasisPlaces::FInputs& In, AnastasisPlaces::FPlan& Places);

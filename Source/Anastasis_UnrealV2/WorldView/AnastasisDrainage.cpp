@@ -555,6 +555,12 @@ bool AnastasisDrainage::Apply(
 	// etre rendu a la terre au-dessus du niveau.
 	TArray<int32> LeftLake;
 	LeftLake.Init(INDEX_NONE, N);
+	// RIVERBANK_LIFE_001 (WaterLook) : distance signee a la rive (uu, negative dans le lac), tiree
+	// du masque floute AVANT seuillage -- (0.5 - M) / |grad M|. Le seuil rend des cellules, donc
+	// une rive en escalier a angles droits, vue a hauteur d'homme ; la distance, elle, est
+	// continue : un talus qui la suit fait passer la ligne d'eau entre les sommets.
+	TArray<float> LakeSigned;
+	LakeSigned.Init(TNumericLimits<float>::Max(), N);
 	{
 		const int32 Radius = FMath::Max(1, FMath::RoundToInt(1500.0 / G.S));
 		for (int32 L = 0; L < Lakes.Num(); ++L)
@@ -611,6 +617,22 @@ bool AnastasisDrainage::Apply(
 			for (const int32 I : Lake.Cells) { LakeOf[I] = INDEX_NONE; LeftLake[I] = L; }
 			for (const int32 I : Cells) { LakeOf[I] = L; LeftLake[I] = INDEX_NONE; }
 			Lake.Cells = MoveTemp(Cells);
+			for (int32 Y = 1; Y + 1 < BH; ++Y)
+			{
+				for (int32 X = 1; X + 1 < BW; ++X)
+				{
+					const float Mv = M[Y * BW + X];
+					if (Mv <= 0.02f || Mv >= 0.98f) continue;
+					const int32 I = (Y0 + Y) * G.W + (X0 + X);
+					if (LakeOf[I] != L && LakeOf[I] != INDEX_NONE) continue;
+					const double GX = (M[Y * BW + X + 1] - M[Y * BW + X - 1]) / (2.0 * G.S);
+					const double GY = (M[(Y + 1) * BW + X] - M[(Y - 1) * BW + X]) / (2.0 * G.S);
+					const double Grad = FMath::Sqrt(GX * GX + GY * GY);
+					if (Grad < 1.e-6) continue;
+					const float D = static_cast<float>(FMath::Clamp((0.5 - Mv) / Grad, -2000.0, 2000.0));
+					if (FMath::Abs(D) < FMath::Abs(LakeSigned[I])) LakeSigned[I] = D;
+				}
+			}
 		}
 	}
 	auto KeepsShore = [&Lakes](int32 L) { return L >= 0 && (Lakes[L].bBorder || Lakes[L].bAuthored); };
@@ -1490,6 +1512,12 @@ bool AnastasisDrainage::Apply(
 			// Mer et lac ecrit gardent leur fond d'origine, plus profond ; ce que l'arrondi leur
 			// ajoute est creuse en cuvette. Lac interieur : cuvette partout.
 			Ground[I] = (Lake.bBorder || Lake.bAuthored) ? FMath::Min(Z[I], Bowl) : Bowl;
+			// WaterLook : le fond remonte vers la rive sur le talus droit (pente 0.15), jusqu'a
+			// la ligne d'eau -- plus de marche entre la derniere cellule du lac et la greve.
+			if (Params.bWaterLook && LakeSigned[I] < 0.0f && LakeSigned[I] > -800.0f)
+			{
+				Ground[I] = FMath::Max(Ground[I], Lake.Level + 0.15 * LakeSigned[I]);
+			}
 			Water[I] = Lake.Level;
 		}
 		const FVector2D P(G.WX(I), G.WY(I));
@@ -1638,7 +1666,17 @@ bool AnastasisDrainage::Apply(
 		for (int32 I = 0; I < N; ++I)
 		{
 			if (Dist[I] < 1 || Dist[I] > 4 || LakeOf[I] >= 0 || Flow[I] > 0.0) continue;
-			Ground[I] = FMath::Min(Ground[I], Lakes[Owner[I]].Level + 30.0 + 110.0 * Dist[I]);
+			const double Level = Lakes[Owner[I]].Level;
+			// WaterLook : la greve suit la distance continue a la rive (talus droit qui part de la
+			// ligne d'eau), pas le rang de cellule -- un palier de 30 cm a bord droit, sinon. Une
+			// cellule que le seuil a laissee a terre du "mauvais" cote reste au moins 5 cm au sec.
+			const float D = LakeSigned[I];
+			if (Params.bWaterLook && D < 1999.0f)
+			{
+				Ground[I] = FMath::Min(Ground[I], Level + 0.15 * FMath::Max(static_cast<double>(D), 30.0));
+				continue;
+			}
+			Ground[I] = FMath::Min(Ground[I], Level + 30.0 + 110.0 * Dist[I]);
 		}
 	}
 
