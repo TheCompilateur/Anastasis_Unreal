@@ -68,6 +68,15 @@ Faible : seules les couleurs et canaux de l'anneau changent, sa géométrie est 
   beige aussi sur la carte. Non touché.
 - L'anneau n'a ni arbres ni herbe : la limite entre la forêt de la carte et la prairie nue
   de l'anneau reste lisible d'en haut.
-- Signalé par villager-png-001 : un banc de capture posé au sol juste hors de la carte se
-  retrouve sous l'anneau ; `capture-tree-lineup.py` (STAGE x = −14000, z = 0) est
-  probablement concerné, non vérifié ici.
+- Tout autre banc de capture posé au sol hors de la carte est sous l'anneau : masquer le
+  composant `HorizonTerrain` comme ci-dessous, ou monter le banc (villager-png-001 :
+  z = 30000).
+
+## SUITE (même branche, second commit)
+
+Signalé par villager-png-001 et vérifié : `capture-tree-lineup.py` (STAGE x = −14000,
+z = 0) sortait sol noir et arbres à moitié enterrés sous l'anneau
+(`Saved/SliceEvidence/lineup_ring_check.png`). Le script masque désormais
+`HorizonTerrain` (rendu et ombre) après le chargement, pour la capture seulement :
+`LINEUP HORIZON_HIDDEN`, `LINEUP::PASS`, planche lisible
+(`lineup_ring_fixed.png`).
