@@ -255,10 +255,14 @@ double SpeciesSuitability(EAnastasisTreeSpecies Species, const FTreeSite& Site)
 	switch (Species)
 	{
 	case EAnastasisTreeSpecies::PlaneTree:
-		// Platanus orientalis is a river tree: without running water, nothing.
-		return 2.4 * Rise(0.2, 0.6, R) * Fall(0.35, 0.6, A) * Fall(20.0, 35.0, S);
+		// Platanus orientalis is a river tree: without running water, nothing. FOREST_TERRAIN_P5 :
+		// des la premiere bande de rive, et plus haut dans les vallees (61 platanes sur la carte).
+		return 3.2 * Rise(0.1, 0.4, R) * Fall(0.45, 0.75, A) * Fall(20.0, 35.0, S);
 	case EAnastasisTreeSpecies::Olive:
-		return 0.9 * Fall(0.12, 0.35, A) * Fall(8.0, 22.0, S) * Fall(0.3, 0.7, Damp);
+		// FOREST_TERRAIN_P5 : 23 oliviers sur la carte reelle -- la bande 0-35 % du relief ne
+		// couvrait presque aucun site boise. Oleastre jusqu'a mi-versant, et l'olivier plante
+		// domine l'arbre isole du pre.
+		return 1.3 * Fall(0.25, 0.55, A) * Fall(12.0, 28.0, S) * Fall(0.35, 0.75, Damp) * (Site.bOpenGround ? 3.0 : 1.0);
 	case EAnastasisTreeSpecies::AleppoPine:
 		return 1.2 * Fall(0.30, 0.55, A) * (1.0 - 0.7 * Rise(0.25, 0.7, Damp));
 	case EAnastasisTreeSpecies::Cypress:

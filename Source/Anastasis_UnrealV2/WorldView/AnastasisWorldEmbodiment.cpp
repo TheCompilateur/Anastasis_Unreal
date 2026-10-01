@@ -562,6 +562,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 if (AnastasisDrainage::RiparianAt(P.Ground.X, P.Ground.Y, Riparian)) Site.Riparian = Riparian;
                 Site.Wetness = T.Wetness;
                 Site.Shade = T.Shade;
+                Site.bOpenGround = P.bLone;
                 const EAnastasisTreeSpecies Species = bSpecies
                     ? AnastasisPresentation::SelectTreeSpecies(Site, P.VisualSeed, T.X, T.Y)
                     : EAnastasisTreeSpecies::Any;

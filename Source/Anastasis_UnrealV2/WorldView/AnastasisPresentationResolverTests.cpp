@@ -671,6 +671,13 @@ bool FAnastasisPresentationTreeZoning::RunTest(const FString&)
 	TestTrue(TEXT("the middle slopes belong to the holm oak first"), Share(Site(0.4, 18.0, 0.0), {ESp::HolmOak}) > 0.35);
 	TestTrue(TEXT("the summits are fir and black pine"), Share(Site(0.95, 25.0, 0.0), {ESp::GreekFir, ESp::BlackPine}) > 0.9);
 	TestEqual(TEXT("no olive on the summits"), SpeciesSuitability(ESp::Olive, Site(0.95, 25.0, 0.0)), 0.0);
+	// FOREST_TERRAIN_P5 : l'olivier tient le bas-versant boise et domine l'arbre isole du pre ;
+	// le platane prend la berge des la premiere bande de rive.
+	TestTrue(TEXT("olive is a real share of low dry woodland"), Share(Site(0.15, 10.0, 0.0), {ESp::Olive}) > 0.3);
+	FTreeSite Meadow = Site(0.15, 10.0, 0.0);
+	Meadow.bOpenGround = true;
+	TestTrue(TEXT("a lone tree in a low meadow is an olive first"), Share(Meadow, {ESp::Olive}) > 0.55);
+	TestTrue(TEXT("the plane takes the first bank band"), Share(Site(0.3, 8.0, 0.3), {ESp::PlaneTree}) > 0.3);
 	TestTrue(TEXT("cypress prefers rocky slopes to flats"),
 		SpeciesSuitability(ESp::Cypress, Site(0.2, 30.0, 0.0)) > 2.0 * SpeciesSuitability(ESp::Cypress, Site(0.2, 2.0, 0.0)));
 	TestTrue(TEXT("the fir keeps the cool faces"),
