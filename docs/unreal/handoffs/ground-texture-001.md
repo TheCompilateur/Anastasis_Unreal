@@ -17,12 +17,12 @@ mètre dans `M_AnastasisGround`, sans toucher aux albédos calés ni au C++. Fic
 
 ## COMMIT
 
-PENDING
+6778d36 (travail) + ce commit (fiche)
 
 ## MEC
 
 - BUILD: PASS (worktree, aucun changement C++)
-- TESTS: voir `finish`
+- TESTS: `finish` -> PASS 180 / KNOWN_EXPECTED_FAILURE 4 / FAIL 0 (184 annonces), HANDOFF_READY::YES
 - COMMANDS:
   - `python tools/unreal/ground-textures.py`
   - `tools\unreal\ground-material.ps1 -Rebuild` → `GROUND_MATERIAL::PASS`, 924 instr. pixel, 10 samplers
