@@ -10,6 +10,7 @@
 
 class UHierarchicalInstancedStaticMeshComponent;
 class UProceduralMeshComponent;
+class UTexture2D;
 
 /**
  * DEBUG / METROLOGY OWNER.
@@ -153,6 +154,9 @@ protected:
 	/** Instance de sol morphologique (MI_AnastasisGround) : porte les valeurs artistiques. */
 	UPROPERTY()
 	TObjectPtr<UMaterialInterface> GroundMaterial;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> ForestGroundTexture;
 
 	/**
 	 * Materiau pose sur la surface. Ordre : instance de sol (anastasis.Terrain.GroundMaterial 1),

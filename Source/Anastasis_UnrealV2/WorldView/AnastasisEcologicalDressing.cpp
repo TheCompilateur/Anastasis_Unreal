@@ -242,4 +242,44 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
     Out = MoveTemp(Result);
     return true;
 }
+
+bool BuildGroundMask(const TArray<FGroundTree>& Trees, const FBox2D& Bounds,
+    int32 Resolution, TArray<FColor>& Out)
+{
+    Out.Reset();
+    const FVector2D Size = Bounds.GetSize();
+    if (!Bounds.bIsValid || !FMath::IsFinite(Size.X) || !FMath::IsFinite(Size.Y)
+        || Size.X <= 0 || Size.Y <= 0 || Resolution < 2 || Resolution > 4096) return false;
+    Out.Init(FColor(0,0,0,255), Resolution * Resolution);
+    const FVector2D Pitch = Size / Resolution;
+    for (const auto& Tree : Trees)
+    {
+        if (!FMath::IsFinite(Tree.Height) || Tree.Height <= 0
+            || !FMath::IsFinite(Tree.Position.X) || !FMath::IsFinite(Tree.Position.Y)) continue;
+        const double Bed = FMath::Clamp(Tree.Height * .42, 350.0, 1150.0);
+        const double Root = FMath::Clamp(Tree.Height * .10, 110.0, 260.0);
+        const double Angle = (Tree.Seed % 997) * (2.0 * PI / 997.0);
+        const double C = FMath::Cos(Angle), S = FMath::Sin(Angle);
+        const double Reach = Bed * 1.5;
+        const int32 X0 = FMath::Clamp(FMath::FloorToInt((Tree.Position.X-Reach-Bounds.Min.X)/Pitch.X),0,Resolution-1);
+        const int32 X1 = FMath::Clamp(FMath::CeilToInt((Tree.Position.X+Reach-Bounds.Min.X)/Pitch.X),0,Resolution-1);
+        const int32 Y0 = FMath::Clamp(FMath::FloorToInt((Tree.Position.Y-Reach-Bounds.Min.Y)/Pitch.Y),0,Resolution-1);
+        const int32 Y1 = FMath::Clamp(FMath::CeilToInt((Tree.Position.Y+Reach-Bounds.Min.Y)/Pitch.Y),0,Resolution-1);
+        for (int32 Y=Y0; Y<=Y1; ++Y) for (int32 X=X0; X<=X1; ++X)
+        {
+            const FVector2D D = Bounds.Min + FVector2D((X+.5)*Pitch.X,(Y+.5)*Pitch.Y) - Tree.Position;
+            // Elliptical beds and asymmetric root lobes avoid a field of round stamps.
+            const double U = D.X*C+D.Y*S, V = -D.X*S+D.Y*C;
+            const double Radius = FMath::Sqrt(U*U*.78+V*V*1.28);
+            const double Theta = FMath::Atan2(V,U);
+            const double Lobes = 1.0 + .16*FMath::Sin(Theta*3+Angle) + .09*FMath::Sin(Theta*5-Angle);
+            const double Litter = 1.0-Smooth((Radius/(Bed*Lobes)-.18)/.82);
+            const double Contact = 1.0-Smooth((Radius/(Root*Lobes)-.12)/.88);
+            auto& Pixel = Out[Y*Resolution+X];
+            Pixel.R = FMath::Max(Pixel.R, static_cast<uint8>(FMath::RoundToInt(Litter*255)));
+            Pixel.G = FMath::Max(Pixel.G, static_cast<uint8>(FMath::RoundToInt(Contact*255)));
+        }
+    }
+    return true;
+}
 }

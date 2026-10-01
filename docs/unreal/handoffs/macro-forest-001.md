@@ -1,4 +1,49 @@
-# macro-forest-001 — passe de forme forestière du 2026-09-30
+# macro-forest-001 — raccord du sol forestier, 2026-09-30
+
+MISSION: Relier les arbres au terrain par de grandes nappes de litiere, terre et mousse,
+sans changer les arbres, le relief ni la simulation. Base: `9175a37`.
+
+FILES_OWNED:
+- `Source/Anastasis_UnrealV2/WorldView/AnastasisEcologicalDressing.{h,cpp}`
+- `Source/Anastasis_UnrealV2/WorldView/AnastasisEcologicalDressingTests.cpp`
+- `Source/Anastasis_UnrealV2/WorldView/AnastasisWorldEmbodiment.{h,cpp}`
+- `tools/unreal/ground-material.py`
+- `tools/unreal/capture-forest-walk.py`
+- `Content/Anastasis/Materials/M_AnastasisGround.uasset`
+- `Content/Anastasis/Materials/MI_AnastasisGround.uasset`
+- cette fiche
+
+COMMIT: PENDING
+
+Reutilisation: le materiau morphologique existant et ses bruits meso/detail, son
+humidite, ses masques de pente et sa rugosite. Le placement HISM reste identique.
+Le WorldEmbodiment rasterise uniquement les arbres acceptes APRES resolution du mesh
+et rejet par l'eau: masque transitoire RG 2048x2048 (16 MiB par copie CPU/GPU),
+lit dans le materiau par coordonnees monde XY. R porte des nappes elliptiques qui
+se recouvrent, G le contact des racines. Aucun asset de texture ni decal par arbre.
+Les nappes varient avec la stature, et leurs lobes avec la graine visuelle.
+Le masque est independant de l'ordre des arbres. Il ne modifie aucun buffer terrain.
+La couche s'efface sur les faces raides et la bande detrempee; les nappes de mousse
+utilisent l'humidite et le bruit existants. L'horizon garde le materiau sans ce masque.
+
+Comparaison: `anastasis.Dressing.ForestGround 0/1`, puis reincarner. Valeur par defaut 1.
+La force par defaut du materiau seul reste 0, pour les usages sans masque dynamique.
+La recette `ground-material.py` est l'autorite des deux assets: livrer sources + assets
+ensemble. Aucun fichier de carte, arbre, generateur de relief ou simulateur modifie.
+
+MEC: PENDING (compilation en file derriere d'autres chantiers). Test ajoute:
+`Anastasis.Ecology.GroundMaskAnchoringAndIsolation`.
+SCN: PENDING, captures A/B fixes et empreintes terrain/arbres preparees.
+PLY: UNKNOWN. Pas de controle joueur ni claim de performance GPU.
+INTEGRATION_RISK: WorldEmbodiment et materiau de sol sont des fichiers partages.
+Ne pas ecraser d'autres modifications lors de l'integration. Ce lot reste dans le
+worktree gere `C:\Users\alex_\.codex\worktrees\macro-forest-001\ANASTASIS_UNREAL`.
+
+Preuves de cette passe: `C:\Users\alex_\.codex\visualizations\2026\09\29\01a0ef4d-f7a0-72c0-8f4d-cc4c8234f6c4\forest-ground\`.
+
+---
+
+# Archive — passe de forme forestière du 2026-09-30
 
 MISSION: Affiner les arbres existants dans une direction stylisée haut de gamme, de près et à distance. Worktree réutilisé après la livraison macro initiale; base de cette passe: `ee575f8aba1249edce9b90463c7f15c167720a89`.
 

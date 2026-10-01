@@ -2,6 +2,9 @@
 
 Set ANASTASIS_FOREST_OUT to a NEW directory. Run via -ExecCmds="py <absolute path>".
 Optional ANASTASIS_FOREST_CAMERAS points to a frozen camera JSON for comparisons.
+ANASTASIS_FOREST_GROUND=0/1 compares deposits only; GROUND_VIEWS=1 (prefixed with
+ANASTASIS_FOREST_) frames root contact, forest floor and edge. Exports frozen cameras
+and hashes terrain/water/horizon geometry as well as tree transforms.
 The default views are at the existing vieille_foret. Timings are editor callback
 wall time, not GPU cost. This is not a PIE or player test.
 """
@@ -9,6 +12,7 @@ import hashlib
 import json
 import os
 import time
+import struct
 import unreal
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
@@ -20,6 +24,26 @@ ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 assert les.load_level('/Game/Anastasis/Maps/Lvl_AnastasisSlice')
 world = ues.get_editor_world()
 actor = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.AnastasisWorldEmbodiment)[0]
+ground_mode = os.environ.get('ANASTASIS_FOREST_GROUND')
+if ground_mode is not None:
+    assert ground_mode in ('0', '1')
+    unreal.SystemLibrary.execute_console_command(world, 'anastasis.Dressing.ForestGround '+ground_mode)
+    assert actor.call_method('EmbodyCanonical', args=(12345,))
+
+# Hash geometry separately from appearance, including water and the distant ring.
+terrain_digest = hashlib.sha256()
+ground_vertices = []
+for surface in sorted(actor.get_components_by_class(unreal.ProceduralMeshComponent), key=lambda c:c.get_name()):
+    for section in range(surface.get_num_sections()):
+        vertices, triangles, normals, uvs, tangents = unreal.ProceduralMeshLibrary.get_section_from_procedural_mesh(surface, section)
+        terrain_digest.update(surface.get_name().encode())
+        terrain_digest.update(struct.pack('<3i', section, len(vertices), len(triangles)))
+        for vertex in vertices:
+            terrain_digest.update(struct.pack('<3d', vertex.x, vertex.y, vertex.z))
+        for triangle in triangles:
+            terrain_digest.update(struct.pack('<i', triangle))
+        if section == 0 and 'Horizon' not in surface.get_name():
+            ground_vertices = vertices
 rows, trees, transforms = [], [], []
 for component in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
     if not component.get_name().startswith('Dressing_Tree_'):
@@ -54,6 +78,11 @@ else:
                     target=[hero[0], hero[1], base+800]),
                dict(name='crown', eye=[hero[0]-1800, hero[1]-1200, base+170],
                     target=[hero[0], hero[1], base+hero[3]*.72])]
+    if os.environ.get('ANASTASIS_FOREST_GROUND_VIEWS') == '1':
+        floor = min(ground_vertices, key=lambda p:(p.x-hero[0]+800)**2+(p.y-hero[1]+500)**2)
+        cameras = [dict(name='roots', eye=[floor.x, floor.y, floor.z+240], target=[hero[0],hero[1],base+30]),
+                   dict(name='forest_floor', eye=[hero[0]-1800,hero[1]-1500,base+2000], target=[hero[0]+700,hero[1]+700,base]),
+                   dict(name='forest_edge', eye=[hero[0]-4500,hero[1]-6500,base+4500], target=[hero[0],hero[1],base])]
 for camera in cameras:
     assert not os.path.exists(os.path.join(OUT, camera['name']+'.png')), 'Use a fresh output directory'
 transforms.sort()
@@ -61,6 +90,10 @@ report = dict(project=unreal.Paths.project_dir(), meshes=rows, trees=len(trees),
               instance_transform_sha256=hashlib.sha256(json.dumps(transforms).encode()).hexdigest(),
               instance_weighted_lod0_triangle_upper_bound=sum(r['count']*r['triangles_by_lod'][0] for r in rows),
               frame_scope='Editor callback wall time; includes host load, not GPU timing', completed=False)
+report.update(forest_ground=ground_mode if ground_mode is not None else 'default',
+              terrain_sha256=terrain_digest.hexdigest())
+with open(os.path.join(OUT, 'cameras.json'), 'w') as stream:
+    json.dump(cameras, stream, indent=2)
 
 def write_report():
     with open(os.path.join(OUT, 'report.json'), 'w') as stream:

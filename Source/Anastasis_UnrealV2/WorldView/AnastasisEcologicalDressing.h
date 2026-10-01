@@ -36,6 +36,20 @@ struct FAnastasisForestDressingSettings
 
 namespace AnastasisEcologicalDressing
 {
+/** Rendered trees only, after mesh resolution and water rejection. Centimetres. */
+struct FGroundTree
+{
+    FVector2D Position;
+    double Height = 0;
+    uint32 Seed = 0;
+};
+
+/** Presentation mask: R = overlapping litter beds, G = root contact. No geometry/RNG edits.
+ * Linear byte data, texel centres mapped over Bounds; order-independent max union.
+ */
+bool BuildGroundMask(const TArray<FGroundTree>& Trees, const FBox2D& Bounds,
+    int32 Resolution, TArray<FColor>& Out);
+
 enum class ELayer : uint8 { Young, Secondary, Canopy };
 
 struct FPlacement

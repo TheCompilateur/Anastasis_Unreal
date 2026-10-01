@@ -13,6 +13,7 @@
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/Texture2D.h"
 #include "HAL/IConsoleManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
@@ -33,6 +34,10 @@ static TAutoConsoleVariable<int32> CVarPlaces(
 static TAutoConsoleVariable<int32> CVarMacroForest(
     TEXT("anastasis.Dressing.MacroForest"), 1,
     TEXT("0=original ecological dressing, 1=large forest masses conditioned by rendered relief; applied on embodiment."), ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarForestGround(
+    TEXT("anastasis.Dressing.ForestGround"), 1,
+    TEXT("0=original ground, 1=litter/moss/root contact from rendered macro trees; applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
@@ -314,6 +319,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	}
 
 	DressingInstanceCount = 0;
+	TArray<AnastasisEcologicalDressing::FGroundTree> GroundTrees;
 	int32 UngroundedTiles = 0;
     const double DressingStart = FPlatformTime::Seconds();
     const bool bEcology = SurfaceCrop && ForestDressing.bEnabled && CVarEcologicalDressing.GetValueOnGameThread() != 0;
@@ -481,6 +487,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 ++StatureCounts[static_cast<uint8>(Stature)];
                 ++FamilyCounts[static_cast<uint8>(Family)];
                 const double HeightUU = (MeshBounds.Max.Z - MinZ) * Pose.GetScale3D().Z;
+                if (bMacro) GroundTrees.Add({FVector2D(P.Ground.X, P.Ground.Y), HeightUU, P.VisualSeed});
                 TallestUU = FMath::Max(TallestUU, HeightUU);
                 ShortestUU = FMath::Min(ShortestUU, HeightUU);
                 ++DressingInstanceCount;
@@ -520,6 +527,43 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 At(SiteShade, 0.0), At(SiteShade, 0.5), At(SiteShade, 1.0),
                 At(SiteWetness, 0.0), At(SiteWetness, 0.5), At(SiteWetness, 1.0),
                 At(SiteConiferousness, 0.0), At(SiteConiferousness, 0.5), At(SiteConiferousness, 1.0));
+        }
+    }
+    // The existing ground material reads a transient mask of ACTUAL accepted trees.
+    // Neither the terrain buffers/collision nor the placement plan are modified.
+    ForestGroundTexture = nullptr;
+    if (SurfaceCrop && ExperimentalSurface && GroundTrees.Num() > 0
+        && CVarForestGround.GetValueOnGameThread() != 0 && CVarGroundMaterial.GetValueOnGameThread() != 0)
+    {
+        const double Start = FPlatformTime::Seconds();
+        const FBox2D Bounds(FVector2D(ActiveFootprintBounds.Min), FVector2D(ActiveFootprintBounds.Max));
+        constexpr int32 Resolution = 2048;
+        TArray<FColor> Pixels;
+        if (AnastasisEcologicalDressing::BuildGroundMask(GroundTrees, Bounds, Resolution, Pixels))
+        {
+            ForestGroundTexture = UTexture2D::CreateTransient(Resolution, Resolution, PF_B8G8R8A8);
+            if (ForestGroundTexture)
+            {
+                ForestGroundTexture->SRGB = false;
+                ForestGroundTexture->Filter = TF_Bilinear;
+                ForestGroundTexture->AddressX = TA_Clamp;
+                ForestGroundTexture->AddressY = TA_Clamp;
+                ForestGroundTexture->NeverStream = true;
+                auto& Mip = ForestGroundTexture->GetPlatformData()->Mips[0];
+                void* Data = Mip.BulkData.Lock(LOCK_READ_WRITE);
+                FMemory::Memcpy(Data, Pixels.GetData(), Pixels.Num() * sizeof(FColor));
+                Mip.BulkData.Unlock();
+                ForestGroundTexture->UpdateResource();
+                auto* MID = UMaterialInstanceDynamic::Create(ResolveGroundMaterial(), this);
+                MID->SetTextureParameterValue(TEXT("ForestGroundMask"), ForestGroundTexture);
+                MID->SetVectorParameterValue(TEXT("ForestGroundOrigin"), FLinearColor(Bounds.Min.X,Bounds.Min.Y,0,0));
+                MID->SetVectorParameterValue(TEXT("ForestGroundScale"), FLinearColor(1.0/Bounds.GetSize().X,1.0/Bounds.GetSize().Y,0,0));
+                MID->SetScalarParameterValue(TEXT("ForestGroundStrength"), 1.0f);
+                ExperimentalSurface->SetMaterial(0, MID);
+                UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_FOREST_GROUND trees=%d mask=%dx%d bytes=%d build_ms=%.2f texel_uu=%.2f"),
+                    GroundTrees.Num(), Resolution, Resolution, Pixels.Num()*static_cast<int32>(sizeof(FColor)),
+                    (FPlatformTime::Seconds()-Start)*1000, Bounds.GetSize().X/Resolution);
+            }
         }
     }
     UE_LOG(LogAnastasis_UnrealV2, Display,

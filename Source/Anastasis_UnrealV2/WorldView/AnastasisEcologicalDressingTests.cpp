@@ -242,4 +242,31 @@ bool FAnastasisMacroForestCanonical::RunTest(const FString&)
     AnastasisTerrainForge::ClearActive();
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisForestGroundMask, "Anastasis.Ecology.GroundMaskAnchoringAndIsolation",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisForestGroundMask::RunTest(const FString&)
+{
+    using namespace AnastasisEcologicalDressing;
+    const FBox2D Bounds(FVector2D(-2000,-2000),FVector2D(2000,2000));
+    TArray<FGroundTree> Trees = {{FVector2D(0,0),2000,12345},{FVector2D(600,100),1700,6789}};
+    TArray<FColor> A, B, Empty;
+    TestTrue(TEXT("mask built"),BuildGroundMask(Trees,Bounds,128,A));
+    Swap(Trees[0],Trees[1]);
+    TestTrue(TEXT("reordered mask built"),BuildGroundMask(Trees,Bounds,128,B));
+    TestTrue(TEXT("tree order cannot change deposits"),A==B);
+    TestTrue(TEXT("empty forest valid"),BuildGroundMask({},Bounds,128,Empty));
+    TestTrue(TEXT("empty forest has no deposits"),!Empty.ContainsByPredicate([](FColor C){return C.R || C.G;}));
+    if (A.Num()==128*128)
+    {
+        TestTrue(TEXT("root contact at accepted tree"),A[64*128+64].G>240);
+        TestTrue(TEXT("litter reaches beyond roots"),A[64*128+76].R>100 && A[64*128+76].G==0);
+        TestTrue(TEXT("distant clearing untouched"),A[0].R==0 && A.Last().R==0);
+        int32 Litter=0,Roots=0;
+        for (auto C:A) { Litter+=C.R>0; Roots+=C.G>0; }
+        TestTrue(TEXT("broad beds dominate root patches"),Litter>Roots*4);
+    }
+    TestFalse(TEXT("degenerate bounds rejected"),BuildGroundMask(Trees,FBox2D(FVector2D(0),FVector2D(0)),128,B));
+    TestEqual(TEXT("failure clears stale mask"),B.Num(),0);
+    return true;
+}
 #endif

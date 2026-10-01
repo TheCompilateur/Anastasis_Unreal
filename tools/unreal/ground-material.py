@@ -28,6 +28,9 @@ CE QUE LE MATERIAU LIT, ET D'OU CA VIENT (AnastasisTerrainSurface::Build) :
   TexCoord1.y      Wetness [0,1], champ de proximite d'eau du simulateur
   VertexNormalWS   la pente, qui n'a pas besoin d'etre exportee : elle EST la normale
   WorldPosition    l'altitude et la place dans le monde, pour la meme raison
+  ForestGroundMask RG = nappes de litiere / contacts de racines des arbres rendus;
+                   texture transitoire du WorldEmbodiment, jamais un asset de carte.
+                   Strength=0 hors macro foret, coordonnees monde XY via Origin/Scale.
 
 Aucune de ces entrees n'est inventee ici. Le materiau projette, il ne simule pas.
 
@@ -460,6 +463,42 @@ def build_master():
     base = g.lerp(base, '', g.mul(base, '', p_worked_tint, '', -760, -200), '', w_worked, '', -600, -240)
     base = g.lerp(base, '', p_rock_col, '', rock_mask, '', -440, -240)
 
+    # FOREST_GROUND: existing soil, driven by accepted tree footprints (linear RG).
+    # Strength defaults to zero: legacy slices, horizon and missing runtime masks keep
+    # their original appearance. No extra noise evaluation: reuse meso/detail fields.
+    fg = 'Ground|Forest'
+    origin = g.vector('ForestGroundOrigin', (0.0, 0.0, 0.0), fg, -2600, 1500)
+    scale = g.vector('ForestGroundScale', (1.0, 1.0, 0.0), fg, -2600, 1640)
+    xy = g.mask(g.mul(g.sub(wp, '', origin, '', -2250, 1500), '', scale, '', -2090, 1500),
+                '', True, True, False, -1930, 1500)
+    default_mask = unreal.load_asset('/Engine/EngineResources/WhiteSquareTexture')
+    assert default_mask is not None
+    mask_sampler = (unreal.MaterialSamplerType.SAMPLERTYPE_COLOR if default_mask.get_editor_property('srgb')
+                    else unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR)
+    forest_tex = g.node(unreal.MaterialExpressionTextureSampleParameter2D, -1760, 1500,
+                        parameter_name='ForestGroundMask', group=fg,
+                        texture=default_mask, sampler_type=mask_sampler)
+    g.link(xy, '', forest_tex, 'UVs')
+    strength = g.scalar('ForestGroundStrength', 0.0, fg, -1700, 1750)
+    amount = g.scalar('ForestGroundOpacity', 0.92, fg, -1500, 1750)
+    litter_col = g.vector('ForestLitterColor', (0.115, 0.069, 0.029), fg, -2600, 1860)
+    earth_col = g.vector('ForestEarthColor', (0.052, 0.030, 0.014), fg, -2600, 2010)
+    moss_col = g.vector('ForestMossColor', (0.060, 0.083, 0.022), fg, -2600, 2160)
+    # Soft irregular borders, with no deposits outside the actual forest footprint.
+    breakup = g.addc(g.mulc(n_meso, '', 0.8, -1550, 1900), '', 0.65, -1380, 1900)
+    bed = g.sat(g.mul(forest_tex, 'R', breakup, '', -1200, 1500), '', -1040, 1500)
+    dry_bank = g.one_minus(damp, '', -1200, 1600)
+    gentle = g.one_minus(slope_rock, '', -1200, 1700)
+    cover = g.mul(g.mul(bed, '', dry_bank, '', -870, 1500), '', gentle, '', -710, 1500)
+    cover = g.mul(g.mul(cover, '', strength, '', -550, 1500), '', amount, '', -390, 1500)
+    # Earth around buttresses; detached moss islands favour humid sheltered beds.
+    roots = g.sat(g.mul(forest_tex, 'G', g.addc(g.mulc(d_grain, '', .24, -1380, 2060), '', 1.0, -1220, 2060), '', -1040, 2060), '', -870, 2060)
+    moss_noise = g.sat(g.mulc(g.subc(n_meso, '', .40, -1380, 2220), '', 4.2, -1220, 2220), '', -1040, 2220)
+    moss = g.mul(moss_noise, '', g.addc(g.mulc(wetness, '', .65, -1380, 2340), '', .30, -1220, 2340), '', -870, 2220)
+    forest_color = g.lerp(litter_col, '', moss_col, '', moss, '', -680, 2060)
+    forest_color = g.lerp(forest_color, '', earth_col, '', roots, '', -500, 2060)
+    base = g.lerp(base, '', forest_color, '', cover, '', -250, 1500)
+
     # Masses macro : une modulation de TEINTE, pas une seconde couleur posee par-dessus.
     macro_tint = g.lerp(p_macro_cool, '', p_macro_warm, '', n_macro, '', -440, 40)
     base = g.lerp(base, '', g.mul(base, '', macro_tint, '', -280, 0), '', p_macro_amt, '', -120, -240)
@@ -483,6 +522,7 @@ def build_master():
 
     # ---------------------------------------------------------------------- rugosite
     r = g.lerp(p_soil_rough, '', p_rock_rough, '', rock_mask, '', -120, 400)
+    r = g.lerp(r, '', p_soil_rough, '', cover, '', -40, 600)
     r = g.lerp(r, '', p_damp_rough, '', damp_mask, '', 40, 400)
     r = g.add(r, '', g.mul(g.mul(p_rough_grain, '', detail_fade, '', 200, 520), '', d_grain, '', 200, 460), '', 360, 400)
     r = g.sat(r, '', 520, 400)
