@@ -128,7 +128,9 @@ bool FAnastasisGroundCoverLande::RunTest(const FString&)
 	TestTrue(TEXT("high"), AnastasisGroundCover::Build(AnastasisGroundCoverTestFixture::OpenPlane(40.0), AnastasisGroundCover::FSettings(), High, Error));
 	AddInfo(FString::Printf(TEXT("meadow 4deg=%d lande 24deg=%d (heather=%d) 40deg=%d"), Meadow.Instances.Num(),
 		Foot.Instances.Num(), AnastasisGroundCoverTestFixture::Count(Foot, Heather), High.Instances.Num()));
-	TestTrue(TEXT("lande is sparser than meadow"), 2 * Foot.Instances.Num() < Meadow.Instances.Num());
+	// Plus maigre que la prairie, sans plus : v1 exigeait un facteur 2, mais a cette densite le
+	// versant restait invisible (~5 % couvert, mesure). Densite relevee a 0,9 au pied en v2.
+	TestTrue(TEXT("lande is sparser than meadow"), Foot.Instances.Num() < Meadow.Instances.Num());
 	TestTrue(TEXT("lande thins as it climbs"), High.Instances.Num() < Foot.Instances.Num() && High.Instances.Num() > 0);
 
 	// Callune en haut du versant, touffes d'eboulis en bas : versant de 24 deg sur 100 m, soit
