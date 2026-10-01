@@ -1733,17 +1733,62 @@ bool AnastasisDrainage::Apply(
 				if (Ground[I] >= Water[I] && C.B > C.R + 0.04f) Recolor[I] = 1;
 			}
 		}
+		// WaterLook : 120 iterations de relaxation ne traversent pas un ancien bras de 30 mailles,
+		// dont le coeur gardait son bleu d'origine (Anastasis.Terrain.Drainage.WaterLook en comptait
+		// 2 800 sommets). On part donc de la terre seche la plus proche, puis on lisse.
+		TArray<int32> NearestLand;
+		if (Params.bWaterLook)
+		{
+			NearestLand.Init(INDEX_NONE, N);
+			TArray<int32> Queue;
+			for (int32 I = 0; I < N; ++I)
+			{
+				if (!Recolor[I] && Ground[I] >= Water[I]) { NearestLand[I] = I; Queue.Add(I); }
+			}
+			for (int32 Q = 0; Q < Queue.Num(); ++Q)
+			{
+				const int32 I = Queue[Q];
+				for (int32 K = 0; K < 4; ++K)
+				{
+					const int32 X = I % G.W + Off4X[K], Y = I / G.W + Off4Y[K];
+					if (!G.In(X, Y)) continue;
+					const int32 J = Y * G.W + X;
+					if (Recolor[J] && NearestLand[J] == INDEX_NONE) { NearestLand[J] = NearestLand[I]; Queue.Add(J); }
+				}
+			}
+		}
 		TArray<double> Ch;
 		Ch.SetNumUninitialized(N);
 		auto FillChannel = [&](TFunctionRef<double(int32)> Get, TFunctionRef<void(int32, double)> Set)
 		{
 			for (int32 I = 0; I < N; ++I) Ch[I] = Get(I);
+			if (NearestLand.Num() == N)
+			{
+				for (int32 I = 0; I < N; ++I) if (Recolor[I] && NearestLand[I] != INDEX_NONE) Ch[I] = Get(NearestLand[I]);
+			}
 			Harmonic(G, Ch, Recolor, 120);
 			for (int32 I = 0; I < N; ++I) if (Recolor[I]) Set(I, Ch[I]);
 		};
 		FillChannel([&](int32 I) { return Geo.Colors[I].R; }, [&](int32 I, double V) { Geo.Colors[I].R = static_cast<float>(V); });
 		FillChannel([&](int32 I) { return Geo.Colors[I].G; }, [&](int32 I, double V) { Geo.Colors[I].G = static_cast<float>(V); });
 		FillChannel([&](int32 I) { return Geo.Colors[I].B; }, [&](int32 I, double V) { Geo.Colors[I].B = static_cast<float>(V); });
+		if (NearestLand.Num() == N)
+		{
+			// Le lissage tire aussi vers les sommets immerges, encore bleus a ce stade (leur fond
+			// est peint a l'ecriture) : au bord de l'eau, une terre seche peut en rester bleutee.
+			// Elle prend alors franchement la teinte de la terre la plus proche.
+			for (int32 I = 0; I < N; ++I)
+			{
+				FLinearColor& C = Geo.Colors[I];
+				if (!Recolor[I] || Ground[I] < Water[I] || C.B <= C.R + 0.04f) continue;
+				if (NearestLand[I] != INDEX_NONE)
+				{
+					const FLinearColor& L = Geo.Colors[NearestLand[I]];
+					C = FLinearColor(L.R, L.G, L.B, C.A);
+				}
+				else C.B = C.R;
+			}
+		}
 		if (Geo.UV0.Num() == N)
 		{
 			FillChannel([&](int32 I) { return Geo.UV0[I].X; }, [&](int32 I, double V) { Geo.UV0[I].X = V; });
@@ -2124,12 +2169,20 @@ void AnastasisDrainage::BuildRiverRibbons(const FNetwork& Network, FWaterRibbons
 		for (int32 K = 0; K + 1 < Num; ++K)
 		{
 			const int32 L0 = Base + 2 * K, R0 = L0 + 1, L1 = L0 + 2, R1 = L0 + 3;
-			// Meme sens d'enroulement que la grille (face visible vers le haut) : on teste le
-			// signe plutot que de supposer de quel cote tombe la normale de la polyligne.
-			const FVector A = Out.Vertices[L0], B = Out.Vertices[R0], Cc = Out.Vertices[L1];
-			const double Cross = (Cc.X - A.X) * (B.Y - A.Y) - (Cc.Y - A.Y) * (B.X - A.X);
-			if (Cross < 0.0) Out.Triangles.Append({L0, L1, R0, R0, L1, R1});
-			else Out.Triangles.Append({L0, R0, L1, R0, R1, L1});
+			// Meme sens d'enroulement que la grille (face visible vers le haut), teste triangle par
+			// triangle : dans un coude serre, le quad se replie et ses deux moities n'ont plus le
+			// meme signe (12 triangles retournes sur 2 654 avant ce test).
+			const auto AddUp = [&Out](int32 A, int32 B, int32 C)
+			{
+				const FVector& PA = Out.Vertices[A];
+				const FVector& PB = Out.Vertices[B];
+				const FVector& PC = Out.Vertices[C];
+				const double Cross = (PB.X - PA.X) * (PC.Y - PA.Y) - (PB.Y - PA.Y) * (PC.X - PA.X);
+				if (Cross < 0.0) Out.Triangles.Append({A, B, C});
+				else Out.Triangles.Append({A, C, B});
+			};
+			AddUp(L0, R0, L1);
+			AddUp(R0, R1, L1);
 		}
 	}
 }

@@ -137,13 +137,17 @@ def build(mat=None):
     unreal.log('WATER_MATERIAL_WIRING ' + ' '.join('%s=%s' % (k, wiring[k]) for k in sorted(wiring)))
     if not all(wiring.values()):
         unreal.log_error('WATER_MATERIAL_WIRING_INCOMPLETE ' + repr(wiring))
+    # Marqueur AVANT la compilation : un echec de compilation n'est qu'un Warning dans le
+    # log ; water-look.ps1 cherche les erreurs qui le suivent et refuse le materiau.
+    unreal.log('WATER_MATERIAL_COMPILE ' + PATH)
     mel.recompile_material(mat)
     unreal.EditorAssetLibrary.save_asset(PATH)
     unreal.log('WATER_MATERIAL_SAVED ' + PATH)
 
 
-# Regeneration EN PLACE : le terrain de la carte ouverte tient deja le materiau, delete_asset
-# echouerait sans bruit. On vide son graphe et on le recable -- meme asset, memes references.
+# Regeneration EN PLACE : si un package tient deja le materiau (le terrain de
+# Lvl_AnastasisSlice, quand l'editeur s'ouvre dessus), delete_asset echoue sans bruit. On vide
+# son graphe et on le recable -- meme asset, memes references.
 try:
     if not unreal.EditorAssetLibrary.does_asset_exist(PATH):
         build()
