@@ -296,7 +296,8 @@ manque puis se contentent de le vérifier ; `*_REBUILD=1` le régénère et écr
 | Script | Asset |
 |---|---|
 | `observe-slice.py` | `M_AnastasisSlice`, `Lvl_AnastasisSlice` |
-| `ground-material.ps1` + `.py` | `M_AnastasisGround`, `MI_AnastasisGround` |
+| `ground-material.ps1` + `.py` | `M_AnastasisGround`, `MI_AnastasisGround`, les huit `T_Ground_*` de `Materials/GroundTextures` (import si absentes ; `-ReimportTextures` les reimporte) |
+| `ground-textures.py` | **Python systeme, hors Unreal**, a lancer avant `ground-material.ps1` : telecharge les quatre textures CC0 Poly Haven du sol et les empaquette (detail neutre en moyenne) dans `Saved/GroundTextures/packed` ; n'ecrit pas dans `Content/` |
 | `shore-water.ps1` + `.py` | `M_AnastasisShoreWater` |
 | `water-look.ps1` + `.py` | `M_AnastasisWater` (Single Layer Water, WATER_LOOK_001) |
 | `presentation-registry.py` | `DA_AnastasisPresentation` |
@@ -332,7 +333,7 @@ se change dans le script.
 | Script | Role |
 |---|---|
 | `create-ground-cover.ps1` + `create-ground-cover.py` | **ecrit** dans `Content/` : les trois touffes `SM_Grass_MeadowTall/MeadowShort/Sedge_01` (`/Game/Anastasis/GroundCover`) et `M_AnastasisGrass`, regeneres a chaque run ; editeur dedie qui se ferme |
-| `capture-ground-cover.ps1` + `ground-cover-capture.py` | A/B de l'herbe aux memes cameras, `-States on,off,notint,noshadow,on2` (`notint` = memes touffes, sol non teinte) : prairie, riviere, lisiere, vallee B, oblique, aerien, hameau, hors vallee, lande ; frame p50/p95 et GPU par vue → `Saved/GroundCoverEvidence/<Label>/` |
+| `capture-ground-cover.ps1` + `ground-cover-capture.py` | A/B de l'herbe aux memes cameras, `-States on,off,notint,noshadow,on2` (`notint` = memes touffes, sol non teinte) : prairie, riviere, lisiere, vallee B, oblique, aerien, hameau, hors vallee, lande ; frame p50/p95 et GPU par vue ; `-States on,on_notex,bare,bare_notex` fait l'A/B des textures photo du sol (GROUND_TEXTURE_001) → `Saved/GroundCoverEvidence/<Label>/` |
 
 ### Population visuelle (VILLAGER_PNG_001)
 

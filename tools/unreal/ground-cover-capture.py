@@ -16,6 +16,12 @@ des ellipses de la vallee ecrite : elle prouve que la carte entiere est couverte
 ANASTASIS_GROUND_OUT     dossier de sortie (obligatoire)
 ANASTASIS_GROUND_STATES  etats captures, dans l'ordre, le premier doit poser l'herbe
                          (defaut "on,off") : on | off | noshadow | notint | on2
+                         | on_notex | bare | bare_notex   (GROUND_TEXTURE_001)
+
+Etats *_notex : le sol est rendu par une instance DYNAMIQUE de MI_AnastasisGround dont le
+fondu des textures photo est ferme (TexFadeStart 0, TexFadeEnd 1). Le materiau rend alors
+exactement l'ancien sol, aux memes cameras. Rien n'est ecrit dans l'asset : une MID est
+transitoire, et l'editeur n'a aucun paquet sale a proposer de sauver en quittant.
 """
 import os, time, math, json, unreal
 
@@ -28,7 +34,12 @@ STATE_CMDS = {
     'notint': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 0'),
     # Repetition de "on" en fin de serie : l'ecart on / on2 mesure la derive de la machine.
     'on2': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'on_notex': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'bare': ('anastasis.Dressing.GroundCover 0', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'bare_notex': ('anastasis.Dressing.GroundCover 0', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
 }
+NO_TEXTURE = ('on_notex', 'bare_notex')
+GROUND_MI = '/Game/Anastasis/Materials/MI_AnastasisGround'
 states = [x.strip() for x in os.environ.get('ANASTASIS_GROUND_STATES', 'on,off').split(',') if x.strip()]
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
 SEED = 12345
@@ -65,6 +76,31 @@ try:
     found = unreal.GameplayStatics.get_all_actors_of_class(world, cls)
     actor = found[0] if len(found) > 0 else eas.spawn_actor_from_class(cls, V(0, 0, 0), unreal.Rotator(0, 0, 0))
     actor.call_method('EmbodyCanonical', args=(SEED,))
+
+    def texture_state(state):
+        # Apres CHAQUE incarnation : EmbodyCanonical repose le materiau de l'asset.
+        if state not in NO_TEXTURE:
+            return
+        # Une MID par section, creee par le composant lui-meme (UFUNCTION exposee a Python).
+        n = 0
+        for comp in actor.get_components_by_class(unreal.ProceduralMeshComponent):
+            for i in range(comp.get_num_materials()):
+                m = comp.get_material(i)
+                if m is None or not m.get_path_name().startswith(GROUND_MI):
+                    continue
+                mid = comp.create_dynamic_material_instance(i, m)
+                mid.set_scalar_parameter_value('TexFadeStart', 0.0)
+                mid.set_scalar_parameter_value('TexFadeEnd', 1.0)
+                # Un materiau sans le parametre l'ignore en silence et rendrait un faux A/B.
+                get = getattr(mid, 'k2_get_scalar_parameter_value', None) or mid.get_scalar_parameter_value
+                if abs(get('TexFadeEnd') - 1.0) > 1e-4:
+                    raise RuntimeError('MI_AnastasisGround sans TexFadeEnd : rien a couper')
+                n += 1
+        if n == 0:
+            raise RuntimeError('aucune section ne porte MI_AnastasisGround')
+        unreal.log('GROUND_CAPTURE_NOTEX state=%s sections=%d' % (state, n))
+
+    texture_state(states[0])
     report = [r.split('|') for r in actor.call_method('GetPlaceReport')]
 
     def trace(a, b):
@@ -212,6 +248,7 @@ def tick(dt):
                 for c in STATE_CMDS[states[state_i]]:
                     cmd(c)
                 actor.call_method('EmbodyCanonical', args=(SEED,))
+                texture_state(states[state_i])
                 queue = [(states[state_i], v) for v in views]
                 first, mark, frames, timings = True, time.monotonic(), [], []
                 return
