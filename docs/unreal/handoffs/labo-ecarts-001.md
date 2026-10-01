@@ -24,9 +24,15 @@ BRANCH_HEAD sur `agent/labo-ecarts-001`. Deux commits : le laboratoire et les **
 
 ## MEC
 
-- BUILD / TESTS : voir `finish` ci-dessous. La mission ne touche aucun `.cpp` / `.h` ; le seul fichier sous
-  `Source/AnastasisSim/` est `ECARTS.md`. Note : la consigne de mission annonçait une session cloud Linux ;
-  elle a en fait tourné sur le poste Windows d'Alexandre (worktree `C:\dev\ANASTASIS_WORKTREES\labo-ecarts-001`).
+- BUILD / TESTS : **NOT_ATTEMPTED par `finish`**. Le portail s'arrête avant le build, au contrôle des écarts :
+  `agent-worktree.ps1` appelle `check-ecarts.mjs -base main`, et `ECARTS.md` n'existe pas dans `main` (il
+  arrive avec la PR #2, non versée) : les 19 fiches y passent pour « nouvelles dans ce lot »
+  (`ECARTS::FAIL fail=17`). Contre la vraie base de la branche, le même contrôle passe :
+  `node tools/migration/check-ecarts.mjs -base origin/agent/ecarts-protocole-001 -handoff docs/unreal/handoffs/labo-ecarts-001.md`
+  → voir la ligne `ECARTS::` ci-dessous. `finish` est à rejouer quand la PR #2 sera dans `main`. La mission
+  ne touche aucun `.cpp` / `.h` : un build ne prouverait rien de ce qu'elle apporte.
+  Note : la consigne annonçait une session cloud Linux ; la mission a tourné sur le poste Windows
+  d'Alexandre (worktree `C:\dev\ANASTASIS_WORKTREES\labo-ecarts-001`).
 - Référence : `git clone --depth 1 --branch anastasis-ref-p3` → `HEAD = fee66ae8b571f6f7bcbe6a61f9749d0a812b84e2`,
   0 fichier modifié (vérifié).
 - Coût mesuré : un jour simulé JS = 2 à 4 s pour 5 habitants (Node 24.16) ; un passage de 3 jours ≈ 9 s.
@@ -35,6 +41,9 @@ BRANCH_HEAD sur `agent/labo-ecarts-001`. Deux commits : le laboratoire et les **
 - Calibration A/A (`endurance`, 6 paires de témoins) : règle v1 → 6/6 `DERIVE` ; règle v2 (Holm) → 1/6
   `DERIVE`, 5/6 `INDETERMINE`, 0/6 `NEUTRE`. Contrôle de bout en bout A = B (même bras) : `IDENTIQUE`, toutes
   différences nulles.
+- `node tools/migration/check-ecarts.mjs -base origin/agent/ecarts-protocole-001 -handoff docs/unreal/handoffs/labo-ecarts-001.md`
+  → `ECARTS::PASS fiches=19 ouvertes=19 fail=0 warn=3` (les trois avertissements préexistent : « à attribuer »
+  n° 9 et 17, marques manquantes). `-base main` → `ECARTS::FAIL fail=17`, pour la raison dite plus haut.
 - `node tools/migration/check-ecarts.mjs` → `ECARTS::PASS fiches=19 ouvertes=19 fail=0 warn=3` (inchangé) ;
   `-bilan` → `A_FERMER=15 A_TRANCHER=4` (inchangé).
 - COMMANDS (depuis la racine, `<jsref>` = clone du tag, `<runs>` = dossier hors dépôt) :
@@ -62,8 +71,9 @@ NOT_APPLICABLE — aucun changement de jeu, aucun asset, aucun niveau.
 
 ## ECARTS
 
-AUCUN — la mission ne modifie aucun code C++ de `Source/AnastasisSim/` ; elle ajoute le champ `jugement`
-aux fiches n° 5 et n° 16 de `ECARTS.md`, sans changer classe, destin ni statut.
+AUCUN — la mission ne modifie aucun code C++ de `Source/AnastasisSim/` (aucun `.cpp`, aucun `.h`) ; dans
+`ECARTS.md` elle ajoute seulement le champ `jugement` (table du format et deux fiches, celles de la cadence
+et du flux des rumeurs), sans changer classe, destin ni statut. Aucun test de parité n'est concerné.
 
 ## INTEGRATION_RISK
 
