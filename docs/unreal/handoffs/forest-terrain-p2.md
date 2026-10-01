@@ -29,11 +29,12 @@ demi-tuile depuis le bord, rapportee a l'interieur :
 
 ```
 avant  : 106 %  137 %  96 % ...   coupe pleine densite sur la grille
-apres  :  17 %   54 %  89 % ...   lisiere de ~30 m
+apres  :   7 %   35 %  79 % ...   lisiere de ~30 m
 ```
 
-Interieur : coefficient de variation des blocs 3x3 tuiles 0.69, 110 blocs 2x2 vides (clairieres).
-Prairie basse plate (echelle 1) : 83 arbres, tous isoles. La foret totale baisse (~40 % sur le
+Interieur : coefficient de variation des blocs 3x3 tuiles 0.69, 120 blocs 2x2 vides (clairieres).
+Prairie basse plate (echelle 1) : 90 arbres, tous isoles. (Chiffres apres la correction des graines
+de bruit en P3 : avant elle, le bruit de clairiere etait correle au bruit de masse.) La foret totale baisse (~40 % sur le
 fixture) : un peuplement mediterraneen est plus ouvert que la foret pontique saturee.
 
 ## COMMIT
@@ -45,7 +46,7 @@ BRANCH_HEAD (`claude/anastasis-forest-terrain-yhszr2`)
 - BUILD: **NOT_RUN** (conteneur Linux sans Unreal).
   `tools\unreal\anastasis-unreal.ps1 build` puis `tools\unreal\report-tests.ps1 -Filter "Anastasis.Ecology"`.
 - Nouveau test : `Anastasis.Ecology.ForestEdgesAndOpenings` (lisiere clairsemee puis comblee, CV > 0.35,
-  >= 10 clairieres 2x2). Seuils tires de la replique avec marge (17 % < 40 %, 0.69 > 0.35, 110 >= 10).
+  >= 10 clairieres 2x2). Seuils tires de la replique avec marge (7 % < 40 %, 0.69 > 0.35, 120 >= 10).
 - Tests MODIFIES, sur mandat (« des arbres isoles dans les pres ») :
   - `MacroForestRenderedHabitat` : « flat low prairie stays open » (0 arbre) devient « aucune masse,
     seulement des arbres isoles, au plus un pour vingt tuiles, et au moins un ».

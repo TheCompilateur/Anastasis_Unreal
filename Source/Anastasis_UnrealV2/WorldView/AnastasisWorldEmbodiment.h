@@ -111,6 +111,11 @@ protected:
 	/** Strate herbacee des espaces ouverts, posee apres les arbres (Canopy = couronnes posees : X, Y, rayon). */
 	void PlaceGroundCover(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,
 		const AnastasisPlaces::FPlan& Places, const TArray<FVector>& Canopy, bool bEnabled);
+	/** FOREST_TERRAIN_P3 : maquis, ronces et rochers ; un HISM par mesh, transitoires, vides puis reremplis. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> UnderstoryMeshes;
+	/** Strate arbustive et rochers, apres les arbres et avant l'herbe ; ajoute leurs emprises a Canopy. */
+	void PlaceUnderstory(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource, TArray<FVector>& Canopy, bool bEnabled);
 	/** Compose les lieux sur le sol rendu ; false = lieux coupes (plan vide). */
 	bool ComposePlaces(const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop,
 		const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource, AnastasisPlaces::FInputs& In, AnastasisPlaces::FPlan& Places);

@@ -131,7 +131,7 @@ int32 SelectVariantIndex(
 		}
 		if (Kind.Num() > 0)
 		{
-			const uint32 H = HashTile(Seed, TileX, TileY, 0x51u + static_cast<uint32>(Species) * 0x2545u);
+			const uint32 H = HashTile(Seed ^ 0x3C6EF372u, TileX, TileY, 0x51u + static_cast<uint32>(Species) * 0x2545u);
 			return Kind[H % static_cast<uint32>(Kind.Num())];
 		}
 	}
@@ -290,7 +290,10 @@ EAnastasisTreeSpecies SelectTreeSpecies(const FTreeSite& Site, uint32 Seed, int3
 	{
 		return EAnastasisTreeSpecies::HolmOak;
 	}
-	double Draw = UnitFloat(HashTile(Seed, TileX, TileY, 0x9u)) * Total;
+	// Graine perturbee AVANT le melange : HashTile est la fonction meme du tirage de presence
+	// d'AnastasisEcologicalDressing (meme graine, meme tuile) ; un sel seul n'y change qu'une
+	// constante, et l'essence suivrait la densite locale.
+	double Draw = UnitFloat(HashTile(Seed ^ 0x51ED270Bu, TileX, TileY, 0x9u)) * Total;
 	for (int32 I = 0; I < SpeciesCount; ++I)
 	{
 		if (Draw < Weights[I])

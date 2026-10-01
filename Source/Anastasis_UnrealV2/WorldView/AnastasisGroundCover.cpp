@@ -321,8 +321,11 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 							? 1.0 - Smooth((Slope - (C.TallSlopeDegrees - C.BlendDegrees)) / (2.0 * C.BlendDegrees))
 							: (Slope <= C.TallSlopeDegrees ? 1.0 : 0.0);
 						const double Mix = FMath::Lerp(0.45, 1.0, Smooth((Patch(In.Seed, X, Y, C.PatchSpanUU * 0.6, 31) - 0.2) / 0.45));
-						// Sol pietine et lisiere ombragee : l'herbe haute y cede la place a la rase.
-						const double TallChance = Flat * Mix * Trampled * (1.0 - 0.6 * Shade);
+						// Sol pietine : l'herbe haute y cede la place a la rase. Lisiere (FOREST_TERRAIN_P3) :
+						// l'ourlet, la bande d'herbes hautes a mi-ombre entre le pre fauche et le couvert,
+						// au lieu d'une herbe rase jusqu'au tronc.
+						const double Ourlet = 4.0 * Shade * (1.0 - Shade);
+						const double TallChance = Flat * Trampled * FMath::Min(1.0, Mix * (1.0 - 0.6 * Shade) + 0.7 * Ourlet);
 						Family = Unit(Hash(In.Seed, GX, GY, 15)) < TallChance ? EFamily::MeadowTall : EFamily::MeadowShort;
 					}
 
@@ -331,7 +334,7 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 					P.Normal = FVector(-(East - West) / (2.0 * R), -(North - South) / (2.0 * R), 1.0).GetSafeNormal();
 					P.Yaw = 360.0 * Unit(Hash(In.Seed, GX, GY, 16));
 					P.Scale = FMath::Lerp(C.ScaleMin, C.ScaleMax, Unit(Hash(In.Seed, GX, GY, 17)))
-						* (Family == EFamily::MeadowTall ? FMath::Lerp(0.85, 1.0, Mask) : 1.0)
+						* (Family == EFamily::MeadowTall ? FMath::Lerp(0.85, 1.0, Mask) * (1.0 + 0.25 * 4.0 * Shade * (1.0 - Shade)) : 1.0)
 						* (bLande ? C.LandeScale : 1.0);
 					P.SlopeDegrees = Slope;
 					P.Wetness = Wet;

@@ -9,12 +9,14 @@
 #include "WorldView/AnastasisDrainage.h"
 #include "WorldView/AnastasisPlaces.h"
 #include "WorldView/AnastasisGroundCover.h"
+#include "WorldView/AnastasisUnderstory.h"
 
 #include "Anastasis_UnrealV2.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Engine/StaticMesh.h"
 #include "HAL/IConsoleManager.h"
+#include "Misc/Paths.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "RenderTimer.h"
 #include "DynamicRHI.h"
@@ -61,6 +63,14 @@ static TAutoConsoleVariable<int32> CVarGroundCoverShadows(
 static TAutoConsoleVariable<int32> CVarGroundCoverInAutomation(
     TEXT("anastasis.GroundCover.InAutomation"), 0,
     TEXT("0=pas d'herbe pendant les tests d'automatisation (defaut), 1=herbe aussi sous automatisation ; applique a l'incarnation."), ECVF_Default);
+
+// FOREST_TERRAIN_P3. Coupables pour l'A/B : memes arbres, meme herbe, sans maquis ni rochers.
+static TAutoConsoleVariable<int32> CVarUnderstory(
+    TEXT("anastasis.Dressing.Understory"), 1,
+    TEXT("0=no shrub layer, brambles or scattered rocks, 1=maquis, brambles and rocks by slope, altitude and water; applied on embodiment."), ECVF_Default);
+static TAutoConsoleVariable<int32> CVarUnderstoryInAutomation(
+    TEXT("anastasis.Understory.InAutomation"), 0,
+    TEXT("0=pas de maquis ni de rochers pendant les tests d'automatisation (defaut, comme l'herbe), 1=aussi sous automatisation."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
@@ -182,14 +192,19 @@ namespace
 		return Unit < EmergentShareOfCanopy ? EAnastasisStatureClass::Emergent : EAnastasisStatureClass::Canopy;
 	}
 
-	/** Presentation-only per-tree draw, for height, crown width and tint. Same shape as above. */
+	/**
+	 * Presentation-only per-tree draw, for height, crown width and tint. The salt is mixed in
+	 * FIRST and the result fully finalised: with the salt xored at the last step only, two
+	 * salts of the same tree differ by a constant and height, crown and tint come out correlated.
+	 */
 	double TreeUnit(uint32 VisualSeed, int32 TileX, int32 TileY, uint32 Salt)
 	{
-		uint32 H = VisualSeed ^ 0x2C1B3C6Du;
+		uint32 H = VisualSeed ^ 0x2C1B3C6Du ^ (Salt * 0x9E3779B9u);
 		H = (H ^ static_cast<uint32>(TileX)) * 0x85EBCA6Bu;
 		H = (H ^ static_cast<uint32>(TileY)) * 0xC2B2AE35u;
-		H = (H ^ Salt) * 0x27D4EB2Fu;
-		H ^= H >> 15;
+		H ^= H >> 16; H *= 0x7FEB352Du;
+		H ^= H >> 15; H *= 0x846CA68Bu;
+		H ^= H >> 16;
 		return static_cast<double>(H) / static_cast<double>(MAX_uint32);
 	}
 
@@ -647,6 +662,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	UE_LOG(LogAnastasis_UnrealV2, Display,
 		TEXT("ANASTASIS_DRESSING ground=%s instances=%d refused_ungrounded=%d"),
 		SurfaceCrop ? TEXT("surface") : TEXT("slab"), DressingInstanceCount, UngroundedTiles);
+	PlaceUnderstory(CanonicalSource, Canopy, bEcology);
 	PlaceGroundCover(CanonicalSource, Places, Canopy, bEcology);
 	EmbodyPlaces(PlaceInputs, Places, bPlaces, CanonicalSource, SupersededRuins);
 }
@@ -708,6 +724,152 @@ double OpennessAt(const AnastasisWorldView::FWorldVisualSnapshot& S, double X, d
 	}
 	return Weight > 0.0 ? Sum / Weight : 0.0;
 }
+}
+
+void AAnastasisWorldEmbodiment::PlaceUnderstory(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,
+	TArray<FVector>& Canopy, bool bEnabled)
+{
+	namespace US = AnastasisUnderstory;
+	// Vider, jamais detruire : meme regle que l'herbe et les lieux composes.
+	for (UHierarchicalInstancedStaticMeshComponent* M : UnderstoryMeshes)
+	{
+		if (IsValid(M)) M->ClearInstances();
+	}
+	UnderstoryMeshes.RemoveAll([](const TObjectPtr<UHierarchicalInstancedStaticMeshComponent>& M) { return !IsValid(M); });
+	const double T = AnastasisWorldView::TileWorldSize * CanonicalSource.SpatialScale;
+	double Probe;
+	const bool bGround = AnastasisTerrainForge::SampleActive((CanonicalSource.OriginX + CanonicalSource.W * 0.5) * T,
+		(CanonicalSource.OriginY + CanonicalSource.H * 0.5) * T, Probe);
+	const bool bAutomation = GIsAutomationTesting && CVarUnderstoryInAutomation.GetValueOnGameThread() == 0;
+	if (!bEnabled || CVarUnderstory.GetValueOnGameThread() == 0 || !bGround || bAutomation)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_UNDERSTORY enabled=0 ecology=%d rendered_ground=%d automation=%d"),
+			bEnabled, bGround, bAutomation);
+		return;
+	}
+	const double Start = FPlatformTime::Seconds();
+	US::FInputs In;
+	In.Source = &CanonicalSource;
+	In.SampleHeight = [](double X, double Y, double& Z) { return AnastasisTerrainForge::SampleActive(X, Y, Z); };
+	In.SampleWaterHeight = [](double X, double Y, double& Z) { return AnastasisTerrainForge::SampleActiveWater(X, Y, Z); };
+	In.SampleRiparian = [](double X, double Y, double& W) { return AnastasisDrainage::RiparianAt(X, Y, W); };
+	In.Canopy = Canopy;
+	In.Basin = ForgeBasin;
+	In.bHasBasin = !ForgeBasin.IsZero();
+	In.WaterPlaneZ = AnastasisTerrainSurface::WaterPlaneZ;
+	In.AltitudeSpanUU = FMath::Max(ActiveFootprintBounds.IsValid
+		? ActiveFootprintBounds.Max.Z - AnastasisTerrainSurface::WaterPlaneZ : 0.0, 100.0);
+	US::FPlan Plan;
+	FString Error;
+	if (!US::Build(In, US::FSettings(), Plan, Error))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_UNDERSTORY rejected=%s"), *Error);
+		return;
+	}
+	const double PlanMs = (FPlatformTime::Seconds() - Start) * 1000.0;
+
+	UMaterialInterface* RockMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Anastasis/Materials/M_AnastasisRock.M_AnastasisRock"));
+	if (!RockMaterial && BaseShapeMaterial)
+	{
+		// Repli : l'aplat de pierre des lieux composes, tant que create_tree_asset.py n'a pas tourne.
+		UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
+		Mid->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.105f, 0.101f, 0.096f, 1.0f));
+		RockMaterial = Mid;
+	}
+	TMap<FName, UHierarchicalInstancedStaticMeshComponent*> Existing;
+	for (UHierarchicalInstancedStaticMeshComponent* M : UnderstoryMeshes) Existing.Add(M->GetFName(), M);
+	TMap<FString, UHierarchicalInstancedStaticMeshComponent*> ByPath;
+	TSet<FString> MissingPaths;
+	int32 Placed = 0;
+	for (const US::FInstance& P : Plan.Instances)
+	{
+		const bool bRock = P.Kind == US::EKind::Rock;
+		const FString Path = bRock ? US::RockMeshPath(P.Rock, P.Variant) : US::ShrubMeshPath(P.Kind, P.Variant);
+		UHierarchicalInstancedStaticMeshComponent* Hism = ByPath.FindRef(Path);
+		if (!Hism)
+		{
+			if (MissingPaths.Contains(Path)) continue;
+			UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *Path);
+			if (!Mesh) { MissingPaths.Add(Path); continue; }
+			const FName Name(*FString::Printf(TEXT("Understory_%s"), *FPaths::GetBaseFilename(Path)));
+			Hism = Existing.FindRef(Name);
+			if (!Hism)
+			{
+				Hism = NewObject<UHierarchicalInstancedStaticMeshComponent>(this,
+					MakeUniqueObjectName(this, UHierarchicalInstancedStaticMeshComponent::StaticClass(), Name));
+				Hism->SetFlags(RF_Transient);
+				Hism->SetupAttachment(GetRootComponent());
+				Hism->SetMobility(EComponentMobility::Movable);
+				Hism->SetGenerateOverlapEvents(false);
+				Hism->SetCanEverAffectNavigation(false);
+				Hism->RegisterComponent();
+				UnderstoryMeshes.Add(Hism);
+			}
+			Hism->SetStaticMesh(Mesh);
+			// Un rocher se heurte ; on traverse un buisson.
+			Hism->SetCollisionEnabled(bRock ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+			if (bRock) Hism->SetCollisionProfileName(TEXT("BlockAll"));
+			Hism->SetCastShadow(true);
+			// Coupe par instance : maquis lisible a 300 m (la texture des versants), ronces 150 m,
+			// rochers 400 m. Le fondu commence aux trois quarts.
+			const int32 CullEnd = bRock ? 40000 : (P.Kind == US::EKind::Bramble ? 15000 : 30000);
+			Hism->SetCullDistances(CullEnd * 3 / 4, CullEnd);
+			if (bRock && RockMaterial)
+			{
+				for (int32 Slot = 0; Slot < Mesh->GetStaticMaterials().Num(); ++Slot) Hism->SetMaterial(Slot, RockMaterial);
+			}
+			if (!bRock && Hism->NumCustomDataFloats != 2) Hism->SetNumCustomDataFloats(2);
+			ByPath.Add(Path, Hism);
+		}
+		const FBox Bounds = Hism->GetStaticMesh()->GetBoundingBox();
+		const FVector Size = Bounds.GetSize();
+		double Scale;
+		FVector Up;
+		double Sink;
+		FVector Scale3;
+		if (bRock)
+		{
+			// Taille = plus grande dimension : un rocher bas et large reste un rocher de cette taille.
+			Scale = P.HeightM * 100.0 / FMath::Max(Size.GetMax(), 1.0);
+			Up = FMath::Lerp(FVector::UpVector, P.Normal, 0.8).GetSafeNormal();
+			const FVector2D Lean = FVector2D(FMath::Cos(P.Jitter * 6.2832), FMath::Sin(P.Jitter * 6.2832)) * 0.18 * P.Jitter;
+			Up = (Up + FVector(Lean, 0.0)).GetSafeNormal();
+			// Enfoui de 15 a 40 % : un rocher pose sur l'herbe se lit comme un objet, pas comme le sol.
+			Sink = (0.15 + 0.25 * P.Jitter) * Size.Z * Scale
+				+ 0.5 * FVector2D(Size.X, Size.Y).GetMax() * Scale * FMath::Tan(FMath::DegreesToRadians(FMath::Min(P.SlopeDegrees, 40.0)) * 0.2);
+			Scale3 = FVector(Scale);
+		}
+		else
+		{
+			Scale = P.HeightM * 100.0 / FMath::Max(Size.Z, 1.0);
+			Up = FMath::Lerp(FVector::UpVector, P.Normal, 0.5).GetSafeNormal();
+			const double Residual = FMath::Acos(FMath::Clamp(FVector::DotProduct(Up, P.Normal), -1.0, 1.0));
+			Sink = 0.03 * Size.Z * Scale + 0.5 * FVector2D(Size.X, Size.Y).GetMax() * Scale * FMath::Tan(Residual);
+			const double Crown = FMath::Lerp(0.85, 1.15, P.Jitter);
+			Scale3 = FVector(Scale * Crown, Scale * Crown, Scale);
+		}
+		const FQuat Rotation = FQuat::FindBetweenNormals(FVector::UpVector, Up) * FQuat(FVector::UpVector, FMath::DegreesToRadians(P.Yaw));
+		const FVector Location(P.Ground.X, P.Ground.Y, P.Ground.Z - Bounds.Min.Z * Scale3.Z - Sink);
+		const int32 Index = Hism->AddInstance(FTransform(Rotation, Location, Scale3), false);
+		if (!bRock && Index != INDEX_NONE && Hism->NumCustomDataFloats >= 2)
+		{
+			Hism->SetCustomDataValue(Index, 0, static_cast<float>(P.Dryness * FMath::Lerp(0.55, 1.0, P.Jitter)), false);
+			Hism->SetCustomDataValue(Index, 1, static_cast<float>(P.Jitter * 2.0 - 1.0), false);
+		}
+		// L'herbe s'ecarte des buissons et ne traverse pas les rochers.
+		Canopy.Add(FVector(P.Ground.X, P.Ground.Y, 0.5 * FVector2D(Size.X, Size.Y).GetMax() * Scale3.X * (bRock ? 0.7 : 0.9)));
+		++Placed;
+	}
+	for (UHierarchicalInstancedStaticMeshComponent* M : UnderstoryMeshes)
+	{
+		if (IsValid(M)) M->MarkRenderStateDirty();
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_UNDERSTORY enabled=1 lentisk=%d kermes_oak=%d broom=%d bramble=%d rock=%d placed=%d cells=%d refused_water=%d refused_reserved=%d components=%d missing_meshes=%d truncated=%d plan_ms=%.1f total_ms=%.1f"),
+		Plan.Counts[static_cast<int32>(US::EKind::Lentisk)], Plan.Counts[static_cast<int32>(US::EKind::KermesOak)],
+		Plan.Counts[static_cast<int32>(US::EKind::Broom)], Plan.Counts[static_cast<int32>(US::EKind::Bramble)],
+		Plan.Counts[static_cast<int32>(US::EKind::Rock)], Placed, Plan.Cells, Plan.RejectedWater, Plan.RejectedReserved,
+		UnderstoryMeshes.Num(), MissingPaths.Num(), Plan.bTruncated ? 1 : 0, PlanMs, (FPlatformTime::Seconds() - Start) * 1000.0);
 }
 
 void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,

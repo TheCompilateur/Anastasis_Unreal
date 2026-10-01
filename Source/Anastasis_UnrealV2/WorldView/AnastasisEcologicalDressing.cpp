@@ -80,7 +80,7 @@ namespace P2
     constexpr double EdgeWarpSpan = 2.2;
     /** Habitat share where the forest stops, the band over which it thins out to it, and the
      *  radius of the share. Measured on a straight forest/field border at scale 5 (replica of
-     *  this file): 17 %, 54 %, 89 % of interior density over the first three half-tiles -- a
+     *  this file): 7 %, 35 %, 79 % of interior density over the first three half-tiles -- a
      *  thirty-metre fringe, where the grid cut stood at 106 % on the border itself. */
     constexpr double HabitatEdge = 0.58;
     constexpr double HabitatFringe = 0.40;
@@ -101,6 +101,14 @@ namespace P2
     /** Candidates per (TileUU / TrunkSpacing)^2 -- enough to express the density field
      *  instead of saturating every tile against the trunk spacing. */
     constexpr double CandidatesPerSpacingCell = 2.0;
+    /** Graines propres a chaque bruit. Hash() ne xore le sel qu'au dernier pas : deux sels voisins
+     *  (91 masse, 95 clairiere) donneraient deux champs presque identiques. La graine, elle, passe
+     *  les deux multiplications. */
+    constexpr uint32 WarpXSeed = 0x1B873593u;
+    constexpr uint32 WarpYSeed = 0xCC9E2D51u;
+    constexpr uint32 StandSeed = 0x85EBCA77u;
+    constexpr uint32 GladeSeed = 0xC2B2AE3Du;
+    constexpr uint32 GroveSeed = 0x27D4EB2Fu;
 }
 
 bool Habitat(ETileType Type, bool bMacro = false)
@@ -250,13 +258,13 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
                 { ++Result.RejectedSlope; continue; }
                 // Habitat continu et deforme : champs, ruines et eau d'un cote, tout le reste de
                 // l'autre. La lisiere suit une courbe, plus la grille, et s'eclaircit en degrade.
-                const double WX = X + P2::EdgeWarp * (2.0 * Cluster(S.Seed, X / P2::EdgeWarpSpan, Y / P2::EdgeWarpSpan, 92) - 1.0);
-                const double WY = Y + P2::EdgeWarp * (2.0 * Cluster(S.Seed, X / P2::EdgeWarpSpan + 17.3, Y / P2::EdgeWarpSpan + 5.1, 93) - 1.0);
+                const double WX = X + P2::EdgeWarp * (2.0 * Cluster(S.Seed ^ P2::WarpXSeed, X / P2::EdgeWarpSpan, Y / P2::EdgeWarpSpan, 92) - 1.0);
+                const double WY = Y + P2::EdgeWarp * (2.0 * Cluster(S.Seed ^ P2::WarpYSeed, X / P2::EdgeWarpSpan + 17.3, Y / P2::EdgeWarpSpan + 5.1, 93) - 1.0);
                 // Hors de la bande, plus de foret close ; un arbre isole reste possible (le candidat
                 // est deja sur une tuile d'habitat : jamais sur un champ ni une ruine).
                 Fringe = Smooth((HabitatShare(S, WX, WY, P2::HabitatRadius) - P2::HabitatEdge) / P2::HabitatFringe);
-                Stand = P2::StandFloor + (1.0 - P2::StandFloor) * Cluster(S.Seed, X / P2::StandSpan, Y / P2::StandSpan, 94);
-                Glade = Smooth((Cluster(S.Seed, X / P2::GladeSpan, Y / P2::GladeSpan, 95) - P2::GladeThreshold) / P2::GladeRamp);
+                Stand = P2::StandFloor + (1.0 - P2::StandFloor) * Cluster(S.Seed ^ P2::StandSeed, X / P2::StandSpan, Y / P2::StandSpan, 94);
+                Glade = Smooth((Cluster(S.Seed ^ P2::GladeSeed, X / P2::GladeSpan, Y / P2::GladeSpan, 95) - P2::GladeThreshold) / P2::GladeRamp);
                 Wetness = TileField(S, X, Y, [](const FVisualTile& N) { return N.Wetness; });
                 // Upland shoulders and mountain shelves can carry a forest even where the
                 // simulation labels a rock resource. Flat low grass remains an open valley.
@@ -298,7 +306,7 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
                 Opening *= Reserve;
                 // Arbres isoles et bosquets dans l'ouvert, et galerie le long des rivieres rendues :
                 // la ou la foret close n'a pas sa place, un arbre seul l'a. Memes reserves.
-                const double Grove = Smooth((Cluster(S.Seed, X / P2::GroveSpan, Y / P2::GroveSpan, 96) - 0.55) / 0.35);
+                const double Grove = Smooth((Cluster(S.Seed ^ P2::GroveSeed, X / P2::GroveSpan, Y / P2::GroveSpan, 96) - 0.55) / 0.35);
                 const double Gallery = Smooth((Riparian - 0.20) / 0.25) * (1.0 - Smooth((Riparian - 0.80) / 0.15));
                 LoneProbability = (P2::LoneDensity * Grove + P2::GalleryDensity * Gallery) * Reserve;
                 if (Opening <= 0.0 && LoneProbability <= 0.0) { ++Result.RejectedOpenGround; continue; }

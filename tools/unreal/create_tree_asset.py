@@ -649,6 +649,109 @@ def greek_fir(k, rng):
 SPECIES_RECIPES = (aleppo_pine, cypress, holm_oak, olive, plane_tree, black_pine, greek_fir)
 
 
+# ---------------------------------------------------------------------------
+# FOREST_TERRAIN_P3 -- LA STRATE ARBUSTIVE (maquis) ET LES RONCES
+#
+# Meme grammaire que les arbres (normalisation Z = [-50,+50], deux slots, LOD), sans
+# empattement de racines : un arbuste part du sol en plusieurs tiges. La hauteur reelle
+# est posee par AnastasisUnderstory (lentisque 1-2.5 m, kermes 0.6-1.8 m, genet 1.2-2.8 m,
+# ronce 0.6-1.4 m) ; ici seules les proportions comptent.
+#
+#   lentisque    dome bas et dense, vert sombre lustre, pousses rougeatres     w/h ~1.6
+#   chene kermes coussin serre et pique, vert gris                             w/h ~1.9
+#   genet        touffe de tiges vertes dressees, fleurs jaunes au sommet      w/h ~0.8
+#   ronce        monticule de cannes arquees qui retombent au sol              w/h ~2.0
+# ---------------------------------------------------------------------------
+LENTISK_LEAF = unreal.LinearColor(0.035, 0.060, 0.030, 1.0)
+LENTISK_SHOOT = unreal.LinearColor(0.075, 0.050, 0.035, 1.0)
+KERMES_LEAF = unreal.LinearColor(0.060, 0.075, 0.045, 1.0)
+KERMES_LEAF_PALE = unreal.LinearColor(0.090, 0.095, 0.070, 1.0)
+BROOM_STEM = unreal.LinearColor(0.070, 0.100, 0.035, 0.0)
+BROOM_GREEN = unreal.LinearColor(0.070, 0.100, 0.035, 1.0)
+BROOM_FLOWER = unreal.LinearColor(0.520, 0.400, 0.040, 1.0)
+BRAMBLE_LEAF = unreal.LinearColor(0.045, 0.070, 0.035, 1.0)
+BRAMBLE_CANE = unreal.LinearColor(0.090, 0.045, 0.045, 0.0)
+SHRUB_WOOD = unreal.LinearColor(0.080, 0.065, 0.050, 0.0)
+
+
+def shrub_stems(rng, count, spread, height, r0, r1):
+    """Tiges qui partent du pied en eventail : un arbuste n'a pas de fut."""
+    out = []
+    for i in range(count):
+        a = i * math.tau / count + rng.uniform(-.4, .4)
+        d = spread * rng.uniform(.5, 1.0)
+        out.append(((0.0, 0.0, -50.0), (d * math.cos(a), d * math.sin(a), -50.0 + height * rng.uniform(.7, 1.0)), r0, r1))
+    return out
+
+
+def lentisk(k, rng):
+    stems = shrub_stems(rng, 5, 18.0, 40.0, 1.6, .6)
+    lobes = scatter_lobes(rng, (0.0, 0.0, -16.0), (54.0, 60.0, 50.0)[k], 36.0, 8, 17.0, 24.0, .72, shell=(.4, 1.0), top_bias=.15)
+    return species_spec("SM_Shrub_Lentisk_%02d" % (k + 1), "lentisque -- dome bas et dense, pousses rougeatres",
+                        SHRUB_WOOD, LENTISK_LEAF, stems=stems, axis=None, lobes=lobes, roots=False, twig_radius=.6,
+                        foliage_alt=LENTISK_SHOOT, foliage_alt_share=.15, blade_width=.45, blade_size=(.08, .11),
+                        blades_per_lobe=75, inner_groups=3, distant_stems=1)
+
+
+def kermes_oak(k, rng):
+    stems = shrub_stems(rng, 6, 22.0, 30.0, 1.3, .5)
+    lobes = scatter_lobes(rng, (0.0, 0.0, -22.0), (58.0, 64.0, 54.0)[k], 30.0, 9, 15.0, 21.0, .6, shell=(.4, 1.0), top_bias=.1)
+    return species_spec("SM_Shrub_KermesOak_%02d" % (k + 1), "chene kermes -- coussin serre, vert gris",
+                        SHRUB_WOOD, KERMES_LEAF, stems=stems, axis=None, lobes=lobes, roots=False, twig_radius=.5,
+                        foliage_alt=KERMES_LEAF_PALE, foliage_alt_share=.3, blade_width=.30, blade_size=(.07, .10),
+                        blades_per_lobe=75, inner_groups=3, distant_stems=1)
+
+
+def broom(k, rng):
+    stems = []
+    lobes = []
+    count = (14, 18, 12)[k]
+    for i in range(count):
+        a = rng.uniform(0, math.tau)
+        lean = rng.uniform(.15, .45)
+        top = (math.cos(a) * 100.0 * lean * rng.uniform(.6, 1.0), math.sin(a) * 100.0 * lean * rng.uniform(.6, 1.0),
+               -50.0 + 100.0 * rng.uniform(.75, 1.0))
+        stems.append(((0.0, 0.0, -50.0), top, 1.0, .35))
+        lobes.append((rng.uniform(4.0, 6.5), top[0], top[1], top[2] - 4.0, 1.4))
+    return species_spec("SM_Shrub_Broom_%02d" % (k + 1), "genet d'Espagne -- tiges vertes dressees, fleurs jaunes",
+                        BROOM_STEM, BROOM_GREEN, stems=stems, axis=None, lobes=lobes, roots=False, twig_radius=.3,
+                        foliage_alt=BROOM_FLOWER, foliage_alt_share=.5, blade_width=.35, blade_size=(.30, .45),
+                        blades_per_lobe=40, inner_groups=2, distant_stems=4)
+
+
+def bramble(k, rng):
+    stems = []
+    lobes = []
+    for i in range((7, 8, 6)[k]):
+        a = rng.uniform(0, math.tau)
+        reach = rng.uniform(60.0, 100.0)
+        peak = rng.uniform(55.0, 95.0)
+        prev = (0.0, 0.0, -50.0)
+        for t in (.3, .6, .85, 1.0):
+            z = -50.0 + peak * math.sin(t * math.pi * .95)
+            pt = (math.cos(a) * reach * t, math.sin(a) * reach * t, z)
+            stems.append((prev, pt, .9 * (1.1 - t), .9 * (1.0 - t) + .2))
+            prev = pt
+            if t in (.6, .85):
+                lobes.append((rng.uniform(12.0, 17.0), pt[0], pt[1], pt[2], .7))
+    lobes.append((22.0, 0.0, 0.0, -30.0, .8))
+    return species_spec("SM_Shrub_Bramble_%02d" % (k + 1), "ronce -- cannes arquees, monticule",
+                        BRAMBLE_CANE, BRAMBLE_LEAF, stems=stems, axis=None, lobes=lobes, roots=False, twig_radius=.4,
+                        blade_width=.55, blade_size=(.10, .14), blades_per_lobe=45, inner_groups=2, distant_stems=2)
+
+
+SHRUB_RECIPES = (lentisk, kermes_oak, broom, bramble)
+
+
+def shrub_specs():
+    out = []
+    for recipe in SHRUB_RECIPES:
+        for k in range(SHAPES_PER_SPECIES):
+            rng = random.Random("%s:%d:forest-terrain-p3" % (recipe.__name__, k))
+            out.append(recipe(k, rng))
+    return out
+
+
 def species_specs():
     out = []
     for recipe in SPECIES_RECIPES:
@@ -799,7 +902,7 @@ def build_family(spec):
         parts.append(stems)
     foliage, twigs = living_crown(spec,rng)
     parts.extend((foliage,twigs))
-    if slender or spec.get('stems'):
+    if spec.get('roots', True) and (slender or spec.get('stems')):
         roots=unreal.DynamicMesh()
         radius=slender[0][0] if slender else spec['stems'][0][2]
         for k in range(6):
@@ -828,12 +931,12 @@ def distant_crown(spec):
     mesh = unreal.DynamicMesh()
     rs = spec.get('radius_scale', .55)
     trunk = build_trunk([(s[0]*rs,s[1]*rs,*s[2:]) for s in spec['trunk']], spec['bark'])
-    stems = build_stems(spec, limit=spec.get('distant_stems', 4))
+    stems = build_stems(spec, limit=spec.get('distant_stems', 4)) if spec.get('distant_stems', 4) > 0 else None
     if trunk is not None:
         mesh = merge(mesh, trunk)
     elif stems is not None:
         mesh = merge(mesh, stems)
-    else:
+    elif spec['limbs']:
         mesh = merge(mesh, build_limbs(spec['limbs'], spec['bark']))
     crown = unreal.DynamicMesh()
     for tier, (radius, top, z0, z1) in enumerate(spec['tiers']):
@@ -1230,6 +1333,75 @@ def ensure_bark_material():
     return mat
 
 
+# FOREST_TERRAIN_P3 -- M_AnastasisRock : la pierre des rochers disperses (SM_Rock_*).
+# Les meshes de roche portent WorldGrid a l'import ; les lieux composes les teintaient d'un
+# aplat (StoneTint). Ici une pierre calcaire grecque : gris chaud, lichens jaunes et gris en
+# taches, fissures plus sombres, grain fin en normale -- procedural en espace monde, aucune
+# texture, comme l'ecorce. Rugueuse, peu speculaire.
+ROCK_MATERIAL_NAME = "M_AnastasisRock"
+ROCK_MATERIAL_PATH = MATERIAL_DIR + "/" + ROCK_MATERIAL_NAME
+
+
+def ensure_rock_material():
+    if unreal.EditorAssetLibrary.does_asset_exist(ROCK_MATERIAL_PATH):
+        unreal.EditorAssetLibrary.delete_asset(ROCK_MATERIAL_PATH)
+    mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+        ROCK_MATERIAL_NAME, MATERIAL_DIR, unreal.Material, unreal.MaterialFactoryNew())
+    mel = unreal.MaterialEditingLibrary
+    position = mel.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -1100, 100)
+    normal = mel.create_material_expression(mat, unreal.MaterialExpressionVertexNormalWS, -1100, 260)
+    genome = """
+        float3 p = Position * 0.012;
+        float3 w = abs(normalize(Normal)); w = w / (w.x + w.y + w.z);
+        float n1 = sin(p.x*1.7+sin(p.y*2.3))*sin(p.y*1.9+sin(p.z*2.9))*sin(p.z*1.3+p.x*0.7);
+        float n2 = sin(p.x*7.1+p.z*3.7)*sin(p.y*6.3+p.x*2.1)*sin(p.z*8.3+p.y*1.7);
+        float n3 = sin(p.x*23.0+n2*3.0)*sin(p.y*29.0+p.z*7.0);
+        float crack = pow(saturate(1.0 - abs(n2) * 5.0), 6.0);
+        float lichen = saturate((n1 * 0.5 + 0.5 - 0.62) * 6.0) * saturate(w.z * 1.6);
+        float h = n2 * 0.5 + n3 * 0.12 - crack * 0.8;
+    """
+    base = """
+        float3 stone = float3(0.20, 0.185, 0.160) * (0.82 + n1 * 0.10 + n3 * 0.05);
+        stone = lerp(stone, stone * 0.45, crack);
+        float3 lichenCol = lerp(float3(0.30, 0.27, 0.12), float3(0.22, 0.22, 0.20), saturate(n2 * 0.5 + 0.5));
+        return lerp(stone, lichenCol, lichen * 0.8);
+    """
+    bump = """
+        float3 n = normalize(Normal);
+        float3 a = cross(ddy(Position), n), b = cross(n, ddx(Position));
+        float det = dot(ddx(Position), a);
+        float3 g = sign(det) * (ddx(h) * a + ddy(h) * b);
+        return normalize(max(abs(det), 0.000001) * n - g * 0.8);
+    """
+    for description, code, prop, y in (('Rock colour', genome + base, unreal.MaterialProperty.MP_BASE_COLOR, -100),
+                                        ('Rock normal', genome + bump, unreal.MaterialProperty.MP_NORMAL, 100)):
+        node = mel.create_material_expression(mat, unreal.MaterialExpressionCustom, -450, y)
+        node.set_editor_property('description', description)
+        node.set_editor_property('code', code)
+        node.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+        inputs = []
+        for name in ('Position', 'Normal'):
+            entry = unreal.CustomInput(); entry.set_editor_property('input_name', name); inputs.append(entry)
+        node.set_editor_property('inputs', inputs)
+        for source, name in ((position, 'Position'), (normal, 'Normal')):
+            if not mel.connect_material_expressions(source, '', node, name):
+                raise RuntimeError('Rock input not connected: ' + name)
+        if not mel.connect_material_property(node, '', prop):
+            raise RuntimeError('Rock property not connected')
+    mat.set_editor_property('tangent_space_normal', False)
+    rough = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -350, 260)
+    rough.set_editor_property('r', 0.88)
+    mel.connect_material_property(rough, '', unreal.MaterialProperty.MP_ROUGHNESS)
+    spec = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -350, 460)
+    spec.set_editor_property('r', 0.25)
+    mel.connect_material_property(spec, '', unreal.MaterialProperty.MP_SPECULAR)
+    mat.set_editor_property('two_sided', False)
+    mel.recompile_material(mat)
+    unreal.EditorAssetLibrary.save_asset(ROCK_MATERIAL_PATH)
+    log("ROCK_MATERIAL saved " + ROCK_MATERIAL_PATH)
+    return mat
+
+
 def main():
     log("start")
     if unreal.get_editor_subsystem(unreal.AssetEditorSubsystem) is None:
@@ -1258,7 +1430,15 @@ def main():
         save_static_mesh(build_family(spec), PACKAGE_PATH + "/" + spec["name"], distant_crown(spec))
         log("  %s -- %s" % (spec["name"], spec["note"]))
 
-    log("RESULT::PASS meshes=%d species_meshes=%d" % (len(FAMILIES) + 1 + len(species), len(species)))
+    # FOREST_TERRAIN_P3 : arbustes du maquis, ronces, et la pierre des rochers disperses.
+    shrubs = shrub_specs()
+    for spec in shrubs:
+        save_static_mesh(build_family(spec), PACKAGE_PATH + "/" + spec["name"], distant_crown(spec))
+        log("  %s -- %s" % (spec["name"], spec["note"]))
+    ensure_rock_material()
+
+    log("RESULT::PASS meshes=%d species_meshes=%d shrub_meshes=%d"
+        % (len(FAMILIES) + 1 + len(species) + len(shrubs), len(species), len(shrubs)))
     return True
 
 

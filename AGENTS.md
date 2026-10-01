@@ -286,7 +286,7 @@ manque puis se contentent de le vérifier ; `*_REBUILD=1` le régénère et écr
 | `shore-water.ps1` + `.py` | `M_AnastasisShoreWater` |
 | `presentation-registry.py` | `DA_AnastasisPresentation` |
 | `atmosphere-profile.py` | `DA_AnastasisAtmosphere` |
-| `create_tree_asset.py` | `SM_Tree_*` (grille pontique + 7 essences x 3 formes : pin d'Alep, cypres, chene vert, olivier, platane, pin noir, sapin de Cephalonie), `M_AnastasisVegetation`, `M_AnastasisBark` — régénérés à **chaque** run |
+| `create_tree_asset.py` | `SM_Tree_*` (grille pontique + 7 essences x 3 formes : pin d'Alep, cypres, chene vert, olivier, platane, pin noir, sapin de Cephalonie), `SM_Shrub_*` (lentisque, chene kermes, genet, ronce x 3), `M_AnastasisVegetation`, `M_AnastasisBark`, `M_AnastasisRock` — régénérés à **chaque** run |
 | `create-reed-form.py` | recette isolee de roseaux courbes ; cree les assets de la variante |
 | `world-dressing-01.ps1` + `.py` | trois lieux composes sur Human Geography V2 ; Preview sans sauvegarde, Save ecrit les acteurs WD01 de Lvl_AnastasisSlice et MI_WeatheredStone, Verify relit la map ; preuves via -Out |
 | `create_ruin_asset.py` | `SM_Ruin_Generic_01` |

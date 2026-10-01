@@ -1053,8 +1053,13 @@ private:
 				{
 					const FVisualTile* Nb = TileAt(Tl.X + D.X, Tl.Y + D.Y);
 					if (!Nb || Nb->Type == ETileType::Forest || Nb->Type == ETileType::Water) continue;
-					const FVector2D Edge = Center(Tl) + FVector2D(D.X, D.Y) * 0.45 * T;
-					Put(R, EFamily::BushLow, Jitter(R, Edge, 0.25 * T), R.FRandRange(0, 360), R.FRandRange(3.0, 4.6), 0.05);
+					// FOREST_TERRAIN_P3 : plus de rang le long du bord de tuile. Profondeur et position
+					// le long du bord tirees, un tiers des bords sans rien : un ourlet, pas une haie.
+					if (R.FRand() < 0.33) continue;
+					const FVector2D Across(-D.Y, D.X);
+					const FVector2D Edge = Center(Tl) + FVector2D(D.X, D.Y) * R.FRandRange(0.1, 0.75) * T
+						+ Across * R.FRandRange(-0.45, 0.45) * T;
+					Put(R, EFamily::BushLow, Jitter(R, Edge, 0.2 * T), R.FRandRange(0, 360), R.FRandRange(3.0, 4.6), 0.05);
 					if (R.FRand() < 0.4) Put(R, EFamily::Sapling, Jitter(R, Edge, 0.3 * T), R.FRandRange(0, 360), R.FRandRange(3.5, 5.0), 0.02);
 				}
 			}
