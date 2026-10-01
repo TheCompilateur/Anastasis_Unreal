@@ -56,6 +56,11 @@ static TAutoConsoleVariable<int32> CVarGroundCoverInAutomation(
     TEXT("anastasis.GroundCover.InAutomation"), 0,
     TEXT("0=pas d'herbe pendant les tests d'automatisation (defaut), 1=herbe aussi sous automatisation ; applique a l'incarnation."), ECVF_Default);
 
+// SOL SOUS L'HERBE. Coupable pour l'A/B : memes touffes, sol teinte ou non.
+static TAutoConsoleVariable<int32> CVarGroundCoverSoilTint(
+    TEXT("anastasis.GroundCover.SoilTint"), 1,
+    TEXT("0=sol non teinte sous l'herbe, 1=sol fonce et verdi sous la prairie, brun sous les laiches, terre sous la lande (defaut) ; applique a l'incarnation."), ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainForge(
@@ -784,6 +789,52 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 		PerTier[K] += Batch.Value.Num();
 		++Chunks;
 	}
+	// SOL SOUS L'HERBE : la couleur de sommet de la section de sol (la chromie large, cf.
+	// GROUND_HYDROLOGY_ARBITRATION.md) est teintee par le champ de couverture. Relue depuis la
+	// section elle-meme, que EmbodyCrop vient de recreer : aucune teinte ne s'accumule d'une
+	// incarnation a l'autre. Les sommets non teintes repartent a l'octet pres.
+	int32 TintedVertices = 0;
+	double TintSum = 0.0;
+	if (CVarGroundCoverSoilTint.GetValueOnGameThread() != 0 && ExperimentalSurface)
+	{
+		GC::FCoverField Field;
+		GC::BuildCoverField(Cover, In.Bounds, 400.0, GC::FSettings().CellUU, Field);
+		if (FProcMeshSection* Section = ExperimentalSurface->GetProcMeshSection(0))
+		{
+			const GC::FSoilTint Tint;
+			const int32 N = Section->ProcVertexBuffer.Num();
+			TArray<FColor> Colors;
+			TArray<FVector> Positions;
+			Colors.SetNumUninitialized(N);
+			Positions.SetNumUninitialized(N);
+			for (int32 I = 0; I < N; ++I)
+			{
+				const FProcMeshVertex& V = Section->ProcVertexBuffer[I];
+				Colors[I] = V.Color;
+				Positions[I] = V.Position;
+				// La section est creee SANS conversion sRGB (CreateMeshSection_LinearColor,
+				// bSRGBConversion=false) : ses octets sont lineaires. Les relire en sRGB
+				// assombrirait et fausserait toute la teinte.
+				double Amount = 0.0;
+				const FLinearColor Tinted = GC::TintSoil(V.Color.ReinterpretAsLinear(), Field.Sample(V.Position.X, V.Position.Y), Tint, &Amount);
+				if (Amount <= 0.001) continue;
+				Colors[I] = Tinted.ToFColor(false);
+				++TintedVertices;
+				TintSum += Amount;
+			}
+			if (TintedVertices > 0)
+			{
+				// Les positions sont REQUISES, inchangees : UpdateMeshSection ne recopie rien --
+				// couleurs comprises -- si le tableau de positions n'a pas le nombre de sommets
+				// de la section (tint-v1 : 135 805 sommets "teintes", sol identique a l'image).
+				ExperimentalSurface->UpdateMeshSection(0, Positions, TArray<FVector>(), TArray<FVector2D>(),
+					TArray<FVector2D>(), TArray<FVector2D>(), TArray<FVector2D>(), Colors, TArray<FProcMeshTangent>());
+			}
+		}
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_SOIL_TINT enabled=%d tinted_vertices=%d mean_amount=%.3f"),
+		CVarGroundCoverSoilTint.GetValueOnGameThread() != 0, TintedVertices, TintedVertices > 0 ? TintSum / TintedVertices : 0.0);
+
 	UE_LOG(LogAnastasis_UnrealV2, Display,
 		TEXT("ANASTASIS_GROUND_COVER enabled=1 tall=%d short=%d sedge=%d heath=%d heather=%d placed=%d near=%d far=%d chunks=%d outside_valley=%d shadows=%d candidates=%d refused_mask=%d refused_ground=%d refused_water=%d refused_slope=%d refused_canopy=%d refused_density=%d crowns=%d clearings=%d truncated=%d missing_meshes=%d plan_ms=%.1f total_ms=%.1f"),
 		Cover.Counts[0], Cover.Counts[1], Cover.Counts[2], Cover.Counts[3], Cover.Counts[4], Placed, PerTier[0], PerTier[1], Chunks, OutsideValley, bShadows,

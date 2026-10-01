@@ -158,6 +158,46 @@ bool FAnastasisGroundCoverLande::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisGroundCoverSoilTint, "Anastasis.GroundCover.SoilTint",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisGroundCoverSoilTint::RunTest(const FString&)
+{
+	// Champ : une prairie a l'ouest (X < 5000), rien a l'est.
+	FString Error;
+	AnastasisGroundCover::FInputs Half = AnastasisGroundCoverTestFixture::OpenPlane(3.0);
+	Half.Mask = [](double X, double) { return X < 5000.0 ? 1.0 : 0.0; };
+	AnastasisGroundCover::FPlan Plan;
+	TestTrue(TEXT("plan builds"), AnastasisGroundCover::Build(Half, AnastasisGroundCover::FSettings(), Plan, Error));
+	AnastasisGroundCover::FCoverField Field;
+	AnastasisGroundCover::BuildCoverField(Plan, Half.Bounds, 400.0, AnastasisGroundCover::FSettings().CellUU, Field);
+	TestTrue(TEXT("field is valid"), Field.IsValid());
+	const FVector3f West = Field.Sample(2000.0, 5000.0), East = Field.Sample(8500.0, 5000.0);
+	AddInfo(FString::Printf(TEXT("cover west=(%.2f %.2f %.2f) east=(%.2f %.2f %.2f)"), West.X, West.Y, West.Z, East.X, East.Y, East.Z));
+	TestTrue(TEXT("meadow covers the west"), West.X > 0.3f && West.Y < 0.01f && West.Z < 0.01f);
+	TestTrue(TEXT("nothing covers the east"), East.X + East.Y + East.Z < 0.01f);
+	TestTrue(TEXT("outside the grid is bare"), Field.Sample(-5000.0, 5000.0).IsNearlyZero());
+
+	// Teinte : sol nu intact, alpha intact, prairie plus sombre et plus verte que la lande.
+	const AnastasisGroundCover::FSoilTint Tint;
+	const FLinearColor Grass(0.16f, 0.19f, 0.07f, 0.0f), Sand(0.30f, 0.25f, 0.15f, 1.0f);
+	double Amount = -1.0;
+	TestTrue(TEXT("bare soil unchanged"), AnastasisGroundCover::TintSoil(Grass, FVector3f::ZeroVector, Tint, &Amount).Equals(Grass) && Amount == 0.0);
+	const FLinearColor UnderMeadow = AnastasisGroundCover::TintSoil(Grass, FVector3f(1, 0, 0), Tint, &Amount);
+	TestTrue(TEXT("full cover tints at full strength"), FMath::IsNearlyEqual(Amount, Tint.Strength, 1e-6));
+	TestTrue(TEXT("alpha (underwater flag) kept"), UnderMeadow.A == Grass.A && AnastasisGroundCover::TintSoil(Sand, FVector3f(1, 0, 0), Tint).A == Sand.A);
+	TestTrue(TEXT("soil under meadow is darker"), UnderMeadow.GetLuminance() < Grass.GetLuminance());
+	const FLinearColor SandMeadow = AnastasisGroundCover::TintSoil(Sand, FVector3f(1, 0, 0), Tint);
+	TestTrue(TEXT("sand under meadow turns greener"), SandMeadow.G / SandMeadow.R > Sand.G / Sand.R);
+	const FLinearColor UnderLande = AnastasisGroundCover::TintSoil(Grass, FVector3f(0, 0, 1), Tint);
+	TestTrue(TEXT("lande soil is browner than meadow soil"), UnderLande.R / UnderLande.G > UnderMeadow.R / UnderMeadow.G);
+	const FLinearColor UnderSedge = AnastasisGroundCover::TintSoil(Grass, FVector3f(0, 1, 0), Tint);
+	TestTrue(TEXT("sedge soil is the darkest"), UnderSedge.GetLuminance() < UnderMeadow.GetLuminance());
+	double Thin = 0.0;
+	AnastasisGroundCover::TintSoil(Grass, FVector3f(0.15f, 0, 0), Tint, &Thin);
+	TestTrue(TEXT("sparse cover tints less"), Thin > 0.0 && Thin < Amount);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisGroundCoverWaterAndWetness, "Anastasis.GroundCover.WaterAndWetness",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnastasisGroundCoverWaterAndWetness::RunTest(const FString&)

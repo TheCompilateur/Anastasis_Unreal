@@ -317,7 +317,7 @@ se change dans le script.
 | Script | Role |
 |---|---|
 | `create-ground-cover.ps1` + `create-ground-cover.py` | **ecrit** dans `Content/` : les trois touffes `SM_Grass_MeadowTall/MeadowShort/Sedge_01` (`/Game/Anastasis/GroundCover`) et `M_AnastasisGrass`, regeneres a chaque run ; editeur dedie qui se ferme |
-| `capture-ground-cover.ps1` + `ground-cover-capture.py` | A/B de l'herbe (`anastasis.Dressing.GroundCover 1/0`) aux memes cameras : prairie, riviere, lisiere, vallee B, oblique, hameau ; frame p50/p95 par vue → `Saved/GroundCoverEvidence/<Label>/` |
+| `capture-ground-cover.ps1` + `ground-cover-capture.py` | A/B de l'herbe aux memes cameras, `-States on,off,notint,noshadow,on2` (`notint` = memes touffes, sol non teinte) : prairie, riviere, lisiere, vallee B, oblique, aerien, hameau, hors vallee, lande ; frame p50/p95 et GPU par vue → `Saved/GroundCoverEvidence/<Label>/` |
 
 ### Population visuelle (VILLAGER_PNG_001)
 
