@@ -53,4 +53,5 @@ NOT_IMPLEMENTED. Le mannequin du labo est une boîte de 180 cm, hors du système
 
 - Pas de FPS du labo. Les CVars runtime n'ont pas été relues (`ConsoleManager` absent du module Python).
 - Le décal stain n'est pas livré.
+- Le sol du labo est noir sur `cam_a` : pixel (960, 810) = RGB 0,0,0. Le script demande ensuite un matériau two-sided et Nanite off sur `SM_AAA_Ground_30m`. Ce rebake n'est pas dans les `.uasset` tant qu'un éditeur n'a pas rejoué le script.
 - Pas de modification de Lumen, du ciel, de l'herbe, des PNJ, de la rivière, de la map.

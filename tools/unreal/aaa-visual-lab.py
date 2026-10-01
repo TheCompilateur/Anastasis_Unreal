@@ -244,8 +244,8 @@ def build_ground():
         cols.append(row_c)
     for j in range(n):
         for i in range(n):
-            quad = [pts[j][i], pts[j][i + 1], pts[j + 1][i + 1], pts[j + 1][i]]
-            cs = [cols[j][i], cols[j][i + 1], cols[j + 1][i + 1], cols[j + 1][i]]
+            quad = [pts[j][i], pts[j + 1][i], pts[j + 1][i + 1], pts[j][i + 1]]
+            cs = [cols[j][i], cols[j + 1][i], cols[j + 1][i + 1], cols[j][i + 1]]
             uvs = [(p[0] / 100.0, p[1] / 100.0) for p in quad]
             mesh.quad(quad, cs, uvs)
     return mesh.finish()
@@ -522,6 +522,7 @@ def build_master():
     mat = assets.create_asset('M_AAA_Lab_Surface', PKG, unreal.Material, unreal.MaterialFactoryNew())
     if mat is None or mat.get_name() != 'M_AAA_Lab_Surface':
         raise RuntimeError('master material was not created at the expected path')
+    mat.set_editor_property('two_sided', True)
     try:
         mat.set_editor_property('shading_model', unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
     except Exception as exc:
@@ -974,7 +975,7 @@ def main():
     master = build_master()
     instances = build_instances(master)
     built = {
-        'SM_AAA_Ground_30m': (build_ground(), instances['MI_AAA_Soil'], True),
+        'SM_AAA_Ground_30m': (build_ground(), instances['MI_AAA_Soil'], False),
         'SM_AAA_Stone_Hero': (build_stone(), instances['MI_AAA_Stone'], True),
         'SM_AAA_Timber_Wall': (build_wall(), instances['MI_AAA_Wood'], True),
         'SM_AAA_Timber_Beam': (build_beam(), instances['MI_AAA_Wood'], True),

@@ -7,9 +7,8 @@ $project=Join-Path $root 'Anastasis_UnrealV2.uproject'
 $engine='C:\Program Files\Epic Games\UE_5.8'
 $version=Get-Content (Join-Path $engine 'Engine/Build/Build.version') -Raw | ConvertFrom-Json
 if($version.PatchVersion -ne 2 -or $version.Changelist -ne 56702186){throw 'Unexpected engine version'}
-$os=Get-CimInstance Win32_OperatingSystem
-$freeGb=[math]::Round($os.FreePhysicalMemory/1MB, 2)
-if($freeGb -lt 4){throw "RAM libre $freeGb Go. Seuil 4 Go : d'autres editeurs tiennent la machine. LookDev non lance."}
+$availableMb=(Get-CimInstance Win32_PerfFormattedData_PerfOS_Memory).AvailableMBytes
+if($availableMb -lt 4000){throw "RAM disponible $availableMb Mo. Seuil 4000 Mo : LookDev non lance."}
 $outPath=[IO.Path]::GetFullPath($OutDir)
 if(Test-Path -LiteralPath $outPath){throw 'Choose a new evidence directory'}
 New-Item -ItemType Directory -Path $outPath | Out-Null
