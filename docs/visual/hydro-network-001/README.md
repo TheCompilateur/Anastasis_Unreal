@@ -39,3 +39,5 @@ Ce que ces images ne prouvent pas : l'aspect de l'eau (matériau inchangé), la 
 | `pass2_original_forms_top` | même passe, `anastasis.Terrain.HumanGeography 0` |
 
 `network_seed12345.json` est celui de la passe 2.
+| `pass3_brook_before_after` | ruisseau de la vallée B : ligne droite, essai à coudes, tracé retenu |
+| `pass3_close_brookmouth` | gros plan du tracé retenu |

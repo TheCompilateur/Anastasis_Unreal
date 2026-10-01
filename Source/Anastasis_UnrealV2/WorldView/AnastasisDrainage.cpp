@@ -1,6 +1,7 @@
 #include "WorldView/AnastasisDrainage.h"
 
 #include "WorldView/AnastasisHumanGeography.h"
+#include "World/AnastasisWorldNoise.h"
 
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
@@ -276,9 +277,10 @@ void SmoothXY(TArray<FPt>& Pts, int32 Passes, bool bPinLast)
 	for (int32 Pass = 0; Pass < Passes; ++Pass)
 	{
 		TArray<FPt> Copy = Pts;
+		// Les points ecrits sont lisses aussi : sans cela, chaque noeud de la courbe de HG
+		// restait un coude visible.
 		for (int32 K = 1; K + 1 < Pts.Num(); ++K)
 		{
-			if (Pts[K].bAuthored) continue;
 			Pts[K].P = 0.25 * Copy[K - 1].P + 0.5 * Copy[K].P + 0.25 * Copy[K + 1].P;
 		}
 		if (!bPinLast && Pts.Num() >= 2) Pts.Last().P = 0.5 * (Copy.Last().P + Copy[Pts.Num() - 2].P);
@@ -1189,21 +1191,27 @@ bool AnastasisDrainage::Apply(
 			for (int32 K = 1; K < Pts.Num(); ++K) Arc[K] = Arc[K - 1] + FVector2D::Distance(Pts[K - 1].P, Pts[K].P);
 			const double Total = Arc.Last();
 			TArray<FPt> Moved = Pts;
+			const double NoiseSeed = static_cast<double>(Crop.Seed) + 4271.0 + 97.0 * Id;
 			for (int32 K = 1; K + 1 < Pts.Num(); ++K)
 			{
-				if (Pts[K].bAuthored) continue;
 				const double Width = WidthOf(Pts[K]);
-				const double Lambda = FMath::Max(12.0 * Width, 6000.0);
-				const double Taper = SmoothStep(0.0, Lambda * 0.6, FMath::Min(Arc[K], Total - Arc[K]));
 				const double Flat = 1.0 - Pts[K].Hill;
-				const double Amp = 0.9 * Width * Flat * Flat * Taper;
+				// Plus court en versant : un torrent zigzague serre, une riviere de plaine ample.
+				const double Lambda = FMath::Max(FMath::Lerp(7.0, 12.0, Flat) * Width, 6000.0);
+				const double Taper = SmoothStep(0.0, Lambda * 0.6, FMath::Min(Arc[K], Total - Arc[K]));
+				// Plancher de sinuosite : meme sur versant raide, aucun cours d'eau n'est trace a la
+				// regle. Une riviere ecrite (Human_Geography_V2) meandre autour de sa courbe, plus
+				// sagement : son trace reste lisible, son profil d'eau est garde.
+				const double Amp = (0.35 + 0.65 * Flat * Flat) * Width * Taper * (Pts[K].bAuthored ? 0.7 : 1.0);
 				if (Amp < 1.0) continue;
 				const double Phase = UE_DOUBLE_TWO_PI * Arc[K] / Lambda;
-				// Deux harmoniques de phases independantes : des boucles asymetriques, pas une sinusoide.
-				const double Wave = FMath::Sin(Phase + PhaseA) + Skew * FMath::Sin(2.13 * Phase + PhaseB);
+				// Deux harmoniques de phases independantes : des boucles asymetriques, pas une sinusoide ;
+				// un bruit fBm le long du cours casse ce qui resterait de regulier.
+				const double Noise = 2.0 * (AnastasisWorldNoise::Fbm(Arc[K] / (0.7 * Lambda), 0.5, NoiseSeed) - 0.5);
+				const double Wave = FMath::Sin(Phase + PhaseA) + Skew * FMath::Sin(2.13 * Phase + PhaseB) + 0.8 * Noise;
 				const FVector2D Tangent = (Pts[K + 1].P - Pts[K - 1].P).GetSafeNormal();
 				const FVector2D Normal(-Tangent.Y, Tangent.X);
-				double Offset = Amp * Wave / (1.0 + Skew);
+				double Offset = Amp * Wave / (1.0 + Skew + 0.4);
 				// Le meandre reste dans la vallee : pas de boucle qui grimpe sur le versant.
 				for (int32 Try = 0; Try < 3; ++Try)
 				{

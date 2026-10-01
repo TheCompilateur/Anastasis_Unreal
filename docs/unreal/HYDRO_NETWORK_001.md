@@ -161,6 +161,25 @@ Résultat (seed 12345, HG actif) : 19 rivières, 14 têtes, 9 confluences, ordre
 8 plans d'eau dont 1 lac de bassin fermé, 277 cuvettes comblées ; contrôles tous à zéro,
 containment 0.942 (HG coupé : 0.929). Captures : `docs/visual/hydro-network-001/pass2_*`.
 
+## Passe 3 — la ligne droite du ruisseau de la vallée B
+
+Relevé par Alexandre : le bas du ruisseau (confluence en Y → mer sud-ouest) traversait la
+crête en ligne droite. Cause : la courbe écrite `SecondaryBrook` de Human_Geography_V2 avait
+quatre nœuds alignés, et HG y creuse une auge droite ; le méandrage, coupé sur les points
+écrits, n'aurait de toute façon rien pu faire dans des parois droites.
+
+- `AnastasisHumanGeography.cpp` : **donnée écrite modifiée** (mission human-geography-v2).
+  Mêmes extrémités (33,24) et (17,6), même profil d'eau décroissant (4.15 → 2.75 m), quatre
+  nœuds intermédiaires décalés en alternance (±0.4 à ±1.2 tuile). L'auge de HG et la rivière
+  serpentent ensemble. Le test HG qui cite (33,24) ne lit que hauteur et collision : inchangé.
+- Méandrage : plancher de sinuosité (35 % de la largeur, même sur versant raide), longueur
+  d'onde plus courte en pente, terme fBm pour casser la régularité ; les rivières écrites
+  méandrent autour de leur courbe (×0.7) et leurs points sont lissés comme les autres (plus
+  de coude à chaque nœud).
+
+Capture : `docs/visual/hydro-network-001/pass3_brook_before_after.png` (avant, essai à coudes,
+retenu).
+
 Hors périmètre, signalé : l'anneau d'horizon prolonge l'exutoire nord par un lit sombre qui
 s'arrête, et la mer sud-ouest par une langue d'eau ; c'est `AnastasisTerrainHorizon`.
 
