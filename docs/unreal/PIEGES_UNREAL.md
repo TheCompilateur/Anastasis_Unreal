@@ -43,6 +43,14 @@ quelles fenêtres sont apparues.
 **Parade** : `Get-CimInstance Win32_Process -Filter "Name LIKE '%Unreal%'"` — la ligne de commande dit à quel
 worktree appartient chaque éditeur. Attendre une fenêtre calme, relancer. Ne pas tuer l'éditeur d'un autre.
 
+### Le script attend sans rien lancer : `EDITOR_GATE::WAIT`, puis `EDITOR_GATE::TIMEOUT`
+**Cause** : la porte mémoire de `Start-AnastasisEditor` (`AGENTS.md`, « Porte mémoire ») : déjà deux éditeurs
+ouverts, ou moins de 3 Go de RAM disponible, ou moins de 8 Go de marge d'engagement. Avant elle, ces
+lancements partaient quand même et mouraient faute de mémoire (2026-09-30 : douze alertes Windows 2004
+« mémoire virtuelle insuffisante » en une soirée).
+**Parade** : la ligne nomme les pids ; leur ligne de commande dit à quel worktree ils appartiennent. Attendre,
+relancer. Ne pas tuer l'éditeur d'un autre, ne pas poser `ANASTASIS_EDITOR_GATE=0` de soi-même.
+
 ### `Unable to build while Live Coding is active` alors que tu as passé `-NoLiveCoding`
 **Tu vois** : `Result: Failed (OtherCompilationError)`, exit 6.
 **Cause** : le verrou est **global à la machine** : n'importe quel `UnrealEditor.exe` ouvert, même d'un autre

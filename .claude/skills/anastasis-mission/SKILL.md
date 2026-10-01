@@ -47,6 +47,7 @@ Si `finish` échoue :
 | `TESTS::FAIL lanceur bloque`, ou `RUN_INCOMPLET` | lire le log avant tout : `PIEGES_UNREAL.md` (éditeur fermé, VRAM, machine saturée) |
 | un test marqué sort `Fail` | lire la sortie du test lui-même ; ne jamais toucher au marqueur ni au registre |
 | machine saturée (RAM libre < 4 Go, éditeur > 5 min au boot) | attendre une fenêtre calme, relancer ; ne pas tuer l'éditeur d'un autre |
+| `EDITOR_GATE::WAIT` / `EDITOR_GATE::TIMEOUT` | porte mémoire (`AGENTS.md`) : trop d'éditeurs ou de RAM prise ; relancer plus tard, jamais `ANASTASIS_EDITOR_GATE=0` sans mandat |
 
 ## 4. Verser (rôle intégrateur, sur demande d'Alexandre)
 

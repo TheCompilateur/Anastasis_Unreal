@@ -234,6 +234,25 @@ fonctionnent comme avant. `ANASTASIS_EDITOR_VISIBLE=1` rétablit la fenêtre nor
 éditeur travailler, ou débloquer une boîte de dialogue). `ANASTASIS_EDITOR_GUARD_LOG=<fichier>` journalise
 le gardien.
 
+### Porte mémoire — un éditeur ne démarre que si la machine peut le porter
+
+La machine a 16 Go. Un éditeur en prend 8 à 13 Go. Le 2026-09-30, Windows a levé douze alertes « mémoire
+virtuelle insuffisante » en une soirée, chaque fois avec deux ou trois éditeurs d'agents plus une
+compilation : tout gelait, puis un éditeur mourait, et son agent cherchait une régression.
+
+`Start-AnastasisEditor` attend donc, sous un verrou global à la machine, que les trois conditions tiennent :
+
+| Condition | Défaut | Variable |
+|---|---|---|
+| éditeurs Unreal ouverts (`UnrealEditor`, `UnrealEditor-Cmd`, **celui d'Alexandre compris**) | < 2 | `ANASTASIS_EDITOR_MAX` |
+| RAM disponible | ≥ 3 Go | `ANASTASIS_EDITOR_MIN_RAM_GB` |
+| marge avant la limite de mémoire engagée | ≥ 8 Go | `ANASTASIS_EDITOR_MIN_COMMIT_GB` |
+
+Pendant l'attente, une ligne `EDITOR_GATE::WAIT` par minute dit ce qui bloque. Au bout de 45 min
+(`ANASTASIS_EDITOR_WAIT_MIN`) : `EDITOR_GATE::TIMEOUT`, levé comme une erreur. **C'est une machine saturée,
+pas une régression** : relancer plus tard. Ne jamais fermer l'éditeur d'un autre pour passer.
+`ANASTASIS_EDITOR_GATE=0` supprime la porte — sur demande d'Alexandre seulement.
+
 ## Index de `tools/unreal/`
 
 Chaque `.ps1` lance l'éditeur de **son** worktree (racine déduite de son chemin), discrètement (voir
@@ -249,7 +268,7 @@ Opérateur et portails :
 | `test-agent-worktree.ps1` | banc d'essai de `integrate` / `prune` sur un dépôt jetable (13 contrôles) ; à relancer après toute modification de `agent-worktree.ps1` |
 | `mcp-port.ps1` | port MCP d'une racine, à dot-sourcer |
 | `tools-index.ps1` | contrôle cet index contre le dossier, à dot-sourcer : `finish` bloque, `health` passe YELLOW |
-| `editor-launch.ps1` | `Start-AnastasisEditor` : lancement d'Unreal sans focus, avec gardien, à dot-sourcer |
+| `editor-launch.ps1` | `Start-AnastasisEditor` : lancement d'Unreal sans focus, avec gardien, derrière la porte mémoire, à dot-sourcer |
 | `editor-window-guard.ps1` | gardien lancé par `Start-AnastasisEditor` : fenêtres hors écran, focus rendu |
 | `report-tests.ps1` | suite `Anastasis`, classée PASS / KNOWN_EXPECTED_FAILURE / FAIL, refuse un run tronqué |
 | `project-health.ps1` | rapport de santé des preuves (appelé par `health`) ; absent ou périmé ≠ PASS |

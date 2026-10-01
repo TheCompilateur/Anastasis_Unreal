@@ -23,6 +23,18 @@
 #
 # ANASTASIS_EDITOR_VISIBLE=1 : comportement d'avant (fenetre normale, pas de gardien),
 # pour regarder un editeur travailler.
+#
+# Porte memoire (Invoke-AnastasisEditorGated). Le 2026-09-30, douze alertes Windows
+# "memoire virtuelle insuffisante" en une soiree : chaque fois deux ou trois editeurs
+# d'agents a 8-13 Go chacun, sur une machine de 16 Go, plus une compilation. Tout gelait,
+# puis un editeur mourait faute de memoire, et l'agent cherchait une regression. Un
+# lancement attend donc que la machine puisse le porter : moins de ANASTASIS_EDITOR_MAX
+# editeurs Unreal ouverts (2, l'editeur d'Alexandre compte), au moins
+# ANASTASIS_EDITOR_MIN_RAM_GB de RAM disponible (3) et ANASTASIS_EDITOR_MIN_COMMIT_GB de
+# marge avant la limite de memoire engagee (8). Au-dela de ANASTASIS_EDITOR_WAIT_MIN
+# minutes (45), EDITOR_GATE::TIMEOUT. Le compte d'editeurs couvre la montee en memoire d'un
+# editeur qui vient de demarrer, que la RAM ne montre pas encore. Le verrou nomme rend
+# "verifier puis lancer" atomique entre agents. ANASTASIS_EDITOR_GATE=0 : pas de porte.
 
 if (-not ('AnastasisLaunch' -as [type])) {
   Add-Type -TypeDefinition @'
@@ -66,21 +78,113 @@ public static class AnastasisLaunch {
 '@
 }
 
+if (-not ('AnastasisMemory' -as [type])) {
+  Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class AnastasisMemory {
+  [StructLayout(LayoutKind.Sequential)]
+  struct MEMORYSTATUSEX {
+    public uint dwLength, dwMemoryLoad;
+    public ulong ullTotalPhys, ullAvailPhys, ullTotalPageFile, ullAvailPageFile,
+      ullTotalVirtual, ullAvailVirtual, ullAvailExtendedVirtual;
+  }
+  [DllImport("kernel32.dll", SetLastError = true)] static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX m);
+  // { RAM disponible, marge avant la limite d'engagement }, en octets.
+  public static ulong[] Read() {
+    var m = new MEMORYSTATUSEX(); m.dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
+    if (!GlobalMemoryStatusEx(ref m)) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+    return new ulong[] { m.ullAvailPhys, m.ullAvailPageFile };
+  }
+}
+'@
+}
+
+function Get-AnastasisEditorLoad {
+  $mem = [AnastasisMemory]::Read()
+  $eds = @(Get-Process UnrealEditor, UnrealEditor-Cmd -ErrorAction SilentlyContinue)
+  [pscustomobject]@{
+    Editors  = $eds.Count
+    Pids     = (($eds | ForEach-Object Id) -join ',')
+    RamGB    = [math]::Round($mem[0] / 1GB, 1)
+    CommitGB = [math]::Round($mem[1] / 1GB, 1)
+  }
+}
+
+function Get-AnastasisGateSetting([string]$Name, [double]$Default) {
+  $v = [Environment]::GetEnvironmentVariable($Name)
+  if ($v) { return [double]$v } # cast PowerShell : culture invariante, "2.5" partout
+  return $Default
+}
+
+# Lance $Launch quand la machine peut porter un editeur de plus (voir l'en-tete), et rend
+# ce qu'il rend. Les messages passent par Write-Host pour ne pas se meler au processus rendu.
+function Invoke-AnastasisEditorGated {
+  param(
+    [Parameter(Mandatory = $true)][scriptblock]$Launch,
+    [int]$MaxEditors = (Get-AnastasisGateSetting 'ANASTASIS_EDITOR_MAX' 2),
+    [double]$MinRamGB = (Get-AnastasisGateSetting 'ANASTASIS_EDITOR_MIN_RAM_GB' 3),
+    [double]$MinCommitGB = (Get-AnastasisGateSetting 'ANASTASIS_EDITOR_MIN_COMMIT_GB' 8),
+    [double]$TimeoutMinutes = (Get-AnastasisGateSetting 'ANASTASIS_EDITOR_WAIT_MIN' 45),
+    [int]$PollSeconds = 15
+  )
+  if ($env:ANASTASIS_EDITOR_GATE -eq '0') { return & $Launch }
+  $gate = New-Object System.Threading.Mutex($false, 'Global\AnastasisEditorGate')
+  $gateStart = Get-Date
+  $gateNote = [datetime]::MinValue
+  try {
+    while ($true) {
+      try { [void]$gate.WaitOne() } catch {
+        # Un lanceur tue en tenant le verrou le laisse abandonne : on en herite, c'est voulu.
+        $e = $_.Exception
+        if (-not ($e -is [System.Threading.AbandonedMutexException] -or
+                  $e.InnerException -is [System.Threading.AbandonedMutexException])) { throw }
+      }
+      $load = Get-AnastasisEditorLoad
+      $blocked = @()
+      if ($load.Editors -ge $MaxEditors) { $blocked += "editeurs=$($load.Editors)/$MaxEditors (pids $($load.Pids))" }
+      if ($load.RamGB -lt $MinRamGB) { $blocked += "ram_dispo=$($load.RamGB)/$MinRamGB Go" }
+      if ($load.CommitGB -lt $MinCommitGB) { $blocked += "marge_engagee=$($load.CommitGB)/$MinCommitGB Go" }
+      if (-not $blocked.Count) {
+        try { $launched = & $Launch } finally { $gate.ReleaseMutex() }
+        $waitedMin = ((Get-Date) - $gateStart).TotalMinutes
+        if ($waitedMin -ge 0.25) { Write-Host ('EDITOR_GATE::OPEN apres {0:N1} min' -f $waitedMin) }
+        return $launched
+      }
+      $gate.ReleaseMutex()
+      $waitedMin = ((Get-Date) - $gateStart).TotalMinutes
+      if ($waitedMin -ge $TimeoutMinutes) {
+        throw ("EDITOR_GATE::TIMEOUT apres {0:N0} min : {1}. Machine saturee, pas une regression : " +
+          "relancer quand un editeur se ferme ; ANASTASIS_EDITOR_GATE=0 force le lancement.") -f $waitedMin, ($blocked -join ' ')
+      }
+      if (((Get-Date) - $gateNote).TotalSeconds -ge 60) {
+        Write-Host ('EDITOR_GATE::WAIT {0} -- attente {1:N0}/{2:N0} min (editor-launch.ps1)' -f ($blocked -join ' '), $waitedMin, $TimeoutMinutes)
+        $gateNote = Get-Date
+      }
+      Start-Sleep -Seconds $PollSeconds
+    }
+  } finally {
+    $gate.Dispose()
+  }
+}
+
 function Start-AnastasisEditor {
   param(
     [Parameter(Mandatory = $true)][string]$FilePath,
     [string[]]$ArgumentList = @()
   )
-  if ($env:ANASTASIS_EDITOR_VISIBLE -eq '1') {
-    return Start-Process $FilePath -ArgumentList $ArgumentList -PassThru
+  $p = Invoke-AnastasisEditorGated {
+    if ($env:ANASTASIS_EDITOR_VISIBLE -eq '1') {
+      Start-Process $FilePath -ArgumentList $ArgumentList -PassThru
+    } elseif ($FilePath -match '-Cmd\.exe$') {
+      Start-Process $FilePath -ArgumentList $ArgumentList -WindowStyle Hidden -PassThru
+    } else {
+      $SW_SHOWNOACTIVATE = 4
+      $cmd = '"' + $FilePath + '" ' + ($ArgumentList -join ' ')
+      [AnastasisLaunch]::Start($FilePath, $cmd, (Get-Location).ProviderPath, $SW_SHOWNOACTIVATE)
+    }
   }
-  if ($FilePath -match '-Cmd\.exe$') {
-    $p = Start-Process $FilePath -ArgumentList $ArgumentList -WindowStyle Hidden -PassThru
-  } else {
-    $SW_SHOWNOACTIVATE = 4
-    $cmd = '"' + $FilePath + '" ' + ($ArgumentList -join ' ')
-    $p = [AnastasisLaunch]::Start($FilePath, $cmd, (Get-Location).ProviderPath, $SW_SHOWNOACTIVATE)
-  }
+  if ($env:ANASTASIS_EDITOR_VISIBLE -eq '1') { return $p }
   $guard = Join-Path $PSScriptRoot 'editor-window-guard.ps1'
   $guardArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
     '-File', ('"' + $guard + '"'), '-ProcessId', $p.Id)
