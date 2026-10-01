@@ -1,0 +1,1315 @@
+{
+ "_doc": "Ecrit par villager-png.py sheets -- ne pas editer : changer le manifeste et relancer.",
+ "people": [
+  {
+   "id": "CHR_M_Adult_001",
+   "category": "Adult_Male",
+   "stature_cm": 173,
+   "body_px": 300,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "fourche"
+  },
+  {
+   "id": "CHR_M_Adult_002",
+   "category": "Adult_Male",
+   "stature_cm": 171,
+   "body_px": 296,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "porteur (marteau, sac)"
+  },
+  {
+   "id": "CHR_M_Adult_003",
+   "category": "Adult_Male",
+   "stature_cm": 165,
+   "body_px": 285,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "artisan (marteau)"
+  },
+  {
+   "id": "CHR_M_Adult_004",
+   "category": "Adult_Male",
+   "stature_cm": 169,
+   "body_px": 293,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "garde (lance, bouclier)"
+  },
+  {
+   "id": "CHR_F_Adult_001",
+   "category": "Adult_Female",
+   "stature_cm": 160,
+   "body_px": 293,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "panier"
+  },
+  {
+   "id": "CHR_F_Adult_002",
+   "category": "Adult_Female",
+   "stature_cm": 154,
+   "body_px": 283,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "porteuse d'eau (cruche)"
+  },
+  {
+   "id": "CHR_F_Adult_003",
+   "category": "Adult_Female",
+   "stature_cm": 156,
+   "body_px": 286,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "herbes"
+  },
+  {
+   "id": "CHR_F_Adult_004",
+   "category": "Adult_Female",
+   "stature_cm": 160,
+   "body_px": 294,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "panier"
+  },
+  {
+   "id": "CHR_M_Child_001",
+   "category": "Child_Male",
+   "stature_cm": 138,
+   "body_px": 202,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": false,
+   "facing": "left",
+   "jobs": [],
+   "pose": "court",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Child_002",
+   "category": "Child_Male",
+   "stature_cm": 136,
+   "body_px": 199,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Child_003",
+   "category": "Child_Male",
+   "stature_cm": 112,
+   "body_px": 164,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Child_001",
+   "category": "Child_Female",
+   "stature_cm": 121,
+   "body_px": 192,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Child_002",
+   "category": "Child_Female",
+   "stature_cm": 127,
+   "body_px": 202,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Child_003",
+   "category": "Child_Female",
+   "stature_cm": 121,
+   "body_px": 192,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Elder_001",
+   "category": "Elder_Male",
+   "stature_cm": 164,
+   "body_px": 230,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "baton"
+  },
+  {
+   "id": "CHR_M_Elder_002",
+   "category": "Elder_Male",
+   "stature_cm": 154,
+   "body_px": 216,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "canne"
+  },
+  {
+   "id": "CHR_M_Elder_003",
+   "category": "Elder_Male",
+   "stature_cm": 168,
+   "body_px": 236,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "pretre (livre, chapelet)"
+  },
+  {
+   "id": "CHR_F_Elder_001",
+   "category": "Elder_Female",
+   "stature_cm": 149,
+   "body_px": 213,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "panier"
+  },
+  {
+   "id": "CHR_F_Elder_002",
+   "category": "Elder_Female",
+   "stature_cm": 153,
+   "body_px": 220,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "canne"
+  },
+  {
+   "id": "CHR_F_Elder_003",
+   "category": "Elder_Female",
+   "stature_cm": 109,
+   "body_px": 203,
+   "sheet": "Sheets/serie-1.png",
+   "in_game": false,
+   "facing": "left",
+   "jobs": [],
+   "pose": "assis",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Adult_005",
+   "category": "Adult_Male",
+   "stature_cm": 171,
+   "body_px": 222,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "porteur (sac)"
+  },
+  {
+   "id": "CHR_M_Adult_006",
+   "category": "Adult_Male",
+   "stature_cm": 172,
+   "body_px": 224,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "baton de marche"
+  },
+  {
+   "id": "CHR_M_Adult_007",
+   "category": "Adult_Male",
+   "stature_cm": 165,
+   "body_px": 215,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "porteur (poutre)"
+  },
+  {
+   "id": "CHR_M_Adult_008",
+   "category": "Adult_Male",
+   "stature_cm": 171,
+   "body_px": 222,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "artisan (hachette)"
+  },
+  {
+   "id": "CHR_M_Adult_009",
+   "category": "Adult_Male",
+   "stature_cm": 167,
+   "body_px": 217,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "pecheur (filet)"
+  },
+  {
+   "id": "CHR_M_Adult_010",
+   "category": "Adult_Male",
+   "stature_cm": 170,
+   "body_px": 221,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "baton de marche"
+  },
+  {
+   "id": "CHR_M_Adult_011",
+   "category": "Adult_Male",
+   "stature_cm": 170,
+   "body_px": 221,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "moine"
+  },
+  {
+   "id": "CHR_M_Adult_012",
+   "category": "Adult_Male",
+   "stature_cm": 170,
+   "body_px": 221,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "garde (lance, bouclier)"
+  },
+  {
+   "id": "CHR_F_Adult_005",
+   "category": "Adult_Female",
+   "stature_cm": 157,
+   "body_px": 218,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "panier"
+  },
+  {
+   "id": "CHR_F_Adult_006",
+   "category": "Adult_Female",
+   "stature_cm": 159,
+   "body_px": 221,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "mains vides"
+  },
+  {
+   "id": "CHR_F_Adult_007",
+   "category": "Adult_Female",
+   "stature_cm": 158,
+   "body_px": 219,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "porteuse d'eau (cruche)"
+  },
+  {
+   "id": "CHR_F_Adult_008",
+   "category": "Adult_Female",
+   "stature_cm": 158,
+   "body_px": 219,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "panier"
+  },
+  {
+   "id": "CHR_F_Adult_009",
+   "category": "Adult_Female",
+   "stature_cm": 155,
+   "body_px": 215,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "panier"
+  },
+  {
+   "id": "CHR_F_Adult_010",
+   "category": "Adult_Female",
+   "stature_cm": 160,
+   "body_px": 222,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "herbes"
+  },
+  {
+   "id": "CHR_F_Adult_011",
+   "category": "Adult_Female",
+   "stature_cm": 158,
+   "body_px": 219,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "porteuse (cruche, panier)"
+  },
+  {
+   "id": "CHR_F_Adult_012",
+   "category": "Adult_Female",
+   "stature_cm": 158,
+   "body_px": 219,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "mere (bebe)"
+  },
+  {
+   "id": "CHR_M_Child_004",
+   "category": "Child_Male",
+   "stature_cm": 135,
+   "body_px": 165,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Child_005",
+   "category": "Child_Male",
+   "stature_cm": 133,
+   "body_px": 163,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Child_006",
+   "category": "Child_Male",
+   "stature_cm": 123,
+   "body_px": 151,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": false,
+   "facing": "left",
+   "jobs": [],
+   "pose": "court",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Child_007",
+   "category": "Child_Male",
+   "stature_cm": 120,
+   "body_px": 147,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Child_008",
+   "category": "Child_Male",
+   "stature_cm": 124,
+   "body_px": 152,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Child_009",
+   "category": "Child_Male",
+   "stature_cm": 117,
+   "body_px": 144,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Child_004",
+   "category": "Child_Female",
+   "stature_cm": 124,
+   "body_px": 164,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Child_005",
+   "category": "Child_Female",
+   "stature_cm": 121,
+   "body_px": 160,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Child_006",
+   "category": "Child_Female",
+   "stature_cm": 121,
+   "body_px": 160,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Child_007",
+   "category": "Child_Female",
+   "stature_cm": 121,
+   "body_px": 159,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Child_008",
+   "category": "Child_Female",
+   "stature_cm": 114,
+   "body_px": 150,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Child_009",
+   "category": "Child_Female",
+   "stature_cm": 118,
+   "body_px": 156,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Elder_004",
+   "category": "Elder_Male",
+   "stature_cm": 164,
+   "body_px": 175,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "baton"
+  },
+  {
+   "id": "CHR_M_Elder_005",
+   "category": "Elder_Male",
+   "stature_cm": 170,
+   "body_px": 181,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "pretre"
+  },
+  {
+   "id": "CHR_M_Elder_006",
+   "category": "Elder_Male",
+   "stature_cm": 118,
+   "body_px": 164,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": false,
+   "facing": "left",
+   "jobs": [],
+   "pose": "assis",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Elder_007",
+   "category": "Elder_Male",
+   "stature_cm": 162,
+   "body_px": 173,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "moine (chapelet)"
+  },
+  {
+   "id": "CHR_F_Elder_004",
+   "category": "Elder_Female",
+   "stature_cm": 147,
+   "body_px": 171,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "panier"
+  },
+  {
+   "id": "CHR_F_Elder_005",
+   "category": "Elder_Female",
+   "stature_cm": 153,
+   "body_px": 178,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "canne"
+  },
+  {
+   "id": "CHR_F_Elder_006",
+   "category": "Elder_Female",
+   "stature_cm": 151,
+   "body_px": 176,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "mains vides"
+  },
+  {
+   "id": "CHR_F_Elder_007",
+   "category": "Elder_Female",
+   "stature_cm": 109,
+   "body_px": 159,
+   "sheet": "Sheets/serie-2.png",
+   "in_game": false,
+   "facing": "left",
+   "jobs": [],
+   "pose": "assis",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Adult_013",
+   "category": "Adult_Female",
+   "stature_cm": 155,
+   "body_px": 265,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "porteuse d'eau (amphore)"
+  },
+  {
+   "id": "CHR_F_Adult_014",
+   "category": "Adult_Female",
+   "stature_cm": 159,
+   "body_px": 272,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "mains vides"
+  },
+  {
+   "id": "CHR_F_Adult_015",
+   "category": "Adult_Female",
+   "stature_cm": 157,
+   "body_px": 267,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "deux paniers d'herbes"
+  },
+  {
+   "id": "CHR_F_Adult_016",
+   "category": "Adult_Female",
+   "stature_cm": 158,
+   "body_px": 270,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "femme pieuse (croix)"
+  },
+  {
+   "id": "CHR_F_Adult_017",
+   "category": "Adult_Female",
+   "stature_cm": 157,
+   "body_px": 267,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "tisseuse (etoffes)"
+  },
+  {
+   "id": "CHR_F_Adult_018",
+   "category": "Adult_Female",
+   "stature_cm": 160,
+   "body_px": 273,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "boulangere (pain)"
+  },
+  {
+   "id": "CHR_F_Adult_019",
+   "category": "Adult_Female",
+   "stature_cm": 158,
+   "body_px": 270,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "panier de fruits"
+  },
+  {
+   "id": "CHR_F_Adult_020",
+   "category": "Adult_Female",
+   "stature_cm": 155,
+   "body_px": 265,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "artisane (panier, sacoche)"
+  },
+  {
+   "id": "CHR_F_Adult_021",
+   "category": "Adult_Female",
+   "stature_cm": 155,
+   "body_px": 265,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "herbes"
+  },
+  {
+   "id": "CHR_F_Adult_022",
+   "category": "Adult_Female",
+   "stature_cm": 159,
+   "body_px": 272,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "porteuse de bois"
+  },
+  {
+   "id": "CHR_F_Adult_023",
+   "category": "Adult_Female",
+   "stature_cm": 158,
+   "body_px": 269,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "mains vides"
+  },
+  {
+   "id": "CHR_F_Adult_024",
+   "category": "Adult_Female",
+   "stature_cm": 159,
+   "body_px": 272,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "voyageuse (baton)"
+  },
+  {
+   "id": "CHR_F_Child_010",
+   "category": "Child_Female",
+   "stature_cm": 121,
+   "body_px": 166,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Child_011",
+   "category": "Child_Female",
+   "stature_cm": 120,
+   "body_px": 164,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Child_012",
+   "category": "Child_Female",
+   "stature_cm": 117,
+   "body_px": 160,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Child_013",
+   "category": "Child_Female",
+   "stature_cm": 122,
+   "body_px": 168,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Child_014",
+   "category": "Child_Female",
+   "stature_cm": 121,
+   "body_px": 166,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Child_015",
+   "category": "Child_Female",
+   "stature_cm": 122,
+   "body_px": 168,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Elder_009",
+   "category": "Elder_Female",
+   "stature_cm": 152,
+   "body_px": 172,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "canne"
+  },
+  {
+   "id": "CHR_F_Elder_010",
+   "category": "Elder_Female",
+   "stature_cm": 109,
+   "body_px": 163,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": false,
+   "facing": "left",
+   "jobs": [],
+   "pose": "assis",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Elder_011",
+   "category": "Elder_Female",
+   "stature_cm": 109,
+   "body_px": 169,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": false,
+   "facing": "left",
+   "jobs": [],
+   "pose": "assis",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Elder_012",
+   "category": "Elder_Female",
+   "stature_cm": 150,
+   "body_px": 169,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "herbes"
+  },
+  {
+   "id": "CHR_F_Elder_013",
+   "category": "Elder_Female",
+   "stature_cm": 109,
+   "body_px": 169,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": false,
+   "facing": "left",
+   "jobs": [],
+   "pose": "assis",
+   "note": ""
+  },
+  {
+   "id": "CHR_F_Elder_014",
+   "category": "Elder_Female",
+   "stature_cm": 109,
+   "body_px": 172,
+   "sheet": "Sheets/serie-4.png",
+   "in_game": false,
+   "facing": "left",
+   "jobs": [],
+   "pose": "assis",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Adult_013",
+   "category": "Adult_Male",
+   "stature_cm": 171,
+   "body_px": 245,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
+   "pose": "debout",
+   "note": "fourche"
+  },
+  {
+   "id": "CHR_M_Adult_014",
+   "category": "Adult_Male",
+   "stature_cm": 168,
+   "body_px": 241,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "pecheur (filet)"
+  },
+  {
+   "id": "CHR_M_Adult_015",
+   "category": "Adult_Male",
+   "stature_cm": 173,
+   "body_px": 248,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "bucheron (hache)"
+  },
+  {
+   "id": "CHR_M_Adult_016",
+   "category": "Adult_Male",
+   "stature_cm": 169,
+   "body_px": 242,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "mains vides, outils a la ceinture"
+  },
+  {
+   "id": "CHR_M_Adult_017",
+   "category": "Adult_Male",
+   "stature_cm": 173,
+   "body_px": 248,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "mains vides"
+  },
+  {
+   "id": "CHR_M_Adult_018",
+   "category": "Adult_Male",
+   "stature_cm": 172,
+   "body_px": 246,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "porteur (hotte)"
+  },
+  {
+   "id": "CHR_M_Adult_019",
+   "category": "Adult_Male",
+   "stature_cm": 169,
+   "body_px": 242,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "mains vides"
+  },
+  {
+   "id": "CHR_M_Adult_020",
+   "category": "Adult_Male",
+   "stature_cm": 167,
+   "body_px": 239,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "garde (lance, bouclier)"
+  },
+  {
+   "id": "CHR_M_Adult_021",
+   "category": "Adult_Male",
+   "stature_cm": 170,
+   "body_px": 243,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "moine (livre)"
+  },
+  {
+   "id": "CHR_M_Adult_022",
+   "category": "Adult_Male",
+   "stature_cm": 169,
+   "body_px": 242,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "berger (houlette)"
+  },
+  {
+   "id": "CHR_M_Adult_023",
+   "category": "Adult_Male",
+   "stature_cm": 171,
+   "body_px": 245,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "voyageur (baton)"
+  },
+  {
+   "id": "CHR_M_Adult_024",
+   "category": "Adult_Male",
+   "stature_cm": 170,
+   "body_px": 244,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": "bucheron (hache, fagot)"
+  },
+  {
+   "id": "CHR_M_Child_010",
+   "category": "Child_Male",
+   "stature_cm": 124,
+   "body_px": 161,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Child_011",
+   "category": "Child_Male",
+   "stature_cm": 123,
+   "body_px": 160,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Child_012",
+   "category": "Child_Male",
+   "stature_cm": 125,
+   "body_px": 163,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Child_013",
+   "category": "Child_Male",
+   "stature_cm": 124,
+   "body_px": 162,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Child_014",
+   "category": "Child_Male",
+   "stature_cm": 124,
+   "body_px": 161,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Child_015",
+   "category": "Child_Male",
+   "stature_cm": 125,
+   "body_px": 163,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [],
+   "pose": "debout",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Elder_009",
+   "category": "Elder_Male",
+   "stature_cm": 164,
+   "body_px": 164,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": true,
+   "facing": "left",
+   "jobs": [
+    "settler"
+   ],
+   "pose": "debout",
+   "note": "canne"
+  },
+  {
+   "id": "CHR_M_Elder_010",
+   "category": "Elder_Male",
+   "stature_cm": 118,
+   "body_px": 155,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": false,
+   "facing": "left",
+   "jobs": [],
+   "pose": "assis",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Elder_011",
+   "category": "Elder_Male",
+   "stature_cm": 118,
+   "body_px": 164,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": false,
+   "facing": "left",
+   "jobs": [],
+   "pose": "assis",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Elder_012",
+   "category": "Elder_Male",
+   "stature_cm": 118,
+   "body_px": 163,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": false,
+   "facing": "left",
+   "jobs": [],
+   "pose": "assis",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Elder_013",
+   "category": "Elder_Male",
+   "stature_cm": 118,
+   "body_px": 164,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": false,
+   "facing": "left",
+   "jobs": [],
+   "pose": "assis",
+   "note": ""
+  },
+  {
+   "id": "CHR_M_Elder_014",
+   "category": "Elder_Male",
+   "stature_cm": 118,
+   "body_px": 161,
+   "sheet": "Sheets/serie-5.png",
+   "in_game": false,
+   "facing": "left",
+   "jobs": [],
+   "pose": "assis",
+   "note": ""
+  }
+ ]
+}

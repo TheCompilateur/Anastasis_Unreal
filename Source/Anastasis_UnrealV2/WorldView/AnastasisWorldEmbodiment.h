@@ -196,6 +196,15 @@ protected:
 	 */
 	UMaterialInterface* ResolveWaterMaterial();
 
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> WaterLookMaterial;
+
+	/**
+	 * WATER_LOOK_001 -- M_AnastasisWater (Single Layer Water). Repli sur le materiau de rive
+	 * si l'asset manque : l'eau rend alors comme avant, et le log le dit.
+	 */
+	UMaterialInterface* ResolveWaterLookMaterial();
+
 	AnastasisWorldView::FWorldVisualSnapshot Snapshot;
 	AnastasisWorldView::FPlan Plan;
 	TArray<int32> LocalInstanceIndex;

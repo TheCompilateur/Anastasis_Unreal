@@ -1,0 +1,636 @@
+{
+  "_doc": "VILLAGER_PNG_001 -- autorite de la population visuelle. Les individus sont DESSINES sur les planches de Sheets/ (series 1, 2, 4 et 5, fournies par Alexandre le 2026-10-01) ; ce fichier dit ou ils sont et qui ils sont. `villager-png.py sheets` les decoupe dans Raw/ et ecrit villager-extract.json (statures mesurees). Purement visuel : la simulation ne lit pas ce fichier.",
+  "canvas": {
+    "width": 512,
+    "height": 1024,
+    "cm_per_canvas_height": 256,
+    "foot_margin_px": 16
+  },
+  "categories": {
+    "Adult_Male": {
+      "sex": "M",
+      "life_stage": "Adult",
+      "stature_cm": 170
+    },
+    "Adult_Female": {
+      "sex": "F",
+      "life_stage": "Adult",
+      "stature_cm": 158
+    },
+    "Elder_Male": {
+      "sex": "M",
+      "life_stage": "Elder",
+      "stature_cm": 164
+    },
+    "Elder_Female": {
+      "sex": "F",
+      "life_stage": "Elder",
+      "stature_cm": 151
+    },
+    "Child_Male": {
+      "sex": "M",
+      "life_stage": "Child",
+      "stature_cm": 124
+    },
+    "Child_Female": {
+      "sex": "F",
+      "life_stage": "Child",
+      "stature_cm": 121
+    }
+  },
+  "sheets": [
+    {
+      "file": "Sheets/serie-1.png",
+      "panels": [
+        {
+          "category": "Adult_Male",
+          "rect": [
+            23,
+            156,
+            764,
+            506
+          ],
+          "ids": [
+            "CHR_M_Adult_001",
+            "CHR_M_Adult_002",
+            "CHR_M_Adult_003",
+            "CHR_M_Adult_004"
+          ]
+        },
+        {
+          "category": "Adult_Female",
+          "rect": [
+            773,
+            156,
+            1513,
+            506
+          ],
+          "ids": [
+            "CHR_F_Adult_001",
+            "CHR_F_Adult_002",
+            "CHR_F_Adult_003",
+            "CHR_F_Adult_004"
+          ]
+        },
+        {
+          "category": "Child_Male",
+          "rect": [
+            23,
+            548,
+            374,
+            843
+          ],
+          "ids": [
+            "CHR_M_Child_001",
+            "CHR_M_Child_002",
+            "CHR_M_Child_003"
+          ]
+        },
+        {
+          "category": "Child_Female",
+          "rect": [
+            383,
+            548,
+            764,
+            843
+          ],
+          "ids": [
+            "CHR_F_Child_001",
+            "CHR_F_Child_002",
+            "CHR_F_Child_003"
+          ]
+        },
+        {
+          "category": "Elder_Male",
+          "rect": [
+            772,
+            548,
+            1144,
+            843
+          ],
+          "ids": [
+            "CHR_M_Elder_001",
+            "CHR_M_Elder_002",
+            "CHR_M_Elder_003"
+          ]
+        },
+        {
+          "category": "Elder_Female",
+          "rect": [
+            1153,
+            548,
+            1513,
+            843
+          ],
+          "ids": [
+            "CHR_F_Elder_001",
+            "CHR_F_Elder_002",
+            "CHR_F_Elder_003"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "Sheets/serie-2.png",
+      "panels": [
+        {
+          "category": "Adult_Male",
+          "rect": [
+            8,
+            129,
+            779,
+            395
+          ],
+          "ids": [
+            "CHR_M_Adult_005",
+            "CHR_M_Adult_006",
+            "CHR_M_Adult_007",
+            "CHR_M_Adult_008",
+            "CHR_M_Adult_009",
+            "CHR_M_Adult_010",
+            "CHR_M_Adult_011",
+            "CHR_M_Adult_012"
+          ]
+        },
+        {
+          "category": "Adult_Female",
+          "rect": [
+            787,
+            131,
+            1527,
+            395
+          ],
+          "ids": [
+            "CHR_F_Adult_005",
+            "CHR_F_Adult_006",
+            "CHR_F_Adult_007",
+            "CHR_F_Adult_008",
+            "CHR_F_Adult_009",
+            "CHR_F_Adult_010",
+            "CHR_F_Adult_011",
+            "CHR_F_Adult_012"
+          ]
+        },
+        {
+          "category": "Child_Male",
+          "rect": [
+            7,
+            436,
+            441,
+            659
+          ],
+          "ids": [
+            "CHR_M_Child_004",
+            "CHR_M_Child_005",
+            "CHR_M_Child_006",
+            "CHR_M_Child_007",
+            "CHR_M_Child_008",
+            "CHR_M_Child_009"
+          ],
+          "_note": "la planche etiquette deux figures CHR_M_Child_007 : la 5e devient 008, la 6e (etiquetee 008) devient 009"
+        },
+        {
+          "category": "Child_Female",
+          "rect": [
+            447,
+            436,
+            850,
+            659
+          ],
+          "ids": [
+            "CHR_F_Child_004",
+            "CHR_F_Child_005",
+            "CHR_F_Child_006",
+            "CHR_F_Child_007",
+            "CHR_F_Child_008",
+            "CHR_F_Child_009"
+          ]
+        },
+        {
+          "category": "Elder_Male",
+          "rect": [
+            857,
+            437,
+            1190,
+            659
+          ],
+          "ids": [
+            "CHR_M_Elder_004",
+            "CHR_M_Elder_005",
+            "CHR_M_Elder_006",
+            "CHR_M_Elder_007"
+          ]
+        },
+        {
+          "category": "Elder_Female",
+          "rect": [
+            1196,
+            436,
+            1528,
+            659
+          ],
+          "ids": [
+            "CHR_F_Elder_004",
+            "CHR_F_Elder_005",
+            "CHR_F_Elder_006",
+            "CHR_F_Elder_007"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "Sheets/serie-4.png",
+      "panels": [
+        {
+          "category": "Adult_Female",
+          "rect": [
+            15,
+            108,
+            1433,
+            424
+          ],
+          "label_lines": 2,
+          "ids": [
+            "CHR_F_Adult_013",
+            "CHR_F_Adult_014",
+            "CHR_F_Adult_015",
+            "CHR_F_Adult_016",
+            "CHR_F_Adult_017",
+            "CHR_F_Adult_018",
+            "CHR_F_Adult_019",
+            "CHR_F_Adult_020",
+            "CHR_F_Adult_021",
+            "CHR_F_Adult_022",
+            "CHR_F_Adult_023",
+            "CHR_F_Adult_024"
+          ]
+        },
+        {
+          "category": "Child_Female",
+          "rect": [
+            15,
+            461,
+            593,
+            668
+          ],
+          "label_lines": 2,
+          "ids": [
+            "CHR_F_Child_010",
+            "CHR_F_Child_011",
+            "CHR_F_Child_012",
+            "CHR_F_Child_013",
+            "CHR_F_Child_014",
+            "CHR_F_Child_015"
+          ],
+          "_note": "la planche numerote ses filles 009-014 ; 009 existe deja (serie 2) : elles deviennent 010-015, dans l'ordre"
+        },
+        {
+          "category": "Elder_Female",
+          "rect": [
+            604,
+            461,
+            1433,
+            669
+          ],
+          "label_lines": 2,
+          "ids": [
+            "CHR_F_Elder_009",
+            "CHR_F_Elder_010",
+            "CHR_F_Elder_011",
+            "CHR_F_Elder_012",
+            "CHR_F_Elder_013",
+            "CHR_F_Elder_014"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "Sheets/serie-5.png",
+      "panels": [
+        {
+          "category": "Adult_Male",
+          "rect": [
+            14,
+            101,
+            1433,
+            390
+          ],
+          "label_lines": 2,
+          "ids": [
+            "CHR_M_Adult_013",
+            "CHR_M_Adult_014",
+            "CHR_M_Adult_015",
+            "CHR_M_Adult_016",
+            "CHR_M_Adult_017",
+            "CHR_M_Adult_018",
+            "CHR_M_Adult_019",
+            "CHR_M_Adult_020",
+            "CHR_M_Adult_021",
+            "CHR_M_Adult_022",
+            "CHR_M_Adult_023",
+            "CHR_M_Adult_024"
+          ]
+        },
+        {
+          "category": "Child_Male",
+          "rect": [
+            14,
+            428,
+            639,
+            631
+          ],
+          "label_lines": 2,
+          "ids": [
+            "CHR_M_Child_010",
+            "CHR_M_Child_011",
+            "CHR_M_Child_012",
+            "CHR_M_Child_013",
+            "CHR_M_Child_014",
+            "CHR_M_Child_015"
+          ],
+          "_note": "la planche numerote ses garcons 009-014 ; 009 existe deja (serie 2) : ils deviennent 010-015, dans l'ordre"
+        },
+        {
+          "category": "Elder_Male",
+          "rect": [
+            650,
+            428,
+            1433,
+            631
+          ],
+          "label_lines": 2,
+          "ids": [
+            "CHR_M_Elder_009",
+            "CHR_M_Elder_010",
+            "CHR_M_Elder_011",
+            "CHR_M_Elder_012",
+            "CHR_M_Elder_013",
+            "CHR_M_Elder_014"
+          ]
+        }
+      ]
+    }
+  ],
+  "overrides": {
+    "_doc": "pose 'assis' : portrait sur la planche, jamais attribue a un habitant qui marche ; stature = 72 % de la categorie. job : metier SIMULE dont le portrait porte l'objet (farmer) ou mains vides (settler) ; sans job, le portrait reste sur la planche (role que la simulation n'a pas). Releve a l'oeil sur les planches decoupees, 2026-10-01.",
+    "CHR_F_Elder_003": {
+      "pose": "assis"
+    },
+    "CHR_M_Elder_006": {
+      "pose": "assis"
+    },
+    "CHR_F_Elder_007": {
+      "pose": "assis"
+    },
+    "CHR_F_Elder_010": {
+      "pose": "assis"
+    },
+    "CHR_F_Elder_011": {
+      "pose": "assis"
+    },
+    "CHR_F_Elder_013": {
+      "pose": "assis"
+    },
+    "CHR_F_Elder_014": {
+      "pose": "assis"
+    },
+    "CHR_M_Elder_010": {
+      "pose": "assis"
+    },
+    "CHR_M_Elder_011": {
+      "pose": "assis"
+    },
+    "CHR_M_Elder_012": {
+      "pose": "assis"
+    },
+    "CHR_M_Elder_013": {
+      "pose": "assis"
+    },
+    "CHR_M_Elder_014": {
+      "pose": "assis"
+    },
+    "CHR_M_Child_001": {
+      "pose": "court"
+    },
+    "CHR_M_Child_006": {
+      "pose": "court"
+    },
+    "CHR_M_Adult_001": {
+      "note": "fourche",
+      "job": "farmer"
+    },
+    "CHR_M_Adult_013": {
+      "note": "fourche",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_001": {
+      "note": "panier",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_003": {
+      "note": "herbes",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_004": {
+      "note": "panier",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_005": {
+      "note": "panier",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_008": {
+      "note": "panier",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_009": {
+      "note": "panier",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_010": {
+      "note": "herbes",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_019": {
+      "note": "panier de fruits",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_021": {
+      "note": "herbes",
+      "job": "farmer"
+    },
+    "CHR_F_Elder_001": {
+      "note": "panier",
+      "job": "farmer"
+    },
+    "CHR_F_Elder_004": {
+      "note": "panier",
+      "job": "farmer"
+    },
+    "CHR_F_Elder_012": {
+      "note": "herbes",
+      "job": "farmer"
+    },
+    "CHR_M_Adult_006": {
+      "note": "baton de marche",
+      "job": "settler"
+    },
+    "CHR_M_Adult_010": {
+      "note": "baton de marche",
+      "job": "settler"
+    },
+    "CHR_M_Adult_016": {
+      "note": "mains vides, outils a la ceinture",
+      "job": "settler"
+    },
+    "CHR_M_Adult_017": {
+      "note": "mains vides",
+      "job": "settler"
+    },
+    "CHR_M_Adult_019": {
+      "note": "mains vides",
+      "job": "settler"
+    },
+    "CHR_F_Adult_006": {
+      "note": "mains vides",
+      "job": "settler"
+    },
+    "CHR_F_Adult_014": {
+      "note": "mains vides",
+      "job": "settler"
+    },
+    "CHR_F_Adult_023": {
+      "note": "mains vides",
+      "job": "settler"
+    },
+    "CHR_M_Elder_001": {
+      "note": "baton",
+      "job": "settler"
+    },
+    "CHR_M_Elder_002": {
+      "note": "canne",
+      "job": "settler"
+    },
+    "CHR_M_Elder_004": {
+      "note": "baton",
+      "job": "settler"
+    },
+    "CHR_M_Elder_009": {
+      "note": "canne",
+      "job": "settler"
+    },
+    "CHR_F_Elder_002": {
+      "note": "canne",
+      "job": "settler"
+    },
+    "CHR_F_Elder_005": {
+      "note": "canne",
+      "job": "settler"
+    },
+    "CHR_F_Elder_006": {
+      "note": "mains vides",
+      "job": "settler"
+    },
+    "CHR_F_Elder_009": {
+      "note": "canne",
+      "job": "settler"
+    },
+    "CHR_M_Adult_004": {
+      "note": "garde (lance, bouclier)"
+    },
+    "CHR_M_Adult_012": {
+      "note": "garde (lance, bouclier)"
+    },
+    "CHR_M_Adult_020": {
+      "note": "garde (lance, bouclier)"
+    },
+    "CHR_M_Adult_011": {
+      "note": "moine"
+    },
+    "CHR_M_Adult_021": {
+      "note": "moine (livre)"
+    },
+    "CHR_M_Elder_003": {
+      "note": "pretre (livre, chapelet)"
+    },
+    "CHR_M_Elder_005": {
+      "note": "pretre"
+    },
+    "CHR_M_Elder_007": {
+      "note": "moine (chapelet)"
+    },
+    "CHR_M_Adult_002": {
+      "note": "porteur (marteau, sac)"
+    },
+    "CHR_M_Adult_005": {
+      "note": "porteur (sac)"
+    },
+    "CHR_M_Adult_007": {
+      "note": "porteur (poutre)"
+    },
+    "CHR_M_Adult_018": {
+      "note": "porteur (hotte)"
+    },
+    "CHR_M_Adult_003": {
+      "note": "artisan (marteau)"
+    },
+    "CHR_M_Adult_008": {
+      "note": "artisan (hachette)"
+    },
+    "CHR_F_Adult_017": {
+      "note": "tisseuse (etoffes)"
+    },
+    "CHR_F_Adult_018": {
+      "note": "boulangere (pain)"
+    },
+    "CHR_F_Adult_020": {
+      "note": "artisane (panier, sacoche)"
+    },
+    "CHR_M_Adult_009": {
+      "note": "pecheur (filet)"
+    },
+    "CHR_M_Adult_014": {
+      "note": "pecheur (filet)"
+    },
+    "CHR_M_Adult_015": {
+      "note": "bucheron (hache)"
+    },
+    "CHR_M_Adult_024": {
+      "note": "bucheron (hache, fagot)"
+    },
+    "CHR_F_Adult_022": {
+      "note": "porteuse de bois"
+    },
+    "CHR_M_Adult_022": {
+      "note": "berger (houlette)"
+    },
+    "CHR_M_Adult_023": {
+      "note": "voyageur (baton)"
+    },
+    "CHR_F_Adult_024": {
+      "note": "voyageuse (baton)"
+    },
+    "CHR_F_Adult_002": {
+      "note": "porteuse d'eau (cruche)"
+    },
+    "CHR_F_Adult_007": {
+      "note": "porteuse d'eau (cruche)"
+    },
+    "CHR_F_Adult_011": {
+      "note": "porteuse (cruche, panier)"
+    },
+    "CHR_F_Adult_013": {
+      "note": "porteuse d'eau (amphore)"
+    },
+    "CHR_F_Adult_012": {
+      "note": "mere (bebe)"
+    },
+    "CHR_F_Adult_016": {
+      "note": "femme pieuse (croix)"
+    },
+    "CHR_F_Adult_015": {
+      "note": "deux paniers d'herbes",
+      "job": "farmer"
+    }
+  }
+}

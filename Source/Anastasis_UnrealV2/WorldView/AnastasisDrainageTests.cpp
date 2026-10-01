@@ -155,38 +155,61 @@ bool FAnastasisDrainageDeterminism::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisDrainageDryPaint, "Anastasis.Terrain.Drainage.NoWaterPaintOnDryLand",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisDrainageWaterLook, "Anastasis.Terrain.Drainage.WaterLook",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-bool FAnastasisDrainageDryPaint::RunTest(const FString&)
+bool FAnastasisDrainageWaterLook::RunTest(const FString&)
 {
-	// FOREST_TERRAIN_P0 : une tuile d'eau de la simulation que le relief corrige laisse hors
-	// d'eau ne doit pas rester peinte en bleu au milieu d'un pre. La teinte d'eau de TileColor
-	// est la seule du sol dont le bleu domine : c'est sa signature.
-	auto BlueDominant = [](const FLinearColor& C) { return C.B > FMath::Max(C.R, C.G); };
+	// WATER_LOOK_001 : berges marquees, rubans d'eau, nappe sans rivieres, plus de bleu de tuile a sec.
 	AnastasisWorldView::FWorldVisualSnapshot S;
 	AnastasisTerrainForge::FMesh M;
 	if (!TestTrue(TEXT("forge"), AnastasisDrainageTestDetail::Forge(true, S, M))) return false;
-	const auto& Before = M.Geometry;
-	int32 DryBlueBefore = 0;
-	for (int32 I = 0; I < Before.Vertices.Num(); ++I)
-	{
-		DryBlueBefore += Before.Vertices[I].Z >= Before.WaterVertices[I].Z && BlueDominant(Before.Colors[I]) ? 1 : 0;
-	}
+	AnastasisDrainage::FParams Params;
+	Params.bWaterLook = true;
 	AnastasisDrainage::FNetwork Net;
-	if (!TestTrue(TEXT("drains"), AnastasisDrainage::Apply(S, M, Net))) return false;
+	if (!TestTrue(TEXT("water-look world drains"), AnastasisDrainage::Apply(S, M, Net, Params))) return false;
+	// Le reseau reste coherent avec les berges marquees.
+	AnastasisDrainageTestDetail::ExpectCoherent(*this, Net, M);
+
 	const auto& Geo = M.Geometry;
-	int32 Dry = 0, DryBlue = 0, Wet = 0, WetBlue = 0;
+	TestTrue(TEXT("still water exists (lakes, sea)"), Net.LakeWaterTriangles.Num() > 0);
+	TestEqual(TEXT("still water is whole triangles"), Net.LakeWaterTriangles.Num() % 3, 0);
+	TestTrue(TEXT("rivers left the grid water"), Net.LakeWaterTriangles.Num() < Geo.WaterTriangles.Num());
+
+	AnastasisDrainage::FWaterRibbons Ribbons;
+	AnastasisDrainage::BuildRiverRibbons(Net, Ribbons);
+	TestTrue(TEXT("every river has a ribbon"), Ribbons.Triangles.Num() / 6 >= Net.Rivers.Num());
+	TestEqual(TEXT("one flow vector per vertex"), Ribbons.UV2.Num(), Ribbons.Vertices.Num());
+	// Meme sens d'enroulement que la grille : visible du dessus.
+	auto CrossZ = [](const TArray<FVector>& V, const TArray<int32>& T, int32 I)
+	{
+		const FVector A = V[T[I]], B = V[T[I + 1]], C = V[T[I + 2]];
+		return (B.X - A.X) * (C.Y - A.Y) - (B.Y - A.Y) * (C.X - A.X);
+	};
+	if (!TestTrue(TEXT("grid water exists"), Geo.WaterTriangles.Num() >= 3)) return false;
+	const bool bGridNegative = CrossZ(Geo.WaterVertices, Geo.WaterTriangles, 0) < 0.0;
+	int32 Flipped = 0;
+	for (int32 I = 0; I + 2 < Ribbons.Triangles.Num(); I += 3)
+	{
+		const double Z = CrossZ(Ribbons.Vertices, Ribbons.Triangles, I);
+		Flipped += (Z != 0.0 && (Z < 0.0) != bGridNegative) ? 1 : 0;
+	}
+	TestEqual(TEXT("ribbons face up like the grid"), Flipped, 0);
+	int32 FastFlow = 0;
+	for (const FVector2D& F : Ribbons.UV2) FastFlow += F.Size() > 1.0 + 1.e-6 ? 1 : 0;
+	TestEqual(TEXT("flow vectors are normalised"), FastFlow, 0);
+
+	// Plus aucune terre seche ne porte le bleu d'une tuile d'eau ; aucun fond immerge non plus.
+	int32 BlueDry = 0, BlueBed = 0;
 	for (int32 I = 0; I < Geo.Vertices.Num(); ++I)
 	{
-		const bool bDry = Geo.Vertices[I].Z >= Geo.WaterVertices[I].Z;
-		const bool bBlue = BlueDominant(Geo.Colors[I]);
-		(bDry ? Dry : Wet) += 1;
-		(bDry ? DryBlue : WetBlue) += bBlue ? 1 : 0;
+		const FLinearColor& C = Geo.Colors[I];
+		const bool bUnder = Geo.Vertices[I].Z < Geo.WaterVertices[I].Z;
+		if (C.B > C.R + 0.04f) (bUnder ? BlueBed : BlueDry) += 1;
 	}
-	AddInfo(FString::Printf(TEXT("DRY_WATER_PAINT before_drainage=%d after=%d dry=%d wet=%d wet_blue=%d"),
-		DryBlueBefore, DryBlue, Dry, Wet, WetBlue));
-	TestTrue(TEXT("dry land was probed"), Dry > 0);
-	TestEqual(TEXT("no dry vertex keeps the water paint"), DryBlue, 0);
+	AddInfo(FString::Printf(TEXT("ribbons=%d ribbon_triangles=%d still_triangles=%d blue_dry=%d blue_bed=%d"),
+		Net.Rivers.Num(), Ribbons.Triangles.Num() / 3, Net.LakeWaterTriangles.Num() / 3, BlueDry, BlueBed));
+	TestEqual(TEXT("no dry land painted as water"), BlueDry, 0);
+	TestEqual(TEXT("no submerged bed painted as water"), BlueBed, 0);
 	return true;
 }
 #endif

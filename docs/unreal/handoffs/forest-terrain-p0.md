@@ -1,5 +1,11 @@
 # HANDOFF: forest-terrain-p0
 
+> **Mise a jour a la fusion de main (WATER_LOOK_001).** Le correctif 1 ci-dessous (tache bleue) et
+> son test `NoWaterPaintOnDryLand` sont RETIRES : WATER_LOOK_001, integre et prouve sur main, corrige
+> le meme defaut (`Params.bWaterLook`, critere B > R + 0.04, repeinte depuis la terre seche la plus
+> proche, test `Anastasis.Terrain.Drainage.WaterLook`). Sa version est gardee telle quelle. Reste de
+> cette phase : l'exutoire sinueux (correctif 2).
+
 ## MISSION
 
 Phase P0 de la mission foret/terrain : retirer les deux artefacts signales au sol --

@@ -80,6 +80,11 @@ struct FRing
 	double MaxZ = 0.0;
 	/** Sommets du bord forge sous leur nappe : l'eau qui sort de la carte. */
 	int32 EdgeWater = 0;
+	/** Sommets de prairie de la carte dont l'anneau tire ses teintes lointaines. */
+	int32 PaletteDonors = 0;
+	/** Prairie verte (moitie sombre) et prairie seche (moitie claire) des donneurs. */
+	FLinearColor LushColor = FLinearColor::Black;
+	FLinearColor DryColor = FLinearColor::Black;
 };
 
 /**

@@ -112,6 +112,93 @@ struct FCanopyIndex
 };
 }
 
+FVector3f AnastasisGroundCover::FCoverField::Sample(double X, double Y) const
+{
+	if (!IsValid()) return FVector3f::ZeroVector;
+	const double U = (X - Origin.X) / CellUU - 0.5, V = (Y - Origin.Y) / CellUU - 0.5;
+	if (!FMath::IsFinite(U) || !FMath::IsFinite(V) || U < -0.5 || V < -0.5 || U > W - 0.5 || V > H - 0.5) return FVector3f::ZeroVector;
+	const int32 X0 = FMath::Clamp(FMath::FloorToInt(U), 0, W - 2), Y0 = FMath::Clamp(FMath::FloorToInt(V), 0, H - 2);
+	const float FX = static_cast<float>(FMath::Clamp(U - X0, 0.0, 1.0)), FY = static_cast<float>(FMath::Clamp(V - Y0, 0.0, 1.0));
+	const int32 A = Y0 * W + X0;
+	return FMath::Lerp(FMath::Lerp(Cover[A], Cover[A + 1], FX), FMath::Lerp(Cover[A + W], Cover[A + W + 1], FX), FY);
+}
+
+void AnastasisGroundCover::BuildCoverField(const FPlan& Plan, const FBox2D& Bounds, double CellUU, double CandidateCellUU, FCoverField& Out)
+{
+	Out = FCoverField();
+	if (!Bounds.bIsValid || !(CellUU > 0.0) || !(CandidateCellUU > 0.0)) return;
+	Out.Origin = Bounds.Min;
+	Out.CellUU = CellUU;
+	Out.W = FMath::Max(2, FMath::CeilToInt((Bounds.Max.X - Bounds.Min.X) / CellUU));
+	Out.H = FMath::Max(2, FMath::CeilToInt((Bounds.Max.Y - Bounds.Min.Y) / CellUU));
+	Out.Cover.SetNumZeroed(Out.W * Out.H);
+	// Une cellule du champ contient au plus (CellUU / CandidateCellUU)^2 candidates : la
+	// couverture est la part de candidates REELLEMENT posees, par groupe de familles.
+	const float PerTuft = static_cast<float>(FMath::Square(CandidateCellUU / CellUU));
+	for (const FPlacement& P : Plan.Instances)
+	{
+		const int32 X = FMath::FloorToInt((P.Ground.X - Out.Origin.X) / CellUU), Y = FMath::FloorToInt((P.Ground.Y - Out.Origin.Y) / CellUU);
+		if (X < 0 || Y < 0 || X >= Out.W || Y >= Out.H) continue;
+		FVector3f& C = Out.Cover[Y * Out.W + X];
+		switch (P.Family)
+		{
+		case EFamily::MeadowTall: case EFamily::MeadowShort: C.X += PerTuft; break;
+		case EFamily::Sedge: C.Y += PerTuft; break;
+		default: C.Z += PerTuft; break;
+		}
+	}
+	// Deux passes de flou 3x3 : ~3 cellules de portee, pas de marche a la frontiere d'une tache.
+	TArray<FVector3f> Tmp;
+	for (int32 Pass = 0; Pass < 2; ++Pass)
+	{
+		Tmp = Out.Cover;
+		for (int32 Y = 0; Y < Out.H; ++Y)
+		{
+			for (int32 X = 0; X < Out.W; ++X)
+			{
+				FVector3f Sum = FVector3f::ZeroVector;
+				int32 N = 0;
+				for (int32 DY = -1; DY <= 1; ++DY)
+				{
+					for (int32 DX = -1; DX <= 1; ++DX)
+					{
+						const int32 SX = X + DX, SY = Y + DY;
+						if (SX < 0 || SY < 0 || SX >= Out.W || SY >= Out.H) continue;
+						Sum += Tmp[SY * Out.W + SX];
+						++N;
+					}
+				}
+				Out.Cover[Y * Out.W + X] = Sum / static_cast<float>(N);
+			}
+		}
+	}
+	for (FVector3f& C : Out.Cover)
+	{
+		C = FVector3f(FMath::Clamp(C.X, 0.f, 1.f), FMath::Clamp(C.Y, 0.f, 1.f), FMath::Clamp(C.Z, 0.f, 1.f));
+	}
+}
+
+FLinearColor AnastasisGroundCover::TintSoil(const FLinearColor& Base, const FVector3f& Cover, const FSoilTint& T, double* Amount)
+{
+	using namespace AnastasisGroundCover::Detail;
+	const double Total = static_cast<double>(Cover.X) + Cover.Y + Cover.Z;
+	if (Amount) *Amount = 0.0;
+	if (!(Total > 1e-4) || !(T.FullCover > 0.0)) return Base;
+	const auto Target = [&](const FLinearColor& Factor, const FLinearColor& Absolute)
+	{
+		const FLinearColor Relative(Base.R * Factor.R, Base.G * Factor.G, Base.B * Factor.B, Base.A);
+		return FMath::Lerp(Relative, FLinearColor(Absolute.R, Absolute.G, Absolute.B, Base.A), static_cast<float>(T.AbsoluteShare));
+	};
+	const FLinearColor Mixed = (Target(T.MeadowFactor, T.MeadowAbsolute) * Cover.X
+		+ Target(T.SedgeFactor, T.SedgeAbsolute) * Cover.Y
+		+ Target(T.LandeFactor, T.LandeAbsolute) * Cover.Z) / static_cast<float>(Total);
+	const double Share = FMath::Clamp(T.Strength, 0.0, 1.0) * Smooth(FMath::Min(Total, 1.0) / T.FullCover);
+	if (Amount) *Amount = Share;
+	FLinearColor Out = FMath::Lerp(Base, Mixed, static_cast<float>(Share));
+	Out.A = Base.A;
+	return Out;
+}
+
 const TCHAR* AnastasisGroundCover::FamilyName(EFamily Family)
 {
 	switch (Family)

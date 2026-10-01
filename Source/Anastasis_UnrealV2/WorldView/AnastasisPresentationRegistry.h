@@ -7,6 +7,7 @@
 
 class UStaticMesh;
 class UMaterialInterface;
+class UTexture2D;
 
 /**
  * Editor-facing mirror of AnastasisWorld::ETileType.
@@ -178,6 +179,63 @@ struct FAnastasisPresentationVariant
 	FVector2D HeightRangeM = FVector2D::ZeroVector;
 };
 
+/**
+ * Who a villager portrait depicts. A PRESENTATION category, not a demographic of the
+ * simulation: AnastasisVillage::FNpc carries no age and no sex (deviation 8 of
+ * AnastasisVillage.h -- every villager is an adult). The category only decides which
+ * portraits may be handed to a simulated villager (see AnastasisVillagerLooks).
+ */
+UENUM(BlueprintType)
+enum class EAnastasisVillagerCategory : uint8
+{
+	AdultMale = 0,
+	AdultFemale = 1,
+	ElderMale = 2,
+	ElderFemale = 3,
+	ChildMale = 4,
+	ChildFemale = 5,
+};
+
+/**
+ * One individual of the visual population (VILLAGER_PNG_001): a cut-out PNG, one person.
+ *
+ * Every portrait shares the canvas of SourceArt/Characters/villager-population.json: 512 x 1024 px
+ * for 128 x 256 cm, feet on the vertical axis, 16 px above the bottom edge. The person's
+ * stature is therefore baked into the image, and every card is drawn at the same size.
+ */
+USTRUCT(BlueprintType)
+struct FAnastasisVillagerLook
+{
+	GENERATED_BODY()
+
+	/** CHR_M_Adult_001... -- the manifest id, stable across re-imports. */
+	UPROPERTY(EditAnywhere, Category = "Villagers")
+	FName LookId;
+
+	UPROPERTY(EditAnywhere, Category = "Villagers")
+	EAnastasisVillagerCategory Category = EAnastasisVillagerCategory::AdultMale;
+
+	/** Soft, like meshes: the registry stays loadable without pulling 32 textures in. */
+	UPROPERTY(EditAnywhere, Category = "Villagers")
+	TSoftObjectPtr<UTexture2D> Portrait;
+
+	/**
+	 * False: shown on the lineup, never handed to a simulated villager. A seated elder drawn on a
+	 * bench would glide across the village on it. Defaults to true, so data written before the
+	 * field existed keeps its meaning.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Villagers")
+	bool bInGame = true;
+
+	/**
+	 * Simulated jobs (AnastasisVillage::FNpc::JobId: "settler", "farmer") this portrait may stand for.
+	 * The object in the painted hands is the job's: a pitchfork or a basket for a farmer, empty hands
+	 * for a settler. Empty: no simulated job matches (guard, monk, fisher...), never handed out.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Villagers")
+	TArray<FName> Jobs;
+};
+
 /** What one semantic type looks like. The simulation never sees this struct. */
 USTRUCT(BlueprintType)
 struct FAnastasisPresentationEntry
@@ -245,6 +303,18 @@ class UAnastasisPresentationRegistry : public UDataAsset
 public:
 	UPROPERTY(EditAnywhere, Category = "Presentation")
 	TArray<FAnastasisPresentationEntry> Entries;
+
+	/**
+	 * The visual population, written by tools/unreal/import-villagers.py from the manifest.
+	 * Empty -- the code fallback, or an asset older than this field -- draws no villager
+	 * card; the debug spheres (anastasis.Village.Debug) still show the simulation.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Villagers")
+	TArray<FAnastasisVillagerLook> Villagers;
+
+	/** Masked card material with a `Portrait` texture and a `Mirror` scalar parameter (M_AnastasisVillager). */
+	UPROPERTY(EditAnywhere, Category = "Villagers")
+	TSoftObjectPtr<UMaterialInterface> VillagerMaterial;
 
 	/** First enabled entry for this type, or nullptr. */
 	const FAnastasisPresentationEntry* FindEntry(AnastasisWorld::ETileType Type) const;

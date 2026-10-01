@@ -7,7 +7,12 @@
 #include "Village/AnastasisVillage.h"
 #include "Village/AnastasisVillageBuilding.h"
 #include "Village/AnastasisVillageInteractionSubsystem.h"
+#include "Village/AnastasisVillagerLooks.h"
+#include "Village/AnastasisVillagerVisual.h"
 #include "World/AnastasisWorld.h"
+#include "WorldView/AnastasisPresentationRegistry.h"
+#include "Engine/Texture2D.h"
+#include "Materials/MaterialInterface.h"
 #include "WorldView/AnastasisWorldView.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
 #include "EngineUtils.h"
@@ -183,8 +188,117 @@ int32 FAnastasisVillagePresentation::Sync(
 	return Changes;
 }
 
+int32 FAnastasisVillagePresentation::SyncVillagers(
+	const AnastasisVillage::FVillage& Village,
+	const AnastasisWorld::FWorld& World,
+	UWorld* PresentationWorld,
+	const UAnastasisPresentationRegistry& Registry,
+	bool bEnabled)
+{
+	int32 Changes = 0;
+	for (auto It = Villagers.CreateIterator(); It; ++It)
+	{
+		AAnastasisVillagerVisual* Actor = It.Value().Get();
+		if (bEnabled && Actor && Village.FindNpc(It.Key()))
+		{
+			continue;
+		}
+		if (Actor)
+		{
+			Actor->Destroy();
+		}
+		VillagerJobs.Remove(It.Key());
+		It.RemoveCurrent();
+		++Changes;
+	}
+	if (!bEnabled || !PresentationWorld)
+	{
+		return Changes;
+	}
+
+	TMap<FName, TArray<int32>> Pools;
+	for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
+	{
+		const FVector Feet = SimToUnreal(World, Npc.X, Npc.Y, PresentationWorld);
+		const FName Job(*Npc.JobId);
+		AAnastasisVillagerVisual* Actor = FindVillager(Npc.Id);
+		if (Actor && VillagerJobs.FindRef(Npc.Id) != Job)
+		{
+			// Le metier a change (embauche au grenier) : l'objet peint doit suivre. Le visage change
+			// avec lui -- aucun individu des planches n'existe avec deux objets.
+			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE villager %s job %s -> %s: card redrawn"),
+				*Npc.Id, *VillagerJobs.FindRef(Npc.Id).ToString(), *Job.ToString());
+			Actor->Destroy();
+			Villagers.Remove(Npc.Id);
+			VillagerJobs.Remove(Npc.Id);
+			Actor = nullptr;
+			++Changes;
+		}
+		if (!Actor)
+		{
+			TArray<int32>* Pool = Pools.Find(Job);
+			if (!Pool)
+			{
+				Pool = &Pools.Add(Job, AnastasisVillagerLooks::VillagePool(Registry.Villagers, Job));
+			}
+			const int32 LookIndex = AnastasisVillagerLooks::PickLook(*Pool, Npc.Id);
+			UMaterialInterface* Material = Registry.VillagerMaterial.LoadSynchronous();
+			UTexture2D* Portrait = LookIndex != INDEX_NONE ? Registry.Villagers[LookIndex].Portrait.LoadSynchronous() : nullptr;
+			if (!Portrait || !Material)
+			{
+				if (!bWarnedNoLooks)
+				{
+					bWarnedNoLooks = true;
+					UE_LOG(LogAnastasis_UnrealV2, Warning,
+						TEXT("ANASTASIS_VILLAGE villager cards: none for job %s (looks=%d pool=%d material=%s) -- see VILLAGER_PNG_001"),
+						*Job.ToString(), Registry.Villagers.Num(), Pool->Num(), Material ? TEXT("ok") : TEXT("missing"));
+				}
+				continue;
+			}
+			FActorSpawnParameters Params;
+			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			Params.ObjectFlags |= RF_Transient;
+			Actor = PresentationWorld->SpawnActor<AAnastasisVillagerVisual>(Feet, FRotator::ZeroRotator, Params);
+			if (!Actor)
+			{
+				continue;
+			}
+			const FName LookId = Registry.Villagers[LookIndex].LookId;
+			Actor->SetLook(LookId, Portrait, Material);
+#if WITH_EDITOR
+			Actor->SetActorLabel(FString::Printf(TEXT("Villager_%s_%s"), *Npc.Id, *LookId.ToString()));
+#endif
+			Villagers.Add(Npc.Id, Actor);
+			VillagerJobs.Add(Npc.Id, Job);
+			++Changes;
+			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE villager %s (%s) -> look %s at %s"),
+				*Npc.Id, *Job.ToString(), *LookId.ToString(), *Feet.ToCompactString());
+		}
+		Actor->MoveFeetTo(Feet);
+		// Dedans : la simulation garde la position du seuil, la carte ne doit pas y rester plantee.
+		Actor->SetActorHiddenInGame(Npc.Inside.bActive);
+	}
+	return Changes;
+}
+
+AAnastasisVillagerVisual* FAnastasisVillagePresentation::FindVillager(const FString& NpcId) const
+{
+	const TWeakObjectPtr<AAnastasisVillagerVisual>* Found = Villagers.Find(NpcId);
+	return Found ? Found->Get() : nullptr;
+}
+
 void FAnastasisVillagePresentation::Clear(UAnastasisVillageInteractionSubsystem* Rooms)
 {
+	for (const TPair<FString, TWeakObjectPtr<AAnastasisVillagerVisual>>& Pair : Villagers)
+	{
+		if (AAnastasisVillagerVisual* Actor = Pair.Value.Get())
+		{
+			Actor->Destroy();
+		}
+	}
+	Villagers.Reset();
+	VillagerJobs.Reset();
+
 	for (const TPair<FString, TWeakObjectPtr<AAnastasisVillageBuilding>>& Pair : Actors)
 	{
 		if (AAnastasisVillageBuilding* Actor = Pair.Value.Get())

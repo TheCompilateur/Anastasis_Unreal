@@ -30,8 +30,9 @@ LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
 MESH_DIR = '/Game/Anastasis/Vegetation/'
 MATERIAL = '/Game/Anastasis/Materials/M_AnastasisVegetation'
 
-# Scene montee loin de l'emprise du monde ([0,9600]^2) : le terrain reste charge
-# mais hors champ, et on n'a pas a le modifier pour l'ecarter.
+# Scene montee hors de l'emprise du monde (la carte commence a x = 1000) : le terrain
+# reste charge mais hors champ. L'anneau d'horizon, lui, couvre ce point : il est masque
+# plus bas.
 STAGE = unreal.Vector(-14000.0, 0.0, 0.0)
 
 # LES SUJETS SONT SUR UN ARC, PAS SUR UNE LIGNE.
@@ -120,6 +121,18 @@ def spawn_mesh(mesh, location, scale, label):
 les.load_level(LEVEL)
 world = ues.get_editor_world()
 material = unreal.EditorAssetLibrary.load_asset(MATERIAL)
+
+# HORIZON_RING_001 a entoure le monde d'un anneau de terrain lointain : hors de l'emprise,
+# STAGE n'est plus dans le vide mais SOUS ce terrain (sol noir, arbres a moitie enterres,
+# constate le 2026-10-01). La planche veut l'espace degage d'avant : l'anneau est masque,
+# rendu et ombre, pour cette capture seulement -- rien n'est sauve.
+for embodiment in unreal.GameplayStatics.get_all_actors_of_class(
+        world, unreal.load_class(None, '/Script/Anastasis_UnrealV2.AnastasisWorldEmbodiment')):
+    for comp in embodiment.get_components_by_class(unreal.ProceduralMeshComponent):
+        if comp.get_name() == 'HorizonTerrain':
+            comp.set_visibility(False)
+            comp.set_cast_shadow(False)
+            log('HORIZON_HIDDEN %s' % embodiment.get_name())
 
 # Camera d'abord : c'est elle qui definit l'arc, pas l'inverse. Elle regarde -Y,
 # donc son vecteur droite est +X et l'angle croissant va vers la droite de l'image.

@@ -29,6 +29,13 @@ public:
 	void LogStatus() const;
 
 	/**
+	 * VILLAGER_PNG_001 -- le village du lancement : `anastasis.Village.StartVillagers` habitants
+	 * (12 par defaut, 0 = village vide) autour du premier puits, poses par SeedFirstWell au debut
+	 * de partie pour que le jeu ne s'ouvre pas sur un monde vide. Vrai tant qu'il est intact.
+	 */
+	bool HasStartVillage() const { return bStartVillage; }
+
+	/**
 	 * Premier batiment (mission first-building-001) : pose un puits sur la case
 	 * libre la plus proche de (TileX, TileY) et `NpcCount` habitants autour, a
 	 * soifs echelonnees. Rend l'identifiant du puits, vide si rien n'a pu etre pose.
@@ -73,6 +80,13 @@ public:
 private:
 	void DrawOverlay() const;
 	void LogDayIfChanged();
+	/**
+	 * Un scenario explicite (FirstWell, FirstHouse, FirstGranary, FirstFarmer, FoodSupply) REMPLACE le
+	 * village du lancement : simulation remise a zero sur la meme graine, acteurs de presentation
+	 * retires. Les preuves PIE des autres missions retrouvent donc exactement leur etat d'avant. Sans
+	 * village de lancement intact, ne fait rien : deux scenarios s'empilent comme avant.
+	 */
+	void ReplaceStartVillage();
 
 	FAnastasisSimulation Simulation;
 	FAnastasisVillagePresentation VillagePresentation;
@@ -81,6 +95,7 @@ private:
 	int32 LoggedDay = 0;
 	/** True only after OnWorldBeginPlay. Tests ResetCanonical without the engine ticker. */
 	bool bPumpFromEngineTick = false;
+	bool bStartVillage = false;
 };
 
 /**
@@ -125,4 +140,12 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetGatherStatus(const UObject* WorldContextObject);
+
+	/**
+	 * VILLAGER_PNG_001, en JSON : nombre d'habitants simules et de cartes, puis une ligne par
+	 * habitant avec sa carte (portrait, pieds, cachee, en miroir), "look":"" s'il n'en a pas.
+	 * Lecture seule ; `{}` sans hote.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetVillagerCards(const UObject* WorldContextObject);
 };

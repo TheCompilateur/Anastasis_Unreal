@@ -35,7 +35,8 @@ BRANCH_HEAD (`claude/anastasis-forest-terrain-yhszr2`)
   `MI_AnastasisGround`) ; l'herbe : `tools\unreal\create-ground-cover.ps1`.
 - Tests a surveiller : `Anastasis.Terrain.Semantics` (terre jamais bleue), `HydrologyGradient` (crue
   plus sombre : vase 0.073 de luminance contre 0.143 pour la nouvelle prairie), `SlopeShade`,
-  `Anastasis.Terrain.Drainage.NoWaterPaintOnDryLand` (Stone inchange : seuil de 3 % toujours valable).
+  `Anastasis.Terrain.Drainage.WaterLook` (critere de repeinte B > R + 0.04 : toute la nouvelle palette
+  de terre a B < R).
 
 ## SCN
 

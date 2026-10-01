@@ -167,6 +167,20 @@ tools\unreal\anastasis-unreal.ps1 editor   # lance l'éditeur (pas une vérifica
 Le script refuse de tourner hors de la racine canonique ou d'un worktree sous `C:\dev\ANASTASIS_WORKTREES`,
 et valide l'identité moteur (5.8.2 / CL 56702186).
 
+## Procédures (skills)
+
+Les procédures répétées sont écrites une fois, dans `.claude/skills/<nom>/SKILL.md`. Claude Code les charge
+quand la tâche s'y prête ; tout autre agent (Codex…) les lit comme des documents ordinaires. Elles donnent
+l'ordre et les décisions ; les règles restent ici, les pièges dans `docs/unreal/PIEGES_UNREAL.md`.
+
+| Skill | Quand |
+|---|---|
+| `anastasis-mission` | avant de modifier un fichier du projet ; avant toute intégration ou tout push |
+| `anastasis-editeur-mcp` | avant tout appel `mcp__unreal__*` : bon port, bon éditeur, bon groupe d'outils |
+| `anastasis-capture` | quand le verdict est une image : A/B à une seule variable, regarder, mesurer (`compare.py`) |
+
+Une procédure qui change (nouveau portail, nouveau script) se corrige dans son skill, dans le même commit.
+
 ## Éditeur vivant : MCP Unreal
 
 Le plugin `ModelContextProtocol` (expérimental, UE 5.8) démarre avec l'éditeur un serveur MCP sur
@@ -284,6 +298,7 @@ manque puis se contentent de le vérifier ; `*_REBUILD=1` le régénère et écr
 | `observe-slice.py` | `M_AnastasisSlice`, `Lvl_AnastasisSlice` |
 | `ground-material.ps1` + `.py` | `M_AnastasisGround`, `MI_AnastasisGround` |
 | `shore-water.ps1` + `.py` | `M_AnastasisShoreWater` |
+| `water-look.ps1` + `.py` | `M_AnastasisWater` (Single Layer Water, WATER_LOOK_001) |
 | `presentation-registry.py` | `DA_AnastasisPresentation` |
 | `atmosphere-profile.py` | `DA_AnastasisAtmosphere` |
 | `create_tree_asset.py` | `SM_Tree_*` (grille pontique + 7 essences x 3 formes : pin d'Alep, cypres, chene vert, olivier, platane, pin noir, sapin de Cephalonie), `SM_Shrub_*` (lentisque, chene kermes, genet, ronce x 3), `M_AnastasisVegetation`, `M_AnastasisBark`, `M_AnastasisRock` — régénérés à **chaque** run |
@@ -317,7 +332,21 @@ se change dans le script.
 | Script | Role |
 |---|---|
 | `create-ground-cover.ps1` + `create-ground-cover.py` | **ecrit** dans `Content/` : les trois touffes `SM_Grass_MeadowTall/MeadowShort/Sedge_01` (`/Game/Anastasis/GroundCover`) et `M_AnastasisGrass`, regeneres a chaque run ; editeur dedie qui se ferme |
-| `capture-ground-cover.ps1` + `ground-cover-capture.py` | A/B de l'herbe (`anastasis.Dressing.GroundCover 1/0`) aux memes cameras : prairie, riviere, lisiere, vallee B, oblique, hameau ; frame p50/p95 par vue → `Saved/GroundCoverEvidence/<Label>/` |
+| `capture-ground-cover.ps1` + `ground-cover-capture.py` | A/B de l'herbe aux memes cameras, `-States on,off,notint,noshadow,on2` (`notint` = memes touffes, sol non teinte) : prairie, riviere, lisiere, vallee B, oblique, aerien, hameau, hors vallee, lande ; frame p50/p95 et GPU par vue → `Saved/GroundCoverEvidence/<Label>/` |
+
+### Population visuelle (VILLAGER_PNG_001)
+
+Autorite : les planches `SourceArt/Characters/Sheets/serie-*.png` et `SourceArt/Characters/villager-population.json`
+(qui est ou sur quelle planche, poses assises). Les habitants simules portent un portrait ; la simulation n'en sait rien.
+Au lancement, `anastasis.Village.StartVillagers` (12) habitants autour du premier puits ; le premier scenario
+`Anastasis.Village.First*` / `FoodSupply` remplace ce village. Voir `docs/unreal/VILLAGER_PNG_001.md`.
+
+| Script | Role |
+|---|---|
+| `villager-png.py` | **hors editeur** (Python systeme, Pillow + numpy) : `sheets` (decoupe des planches → `Raw/` + `villager-extract.json`, statures mesurees), `prep` (→ `SourceArt/Characters/PNG/<Categorie>/`, canevas 512x1024 = 128x256 cm, pieds alignes), `board` (planches → `docs/visual/villager-png-001/`), `check` (ressemblance silhouette / visage par paire) |
+| `import-villagers.ps1` + `import-villagers.py` | **ecrit** dans `Content/` : textures `/Game/Anastasis/Characters/PNG/<Categorie>/CHR_*` (BC7, sRGB, Character, Clamp, hors streaming, couverture alpha), `M_AnastasisVillager`, et `DA_AnastasisPresentation.Villagers` ; relit, verifie, refuse un materiau qui ne compile pas ; editeur dedie qui se ferme |
+| `villager-lineup.ps1` + `villager-lineup.py` | planche dans Unreal (vrais acteurs `AnastasisVillagerVisual`) : population entiere puis par groupe, sur un arc, temoin 180 cm → `Saved/VillagerEvidence/<Label>/` ; niveau jamais sauve |
+| `villager-pie.ps1` + `villager-pie.py` | preuve PIE : village du lancement sans commande, puis `FirstWell 12` (le remplace), `RemoveNpc`, `FirstFarmer 1` ; une carte par habitant, portraits distincts et du METIER simule de chacun → `Saved/VillagerEvidence/pie/` |
 
 ## Tests
 
