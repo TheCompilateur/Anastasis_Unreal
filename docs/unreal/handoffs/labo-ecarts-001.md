@@ -19,18 +19,17 @@ rumeurs). Branche partie de `agent/ecarts-protocole-001` (PR #2, non versée dan
 
 ## COMMIT
 
-BRANCH_HEAD sur `agent/labo-ecarts-001`. Deux commits : le laboratoire et les **prédictions seules**
-(`baa47e5`, avant toute expérience à N répliques), puis les résultats.
+BRANCH_HEAD sur `agent/labo-ecarts-001`, rebasée sur `main` (`0179c9a`) le 2026-10-01 pour versement.
+Le lot versé contient **cinq** commits : les deux de `ecarts-protocole-001` (PR #2 : registre, contrôleur,
+protocole), puis les trois de cette mission — le laboratoire et les **prédictions seules** (`888389d`,
+`baa47e5` avant rebase, commité avant toute expérience à N répliques), les résultats, cette fiche.
 
 ## MEC
 
-- BUILD / TESTS : **NOT_ATTEMPTED par `finish`**. Le portail s'arrête avant le build, au contrôle des écarts :
-  `agent-worktree.ps1` appelle `check-ecarts.mjs -base main`, et `ECARTS.md` n'existe pas dans `main` (il
-  arrive avec la PR #2, non versée) : les 19 fiches y passent pour « nouvelles dans ce lot »
-  (`ECARTS::FAIL fail=17`). Contre la vraie base de la branche, le même contrôle passe :
-  `node tools/migration/check-ecarts.mjs -base origin/agent/ecarts-protocole-001 -handoff docs/unreal/handoffs/labo-ecarts-001.md`
-  → voir la ligne `ECARTS::` ci-dessous. `finish` est à rejouer quand la PR #2 sera dans `main`. La mission
-  ne touche aucun `.cpp` / `.h` : un build ne prouverait rien de ce qu'elle apporte.
+- BUILD / TESTS : voir la sortie de `finish` (versement du 2026-10-01). La mission ne touche aucun `.cpp`
+  ni `.h`. Un premier `finish`, avant rebase, s'était arrêté au contrôle des écarts : `ECARTS.md` n'existait
+  pas dans `main`, et la section `ECARTS` de cette fiche ne nommait pas les fiches que le lot apporte avec
+  la PR #2 (`ECARTS::FAIL fail=17`). Corrigé ci-dessous, section `ECARTS`.
   Note : la consigne annonçait une session cloud Linux ; la mission a tourné sur le poste Windows
   d'Alexandre (worktree `C:\dev\ANASTASIS_WORKTREES\labo-ecarts-001`).
 - Référence : `git clone --depth 1 --branch anastasis-ref-p3` → `HEAD = fee66ae8b571f6f7bcbe6a61f9749d0a812b84e2`,
@@ -41,9 +40,9 @@ BRANCH_HEAD sur `agent/labo-ecarts-001`. Deux commits : le laboratoire et les **
 - Calibration A/A (`endurance`, 6 paires de témoins) : règle v1 → 6/6 `DERIVE` ; règle v2 (Holm) → 1/6
   `DERIVE`, 5/6 `INDETERMINE`, 0/6 `NEUTRE`. Contrôle de bout en bout A = B (même bras) : `IDENTIQUE`, toutes
   différences nulles.
-- `node tools/migration/check-ecarts.mjs -base origin/agent/ecarts-protocole-001 -handoff docs/unreal/handoffs/labo-ecarts-001.md`
-  → `ECARTS::PASS fiches=19 ouvertes=19 fail=0 warn=3` (les trois avertissements préexistent : « à attribuer »
-  n° 9 et 17, marques manquantes). `-base main` → `ECARTS::FAIL fail=17`, pour la raison dite plus haut.
+- `node tools/migration/check-ecarts.mjs -base main -handoff docs/unreal/handoffs/labo-ecarts-001.md` → voir
+  `finish`. Avant rebase, contre `origin/agent/ecarts-protocole-001` : `ECARTS::PASS fiches=19 fail=0 warn=3`
+  (avertissements préexistants : « à attribuer » n° 9 et 17, marques manquantes).
 - `node tools/migration/check-ecarts.mjs` → `ECARTS::PASS fiches=19 ouvertes=19 fail=0 warn=3` (inchangé) ;
   `-bilan` → `A_FERMER=15 A_TRANCHER=4` (inchangé).
 - COMMANDS (depuis la racine, `<jsref>` = clone du tag, `<runs>` = dossier hors dépôt) :
@@ -71,13 +70,18 @@ NOT_APPLICABLE — aucun changement de jeu, aucun asset, aucun niveau.
 
 ## ECARTS
 
-AUCUN — la mission ne modifie aucun code C++ de `Source/AnastasisSim/` (aucun `.cpp`, aucun `.h`) ; dans
-`ECARTS.md` elle ajoute seulement le champ `jugement` (table du format et deux fiches, celles de la cadence
-et du flux des rumeurs), sans changer classe, destin ni statut. Aucun test de parité n'est concerné.
+- **n° 1 à 19 : fiches créées par `ecarts-protocole-001`** (PR #2), versées dans `main` avec ce lot ; leur
+  détail et leur banc sont dans `docs/unreal/handoffs/ecarts-protocole-001.md`. Cette mission n'en crée,
+  n'en ferme et n'en reclasse aucune.
+- Cette mission ajoute seulement le champ `jugement` (table du format, fiches de la cadence et du flux des
+  rumeurs), sans changer classe, destin ni statut, et ne modifie aucun code C++ de `Source/AnastasisSim/`
+  (aucun `.cpp`, aucun `.h`).
 
 ## INTEGRATION_RISK
 
-- Branche empilée sur `agent/ecarts-protocole-001` (PR #2) : à verser après elle, ou avec elle.
+- **Le versement apporte aussi la PR #2** (`ecarts-protocole-001`) : `ECARTS.md`, `check-ecarts.mjs`, le
+  protocole, et l'appel du contrôleur dans `agent-worktree.ps1 finish`, qui devient actif pour toutes les
+  missions suivantes. La PR #2 sur GitHub reste à fermer ou à rebaser après le push.
 - `ECARTS.md` : la fiche n° 5 sera touchée par `budget-cadence-001` (autre session, qui branche la cadence) ;
   conflit textuel possible sur la fiche, à fusionner à la main (garder les deux champs).
 - `tolerances.json` v1 et les règles v1 / v2 sont des **propositions** de l'agent, non validées par
