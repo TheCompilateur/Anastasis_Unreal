@@ -50,6 +50,15 @@ public:
 	 */
 	void Reset(uint32 Seed, int32 Width, int32 Height);
 
+	/**
+	 * Harnais : le chemin de `deserialize`. Le monde est FOURNI (genere puis
+	 * `tileDiff` applique, Harness/AnastasisJsSave.h), l'horloge est celle de la
+	 * sauvegarde ; la file de minuit part vide (`_dayDeferred` n'est pas
+	 * sauvegarde). Le village est lie a ce monde, vide : a peupler par
+	 * `FVillage::RestoreForHarness`.
+	 */
+	void ResetFromWorld(uint32 Seed, AnastasisWorld::FWorld&& InWorld, double InTime, int32 InDay);
+
 	/** No-op tant que Reset n'a pas ete appele (port de `if (this.bootDeferred) return`). */
 	void Tick(double Dt);
 

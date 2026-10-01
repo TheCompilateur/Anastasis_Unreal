@@ -356,7 +356,9 @@ namespace AnastasisJsSave
 		/** `tileDiff(sim)`: ce qui differe de la generation, recalcule depuis le monde C++. */
 		FValue ProjectTileDiff(const FState& S)
 		{
-			const AnastasisWorld::FWorld Pristine = AnastasisWorld::GenerateWorld(S.Seed, S.W, S.H);
+			// `pristineReference` est memoisee dans la reference ; ici, a la lecture.
+			const AnastasisWorld::FWorld Generated = S.Pristine.IsValid() ? AnastasisWorld::FWorld() : AnastasisWorld::GenerateWorld(S.Seed, S.W, S.H);
+			const AnastasisWorld::FWorld& Pristine = S.Pristine.IsValid() ? *S.Pristine : Generated;
 			// `pristine.clearing[i] = t.clearing || 0` dans un Float32Array: la
 			// generation ne pose pas de clairiere, la reference vierge vaut 0.
 			constexpr double PristineClearing = 0.0;
@@ -702,6 +704,7 @@ namespace AnastasisJsSave
 			OutError = TEXT("save : la generation n'a pas rendu w x h tuiles");
 			return false;
 		}
+		Out.Pristine = MakeShared<const AnastasisWorld::FWorld>(Out.World);
 		Out.TileExtras.SetNum(Out.World.Tiles.Num());
 		const FValue* Diff = Save.Find(TEXT("tileDiff"));
 		if (!Diff || !ApplyTileDiff(R, *Diff, Out))

@@ -378,6 +378,84 @@ namespace AnastasisJson
 		return true;
 	}
 
+	namespace
+	{
+		void AppendQuoted(FString& Out, const FString& S)
+		{
+			Out.AppendChar(TEXT('"'));
+			for (const TCHAR C : S)
+			{
+				switch (C)
+				{
+				case TEXT('"'): Out.Append(TEXT("\\\"")); break;
+				case TEXT('\\'): Out.Append(TEXT("\\\\")); break;
+				case TEXT('\n'): Out.Append(TEXT("\\n")); break;
+				case TEXT('\r'): Out.Append(TEXT("\\r")); break;
+				case TEXT('\t'): Out.Append(TEXT("\\t")); break;
+				case TEXT('\b'): Out.Append(TEXT("\\b")); break;
+				case TEXT('\f'): Out.Append(TEXT("\\f")); break;
+				default:
+					if (C < 0x20)
+					{
+						Out.Appendf(TEXT("\\u%04x"), static_cast<uint32>(C));
+					}
+					else
+					{
+						Out.AppendChar(C);
+					}
+				}
+			}
+			Out.AppendChar(TEXT('"'));
+		}
+
+		void AppendValue(FString& Out, const FValue& V)
+		{
+			switch (V.Kind)
+			{
+			case EKind::Null: Out.Append(TEXT("null")); return;
+			case EKind::Bool: Out.Append(V.bBool ? TEXT("true") : TEXT("false")); return;
+			case EKind::Number:
+				if (!FMath::IsFinite(V.Number))
+				{
+					Out.Append(TEXT("null"));
+				}
+				else
+				{
+					Out.Appendf(TEXT("%.17g"), V.Number);
+				}
+				return;
+			case EKind::String: AppendQuoted(Out, V.String); return;
+			case EKind::Array:
+				Out.AppendChar(TEXT('['));
+				for (int32 I = 0; I < V.Items.Num(); ++I)
+				{
+					if (I > 0) Out.AppendChar(TEXT(','));
+					AppendValue(Out, V.Items[I]);
+				}
+				Out.AppendChar(TEXT(']'));
+				return;
+			case EKind::Object:
+				Out.AppendChar(TEXT('{'));
+				for (int32 I = 0; I < V.Keys.Num(); ++I)
+				{
+					if (I > 0) Out.AppendChar(TEXT(','));
+					AppendQuoted(Out, V.Keys[I]);
+					Out.AppendChar(TEXT(':'));
+					AppendValue(Out, V.Items[I]);
+				}
+				Out.AppendChar(TEXT('}'));
+				return;
+			}
+		}
+	}
+
+	FString Stringify(const FValue& Value)
+	{
+		FString Out;
+		AppendValue(Out, Value);
+		return Out;
+	}
+
 	void Write(AnastasisDigest::FStateWriter& Writer, const FValue& Value)
 	{
 		switch (Value.Kind)

@@ -278,9 +278,11 @@ l'empreinte que la référence calcule (35 sections, global `47a2a2ffc0e5d98a`).
 **recalculé** depuis le monde C++ contre une génération vierge : la génération C++ sur 108 × 114
 rend exactement les 590 cases de la référence. Pour bâtiments, habitants et réservations, la
 projection repart de l'objet d'origine et y **réécrit** chaque champ lu depuis la valeur C++ ; les
-champs non lus (un habitant JS en a 105 au premier niveau) sont **recopiés**, figés. Le lecteur ne
-fait pas encore tourner l'état lu : brancher `FState` sur `FVillage` / `FAnastasisSimulation` est le
-travail de `sim-digest-emitter-001`.
+champs non lus (un habitant JS en a 105 au premier niveau) sont **recopiés**, figés. L'état lu est
+repris par l'hôte et tourne depuis `sim-digest-emitter-001` (`Harness/AnastasisHarnessTrace.h`,
+`FAnastasisSimulation::ResetFromWorld`, `FVillage::RestoreForHarness`) : la trace Unreal sort au format
+JS. Premier rapport, première divergence (la cadence du budget, non branchée dans `UpdateActors`) :
+`docs/migration/phase3/P3_PREMIER_RAPPORT.md`.
 
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 

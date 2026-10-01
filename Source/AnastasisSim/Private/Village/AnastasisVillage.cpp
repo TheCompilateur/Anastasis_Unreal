@@ -240,6 +240,47 @@ namespace AnastasisVillage
 		return Id;
 	}
 
+	bool FVillage::RestoreForHarness(const TArray<FBuilding>& InBuildings, const TArray<FNpc>& InActors,
+		const TArray<FMealReservation>& InMeals, int32 InMealSeq, int32 InNextBuildingId, int32 InNextNpcId, FString& OutError)
+	{
+		if (!World)
+		{
+			OutError = TEXT("village non lie a un monde");
+			return false;
+		}
+		if (Buildings.Num() > 0 || Actors.Num() > 0)
+		{
+			OutError = TEXT("village deja peuple : la reprise part d'un village vide (Bind)");
+			return false;
+		}
+		for (const FBuilding& Building : InBuildings)
+		{
+			const int32 TX = FloorInt(Building.X);
+			const int32 TY = FloorInt(Building.Y);
+			if (!Nav.IsInBounds(TX, TY))
+			{
+				OutError = FString::Printf(TEXT("%s hors de la carte (%d, %d)"), *Building.Id, TX, TY);
+				return false;
+			}
+			// `deserialize` : `buildingIndex[index] = building ; blocked[index] = 1`,
+			// puis `rebuildMoveCosts` — une case de batiment ne se traverse pas.
+			const int32 Index = TY * Nav.W + TX;
+			Nav.Blocked[Index] = 1;
+			Nav.MoveCost[Index] = std::numeric_limits<float>::infinity();
+			++NavVersion;
+			Buildings.Add(Building);
+		}
+		for (const FNpc& Npc : InActors)
+		{
+			Actors.Add(Npc);
+		}
+		MealReservations = InMeals;
+		MealSeq = InMealSeq;
+		NextBuildingId = InNextBuildingId;
+		NextNpcId = InNextNpcId;
+		return true;
+	}
+
 	bool FVillage::RemoveBuilding(const FString& Id)
 	{
 		const int32 Index = Buildings.IndexOfId(Id);

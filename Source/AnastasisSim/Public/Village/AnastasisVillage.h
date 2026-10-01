@@ -824,6 +824,25 @@ namespace AnastasisVillage
 		/** `perceive(sim, npc, true)` — balayage force (utilise par SpawnNpc et les tests). */
 		void PerceiveNow(const FString& NpcId);
 
+		/**
+		 * Harnais (sim-digest-emitter-001) : reprend un etat lu d'une sauvegarde JS
+		 * (Harness/AnastasisJsSave.h) sur un village lie au monde lu, comme
+		 * `deserialize` le fait cote JS. Les batiments gardent leur identifiant,
+		 * leurs champs et leurs seuils SAUVEGARDES (case bloquee, cout infini, version
+		 * de navigation incrementee, comme AddBuilding) ; les habitants sont repris
+		 * tels quels, sans perception (le JS ne percoit pas au chargement) ; le
+		 * registre des repas et les compteurs d'identifiants aussi. Refuse si le
+		 * village n'est pas lie, s'il a deja des entites, ou si un batiment sort de
+		 * la carte.
+		 */
+		bool RestoreForHarness(const TArray<FBuilding>& InBuildings, const TArray<FNpc>& InActors,
+			const TArray<FMealReservation>& InMeals, int32 InMealSeq, int32 InNextBuildingId, int32 InNextNpcId, FString& OutError);
+
+		/** Tuiles touchees depuis Bind (recolte, repousse) : index -> etat vivant. Lecture seule. */
+		const TMap<int32, AnastasisWorld::FTile>& GetLiveTiles() const { return LiveTiles; }
+		/** `ledger.seq` du registre des repas. */
+		int32 GetMealSeq() const { return MealSeq; }
+
 		const TArray<FBuilding>& GetBuildings() const { return Buildings.GetItems(); }
 		const TArray<FNpc>& GetActors() const { return Actors.GetItems(); }
 		const FBuilding* FindBuilding(const FString& Id) const { return Buildings.FindById(Id); }

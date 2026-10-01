@@ -95,6 +95,11 @@ namespace AnastasisJsSave
 		AnastasisWorld::FWorld World;
 		/** Indexe comme `World.Tiles`. */
 		TArray<FTileExtra> TileExtras;
+		/**
+		 * `pristineReference` : la generation seule, calculee une fois a la lecture.
+		 * `tileDiff` se projette contre elle ; partagee par les copies de l'etat.
+		 */
+		TSharedPtr<const AnastasisWorld::FWorld> Pristine;
 
 		TAnastasisEntityTable<AnastasisVillage::FBuilding> Buildings;
 		TAnastasisEntityTable<AnastasisVillage::FNpc> Actors;

@@ -86,6 +86,13 @@ namespace AnastasisJson
 	 */
 	ANASTASISSIM_API void Write(AnastasisDigest::FStateWriter& Writer, const FValue& Value);
 
+	/**
+	 * Ecrit `Value` en JSON compact. Un nombre fini s'ecrit en `%.17g` : pas la
+	 * plus courte ecriture, mais une que `JSON.parse` relit au bit pres (-0
+	 * compris). NaN et l'infini s'ecrivent `null`, comme `JSON.stringify`.
+	 */
+	ANASTASISSIM_API FString Stringify(const FValue& Value);
+
 	/** `digestValue(v)`: l'empreinte d'une valeur isolee. */
 	ANASTASISSIM_API uint64 DigestOf(const FValue& Value);
 }

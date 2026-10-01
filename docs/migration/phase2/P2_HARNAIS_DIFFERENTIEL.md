@@ -98,16 +98,17 @@ aucune transcription à la main entre les deux.
 node tools/migration/gen-digest-vectors.mjs   # régénère le .inl
 ```
 
-## Ce qui n'est pas encore là
+## L'émetteur Unreal (phase 3)
 
-**Il n'y a pas d'émetteur Unreal.** Le C++ sait calculer l'empreinte d'un état ; il n'a
-pas encore d'état à décrire — `serialize` n'a pas de contrepartie tant que la vague 4
-(état du monde et sauvegarde) n'est pas portée. Le harnais est donc aujourd'hui complet
-d'un côté et prouvé des deux : dès que le C++ aura un état, `FStateWriter` le décrit, la
-trace sort au même format, et le comparateur marche sans changer une ligne.
+Depuis `sim-digest-emitter-001`, le C++ a son émetteur : un scénario est lu
+(`Harness/AnastasisJsSave.h`), repris par l'hôte, et chaque tick l'état vivant du C++ est projeté
+sur le périmètre du scénario et écrit au format de `emit-state-digests.mjs`
+(`Harness/AnastasisHarnessTrace.h`, test `Anastasis.Sim.Harnais.Trace`). Premier rapport réel,
+et ce qu'il ordonne : `docs/migration/phase3/P3_PREMIER_RAPPORT.md`. Le forage champ par champ
+se fait par `-dump` (JS), `ANASTASIS_HARNESS_DRILL` (C++) et `tools/migration/diff-states.mjs`.
 
-En attendant, il sert déjà à comparer deux états du dépôt JS entre eux — une refonte qui
-ne devait rien changer, une sauvegarde rechargée qui doit reprendre à l'identique.
+Il sert aussi à comparer deux états du dépôt JS entre eux — une refonte qui ne devait rien
+changer, une sauvegarde rechargée qui doit reprendre à l'identique.
 
 ## Scénarios et masques (phase 3)
 
@@ -138,3 +139,6 @@ pour lancer chaque trace dans son propre processus.
 | `tools/migration/gen-digest-vectors.mjs` | vecteurs de parité de l'empreinte, JS → C++ |
 | `Source/AnastasisSim/Public/Core/AnastasisStateDigest.h` | l'empreinte côté C++ |
 | `Source/AnastasisSim/Private/Tests/AnastasisDigestTests.cpp` | la preuve que les deux côtés hachent pareil |
+| `Source/AnastasisSim/Public/Harness/AnastasisJsSave.h` | lecteur C++ d'un scénario (sauvegarde JS), projection sur `serialize` |
+| `Source/AnastasisSim/Public/Harness/AnastasisHarnessTrace.h` | émetteur Unreal : reprise par l'hôte, trace JSONL, forage |
+| `tools/migration/diff-states.mjs` | forage champ par champ de deux états vidés au même tick |

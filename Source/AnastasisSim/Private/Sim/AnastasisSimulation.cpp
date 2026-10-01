@@ -25,6 +25,23 @@ void FAnastasisSimulation::Reset(uint32 SeedValue, int32 Width, int32 Height)
 	Accumulator = 0.0;
 }
 
+void FAnastasisSimulation::ResetFromWorld(uint32 SeedValue, AnastasisWorld::FWorld&& InWorld, double InTime, int32 InDay)
+{
+	bBootDeferred = false;
+	Seed = SeedValue;
+	World = MoveTemp(InWorld);
+	Village.Bind(World);
+	Time = InTime;
+	Day = InDay;
+	NewDayCount = 0;
+	DeferredRemaining = 0;
+	DeferredJobs.Reset();
+	LastRegrownFields = 0;
+	Village.SetRngSeed(Seed);
+	Village.SetWeatherSeed(Seed);
+	Accumulator = 0.0;
+}
+
 void FAnastasisSimulation::Tick(double Dt)
 {
 	if (bBootDeferred)

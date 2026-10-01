@@ -57,6 +57,9 @@
 //                   divergence dont on connait deja la reponse.
 //   -perturb-path <chemin>  le nombre perturbe (defaut `actors.0.x`), chemin
 //                   pointe dans `sim` : `colony.treasury`, `actors.1.needs.hunger`…
+//   -dump <tick>    forage: a ce tick, ecrire l'etat (`serialize`) en JSON dans
+//   -dump-out <f>   <f> — les sections du perimetre du scenario, ou toutes sans
+//                   scenario. A comparer champ par champ (diff-states.mjs).
 //
 // UNE TRACE = UN PROCESSUS NEUF. Deux `new Simulation(graine)` dans le meme
 // processus ne produisent pas le meme etat: les identifiants du journal de
@@ -93,6 +96,9 @@ const DRILL = argv.includes("-drill") ? Number(argOf("-drill", -1)) : -1;
 const PERTURB = argv.includes("-perturb") ? Number(argOf("-perturb", -1)) : -1;
 const PERTURB_PATH = argOf("-perturb-path", "actors.0.x");
 const OUT = argOf("-out", null);
+const DUMP = argv.includes("-dump") ? Number(argOf("-dump", -1)) : -1;
+const DUMP_OUT = argOf("-dump-out", null);
+if (DUMP >= 0 && !DUMP_OUT) refuser("-dump demande -dump-out", 2);
 if (MODE_TICK && !["reference", "recompose"].includes(MODE_TICK)) refuser(`-tick ${MODE_TICK} : attendu reference | recompose`, 2);
 if (!SCENARIO_CHEMIN && (SANS_MASQUES || AUDIT || MODE_TICK)) refuser("-sans-masques, -audit-rng et -tick demandent -scenario", 2);
 
@@ -227,6 +233,12 @@ lignes.push(JSON.stringify({
 // un bug de simulation la ou il n'y en a pas.
 function echantillon(t) {
   const etat = serialize(sim);
+  if (t === DUMP) {
+    const garder = scenario ? scenario.sections : Object.keys(etat);
+    const vidage = Object.fromEntries(garder.map((k) => [k, etat[k]]));
+    mkdirSync(dirname(DUMP_OUT), { recursive: true });
+    writeFileSync(DUMP_OUT, JSON.stringify(vidage), "utf8");
+  }
   const { global, sections } = digestState(etat);
   const ligne = { t, day: sim.day, time: etat.time, g: global, s: sections };
   if (t === DRILL) {
@@ -243,7 +255,7 @@ if (PERTURB === 0) perturber(sim, PERTURB_PATH);
 echantillon(0);
 for (let t = 1; t <= TICKS; t += 1) {
   pas(t);
-  if (t % EVERY === 0 || t === DRILL) echantillon(t);
+  if (t % EVERY === 0 || t === DRILL || t === DUMP) echantillon(t);
 }
 
 const sortie = lignes.join("\n") + "\n";
