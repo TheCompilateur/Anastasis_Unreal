@@ -154,4 +154,45 @@ struct FPlan
 };
 
 bool Build(const FInputs& In, const FSettings& Settings, FPlan& Out, FString& OutError);
+
+/**
+ * SOL SOUS L'HERBE. Part du sol couverte, par groupe de familles, lissee sur une grille de
+ * quelques metres : X prairie (haute + basse), Y laiches, Z lande (touffes + callune), [0,1].
+ * C'est un champ BASSE FREQUENCE : il teinte la couleur de sommet du sol, qui porte la chromie
+ * large (GROUND_HYDROLOGY_ARBITRATION.md) ; le materiau de sol garde le detail.
+ */
+struct FCoverField
+{
+	FVector2D Origin = FVector2D::ZeroVector;
+	double CellUU = 400.0;
+	int32 W = 0;
+	int32 H = 0;
+	TArray<FVector3f> Cover;
+
+	bool IsValid() const { return W > 1 && H > 1 && Cover.Num() == W * H && CellUU > 0.0; }
+	/** Bilineaire entre centres de cellules ; hors grille : zero. */
+	FVector3f Sample(double X, double Y) const;
+};
+
+/** Teinte du sol sous chaque groupe : multiplicative sur la teinte de tuile, puis tiree vers un absolu. */
+struct FSoilTint
+{
+	/** Facteurs sur la teinte de la tuile (garde sa semantique : sable, herbe, rive). */
+	FLinearColor MeadowFactor = FLinearColor(0.62f, 0.70f, 0.50f);
+	FLinearColor SedgeFactor = FLinearColor(0.50f, 0.58f, 0.50f);
+	FLinearColor LandeFactor = FLinearColor(0.82f, 0.72f, 0.62f);
+	/** Couleurs absolues vers lesquelles on tire a moitie : un sable sous prairie verdit. */
+	FLinearColor MeadowAbsolute = FLinearColor(0.070f, 0.085f, 0.035f);
+	FLinearColor SedgeAbsolute = FLinearColor(0.050f, 0.062f, 0.038f);
+	FLinearColor LandeAbsolute = FLinearColor(0.095f, 0.082f, 0.060f);
+	double AbsoluteShare = 0.5;
+	/** Couverture a partir de laquelle la teinte est pleine. */
+	double FullCover = 0.6;
+	double Strength = 0.75;
+};
+
+/** Champ de couverture d'un plan : comptes par cellule normalises, puis deux passes de flou 3x3. */
+void BuildCoverField(const FPlan& Plan, const FBox2D& Bounds, double CellUU, double CandidateCellUU, FCoverField& Out);
+/** Teinte d'un sommet de sol ; Amount (optionnel) recoit la part de teinte appliquee [0,1]. Alpha intact. */
+FLinearColor TintSoil(const FLinearColor& Base, const FVector3f& Cover, const FSoilTint& Tint, double* Amount = nullptr);
 }

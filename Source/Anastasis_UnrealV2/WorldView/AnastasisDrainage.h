@@ -108,6 +108,12 @@ struct FNetwork
 	TArray<float> Riparian;
 	int32 GridW = 0, GridH = 0;
 	double GridX0 = 0.0, GridY0 = 0.0, GridStep = 0.0;
+	/**
+	 * Triangles de nappe de la grille SANS les rivieres (lacs, mers, mares) : avec les
+	 * rubans de BuildRiverRibbons, la grille ne dessine plus les rivieres -- elle garde
+	 * leurs hauteurs d'eau, que lisent foret, lieux et couvert vegetal.
+	 */
+	TArray<int32> LakeWaterTriangles;
 	/** Aire de reference de la geometrie hydraulique (m2). */
 	double ChannelAreaM2 = 0.0;
 	/** Seuil d'initiation retenu, aire x pente^2 (m2). */
@@ -134,6 +140,12 @@ struct FParams
 	double WidthRefAreaM2 = 40000.0;
 	/** Tetes avant elagage : les ravines courtes (< MinTributaryM) tombent ensuite. */
 	int32 MaxHeads = 60;
+	/**
+	 * WATER_LOOK_001 (anastasis.Terrain.WaterLook) : berges marquees en plaine (revanche
+	 * 1 m, talus de ~1.5 x la largeur au lieu de 3 x), fond immerge en vase et gravier au
+	 * lieu du bleu de tuile. Sans lui, la geometrie d'avant.
+	 */
+	bool bWaterLook = false;
 	/** Affluents de premier ordre plus courts : elagues. */
 	double MinTributaryM = 220.0;
 	double MinWidthM = 6.0;
@@ -196,5 +208,27 @@ const FNetwork& GetActive();
  * River Width / Depth / Velocity du Water plugin.
  */
 void DrawDebug(UWorld* World, const FNetwork& Network, int32 Mode);
+
+/** Ruban d'eau d'une riviere : une bande lisse le long de sa polyligne, au niveau de l'eau. */
+struct FWaterRibbons
+{
+	TArray<FVector> Vertices;
+	TArray<int32> Triangles;
+	TArray<FVector> Normals;
+	/** (distance le long du cours en m / 10, travers -1..1). */
+	TArray<FVector2D> UV0;
+	/** Sens du courant x vitesse normalisee [0,1] : lu par M_AnastasisWater (flowmap). */
+	TArray<FVector2D> UV2;
+	TArray<FLinearColor> Colors;
+};
+
+/**
+ * WATER_LOOK_001 -- rubans d'eau des rivieres. Le bord visible n'est plus l'escalier de la
+ * grille de 5 m : le ruban deborde de 3.5 m sous les berges, et c'est l'intersection d'un
+ * plan d'eau avec une berge lisse qui dessine la rive. Un affluent est pose un peu plus bas
+ * que son recepteur, une riviere un peu plus bas qu'un lac : le recepteur couvre la
+ * confluence, pas de scintillement de deux surfaces confondues.
+ */
+void BuildRiverRibbons(const FNetwork& Network, FWaterRibbons& Out);
 int32 DebugMode();
 }

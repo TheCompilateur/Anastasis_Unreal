@@ -90,10 +90,26 @@ uniforme ; LOD écrits à la main (45 % puis 30 % des lames, élargies), pas ré
 ouvre l'éditeur sur `/Engine/Maps/Entry` : sur la carte de démarrage, les touffes posées
 verrouillaient les assets à régénérer.
 
+## Sol sous l'herbe
+
+Le matériau de sol (`M_AnastasisGround`, `tools/unreal/ground-material.py`) multiplie toutes ses
+couches par la couleur de sommet. Après la pose de l'herbe, `PlaceGroundCover` construit un champ de
+couverture (`BuildCoverField` : part des candidates réellement posées par cellule de 4 m, par groupe
+prairie / laîches / lande, deux flous 3×3) et teinte la couleur de sommet de la section de sol
+(`TintSoil`) : sous la prairie elle fonce et verdit, sous les laîches elle fonce davantage, sous la
+lande elle passe en terre brune. Facteurs relatifs (la tuile garde sa sémantique : un sable reste
+plus clair qu'une herbe) tirés à moitié vers un absolu (un sable sous prairie verdit).
+
+C'est un champ basse fréquence : il va dans la couleur de sommet, comme le veut
+`GROUND_HYDROLOGY_ARBITRATION.md` ; le matériau garde le détail et n'est pas modifié. Le canal alpha
+(drapeau « sous l'eau » du drainage) est intact. CVar : `anastasis.GroundCover.SoilTint` (1 ; 0 pour
+l'A/B, mêmes touffes). Journal : `ANASTASIS_SOIL_TINT tinted_vertices= mean_amount=`. Preuves :
+`docs/visual/ground-soil-tint-001/`.
+
 ## Limites connues
 
-- **Le sol sous l'herbe** (`MI_AnastasisGround`, autre chantier) perce entre les touffes : vert
-  pâle en vallée, sableux ailleurs. La lecture lointaine d'une prairie relève du matériau de sol.
+- **Le sol sous l'herbe** est teinté par la couverture (voir ci-dessus) ; hors herbe, il garde la
+  teinte de tuile du matériau de sol (sable, roche).
 - **Vue oblique / aérienne** : l'herbe est coupée à 108 m ; de haut elle ne compte pas.
 - **Pentes > 45°** : nues (falaise). Entre 20 et 45° : lande clairsemée, voir Lande (H6).
 - **Hameau** : sur un replat sableux où l'herbe est rare ; la clairière piétinée (règle testée

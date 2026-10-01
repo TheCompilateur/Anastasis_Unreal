@@ -56,6 +56,11 @@ static TAutoConsoleVariable<int32> CVarGroundCoverInAutomation(
     TEXT("anastasis.GroundCover.InAutomation"), 0,
     TEXT("0=pas d'herbe pendant les tests d'automatisation (defaut), 1=herbe aussi sous automatisation ; applique a l'incarnation."), ECVF_Default);
 
+// SOL SOUS L'HERBE. Coupable pour l'A/B : memes touffes, sol teinte ou non.
+static TAutoConsoleVariable<int32> CVarGroundCoverSoilTint(
+    TEXT("anastasis.GroundCover.SoilTint"), 1,
+    TEXT("0=sol non teinte sous l'herbe, 1=sol fonce et verdi sous la prairie, brun sous les laiches, terre sous la lande (defaut) ; applique a l'incarnation."), ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainForge(
@@ -74,6 +79,15 @@ static TAutoConsoleVariable<int32> CVarTerrainForge(
 static TAutoConsoleVariable<int32> CVarShoreline(
     TEXT("anastasis.Terrain.Shoreline"), 1,
     TEXT("0=nappe d'eau opaque historique, 1=rive graduee M_AnastasisShoreWater (defaut); applique a l'incarnation."),
+    ECVF_Default);
+
+// WATER_LOOK_001 : l'eau se lisait comme de la peinture (aplat translucide, a fleur
+// d'herbe, bords en escalier, immobile). 1 = M_AnastasisWater (Single Layer Water :
+// absorption selon la profondeur, reflets, vagues advectees par le courant), rubans
+// d'eau lisses par riviere (section 2), berges marquees et fond de vase. 0 = l'eau d'avant.
+static TAutoConsoleVariable<int32> CVarWaterLook(
+    TEXT("anastasis.Terrain.WaterLook"), 1,
+    TEXT("1=eau Single Layer Water + rubans de riviere + berges marquees (defaut), 0=nappe de rive d'avant; applique a l'incarnation."),
     ECVF_Default);
 
 // Le bouton qui rend la comparaison possible. Les deux chemins batissent EXACTEMENT
@@ -784,6 +798,52 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 		PerTier[K] += Batch.Value.Num();
 		++Chunks;
 	}
+	// SOL SOUS L'HERBE : la couleur de sommet de la section de sol (la chromie large, cf.
+	// GROUND_HYDROLOGY_ARBITRATION.md) est teintee par le champ de couverture. Relue depuis la
+	// section elle-meme, que EmbodyCrop vient de recreer : aucune teinte ne s'accumule d'une
+	// incarnation a l'autre. Les sommets non teintes repartent a l'octet pres.
+	int32 TintedVertices = 0;
+	double TintSum = 0.0;
+	if (CVarGroundCoverSoilTint.GetValueOnGameThread() != 0 && ExperimentalSurface)
+	{
+		GC::FCoverField Field;
+		GC::BuildCoverField(Cover, In.Bounds, 400.0, GC::FSettings().CellUU, Field);
+		if (FProcMeshSection* Section = ExperimentalSurface->GetProcMeshSection(0))
+		{
+			const GC::FSoilTint Tint;
+			const int32 N = Section->ProcVertexBuffer.Num();
+			TArray<FColor> Colors;
+			TArray<FVector> Positions;
+			Colors.SetNumUninitialized(N);
+			Positions.SetNumUninitialized(N);
+			for (int32 I = 0; I < N; ++I)
+			{
+				const FProcMeshVertex& V = Section->ProcVertexBuffer[I];
+				Colors[I] = V.Color;
+				Positions[I] = V.Position;
+				// La section est creee SANS conversion sRGB (CreateMeshSection_LinearColor,
+				// bSRGBConversion=false) : ses octets sont lineaires. Les relire en sRGB
+				// assombrirait et fausserait toute la teinte.
+				double Amount = 0.0;
+				const FLinearColor Tinted = GC::TintSoil(V.Color.ReinterpretAsLinear(), Field.Sample(V.Position.X, V.Position.Y), Tint, &Amount);
+				if (Amount <= 0.001) continue;
+				Colors[I] = Tinted.ToFColor(false);
+				++TintedVertices;
+				TintSum += Amount;
+			}
+			if (TintedVertices > 0)
+			{
+				// Les positions sont REQUISES, inchangees : UpdateMeshSection ne recopie rien --
+				// couleurs comprises -- si le tableau de positions n'a pas le nombre de sommets
+				// de la section (tint-v1 : 135 805 sommets "teintes", sol identique a l'image).
+				ExperimentalSurface->UpdateMeshSection(0, Positions, TArray<FVector>(), TArray<FVector2D>(),
+					TArray<FVector2D>(), TArray<FVector2D>(), TArray<FVector2D>(), Colors, TArray<FProcMeshTangent>());
+			}
+		}
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_SOIL_TINT enabled=%d tinted_vertices=%d mean_amount=%.3f"),
+		CVarGroundCoverSoilTint.GetValueOnGameThread() != 0, TintedVertices, TintedVertices > 0 ? TintSum / TintedVertices : 0.0);
+
 	UE_LOG(LogAnastasis_UnrealV2, Display,
 		TEXT("ANASTASIS_GROUND_COVER enabled=1 tall=%d short=%d sedge=%d heath=%d heather=%d placed=%d near=%d far=%d chunks=%d outside_valley=%d shadows=%d candidates=%d refused_mask=%d refused_ground=%d refused_water=%d refused_slope=%d refused_canopy=%d refused_density=%d crowns=%d clearings=%d truncated=%d missing_meshes=%d plan_ms=%.1f total_ms=%.1f"),
 		Cover.Counts[0], Cover.Counts[1], Cover.Counts[2], Cover.Counts[3], Cover.Counts[4], Placed, PerTier[0], PerTier[1], Chunks, OutsideValley, bShadows,
@@ -1000,6 +1060,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 if (SurfaceMode == 2 && AnastasisDrainage::IsEnabled())
                 {
                     AnastasisDrainage::FParams DrainageParams;
+                    DrainageParams.bWaterLook = CVarWaterLook.GetValueOnGameThread() != 0;
                     if (ForgeMesh.bBasinFound || ForgeMesh.bHumanGeography) DrainageParams.Protected.Add(FVector2D(ForgeMesh.BasinX, ForgeMesh.BasinY));
                     if (ForgeMesh.bLandmarkFound) DrainageParams.Protected.Add(FVector2D(ForgeMesh.LandmarkX, ForgeMesh.LandmarkY));
                     if (AnastasisDrainage::Apply(Crop, ForgeMesh, Drainage, DrainageParams))
@@ -1068,7 +1129,13 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 Geometry.Colors, TArray<FProcMeshTangent>{}, true);
             // Section 1 : nappe d'eau plate au niveau de la mer, encastree dans le relief.
             ExperimentalSurface->ClearMeshSection(1);
-            bWaterSurfaceBuilt = Geometry.WaterTriangles.Num() > 0;
+            ExperimentalSurface->ClearMeshSection(2);
+            // WATER_LOOK_001 : seulement si le drainage a tourne -- ses rubans et sa liste de
+            // triangles sans rivieres en dependent.
+            const AnastasisDrainage::FNetwork& ActiveDrainage = AnastasisDrainage::GetActive();
+            const bool bWaterLook = CVarWaterLook.GetValueOnGameThread() != 0 && ActiveDrainage.GridW > 0;
+            const TArray<int32>& WaterTriangles = bWaterLook ? ActiveDrainage.LakeWaterTriangles : Geometry.WaterTriangles;
+            bWaterSurfaceBuilt = WaterTriangles.Num() > 0;
             const bool bShoreline = CVarShoreline.GetValueOnGameThread() != 0;
             if (bWaterSurfaceBuilt)
             {
@@ -1078,7 +1145,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 // sommet reste celle d'avant -- c'est le repli, et c'est ce que rend le
                 // mode 0. La geometrie est identique dans les deux cas : seuls les canaux
                 // et le materiau changent, sinon l'A/B ne prouverait rien.
-                ExperimentalSurface->CreateMeshSection_LinearColor(1, Geometry.WaterVertices, Geometry.WaterTriangles,
+                ExperimentalSurface->CreateMeshSection_LinearColor(1, Geometry.WaterVertices, WaterTriangles,
                     Geometry.WaterNormals,
                     bShoreline ? Geometry.WaterUV0 : TArray<FVector2D>{},
                     bShoreline ? Geometry.WaterUV1 : TArray<FVector2D>{},
@@ -1094,7 +1161,28 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             // anastasis.Terrain.Shoreline 0 doit rendre l'eau comme avant, pas la peindre
             // en terre.
             UMaterialInterface* SurfaceMaterial = ResolveGroundMaterial();
-            UMaterialInterface* ShoreMaterial = bShoreline ? ResolveWaterMaterial() : ResolveSliceMaterial();
+            UMaterialInterface* ShoreMaterial = bWaterLook ? ResolveWaterLookMaterial()
+                : bShoreline ? ResolveWaterMaterial() : ResolveSliceMaterial();
+            // Section 2 : rubans d'eau des rivieres, meme materiau que la nappe.
+            if (bWaterLook)
+            {
+                AnastasisDrainage::FWaterRibbons Ribbons;
+                AnastasisDrainage::BuildRiverRibbons(ActiveDrainage, Ribbons);
+                if (Ribbons.Triangles.Num() > 0)
+                {
+                    ExperimentalSurface->CreateMeshSection_LinearColor(2, Ribbons.Vertices, Ribbons.Triangles, Ribbons.Normals,
+                        Ribbons.UV0, TArray<FVector2D>{}, Ribbons.UV2, TArray<FVector2D>{},
+                        Ribbons.Colors, TArray<FProcMeshTangent>{}, false);
+                    if (ShoreMaterial) ExperimentalSurface->SetMaterial(2, ShoreMaterial);
+                }
+                UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_WATER_LOOK enabled=1 material=%s ribbons=%d ribbon_triangles=%d still_water_triangles=%d"),
+                    ShoreMaterial ? *ShoreMaterial->GetName() : TEXT("none"), ActiveDrainage.Rivers.Num(),
+                    Ribbons.Triangles.Num() / 3, WaterTriangles.Num() / 3);
+            }
+            else
+            {
+                UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_WATER_LOOK enabled=0"));
+            }
             if (SurfaceMaterial)
             {
                 ExperimentalSurface->SetMaterial(0, SurfaceMaterial);
@@ -1258,6 +1346,16 @@ UMaterialInterface* AAnastasisWorldEmbodiment::ResolveGroundMaterial()
 			nullptr, TEXT("/Game/Anastasis/Materials/M_AnastasisSlice.M_AnastasisSlice"));
 	}
 	return SliceMaterial ? SliceMaterial.Get() : BaseShapeMaterial.Get();
+}
+
+UMaterialInterface* AAnastasisWorldEmbodiment::ResolveWaterLookMaterial()
+{
+	if (!WaterLookMaterial)
+	{
+		WaterLookMaterial = LoadObject<UMaterialInterface>(
+			nullptr, TEXT("/Game/Anastasis/Materials/M_AnastasisWater.M_AnastasisWater"));
+	}
+	return WaterLookMaterial ? WaterLookMaterial.Get() : ResolveWaterMaterial();
 }
 
 UMaterialInterface* AAnastasisWorldEmbodiment::ResolveWaterMaterial()

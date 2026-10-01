@@ -15,17 +15,19 @@ des ellipses de la vallee ecrite : elle prouve que la carte entiere est couverte
 
 ANASTASIS_GROUND_OUT     dossier de sortie (obligatoire)
 ANASTASIS_GROUND_STATES  etats captures, dans l'ordre, le premier doit poser l'herbe
-                         (defaut "on,off") : on | off | noshadow | on2
+                         (defaut "on,off") : on | off | noshadow | notint | on2
 """
 import os, time, math, json, unreal
 
 OUT = os.environ.get('ANASTASIS_GROUND_OUT')
 STATE_CMDS = {
-    'on': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1'),
-    'off': ('anastasis.Dressing.GroundCover 0', 'anastasis.GroundCover.Shadows 1'),
-    'noshadow': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 0'),
+    'on': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'off': ('anastasis.Dressing.GroundCover 0', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'noshadow': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 0', 'anastasis.GroundCover.SoilTint 1'),
+    # Memes touffes, sol non teinte : l'A/B du sol sous l'herbe.
+    'notint': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 0'),
     # Repetition de "on" en fin de serie : l'ecart on / on2 mesure la derive de la machine.
-    'on2': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1'),
+    'on2': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
 }
 states = [x.strip() for x in os.environ.get('ANASTASIS_GROUND_STATES', 'on,off').split(',') if x.strip()]
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
@@ -96,6 +98,9 @@ try:
         ('lisiere_eye', (37.0, 57.0), 170, (28.0, 58.0), 600),
         ('vallee_b_eye', (37.0, 27.0), 170, (28.0, 21.0), 300),
         ('oblique', (40.0, 44.0), 3500, (50.0, 58.0), 0),
+        # Vue d'ensemble a ~300 m : l'herbe est coupee a 108 m, ce qu'on voit d'ici c'est le
+        # SOL -- la mosaique prairie / laiches / lande de la vue aerienne d'EZ5.
+        ('aerien', (30.0, 34.0), 30000, (52.0, 58.0), 0),
     ]
     for pid, x, y, z, r in report:
         if pid == 'hameau':
