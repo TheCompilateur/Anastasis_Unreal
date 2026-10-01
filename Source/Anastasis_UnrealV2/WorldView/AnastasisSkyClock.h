@@ -55,6 +55,8 @@ namespace AnastasisSkyClock
 		/** Post-process colour saturation and white-balance temperature for night vision (1 and 6500 K in daylight). */
 		double ColorSaturation = 1.0;
 		double WhiteTemp = 6500.0;
+		/** 0 in day and night, 1 while the sun grazes the horizon (TwilightFor). */
+		double Twilight = 0.0;
 		AnastasisWeather::FWeather Weather;
 		double Humidity = 0.0;
 		double Wetness = 0.0;
@@ -108,4 +110,27 @@ namespace AnastasisSkyClock
 	 * The WHERE stays the simulation's wetness field; this only says WHEN and how much.
 	 */
 	double MistFactorFor(const UAnastasisAtmosphereProfile& Profile, const FSkyState& State);
+
+	/**
+	 * Twilight band for a sun elevation (ENV_REALISM_002): 0 below TwilightStartDegrees and above
+	 * TwilightEndDegrees, 1 between TwilightFullLowDegrees and TwilightFullHighDegrees, smoothstep
+	 * on both edges. Daytime and night images are untouched by construction.
+	 */
+	double TwilightFor(const UAnastasisAtmosphereProfile& Profile, double SunElevationDegrees);
+
+	/**
+	 * The same instant as DAY_NIGHT_WEATHER_001 rendered it: no twilight band, and saturation and
+	 * white point both on the exposure curve. anastasis.Sky.Twilight 0, for the A/B.
+	 */
+	FSkyState WithoutTwilight(const UAnastasisAtmosphereProfile& Profile, const FSkyState& State);
+
+	/** Lerp(1, FullTwilightScale, Twilight): how a twilight multiplier applies at this instant. */
+	double TwilightScale(double Twilight, double FullTwilightScale);
+
+	/**
+	 * Ground rain wetness in [0,1] for M_AnastasisGround: the state's WeatherWetnessAt, or a
+	 * pinned value (anastasis.Sky.GroundWetness >= 0) for captures. 0 when the profile says
+	 * the weather does not wet the ground.
+	 */
+	double GroundWetnessFor(const UAnastasisAtmosphereProfile& Profile, const FSkyState& State, double PinnedWetness);
 }

@@ -247,6 +247,9 @@ double WaterDepthFromShade(double Shade);
 /**
  * Projection sommet : les champs deja presents sur la tuile, rien d'invente.
  * Palette distincte des cubes DEBUG.
+ *
+ * Sur une tuile d'eau, c'est le FOND qui est peint (limon au bord, sombre en
+ * profondeur), jamais l'eau : la nappe est une autre section. Alpha 1 = immerge.
  */
 FLinearColor TileColor(const AnastasisWorldView::FVisualTile& Tile, double MinAlt, double MaxAlt);
 }

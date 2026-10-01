@@ -96,7 +96,10 @@ bool FAnastasisTerrainSemantics::RunTest(const FString&)
         {
             ++WaterTiles;
             TestEqual(TEXT("alpha eau = 1"), C.A, 1.0f);
-            TestTrue(TEXT("l'eau est bleue dominante"), C.B > C.R && C.B > C.G);
+            // Le sommet d'une tuile d'eau peint le FOND (section 0), pas l'eau : la nappe a
+            // sa propre section et son propre materiau. Un fond bleu se lisait a travers la
+            // marge translucide et debordait sur la berge par interpolation (ENV_REALISM_002).
+            TestTrue(TEXT("le lit immerge n'est pas peint en bleu"), C.B <= C.R || C.B <= C.G);
         }
         else
         {
@@ -944,9 +947,10 @@ bool FAnastasisTerrainHydrologyGradient::RunTest(const FString&)
     Channel.FlowAmt = 0.7;
     const FLinearColor StillColor = AnastasisTerrainSurface::TileColor(Still, MinAlt, MaxAlt);
     const FLinearColor ChannelColor = AnastasisTerrainSurface::TileColor(Channel, MinAlt, MaxAlt);
-    TestTrue(TEXT("FlowAmt change la couleur d'eau a Shade egal"), StillColor != ChannelColor);
-    TestTrue(TEXT("eau stagnante bleue dominante"), StillColor.B > StillColor.R && StillColor.B > StillColor.G);
-    TestTrue(TEXT("eau courante bleue dominante"), ChannelColor.B > ChannelColor.R && ChannelColor.B > ChannelColor.G);
+    TestTrue(TEXT("FlowAmt change la couleur du lit a Shade egal"), StillColor != ChannelColor);
+    TestTrue(TEXT("lit stagnant : du limon, pas du bleu"), StillColor.B < StillColor.R);
+    TestTrue(TEXT("lit courant : du gravier, pas du bleu"), ChannelColor.B < ChannelColor.R);
+    TestTrue(TEXT("le courant eclaircit le lit (le limon part)"), Luma(ChannelColor) > Luma(StillColor));
     TestEqual(TEXT("profondeur inversee"), AnastasisTerrainSurface::WaterDepthFromShade(Still.Shade), 0.4);
 
     const auto Full = AnastasisWorldView::CaptureCanonicalWorld(12345);
@@ -1059,7 +1063,12 @@ bool FAnastasisTerrainSlopeShade::RunTest(const FString&)
     const FLinearColor DeepColor = AnastasisTerrainSurface::TileColor(DeepWaterTile, MinAlt, MaxAlt);
     const FLinearColor ShallowColor = AnastasisTerrainSurface::TileColor(ShallowWaterTile, MinAlt, MaxAlt);
     TestTrue(TEXT("sur l'eau Shade reste la profondeur"), Luma(DeepColor) < Luma(ShallowColor));
-    TestTrue(TEXT("eau profonde bleue dominante"), DeepColor.B > DeepColor.R && DeepColor.B > DeepColor.G);
+    TestTrue(TEXT("le fond profond est sombre (l'eau absorbe la lumiere)"), Luma(DeepColor) < 0.06f);
+    TestTrue(TEXT("le fond profond n'est pas peint en bleu"), DeepColor.B <= DeepColor.R || DeepColor.B <= DeepColor.G);
+    // Au trait de cote, le fond prolonge la berge : un limon, ni plus sombre que la vase
+    // saturee de 3 stops, ni plus clair que la berge elle-meme.
+    TestTrue(TEXT("le limon du bord reste dans la plage des sols humides"),
+        Luma(ShallowColor) > 0.06f && Luma(ShallowColor) < 0.25f);
 
     const auto Full = AnastasisWorldView::CaptureCanonicalWorld(12345);
     const auto Crop = AnastasisWorldView::CropSnapshot(Full, 0, 0, 32, 32);

@@ -77,11 +77,27 @@ const FLinearColor SaturatedBank(0.247f, 0.220f, 0.165f);
  * sommets en neige.
  */
 const FLinearColor HighlandRock(0.171f, 0.163f, 0.152f);
-// Eau : hors perimetre de GROUND_SURFACE_001, tenue par hydrology-surface.
-const FLinearColor ShallowWater(0.102f, 0.361f, 0.427f);
-const FLinearColor DeepWater(0.016f, 0.063f, 0.204f);
-/** Ecoulement : toujours bleu-dominant, un peu plus trouble que l'eau stagnante. */
-const FLinearColor ChannelWater(0.078f, 0.286f, 0.345f);
+/**
+ * LIT IMMERGE (ENV_REALISM_002). Une tuile d'eau ne peint plus de l'eau : elle peint le FOND.
+ *
+ * La couleur de sommet d'une tuile d'eau est celle de la section 0 -- le relief sous la
+ * nappe -- et jamais celle de l'eau : la nappe est une autre section, avec son propre
+ * materiau (M_AnastasisShoreWater, ou des couleurs constantes en mode historique). Peindre
+ * le fond en bleu (ShallowWater 0.10/0.36/0.43, l'ancienne valeur) avait deux effets, tous
+ * deux faux et tous deux decrits par SHORELINE_FORGE_001 (Limites n.1) :
+ *   - la translucidite de la marge ne revelait pas du limon, elle revelait du bleu ;
+ *   - la forge interpole la couleur entre sommets : le bleu du premier sommet immerge
+ *     debordait sur la berge emergee, une bande bleutee juste au-dessus du trait d'eau.
+ *
+ * Donc : un limon sature au bord (de la meme famille que WetMud, un cran plus clair, car
+ * il est lave), qui s'eteint vers un fond sombre et neutre a mesure que l'eau absorbe la
+ * lumiere. Le bleu, quand il y en a, est celui de la nappe, plus celui d'aucun albedo.
+ */
+const FLinearColor ShallowBed(0.135f, 0.118f, 0.082f);
+/** Fond profond : sombre et neutre. Il ne se voit qu'a travers une nappe deja opaque. */
+const FLinearColor DeepBed(0.040f, 0.041f, 0.036f);
+/** Lit d'ecoulement : le courant emporte le limon, il reste un gravier plus gris. */
+const FLinearColor ChannelBed(0.120f, 0.115f, 0.100f);
 }
 
 double AnastasisTerrainSurface::WaterDepthFromShade(double Shade)
@@ -93,12 +109,17 @@ FLinearColor AnastasisTerrainSurface::TileColor(const AnastasisWorldView::FVisua
 {
     if (T.Type == AnastasisWorld::ETileType::Water)
     {
+        // Shade porte la profondeur sur l'eau (WaterDepthFromShade) : 0 au trait de cote,
+        // 1 a 0.2 d'altitude sous la mer. La puissance < 1 eteint le limon vite : passe le
+        // premier tiers de profondeur, le fond ne se voit deja plus a travers la nappe.
         const double Depth = WaterDepthFromShade(T.Shade);
-        FLinearColor Water = FMath::Lerp(ShallowWater, DeepWater, static_cast<float>(Depth));
+        FLinearColor Bed = FMath::Lerp(ShallowBed, DeepBed, static_cast<float>(FMath::Pow(Depth, 0.7)));
         const float Flow = static_cast<float>(FMath::Clamp(T.FlowAmt, 0.0, 1.0));
-        Water = FMath::Lerp(Water, ChannelWater, FMath::Pow(Flow, 0.85f) * 0.55f);
-        Water.A = 1.0f;
-        return Water;
+        Bed = FMath::Lerp(Bed, ChannelBed, FMath::Pow(Flow, 0.85f) * 0.55f);
+        // Alpha 1 reste le marqueur "sous l'eau" : M_AnastasisSlice le lit comme lisse et
+        // speculaire, l'anneau d'horizon et la forge comme "pas de la terre".
+        Bed.A = 1.0f;
+        return Bed;
     }
 
     FLinearColor Color = SurfaceTypeColor(T.Type);

@@ -17,6 +17,8 @@
 #include "HAL/IConsoleManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialParameterCollection.h"
+#include "Materials/MaterialParameterCollectionInstance.h"
 #include "Life/AnastasisVillageRhythm.h"
 #include "Sim/AnastasisSimulationSubsystem.h"
 #include "WorldView/AnastasisAtmosphereProfile.h"
@@ -60,6 +62,18 @@ static TAutoConsoleVariable<int32> CVarSkyWeather(
 	TEXT("anastasis.Sky.Weather"),
 	1,
 	TEXT("1=the simulation's weather drives cloud coverage and fog density; 0=fixed fair-weather sky."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarSkyTwilight(
+	TEXT("anastasis.Sky.Twilight"),
+	1,
+	TEXT("ENV_REALISM_002. 1=thinner mist, fog and aerosol and a calmer grade while the sun grazes the horizon, moon white point only at night; 0=the DAY_NIGHT_WEATHER_001 twilight (the A/B)."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<float> CVarSkyGroundWetness(
+	TEXT("anastasis.Sky.GroundWetness"),
+	-1.0f,
+	TEXT("ENV_REALISM_002. Pins the ground's rain wetness [0,1] for captures (M_AnastasisGround via MPC_AnastasisWeather); -1 follows the simulation's weather."),
 	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarRealism(
@@ -242,6 +256,10 @@ void AAnastasisWorldAtmosphere::Tick(const float DeltaSeconds)
 	uint32 Seed = 0;
 	const double SimTime = ResolveSkySimTime(Seed);
 	LastSky = AnastasisSkyClock::Evaluate(Profile, SimTime, Seed);
+	if (CVarSkyTwilight.GetValueOnAnyThread() == 0)
+	{
+		LastSky = AnastasisSkyClock::WithoutTwilight(Profile, LastSky);
+	}
 	UpdateSky(Profile, /*bForceLog*/ false);
 }
 
@@ -282,7 +300,12 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 	if (Profile.bFixedExposure && ExposureVolume)
 	{
 		const float EV = static_cast<float>(LastSky.ExposureEV100);
-		if (FMath::Abs(EV - LastExposureWritten) > 0.005f)
+		// Saturation and white point no longer move only with the exposure: the twilight
+		// grade and the moon's white point have their own bands (ENV_REALISM_002), and the
+		// exposure is flat above +10 deg while the twilight band runs to +14.
+		const bool bGradeMoved = FMath::Abs(static_cast<float>(LastSky.ColorSaturation) - LastSaturationWritten) > 0.002f
+			|| FMath::Abs(static_cast<float>(LastSky.WhiteTemp) - LastWhiteTempWritten) > 1.0f;
+		if (FMath::Abs(EV - LastExposureWritten) > 0.005f || bGradeMoved)
 		{
 			ExposureVolume->Settings.AutoExposureMinBrightness = EV;
 			ExposureVolume->Settings.AutoExposureMaxBrightness = EV;
@@ -300,6 +323,8 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 			ExposureVolume->Settings.bOverride_WhiteTemp = true;
 			ExposureVolume->Settings.WhiteTemp = static_cast<float>(LastSky.WhiteTemp);
 			LastExposureWritten = EV;
+			LastSaturationWritten = Sat;
+			LastWhiteTempWritten = static_cast<float>(LastSky.WhiteTemp);
 		}
 	}
 
@@ -309,7 +334,8 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 	{
 		if (UExponentialHeightFogComponent* FogComponent = Fog->GetComponent())
 		{
-			const double Scale = bWeather ? AnastasisSkyClock::FogDensityScaleFor(Profile, LastSky.Humidity) : 1.0;
+			const double Scale = (bWeather ? AnastasisSkyClock::FogDensityScaleFor(Profile, LastSky.Humidity) : 1.0)
+				* AnastasisSkyClock::TwilightScale(LastSky.Twilight, Profile.TwilightFogDensityScale);
 			const float Density = static_cast<float>(Profile.FogDensity * Scale);
 			if (!FMath::IsNearlyEqual(FogComponent->FogDensity, Density, 1e-6f))
 			{
@@ -342,6 +368,29 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 		}
 		LastMistFactor = MistFactor;
 	}
+	// --- Aerosol: thinner while the sun grazes the horizon (ENV_REALISM_002) --------------
+	// Only over the realism layer, which owns these two properties: with it off they hold the
+	// engine defaults and nothing here may move them.
+	if (bRealismApplied && SkyAtmosphere)
+	{
+		const float Aerosol = static_cast<float>(AnastasisSkyClock::TwilightScale(LastSky.Twilight, Profile.TwilightAerosolScale));
+		if (FMath::Abs(Aerosol - LastAerosolScale) > 0.002f)
+		{
+			if (USkyAtmosphereComponent* SkyComponent = SkyAtmosphere->GetComponent())
+			{
+				SkyComponent->SetMieScatteringScale(Profile.SkyMieScatteringScale * Aerosol);
+				SkyComponent->SetAerialPespectiveViewDistanceScale(Profile.SkyAerialPerspectiveDistanceScale * Aerosol);
+			}
+			LastAerosolScale = Aerosol;
+		}
+	}
+
+	// --- Ground: rain wets the soil (ENV_REALISM_002) ------------------------------------
+	const double PinnedWetness = CVarSkyGroundWetness.GetValueOnAnyThread();
+	const float GroundWetness = (bWeather || PinnedWetness >= 0.0)
+		? static_cast<float>(AnastasisSkyClock::GroundWetnessFor(Profile, LastSky, PinnedWetness)) : 0.0f;
+	WriteGroundWetness(Profile, GroundWetness);
+
 	if (UVolumetricCloudComponent* CloudComponent = Cloud ? Cloud->FindComponentByClass<UVolumetricCloudComponent>() : nullptr)
 	{
 		if (bWeather)
@@ -370,13 +419,52 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 		LastLoggedPhase = Phase;
 		UE_LOG(LogAnastasis_UnrealV2, Display,
 			TEXT("ANASTASIS_SKY day=%.0f hour=%.2f phase=%s season=%s decl=%.2f sun_elev=%.2f moon_elev=%.2f ev100=%.2f ")
-			TEXT("cover=%.3f rain=%.3f snow=%.3f humidity=%.3f wind=%.3f weather=%d mist_factor=%.3f"),
+			TEXT("cover=%.3f rain=%.3f snow=%.3f humidity=%.3f wind=%.3f weather=%d mist_factor=%.3f ")
+			TEXT("twilight=%.3f saturation=%.3f white_temp=%.0f ground_wetness=%.3f"),
 			LastSky.Day, LastSky.Hours, *Phase, AnastasisWeather::SeasonId(LastSky.Weather.Season),
 			LastSky.DeclinationDegrees, LastSky.SunElevationDegrees,
 			AnastasisSkyClock::ElevationOf(LastSky.MoonRotation), LastSky.ExposureEV100,
 			LastSky.Weather.Cover, LastSky.Weather.Rain, LastSky.Weather.Snow, LastSky.Humidity,
-			LastSky.Weather.Wind, bWeather ? 1 : 0, MistFactor);
+			LastSky.Weather.Wind, bWeather ? 1 : 0, MistFactor,
+			LastSky.Twilight, LastSky.ColorSaturation, LastSky.WhiteTemp, GroundWetness);
 	}
+}
+
+void AAnastasisWorldAtmosphere::WriteGroundWetness(const UAnastasisAtmosphereProfile& Profile, const float Wetness)
+{
+	// Unchanged, or the collection already found missing: a TryLoad of an absent asset is a disk
+	// lookup, and the weather moves this value every tick in PIE. Apply() clears the refusal.
+	if (FMath::Abs(Wetness - LastGroundWetnessWritten) <= 0.002f || bGroundWetnessMissingLogged)
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	if (!WeatherCollection)
+	{
+		WeatherCollection = Cast<UMaterialParameterCollection>(Profile.WeatherParameterCollection.TryLoad());
+	}
+	UMaterialParameterCollectionInstance* Instance = WeatherCollection ? World->GetParameterCollectionInstance(WeatherCollection) : nullptr;
+	// A missing collection is a dry ground, said once -- not a crash, and not a silent no-op:
+	// it means tools/unreal/ground-material.py has not been run since ENV_REALISM_002.
+	if (!Instance || !Instance->SetScalarParameterValue(TEXT("RainWetness"), Wetness))
+	{
+		if (!bGroundWetnessMissingLogged)
+		{
+			// Display, not Warning: until the collection is generated and committed this is the
+			// expected state of every run, and the editor log baseline must not learn it as noise.
+			UE_LOG(LogAnastasis_UnrealV2, Display,
+				TEXT("ANASTASIS_ATMOSPHERE ground_wetness_unavailable path=%s collection=%d (run tools/unreal/ground-material.ps1)"),
+				*Profile.WeatherParameterCollection.ToString(), WeatherCollection ? 1 : 0);
+			bGroundWetnessMissingLogged = true;
+		}
+		LastGroundWetnessWritten = Wetness;
+		return;
+	}
+	LastGroundWetnessWritten = Wetness;
 }
 
 void AAnastasisWorldAtmosphere::ApplyRealism(const UAnastasisAtmosphereProfile& Profile, const bool bOn, const FRotator& SunRotation, const FRotator& MoonRotation)
@@ -585,6 +673,10 @@ bool AAnastasisWorldAtmosphere::Apply()
 		uint32 Seed = 0;
 		const double SimTime = ResolveSkySimTime(Seed);
 		LastSky = AnastasisSkyClock::Evaluate(Profile, SimTime, Seed);
+		if (CVarSkyTwilight.GetValueOnAnyThread() == 0)
+		{
+			LastSky = AnastasisSkyClock::WithoutTwilight(Profile, LastSky);
+		}
 	}
 	const FRotator SunRotation = bSkyClockActive ? LastSky.SunRotation : AnastasisAtmosphere::ResolveSunRotation(Profile);
 	const FRotator MoonRotation = bSkyClockActive ? LastSky.MoonRotation : AnastasisAtmosphere::ResolveMoonRotation(Profile);
@@ -700,9 +792,20 @@ bool AAnastasisWorldAtmosphere::Apply()
 		// Apply() just wrote the profile's day EV into the volume: the cache of what the
 		// clock last wrote is stale, and must not suppress the rewrite.
 		LastExposureWritten = TNumericLimits<float>::Lowest();
+		LastSaturationWritten = TNumericLimits<float>::Lowest();
+		LastWhiteTempWritten = TNumericLimits<float>::Lowest();
+		// ApplyRealism just wrote the profile's aerosol: same reasoning.
+		LastAerosolScale = -1.0f;
+		// A collection generated since the last Apply() gets one more look.
+		bGroundWetnessMissingLogged = false;
 		UpdateSky(Profile, /*bForceLog*/ true);
 	}
-	else if (CloudMaterialInstance)
+	else if (LastGroundWetnessWritten > 0.0f)
+	{
+		// Without the clock there is no weather: a ground the clock had wetted dries.
+		WriteGroundWetness(Profile, 0.0f);
+	}
+	if (!bSkyClockActive && CloudMaterialInstance)
 	{
 		// The clock was on and is now off: give the cloud layer its profile material back.
 		if (UVolumetricCloudComponent* CloudComponent = Cloud ? Cloud->FindComponentByClass<UVolumetricCloudComponent>() : nullptr)

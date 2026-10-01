@@ -234,4 +234,107 @@ bool FAnastasisSkyClockFogAndMistFollowTheLight::RunTest(const FString&)
 	return true;
 }
 
+/**
+ * ENV_REALISM_002. The twilight correction is a BAND around the horizon, never a new look:
+ *   - outside the band (full day, full night) every value it touches -- saturation, white point,
+ *     the twilight factor itself -- is bit-for-bit the DAY_NIGHT_WEATHER_001 one, at every
+ *     instant of a year; the daytime captures and the night captures cannot move;
+ *   - inside it, at the two instants the first captures showed pink (6h and 18h30 at the
+ *     equinox), the moon's white point is no longer half-applied, the grade is calmer, and the
+ *     mist is thinner than it was;
+ *   - the A/B path (WithoutTwilight) really is the old rendering.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisSkyClockTwilightIsABand, "Anastasis.Sky.Clock.TwilightIsABand", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisSkyClockTwilightIsABand::RunTest(const FString&)
+{
+	using AnastasisSkyClockTest::Bits;
+	const UAnastasisAtmosphereProfile* Profile = UAnastasisAtmosphereProfile::CreateCodeDefaults(GetTransientPackage());
+
+	TestEqual(TEXT("deep night: no twilight"), AnastasisSkyClock::TwilightFor(*Profile, -40.0), 0.0, 1e-12);
+	TestEqual(TEXT("high sun: no twilight"), AnastasisSkyClock::TwilightFor(*Profile, 40.0), 0.0, 1e-12);
+	TestEqual(TEXT("sun on the horizon: full twilight"), AnastasisSkyClock::TwilightFor(*Profile, 0.0), 1.0, 1e-12);
+	TestEqual(TEXT("no twilight: multipliers are identity"), AnastasisSkyClock::TwilightScale(0.0, 0.3), 1.0, 1e-12);
+	TestEqual(TEXT("full twilight: the profile's multiplier"), AnastasisSkyClock::TwilightScale(1.0, 0.3), 0.3, 1e-12);
+
+	// A year, every ~20 simulated minutes: outside the band nothing moves.
+	int32 Outside = 0, Moved = 0, Inside = 0;
+	for (double Time = 0.0; Time < 120.0 * AnastasisSkyClock::DayLengthSeconds; Time += 1.3)
+	{
+		const AnastasisSkyClock::FSkyState S = AnastasisSkyClock::Evaluate(*Profile, Time, 12345u);
+		const AnastasisSkyClock::FSkyState Old = AnastasisSkyClock::WithoutTwilight(*Profile, S);
+		if (S.SunElevationDegrees < Profile->TwilightStartDegrees || S.SunElevationDegrees > Profile->TwilightEndDegrees)
+		{
+			++Outside;
+			if (Bits(S.ColorSaturation) != Bits(Old.ColorSaturation) || Bits(S.WhiteTemp) != Bits(Old.WhiteTemp) || S.Twilight != 0.0)
+			{
+				++Moved;
+			}
+		}
+		else
+		{
+			++Inside;
+		}
+	}
+	AddInfo(FString::Printf(TEXT("ANASTASIS_SKY_TWILIGHT outside=%d inside=%d moved_outside=%d"), Outside, Inside, Moved));
+	TestTrue(TEXT("the year has day/night instants and twilight instants"), Outside > 0 && Inside > 0);
+	TestEqual(TEXT("instants outside the twilight band whose grade changed"), Moved, 0);
+
+	auto At = [Profile](double Day, double Hours)
+	{
+		return AnastasisSkyClock::Evaluate(*Profile, AnastasisSkyClock::SimTimeFor(Day, Hours), 12345u);
+	};
+	for (const double Hours : {6.0, 18.5})
+	{
+		const AnastasisSkyClock::FSkyState New = At(1.0, Hours);
+		const AnastasisSkyClock::FSkyState Old = AnastasisSkyClock::WithoutTwilight(*Profile, New);
+		AddInfo(FString::Printf(TEXT("ANASTASIS_SKY_TWILIGHT hour=%.2f sun_elev=%.2f twilight=%.3f white_temp=%.0f (was %.0f) saturation=%.3f (was %.3f) mist=%.3f (was %.3f)"),
+			Hours, New.SunElevationDegrees, New.Twilight, New.WhiteTemp, Old.WhiteTemp, New.ColorSaturation, Old.ColorSaturation,
+			AnastasisSkyClock::MistFactorFor(*Profile, New), AnastasisSkyClock::MistFactorFor(*Profile, Old)));
+		const FString Tag = FString::Printf(TEXT("%.1fh: "), Hours);
+		TestTrue(Tag + TEXT("inside the twilight band"), New.Twilight > 0.8);
+		TestTrue(Tag + TEXT("the moon's white point is not applied to the twilight sky"), New.WhiteTemp > 6000.0);
+		TestTrue(Tag + TEXT("the white point moved back toward the day's"), New.WhiteTemp > Old.WhiteTemp);
+		TestTrue(Tag + TEXT("the grade is calmer than before"), New.ColorSaturation < Old.ColorSaturation);
+		TestTrue(Tag + TEXT("the grade is not grey"), New.ColorSaturation > 0.4);
+		TestTrue(Tag + TEXT("the mist is thinner than before"), AnastasisSkyClock::MistFactorFor(*Profile, New) < AnastasisSkyClock::MistFactorFor(*Profile, Old));
+	}
+	return true;
+}
+
+/**
+ * ENV_REALISM_002. The ground's rain wetness is the simulation's (WeatherWetnessAt, the very
+ * value FSkyState already carried), pinned only on request, and nothing when the profile says
+ * the weather does not reach the ground.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisSkyClockRainWetsTheGround, "Anastasis.Sky.Clock.RainWetsTheGround", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisSkyClockRainWetsTheGround::RunTest(const FString&)
+{
+	using AnastasisSkyClockTest::Bits;
+	UAnastasisAtmosphereProfile* Profile = UAnastasisAtmosphereProfile::CreateCodeDefaults(GetTransientPackage());
+
+	int32 Bad = 0, WetInstants = 0, DryInstants = 0;
+	for (double Time = 0.0; Time < 120.0 * AnastasisSkyClock::DayLengthSeconds; Time += 1.7)
+	{
+		const AnastasisSkyClock::FSkyState S = AnastasisSkyClock::Evaluate(*Profile, Time, 12345u);
+		const double G = AnastasisSkyClock::GroundWetnessFor(*Profile, S, -1.0);
+		const AnastasisWeather::FWeather W = AnastasisWeather::WeatherAt(12345u, S.Day, nullptr, S.DayFrac);
+		if (Bits(G) != Bits(AnastasisWeather::WeatherWetnessAt(W)) || G < 0.0 || G > 1.0)
+		{
+			++Bad;
+		}
+		WetInstants += G > 0.15 ? 1 : 0;
+		DryInstants += G < 0.05 ? 1 : 0;
+	}
+	AddInfo(FString::Printf(TEXT("ANASTASIS_SKY_GROUND wet_instants=%d dry_instants=%d"), WetInstants, DryInstants));
+	TestEqual(TEXT("instants where the ground's wetness differs from the simulation's"), Bad, 0);
+	TestTrue(TEXT("a year of seed 12345 wets the ground and dries it"), WetInstants > 0 && DryInstants > 0);
+
+	const AnastasisSkyClock::FSkyState Any = AnastasisSkyClock::Evaluate(*Profile, AnastasisSkyClock::InitialSimTime, 12345u);
+	TestEqual(TEXT("a pinned wetness is the pinned value"), AnastasisSkyClock::GroundWetnessFor(*Profile, Any, 0.8), 0.8, 1e-12);
+	TestEqual(TEXT("a pinned wetness is clamped"), AnastasisSkyClock::GroundWetnessFor(*Profile, Any, 3.0), 1.0, 1e-12);
+	Profile->bWeatherWetsGround = false;
+	TestEqual(TEXT("profile off: the ground stays dry, pinned or not"), AnastasisSkyClock::GroundWetnessFor(*Profile, Any, 0.8), 0.0, 1e-12);
+	return true;
+}
+
 #endif

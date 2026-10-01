@@ -136,9 +136,11 @@ soir, comme dans la référence.
    parité). **Non tranché ici.**
 2. **Aube et crépuscule trop roses** (6 h 00, 18 h 30) : le brouillard, la brume à pleine force
    et l'aérosol prennent la couleur de l'horizon et la répandent sur tout le cadre.
+   *Repris par `ENV_REALISM_002.md` (bande crépusculaire, blanc de lune différé) — non capturé.*
 3. **Pas de pluie ni de neige visibles** : le projet n'a aucun système Niagara à lui ; la pluie
    se voit au ciel couvert et à l'humidité, pas en gouttes. `WeatherWetnessAt` est calculé mais
    pas encore câblé au matériau de sol.
+   *Câblé par `ENV_REALISM_002.md` (`MPC_AnastasisWeather`) — matériau à régénérer.*
 4. Vues d'en haut : les poches de brume restent des taches à l'aube et au crépuscule.
 5. Coût GPU de la couche (nuages et brouillard volumétriques, soleil mobile qui invalide les
    ombres virtuelles chaque frame) : **non mesuré**.

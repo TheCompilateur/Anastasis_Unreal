@@ -194,6 +194,22 @@ protected:
 	bool bSkyClockActive = false;
 	FString LastLoggedPhase;
 	float LastExposureWritten = TNumericLimits<float>::Lowest();
+	float LastSaturationWritten = TNumericLimits<float>::Lowest();
+	float LastWhiteTempWritten = TNumericLimits<float>::Lowest();
+	/** Twilight multiplier of the realism layer's aerosol last written; -1 = rewrite. */
+	float LastAerosolScale = -1.0f;
+
+	/**
+	 * Writes the ground's rain wetness into MPC_AnastasisWeather "RainWetness" (ENV_REALISM_002),
+	 * which M_AnastasisGround reads. Skips unchanged values; a missing collection is logged once
+	 * and leaves the ground dry.
+	 */
+	void WriteGroundWetness(const UAnastasisAtmosphereProfile& Profile, float Wetness);
+
+	UPROPERTY()
+	TObjectPtr<class UMaterialParameterCollection> WeatherCollection;
+	float LastGroundWetnessWritten = -1.0f;
+	bool bGroundWetnessMissingLogged = false;
 
 	/**
 	 * Adopt what the level already has, create only what is missing, and record which is

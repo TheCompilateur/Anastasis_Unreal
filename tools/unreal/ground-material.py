@@ -28,8 +28,16 @@ CE QUE LE MATERIAU LIT, ET D'OU CA VIENT (AnastasisTerrainSurface::Build) :
   TexCoord1.y      Wetness [0,1], champ de proximite d'eau du simulateur
   VertexNormalWS   la pente, qui n'a pas besoin d'etre exportee : elle EST la normale
   WorldPosition    l'altitude et la place dans le monde, pour la meme raison
+  MPC_AnastasisWeather.RainWetness
+                   humidite de pluie [0,1] : AnastasisWeather::WeatherWetnessAt, ecrite a
+                   chaque tick par AAnastasisWorldAtmosphere (ENV_REALISM_002)
 
 Aucune de ces entrees n'est inventee ici. Le materiau projette, il ne simule pas.
+
+TROISIEME ASSET (ENV_REALISM_002) : /Game/Anastasis/Materials/MPC_AnastasisWeather, la
+collection de parametres par laquelle le ciel parle au sol. Creee si elle manque, a chaque
+run, REBUILD ou non : sans elle le maitre ne compile pas. Le maitre deja committe ne la lit
+pas tant qu'il n'a pas ete regenere (-Rebuild).
 
 Variables d'environnement :
   ANASTASIS_GROUND_REBUILD  "1" regenere les deux assets (ecrase l'existant)
@@ -41,6 +49,8 @@ import unreal
 PKG = '/Game/Anastasis/Materials'
 MASTER = PKG + '/M_AnastasisGround'
 INSTANCE = PKG + '/MI_AnastasisGround'
+WEATHER_MPC = PKG + '/MPC_AnastasisWeather'
+RAIN_WETNESS = 'RainWetness'
 
 mel = unreal.MaterialEditingLibrary
 eal = unreal.EditorAssetLibrary
@@ -246,7 +256,44 @@ VECTOR_NOISE_PERLIN_GRADIENT = enum_of(unreal.VectorNoiseFunction, 2,
                                        'VNF_GRADIENT_ALU', 'VNF_GRADIENTALU', 'VNF_GradientALU')
 
 
-def build_master():
+def ensure_weather_collection():
+    """MPC_AnastasisWeather : le canal du ciel vers le sol, cree s'il manque.
+
+    Une collection plutot qu'un parametre d'instance : le sol est pose par
+    AAnastasisWorldEmbodiment, la pluie est connue d'AAnastasisWorldAtmosphere. Une collection
+    est un etat du MONDE, que l'un ecrit sans connaitre les materiaux de l'autre -- les routes
+    et les batiments a venir liront la meme valeur, comme dans la reference
+    (weatherWetnessAt : "humidite visuelle partagee (sol, routes, batiments)").
+    """
+    if eal.does_asset_exist(WEATHER_MPC):
+        mpc = unreal.load_asset(WEATHER_MPC)
+    else:
+        mpc = tools.create_asset('MPC_AnastasisWeather', PKG, unreal.MaterialParameterCollection,
+                                 unreal.MaterialParameterCollectionFactoryNew())
+        if mpc is None or mpc.get_name() != 'MPC_AnastasisWeather':
+            raise RuntimeError('create_asset MPC_AnastasisWeather failed (%s)' % (mpc.get_name() if mpc else None))
+        log('CREATE ' + WEATHER_MPC)
+    names = [str(p.get_editor_property('parameter_name')) for p in mpc.get_editor_property('scalar_parameters')]
+    if RAIN_WETNESS not in names:
+        # Le constructeur C++ de FCollectionParameterBase tire le GUID du parametre : c'est lui
+        # que le materiau retient, pas le nom. Ne jamais recreer ce parametre a la main.
+        p = unreal.CollectionScalarParameter()
+        p.set_editor_property('parameter_name', RAIN_WETNESS)
+        # 0 : un sol sec tant que personne n'ecrit. C'est l'image d'avant ENV_REALISM_002.
+        p.set_editor_property('default_value', 0.0)
+        params = list(mpc.get_editor_property('scalar_parameters'))
+        params.append(p)
+        mpc.set_editor_property('scalar_parameters', params)
+        eal.save_asset(WEATHER_MPC)
+        names = [str(q.get_editor_property('parameter_name')) for q in mpc.get_editor_property('scalar_parameters')]
+        if RAIN_WETNESS not in names:
+            raise RuntimeError('MPC_AnastasisWeather : %s absent apres ecriture (%s)' % (RAIN_WETNESS, names))
+        log('MPC_PARAMETER_ADDED ' + RAIN_WETNESS)
+    log('MPC_READY scalars=%s' % names)
+    return mpc
+
+
+def build_master(weather_mpc):
     mat = tools.create_asset('M_AnastasisGround', PKG, unreal.Material, unreal.MaterialFactoryNew())
     if mat is None:
         raise RuntimeError('create_asset M_AnastasisGround failed')
@@ -271,6 +318,12 @@ def build_master():
     uv1 = g.node(unreal.MaterialExpressionTextureCoordinate, -2600, 180, coordinate_index=1)
     nws = g.node(unreal.MaterialExpressionVertexNormalWS, -2600, 300)
     wp = g.node(unreal.MaterialExpressionWorldPosition, -2600, 420)
+    # La collection AVANT le nom : c'est en recevant le nom que le noeud resout le GUID du
+    # parametre dans la collection deja posee. Dans l'autre ordre il reste invalide, et le
+    # compilateur le refuse (ce que recompile_material remonte plus bas).
+    rain_node = g.node(unreal.MaterialExpressionCollectionParameter, -2600, 1400,
+                       collection=weather_mpc, parameter_name=unreal.Name(RAIN_WETNESS))
+    rain = g.sat(g.mask(rain_node, '', True, False, False, -2380, 1400), '', -2240, 1400)
 
     w_rock = g.mask(uv0, '', True, False, False, -2380, 40)
     w_litter = g.mask(uv0, '', False, True, False, -2380, 120)
@@ -426,6 +479,16 @@ def build_master():
     p_fade_near = g.scalar('DetailFadeStart', 1500.0, P + 'Detail', -1900, 1060)
     p_fade_far = g.scalar('DetailFadeEnd', 7000.0, P + 'Detail', -1900, 1120)
     p_soil_spec = g.scalar('SoilSpecular', 0.22, P + 'Roughness', -1900, 1000)
+    # PLUIE (ENV_REALISM_002). Un sol mouille s'assombrit parce que l'eau remplit ses pores et
+    # que la lumiere y reste piegee : 25-35 % plus sombre pour une terre, beaucoup moins pour
+    # une roche peu poreuse, qui gagne surtout du lustre. La pluie vient du ciel, pas de la
+    # rive : elle mouille toute la carte, la ou DampDarken ne creusait que le trait de cote.
+    p_rain_dark = g.scalar('RainDarken', 0.70, P + 'Rain', -1900, 1180)
+    p_rain_rock_porosity = g.scalar('RainRockPorosity', 0.40, P + 'Rain', -1900, 1240)
+    p_rain_rough = g.scalar('RainRoughness', 0.30, P + 'Rain', -1900, 1300)
+    # Le film d'eau tient sur le plat et ruisselle des pentes : une pente garde cette part
+    # du lustre, le plat le prend entier.
+    p_rain_slope_gloss = g.scalar('RainSlopeGloss', 0.55, P + 'Rain', -1900, 1360)
 
     # ------------------------------------------------------------------ fondu de detail
     # PixelDepth plutot qu'une distance a la camera calculee : c'est la profondeur deja
@@ -477,7 +540,12 @@ def build_master():
     # Sol detrempe : plus sombre, comme un sol reellement mouille.
     dark = g.mul(base, '', p_damp_dark, '', 360, -120)
     damp_lerp = g.lerp(base, '', dark, '', damp_mask, '', 520, -120)
-    base_final = g.mul(damp_lerp, '', p_albedo, '', 680, -160)
+    # Pluie : meme assombrissement multiplicatif, pondere par la porosite (la roche en prend
+    # RainRockPorosity). A RainWetness 0 le lerp rend damp_lerp tel quel : sol sec = avant.
+    porosity = g.lerp(g.const(1.0, 360, 1420), '', p_rain_rock_porosity, '', rock_mask, '', 520, 1420)
+    rain_dark_amt = g.mul(rain, '', porosity, '', 680, 1420)
+    rained = g.lerp(damp_lerp, '', g.mul(damp_lerp, '', p_rain_dark, '', 680, -60), '', rain_dark_amt, '', 840, -120)
+    base_final = g.mul(rained, '', p_albedo, '', 1000, -160)
 
     g.prop(base_final, '', unreal.MaterialProperty.MP_BASE_COLOR)
 
@@ -485,7 +553,11 @@ def build_master():
     r = g.lerp(p_soil_rough, '', p_rock_rough, '', rock_mask, '', -120, 400)
     r = g.lerp(r, '', p_damp_rough, '', damp_mask, '', 40, 400)
     r = g.add(r, '', g.mul(g.mul(p_rough_grain, '', detail_fade, '', 200, 520), '', d_grain, '', 200, 460), '', 360, 400)
-    r = g.sat(r, '', 520, 400)
+    # Film de pluie : plein sur le plat (N.z ~ 1), RainSlopeGloss sur les pentes.
+    flat = g.smoothstep(g.const(0.80, 200, 1500), '', g.const(0.97, 200, 1560), '', nz, '', 360, 1500)
+    film = g.mul(rain, '', g.lerp(p_rain_slope_gloss, '', g.const(1.0, 360, 1620), '', flat, '', 520, 1560), '', 680, 1500)
+    r = g.lerp(r, '', p_rain_rough, '', film, '', 520, 460)
+    r = g.sat(r, '', 680, 400)
     g.prop(r, '', unreal.MaterialProperty.MP_ROUGHNESS)
     g.prop(p_soil_spec, '', unreal.MaterialProperty.MP_SPECULAR)
 
@@ -597,9 +669,12 @@ def run():
     # REBUILD force la recreation sans reinterroger does_asset_exist : juste apres un
     # delete_asset le registre d'assets repond encore True, et on repartait alors sur
     # l'ancienne instance -- pointant vers un maitre qui venait d'etre supprime.
+    # Toujours, REBUILD ou non : le maitre la reference, et AAnastasisWorldAtmosphere y ecrit.
+    weather_mpc = ensure_weather_collection()
+
     if REBUILD or not eal.does_asset_exist(MASTER):
         log('CREATE ' + MASTER)
-        master_asset = build_master()
+        master_asset = build_master(weather_mpc)
     else:
         master_asset = unreal.load_asset(MASTER)
         log('LOAD ' + MASTER)

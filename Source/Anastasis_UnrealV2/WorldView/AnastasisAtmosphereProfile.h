@@ -417,6 +417,75 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock", meta = (ClampMin = "0.05", ClampMax = "1.0"))
 	float MistVerticalScale = 0.3f;
 
+	// --- Twilight (ENV_REALISM_002) ---------------------------------------------------
+	//
+	// DAY_NIGHT_WEATHER_001, "ce qui reste faux" n.2: dawn (6h) and dusk (18h30) read pink to
+	// purple over the whole frame. Three causes, all in the medium, none in the light:
+	//   - the mist pockets are at full strength around sunrise (radiation fog), white albedo
+	//     lit by a reddened sun: pink cotton balls over the valley;
+	//   - height and volumetric fog, and the aerosol (Mie, aerial perspective x3), carry the
+	//     horizon's colour across 10 km of view;
+	//   - the moon's white point (4100 K) was already half applied at -6 deg, when the light is
+	//     still the twilight sky, not the moon: a white balance toward blue over a pink frame
+	//     is magenta, the exact cast of valley_long_d1h1830.
+	// The light stays physical. The medium thins and the grade calms only across the band
+	// where the sun grazes the horizon; outside it (day, night) nothing below changes a value.
+
+	/**
+	 * The twilight band, in sun elevation degrees: 0 below TwilightStartDegrees, full between
+	 * TwilightFullLowDegrees and TwilightFullHighDegrees, 0 again above TwilightEndDegrees,
+	 * smoothstep on both edges. 6h at the equinox is 0 deg, 18h30 is -5.7 deg.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock|Twilight")
+	float TwilightStartDegrees = -12.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock|Twilight")
+	float TwilightFullLowDegrees = -4.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock|Twilight")
+	float TwilightFullHighDegrees = 6.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock|Twilight")
+	float TwilightEndDegrees = 14.0f;
+
+	/** Mist pocket strength at full twilight, as a multiplier of the clock's own mist factor. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock|Twilight", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float TwilightMistScale = 0.5f;
+
+	/** Height (and so volumetric) fog density at full twilight, multiplier. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock|Twilight", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float TwilightFogDensityScale = 0.6f;
+
+	/** Aerosol at full twilight: multiplier of SkyMieScatteringScale and SkyAerialPerspectiveDistanceScale (realism layer only). */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock|Twilight", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float TwilightAerosolScale = 0.5f;
+
+	/** Post-process saturation at full twilight, multiplied with the night-vision saturation. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock|Twilight", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float TwilightColorSaturation = 0.85f;
+
+	/**
+	 * Sun elevation (deg) above which the white point is the day's 6500 K. The moon's white
+	 * point fades in from here down to NightElevationDegrees -- it belongs to the hours the
+	 * moon lights the land, not to the twilight sky. Saturation keeps the exposure curve.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock|Twilight")
+	float NightWhiteBalanceStartDegrees = -4.0f;
+
+	// --- Weather on the ground (ENV_REALISM_002) ---------------------------------------
+
+	/**
+	 * Rain wets the ground: the clock writes AnastasisWeather::WeatherWetnessAt -- the reference's
+	 * "humidite visuelle partagee (sol, routes, batiments)" -- into WeatherParameterCollection's
+	 * "RainWetness", which M_AnastasisGround reads (darker albedo, glossier surface). False = 0.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock|Ground")
+	bool bWeatherWetsGround = true;
+
+	/** Created by tools/unreal/ground-material.py. Missing = logged once, the ground stays dry. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock|Ground")
+	FSoftObjectPath WeatherParameterCollection = FSoftObjectPath(TEXT("/Game/Anastasis/Materials/MPC_AnastasisWeather.MPC_AnastasisWeather"));
+
 	// --- Exposure --------------------------------------------------------------------
 
 	/**

@@ -446,6 +446,7 @@ condition d'arrêt « le gain dépend seulement de plantes décoratives » exige
    fond immergé demanderait de toucher `TileColor`, qui appartient à
    GROUND_SURFACE_001. **C'est la première chose à faire quand les deux missions
    seront intégrées**, et c'est une ligne, pas un chantier.
+   *Fait par `ENV_REALISM_002.md` (limon au bord, fond sombre en profondeur) — non capturé.*
 2. **Aucune bande écologique.** Gate 6 n'est pas faite : ni roseaux, ni pierres
    de rive, ni herbes humides. Le dressing appartient à
    `AnastasisEcologicalDressing` et à la mission arbres, tous deux vivants. En
