@@ -1102,6 +1102,7 @@ TSharedRef<FJsonObject> UAnastasisWorldProbeSubsystem::BuildSnapshotObject() con
 			AtmosphereObj->SetNumberField(TEXT("moon_intensity"), MoonComponent->Intensity);
 			AtmosphereObj->SetNumberField(TEXT("moon_atmosphere_index"), MoonComponent->GetAtmosphereSunLightIndex());
 			AtmosphereObj->SetBoolField(TEXT("moon_casts_shadows"), MoonComponent->CastShadows != 0);
+			AtmosphereObj->SetNumberField(TEXT("moon_forward_shading_priority"), MoonComponent->ForwardShadingPriority);
 		}
 	}
 	AtmosphereObj->SetBoolField(TEXT("volumetric_cloud_present"), FindFirstActor<AVolumetricCloud>(World) != nullptr);
@@ -1113,6 +1114,9 @@ TSharedRef<FJsonObject> UAnastasisWorldProbeSubsystem::BuildSnapshotObject() con
 			AtmosphereObj->SetNumberField(TEXT("sun_intensity"), SunComponent->Intensity);
 			AtmosphereObj->SetBoolField(TEXT("sun_is_atmosphere_light"), SunComponent->IsUsedAsAtmosphereSunLight());
 			AtmosphereObj->SetBoolField(TEXT("sun_casts_shadows"), SunComponent->CastShadows != 0);
+			// ATMOSPHERE_COHERENCE_001: one forward light, never two at the same priority.
+			AtmosphereObj->SetNumberField(TEXT("sun_forward_shading_priority"), SunComponent->ForwardShadingPriority);
+			AtmosphereObj->SetNumberField(TEXT("sun_volumetric_scattering_intensity"), SunComponent->VolumetricScatteringIntensity);
 		}
 	}
 

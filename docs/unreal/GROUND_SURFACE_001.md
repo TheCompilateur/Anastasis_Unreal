@@ -293,6 +293,8 @@ voit comme un sol fade, ce qu'aucun test de couleur n'attrape.
    procédurale. Elle tient à distance moyenne et près du sol, mais elle ne donnera jamais
    la densité d'information d'un albédo photographié. C'est la limite structurelle du
    résultat, pas un réglage.
+   **Levée par `GROUND_TEXTURE_001`** (`docs/unreal/GROUND_TEXTURE_001.md`) : détail photo CC0
+   sous le mètre, en modulation neutre de ces albédos.
 2. **Un sommet par mètre.** Tout ce qui est sous le mètre est une normale, pas une forme :
    la silhouette du sol reste facettée en vue rasante.
 3. **`HighlandRock` reste indexé sur l'altitude normalisée par l'emprise** (`Crop.MaxAlt`),

@@ -172,6 +172,14 @@ Il ne l'est pas toujours (2026-09-29 : branche d'un autre agent, C++ non commit�
 `git status --porcelain` après tout refus ; `integrate` liste les entrées salies. Ne jamais `git clean -fd`
 dans le canonique : cela emporte le travail non commité des autres.
 
+### Le push est refusé par le pre-push alors que le code compile
+**Tu vois** : `git push` échoue sur une erreur de `anastasis-unreal.ps1` (bloc `catch`), et `build.log` du
+canonique commence par `Build.bat is already running, waiting for existing script to terminate`.
+**Cause** : un autre agent compilait le canonique au même instant (il versait sa propre mission).
+**Parade** : `tools\unreal\anastasis-unreal.ps1 build` dans le canonique ; `BUILD::PASS` → repousser. Si la
+réponse est « Everything up-to-date », l'autre agent a poussé `main` avec tes commits : vérifier
+`git ls-remote origin refs/heads/main`.
+
 ### `main` bouge pendant ta preuve
 Plusieurs versements par heure. `integrate` refuse tout non-fast-forward : rebaser, refaire `finish`, reverser.
 Relire ce que `main` a apporté — un nouveau script de `tools/unreal/` arrive souvent avec.

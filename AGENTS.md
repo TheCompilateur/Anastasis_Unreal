@@ -167,6 +167,20 @@ tools\unreal\anastasis-unreal.ps1 editor   # lance l'éditeur (pas une vérifica
 Le script refuse de tourner hors de la racine canonique ou d'un worktree sous `C:\dev\ANASTASIS_WORKTREES`,
 et valide l'identité moteur (5.8.2 / CL 56702186).
 
+## Procédures (skills)
+
+Les procédures répétées sont écrites une fois, dans `.claude/skills/<nom>/SKILL.md`. Claude Code les charge
+quand la tâche s'y prête ; tout autre agent (Codex…) les lit comme des documents ordinaires. Elles donnent
+l'ordre et les décisions ; les règles restent ici, les pièges dans `docs/unreal/PIEGES_UNREAL.md`.
+
+| Skill | Quand |
+|---|---|
+| `anastasis-mission` | avant de modifier un fichier du projet ; avant toute intégration ou tout push |
+| `anastasis-editeur-mcp` | avant tout appel `mcp__unreal__*` : bon port, bon éditeur, bon groupe d'outils |
+| `anastasis-capture` | quand le verdict est une image : A/B à une seule variable, regarder, mesurer (`compare.py`) |
+
+Une procédure qui change (nouveau portail, nouveau script) se corrige dans son skill, dans le même commit.
+
 ## Éditeur vivant : MCP Unreal
 
 Le plugin `ModelContextProtocol` (expérimental, UE 5.8) démarre avec l'éditeur un serveur MCP sur
@@ -263,7 +277,8 @@ Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
 | `capture-terrain-forge.ps1` + `terrain-forge-capture.py` | captures avant/après du relief → `Saved/TerrainForgeEvidence/` |
 | `capture-terrain-relief.ps1` + `terrain-relief-capture.py` | avant/après d'une étape de la forge de relief (`-Step 1/2/3/scale`), dressing masqué → `Saved/TerrainReliefEvidence/` |
 | `capture-horizon.ps1` + `capture-horizon.py` | A/B de l'horizon (`anastasis.Terrain.Horizon` 0 puis 1), cinq vues calées sur la carte, part de pixels « vide » par image ; `-PreCmds` pour l'étape brume → `Saved/HorizonEvidence/<Label>/` |
-| `capture-sky.ps1` + `capture-sky.py` | ciel de `Lvl_AnastasisSlice` par états de CVars, mêmes caméras (oblique, fond de vallée, crête, contre-jour) : réalisme (`anastasis.Atmosphere.Realism`), heure et jour du ciel (`anastasis.Sky.Hour` / `Sky.Day`), météo (`anastasis.Sky.Weather`) → `Saved/SkyEvidence/<Label>/` |
+| `capture-sky.ps1` + `capture-sky.py` | ciel de `Lvl_AnastasisSlice` par états de CVars, mêmes caméras (oblique, fond de vallée, crête, contre-jour) : réalisme (`anastasis.Atmosphere.Realism`), heure et jour du ciel (`anastasis.Sky.Hour` / `Sky.Day`), météo (`anastasis.Sky.Weather`), humidité du ciel (`anastasis.Sky.Humidity`) ; `-Preset cycle` = 06 09 12 16 18 20 00 03 × sec / humide / saturé → `Saved/SkyEvidence/<Label>/` |
+| `atmosphere-metrics.py` | **hors éditeur** (Python système, Pillow + numpy) : mesures par capture de ciel (médiane, surexposition, mur de brouillard, voile, profondeur par tiers, drapeaux `WALL` / `HAZE` / `CLIPPED` / `BLACK`) et planches heure × humidité par vue, dans le dossier lu (`ATMOSPHERE_COHERENCE_001`) |
 | `sky-clock-pie.py` | preuve PIE de l'horloge du ciel : PIE sur `Lvl_AnastasisSlice` plus d'un jour de simulation, lignes `ANASTASIS_SKY` à chaque phase du village et échantillons `SKY_PIE_SAMPLE` (temps et phase de la simulation) ; `ANASTASIS_SKY_PIE_SECONDS` |
 | `capture-places.ps1` + `places-capture.py` | lieux composés (`AnastasisPlaces`) : vue lointaine et vues à 1,7 m par lieu, lieux actifs puis coupés aux mêmes caméras (`-OnOnly`, `-All`) → `Saved/PlacesEvidence/<Label>/` |
 | `capture-human-geography.py` | comparaison du relief corrige et de Human_Geography_V2 : export des maillages et vues a 170 cm ; sortie via ANASTASIS_HUMAN_EVIDENCE ; ferme l'editeur dedie |
@@ -283,7 +298,8 @@ manque puis se contentent de le vérifier ; `*_REBUILD=1` le régénère et écr
 | Script | Asset |
 |---|---|
 | `observe-slice.py` | `M_AnastasisSlice`, `Lvl_AnastasisSlice` |
-| `ground-material.ps1` + `.py` | `M_AnastasisGround`, `MI_AnastasisGround` |
+| `ground-material.ps1` + `.py` | `M_AnastasisGround`, `MI_AnastasisGround`, les huit `T_Ground_*` de `Materials/GroundTextures` (import si absentes ; `-ReimportTextures` les reimporte) |
+| `ground-textures.py` | **Python systeme, hors Unreal**, a lancer avant `ground-material.ps1` : telecharge les quatre textures CC0 Poly Haven du sol et les empaquette (detail neutre en moyenne) dans `Saved/GroundTextures/packed` ; n'ecrit pas dans `Content/` |
 | `shore-water.ps1` + `.py` | `M_AnastasisShoreWater` |
 | `water-look.ps1` + `.py` | `M_AnastasisWater` (Single Layer Water, WATER_LOOK_001) |
 | `presentation-registry.py` | `DA_AnastasisPresentation` |
@@ -319,7 +335,7 @@ se change dans le script.
 | Script | Role |
 |---|---|
 | `create-ground-cover.ps1` + `create-ground-cover.py` | **ecrit** dans `Content/` : les trois touffes `SM_Grass_MeadowTall/MeadowShort/Sedge_01` (`/Game/Anastasis/GroundCover`) et `M_AnastasisGrass`, regeneres a chaque run ; editeur dedie qui se ferme |
-| `capture-ground-cover.ps1` + `ground-cover-capture.py` | A/B de l'herbe aux memes cameras, `-States on,off,notint,noshadow,on2` (`notint` = memes touffes, sol non teinte) : prairie, riviere, lisiere, vallee B, oblique, aerien, hameau, hors vallee, lande ; frame p50/p95 et GPU par vue → `Saved/GroundCoverEvidence/<Label>/` |
+| `capture-ground-cover.ps1` + `ground-cover-capture.py` | A/B de l'herbe aux memes cameras, `-States on,off,notint,noshadow,on2` (`notint` = memes touffes, sol non teinte) : prairie, riviere, lisiere, vallee B, oblique, aerien, hameau, hors vallee, lande ; frame p50/p95 et GPU par vue ; `-States on,on_notex,bare,bare_notex` fait l'A/B des textures photo du sol (GROUND_TEXTURE_001) → `Saved/GroundCoverEvidence/<Label>/` |
 
 ### Population visuelle (VILLAGER_PNG_001)
 

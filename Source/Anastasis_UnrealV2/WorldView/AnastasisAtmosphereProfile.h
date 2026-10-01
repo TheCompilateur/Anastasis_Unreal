@@ -185,9 +185,18 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Atmosphere|Mist", meta = (ClampMin = "0.0", ClampMax = "0.999"))
 	float MistPhaseG = 0.35f;
 
-	/** Cool, slightly desaturated white — water fog, not a warm dust haze. */
+	/**
+	 * Cool, slightly desaturated -- water fog, not a warm dust haze.
+	 *
+	 * ATMOSPHERE_COHERENCE_001: was (0.86, 0.90, 0.94). A pocket is lit without shadows by the
+	 * sky light and the low sun, over ground that is shadowed and occluded (grass albedo ~0.25):
+	 * at that albedo a bank came out ~1.5 stops above the land it sits on (day-night-weather-001
+	 * contact sheet, 19h30 overview: mist p99 luma 83 against a median 30, max 124) and read as a
+	 * light source. ~0.6 halves the gap (-0.6 stop) and keeps it whiter than the land. A
+	 * judgement to recalibrate with tools/unreal/atmosphere-metrics.py, stated as one.
+	 */
 	UPROPERTY(EditAnywhere, Category = "Atmosphere|Mist")
-	FLinearColor MistAlbedo = FLinearColor(0.86f, 0.90f, 0.94f);
+	FLinearColor MistAlbedo = FLinearColor(0.60f, 0.64f, 0.68f);
 
 	// --- Realism (ENV_REALISM_001) -----------------------------------------------------
 	//
@@ -453,6 +462,32 @@ public:
 	/** Sun elevation (deg) at which the mist has burnt off down to MistMiddayFactor. */
 	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock", meta = (ClampMin = "1.0", ClampMax = "60.0"))
 	float MistBurnOffElevationDegrees = 25.0f;
+
+	/**
+	 * ATMOSPHERE_COHERENCE_001. Sun elevation (deg) at which the fog scatters the sun fully
+	 * (its VolumetricScatteringIntensity reaches 1). Under the horizon it scatters nothing;
+	 * smoothstep between. Low: the golden hour keeps its backlit haze.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock", meta = (ClampMin = "0.1", ClampMax = "30.0"))
+	float SunFogScatterFullElevationDegrees = 4.0f;
+
+	/**
+	 * ATMOSPHERE_COHERENCE_001. Hours around midnight over which the sky cross-fades from one
+	 * simulation day's weather to the next (AnastasisSkyClock::SkyWeatherAt). The simulation
+	 * rolls a new humidity and wind each day; without this the fog density jumped at 00:00.
+	 * 0 = the raw daily step.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock", meta = (ClampMin = "0.0", ClampMax = "24.0"))
+	float WeatherBlendHours = 4.0f;
+
+	/**
+	 * ATMOSPHERE_COHERENCE_001. Local exposure highlight contrast once the sun is gone. In full
+	 * day the project's own r.DefaultFeature.LocalExposure.HighlightContrastScale applies
+	 * unchanged; through twilight it eases to this value, so a bright dusk sky stops crushing a
+	 * ground lit only by that sky. Highlights only: the night stays as dark as the pinned EV.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float TwilightHighlightContrastScale = 0.6f;
 
 	/**
 	 * Vertical scale of a mist pocket relative to its radius. A sphere 240 m wide reads as a
