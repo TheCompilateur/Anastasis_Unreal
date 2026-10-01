@@ -105,6 +105,9 @@ namespace AnastasisPresentation
 		double Riparian = 0.0;
 		double Wetness = 0.0;
 		double Shade = 0.0;
+		/** A lone tree in open ground (meadow, valley edge, river gallery), not part of a stand:
+		 *  where an olive is most often planted. */
+		bool bOpenGround = false;
 	};
 
 	/**

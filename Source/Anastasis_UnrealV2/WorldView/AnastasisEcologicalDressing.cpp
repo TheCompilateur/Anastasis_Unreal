@@ -94,10 +94,10 @@ namespace P2
     constexpr double GladeRamp = 0.14;
     constexpr double GladeDepth = 0.92;
     /** Lone trees and groves in open ground, per candidate, before the grove noise. */
-    constexpr double LoneDensity = 0.013;
+    constexpr double LoneDensity = 0.018;
     constexpr double GroveSpan = 2.0;
     /** Gallery along the rendered rivers (plane trees by species), per candidate. */
-    constexpr double GalleryDensity = 0.035;
+    constexpr double GalleryDensity = 0.07;
     /** Candidates per (TileUU / TrunkSpacing)^2 -- enough to express the density field
      *  instead of saturating every tile against the trunk spacing. */
     constexpr double CandidatesPerSpacingCell = 2.0;
