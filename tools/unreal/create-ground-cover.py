@@ -34,7 +34,9 @@ NORMALES. Tirees vers le ciel (UP_BLEND) : une prairie se lit comme une masse ec
 haut, pas comme mille lames qui clignotent selon leur orientation.
 
 LODS. Ecrits a la main, pas reduits : une reduction automatique effondre des lames fines en
-eclats. LOD1 garde 45 % des lames, LOD2 30 %, plus larges, en un seul triangle.
+eclats. LOD0 (la touffe qui remplit l'ecran, sous ~7 m) garde l'arc en plusieurs segments.
+LOD1 garde 45 % des lames, a peine plus larges. LOD2, 30 % et un seul triangle, ne s'affiche
+que lorsque la touffe est deja petite (~60 m), dans le fondu.
 
 Lancer par tools/unreal/create-ground-cover.ps1 (editeur dedie, discret, qui se ferme), ou
 dans la console Python d'un editeur ouvert. Le commandlet Python est refuse : la pose des
@@ -52,9 +54,10 @@ MATERIAL_PATH = MATERIAL_DIR + '/' + MATERIAL_NAME
 SEED = 20260930
 
 UP_BLEND = 0.72
-# Seuils d'ecran des LOD. Une touffe de ~90 cm de rayon englobant : ~0.10 vers 16 m,
-# ~0.045 vers 36 m. Au-dela, le materiau l'enfonce (FADE_*) puis le HISM ne la soumet plus.
-LOD_SCREEN = (1.0, 0.10, 0.045)
+# Seuils d'ecran des LOD. Une touffe de ~90 cm de rayon : ~0.22 vers 7 m, ~0.025 vers 60 m.
+# Le premier plan (prairie_low, 60 cm) reste en LOD0. Le triangle large de LOD2 n'arrive
+# qu'une fois la touffe petite, la ou le fondu de distance la retire deja.
+LOD_SCREEN = (1.0, 0.22, 0.025)
 # Fondu de distance, en uu : PARAMETRES du materiau (FadeStart / FadeEnd). Chaque HISM les regle
 # par MID (AnastasisWorldEmbodiment::PlaceGroundCover) : touffes proches 40 -> 55 m, lointaines
 # 70 -> 105 m, chacune coupee juste apres. Les valeurs ci-dessous ne sont que les defauts du
@@ -85,11 +88,13 @@ FAMILIES = [
         'name': 'SM_Grass_MeadowTall_01',
         'note': 'H1 prairie haute : 38-72 cm, epis ocre, 15 % de paille',
         'radius': 62.0, 'tufts': 10, 'blades': 220, 'spread': 15.0, 'fill': 0.35,
-        'height': (38.0, 72.0), 'width': (1.1, 2.0), 'lean': (0.05, 0.35), 'bend': (0.25, 0.85),
-        'segments': 4,
+        # Largeur ~0,5-1 cm : a 60 cm une lame de 2 cm faisait un ruban de ~30 px.
+        # Base assombrie : le pied entre dans le sol, la pointe garde la luminance du pre.
+        'height': (38.0, 72.0), 'width': (0.55, 1.05), 'lean': (0.05, 0.35), 'bend': (0.25, 0.85),
+        'segments': 7,
         # EZ5 clairiere : un vert sourd sous des epis dores, pas une savane. v2 a 40 % d'ocre
         # se lisait brun-sec (capture prairie_eye v2) : l'ocre reste, minoritaire.
-        'base': c(0.048, 0.072, 0.024),
+        'base': c(0.026, 0.040, 0.014),
         # FOREST_TERRAIN_P4 : prairie mediterraneenne de debut d'ete -- le vert vire a l'olive et
         # la part d'ocre et de paille passe de 38 a 55 %. Meme luminance : la prairie reste au
         # niveau du sol (MI_AnastasisGround) et des couronnes, elle change de saison, pas de valeur.
@@ -101,9 +106,9 @@ FAMILIES = [
         'name': 'SM_Grass_MeadowShort_01',
         'note': 'H2 prairie basse : lames de 11-28 cm, plus verte, la terre perce',
         'radius': 62.0, 'tufts': 12, 'blades': 240, 'spread': 14.0, 'fill': 0.45,
-        'height': (12.0, 30.0), 'width': (0.8, 1.4), 'lean': (0.10, 0.50), 'bend': (0.30, 1.00),
-        'segments': 3,
-        'base': c(0.052, 0.074, 0.026),
+        'height': (12.0, 30.0), 'width': (0.42, 0.80), 'lean': (0.10, 0.50), 'bend': (0.30, 1.00),
+        'segments': 6,
+        'base': c(0.028, 0.042, 0.015),
         'tips': [(0.58, c(0.145, 0.175, 0.060)), (0.30, c(0.230, 0.205, 0.085)), (0.12, None)],
         'straw': (c(0.140, 0.122, 0.064), c(0.285, 0.245, 0.130)),
         'heads': 0,
@@ -112,9 +117,9 @@ FAMILIES = [
         'name': 'SM_Grass_Sedge_01',
         'note': 'H3 prairie humide : laiches de 45-80 cm de lame, retombant a ~35-60 cm, vert bleute',
         'radius': 55.0, 'tufts': 5, 'blades': 120, 'spread': 10.0, 'fill': 0.2,
-        'height': (45.0, 80.0), 'width': (1.6, 2.6), 'lean': (0.15, 0.40), 'bend': (0.80, 1.60),
-        'segments': 5,
-        'base': c(0.036, 0.064, 0.038),
+        'height': (45.0, 80.0), 'width': (0.90, 1.50), 'lean': (0.15, 0.40), 'bend': (0.80, 1.60),
+        'segments': 7,
+        'base': c(0.020, 0.038, 0.022),
         'tips': [(0.80, c(0.095, 0.150, 0.088)), (0.20, c(0.185, 0.158, 0.078))],
         'straw': (c(0.110, 0.100, 0.060), c(0.230, 0.200, 0.110)),
         'heads': 0,
@@ -201,7 +206,8 @@ def blade(buf, base, yaw, height, width, lean, bend, segments, col_base, col_tip
     for s in range(segments + 1):
         t = s / float(segments)
         half = 0.5 * width * (1.0 - t) ** 0.6
-        rgb = lerp3(col_base, col_tip, t ** 1.3)
+        # L'exposant garde le pied sombre : la pointe claire ne descend pas jusqu'au sol.
+        rgb = lerp3(col_base, col_tip, t ** 1.8)
         alpha = max(0.0, min(1.0, p[2] / 100.0))
         if s < segments:
             a = buf.vertex((p[0] - sx * half, p[1] - sy * half, p[2]), normal, rgb, alpha, (0.0, t))
@@ -292,14 +298,14 @@ def draw_blades(spec, rng):
             tip = tip or spec['tips'][0][1]
         k_tint = rng.uniform(0.85, 1.15)
         out = (x / d, y / d) if d > 1e-3 else (math.cos(yaw), math.sin(yaw))
-        blades.append({'base': (x, y, -3.0), 'yaw': yaw, 'height': h, 'width': rng.uniform(*spec['width']),
+        blades.append({'base': (x, y, -6.0), 'yaw': yaw, 'height': h, 'width': rng.uniform(*spec['width']),
                        'lean': lean, 'bend': bend, 'col_base': scaled(base, k_tint), 'col_tip': scaled(tip, k_tint),
                        'outward': out, 'keep': rng.random()})
     heads = []
     for k in range(spec.get('heads', 0)):
         tx, ty, vigour = tufts[rng.randrange(len(tufts))]
         x, y = tx + rng.gauss(0.0, spec['spread'] * 0.6), ty + rng.gauss(0.0, spec['spread'] * 0.6)
-        heads.append({'base': (x, y, -3.0), 'yaw': rng.random() * math.tau,
+        heads.append({'base': (x, y, -6.0), 'yaw': rng.random() * math.tau,
                       'height': rng.uniform(*spec['head_height']), 'lean': rng.uniform(0.04, 0.22),
                       'keep': rng.random()})
     return blades, heads
@@ -307,7 +313,8 @@ def draw_blades(spec, rng):
 
 def build_lod(spec, blades, heads, lod):
     keep = (1.0, 0.45, 0.30)[lod]
-    widen = (1.0, 1.3, 2.0)[lod]
+    # LOD2 ne double plus la largeur : un triangle deux fois plus gros remplissait encore l'oeil.
+    widen = (1.0, 1.15, 1.35)[lod]
     segments = max(1, spec['segments'] - (0, 1, spec['segments'])[lod])
     buf = Buffers()
     for b in blades:

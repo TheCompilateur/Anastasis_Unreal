@@ -507,9 +507,10 @@ def build_master(textures):
     #
     # Macro ~60 m : les grandes masses chromatiques du paysage.
     # Meso  ~11 m : les taches, et l'irregularite des masques roche/humidite.
-    # Detail ~1.6 m : le grain, et la SEULE source de relief micro -- VectorNoise
-    #   "Perlin Gradient" rend le gradient (RGB) ET le scalaire (A) en une evaluation,
-    #   ce qui donne une normale analytique sans payer trois bruits.
+    # Detail ~25 cm : le grain, et la SEULE source de relief micro. L'echelle de 1,1 m
+    # (1/70) laissait chaque trou entre les touffes d'une seule teinte. VectorNoise
+    # "Perlin Gradient" rend le gradient (RGB) ET le scalaire (A) en une evaluation,
+    # ce qui donne une normale analytique sans payer trois bruits.
     #
     # Fast Gradient 3D se repete tous les 16 en position mise a l'echelle : a 1/6000
     # cela fait 96 000 UU, dix fois le monde (9 600 UU). Aucune repetition visible.
@@ -519,7 +520,10 @@ def build_master(textures):
     # de variation devient reglable depuis l'instance comme le reste du look.
     p_macro_tiling = g.scalar('MacroTiling', 1.0 / 6000.0, 'Ground|Macro', -2560, 500)
     p_meso_tiling = g.scalar('MesoTiling', 1.0 / 1100.0, 'Ground|Macro', -2560, 680)
-    p_detail_tiling = g.scalar('DetailTiling', 1.0 / 70.0, 'Ground|Detail', -2560, 860)
+    # Detail ~25 cm : le grain qui se lit ENTRE les touffes, a 60 cm. A 1/70 (~1,1 m) chaque
+    # trou du premier plan ne contenait qu'une valeur, et le sol restait une nappe. Le fondu
+    # (DetailFade*) l'eteint avant 15-70 m, la ou cette frequence redeviendrait un motif.
+    p_detail_tiling = g.scalar('DetailTiling', 1.0 / 16.0, 'Ground|Detail', -2560, 860)
     # FOREST_TERRAIN_P4 -- ECHELLE REGIONALE. La "macro" de 60 m a ete reglee pour un monde de
     # 9 600 uu ; a l'echelle 5 la carte en fait 192 000, et rien ne variait au-dela de quelques
     # dizaines de metres : un versant entier avait la meme teinte. ~600 m : des pans de colline
@@ -578,7 +582,7 @@ def build_master(textures):
     p_macro_warm = g.vector('MacroTintWarm', (1.20, 1.06, 0.84), P + 'Macro', -1900, 60)
     p_macro_amt = g.scalar('MacroContrast', 0.62, P + 'Macro', -1900, 160)
     p_meso_amt = g.scalar('MesoContrast', 0.30, P + 'Macro', -1900, 220)
-    p_detail_amt = g.scalar('DetailContrast', 0.26, P + 'Detail', -1900, 280)
+    p_detail_amt = g.scalar('DetailContrast', 0.40, P + 'Detail', -1900, 280)
     # CES DEUX SEUILS SONT CALIBRES CONTRE L'EXAGERATION VERTICALE DU TERRAIN.
     #
     # La pente lue par le materiau est celle de la surface RENDUE, pas celle du
@@ -690,9 +694,9 @@ def build_master(textures):
     T = 'Ground|Texture'
     tex_params = {
         'AlbedoStrength': g.scalar('TexAlbedoStrength', 0.85, T, -1900, 1300),
-        'AOStrength': g.scalar('TexAOStrength', 0.5, T, -1900, 1360),
-        'RoughnessStrength': g.scalar('TexRoughnessStrength', 0.12, T, -1900, 1420),
-        'NormalStrength': g.scalar('TexNormalStrength', 0.8, T, -1900, 1480),
+        'AOStrength': g.scalar('TexAOStrength', 0.85, T, -1900, 1360),
+        'RoughnessStrength': g.scalar('TexRoughnessStrength', 0.28, T, -1900, 1420),
+        'NormalStrength': g.scalar('TexNormalStrength', 1.15, T, -1900, 1480),
         # Meme constat que RockBumpScale : une face raide est deja pres du terminateur,
         # une normale forte y fait des taches noires, pas de la roche.
         'RockNormalScale': g.scalar('TexRockNormalScale', 0.6, T, -1900, 1540),
@@ -766,6 +770,16 @@ def build_master(textures):
     base = g.mul(base, '', meso_val, '', 40, -240)
     grain_val = g.addc(g.mul(grain_amt, '', d_grain, '', -280, 900), '', 1.0, -120, 900)
     base = g.mul(base, '', grain_val, '', 200, -240)
+    # Le grain de valeur, meme a 25 cm, module le jaune deja la : il ne le quitte pas.
+    # Le creux (d_grain < 0) tire vers une terre, de pres seulement (detail_fade).
+    # Valeurs capturees (prairie_low, label ground-soil) : le premier plan reste jaune,
+    # moyenne 137 -> 139, 17,5 % des pixels du bas bougent. Un disque au pied de chaque
+    # touffe a ete essaye puis retire : sur le materiau feuillage il se lit comme un trou.
+    p_gap_soil = g.vector('GapSoil', (0.16, 0.12, 0.07), P + 'Detail', -1900, 1180)
+    p_gap_amt = g.scalar('GapSoilAmount', 0.70, P + 'Detail', -1900, 1240)
+    gap_dark = g.sat(g.mulc(d_grain, '', -1.0, -440, 980), '', -280, 980)
+    gap = g.mul(gap_dark, '', g.mul(p_gap_amt, '', detail_fade, '', -280, 1040), '', -120, 980)
+    base = g.lerp(base, '', p_gap_soil, '', gap, '', 240, -160)
     # Detail photo : un facteur neutre en moyenne, pose APRES les teintes calees.
     base = g.mul(base, '', tex, '', 280, -240)
 

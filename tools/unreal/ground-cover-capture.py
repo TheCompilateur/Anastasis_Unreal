@@ -17,6 +17,7 @@ ANASTASIS_GROUND_OUT     dossier de sortie (obligatoire)
 ANASTASIS_GROUND_STATES  etats captures, dans l'ordre, le premier doit poser l'herbe
                          (defaut "on,off") : on | off | noshadow | notint | on2
                          | on_notex | bare | bare_notex   (GROUND_TEXTURE_001)
+                         | eco | noeco   (MICRO_ECOLOGY_001 : herbe laissee, seule la micro-ecologie change)
 
 Etats *_notex : le sol est rendu par une instance DYNAMIQUE de MI_AnastasisGround dont le
 fondu des textures photo est ferme (TexFadeStart 0, TexFadeEnd 1). Le materiau rend alors
@@ -37,6 +38,11 @@ STATE_CMDS = {
     'on_notex': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     'bare': ('anastasis.Dressing.GroundCover 0', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     'bare_notex': ('anastasis.Dressing.GroundCover 0', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    # MICRO_ECOLOGY_001. L'herbe, sa teinte et les rives vivantes restent. Seule cette couche bouge.
+    'eco': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1',
+            'anastasis.Dressing.MicroEcology 1', 'anastasis.MicroEcology.Soil 1'),
+    'noeco': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1',
+              'anastasis.Dressing.MicroEcology 0', 'anastasis.MicroEcology.Soil 0'),
 }
 NO_TEXTURE = ('on_notex', 'bare_notex')
 GROUND_MI = '/Game/Anastasis/Materials/MI_AnastasisGround'
