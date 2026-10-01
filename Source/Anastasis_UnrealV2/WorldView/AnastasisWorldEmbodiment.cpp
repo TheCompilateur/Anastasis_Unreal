@@ -585,6 +585,9 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 ForestLayerCounts[0], ForestLayerCounts[1], ForestLayerCounts[2], ForestPlan.Instances.Num(),
                 ForestPlan.RejectedWaterOrFootprint, ForestPlan.RejectedSlope, ForestPlan.RejectedSpacing,
                 bMacro, ForestPlan.RejectedOpenGround);
+            // FOREST_TERRAIN_P2 : arbres isoles, bosquets et galerie de berge hors des masses.
+            UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_FOREST_OPEN lone_trees=%d of=%d"),
+                ForestPlan.LoneTrees, ForestPlan.Instances.Num());
             // The stature profile is the visual claim of this pass, so it is measured rather
             // than asserted: a forest that has collapsed back onto one height says so here.
             UE_LOG(LogAnastasis_UnrealV2, Display,

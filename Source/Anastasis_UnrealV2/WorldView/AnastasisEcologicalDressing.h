@@ -50,6 +50,9 @@ struct FPlacement
     double Maturity = 1.0;
     double SlopeDegrees = 0.0;
     ELayer Layer = ELayer::Young;
+    /** FOREST_TERRAIN_P2: a lone tree, grove or gallery tree in open ground, not part of a
+     *  forest mass. Valleys stay free of forest; they may hold these, sparsely. */
+    bool bLone = false;
 };
 
 struct FPlan
@@ -59,6 +62,8 @@ struct FPlan
     int32 RejectedSlope = 0;
     int32 RejectedSpacing = 0;
     int32 RejectedOpenGround = 0;
+    /** FOREST_TERRAIN_P2: instances with bLone. */
+    int32 LoneTrees = 0;
 };
 
 /** Read-only view of the terrain already built by the owner. No terrain generation here. */

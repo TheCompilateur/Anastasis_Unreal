@@ -14,6 +14,9 @@ struct FSample
     double WaterHeight = 2.75;
     double ValleyWeight = 0;
     double RiverWeight = 0;
+    /** FOREST_TERRAIN_P2: the sinuous pass road alone, [0,1], 1 on its axis. Already part of
+     * ValleyWeight; exposed so a lone tree can stand in a meadow but never on the road. */
+    double RoadWeight = 0;
 };
 FSample Evaluate(double X, double Y, double OriginalHeight);
 /** Authored river centrelines, upstream first: XY in the same tile coordinates as Evaluate,

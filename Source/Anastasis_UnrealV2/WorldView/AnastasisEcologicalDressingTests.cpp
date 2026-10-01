@@ -171,7 +171,14 @@ bool FAnastasisMacroForestHabitat::RunTest(const FString&)
     H.SampleHeight = [](double,double,double& Z) { Z=400; return true; };
     for (auto& T : S.Tiles) T.Type=ETileType::Grass;
     TestTrue(TEXT("valley sample"),Build(S,C,P,E,&H));
-    TestEqual(TEXT("flat low prairie stays open"),P.Instances.Num(),0);
+    // FOREST_TERRAIN_P2 : la prairie basse reste sans FORET, mais plus vide -- quelques arbres
+    // isoles et bosquets, clairsemes (au plus un pour vingt tuiles), jamais une masse.
+    int32 LoneInPrairie=0;
+    for (const auto& Tree : P.Instances) LoneInPrairie += Tree.bLone ? 1 : 0;
+    TestEqual(TEXT("flat low prairie holds no forest mass, only lone trees"),LoneInPrairie,P.Instances.Num());
+    TestTrue(TEXT("the prairie is no longer empty"),P.Instances.Num()>0);
+    TestTrue(TEXT("lone trees stay sparse"),P.Instances.Num()<=S.Tiles.Num()/20);
+    TestEqual(TEXT("the plan counts its lone trees"),P.LoneTrees,LoneInPrairie);
     H.SampleHeight = [](double,double,double& Z) { Z=1000; return true; };
     for (auto& T : S.Tiles) T.Type=ETileType::Field;
     TestTrue(TEXT("fields"),Build(S,C,P,E,&H));
@@ -225,8 +232,11 @@ bool FAnastasisMacroForestCanonical::RunTest(const FString&)
             {
                 const auto Geo=AnastasisHumanGeography::Evaluate(Tree.Ground.X/(AnastasisWorldView::TileWorldSize*S.SpatialScale),
                     Tree.Ground.Y/(AnastasisWorldView::TileWorldSize*S.SpatialScale),0.0);
-                TestTrue(TEXT("existing habitable valleys and pass remain open"),Geo.ValleyWeight<0.8);
+                // FOREST_TERRAIN_P2 : les vallees restent sans foret ; un arbre isole peut s'y tenir,
+                // jamais sur la route du col ni dans le lit de la riviere.
+                if (!Tree.bLone) TestTrue(TEXT("existing habitable valleys and pass remain free of forest"),Geo.ValleyWeight<0.8);
                 TestTrue(TEXT("existing river corridor remains open"),Geo.RiverWeight<0.5);
+                TestTrue(TEXT("no tree on the pass road"),Geo.RoadWeight<0.3);
             }
             if (B.Instances.IsValidIndex(I)) TestTrue(TEXT("identical tree"),Tree.Ground==B.Instances[I].Ground && Tree.ScaleMultiplier==B.Instances[I].ScaleMultiplier);
             Canopy += Tree.Layer==ELayer::Canopy;
@@ -240,6 +250,70 @@ bool FAnastasisMacroForestCanonical::RunTest(const FString&)
             Seed,P.Instances.Num(),Canopy,Stone,P.RejectedOpenGround,P.RejectedSlope));
     }
     AnastasisTerrainForge::ClearActive();
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisForestEdgesAndOpenings, "Anastasis.Ecology.ForestEdgesAndOpenings",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisForestEdgesAndOpenings::RunTest(const FString&)
+{
+    // FOREST_TERRAIN_P2. Un bord foret / champ droit, a l'echelle reelle (5), en altitude : la
+    // lisiere doit etre une bande qui s'eclaircit, pas une ligne pleine densite sur la grille ;
+    // l'interieur doit varier en densite et s'ouvrir en clairieres.
+    using namespace AnastasisEcologicalDressing;
+    using AnastasisWorld::ETileType;
+    auto S = FlatForestEdge();
+    for (auto& T : S.Tiles) T.Type = T.X >= 48 ? ETileType::Forest : ETileType::Field;
+    S.SpatialScale = 5.0;
+    const double TileUU = AnastasisWorldView::TileWorldSize * S.SpatialScale;
+    FAnastasisForestDressingSettings C;
+    FRenderedHabitat H;
+    H.SampleHeight = [](double,double,double& Z) { Z=5000; return true; };
+    FPlan P;
+    FString E;
+    if (!TestTrue(TEXT("edge fixture builds"), Build(S,C,P,E,&H))) return false;
+
+    int32 Columns[12] = {};
+    int32 Interior = 0;
+    TMap<FIntPoint, int32> Blocks3, Blocks2;
+    for (const auto& Tree : P.Instances)
+    {
+        const double X = Tree.Ground.X / TileUU, Y = Tree.Ground.Y / TileUU;
+        if (!TestTrue(TEXT("no tree on the field side"), X >= 48.0)) return false;
+        const int32 Column = FMath::FloorToInt((X - 48.0) * 2.0);
+        if (Column >= 0 && Column < 12) ++Columns[Column];
+        if (X >= 55.0 && X < 93.0) ++Interior;
+        if (X >= 54.0 && X < 93.0 && Y >= 3.0 && Y < 93.0)
+            ++Blocks3.FindOrAdd(FIntPoint(FMath::FloorToInt((X - 54.0) / 3.0), FMath::FloorToInt((Y - 3.0) / 3.0)));
+        if (X >= 54.0 && X < 94.0 && Y >= 2.0 && Y < 94.0)
+            ++Blocks2.FindOrAdd(FIntPoint(FMath::FloorToInt((X - 54.0) / 2.0), FMath::FloorToInt((Y - 2.0) / 2.0)));
+    }
+    // Interieur ramene a la largeur d'une demi-tuile, comme les colonnes de lisiere.
+    const double InteriorPerColumn = Interior / (38.0 * 2.0);
+    TestTrue(TEXT("interior reached"), InteriorPerColumn > 0.0);
+    TestTrue(TEXT("the first half-tile of the fringe is sparse, not a full-density cut"), Columns[0] < 0.4 * InteriorPerColumn);
+    TestTrue(TEXT("the fringe fills in towards the interior"), Columns[0] < Columns[2] && Columns[1] < Columns[3]);
+
+    // Densite variable : coefficient de variation des blocs de 3x3 tuiles.
+    double Sum = 0.0, SumSq = 0.0;
+    const int32 Count3 = 13 * 30;
+    for (int32 BX = 0; BX < 13; ++BX)
+        for (int32 BY = 0; BY < 30; ++BY)
+        {
+            const double N = Blocks3.FindRef(FIntPoint(BX, BY));
+            Sum += N; SumSq += N * N;
+        }
+    const double Mean = Sum / Count3;
+    const double CV = Mean > 0.0 ? FMath::Sqrt(FMath::Max(SumSq / Count3 - Mean * Mean, 0.0)) / Mean : 0.0;
+    TestTrue(TEXT("forest density varies from stand to stand"), CV > 0.35);
+    // Clairieres : des blocs de 2x2 tuiles vides au coeur du peuplement.
+    int32 Empty = 0;
+    for (int32 BX = 0; BX < 20; ++BX)
+        for (int32 BY = 0; BY < 46; ++BY)
+            Empty += Blocks2.Contains(FIntPoint(BX, BY)) ? 0 : 1;
+    TestTrue(TEXT("glades open inside the forest"), Empty >= 10);
+    AddInfo(FString::Printf(TEXT("FOREST_EDGE columns=[%d %d %d %d %d %d] interior_per_column=%.1f cv=%.2f empty_2x2=%d trees=%d lone=%d"),
+        Columns[0], Columns[1], Columns[2], Columns[3], Columns[4], Columns[5], InteriorPerColumn, CV, Empty, P.Instances.Num(), P.LoneTrees));
     return true;
 }
 #endif

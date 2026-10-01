@@ -20,13 +20,87 @@ uint32 Hash(uint32 Seed, int32 X, int32 Y, uint32 Salt)
 double Unit(uint32 H) { return static_cast<double>(H) / 4294967296.0; }
 double Smooth(double V) { V = FMath::Clamp(V, 0.0, 1.0); return V * V * (3.0 - 2.0 * V); }
 
-double Cluster(uint32 Seed, double X, double Y)
+double Cluster(uint32 Seed, double X, double Y, uint32 Salt = 91)
 {
     const int32 IX = FMath::FloorToInt(X), IY = FMath::FloorToInt(Y);
     const double U = Smooth(X - IX), V = Smooth(Y - IY);
     return FMath::Lerp(
-        FMath::Lerp(Unit(Hash(Seed, IX, IY, 91)), Unit(Hash(Seed, IX+1, IY, 91)), U),
-        FMath::Lerp(Unit(Hash(Seed, IX, IY+1, 91)), Unit(Hash(Seed, IX+1, IY+1, 91)), U), V);
+        FMath::Lerp(Unit(Hash(Seed, IX, IY, Salt)), Unit(Hash(Seed, IX+1, IY, Salt)), U),
+        FMath::Lerp(Unit(Hash(Seed, IX, IY+1, Salt)), Unit(Hash(Seed, IX+1, IY+1, Salt)), U), V);
+}
+
+/**
+ * FOREST_TERRAIN_P2 -- a tile property read as a CONTINUOUS field.
+ *
+ * Bilinear between tile centres (X + 0.5), so a value that steps from one tile to the next
+ * becomes a ramp across the twenty metres between them. Reading the candidate's own tile was
+ * what cut the forest along the simulation grid: every per-tile test drew a straight,
+ * axis-aligned edge, at exactly the tile size.
+ */
+double TileField(const FWorldVisualSnapshot& S, double X, double Y, TFunctionRef<double(const FVisualTile&)> Value)
+{
+    const double U = X - 0.5, V = Y - 0.5;
+    const int32 IX = FMath::FloorToInt(U), IY = FMath::FloorToInt(V);
+    const double FX = U - IX, FY = V - IY;
+    const auto At = [&](int32 TX, int32 TY)
+    {
+        const FVisualTile* T = FindTile(S, FMath::Clamp(TX, 0, S.W - 1), FMath::Clamp(TY, 0, S.H - 1));
+        return T ? Value(*T) : 0.0;
+    };
+    return FMath::Lerp(FMath::Lerp(At(IX, IY), At(IX + 1, IY), FX), FMath::Lerp(At(IX, IY + 1), At(IX + 1, IY + 1), FX), FY);
+}
+
+/**
+ * FOREST_TERRAIN_P2 -- share of forest habitat around (X, Y), cone-weighted over Radius tiles.
+ * 0.5 on a straight habitat border, rising to 1 about Radius inside it: the forest edge becomes a
+ * band whose width is set here, not a line drawn along the tile grid.
+ */
+double HabitatShare(const FWorldVisualSnapshot& S, double X, double Y, double Radius)
+{
+    const int32 CX = FMath::FloorToInt(X), CY = FMath::FloorToInt(Y), R = FMath::CeilToInt(Radius);
+    double Weight = 0.0, Habitable = 0.0;
+    for (int32 DY = -R; DY <= R; ++DY)
+        for (int32 DX = -R; DX <= R; ++DX)
+        {
+            const FVisualTile* N = FindTile(S, CX + DX, CY + DY);
+            if (!N) continue;
+            const double W = FMath::Max(0.0, 1.0 - FVector2D(X - (CX + DX + 0.5), Y - (CY + DY + 0.5)).Size() / Radius);
+            Weight += W;
+            Habitable += (N->Type == ETileType::Forest || N->Type == ETileType::Grass || N->Type == ETileType::Scrub
+                || N->Type == ETileType::Stone) ? W : 0.0;
+        }
+    return Weight > 0.0 ? Habitable / Weight : 0.0;
+}
+
+/** FOREST_TERRAIN_P2 -- distribution constants of the macro forest, in simulation tiles. */
+namespace P2
+{
+    /** Domain warp of the habitat field: the edge meanders by up to this much. */
+    constexpr double EdgeWarp = 0.45;
+    constexpr double EdgeWarpSpan = 2.2;
+    /** Habitat share where the forest stops, the band over which it thins out to it, and the
+     *  radius of the share. Measured on a straight forest/field border at scale 5 (replica of
+     *  this file): 17 %, 54 %, 89 % of interior density over the first three half-tiles -- a
+     *  thirty-metre fringe, where the grid cut stood at 106 % on the border itself. */
+    constexpr double HabitatEdge = 0.58;
+    constexpr double HabitatFringe = 0.40;
+    constexpr double HabitatRadius = 3.0;
+    /** Stand density: open woodland to closed stand, at this span. */
+    constexpr double StandSpan = 5.0;
+    constexpr double StandFloor = 0.55;
+    /** Glades: small openings inside the mass. */
+    constexpr double GladeSpan = 3.5;
+    constexpr double GladeThreshold = 0.72;
+    constexpr double GladeRamp = 0.14;
+    constexpr double GladeDepth = 0.92;
+    /** Lone trees and groves in open ground, per candidate, before the grove noise. */
+    constexpr double LoneDensity = 0.013;
+    constexpr double GroveSpan = 2.0;
+    /** Gallery along the rendered rivers (plane trees by species), per candidate. */
+    constexpr double GalleryDensity = 0.035;
+    /** Candidates per (TileUU / TrunkSpacing)^2 -- enough to express the density field
+     *  instead of saturating every tile against the trunk spacing. */
+    constexpr double CandidatesPerSpacingCell = 2.0;
 }
 
 bool Habitat(ETileType Type, bool bMacro = false)
@@ -135,7 +209,12 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
     const double Spacing = bMacro ? C.TrunkSpacingUU : C.MinimumSpacing * TileUU;
     // Physical sampling density stays useful when a simulation tile spans twenty metres.
     // Bounded work: at most 128 candidates per canonical tile; never one actor per tree.
-    const int32 CandidateCount = bMacro ? FMath::Clamp(FMath::CeilToInt(FMath::Square(TileUU/Spacing)*14.0),4,128)
+    // FOREST_TERRAIN_P2 : 14 candidats par cellule d'espacement (128 par tuile a l'echelle 5)
+    // saturaient chaque tuile contre l'espacement des troncs ; la probabilite n'y decidait plus
+    // que du oui ou du non, d'ou une densite uniforme. Deux par cellule laissent la probabilite
+    // s'exprimer en densite.
+    const int32 CandidateCount = bMacro
+        ? FMath::Clamp(FMath::CeilToInt(FMath::Square(TileUU/Spacing)*P2::CandidatesPerSpacingCell),4,128)
         : C.CandidatesPerTile;
     TMap<FIntPoint, TArray<FVector2D>> Occupied;
     const int32 Radius = FMath::CeilToInt(C.EdgeRadius);
@@ -161,12 +240,24 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
             double Support = Weight > 0 ? Forest / Weight : 0.0;
             double Z = 0.0, Slope = 0.0;
             double Opening = 1.0;
+            // FOREST_TERRAIN_P2 (macro seulement) : lisiere, densite, clairieres, arbres isoles.
+            double Fringe = 1.0, Stand = 1.0, Glade = 0.0, LoneProbability = 0.0, Wetness = T.Wetness;
             if (bMacro)
             {
                 if (!GroundAt(S, X * TileUU, Y * TileUU, C, Z, Slope, Rendered))
                 { ++Result.RejectedWaterOrFootprint; continue; }
                 if (Slope > C.HillsideMaxSlope)
                 { ++Result.RejectedSlope; continue; }
+                // Habitat continu et deforme : champs, ruines et eau d'un cote, tout le reste de
+                // l'autre. La lisiere suit une courbe, plus la grille, et s'eclaircit en degrade.
+                const double WX = X + P2::EdgeWarp * (2.0 * Cluster(S.Seed, X / P2::EdgeWarpSpan, Y / P2::EdgeWarpSpan, 92) - 1.0);
+                const double WY = Y + P2::EdgeWarp * (2.0 * Cluster(S.Seed, X / P2::EdgeWarpSpan + 17.3, Y / P2::EdgeWarpSpan + 5.1, 93) - 1.0);
+                // Hors de la bande, plus de foret close ; un arbre isole reste possible (le candidat
+                // est deja sur une tuile d'habitat : jamais sur un champ ni une ruine).
+                Fringe = Smooth((HabitatShare(S, WX, WY, P2::HabitatRadius) - P2::HabitatEdge) / P2::HabitatFringe);
+                Stand = P2::StandFloor + (1.0 - P2::StandFloor) * Cluster(S.Seed, X / P2::StandSpan, Y / P2::StandSpan, 94);
+                Glade = Smooth((Cluster(S.Seed, X / P2::GladeSpan, Y / P2::GladeSpan, 95) - P2::GladeThreshold) / P2::GladeRamp);
+                Wetness = TileField(S, X, Y, [](const FVisualTile& N) { return N.Wetness; });
                 // Upland shoulders and mountain shelves can carry a forest even where the
                 // simulation labels a rock resource. Flat low grass remains an open valley.
                 const double UnscaledHeight = (Z - AnastasisTerrainSurface::WaterPlaneZ) / S.SpatialScale;
@@ -174,8 +265,12 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
                 const double Hillside = Smooth((Slope - 5.0) / 18.0);
                 Support = FMath::Max(Support, Upland * 0.95 + Hillside * 0.35);
                 Support = FMath::Clamp(Support, 0.0, 1.0);
-                if (T.Type == ETileType::Grass)
-                    Opening *= FMath::Max(Upland, Smooth((Slope - 5.0) / 10.0));
+                // Prairie : bilineaire, plus le type de la seule tuile du candidat.
+                const double GrassShare = TileField(S, X, Y, [](const FVisualTile& N) { return N.Type == ETileType::Grass ? 1.0 : 0.0; });
+                Opening *= FMath::Lerp(1.0, FMath::Max(Upland, Smooth((Slope - 5.0) / 10.0)), GrassShare);
+                // Reserves humaines, communes a la foret et aux arbres isoles : bassin du village,
+                // lit de la riviere ecrite, route du col.
+                double Reserve = 1.0;
                 if (S.bHumanGeography && S.Seed == ReferenceSeed)
                 {
                     // Consume the EXISTING valley/pass/river weights; never author another
@@ -183,31 +278,46 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
                     const auto Geo = AnastasisHumanGeography::Evaluate(X,Y,
                         (AnastasisTerrainSurface::WaterPlaneZ + UnscaledHeight)/100.0);
                     Opening *= 1.0-Smooth((Geo.ValleyWeight-0.20)/0.60);
-                    Opening *= 1.0-Smooth(Geo.RiverWeight/0.50);
+                    Reserve *= 1.0-Smooth(Geo.RiverWeight/0.50);
+                    Reserve *= 1.0-Smooth(Geo.RoadWeight/0.30);
                 }
                 double Riparian = 0.0;
                 if (Rendered->SampleRiparian && Rendered->SampleRiparian(X * TileUU, Y * TileUU, Riparian))
                 {
                     // Berges et plaines d'inondation : ripisylve claire, pas une foret close.
-                    Opening *= 1.0 - 0.8 * FMath::Clamp(Riparian, 0.0, 1.0);
+                    Riparian = FMath::Clamp(Riparian, 0.0, 1.0);
+                    Opening *= 1.0 - 0.8 * Riparian;
                 }
                 if (Rendered->bHasBasin && C.BasinClearRadius > 0.0f)
                 {
                     const double Distance = FVector2D(X - Rendered->Basin.X / TileUU,
                         Y - Rendered->Basin.Y / TileUU).Size();
                     // Wide, gradual edge, keeping the village basin entirely free of trunks.
-                    Opening *= Smooth((Distance - C.BasinClearRadius) / 4.0);
+                    Reserve *= Smooth((Distance - C.BasinClearRadius) / 4.0);
                 }
-                if (Opening <= 0.0) { ++Result.RejectedOpenGround; continue; }
+                Opening *= Reserve;
+                // Arbres isoles et bosquets dans l'ouvert, et galerie le long des rivieres rendues :
+                // la ou la foret close n'a pas sa place, un arbre seul l'a. Memes reserves.
+                const double Grove = Smooth((Cluster(S.Seed, X / P2::GroveSpan, Y / P2::GroveSpan, 96) - 0.55) / 0.35);
+                const double Gallery = Smooth((Riparian - 0.20) / 0.25) * (1.0 - Smooth((Riparian - 0.80) / 0.15));
+                LoneProbability = (P2::LoneDensity * Grove + P2::GalleryDensity * Gallery) * Reserve;
+                if (Opening <= 0.0 && LoneProbability <= 0.0) { ++Result.RejectedOpenGround; continue; }
             }
-            if (Support <= 0) continue;
+            if (Support <= 0 && LoneProbability <= 0) continue;
             const double Span = bMacro ? C.MassSpan : C.ClusterSpan;
             const double Patch = Smooth((Cluster(S.Seed, X / Span, Y / Span)
                 - C.ClearingThreshold) / (1.0 - C.ClearingThreshold));
             const double CanopyCover = bMacro ? FMath::Sqrt(Patch) : Patch;
-            const double Probability = C.Density * FMath::Sqrt(Support) * CanopyCover * Opening
-                * (1.0 - C.WetnessPenalty * T.Wetness);
-            if (Unit(Hash(Seed,T.X,T.Y,3)) >= Probability) continue;
+            double Probability = Support > 0 ? C.Density * FMath::Sqrt(Support) * CanopyCover * Opening
+                * (1.0 - C.WetnessPenalty * Wetness) : 0.0;
+            // Lisiere en degrade, peuplement plus ou moins serre, clairieres.
+            if (bMacro) Probability *= Fringe * Stand * (1.0 - P2::GladeDepth * Glade);
+            // Sans arbre isole (hors macro, ou hors de toute prairie), le tirage reste bit a bit
+            // celui d'avant.
+            const double Combined = LoneProbability > 0.0
+                ? 1.0 - (1.0 - FMath::Max(Probability, 0.0)) * (1.0 - LoneProbability) : Probability;
+            if (Unit(Hash(Seed,T.X,T.Y,3)) >= Combined) continue;
+            const bool bLone = bMacro && LoneProbability > Probability;
             FPlacement P;
             if (!bMacro && !GroundAt(S, X * TileWorldSize * S.SpatialScale, Y * TileWorldSize * S.SpatialScale, C, Z, Slope, nullptr))
             { ++Result.RejectedWaterOrFootprint; continue; }
@@ -225,7 +335,12 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
             Occupied.FindOrAdd(Cell).Add(XY);
             const double Mature = Smooth((Support - 0.25) / 0.60);
             const double Choice = Unit(Hash(Seed,T.X,T.Y,4));
-            P.Layer = bMacro ? (Choice < 0.65 + 0.25 * Mature ? ELayer::Canopy : ELayer::Secondary)
+            // Macro : une lisiere, une clairiere ou un peuplement clair recrutent des arbres plus
+            // jeunes -- la hauteur descend vers le bord au lieu de s'arreter net. Un arbre isole
+            // a eu la place de grandir : canopee.
+            const double Interior = Fringe * Smooth((Patch - 0.05) / 0.5) * (1.0 - Glade) * (0.5 + 0.5 * Mature);
+            P.bLone = bLone;
+            P.Layer = bMacro ? (bLone || Choice < 0.5 + 0.42 * Interior ? ELayer::Canopy : ELayer::Secondary)
                 : Choice < Mature * 0.60 ? ELayer::Canopy
                 : Choice < 0.25 + Mature * 0.65 ? ELayer::Secondary : ELayer::Young;
             const FVector2D Envelope = P.Layer == ELayer::Canopy ? C.CanopyScale
@@ -237,6 +352,7 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
             P.VisualSeed = Seed;
             P.Ground = FVector(XY.X,XY.Y,Z);
             P.SlopeDegrees = Slope;
+            Result.LoneTrees += bLone ? 1 : 0;
             Result.Instances.Add(P);
         }
     }
