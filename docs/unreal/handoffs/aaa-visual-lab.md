@@ -20,8 +20,9 @@ Laboratoire visuel isolé de 30 m. Prouver si le pipeline actuel peut porter une
 ## MEC
 
 - BUILD: relancé par `finish`. Pas de C++ de mission.
-- ÉDITEUR: `AAA_LAB::CAPTURE_COMPLETE` sur `/Engine/Maps/Entry`, MCP 8559. Dossier `Saved/SliceEvidence/aaa-visual-lab-007/`. Ligne `AAA_LAB_COMPLETE cameras=3`.
-- SOL: le plan moteur à l'échelle 30, `MI_AAA_Soil`. `cam_a` centre bas RGB environ 184,176,153. La feuille `SM_AAA_Ground_30m` (9 800 triangles, Nanite off) ne s'affiche pas.
+- ÉDITEUR: `AAA_LAB::CAPTURE_COMPLETE` sur `/Engine/Maps/Entry`, MCP 8559. Dossier `Saved/SliceEvidence/aaa-visual-lab-012/`. Ligne `AAA_LAB_COMPLETE cameras=3`.
+- SOL: dalle `SM_AAA_Ground_30m`, photo `T_Ground_Worked` (1,3 m) via `MI_AAA_Soil`. La pierre lit `T_Ground_Rock`. Le sinus micro n'est plus la normale du sol.
+- CONTACT: `SM_AAA_Contact` / `MI_AAA_Contact`, trois taches (pied de mur, bout de poutre, flaque). Ombre de contact du soleil à 0,2.
 - AUDIT: 115 meshes, B 34, C 79, D 2, A 0. Nanite production : 0. Labo : Nanite sur pierre, mur, poutre, dalles.
 - DÉCAL: non posé (`DecalBlendMode` protégé).
 - TESTS: voir `finish`.
@@ -30,7 +31,7 @@ Laboratoire visuel isolé de 30 m. Prouver si le pipeline actuel peut porter une
 ```powershell
 cd C:\dev\ANASTASIS_WORKTREES\aaa-visual-lab
 tools\unreal\anastasis-unreal.ps1 build
-tools\unreal\aaa-visual-lab.ps1 -OutDir C:\dev\ANASTASIS_WORKTREES\aaa-visual-lab\Saved\SliceEvidence\aaa-visual-lab-007
+tools\unreal\aaa-visual-lab.ps1 -OutDir C:\dev\ANASTASIS_WORKTREES\aaa-visual-lab\Saved\SliceEvidence\aaa-visual-lab-012
 ```
 
 - `python -m py_compile tools/unreal/aaa-visual-lab.py` : OK.
@@ -47,12 +48,12 @@ NOT_IMPLEMENTED. Le mannequin du labo est une boîte de 180 cm, hors du système
 
 - `AGENTS.md` est un fichier que d'autres agents éditent : une seule section ajoutée.
 - Les `.uasset` sont confinés à `/Game/Anastasis/LookDev/AAA_Lab/`.
-- Aucun matériau ni mesh de production n'est réécrit. Le sol du niveau référence `/Engine/BasicShapes/Plane`.
+- Aucun matériau ni mesh de production n'est réécrit. Les photos de sol sont lues, pas réimportées.
 
 ## STOP
 
 - Pas de FPS du labo. Les CVars runtime n'ont pas été relues (`ConsoleManager` absent du module Python).
-- Le décal stain n'est pas livré.
-- `SM_AAA_Ground_30m` ne rasterise pas. Le niveau pose le plan moteur à la place.
+- Le décal stain n'est pas livré. Le contact est un mesh.
+- Le bois du labo garde un fil procédural court.
 - Les captures gardent les icônes de lumière et le cadre de sélection.
 - Pas de modification de Lumen, du ciel, de l'herbe, des PNJ, de la rivière, de la map.

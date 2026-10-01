@@ -15,7 +15,14 @@ import unreal
 
 PKG = '/Game/Anastasis/LookDev/AAA_Lab'
 LEVEL = PKG + '/Lvl_AAA_VisualLab'
-VERSION = 'aaa-visual-lab-v1'
+VERSION = 'aaa-visual-lab-v2'
+TEX_PKG = '/Game/Anastasis/Materials/GroundTextures'
+# Famille et taille reelle, celles de ground-textures.py. Lecture seule.
+PHOTO_FAMILY = {
+    'MI_AAA_Soil': ('Worked', 130.0),
+    'MI_AAA_Stone': ('Rock', 300.0),
+    'MI_AAA_Contact': ('Worked', 130.0),
+}
 OUT = os.environ.get('ANASTASIS_AAA_LAB_OUT', '')
 
 CVARS = [
@@ -278,6 +285,50 @@ def build_ground():
     return mesh.finish()
 
 
+def build_contact():
+    """Pied de mur, bout de poutre, flaque. Mesh, pas un decal : DecalBlendMode est protege.
+    La couleur de sommet du sol fait une case d'environ 43 cm, trop large pour un contact.
+    """
+    mesh = Mesh()
+    thick = 3.0
+    lift = 1.6
+
+    def oval(cx, cy, rx, ry, yaw_deg, color, nu=10, nv=6):
+        yaw = math.radians(yaw_deg)
+        co, sn = math.cos(yaw), math.sin(yaw)
+        pts = []
+        for j in range(nv + 1):
+            v = -1.0 + 2.0 * j / nv
+            row = []
+            for i in range(nu + 1):
+                u = -1.0 + 2.0 * i / nu
+                lx, ly = u * rx, v * ry
+                x = cx + lx * co - ly * sn
+                y = cy + lx * sn + ly * co
+                row.append((x, y, ground_z(x, y) + lift))
+            pts.append(row)
+        for j in range(nv):
+            for i in range(nu):
+                p00, p10 = pts[j][i], pts[j][i + 1]
+                p11, p01 = pts[j + 1][i + 1], pts[j + 1][i]
+                mx = (p00[0] + p11[0]) * 0.5
+                my = (p00[1] + p11[1]) * 0.5
+                dx, dy = mx - cx, my - cy
+                lx = dx * co + dy * sn
+                ly = -dx * sn + dy * co
+                if (lx / rx) ** 2 + (ly / ry) ** 2 > 1.02:
+                    continue
+                top = [p00, p10, p11, p01]
+                bot = [(p[0], p[1], p[2] - thick) for p in (p00, p01, p11, p10)]
+                mesh.quad(top, [color] * 4, [(p[0] / 100.0, p[1] / 100.0) for p in top])
+                mesh.quad(bot, [color] * 4, [(p[0] / 100.0, p[1] / 100.0) for p in bot])
+
+    oval(217, -58, 96, 18, -8, col4(1.0, 0.0, 0.9))
+    oval(-65, -354, 26, 16, 18, col4(0.95, 0.2, 0.15))
+    oval(30, -480, 58, 40, 14, col4(0.12, 1.0, 0.04))
+    return mesh.finish()
+
+
 def build_stone():
     mesh = Mesh()
     nu, nv = 48, 24
@@ -291,7 +342,11 @@ def build_stone():
         for i in range(nu):
             u = i / nu
             ang = math.tau * u
-            wobble = 1.0 + 0.09 * math.sin(ang * 3.0 + v * 5.0) + 0.05 * math.sin(ang * 7.0 - v * 2.0)
+            wobble = 1.0 + 0.16 * math.sin(ang * 3.0 + v * 5.0) + 0.07 * math.sin(ang * 7.0 - v * 2.0)
+            # One chipped face, so the silhouette is not a smooth lump at 2 m.
+            if 0.55 < u < 0.78 and v < 0.62:
+                notch = math.sin((u - 0.55) / 0.23 * math.pi) * math.sin(min(v / 0.62, 1.0) * math.pi)
+                wobble -= 0.28 * notch
             x = math.cos(ang) * rad * wobble
             y = math.sin(ang) * rad_y * wobble
             if v > 0.15:
@@ -322,12 +377,12 @@ def build_wall():
     x0 = -total * 0.5
     for p in range(planks):
         x_left = x0 + p * (plank_w + gap)
-        cup = 1.3 * math.sin(p * 1.7)
+        cup = 0.2 * math.sin(p * 1.7)
         for s in range(segs):
             z0 = height * s / segs
             z1 = height * (s + 1) / segs
-            warp0 = cup * math.sin(math.pi * s / segs) + 0.4 * math.sin(p + s)
-            warp1 = cup * math.sin(math.pi * (s + 1) / segs) + 0.4 * math.sin(p + s + 0.4)
+            warp0 = cup * math.sin(math.pi * s / segs)
+            warp1 = cup * math.sin(math.pi * (s + 1) / segs)
             y_front = -thick * 0.5
             face = [
                 (x_left, y_front + warp0, z0),
@@ -335,9 +390,10 @@ def build_wall():
                 (x_left + plank_w, y_front + warp1 * 0.8, z1),
                 (x_left, y_front + warp1, z1),
             ]
-            def paint(z):
+            def paint(z, plank=p):
                 moss = 0.75 if z < 28.0 else (0.2 if z < 55.0 else 0.0)
-                dirt = 0.7 if z < 22.0 else (0.15 if z > height - 18.0 else 0.05)
+                dirt = 0.7 if z < 22.0 else (0.18 if z > height - 18.0 else 0.0)
+                dirt += 0.03 + 0.05 * math.sin(plank * 1.7)
                 wet = 0.35 if z < 16.0 else 0.0
                 return col4(dirt, wet, moss)
             cols = [paint(pt[2]) for pt in face]
@@ -474,7 +530,7 @@ def vector_param(mat, mel, name, rgb, x, y):
     return node
 
 
-def make_custom(mat, mel, code, out_type, x, y, links):
+def make_custom(mat, mel, code, out_type, x, y, links, extra=None):
     node = mel.create_material_expression(mat, unreal.MaterialExpressionCustom, x, y)
     node.set_editor_property('output_type', out_type)
     node.set_editor_property('code', code)
@@ -484,6 +540,14 @@ def make_custom(mat, mel, code, out_type, x, y, links):
         pin.set_editor_property('input_name', name)
         inputs.append(pin)
     node.set_editor_property('inputs', inputs)
+    if extra:
+        outs = []
+        for name, out_t in extra:
+            pin = unreal.CustomOutput()
+            pin.set_editor_property('output_name', name)
+            pin.set_editor_property('output_type', out_t)
+            outs.append(pin)
+        node.set_editor_property('additional_outputs', outs)
     for name, (src, src_pin) in links.items():
         if not mel.connect_material_expressions(src, src_pin, node, name):
             raise RuntimeError('material link failed: %s' % name)
@@ -491,44 +555,103 @@ def make_custom(mat, mel, code, out_type, x, y, links):
 
 
 COLOR_CODE = """
-float macro = sin(P.x * MacroScale) * sin(P.y * MacroScale * 0.73 + P.z * MacroScale * 0.21);
-float meso = sin(P.x * MacroScale * 4.1 + sin(P.y * MacroScale * 2.2)) * sin(P.z * MacroScale * 3.3 + 1.7);
-float micro = sin(P.x * MicroScale) * sin(P.y * MicroScale * 1.37 + P.z * MicroScale * 0.41);
-float grain = sin(P.z * 0.55 + 3.0 * sin(P.x * 0.17 + P.y * 0.02));
+float macro = sin(dot(P.xy, float2(MacroScale, MacroScale * 0.67)));
+float meso = sin(dot(P.xy, float2(MacroScale * 3.7, -MacroScale * 2.3)) + macro);
+float fiber = sin(P.z * 2.4 + sin(P.x * 0.15));
 float3 col = lerp(Base.rgb, Tint.rgb, saturate(macro * 0.5 + 0.5) * ColorVariation);
-col = lerp(col, col * lerp(0.68, 1.22, grain * 0.5 + 0.5), WoodAmount);
-float dirt = saturate(Dirt + VC.r * 0.85 + meso * 0.08);
-col = lerp(col, DirtColor.rgb, dirt * 0.5);
+col = lerp(col, col * lerp(0.94, 1.05, fiber * 0.5 + 0.5), WoodAmount);
+float dirt = saturate(Dirt + VC.r * 0.85 + meso * 0.05);
+col = lerp(col, DirtColor.rgb, dirt * 0.55);
 float moss = saturate(VC.b * MossAmount);
 col = lerp(col, MossColor.rgb, moss);
 float wet = saturate(Wetness + VC.g);
 col = lerp(col, col * float3(0.55, 0.66, 0.62), wet * 0.7);
-float dist = distance(P, Cam);
-float fade = saturate((dist - FadeStart) / max(FadeEnd - FadeStart, 1.0));
-col *= lerp(0.90 + 0.10 * micro, 1.0, fade);
 return col;
 """
 
-NORMAL_CODE = """
-float k = max(MicroScale, 0.0001);
+# Photos T_Ground_* deja importees. AH albedo de detail (moyenne 0.4), NR normale
+# DirectX + rugosite + occlusion. Normale en espace monde : le sinus micro, a 1,7 m,
+# dessinait une onde. Le bois sans photo garde un fil court, pas cette onde.
+PHOTO_CODE = """
 float dist = distance(P, Cam);
 float fade = saturate((dist - FadeStart) / max(FadeEnd - FadeStart, 1.0));
-float amp = DetailStrength * (1.0 - fade);
-float stoneX = cos(P.x * k) * sin(P.y * k);
-float stoneY = sin(P.x * k) * cos(P.y * k * 1.37);
-float woodX = cos(P.z * k * 2.1 + 3.0 * sin(P.x * 0.15));
-float woodY = 0.25 * cos(P.x * k * 0.35);
-float hx = lerp(stoneX, woodX, WoodAmount);
-float hy = lerp(stoneY, woodY, WoodAmount);
-return normalize(float3(amp * k * hx, amp * k * hy, 1.0));
+float live = saturate(UsePhoto) * (1.0 - fade);
+float3 Nn = normalize(N);
+float t = 1.0 / max(TexSizeCm, 1.0);
+float3 sg = float3(Nn.x >= 0.0 ? 1.0 : -1.0, Nn.y >= 0.0 ? 1.0 : -1.0, Nn.z >= 0.0 ? 1.0 : -1.0);
+float3 tw = pow(abs(Nn), 8.0);
+tw /= max(tw.x + tw.y + tw.z, 1e-4);
+float3 dPx = ddx(P);
+float3 dPy = ddy(P);
+float3 alb = 0;
+float4 nr = 0;
+float3 nw = 0;
+{
+    float w = tw.x;
+    float2 uv = float2(P.z * sg.x, P.y) * t;
+    float2 gx = float2(dPx.z * sg.x, dPx.y) * t;
+    float2 gy = float2(dPy.z * sg.x, dPy.y) * t;
+    float4 a = Texture2DSampleGrad(TexAH, TexAHSampler, uv, gx, gy);
+    float4 n = Texture2DSampleGrad(TexNR, TexNRSampler, uv, gx, gy);
+    float2 xy0 = n.xy * 2.0 - 1.0;
+    float z = sqrt(saturate(1.0 - dot(xy0, xy0)));
+    float2 xy = xy0 * NormalStrength;
+    xy.x *= sg.x;
+    nw += float3(xy + Nn.zy, z * Nn.x).zyx * w;
+    alb += a.rgb * w;
+    nr += n * w;
+}
+{
+    float w = tw.y;
+    float2 uv = float2(P.x * sg.y, P.z) * t;
+    float2 gx = float2(dPx.x * sg.y, dPx.z) * t;
+    float2 gy = float2(dPy.x * sg.y, dPy.z) * t;
+    float4 a = Texture2DSampleGrad(TexAH, TexAHSampler, uv, gx, gy);
+    float4 n = Texture2DSampleGrad(TexNR, TexNRSampler, uv, gx, gy);
+    float2 xy0 = n.xy * 2.0 - 1.0;
+    float z = sqrt(saturate(1.0 - dot(xy0, xy0)));
+    float2 xy = xy0 * NormalStrength;
+    xy.x *= sg.y;
+    nw += float3(xy + Nn.xz, z * Nn.y).xzy * w;
+    alb += a.rgb * w;
+    nr += n * w;
+}
+{
+    float w = tw.z;
+    float2 uv = float2(P.x * sg.z, P.y) * t;
+    float2 gx = float2(dPx.x * sg.z, dPx.y) * t;
+    float2 gy = float2(dPy.x * sg.z, dPy.y) * t;
+    float4 a = Texture2DSampleGrad(TexAH, TexAHSampler, uv, gx, gy);
+    float4 n = Texture2DSampleGrad(TexNR, TexNRSampler, uv, gx, gy);
+    float2 xy0 = n.xy * 2.0 - 1.0;
+    float z = sqrt(saturate(1.0 - dot(xy0, xy0)));
+    float2 xy = xy0 * NormalStrength;
+    xy.x *= sg.z;
+    nw += float3(xy + Nn.xy, z * Nn.z) * w;
+    alb += a.rgb * w;
+    nr += n * w;
+}
+alb *= 2.5;
+nw = dot(nw, nw) > 1e-8 ? normalize(nw) : Nn;
+float3 detail = lerp(float3(1.0, 1.0, 1.0), alb, saturate(AlbedoStrength));
+float3 fiber = float3(sin(P.z * 2.2), 0.0, 0.0);
+fiber = fiber - Nn * dot(fiber, Nn);
+float amp = DetailStrength * saturate(WoodAmount) * (1.0 - fade) * 0.04;
+float3 woodN = normalize(Nn + fiber * amp);
+Normal = normalize(lerp(woodN, nw, live));
+Rough = (nr.b - 0.5) * 2.0 * RoughnessPhoto * live;
+AO = lerp(1.0, saturate(nr.a * 2.0), saturate(AoStrength) * live);
+return lerp(float3(1.0, 1.0, 1.0), detail, live);
 """
 
 ROUGH_CODE = """
-float micro = sin(P.x * MicroScale) * sin(P.z * MicroScale * 0.7 + 0.4);
-float r = Roughness + RoughnessVariation * micro;
+float meso = sin(P.x * MacroScale * 5.0) * sin(P.y * MacroScale * 3.7);
+float micro = sin(dot(P.xy, float2(MicroScale, MicroScale * 0.67)));
+float wave = RoughnessVariation * (0.55 * micro + 0.45 * meso) * (1.0 - saturate(UsePhoto));
+float r = Roughness + wave;
 float wet = saturate(Wetness + VC.g);
 r = lerp(r, min(r, 0.22), wet);
-r = saturate(r + VC.r * 0.06);
+r = saturate(r + VC.r * 0.2 + PhotoRough);
 return r;
 """
 
@@ -537,10 +660,31 @@ float wet = saturate(Wetness + VC.g);
 return lerp(0.45, 0.9, wet);
 """
 
-AO_CODE = """
-float cavity = saturate(0.5 + 0.5 * sin(P.x * 0.03) * sin(P.y * 0.025));
-return lerp(1.0, 0.84, cavity * AoStrength);
-"""
+def enum_of(enum, index, *names):
+    for name in names:
+        if hasattr(enum, name):
+            return getattr(enum, name)
+    return list(enum)[index]
+
+
+def load_ground_tex(family, suffix):
+    path = '%s/T_Ground_%s_%s' % (TEX_PKG, family, suffix)
+    tex = unreal.EditorAssetLibrary.load_asset(path)
+    if tex is None:
+        raise RuntimeError('texture sol absente: ' + path)
+    return tex
+
+
+def texture_param(mat, mel, name, texture, sampler, x, y):
+    node = mel.create_material_expression(mat, unreal.MaterialExpressionTextureObjectParameter, x, y)
+    node.set_editor_property('parameter_name', name)
+    node.set_editor_property('texture', texture)
+    node.set_editor_property('sampler_type', sampler)
+    try:
+        node.set_editor_property('group', 'AAA')
+    except Exception:
+        pass
+    return node
 
 
 def build_master():
@@ -550,6 +694,7 @@ def build_master():
     if mat is None or mat.get_name() != 'M_AAA_Lab_Surface':
         raise RuntimeError('master material was not created at the expected path')
     mat.set_editor_property('two_sided', True)
+    mat.set_editor_property('tangent_space_normal', False)
     try:
         mat.set_editor_property('shading_model', unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
     except Exception as exc:
@@ -558,6 +703,11 @@ def build_master():
     wp = mel.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -1800, 0)
     vc = mel.create_material_expression(mat, unreal.MaterialExpressionVertexColor, -1800, 200)
     cam = mel.create_material_expression(mat, unreal.MaterialExpressionCameraPositionWS, -1800, 400)
+    nws = mel.create_material_expression(mat, unreal.MaterialExpressionVertexNormalWS, -1800, 560)
+    sampler_color = enum_of(unreal.MaterialSamplerType, 0, 'SAMPLERTYPE_COLOR', 'SAMPLERTYPE_Color')
+    sampler_linear = enum_of(unreal.MaterialSamplerType, 3, 'SAMPLERTYPE_LINEAR_COLOR', 'SAMPLERTYPE_LinearColor')
+    tex_ah = texture_param(mat, mel, 'TexAH', load_ground_tex('Worked', 'AH'), sampler_color, -1800, 720)
+    tex_nr = texture_param(mat, mel, 'TexNR', load_ground_tex('Worked', 'NR'), sampler_linear, -1800, 880)
     base = vector_param(mat, mel, 'BaseColor', (0.16, 0.13, 0.09), -1600, -200)
     tint = vector_param(mat, mel, 'TintB', (0.10, 0.11, 0.09), -1600, -80)
     dirt_c = vector_param(mat, mel, 'DirtColor', (0.05, 0.035, 0.02), -1600, 40)
@@ -565,45 +715,55 @@ def build_master():
     names = [
         ('ColorVariation', 0.4), ('WoodAmount', 0.0), ('Dirt', 0.1), ('Wetness', 0.0),
         ('MossAmount', 0.3), ('MacroScale', 0.0015), ('MicroScale', 0.25),
-        ('DetailStrength', 0.45), ('FadeStart', 350.0), ('FadeEnd', 1600.0),
+        ('DetailStrength', 0.45), ('FadeStart', 400.0), ('FadeEnd', 2200.0),
         ('Roughness', 0.78), ('RoughnessVariation', 0.08), ('Metallic', 0.0), ('AoStrength', 0.35),
+        ('UsePhoto', 0.0), ('TexSizeCm', 130.0), ('NormalStrength', 0.55),
+        ('AlbedoStrength', 0.75), ('RoughnessPhoto', 0.12),
     ]
     params = {}
     for i, (name, default) in enumerate(names):
         params[name] = scalar(mat, mel, name, default, -1400, -400 + i * 70)
 
     color_links = {
-        'P': (wp, ''), 'VC': (vc, ''), 'Cam': (cam, ''),
+        'P': (wp, ''), 'VC': (vc, ''),
         'Base': (base, ''), 'Tint': (tint, ''), 'DirtColor': (dirt_c, ''), 'MossColor': (moss_c, ''),
         'ColorVariation': (params['ColorVariation'], ''), 'WoodAmount': (params['WoodAmount'], ''),
         'Dirt': (params['Dirt'], ''), 'Wetness': (params['Wetness'], ''),
         'MossAmount': (params['MossAmount'], ''), 'MacroScale': (params['MacroScale'], ''),
-        'MicroScale': (params['MicroScale'], ''), 'FadeStart': (params['FadeStart'], ''),
-        'FadeEnd': (params['FadeEnd'], ''),
     }
     color = make_custom(mat, mel, COLOR_CODE, unreal.CustomMaterialOutputType.CMOT_FLOAT3, -200, -200, color_links)
-    normal = make_custom(mat, mel, NORMAL_CODE, unreal.CustomMaterialOutputType.CMOT_FLOAT3, -200, 200, {
-        'P': (wp, ''), 'Cam': (cam, ''), 'MicroScale': (params['MicroScale'], ''),
+    float1 = unreal.CustomMaterialOutputType.CMOT_FLOAT1
+    float3 = unreal.CustomMaterialOutputType.CMOT_FLOAT3
+    photo = make_custom(mat, mel, PHOTO_CODE, float3, -200, 200, {
+        'P': (wp, ''), 'Cam': (cam, ''), 'N': (nws, ''),
+        'TexAH': (tex_ah, ''), 'TexNR': (tex_nr, ''),
+        'UsePhoto': (params['UsePhoto'], ''), 'TexSizeCm': (params['TexSizeCm'], ''),
+        'NormalStrength': (params['NormalStrength'], ''), 'AlbedoStrength': (params['AlbedoStrength'], ''),
+        'RoughnessPhoto': (params['RoughnessPhoto'], ''), 'AoStrength': (params['AoStrength'], ''),
         'DetailStrength': (params['DetailStrength'], ''), 'WoodAmount': (params['WoodAmount'], ''),
         'FadeStart': (params['FadeStart'], ''), 'FadeEnd': (params['FadeEnd'], ''),
-    })
-    rough = make_custom(mat, mel, ROUGH_CODE, unreal.CustomMaterialOutputType.CMOT_FLOAT1, -200, 500, {
+    }, extra=[('Normal', float3), ('Rough', float1), ('AO', float1)])
+    tinted = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, 80, -200)
+    if not mel.connect_material_expressions(color, '', tinted, 'A'):
+        raise RuntimeError('material link failed: color')
+    if not mel.connect_material_expressions(photo, '', tinted, 'B'):
+        raise RuntimeError('material link failed: photo albedo')
+    rough = make_custom(mat, mel, ROUGH_CODE, float1, -200, 500, {
         'P': (wp, ''), 'VC': (vc, ''), 'MicroScale': (params['MicroScale'], ''),
+        'MacroScale': (params['MacroScale'], ''),
         'Roughness': (params['Roughness'], ''), 'RoughnessVariation': (params['RoughnessVariation'], ''),
-        'Wetness': (params['Wetness'], ''),
+        'Wetness': (params['Wetness'], ''), 'UsePhoto': (params['UsePhoto'], ''),
+        'PhotoRough': (photo, 'Rough'),
     })
-    spec = make_custom(mat, mel, SPEC_CODE, unreal.CustomMaterialOutputType.CMOT_FLOAT1, -200, 760, {
+    spec = make_custom(mat, mel, SPEC_CODE, float1, -200, 760, {
         'VC': (vc, ''), 'Wetness': (params['Wetness'], ''),
     })
-    ao = make_custom(mat, mel, AO_CODE, unreal.CustomMaterialOutputType.CMOT_FLOAT1, -200, 960, {
-        'P': (wp, ''), 'AoStrength': (params['AoStrength'], ''),
-    })
-    assert mel.connect_material_property(color, '', unreal.MaterialProperty.MP_BASE_COLOR)
-    assert mel.connect_material_property(normal, '', unreal.MaterialProperty.MP_NORMAL)
+    assert mel.connect_material_property(tinted, '', unreal.MaterialProperty.MP_BASE_COLOR)
+    assert mel.connect_material_property(photo, 'Normal', unreal.MaterialProperty.MP_NORMAL)
     assert mel.connect_material_property(rough, '', unreal.MaterialProperty.MP_ROUGHNESS)
     assert mel.connect_material_property(spec, '', unreal.MaterialProperty.MP_SPECULAR)
     assert mel.connect_material_property(params['Metallic'], '', unreal.MaterialProperty.MP_METALLIC)
-    assert mel.connect_material_property(ao, '', unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)
+    assert mel.connect_material_property(photo, 'AO', unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)
     errors = list(mel.recompile_material(mat))
     if errors:
         raise RuntimeError('master material compile: %s' % errors)
@@ -614,25 +774,28 @@ def build_master():
 
 INSTANCES = {
     'MI_AAA_Soil': dict(
-        BaseColor=(0.45, 0.32, 0.18), TintB=(0.32, 0.26, 0.16),
-        DirtColor=(0.04, 0.028, 0.016), MossColor=(0.16, 0.15, 0.13),
-        ColorVariation=0.5, WoodAmount=0.0, Dirt=0.18, Wetness=0.0, MossAmount=0.35,
-        MacroScale=0.0012, MicroScale=0.28, DetailStrength=0.55, Roughness=0.93,
-        RoughnessVariation=0.05, Metallic=0.0, AoStrength=0.3,
+        BaseColor=(0.42, 0.30, 0.17), TintB=(0.30, 0.24, 0.15),
+        DirtColor=(0.05, 0.034, 0.018), MossColor=(0.14, 0.16, 0.08),
+        ColorVariation=0.32, WoodAmount=0.0, Dirt=0.06, Wetness=0.0, MossAmount=0.25,
+        MacroScale=0.0035, MicroScale=2.4, DetailStrength=0.16, FadeStart=150.0, FadeEnd=500.0,
+        Roughness=0.86, RoughnessVariation=0.10, Metallic=0.0, AoStrength=0.45,
+        UsePhoto=1.0, TexSizeCm=130.0, NormalStrength=0.55, AlbedoStrength=0.8, RoughnessPhoto=0.12,
     ),
     'MI_AAA_Stone': dict(
-        BaseColor=(0.42, 0.40, 0.36), TintB=(0.28, 0.26, 0.22),
-        DirtColor=(0.045, 0.032, 0.02), MossColor=(0.04, 0.075, 0.03),
-        ColorVariation=0.42, WoodAmount=0.0, Dirt=0.06, Wetness=0.0, MossAmount=1.0,
-        MacroScale=0.0035, MicroScale=0.48, DetailStrength=1.1, Roughness=0.64,
-        RoughnessVariation=0.14, Metallic=0.0, AoStrength=0.4,
+        BaseColor=(0.46, 0.44, 0.40), TintB=(0.30, 0.28, 0.24),
+        DirtColor=(0.06, 0.042, 0.026), MossColor=(0.05, 0.09, 0.035),
+        ColorVariation=0.28, WoodAmount=0.0, Dirt=0.04, Wetness=0.0, MossAmount=1.0,
+        MacroScale=0.012, MicroScale=1.8, DetailStrength=0.2, FadeStart=300.0, FadeEnd=1600.0,
+        Roughness=0.70, RoughnessVariation=0.12, Metallic=0.0, AoStrength=0.45,
+        UsePhoto=1.0, TexSizeCm=300.0, NormalStrength=0.4, AlbedoStrength=0.65, RoughnessPhoto=0.1,
     ),
     'MI_AAA_Wood': dict(
-        BaseColor=(0.32, 0.16, 0.07), TintB=(0.18, 0.09, 0.04),
-        DirtColor=(0.035, 0.025, 0.015), MossColor=(0.05, 0.055, 0.03),
-        ColorVariation=0.22, WoodAmount=1.0, Dirt=0.1, Wetness=0.0, MossAmount=0.55,
-        MacroScale=0.002, MicroScale=1.4, DetailStrength=0.22, Roughness=0.56,
-        RoughnessVariation=0.1, Metallic=0.0, AoStrength=0.25,
+        BaseColor=(0.40, 0.22, 0.10), TintB=(0.24, 0.12, 0.05),
+        DirtColor=(0.045, 0.030, 0.016), MossColor=(0.06, 0.07, 0.03),
+        ColorVariation=0.18, WoodAmount=1.0, Dirt=0.04, Wetness=0.0, MossAmount=0.45,
+        MacroScale=0.004, MicroScale=3.2, DetailStrength=0.12, FadeStart=180.0, FadeEnd=800.0,
+        Roughness=0.58, RoughnessVariation=0.16, Metallic=0.0, AoStrength=0.3,
+        UsePhoto=0.0, TexSizeCm=130.0, NormalStrength=0.0, AlbedoStrength=0.0, RoughnessPhoto=0.0,
     ),
     'MI_AAA_Scale': dict(
         BaseColor=(0.22, 0.22, 0.21), TintB=(0.22, 0.22, 0.21),
@@ -640,6 +803,15 @@ INSTANCES = {
         ColorVariation=0.0, WoodAmount=0.0, Dirt=0.0, Wetness=0.0, MossAmount=0.0,
         MacroScale=0.001, MicroScale=0.01, DetailStrength=0.0, Roughness=0.72,
         RoughnessVariation=0.0, Metallic=0.0, AoStrength=0.0,
+        UsePhoto=0.0, TexSizeCm=130.0, NormalStrength=0.0, AlbedoStrength=0.0, RoughnessPhoto=0.0,
+    ),
+    'MI_AAA_Contact': dict(
+        BaseColor=(0.14, 0.09, 0.05), TintB=(0.10, 0.07, 0.04),
+        DirtColor=(0.04, 0.025, 0.014), MossColor=(0.08, 0.10, 0.04),
+        ColorVariation=0.08, WoodAmount=0.0, Dirt=0.65, Wetness=0.0, MossAmount=0.8,
+        MacroScale=0.003, MicroScale=1.0, DetailStrength=0.0, FadeStart=400.0, FadeEnd=2200.0,
+        Roughness=0.72, RoughnessVariation=0.0, Metallic=0.0, AoStrength=0.55,
+        UsePhoto=1.0, TexSizeCm=130.0, NormalStrength=0.35, AlbedoStrength=0.22, RoughnessPhoto=0.08,
     ),
 }
 
@@ -659,6 +831,20 @@ def build_instances(master):
                     mi, key, unreal.LinearColor(value[0], value[1], value[2], 1))
             else:
                 mel.set_material_instance_scalar_parameter_value(mi, key, float(value))
+        family = PHOTO_FAMILY.get(name)
+        if family:
+            fam, _size = family
+            for suffix, param in (('AH', 'TexAH'), ('NR', 'TexNR')):
+                tex = load_ground_tex(fam, suffix)
+                mel.set_material_instance_texture_parameter_value(mi, param, tex)
+                try:
+                    mi.set_texture_parameter_value_editor_only(param, tex)
+                except Exception as exc:
+                    log('TEX_EDITOR %s %s %s' % (name, param, exc))
+                got = mel.get_material_instance_texture_parameter_value(mi, param)
+                got_path = got.get_path_name() if got else ''
+                if tex.get_path_name() not in got_path:
+                    log('TEX_DEFAULT %s %s master keeps its texture, instance read %s' % (name, param, got_path or 'none'))
         unreal.EditorAssetLibrary.set_metadata_tag(mi, 'Recipe', VERSION)
         unreal.EditorAssetLibrary.save_asset(PKG + '/' + name)
         made[name] = mi
@@ -785,13 +971,8 @@ def build_level(instances, meshes):
             label, loc.x, loc.y, loc.z, comp.static_mesh.get_num_triangles(0) if comp.static_mesh else 0))
         return actor
 
-    # The generated sheet does not rasterize (captures stay 0,0,0 under the objects).
-    # Engine Plane is 100 cm, +Z, and takes the soil instance. Scale 30 covers the 30 m pad.
-    plane = unreal.EditorAssetLibrary.load_asset('/Engine/BasicShapes/Plane')
-    if plane is None:
-        raise RuntimeError('engine plane missing')
-    ground = place_owned('AAA_Ground', plane, instances['MI_AAA_Soil'], 0, 0, planted=False)
-    ground.set_actor_scale3d(unreal.Vector(30.0, 30.0, 1.0))
+    place_owned('AAA_Ground', meshes['SM_AAA_Ground_30m'], instances['MI_AAA_Soil'], 0, 0, planted=False)
+    place_owned('AAA_Contact', meshes['SM_AAA_Contact'], instances['MI_AAA_Contact'], 0, 0, planted=False)
     place_owned('AAA_Stone', meshes['SM_AAA_Stone_Hero'], instances['MI_AAA_Stone'], -180, -140)
     place_owned('AAA_Wall', meshes['SM_AAA_Timber_Wall'], instances['MI_AAA_Wood'], 220, -30, yaw=-8)
     place_owned('AAA_Beam', meshes['SM_AAA_Timber_Beam'], instances['MI_AAA_Wood'], 40, -320, yaw=18)
@@ -824,7 +1005,7 @@ def build_level(instances, meshes):
     light = sun.get_component_by_class(unreal.DirectionalLightComponent)
     set_prop(light, 'intensity', 10.0)
     set_prop(light, 'cast_shadows', True)
-    set_prop(light, 'contact_shadow_length', 0.1)
+    set_prop(light, 'contact_shadow_length', 0.2)
     set_prop(light, 'atmosphere_sun_light', True)
 
     sky = spawn(unreal.SkyLight, unreal.Vector(0, 0, 300), unreal.Rotator())
@@ -832,6 +1013,11 @@ def build_level(instances, meshes):
     sky_comp = sky.get_component_by_class(unreal.SkyLightComponent)
     set_prop(sky_comp, 'mobility', unreal.ComponentMobility.MOVABLE)
     set_prop(sky_comp, 'real_time_capture', True)
+    try:
+        for comp in sky.get_components_by_class(unreal.BillboardComponent):
+            comp.set_visibility(False)
+    except Exception as exc:
+        log('BILLBOARD sky %s' % exc)
 
     atmo = spawn(unreal.SkyAtmosphere, unreal.Vector(0, 0, 0), unreal.Rotator())
     tag(atmo, 'AAA_SkyAtmosphere', 'AAA_LAB/Light')
@@ -916,6 +1102,29 @@ def try_decal(eas):
         return False
 
 
+def capture_clean(world, cam, path):
+    """Scene capture, so the proof frame has no editor light billboards or selection box."""
+    loc = unreal.Vector(*cam['location'])
+    rot = unreal.MathLibrary.find_look_at_rotation(loc, unreal.Vector(*cam['target']))
+    eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    actor = eas.spawn_actor_from_class(unreal.SceneCapture2D, loc, rot)
+    if actor is None:
+        raise RuntimeError('scene capture spawn failed')
+    comp = actor.capture_component2d
+    rt = unreal.RenderingLibrary.create_render_target2d(
+        world, 1920, 1080, unreal.TextureRenderTargetFormat.RTF_RGBA8, unreal.LinearColor(0, 0, 0, 1))
+    comp.set_editor_property('fov_angle', float(cam['fov']))
+    comp.set_editor_property('capture_source', unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR)
+    comp.set_editor_property('texture_target', rt)
+    set_prop(comp, 'capture_every_frame', False)
+    set_prop(comp, 'capture_on_movement', False)
+    comp.capture_scene()
+    folder = os.path.dirname(path)
+    name = os.path.splitext(os.path.basename(path))[0]
+    unreal.RenderingLibrary.export_render_target(world, rt, folder, name)
+    actor.destroy_actor()
+
+
 def screenshot_loop(cameras):
     import time
     les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -959,9 +1168,32 @@ def screenshot_loop(cameras):
                 except Exception:
                     pass
                 if time.monotonic() - state['mark'] > wait:
-                    cmd('HighResShot 1920x1080 filename="%s/cam_%s.png"' % (OUT.replace('\\', '/'), cam['name'].lower()))
-                    state['requested'] = True
-                    state['mark'] = time.monotonic()
+                    png = os.path.join(OUT, 'cam_%s.png' % cam['name'].lower())
+                    if not state.get('exported'):
+                        try:
+                            capture_clean(world, cam, png)
+                            state['exported'] = True
+                            state['mark'] = time.monotonic()
+                        except Exception as exc:
+                            log('CAPTURE_FALLBACK %s' % exc)
+                            cmd('HighResShot 1920x1080 filename="%s/cam_%s.png"' % (OUT.replace('\\', '/'), cam['name'].lower()))
+                            state['requested'] = True
+                            state['mark'] = time.monotonic()
+                        return
+                    if os.path.isfile(png) and os.path.getsize(png) > 1000:
+                        log('CAPTURE %s bytes=%s' % (png, os.path.getsize(png)))
+                        state['idx'] += 1
+                        state['exported'] = False
+                        state['requested'] = False
+                        state['attempts'] = 0
+                        state['mark'] = time.monotonic()
+                        return
+                    if time.monotonic() - state['mark'] > 4.0:
+                        log('CAPTURE_MISSING %s' % png)
+                        cmd('HighResShot 1920x1080 filename="%s/cam_%s.png"' % (OUT.replace('\\', '/'), cam['name'].lower()))
+                        state['requested'] = True
+                        state['exported'] = False
+                        state['mark'] = time.monotonic()
             elif time.monotonic() - state['mark'] > 6.0:
                 png = os.path.join(OUT, 'cam_%s.png' % cam['name'].lower())
                 if not os.path.isfile(png):
@@ -985,9 +1217,9 @@ def screenshot_loop(cameras):
 
 OWNED = (
     'M_AAA_Lab_Surface', 'M_AAA_Lab_Stain',
-    'MI_AAA_Soil', 'MI_AAA_Stone', 'MI_AAA_Wood', 'MI_AAA_Scale',
+    'MI_AAA_Soil', 'MI_AAA_Stone', 'MI_AAA_Wood', 'MI_AAA_Scale', 'MI_AAA_Contact',
     'SM_AAA_Ground_30m', 'SM_AAA_Stone_Hero', 'SM_AAA_Timber_Wall',
-    'SM_AAA_Timber_Beam', 'SM_AAA_Path_Stones', 'SM_AAA_Scale_180cm',
+    'SM_AAA_Timber_Beam', 'SM_AAA_Path_Stones', 'SM_AAA_Scale_180cm', 'SM_AAA_Contact',
     'Lvl_AAA_VisualLab',
 )
 
@@ -1035,7 +1267,8 @@ def main():
     master = build_master()
     instances = build_instances(master)
     built = {
-        'SM_AAA_Ground_30m': (build_ground(), instances['MI_AAA_Soil'], True),
+        'SM_AAA_Ground_30m': (build_ground(), instances['MI_AAA_Soil'], False),
+        'SM_AAA_Contact': (build_contact(), instances['MI_AAA_Contact'], False),
         'SM_AAA_Stone_Hero': (build_stone(), instances['MI_AAA_Stone'], True),
         'SM_AAA_Timber_Wall': (build_wall(), instances['MI_AAA_Wood'], True),
         'SM_AAA_Timber_Beam': (build_beam(), instances['MI_AAA_Wood'], True),
