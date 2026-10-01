@@ -169,7 +169,7 @@ def lobe_steps(radius):
     return phi, 9
 
 
-def lobe(mesh, radius, cx, cy, cz, squash_z):
+def lobe(mesh, radius, cx, cy, cz, squash_z, steps=None):
     """Une masse de feuillage : sphere ecrasee en Z.
 
     Il en faut SIX ou SEPT, de rayons decroissants et largement imbriques. Trois
@@ -181,7 +181,7 @@ def lobe(mesh, radius, cx, cy, cz, squash_z):
     galette posee sur un baton -- une sucette a nouveau, juste plus plate. Un
     hetre porte une masse HAUTE, pas un parasol."""
     centre = unreal.Vector(cx, cy, cz)
-    steps_phi, steps_theta = lobe_steps(radius)
+    steps_phi, steps_theta = steps if steps is not None else lobe_steps(radius)
     mesh = unreal.GeometryScript_Primitives.append_sphere_lat_long(
         mesh, PRIM, unreal.Transform(location=centre),
         radius=radius, steps_phi=steps_phi, steps_theta=steps_theta,
@@ -440,16 +440,263 @@ ALIAS_OF_GENERIC = "SM_Tree_Conifer_Canopy_01"
 GENERIC_NAME = "SM_Tree_Generic_01"
 
 
-def branch_between(mesh, start, end, radius, tip):
+# ---------------------------------------------------------------------------
+# FOREST_TERRAIN_P1 -- LES ESSENCES
+#
+# La grammaire ci-dessus etait pontique (epicea, sapin, hetre, charme). Le cadre est
+# la Grece byzantine apres 1204 : en bas, la flore mediterraneenne ; en haut des
+# versants, les deux coniferes grecs indigenes. Trois formes par essence, tirees
+# d'une graine par nom : deux arbres de la meme essence n'ont pas la meme silhouette.
+#
+# REALISME, PAS FACETTE. Les rapports viennent des arbres reels, adultes :
+#
+#   essence          hauteur   fut nu   largeur/hauteur   lecture
+#   pin d'Alep       11-18 m   ~50 %    0.5-0.65          tronc penche, couronne claire, irreguliere
+#   cypres           12-20 m   < 8 %    0.15-0.18         colonne en flamme
+#   chene vert        8-14 m   ~25 %    0.8-0.9           dome dense et sombre, revers argente
+#   olivier         4.5-8 m    ~35 %    1.0-1.1           tronc tors, couronne argentee ouverte
+#   platane         17-24 m    ~35 %    0.7-0.8           fut clair marbre, grande couronne
+#   pin noir        15-23 m    ~52 %    0.4-0.5           fut droit, couronne sombre, tete plate a l'age
+#   sapin de Cephalonie 14-22 m ~18 %   0.35-0.4          cone d'etages, seul cone legitime : c'est le sapin
+#
+# Les troncs sont dessines a leur rayon reel (radius_scale 1.0), plus le facteur 0.55
+# de la grammaire pontique : un fut trop fin sous une couronne trop petite etait
+# exactement le defaut releve. Hauteurs reelles : registre (HeightRangeM).
+# ---------------------------------------------------------------------------
+PINE_NEEDLE = unreal.LinearColor(0.085, 0.125, 0.050, 1.0)
+PINE_BARK = unreal.LinearColor(0.105, 0.075, 0.055, 0.0)
+CYPRESS_FOLIAGE = unreal.LinearColor(0.030, 0.060, 0.032, 1.0)
+CYPRESS_BARK = unreal.LinearColor(0.085, 0.070, 0.060, 0.0)
+OAK_LEAF = unreal.LinearColor(0.040, 0.062, 0.034, 1.0)
+OAK_LEAF_UNDER = unreal.LinearColor(0.085, 0.095, 0.068, 1.0)
+OAK_BARK = unreal.LinearColor(0.065, 0.060, 0.055, 0.0)
+OLIVE_LEAF = unreal.LinearColor(0.105, 0.120, 0.080, 1.0)
+OLIVE_LEAF_UNDER = unreal.LinearColor(0.155, 0.165, 0.130, 1.0)
+OLIVE_BARK = unreal.LinearColor(0.115, 0.105, 0.092, 0.0)
+OLIVE_BARK_DARK = unreal.LinearColor(0.075, 0.068, 0.060, 0.0)
+PLANE_LEAF = unreal.LinearColor(0.085, 0.150, 0.050, 1.0)
+PLANE_BARK = unreal.LinearColor(0.200, 0.190, 0.150, 0.0)
+PLANE_BARK_PATCH = unreal.LinearColor(0.130, 0.130, 0.100, 0.0)
+BLACK_PINE_NEEDLE = unreal.LinearColor(0.035, 0.068, 0.040, 1.0)
+BLACK_PINE_BARK = unreal.LinearColor(0.060, 0.055, 0.050, 0.0)
+FIR_NEEDLE = unreal.LinearColor(0.032, 0.066, 0.050, 1.0)
+FIR_BARK = unreal.LinearColor(0.085, 0.080, 0.075, 0.0)
+
+SHAPES_PER_SPECIES = 3
+
+
+def curved_stem(rng, base, top_z, lean_deg, azimuth, wobble, r0, r1, segments, sweep=0.0):
+    """Un fut en plusieurs troncons, pas un cylindre : penche, et legerement sinueux.
+
+    sweep > 0 redresse le haut (le pin d'Alep penche a la base et remonte vers la
+    lumiere). Le pied reste EXACTEMENT a base : c'est le pivot de l'arbre."""
+    pts = [tuple(base)]
+    lean = math.tan(math.radians(lean_deg))
+    for i in range(1, segments + 1):
+        t = i / segments
+        z = base[2] + (top_z - base[2]) * t
+        reach = lean * (z - base[2]) * (1.0 - sweep * t * t)
+        jitter = wobble * math.sin(t * math.pi)
+        pts.append((base[0] + reach * math.cos(azimuth) + rng.uniform(-jitter, jitter),
+                    base[1] + reach * math.sin(azimuth) + rng.uniform(-jitter, jitter), z))
+    stems = []
+    for i in range(segments):
+        a, b = pts[i], pts[i + 1]
+        # Prolonge chaque troncon de 4 % : pas de fente au coude.
+        b2 = tuple(a[k] + (b[k] - a[k]) * 1.04 for k in range(3)) if i + 1 < segments else b
+        stems.append((a, b2, r0 + (r1 - r0) * i / segments, r0 + (r1 - r0) * (i + 1) / segments))
+    return stems, pts
+
+
+def scatter_lobes(rng, centre, rx, rz, count, r_lo, r_hi, squash, shell=(.35, .95), top_bias=0.25):
+    """Masses de feuillage dans une enveloppe ellipsoidale : la plus grosse au coeur, les
+    autres sur une coquille, decroissantes. Le bord reste irregulier, et c'est voulu."""
+    lobes = []
+    for k in range(count):
+        radius = r_hi - (r_hi - r_lo) * k / max(count - 1, 1) * rng.uniform(.8, 1.0)
+        if k == 0:
+            lobes.append((radius, centre[0], centre[1], centre[2], squash))
+            continue
+        theta = k * 2.399963 + rng.uniform(-.5, .5)
+        u = (k + .5) / count
+        zz = max(-1.0, min(1.0, 1.0 - 2.0 * u + top_bias))
+        ring = math.sqrt(max(0.0, 1.0 - zz * zz))
+        d = rng.uniform(*shell)
+        ex, ez = max(rx - radius, 1.0), max(rz - radius * squash, 1.0)
+        lobes.append((radius, centre[0] + ex * d * ring * math.cos(theta),
+                      centre[1] + ex * d * ring * math.sin(theta), centre[2] + ez * d * zz, squash))
+    return lobes
+
+
+def species_spec(name, note, bark, foliage, **extra):
+    spec = {"name": name, "note": note, "trunk": [], "limbs": [], "tiers": [], "lobes": [],
+            "stems": [], "axis": None, "bark": bark, "foliage": foliage, "radius_scale": 1.0}
+    spec.update(extra)
+    return spec
+
+
+def aleppo_pine(k, rng):
+    lean = (6.0, 11.0, 3.0)[k] + rng.uniform(-2, 2)
+    az = rng.uniform(0, math.tau)
+    stems, axis = curved_stem(rng, (0, 0, -50), 28.0, lean, az, 1.2, 2.1, 1.0, 5, sweep=.45)
+    centre = axis[-2] if k < 2 else axis[-1]
+    umbrella = k == 2
+    rx, rz = (27.0 + rng.uniform(-3, 3), 30.0) if not umbrella else (33.0, 22.0)
+    cz = (4.0, 6.0, 16.0)[k]
+    lobes = scatter_lobes(rng, (centre[0], centre[1], cz), rx, rz, 7 if not umbrella else 8,
+                          10.0, 15.0, .55 if umbrella else .7, shell=(.45, 1.0), top_bias=.15 if umbrella else 0.0)
+    return species_spec("SM_Tree_AleppoPine_%02d" % (k + 1),
+                        "pin d'Alep -- fut penche de %.0f deg, couronne claire et irreguliere" % lean,
+                        PINE_BARK, PINE_NEEDLE, stems=stems, axis=axis, lobes=lobes, twig_radius=1.0,
+                        blade_width=.30, blade_size=(.12, .17), blades_per_lobe=150, inner_groups=5)
+
+
+def cypress(k, rng):
+    stems, axis = curved_stem(rng, (0, 0, -50), 44.0, rng.uniform(0, 2), rng.uniform(0, math.tau), .3, 1.6, .5, 3)
+    rmax = (7.0, 8.8, 8.0)[k]
+    bend = 3.0 if k == 2 else 0.0
+    lobes = []
+    count = 12
+    for i in range(count):
+        t = (i + .5) / count
+        z = -44.0 + 90.0 * t
+        r = max(2.4, rmax * math.sin(math.pi * min(.999, t ** .75)) ** .8)
+        lobes.append((r, rng.uniform(-1, 1) + bend * t * t, rng.uniform(-1, 1), z, 1.9))
+    lobes.append((2.4, bend, 0.0, 47.0, 2.2))
+    return species_spec("SM_Tree_Cypress_%02d" % (k + 1), "cypres -- colonne en flamme, w/h ~%.2f" % (2 * rmax / 100),
+                        CYPRESS_BARK, CYPRESS_FOLIAGE, stems=stems, axis=axis, lobes=lobes, twig_radius=.4,
+                        blade_width=.45, blade_size=(.18, .26), blades_per_lobe=90, inner_groups=4)
+
+
+def limbs_from(rng, origin, count, reach, z_lo, z_hi, r0, r1):
+    out = []
+    for i in range(count):
+        a = i * math.tau / count + rng.uniform(-.4, .4)
+        d = rng.uniform(*reach)
+        out.append((tuple(origin), (origin[0] + d * math.cos(a), origin[1] + d * math.sin(a), rng.uniform(z_lo, z_hi)), r0, r1))
+    return out
+
+
+def holm_oak(k, rng):
+    stems, axis = curved_stem(rng, (0, 0, -50), -26.0, rng.uniform(2, 4), rng.uniform(0, math.tau), .6, 3.2, 2.4, 2)
+    stems += limbs_from(rng, axis[-1], 3 + (k % 2), (13, 18), -6, 6, 2.0, 1.0)
+    rx = (45.0, 48.0, 43.0)[k]
+    lobes = scatter_lobes(rng, (axis[-1][0], axis[-1][1], 2.0), rx, 46.0, 10, 14.0, 19.0, .85, top_bias=.1)
+    return species_spec("SM_Tree_HolmOak_%02d" % (k + 1), "chene vert -- fut court, dome dense et sombre",
+                        OAK_BARK, OAK_LEAF, stems=stems, axis=axis, lobes=lobes, foliage_alt=OAK_LEAF_UNDER,
+                        foliage_alt_share=.3, blade_width=.5, blade_size=(.10, .14), blades_per_lobe=130, inner_groups=5)
+
+
+def olive(k, rng):
+    stems, axis = curved_stem(rng, (0, 0, -50), -12.0, rng.uniform(3, 9), rng.uniform(0, math.tau), 3.0, 6.5, 3.6, 3)
+    top = axis[-1]
+    leaders = []
+    for i in range(2 + (k % 2)):
+        a = i * math.tau / (2 + (k % 2)) + rng.uniform(-.5, .5)
+        d = rng.uniform(10, 16)
+        mid = (top[0] + .5 * d * math.cos(a) + rng.uniform(-2, 2), top[1] + .5 * d * math.sin(a) + rng.uniform(-2, 2), top[2] + 8)
+        end = (top[0] + d * math.cos(a), top[1] + d * math.sin(a), top[2] + rng.uniform(14, 20))
+        leaders += [(top, mid, 3.2, 2.2), (mid, end, 2.2, 1.3)]
+    rx = (60.0, 64.0, 56.0)[k]
+    lobes = scatter_lobes(rng, (top[0], top[1], 6.0), rx, 34.0, 9, 12.0, 17.0, .7, shell=(.45, 1.0), top_bias=.1)
+    return species_spec("SM_Tree_Olive_%02d" % (k + 1), "olivier -- tronc tors, couronne argentee ouverte",
+                        OLIVE_BARK, OLIVE_LEAF, stems=stems + leaders, axis=axis, lobes=lobes, bark_alt=OLIVE_BARK_DARK,
+                        foliage_alt=OLIVE_LEAF_UNDER, foliage_alt_share=.45, blade_width=.32, blade_size=(.09, .13),
+                        blades_per_lobe=150, inner_groups=4)
+
+
+def plane_tree(k, rng):
+    stems, axis = curved_stem(rng, (0, 0, -50), -14.0, rng.uniform(0, 3), rng.uniform(0, math.tau), .5, 2.8, 2.2, 3)
+    stems += limbs_from(rng, axis[-1], 4, (12, 18), 4, 15, 1.9, 1.0)
+    rx = (42.0, 46.0, 40.0)[k]
+    lobes = scatter_lobes(rng, (axis[-1][0], axis[-1][1], 10.0), rx, 40.0, 10, 14.0, 20.0, .9, top_bias=.1)
+    return species_spec("SM_Tree_PlaneTree_%02d" % (k + 1), "platane d'Orient -- fut clair marbre, grande couronne",
+                        PLANE_BARK, PLANE_LEAF, stems=stems, axis=axis, lobes=lobes, bark_alt=PLANE_BARK_PATCH,
+                        blade_width=.62, blade_size=(.12, .17), blades_per_lobe=140, inner_groups=5)
+
+
+def black_pine(k, rng):
+    stems, axis = curved_stem(rng, (0, 0, -50), 36.0, rng.uniform(0, 2), rng.uniform(0, math.tau), .5, 2.0, .9, 4)
+    lobes = []
+    if k < 2:
+        for layer, (z, reach) in enumerate(((8.0, 18.0), (22.0, 16.0), (36.0, 11.0))):
+            for i in range(3):
+                a = i * math.tau / 3 + layer * .9 + rng.uniform(-.3, .3)
+                p = axis_point({"axis": axis}, z)
+                lobes.append((rng.uniform(8, 12) * (1.0 if layer < 2 else .8), p[0] + reach * .55 * math.cos(a),
+                              p[1] + reach * .55 * math.sin(a), z + rng.uniform(-2, 2), .62))
+        lobes.append((7.0, axis[-1][0], axis[-1][1], 44.0, .7))
+    else:
+        # Vieux pin noir : la tete s'aplatit et s'elargit.
+        lobes = scatter_lobes(rng, (axis[-1][0], axis[-1][1], 22.0), 27.0, 21.0, 9, 9.0, 13.0, .55, shell=(.4, 1.0), top_bias=.05)
+    return species_spec("SM_Tree_BlackPine_%02d" % (k + 1), "pin noir -- fut droit, couronne sombre%s" % (", tete plate" if k == 2 else ""),
+                        BLACK_PINE_BARK, BLACK_PINE_NEEDLE, stems=stems, axis=axis, lobes=lobes, twig_radius=.8,
+                        blade_width=.26, blade_size=(.13, .19), blades_per_lobe=140, inner_groups=5)
+
+
+def greek_fir(k, rng):
+    tiers = []
+    n = 6
+    for i in range(n):
+        base = 19.0 * (1.0 - i / 6.5) + rng.uniform(-1.5, 1.5)
+        z0 = -34.0 + i * 13.0 - 2.0
+        z1 = 50.0 if i == n - 1 else z0 + 17.0
+        tiers.append((base, .4 if i == n - 1 else base * .45, z0, z1))
+    return species_spec("SM_Tree_GreekFir_%02d" % (k + 1), "sapin de Cephalonie -- cone d'etages, fut lisible a la base",
+                        FIR_BARK, FIR_NEEDLE, trunk=[(1.9, 1.4, -50.0, -30.0)], tiers=tiers, spray_blades=18)
+
+
+SPECIES_RECIPES = (aleppo_pine, cypress, holm_oak, olive, plane_tree, black_pine, greek_fir)
+
+
+def species_specs():
+    out = []
+    for recipe in SPECIES_RECIPES:
+        for k in range(SHAPES_PER_SPECIES):
+            rng = random.Random("%s:%d:forest-terrain-p1" % (recipe.__name__, k))
+            out.append(recipe(k, rng))
+    return out
+
+
+def axis_point(spec, z):
+    """Point de l'axe du tronc a la hauteur z : c'est la que naissent les branches."""
+    axis = spec.get('axis')
+    if not axis:
+        return (0.0, 0.0, -18.0)
+    if z <= axis[0][2]:
+        return tuple(axis[0])
+    for a, b in zip(axis, axis[1:]):
+        if z <= b[2]:
+            t = (z - a[2]) / max(b[2] - a[2], 1e-6)
+            return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
+    return tuple(axis[-1])
+
+
+def build_stems(spec, limit=None):
+    """Futs et branches maitresses dessines comme une chaine de troncons orientes."""
+    stems = spec.get('stems') or []
+    if limit is not None:
+        stems = stems[:limit]
+    if not stems:
+        return None
+    out = unreal.DynamicMesh()
+    alt = spec.get('bark_alt')
+    for i, (start, end, r0, r1) in enumerate(stems):
+        part = branch_between(unreal.DynamicMesh(), start, end, r0, r1, steps=11)
+        out = merge(out, coloured(part, alt if (alt is not None and i % 2) else spec['bark']))
+    return out
+
+
+def branch_between(mesh, start, end, radius, tip, steps=8):
     delta = [end[i] - start[i] for i in range(3)]
     length = math.sqrt(sum(v * v for v in delta))
-    return taper(mesh, radius, tip, 0, length, steps=8,
+    return taper(mesh, radius, tip, 0, length, steps=steps,
                  location=unreal.Vector(*start),
                  rotator=unreal.Rotator(pitch=-math.degrees(math.acos(delta[2] / length)),
                                        yaw=math.degrees(math.atan2(delta[1], delta[0]))), prim=PRIM_WOOD)
 
 
-def leaf_blades(centres, color, rng):
+def leaf_blades(centres, color, rng, width=.58, alt=None, alt_share=0.0):
     """Opaque folded blades: real silhouette gaps, no alpha overdraw or external texture.
 
     Positions and palette are recipe-seeded. Four triangles per blade, with a raised
@@ -462,15 +709,17 @@ def leaf_blades(centres, color, rng):
         axis = (math.cos(angle), math.sin(angle), tilt)
         side = (-math.sin(angle), math.cos(angle), rng.uniform(-0.25, 0.25))
         base = len(vertices)
-        for along, across, lift, u, v in ((-1, 0, 0, 0.5, 0), (0, .58, 0, 1, .5),
-                                         (1, 0, 0, .5, 1), (0, -.58, 0, 0, .5),
+        for along, across, lift, u, v in ((-1, 0, 0, 0.5, 0), (0, width, 0, 1, .5),
+                                         (1, 0, 0, .5, 1), (0, -width, 0, 0, .5),
                                          (0, 0, .16, .5, .5)):
             vertices.append(unreal.Vector(cx + size*(along*axis[0]+across*side[0]),
                                           cy + size*(along*axis[1]+across*side[1]),
                                           cz + size*(along*axis[2]+across*side[2]+lift)))
             uv.append(unreal.Vector2D(u,v))
         tint = rng.uniform(.80, 1.18)
-        colors.extend([unreal.LinearColor(color.r*tint, color.g*tint, color.b*tint, 1)]*5)
+        # Deux tons : la face inferieure argentee de l'olivier et du chene vert.
+        tone = alt if (alt is not None and rng.random() < alt_share) else color
+        colors.extend([unreal.LinearColor(tone.r*tint, tone.g*tint, tone.b*tint, 1)]*5)
         for i in range(4): triangles.append(unreal.IntVector(base+4,base+(i+1)%4,base+i))
     buffers = unreal.GeometryScriptSimpleMeshBuffers(vertices=vertices,triangles=triangles,
                                                      vertex_colors=colors,uv0=uv)
@@ -485,24 +734,29 @@ def living_crown(spec, rng):
     wood = unreal.DynamicMesh()
     blades = []
     color = spec['foliage']
+    groups = spec.get('inner_groups', 7)
+    per_lobe = spec.get('blades_per_lobe', 220)
+    size_lo, size_hi = spec.get('blade_size', (.105, .155))
     if spec['lobes']:
         for radius,cx,cy,cz,squash in spec['lobes']:
-            wood = branch_between(wood,(0,0,-18),(cx,cy,cz),.72,.22)
+            origin = axis_point(spec, cz - radius*.6)
+            if math.dist(origin, (cx, cy, cz)) > 1.0:
+                wood = branch_between(wood,origin,(cx,cy,cz),spec.get('twig_radius',.72),.22)
             # Small inner groups carry volume; disconnected outer blades carry the edge.
-            for k in range(7):
+            for k in range(groups):
                 theta = k * 2.399963 + rng.uniform(-.15,.15)
-                z = 1 - 2*(k+.5)/7
+                z = 1 - 2*(k+.5)/groups
                 ring = math.sqrt(max(0,1-z*z))
                 px,py,pz = cx+radius*.62*ring*math.cos(theta),cy+radius*.62*ring*math.sin(theta),cz+radius*.62*z*squash
                 part = lobe(unreal.DynamicMesh(),radius*rng.uniform(.18,.25),px,py,pz,.8)
                 foliage = merge(foliage,coloured(part,unreal.LinearColor(color.r*.88,color.g*.88,color.b*.88,1)))
-            for k in range(220):
+            for k in range(per_lobe):
                 theta = k*2.399963
-                z = 1-2*(k+.5)/220
+                z = 1-2*(k+.5)/per_lobe
                 ring = math.sqrt(max(0,1-z*z))
                 shell = rng.uniform(.68,1.02)
                 blades.append((cx+radius*shell*ring*math.cos(theta),cy+radius*shell*ring*math.sin(theta),
-                               cz+radius*shell*z*squash,radius*rng.uniform(.105,.155)))
+                               cz+radius*shell*z*squash,radius*rng.uniform(size_lo,size_hi)))
     else:
         # Thin sprays transmit light. Closed ellipsoids here create black stacked
         # plates from below, even with a two-sided foliage material.
@@ -517,32 +771,37 @@ def living_crown(spec, rng):
                     ex,ey=length*math.cos(angle),length*math.sin(angle)
                     bz=z+rng.uniform(-2,2)
                     wood=branch_between(wood,(0,0,bz+2),(ex,ey,bz-1.5),.30,.08)
-                    for k in range(24):
+                    for k in range(spec.get('spray_blades', 24)):
                         t=rng.uniform(.22,1.05)
                         spread=rng.uniform(-1,1)*(length*.23*math.sin(min(t,1)*math.pi)+.4)
                         px=ex*t-math.sin(angle)*spread
                         py=ey*t+math.cos(angle)*spread
                         pz=bz+1.5*math.sin(t*math.pi)-1.8*t+rng.uniform(-1.2,1.2)
                         blades.append((px,py,pz,max(.8,length*rng.uniform(.12,.18))))
-    foliage=merge(foliage,leaf_blades(blades,color,rng))
+    foliage=merge(foliage,leaf_blades(blades,color,rng,spec.get('blade_width',.58),
+                                      spec.get('foliage_alt'),spec.get('foliage_alt_share',0.0)))
     return foliage,coloured(wood,spec['bark'])
 
 
 def build_family(spec):
     parts = []
     rng = random.Random(spec['name'] + ':forest-walk-001')
-    slender = [(s[0]*.55,s[1]*.55,*s[2:]) for s in spec['trunk']]
+    rs = spec.get('radius_scale', .55)
+    slender = [(s[0]*rs,s[1]*rs,*s[2:]) for s in spec['trunk']]
     trunk = build_trunk(slender, spec["bark"])
     if trunk is not None:
         parts.append(trunk)
-    limbs = build_limbs([(s[0]*.55,s[1]*.55,*s[2:]) for s in spec['limbs']], spec["bark"])
+    limbs = build_limbs([(s[0]*rs,s[1]*rs,*s[2:]) for s in spec['limbs']], spec["bark"])
     if limbs is not None:
         parts.append(limbs)
+    stems = build_stems(spec)
+    if stems is not None:
+        parts.append(stems)
     foliage, twigs = living_crown(spec,rng)
     parts.extend((foliage,twigs))
-    if slender:
+    if slender or spec.get('stems'):
         roots=unreal.DynamicMesh()
-        radius=slender[0][0]
+        radius=slender[0][0] if slender else spec['stems'][0][2]
         for k in range(6):
             angle=k*math.tau/6+.25
             roots=branch_between(roots,(0,0,-45),(radius*2.1*math.cos(angle),radius*2.1*math.sin(angle),-49.3),radius*.48,.18)
@@ -567,9 +826,13 @@ def distant_crown(spec):
     groups; this mesh is never the close view.
     """
     mesh = unreal.DynamicMesh()
-    trunk = build_trunk([(s[0]*.55,s[1]*.55,*s[2:]) for s in spec['trunk']], spec['bark'])
+    rs = spec.get('radius_scale', .55)
+    trunk = build_trunk([(s[0]*rs,s[1]*rs,*s[2:]) for s in spec['trunk']], spec['bark'])
+    stems = build_stems(spec, limit=spec.get('distant_stems', 4))
     if trunk is not None:
         mesh = merge(mesh, trunk)
+    elif stems is not None:
+        mesh = merge(mesh, stems)
     else:
         mesh = merge(mesh, build_limbs(spec['limbs'], spec['bark']))
     crown = unreal.DynamicMesh()
@@ -580,8 +843,11 @@ def distant_crown(spec):
                          location=unreal.Vector(radius*.35*math.cos(angle),
                                                 radius*.35*math.sin(angle), z0))
             crown = merge(crown, part)
+    # Une enveloppe par lobe, tessellation basse : a 5 % d'ecran la silhouette compte, pas
+    # la rondeur. Les especes a beaucoup de lobes (cypres, chene vert) restent sous ~1k.
+    far_steps = (4, 9) if spec.get('stems') else None
     for radius, cx, cy, cz, squash in spec['lobes']:
-        crown = merge(crown, lobe(unreal.DynamicMesh(), radius, cx, cy, cz, squash))
+        crown = merge(crown, lobe(unreal.DynamicMesh(), radius, cx, cy, cz, squash, far_steps))
     mesh = merge(mesh, coloured(crown, spec['foliage']))
     return shade(normalise(mesh, spec['name'] + ' distant'))
 
@@ -683,19 +949,39 @@ def save_static_mesh(mesh, asset_path, far_mesh):
 # invisible ailleurs.
 TRANSMISSION_WARMTH = unreal.LinearColor(1.5, 1.25, 0.55, 1.0)
 
-# Balancement du feuillage. Exprime dans l'espace LOCAL du mesh (Z=[-50,+50],
-# meme convention que NORMALISED_HEIGHT) : le World Position Offset y est
-# calcule avant le Scale par instance, donc un arbre jeune et un emergent
-# balancent proportionnellement a leur taille sans second reglage.
+# Balancement du feuillage, calcule dans l'espace LOCAL du mesh (Z=[-50,+50]) puis
+# transforme en monde : la transformation porte l'echelle de l'instance, donc un
+# platane de 22 m balance proportionnellement plus qu'un olivier de 6 m.
 #
-# PAS DE WindDirectionalSource. Le lire depuis une fonction moteur (par ex.
-# SimpleGrassWind) suppose des noms de broches que l'entete de ce fichier
-# interdit de supposer sans les verifier contre CE build. Un sinus du temps,
-# lui, ne depend d'aucune signature externe : deterministe dans sa forme,
-# dephase par instance via PerInstanceRandom pour que la foret ne batte pas au
-# meme rythme partout.
-WIND_SWAY_STRENGTH = 4.0
+# CORRECTION (FOREST_TERRAIN_P1). La version precedente ecrivait l'offset directement
+# dans le World Position Offset en croyant qu'il etait applique avant l'echelle par
+# instance. Il ne l'est pas : le WPO est un decalage MONDE, et chaque arbre, du jeune
+# chene au sapin emergent, balancait des memes 4 uu.
+#
+# PAS DE WindDirectionalSource : un sinus du temps ne depend d'aucune signature externe.
+# Dephase par PerInstanceRandom pour que la foret ne batte pas a l'unisson.
+WIND_SWAY_STRENGTH = 4.0          # repli monde, si la transformation locale manque
+WIND_SWAY_LOCAL = 0.6             # unites locales (mesh de 100) au sommet de la couronne
 WIND_SWAY_SPEED = 0.6
+
+# Teinte par arbre (FOREST_TERRAIN_P1). Deux flottants par instance, poses par
+# AAnastasisWorldEmbodiment sur les HISM d'arbres :
+#   PerInstanceCustomData[0]  secheresse du site [0,1] -> couronne vers l'olive paille
+#   PerInstanceCustomData[1]  ecart individuel [-1,1]  -> valeur +-12 %
+# Tous deux valent 0 hors de ce chemin (acteurs poses a la main, lieux composes) : le
+# materiau y rend exactement la couleur de sommet, comme avant.
+DRY_TINT = unreal.LinearColor(1.18, 1.06, 0.72, 1.0)
+DRY_STRENGTH = 0.35
+VALUE_JITTER = 0.12
+
+
+def enum_member(owner_name, *names):
+    owner = getattr(unreal, owner_name, None)
+    for name in names:
+        value = getattr(owner, name, None) if owner is not None else None
+        if value is not None:
+            return value
+    raise RuntimeError('unreal.%s: aucun de %s' % (owner_name, names))
 
 
 def ensure_material():
@@ -704,16 +990,11 @@ def ensure_material():
     Une masse de feuillage opaque lit comme du plastique, quelle que soit sa
     silhouette. Le modele MSM_TWO_SIDED_FOLIAGE laisse la lumiere TRAVERSER la
     couronne, ce que la planche de reference appelle "lumiere filtree" et
-    "volumetrie". C'est le seul changement qui transforme l'image sans toucher
-    un seul sommet.
+    "volumetrie".
 
     L'alpha des sommets sert de masque : 0 sur le bois, 1 sur le feuillage. Sans
-    ce masque, les troncs deviendraient translucides eux aussi.
-
-    Deliberement distinct de M_AnastasisSlice, qui appartient a observe-slice.py
-    et sert le sol : partager un materiau entre le sol et la vegetation lierait
-    deux chantiers qui avancent separement. Le langage, lui, est le meme --
-    la couleur de sommet EST la semantique.
+    ce masque, les troncs deviendraient translucides eux aussi -- et la teinte par
+    arbre peindrait aussi l'ecorce.
     """
     if unreal.EditorAssetLibrary.does_asset_exist(MATERIAL_PATH):
         unreal.EditorAssetLibrary.delete_asset(MATERIAL_PATH)
@@ -722,82 +1003,129 @@ def ensure_material():
         MATERIAL_NAME, MATERIAL_DIR, unreal.Material, unreal.MaterialFactoryNew())
     mel = unreal.MaterialEditingLibrary
 
-    vc = mel.create_material_expression(mat, unreal.MaterialExpressionVertexColor, -900, 0)
-    wired = False
-    base_output = None
-    for out_name in ('', 'RGB', 'Color'):
-        if mel.connect_material_property(vc, out_name, unreal.MaterialProperty.MP_BASE_COLOR):
-            wired = 'output=' + repr(out_name)
-            base_output = out_name
-            break
+    def const(value, x, y):
+        node = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, x, y)
+        node.set_editor_property('r', value)
+        return node
+
+    def const3(color, x, y):
+        node = mel.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, x, y)
+        node.set_editor_property('constant', color)
+        return node
+
+    def op(cls, a, b, x, y, a_out='', b_out=''):
+        node = mel.create_material_expression(mat, cls, x, y)
+        mel.connect_material_expressions(a, a_out, node, 'A')
+        mel.connect_material_expressions(b, b_out, node, 'B')
+        return node
+
+    def lerp(a, b, alpha, x, y, alpha_out=''):
+        node = mel.create_material_expression(mat, unreal.MaterialExpressionLinearInterpolate, x, y)
+        mel.connect_material_expressions(a, '', node, 'A')
+        mel.connect_material_expressions(b, '', node, 'B')
+        mel.connect_material_expressions(alpha, alpha_out, node, 'Alpha')
+        return node
+
+    vc = mel.create_material_expression(mat, unreal.MaterialExpressionVertexColor, -1600, 0)
+    # Sortie '' de VertexColor = RGB, comme la version precedente l'a verifie sur ce build.
+    base_output = ''
+
+    # Teinte par arbre, sur le feuillage seulement (alpha de sommet).
+    tint_state = 'vertex_only'
+    base = vc
+    try:
+        dry = mel.create_material_expression(mat, unreal.MaterialExpressionPerInstanceCustomData, -1600, -300)
+        dry.set_editor_property('data_index', 0)
+        dry.set_editor_property('const_default_value', 0.0)
+        jitter = mel.create_material_expression(mat, unreal.MaterialExpressionPerInstanceCustomData, -1600, -200)
+        jitter.set_editor_property('data_index', 1)
+        jitter.set_editor_property('const_default_value', 0.0)
+        one3 = const3(unreal.LinearColor(1.0, 1.0, 1.0, 1.0), -1400, -420)
+        dry_amount = op(unreal.MaterialExpressionMultiply, dry, const(DRY_STRENGTH, -1600, -380), -1400, -320)
+        dried = lerp(one3, const3(DRY_TINT, -1400, -500), dry_amount, -1200, -400)
+        value = op(unreal.MaterialExpressionAdd, op(unreal.MaterialExpressionMultiply, jitter,
+                   const(VALUE_JITTER, -1600, -140), -1400, -180), const(1.0, -1400, -100), -1200, -160)
+        tint = op(unreal.MaterialExpressionMultiply, dried, value, -1000, -300)
+        foliage_tint = lerp(one3, tint, vc, -850, -250, alpha_out='A')
+        base = op(unreal.MaterialExpressionMultiply, vc, foliage_tint, -650, -100)
+        base_output = ''
+        tint_state = 'per_instance'
+    except Exception as exc:  # noqa: BLE001
+        log('WARN teinte par instance non construite, couleur de sommet seule: %s' % exc)
+
+    wired = mel.connect_material_property(base, base_output, unreal.MaterialProperty.MP_BASE_COLOR)
 
     # Transmission = couleur de base x chaleur x masque de feuillage.
-    warm = mel.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -900, 220)
-    warm.set_editor_property('constant', TRANSMISSION_WARMTH)
-    tinted = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -600, 140)
-    mel.connect_material_expressions(vc, base_output if base_output is not None else '', tinted, 'A')
-    mel.connect_material_expressions(warm, '', tinted, 'B')
-    masked = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -380, 140)
-    mel.connect_material_expressions(tinted, '', masked, 'A')
-    mel.connect_material_expressions(vc, 'A', masked, 'B')
+    tinted = op(unreal.MaterialExpressionMultiply, base, const3(TRANSMISSION_WARMTH, -650, 220),
+                -450, 140, a_out=base_output)
+    masked = op(unreal.MaterialExpressionMultiply, tinted, vc, -300, 140, b_out='A')
     r_sss = mel.connect_material_property(masked, '', unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
+    r_rough = mel.connect_material_property(const(0.82, -350, 260), '', unreal.MaterialProperty.MP_ROUGHNESS)
+    r_spec = mel.connect_material_property(const(0.18, -350, 460), '', unreal.MaterialProperty.MP_SPECULAR)
 
-    rough = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -350, 260)
-    rough.set_editor_property('r', 0.82)
-    r_rough = mel.connect_material_property(rough, '', unreal.MaterialProperty.MP_ROUGHNESS)
-
-    spec = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -350, 460)
-    spec.set_editor_property('r', 0.18)
-    r_spec = mel.connect_material_property(spec, '', unreal.MaterialProperty.MP_SPECULAR)
-
-    # VENT -- balancement du feuillage, jamais du tronc. Un sinus du temps,
-    # dephase par PerInstanceRandom (sans quoi chaque HISM balancerait a
-    # l'unisson), pondere par le meme masque alpha que la transmission
-    # (masked ci-dessus, vc.A) : 0 sur le bois, 1 sur le feuillage.
-    time_node = mel.create_material_expression(mat, unreal.MaterialExpressionTime, -900, 620)
-    speed = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -900, 700)
-    speed.set_editor_property('r', WIND_SWAY_SPEED)
-    sped_time = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -700, 660)
-    mel.connect_material_expressions(time_node, '', sped_time, 'A')
-    mel.connect_material_expressions(speed, '', sped_time, 'B')
-
-    phase = mel.create_material_expression(mat, unreal.MaterialExpressionPerInstanceRandom, -900, 780)
-    two_pi = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -900, 840)
-    two_pi.set_editor_property('r', 6.2832)
-    phase_scaled = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -700, 800)
-    mel.connect_material_expressions(phase, '', phase_scaled, 'A')
-    mel.connect_material_expressions(two_pi, '', phase_scaled, 'B')
-
-    phased_time = mel.create_material_expression(mat, unreal.MaterialExpressionAdd, -500, 700)
-    mel.connect_material_expressions(sped_time, '', phased_time, 'A')
-    mel.connect_material_expressions(phase_scaled, '', phased_time, 'B')
-
-    sway = mel.create_material_expression(mat, unreal.MaterialExpressionSine, -350, 700)
+    # VENT -- balancement du feuillage, jamais du tronc.
+    time_node = mel.create_material_expression(mat, unreal.MaterialExpressionTime, -1600, 620)
+    phase = mel.create_material_expression(mat, unreal.MaterialExpressionPerInstanceRandom, -1600, 780)
+    phased_time = op(unreal.MaterialExpressionAdd,
+                     op(unreal.MaterialExpressionMultiply, time_node, const(WIND_SWAY_SPEED, -1600, 700), -1400, 660),
+                     op(unreal.MaterialExpressionMultiply, phase, const(6.2832, -1600, 860), -1400, 800), -1200, 700)
+    sway = mel.create_material_expression(mat, unreal.MaterialExpressionSine, -1050, 700)
     mel.connect_material_expressions(phased_time, '', sway, '')
+    # Second axe, a une autre frequence : un balancement en ellipse, pas un metronome.
+    sway_b = mel.create_material_expression(mat, unreal.MaterialExpressionSine, -1050, 820)
+    mel.connect_material_expressions(op(unreal.MaterialExpressionAdd,
+        op(unreal.MaterialExpressionMultiply, phased_time, const(0.83, -1200, 860), -1100, 860),
+        const(1.7, -1200, 920), -1000, 900), '', sway_b, '')
+    zero = const(0.0, -500, 980)
 
-    strength = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -350, 780)
-    strength.set_editor_property('r', WIND_SWAY_STRENGTH)
-    sway_scaled = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -200, 720)
-    mel.connect_material_expressions(sway, '', sway_scaled, 'A')
-    mel.connect_material_expressions(strength, '', sway_scaled, 'B')
+    wind_state = 'world'
+    try:
+        weight = vc  # masque de feuillage
+        weight_out = 'A'
+        try:
+            local = mel.create_material_expression(mat, unreal.MaterialExpressionLocalPosition, -1200, 1000)
+            local_z = mel.create_material_expression(mat, unreal.MaterialExpressionComponentMask, -1050, 1000)
+            for channel, keep in (('r', False), ('g', False), ('b', True), ('a', False)):
+                local_z.set_editor_property(channel, keep)
+            if not mel.connect_material_expressions(local, '', local_z, ''):
+                raise RuntimeError('LocalPosition non connectee')
+            height = op(unreal.MaterialExpressionMultiply,
+                        op(unreal.MaterialExpressionAdd, local_z, const(50.0, -1050, 1080), -900, 1020),
+                        const(0.01, -900, 1100), -750, 1040)
+            clamped = mel.create_material_expression(mat, unreal.MaterialExpressionSaturate, -600, 1040)
+            mel.connect_material_expressions(height, '', clamped, '')
+            weight = op(unreal.MaterialExpressionMultiply, vc, clamped, -450, 1000, a_out='A')
+            weight_out = ''
+            wind_state = 'local_height'
+        except Exception as exc:  # noqa: BLE001
+            log('WARN LocalPosition indisponible, balancement uniforme sur la couronne: %s' % exc)
+            wind_state = 'local'
+        amp = op(unreal.MaterialExpressionMultiply, weight, const(WIND_SWAY_LOCAL, -450, 1100), -300, 1040, a_out=weight_out)
+        sx = op(unreal.MaterialExpressionMultiply, sway, amp, -150, 700)
+        sy = op(unreal.MaterialExpressionMultiply, op(unreal.MaterialExpressionMultiply, sway_b,
+                const(0.6, -1050, 900), -900, 860), amp, -150, 820)
+        local_xyz = op(unreal.MaterialExpressionAppendVector,
+                       op(unreal.MaterialExpressionAppendVector, sx, sy, 0, 740), zero, 150, 760)
+        to_world = mel.create_material_expression(mat, unreal.MaterialExpressionTransform, 300, 760)
+        to_world.set_editor_property('transform_source_type', enum_member(
+            'MaterialVectorCoordTransformSource', 'TRANSFORMSOURCE_LOCAL', 'TRANSFORMSOURCE_Local', 'LOCAL'))
+        to_world.set_editor_property('transform_type', enum_member(
+            'MaterialVectorCoordTransform', 'TRANSFORM_WORLD', 'TRANSFORM_World', 'WORLD'))
+        if not mel.connect_material_expressions(local_xyz, '', to_world, ''):
+            raise RuntimeError('entree de Transform non connectee')
+        r_wpo = mel.connect_material_property(to_world, '', unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+        if not r_wpo:
+            raise RuntimeError('WPO non connecte')
+    except Exception as exc:  # noqa: BLE001
+        log('WARN vent local refuse, repli monde (%s uu): %s' % (WIND_SWAY_STRENGTH, exc))
+        wind_state = 'world'
+        sway_masked = op(unreal.MaterialExpressionMultiply,
+                         op(unreal.MaterialExpressionMultiply, sway, const(WIND_SWAY_STRENGTH, -900, 1200), -750, 1200),
+                         vc, -600, 1200, b_out='A')
+        sway_xyz = op(unreal.MaterialExpressionAppendVector,
+                      op(unreal.MaterialExpressionAppendVector, sway_masked, zero, -450, 1200), zero, -300, 1200)
+        r_wpo = mel.connect_material_property(sway_xyz, '', unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
 
-    sway_masked = mel.create_material_expression(mat, unreal.MaterialExpressionMultiply, -50, 720)
-    mel.connect_material_expressions(sway_scaled, '', sway_masked, 'A')
-    mel.connect_material_expressions(vc, 'A', sway_masked, 'B')
-
-    zero = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -50, 820)
-    zero.set_editor_property('r', 0.0)
-    sway_xy = mel.create_material_expression(mat, unreal.MaterialExpressionAppendVector, 100, 740)
-    mel.connect_material_expressions(sway_masked, '', sway_xy, 'A')
-    mel.connect_material_expressions(zero, '', sway_xy, 'B')
-    sway_xyz = mel.create_material_expression(mat, unreal.MaterialExpressionAppendVector, 250, 740)
-    mel.connect_material_expressions(sway_xy, '', sway_xyz, 'A')
-    mel.connect_material_expressions(zero, '', sway_xyz, 'B')
-    r_wpo = mel.connect_material_property(sway_xyz, '', unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
-
-    # Deux faces : les etages de couronne sont des troncons fins vus des deux
-    # cotes des qu'on entre sous le couvert. Le modele feuillage l'exige de toute
-    # facon -- la transmission n'a de sens que si la face arriere est rendue.
     mat.set_editor_property('two_sided', True)
 
     shading = 'ABSENT'
@@ -807,10 +1135,10 @@ def ensure_material():
     except Exception as exc:  # noqa: BLE001
         log('WARN modele d ombrage non pose: %s' % exc)
 
-    # Relu depuis l'asset, pas suppose : un set_editor_property qui echoue en
-    # silence laisserait un materiau opaque et .5a n'aurait servi a rien.
-    log("MATERIAL wiring base_color=%s subsurface=%s roughness=%s specular=%s shading=%s wpo=%s"
-        % (wired, r_sss, r_rough, r_spec, shading, r_wpo))
+    log("MATERIAL wiring base_color=%s tint=%s subsurface=%s roughness=%s specular=%s shading=%s wpo=%s wind=%s"
+        % (wired, tint_state, r_sss, r_rough, r_spec, shading, r_wpo, wind_state))
+    if not wired:
+        raise RuntimeError('MATERIAL base colour not connected')
     mel.recompile_material(mat)
     unreal.EditorAssetLibrary.save_asset(MATERIAL_PATH)
     log("MATERIAL saved " + MATERIAL_PATH)
@@ -924,7 +1252,13 @@ def main():
     save_static_mesh(mesh, PACKAGE_PATH + "/" + GENERIC_NAME, far_mesh)
     log("ALIAS %s <- %s" % (GENERIC_NAME, ALIAS_OF_GENERIC))
 
-    log("RESULT::PASS meshes=%d" % (len(FAMILIES) + 1))
+    # FOREST_TERRAIN_P1 : les essences mediterraneennes et grecques de montagne.
+    species = species_specs()
+    for spec in species:
+        save_static_mesh(build_family(spec), PACKAGE_PATH + "/" + spec["name"], distant_crown(spec))
+        log("  %s -- %s" % (spec["name"], spec["note"]))
+
+    log("RESULT::PASS meshes=%d species_meshes=%d" % (len(FAMILIES) + 1 + len(species), len(species)))
     return True
 
 

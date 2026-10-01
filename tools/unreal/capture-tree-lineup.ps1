@@ -1,4 +1,5 @@
-param([Parameter(Mandatory=$true)][string]$Out,[int]$TimeoutSec=300)
+param([Parameter(Mandatory=$true)][string]$Out,[int]$TimeoutSec=300,[string]$Set='',[string]$Shape='01')
+# -Set species : planche des essences FOREST_TERRAIN_P1 (une forme par essence, -Shape 01..03).
 # Planche de stature de la grammaire d'arbres. Meme forme que capture-slice.ps1 :
 # l'editeur est lance, le script Python cadre et capture, puis se ferme lui-meme.
 # Le niveau n'est jamais sauve -- voir tools/unreal/capture-tree-lineup.py.
@@ -13,6 +14,8 @@ if(Test-Path $shot){Remove-Item $shot}
 $log=Join-Path $dir ($Out -replace '\.png$','.log')
 if(Test-Path $log){Remove-Item $log}
 $env:ANASTASIS_LINEUP_SHOT=$shot
+$env:ANASTASIS_LINEUP_SET=$Set
+$env:ANASTASIS_LINEUP_SHAPE=$Shape
 # Chemin en slashes : un '\t' dans un argument -script est interprete comme une
 # tabulation par la ligne de commande de l'editeur et le fichier reste introuvable.
 $py=(Join-Path $Root 'tools/unreal/capture-tree-lineup.py').Replace('\','/')

@@ -45,6 +45,10 @@ namespace AnastasisPresentation
 		TArray<UMaterialInterface*> AdditionalMaterials;
 		/** The chosen variant's ScaleBias, to be handed back to ResolveInstanceTransform. */
 		float ScaleBias = 1.0f;
+		/** The chosen variant's species, Any for an untagged look. */
+		EAnastasisTreeSpecies Species = EAnastasisTreeSpecies::Any;
+		/** The chosen variant's mature height range in metres; (0, 0) when it has none. */
+		FVector2D HeightRangeM = FVector2D::ZeroVector;
 	};
 
 	/** The live registry: the data asset when it loads, the code defaults otherwise. Never null. */
@@ -68,6 +72,11 @@ namespace AnastasisPresentation
 	 * ones. It FAILS OPEN: an entry whose data names no variant for the requested stature
 	 * falls back to every eligible variant rather than rendering a hole. A missing art asset
 	 * must degrade the look, never the presence of the tree.
+	 *
+	 * Species (FOREST_TERRAIN_P1) is tried first: a named species draws among the looks tagged
+	 * with it, whatever their stature. With no such look the request falls back to the
+	 * (stature, family) pools above. Those pools hold only the UNTAGGED looks whenever the
+	 * entry has any, so a request that names no species never draws a species look by accident.
 	 */
 	int32 SelectVariantIndex(
 		const FAnastasisPresentationEntry& Entry,
@@ -75,7 +84,49 @@ namespace AnastasisPresentation
 		int32 TileX,
 		int32 TileY,
 		EAnastasisStatureClass Wanted = EAnastasisStatureClass::Any,
-		EAnastasisFoliageFamily Family = EAnastasisFoliageFamily::Any);
+		EAnastasisFoliageFamily Family = EAnastasisFoliageFamily::Any,
+		EAnastasisTreeSpecies Species = EAnastasisTreeSpecies::Any);
+
+	/**
+	 * What a forest site offers a tree, as presentation reads it. FOREST_TERRAIN_P1.
+	 *
+	 *   AltitudeFraction  [0,1]  rendered height above the water plane, over the rendered
+	 *                            relief's own span. Relative on purpose: the map is not
+	 *                            rebuilt, its existing relief is zoned.
+	 *   SlopeDegrees             rendered slope under the trunk.
+	 *   Riparian          [0,1]  rendered river wetness (AnastasisDrainage::RiparianAt).
+	 *   Wetness           [0,1]  simulation moisture of the tile.
+	 *   Shade             [-1,1] simulation relief lighting (exposure).
+	 */
+	struct FTreeSite
+	{
+		double AltitudeFraction = 0.0;
+		double SlopeDegrees = 0.0;
+		double Riparian = 0.0;
+		double Wetness = 0.0;
+		double Shade = 0.0;
+	};
+
+	/**
+	 * How well a species suits a site, >= 0, before the draw. Smooth everywhere: altitude
+	 * bands overlap, so a slope changes species gradually instead of along a contour line.
+	 *
+	 *   low, dry      olive (gentle ground), Aleppo pine, cypress (rocky slopes)
+	 *   middle        holm oak, the generalist, present almost everywhere below the summits
+	 *   upper         black pine
+	 *   summits       Greek fir
+	 *   water         oriental plane, and nowhere else
+	 */
+	double SpeciesSuitability(EAnastasisTreeSpecies Species, const FTreeSite& Site);
+
+	/** Deterministic draw over SpeciesSuitability, from a per-site hash. Never Any. */
+	EAnastasisTreeSpecies SelectTreeSpecies(const FTreeSite& Site, uint32 Seed, int32 TileX, int32 TileY);
+
+	/** Conifer for the pines, the cypress and the fir; Broadleaf for oak, olive and plane. */
+	EAnastasisFoliageFamily FamilyOfSpecies(EAnastasisTreeSpecies Species);
+
+	/** Stable lower-case name for logs. */
+	const TCHAR* SpeciesName(EAnastasisTreeSpecies Species);
 
 	/**
 	 * Which species family the site itself calls for.
@@ -114,7 +165,8 @@ namespace AnastasisPresentation
 		int32 TileY,
 		FResolvedPresentation& Out,
 		EAnastasisStatureClass Wanted = EAnastasisStatureClass::Any,
-		EAnastasisFoliageFamily Family = EAnastasisFoliageFamily::Any);
+		EAnastasisFoliageFamily Family = EAnastasisFoliageFamily::Any,
+		EAnastasisTreeSpecies Species = EAnastasisTreeSpecies::Any);
 
 	/**
 	 * Deterministic placement: same (Seed, TileX, TileY, Entry, ScaleBias) always yields the

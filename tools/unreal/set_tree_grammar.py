@@ -58,6 +58,22 @@ VARIANTS = [
     ("SM_Tree_Broadleaf_Emergent_01", "EMERGENT", "BROADLEAF", 1.12),
 ]
 
+# FOREST_TERRAIN_P1 -- les essences. (prefixe de mesh, espece, famille, hauteur adulte en m).
+# Trois formes par espece (_01.._03), produites par create_tree_asset.py. Stature ANY : l'age
+# se lit a la hauteur (HeightRangeM x maturite), pas a un autre mesh. Ajoutees APRES la grille
+# pontique, qui reste le repli non etiquete. Memes valeurs que SpeciesDefaults dans
+# AnastasisPresentationRegistry.cpp.
+SHAPES_PER_SPECIES = 3
+SPECIES = [
+    ("SM_Tree_AleppoPine", "ALEPPO_PINE", "CONIFER", (11.0, 18.0)),
+    ("SM_Tree_Cypress", "CYPRESS", "CONIFER", (12.0, 20.0)),
+    ("SM_Tree_HolmOak", "HOLM_OAK", "BROADLEAF", (8.0, 14.0)),
+    ("SM_Tree_Olive", "OLIVE", "BROADLEAF", (4.5, 8.0)),
+    ("SM_Tree_PlaneTree", "PLANE_TREE", "BROADLEAF", (17.0, 24.0)),
+    ("SM_Tree_BlackPine", "BLACK_PINE", "CONIFER", (15.0, 23.0)),
+    ("SM_Tree_GreekFir", "GREEK_FIR", "CONIFER", (14.0, 22.0)),
+]
+
 
 def log(msg):
     unreal.log("[set_tree_grammar] " + str(msg))
@@ -107,7 +123,26 @@ def build_variants():
         variant.set_editor_property("stature", enum_value("AnastasisStatureClass", stature_name))
         variant.set_editor_property("family", enum_value("AnastasisFoliageFamily", family_name))
         variant.set_editor_property("scale_bias", bias)
+        variant.set_editor_property("species", enum_value("AnastasisTreeSpecies", "ANY"))
+        variant.set_editor_property("height_range_m", unreal.Vector2D(0.0, 0.0))
         out.append(variant)
+    for stem, species_name, family_name, (low, high) in SPECIES:
+        for shape in range(1, SHAPES_PER_SPECIES + 1):
+            path = "%s%s_%02d" % (MESH_DIR, stem, shape)
+            mesh = unreal.EditorAssetLibrary.load_asset(path)
+            if mesh is None:
+                raise Exception("mesh introuvable %s -- lancer d'abord "
+                                "tools/unreal/create_tree_asset.py" % path)
+            variant = unreal.AnastasisPresentationVariant()
+            variant.set_editor_property("mesh", mesh)
+            variant.set_editor_property("material_override", material)
+            variant.set_editor_property("additional_material_overrides", [bark])
+            variant.set_editor_property("stature", enum_value("AnastasisStatureClass", "ANY"))
+            variant.set_editor_property("family", enum_value("AnastasisFoliageFamily", family_name))
+            variant.set_editor_property("scale_bias", 1.0)
+            variant.set_editor_property("species", enum_value("AnastasisTreeSpecies", species_name))
+            variant.set_editor_property("height_range_m", unreal.Vector2D(low, high))
+            out.append(variant)
     return out
 
 
@@ -122,6 +157,12 @@ def describe(entry):
             bias = round(float(variant.get_editor_property("scale_bias")), 4)
         except Exception:
             st, fam, bias = "<absent>", "<absent>", None
+        try:
+            sp = str(variant.get_editor_property("species")).split('.')[-1]
+            hr = variant.get_editor_property("height_range_m")
+            fam = "%s/%s/%.1f-%.1fm" % (fam, sp, hr.x, hr.y)
+        except Exception:
+            fam = fam + "/<pas d'espece>"
         try:
             extra = len(variant.get_editor_property("additional_material_overrides"))
         except Exception:
@@ -192,15 +233,18 @@ def verify():
             continue
         variants = entry.get_editor_property("variants")
         log("VERIFY FOREST %s" % describe(entry))
+        expected = len(VARIANTS) + SHAPES_PER_SPECIES * len(SPECIES)
         statures = {str(v.get_editor_property("stature")) for v in variants}
         families = {str(v.get_editor_property("family")) for v in variants}
+        species = {str(v.get_editor_property("species")) for v in variants}
         slots = {len(v.get_editor_property("additional_material_overrides")) for v in variants}
-        ok = (len(variants) == len(VARIANTS) and len(statures) == 4 and len(families) == 2
-              and slots == {1})
-        log("VERIFY variants=%d attendu=%d statures=%d attendu=4 familles=%d attendu=2 "
-            "slots_supplementaires=%s attendu={1} -> %s"
-            % (len(variants), len(VARIANTS), len(statures), len(families),
-               sorted(slots), "OK" if ok else "MAUVAIS"))
+        # 4 statures pontiques + ANY des essences ; 7 essences + ANY de la grille pontique.
+        ok = (len(variants) == expected and len(statures) == 5 and len(families) == 2
+              and len(species) == len(SPECIES) + 1 and slots == {1})
+        log("VERIFY variants=%d attendu=%d statures=%d attendu=5 familles=%d attendu=2 "
+            "especes=%d attendu=%d slots_supplementaires=%s attendu={1} -> %s"
+            % (len(variants), expected, len(statures), len(families), len(species),
+               len(SPECIES) + 1, sorted(slots), "OK" if ok else "MAUVAIS"))
         return ok
     log("VERIFY::FAIL entree FOREST disparue")
     return False

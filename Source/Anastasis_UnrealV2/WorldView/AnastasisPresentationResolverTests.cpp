@@ -579,4 +579,129 @@ bool FAnastasisSpeciesGradient::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisPresentationTreeSpecies, "Anastasis.Presentation.TreeSpecies", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisPresentationTreeSpecies::RunTest(const FString&)
+{
+	using namespace AnastasisPresentation;
+
+	// FOREST_TERRAIN_P1. A named species draws among its own looks; an unnamed request never
+	// draws a species look while untagged ones exist; a missing species degrades to them.
+	auto Tagged = [](const TCHAR* Path, EAnastasisTreeSpecies Species)
+	{
+		FAnastasisPresentationVariant Variant = MakeGridVariant(Path, EAnastasisStatureClass::Any, FamilyOfSpecies(Species));
+		Variant.Species = Species;
+		Variant.HeightRangeM = FVector2D(4.5, 8.0);
+		return Variant;
+	};
+	UAnastasisPresentationRegistry* Registry = MakeRegistry();
+	FAnastasisPresentationEntry Mixed;
+	Mixed.SemanticType = EAnastasisSemanticType::Forest;
+	Mixed.ArchetypeId = FName(TEXT("Tree_Mixed"));
+	Mixed.Variants.Add(MakeGridVariant(TEXT("/Engine/BasicShapes/Cone.Cone"), EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Conifer));
+	Mixed.Variants.Add(MakeGridVariant(TEXT("/Engine/BasicShapes/Sphere.Sphere"), EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Broadleaf));
+	Mixed.Variants.Add(Tagged(TEXT("/Engine/BasicShapes/Cube.Cube"), EAnastasisTreeSpecies::Olive));
+	Mixed.Variants.Add(Tagged(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"), EAnastasisTreeSpecies::Olive));
+	Mixed.Variants.Add(Tagged(TEXT("/Engine/BasicShapes/Plane.Plane"), EAnastasisTreeSpecies::GreekFir));
+	Registry->Entries.Add(Mixed);
+	const FAnastasisPresentationEntry& Entry = Registry->Entries[0];
+
+	TSet<int32> OliveShapes;
+	for (int32 X = 0; X < 64; ++X)
+	{
+		const int32 Olive = SelectVariantIndex(Entry, 12345u, X, 2, EAnastasisStatureClass::Canopy,
+			EAnastasisFoliageFamily::Broadleaf, EAnastasisTreeSpecies::Olive);
+		if (!TestTrue(TEXT("a named species lands on its own looks"), Olive == 2 || Olive == 3)) return false;
+		OliveShapes.Add(Olive);
+		TestEqual(TEXT("a single-shape species always lands on it"), SelectVariantIndex(Entry, 12345u, X, 2,
+			EAnastasisStatureClass::Emergent, EAnastasisFoliageFamily::Conifer, EAnastasisTreeSpecies::GreekFir), 4);
+		const int32 Untagged = SelectVariantIndex(Entry, 12345u, X, 2, EAnastasisStatureClass::Canopy, EAnastasisFoliageFamily::Broadleaf);
+		TestEqual(TEXT("a request naming no species keeps the untagged (stature, family) look"), Untagged, 1);
+		const int32 Missing = SelectVariantIndex(Entry, 12345u, X, 2, EAnastasisStatureClass::Canopy,
+			EAnastasisFoliageFamily::Conifer, EAnastasisTreeSpecies::Cypress);
+		TestEqual(TEXT("a species with no look degrades to the untagged grammar of its family"), Missing, 0);
+	}
+	TestEqual(TEXT("both olive shapes are reached"), OliveShapes.Num(), 2);
+
+	// An entry made only of species looks still draws a tree for a request naming none.
+	FAnastasisPresentationEntry Only;
+	Only.SemanticType = EAnastasisSemanticType::Forest;
+	Only.ArchetypeId = FName(TEXT("Tree_OnlySpecies"));
+	Only.Variants.Add(Tagged(TEXT("/Engine/BasicShapes/Cube.Cube"), EAnastasisTreeSpecies::HolmOak));
+	Registry->Entries.Add(Only);
+	TestEqual(TEXT("presence before dress: a species-only entry answers an untagged request"),
+		SelectVariantIndex(Registry->Entries[1], 12345u, 3, 3, EAnastasisStatureClass::Canopy), 0);
+
+	// Families follow botany.
+	TestEqual(TEXT("Aleppo pine is a conifer"), static_cast<int32>(FamilyOfSpecies(EAnastasisTreeSpecies::AleppoPine)), static_cast<int32>(EAnastasisFoliageFamily::Conifer));
+	TestEqual(TEXT("cypress is a conifer"), static_cast<int32>(FamilyOfSpecies(EAnastasisTreeSpecies::Cypress)), static_cast<int32>(EAnastasisFoliageFamily::Conifer));
+	TestEqual(TEXT("holm oak is a broadleaf"), static_cast<int32>(FamilyOfSpecies(EAnastasisTreeSpecies::HolmOak)), static_cast<int32>(EAnastasisFoliageFamily::Broadleaf));
+	TestEqual(TEXT("olive is a broadleaf"), static_cast<int32>(FamilyOfSpecies(EAnastasisTreeSpecies::Olive)), static_cast<int32>(EAnastasisFoliageFamily::Broadleaf));
+	TestEqual(TEXT("plane is a broadleaf"), static_cast<int32>(FamilyOfSpecies(EAnastasisTreeSpecies::PlaneTree)), static_cast<int32>(EAnastasisFoliageFamily::Broadleaf));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisPresentationTreeZoning, "Anastasis.Presentation.TreeZoning", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisPresentationTreeZoning::RunTest(const FString&)
+{
+	using namespace AnastasisPresentation;
+	using ESp = EAnastasisTreeSpecies;
+
+	auto Site = [](double A, double S, double R, double W = 0.08, double Sh = 0.0)
+	{
+		FTreeSite Out;
+		Out.AltitudeFraction = A; Out.SlopeDegrees = S; Out.Riparian = R; Out.Wetness = W; Out.Shade = Sh;
+		return Out;
+	};
+	const ESp All[] = {ESp::AleppoPine, ESp::Cypress, ESp::HolmOak, ESp::Olive, ESp::PlaneTree, ESp::BlackPine, ESp::GreekFir};
+	auto Share = [&](const FTreeSite& At, std::initializer_list<ESp> Group)
+	{
+		double Total = 0.0, Part = 0.0;
+		for (const ESp Sp : All) Total += SpeciesSuitability(Sp, At);
+		for (const ESp Sp : Group) Part += SpeciesSuitability(Sp, At);
+		return Total > 0.0 ? Part / Total : 0.0;
+	};
+
+	// The plane is a river tree, and only that.
+	TestEqual(TEXT("no plane tree away from water"), SpeciesSuitability(ESp::PlaneTree, Site(0.1, 5.0, 0.0)), 0.0);
+	TestTrue(TEXT("the plane dominates a low riverbank"), Share(Site(0.1, 4.0, 0.9), {ESp::PlaneTree}) > 0.5);
+	// Altitude zoning, as shares rather than thresholds.
+	TestTrue(TEXT("low dry gentle ground is olive and Aleppo pine first"),
+		Share(Site(0.05, 5.0, 0.0), {ESp::Olive, ESp::AleppoPine}) > 0.55);
+	TestEqual(TEXT("no mountain conifer on the lowland"), Share(Site(0.05, 5.0, 0.0), {ESp::BlackPine, ESp::GreekFir}), 0.0);
+	TestTrue(TEXT("the middle slopes belong to the holm oak first"), Share(Site(0.4, 18.0, 0.0), {ESp::HolmOak}) > 0.35);
+	TestTrue(TEXT("the summits are fir and black pine"), Share(Site(0.95, 25.0, 0.0), {ESp::GreekFir, ESp::BlackPine}) > 0.9);
+	TestEqual(TEXT("no olive on the summits"), SpeciesSuitability(ESp::Olive, Site(0.95, 25.0, 0.0)), 0.0);
+	TestTrue(TEXT("cypress prefers rocky slopes to flats"),
+		SpeciesSuitability(ESp::Cypress, Site(0.2, 30.0, 0.0)) > 2.0 * SpeciesSuitability(ESp::Cypress, Site(0.2, 2.0, 0.0)));
+	TestTrue(TEXT("the fir keeps the cool faces"),
+		SpeciesSuitability(ESp::GreekFir, Site(0.9, 20.0, 0.0, 0.08, -0.6)) > SpeciesSuitability(ESp::GreekFir, Site(0.9, 20.0, 0.0, 0.08, 0.6)));
+
+	// Gradual, not a contour: the lowland share never drops by more than a step's worth.
+	double Previous = Share(Site(0.0, 10.0, 0.0), {ESp::Olive, ESp::AleppoPine, ESp::Cypress});
+	double WorstStep = 0.0;
+	for (int32 I = 1; I <= 100; ++I)
+	{
+		const double Now = Share(Site(I / 100.0, 10.0, 0.0), {ESp::Olive, ESp::AleppoPine, ESp::Cypress});
+		WorstStep = FMath::Max(WorstStep, FMath::Abs(Now - Previous));
+		Previous = Now;
+	}
+	TestTrue(TEXT("species shift with altitude by less than 8% per 1% of relief"), WorstStep < 0.08);
+
+	// Every site draws a species, deterministically, and the whole palette is reachable.
+	TSet<int32> Seen;
+	for (int32 I = 0; I < 400; ++I)
+	{
+		const FTreeSite At = Site((I % 20) / 19.0, (I / 20) * 2.0, (I % 7) / 6.0, 0.08, (I % 5) / 2.0 - 1.0);
+		const ESp Drawn = SelectTreeSpecies(At, 12345u + I, I % 96, I / 96);
+		if (!TestTrue(TEXT("never Any"), Drawn != ESp::Any)) return false;
+		TestEqual(TEXT("the draw is reproducible"), static_cast<int32>(Drawn), static_cast<int32>(SelectTreeSpecies(At, 12345u + I, I % 96, I / 96)));
+		Seen.Add(static_cast<int32>(Drawn));
+	}
+	TestEqual(TEXT("all seven species are reachable"), Seen.Num(), 7);
+	const double Nan = std::numeric_limits<double>::quiet_NaN();
+	TestTrue(TEXT("a NaN site still draws a species"), SelectTreeSpecies(Site(Nan, Nan, Nan, Nan, Nan), 1u, 0, 0) != ESp::Any);
+	AddInfo(FString::Printf(TEXT("TREE_ZONING worst_step=%.3f species_seen=%d"), WorstStep, Seen.Num()));
+	return true;
+}
+
 #endif

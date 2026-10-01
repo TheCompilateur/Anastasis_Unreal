@@ -113,8 +113,38 @@ int32 SelectVariantIndex(
 	int32 TileX,
 	int32 TileY,
 	EAnastasisStatureClass Wanted,
-	EAnastasisFoliageFamily Family)
+	EAnastasisFoliageFamily Family,
+	EAnastasisTreeSpecies Species)
 {
+	// FOREST_TERRAIN_P1. A named species draws among its own looks, whatever their stature:
+	// its age is told by its height, not by a different mesh.
+	if (Species != EAnastasisTreeSpecies::Any)
+	{
+		TArray<int32, TInlineAllocator<4>> Kind;
+		for (int32 Index = 0; Index < Entry.Variants.Num(); ++Index)
+		{
+			const FAnastasisPresentationVariant& Variant = Entry.Variants[Index];
+			if (!Variant.Mesh.IsNull() && Variant.Species == Species)
+			{
+				Kind.Add(Index);
+			}
+		}
+		if (Kind.Num() > 0)
+		{
+			const uint32 H = HashTile(Seed, TileX, TileY, 0x51u + static_cast<uint32>(Species) * 0x2545u);
+			return Kind[H % static_cast<uint32>(Kind.Num())];
+		}
+	}
+
+	// The legacy pools see only untagged looks when the entry has any: a species look must
+	// never answer a request that did not ask for it. An entry made only of species looks
+	// still answers every request -- presence before dress, as everywhere else.
+	bool bHasUntagged = false;
+	for (const FAnastasisPresentationVariant& Variant : Entry.Variants)
+	{
+		bHasUntagged |= !Variant.Mesh.IsNull() && Variant.Species == EAnastasisTreeSpecies::Any;
+	}
+
 	// Only variants that actually name a mesh are eligible: a half-filled row in the data
 	// asset must not produce an invisible "chosen" variant.
 	//
@@ -128,7 +158,7 @@ int32 SelectVariantIndex(
 	for (int32 Index = 0; Index < Entry.Variants.Num(); ++Index)
 	{
 		const FAnastasisPresentationVariant& Variant = Entry.Variants[Index];
-		if (Variant.Mesh.IsNull())
+		if (Variant.Mesh.IsNull() || (bHasUntagged && Variant.Species != EAnastasisTreeSpecies::Any))
 		{
 			continue;
 		}
@@ -197,6 +227,124 @@ EAnastasisFoliageFamily SelectFoliageFamily(
 		: EAnastasisFoliageFamily::Broadleaf;
 }
 
+namespace
+{
+	double Rise(double A, double B, double X)
+	{
+		const double T = FMath::Clamp((X - A) / (B - A), 0.0, 1.0);
+		return T * T * (3.0 - 2.0 * T);
+	}
+	double Fall(double A, double B, double X) { return 1.0 - Rise(A, B, X); }
+
+	constexpr EAnastasisTreeSpecies AllSpecies[] = {
+		EAnastasisTreeSpecies::AleppoPine, EAnastasisTreeSpecies::Cypress, EAnastasisTreeSpecies::HolmOak,
+		EAnastasisTreeSpecies::Olive, EAnastasisTreeSpecies::PlaneTree, EAnastasisTreeSpecies::BlackPine,
+		EAnastasisTreeSpecies::GreekFir};
+	constexpr int32 SpeciesCount = static_cast<int32>(UE_ARRAY_COUNT(AllSpecies));
+}
+
+double SpeciesSuitability(EAnastasisTreeSpecies Species, const FTreeSite& Site)
+{
+	const double A = FMath::IsFinite(Site.AltitudeFraction) ? FMath::Clamp(Site.AltitudeFraction, 0.0, 1.0) : 0.0;
+	const double S = FMath::IsFinite(Site.SlopeDegrees) ? FMath::Max(Site.SlopeDegrees, 0.0) : 0.0;
+	const double R = FMath::IsFinite(Site.Riparian) ? FMath::Clamp(Site.Riparian, 0.0, 1.0) : 0.0;
+	const double W = FMath::IsFinite(Site.Wetness) ? FMath::Clamp(Site.Wetness, 0.0, 1.0) : 0.0;
+	const double Sh = FMath::IsFinite(Site.Shade) ? FMath::Clamp(Site.Shade, -1.0, 1.0) : 0.0;
+	// Moisture as a tree feels it: the river where there is one, the simulation's soil elsewhere.
+	const double Damp = FMath::Max(R, W);
+	switch (Species)
+	{
+	case EAnastasisTreeSpecies::PlaneTree:
+		// Platanus orientalis is a river tree: without running water, nothing.
+		return 2.4 * Rise(0.2, 0.6, R) * Fall(0.35, 0.6, A) * Fall(20.0, 35.0, S);
+	case EAnastasisTreeSpecies::Olive:
+		return 0.9 * Fall(0.12, 0.35, A) * Fall(8.0, 22.0, S) * Fall(0.3, 0.7, Damp);
+	case EAnastasisTreeSpecies::AleppoPine:
+		return 1.2 * Fall(0.30, 0.55, A) * (1.0 - 0.7 * Rise(0.25, 0.7, Damp));
+	case EAnastasisTreeSpecies::Cypress:
+		return 0.45 * Fall(0.35, 0.6, A) * (0.35 + 0.65 * Rise(12.0, 30.0, S)) * Fall(0.3, 0.7, Damp);
+	case EAnastasisTreeSpecies::HolmOak:
+		// The generalist. Its floor keeps every site drawable.
+		return 1.1 * (0.45 + 0.55 * Rise(0.05, 0.3, A)) * Fall(0.6, 0.85, A) * (1.0 - 0.5 * Rise(0.4, 0.8, R)) + 0.02;
+	case EAnastasisTreeSpecies::BlackPine:
+		return 1.2 * Rise(0.38, 0.6, A) * (1.0 - 0.6 * Rise(0.8, 1.0, A));
+	case EAnastasisTreeSpecies::GreekFir:
+		// The fir keeps the cool faces: exposure (Shade > 0) thins it.
+		return 1.1 * Rise(0.58, 0.8, A) * (1.0 - 0.35 * Sh);
+	case EAnastasisTreeSpecies::Any:
+	default:
+		return 0.0;
+	}
+}
+
+EAnastasisTreeSpecies SelectTreeSpecies(const FTreeSite& Site, uint32 Seed, int32 TileX, int32 TileY)
+{
+	double Weights[SpeciesCount];
+	double Total = 0.0;
+	for (int32 I = 0; I < SpeciesCount; ++I)
+	{
+		Weights[I] = SpeciesSuitability(AllSpecies[I], Site);
+		Total += Weights[I];
+	}
+	if (!(Total > 0.0))
+	{
+		return EAnastasisTreeSpecies::HolmOak;
+	}
+	double Draw = UnitFloat(HashTile(Seed, TileX, TileY, 0x9u)) * Total;
+	for (int32 I = 0; I < SpeciesCount; ++I)
+	{
+		if (Draw < Weights[I])
+		{
+			return AllSpecies[I];
+		}
+		Draw -= Weights[I];
+	}
+	// Rounding at the very top of the range: the last species with any weight.
+	for (int32 I = SpeciesCount - 1; I >= 0; --I)
+	{
+		if (Weights[I] > 0.0)
+		{
+			return AllSpecies[I];
+		}
+	}
+	return EAnastasisTreeSpecies::HolmOak;
+}
+
+EAnastasisFoliageFamily FamilyOfSpecies(EAnastasisTreeSpecies Species)
+{
+	switch (Species)
+	{
+	case EAnastasisTreeSpecies::AleppoPine:
+	case EAnastasisTreeSpecies::Cypress:
+	case EAnastasisTreeSpecies::BlackPine:
+	case EAnastasisTreeSpecies::GreekFir:
+		return EAnastasisFoliageFamily::Conifer;
+	case EAnastasisTreeSpecies::HolmOak:
+	case EAnastasisTreeSpecies::Olive:
+	case EAnastasisTreeSpecies::PlaneTree:
+		return EAnastasisFoliageFamily::Broadleaf;
+	case EAnastasisTreeSpecies::Any:
+	default:
+		return EAnastasisFoliageFamily::Any;
+	}
+}
+
+const TCHAR* SpeciesName(EAnastasisTreeSpecies Species)
+{
+	switch (Species)
+	{
+	case EAnastasisTreeSpecies::AleppoPine: return TEXT("aleppo_pine");
+	case EAnastasisTreeSpecies::Cypress: return TEXT("cypress");
+	case EAnastasisTreeSpecies::HolmOak: return TEXT("holm_oak");
+	case EAnastasisTreeSpecies::Olive: return TEXT("olive");
+	case EAnastasisTreeSpecies::PlaneTree: return TEXT("plane_tree");
+	case EAnastasisTreeSpecies::BlackPine: return TEXT("black_pine");
+	case EAnastasisTreeSpecies::GreekFir: return TEXT("greek_fir");
+	case EAnastasisTreeSpecies::Any:
+	default: return TEXT("any");
+	}
+}
+
 bool ResolvePresentation(
 	AnastasisWorld::ETileType Type,
 	uint32 Seed,
@@ -204,7 +352,8 @@ bool ResolvePresentation(
 	int32 TileY,
 	FResolvedPresentation& Out,
 	EAnastasisStatureClass Wanted,
-	EAnastasisFoliageFamily Family)
+	EAnastasisFoliageFamily Family,
+	EAnastasisTreeSpecies Species)
 {
 	Out = FResolvedPresentation{};
 
@@ -214,7 +363,7 @@ bool ResolvePresentation(
 		return false;
 	}
 
-	const int32 VariantIndex = SelectVariantIndex(*Entry, Seed, TileX, TileY, Wanted, Family);
+	const int32 VariantIndex = SelectVariantIndex(*Entry, Seed, TileX, TileY, Wanted, Family, Species);
 	if (VariantIndex == INDEX_NONE)
 	{
 		return false;
@@ -222,6 +371,15 @@ bool ResolvePresentation(
 
 	const FAnastasisPresentationVariant& Variant = Entry->Variants[VariantIndex];
 	UStaticMesh* Mesh = Variant.Mesh.LoadSynchronous();
+	if (!Mesh && Variant.Species != EAnastasisTreeSpecies::Any)
+	{
+		// A species look that is not generated yet (create_tree_asset.py not run): the tree
+		// keeps its presence and its family, drawn with the untagged grammar.
+		UE_LOG(LogAnastasis_UnrealV2, Warning,
+			TEXT("ANASTASIS_PRESENTATION_MISSING_SPECIES_MESH archetype=%s species=%s path=%s fallback=untagged"),
+			*Entry->ArchetypeId.ToString(), SpeciesName(Variant.Species), *Variant.Mesh.ToString());
+		return ResolvePresentation(Type, Seed, TileX, TileY, Out, Wanted, Family, EAnastasisTreeSpecies::Any);
+	}
 	if (!Mesh)
 	{
 		// The row names a mesh that will not load. Omit this archetype rather than render a
@@ -244,6 +402,10 @@ bool ResolvePresentation(
 		Out.AdditionalMaterials.Add(Slot.IsNull() ? nullptr : Slot.LoadSynchronous());
 	}
 	Out.ScaleBias = FMath::IsFinite(Variant.ScaleBias) && Variant.ScaleBias > 0.0f ? Variant.ScaleBias : 1.0f;
+	Out.Species = Variant.Species;
+	const bool bHeights = FMath::IsFinite(Variant.HeightRangeM.X) && FMath::IsFinite(Variant.HeightRangeM.Y)
+		&& Variant.HeightRangeM.X > 0.0 && Variant.HeightRangeM.Y >= Variant.HeightRangeM.X;
+	Out.HeightRangeM = bHeights ? Variant.HeightRangeM : FVector2D::ZeroVector;
 	return true;
 }
 

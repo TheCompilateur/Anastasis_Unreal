@@ -79,6 +79,38 @@ enum class EAnastasisFoliageFamily : uint8
 	Broadleaf = 2,
 };
 
+/**
+ * Which tree species a look depicts. FOREST_TERRAIN_P1.
+ *
+ * The world is Byzantine Greece after 1204, not the Pontic forest the first tree grammar was
+ * drawn from: Mediterranean species below, the two native Greek mountain conifers above.
+ * A stand is zoned by altitude, slope, distance to water and exposure
+ * (AnastasisPresentation::SelectTreeSpecies), never by a hard contour.
+ *
+ * Any is value 0, the same convention as Stature and Family: a variant written before this
+ * axis existed is untagged, and an untagged request ignores species altogether -- every
+ * shipped registry resolves exactly as it did.
+ */
+UENUM(BlueprintType)
+enum class EAnastasisTreeSpecies : uint8
+{
+	Any = 0,
+	/** Pinus halepensis -- low dry slopes, open irregular crown, often leaning. */
+	AleppoPine = 1,
+	/** Cupressus sempervirens -- slim column, rocky ground and around settlements. */
+	Cypress = 2,
+	/** Quercus ilex -- the evergreen oak of the middle slopes, dense dark dome. */
+	HolmOak = 3,
+	/** Olea europaea -- low, gentle and dry ground, gnarled trunk, silver crown. */
+	Olive = 4,
+	/** Platanus orientalis -- only along water, tall pale trunk, broad crown. */
+	PlaneTree = 5,
+	/** Pinus nigra -- upper slopes, straight trunk, dark flat-topped crown. */
+	BlackPine = 6,
+	/** Abies cephalonica -- the summits, conical tiers. */
+	GreekFir = 7,
+};
+
 /** One interchangeable look for an archetype. Adding a second entry here is how FOREST gets a second tree. */
 USTRUCT(BlueprintType)
 struct FAnastasisPresentationVariant
@@ -129,6 +161,21 @@ struct FAnastasisPresentationVariant
 	 */
 	UPROPERTY(EditAnywhere, Category = "Presentation", meta = (ClampMin = "0.05", ClampMax = "4.0"))
 	float ScaleBias = 1.0f;
+
+	/** Species this look depicts. Any = untagged, served only to requests that name no species. */
+	UPROPERTY(EditAnywhere, Category = "Presentation")
+	EAnastasisTreeSpecies Species = EAnastasisTreeSpecies::Any;
+
+	/**
+	 * Mature height range of this species, in metres (X = min, Y = max). (0, 0) = unused, and
+	 * the look keeps the envelope x ScaleBias x layer scaling it always had.
+	 *
+	 * When set, the forest dresses the instance at a REAL height: a draw in this range times
+	 * the tree's maturity. One factor, read in metres -- instead of three envelopes multiplied
+	 * together, which is what made the old grammar's sizes inconsistent between trees.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Presentation")
+	FVector2D HeightRangeM = FVector2D::ZeroVector;
 };
 
 /** What one semantic type looks like. The simulation never sees this struct. */

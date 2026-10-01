@@ -48,6 +48,24 @@ ARC_RADIUS = 2400.0
 ARC_SPACING = 340.0   # corde entre deux sujets : plus large que la plus large couronne
 CAM_HEIGHT = 320.0    # a mi-hauteur de l'emergent, pour ne privilegier ni le haut ni le bas
 
+# FOREST_TERRAIN_P1 -- planche des essences (ANASTASIS_LINEUP_SET=species). Une forme par
+# essence (ANASTASIS_LINEUP_SHAPE, 01 par defaut), a la hauteur MEDIANE que le registre lui
+# donne (HeightRangeM, maturite 1). Du plus petit au plus grand ; memes temoins a gauche.
+if os.environ.get('ANASTASIS_LINEUP_SET', '') == 'species':
+    _shape = os.environ.get('ANASTASIS_LINEUP_SHAPE', '01')
+    SUBJECTS = [
+        ('SM_Tree_Olive_' + _shape, 625.0, 'olivier 6.3 m'),
+        ('SM_Tree_HolmOak_' + _shape, 1100.0, 'chene vert 11 m'),
+        ('SM_Tree_AleppoPine_' + _shape, 1450.0, "pin d'Alep 14.5 m"),
+        ('SM_Tree_Cypress_' + _shape, 1600.0, 'cypres 16 m'),
+        ('SM_Tree_GreekFir_' + _shape, 1800.0, 'sapin de Cephalonie 18 m'),
+        ('SM_Tree_BlackPine_' + _shape, 1900.0, 'pin noir 19 m'),
+        ('SM_Tree_PlaneTree_' + _shape, 2050.0, 'platane 20.5 m'),
+    ]
+    ARC_RADIUS = 7000.0
+    ARC_SPACING = 1500.0
+    CAM_HEIGHT = 900.0
+
 # (mesh, hauteur en uu, etiquette). Les hauteurs sont la MEDIANE que chaque
 # stature recoit dans le monde : enveloppe d'entree 3.6-5.0 au milieu (4.3),
 # multipliee par le facteur de strate ecologique, puis par le biais de variante.

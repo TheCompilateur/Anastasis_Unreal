@@ -44,6 +44,10 @@ struct FPlacement
     uint32 VisualSeed = 0;
     FVector Ground = FVector::ZeroVector;
     double ScaleMultiplier = 1.0;
+    /** FOREST_TERRAIN_P1: the same growth draw as ScaleMultiplier, over the canopy envelope's
+     * top (canopy 0.79-1, secondary 0.42-0.65, young 0.21-0.38). Multiplies a species' real
+     * mature height; carries no world-scale factor. */
+    double Maturity = 1.0;
     double SlopeDegrees = 0.0;
     ELayer Layer = ELayer::Young;
 };

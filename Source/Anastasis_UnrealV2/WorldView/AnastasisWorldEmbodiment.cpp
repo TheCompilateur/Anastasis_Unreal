@@ -37,6 +37,12 @@ static TAutoConsoleVariable<int32> CVarMacroForest(
     TEXT("anastasis.Dressing.MacroForest"), 1,
     TEXT("0=original ecological dressing, 1=large forest masses conditioned by rendered relief; applied on embodiment."), ECVF_Default);
 
+// FOREST_TERRAIN_P1. Coupable pour l'A/B : memes troncs, memes positions ; 0 rend la grammaire
+// pontique d'origine (famille tiree de Shade/Wetness, echelles multipliees).
+static TAutoConsoleVariable<int32> CVarTreeSpecies(
+    TEXT("anastasis.Dressing.TreeSpecies"), 1,
+    TEXT("0=Pontic conifer/broadleaf grammar, 1=Mediterranean and Greek mountain species zoned by altitude, slope and water, at real heights; applied on embodiment."), ECVF_Default);
+
 // GROUND_COVER_001. Coupable pour l'A/B : meme monde, memes arbres, sans la strate herbacee.
 static TAutoConsoleVariable<int32> CVarGroundCover(
     TEXT("anastasis.Dressing.GroundCover"), 1,
@@ -175,6 +181,20 @@ namespace
 		const double Unit = static_cast<double>(H) / static_cast<double>(MAX_uint32);
 		return Unit < EmergentShareOfCanopy ? EAnastasisStatureClass::Emergent : EAnastasisStatureClass::Canopy;
 	}
+
+	/** Presentation-only per-tree draw, for height, crown width and tint. Same shape as above. */
+	double TreeUnit(uint32 VisualSeed, int32 TileX, int32 TileY, uint32 Salt)
+	{
+		uint32 H = VisualSeed ^ 0x2C1B3C6Du;
+		H = (H ^ static_cast<uint32>(TileX)) * 0x85EBCA6Bu;
+		H = (H ^ static_cast<uint32>(TileY)) * 0xC2B2AE35u;
+		H = (H ^ Salt) * 0x27D4EB2Fu;
+		H ^= H >> 15;
+		return static_cast<double>(H) / static_cast<double>(MAX_uint32);
+	}
+
+	/** An emergent is the old tail of the canopy: taller than its species' usual range. */
+	constexpr double EmergentHeightBonus = 1.15;
 }
 
 AAnastasisWorldEmbodiment::AAnastasisWorldEmbodiment()
@@ -359,6 +379,10 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
             Mid->SetVectorParameterValue(TEXT("Color"), R.Entry->Tint);
             M->SetMaterial(0, Mid);
         }
+        // FOREST_TERRAIN_P1 : deux flottants par instance, lus par M_AnastasisVegetation
+        // (PerInstanceCustomData 0 = secheresse du site, 1 = ecart individuel de valeur) pour
+        // teinter la couronne. Nuls par defaut : la couleur de sommet, comme avant.
+        if (M->NumCustomDataFloats != 2) M->SetNumCustomDataFloats(2);
         // Slots 1..N. A tree mesh carries two: foliage on 0, wood on 1. Left unset, slot 1
         // would fall back to the engine's default material -- a grey checkerboard trunk,
         // which is worse than a badly shaded one.
@@ -468,6 +492,13 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
             SiteShade.Reserve(ForestPlan.Instances.Num());
             SiteWetness.Reserve(ForestPlan.Instances.Num());
             SiteConiferousness.Reserve(ForestPlan.Instances.Num());
+            // FOREST_TERRAIN_P1 : etages d'altitude RELATIFS au relief reellement rendu -- la
+            // carte n'est pas refaite, son relief existant est zone.
+            const bool bSpecies = CVarTreeSpecies.GetValueOnGameThread() != 0;
+            const double AltitudeSpan = FMath::Max(ActiveFootprintBounds.IsValid
+                ? ActiveFootprintBounds.Max.Z - AnastasisTerrainSurface::WaterPlaneZ : 0.0, 100.0);
+            int32 SpeciesCounts[8] = {};
+            int32 RealHeightTrees = 0;
             for (const auto& P : ForestPlan.Instances)
             {
                 double GroundZ;
@@ -478,29 +509,67 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 if (Snapshot.bHumanGeography && AnastasisTerrainForge::SampleActiveWater(P.Ground.X, P.Ground.Y, WaterZ) && GroundZ <= WaterZ + 25.0) continue;
                 const auto& T = CanonicalSource.Tiles[P.SourceIndex];
                 const EAnastasisStatureClass Stature = StatureForLayer(P.Layer, P.VisualSeed, T.X, T.Y);
-                // Species comes from the site, not from a blind draw: Shade carries altitude
-                // and exposure, Wetness carries moisture, and both are simulation truth this
-                // layer only reads. Nothing here moves a tree.
-                const EAnastasisFoliageFamily Family = AnastasisPresentation::SelectFoliageFamily(
-                    T.Shade, T.Wetness, P.VisualSeed, T.X, T.Y);
+                // Species comes from the site, not from a blind draw. Nothing here moves a tree.
+                // FOREST_TERRAIN_P1 : altitude relative, pente et riviere RENDUES, plus Shade et
+                // Wetness de la simulation. Sans la CVar, la famille pontique d'origine.
+                AnastasisPresentation::FTreeSite Site;
+                Site.AltitudeFraction = (GroundZ - AnastasisTerrainSurface::WaterPlaneZ) / AltitudeSpan;
+                Site.SlopeDegrees = P.SlopeDegrees;
+                double Riparian = 0.0;
+                if (AnastasisDrainage::RiparianAt(P.Ground.X, P.Ground.Y, Riparian)) Site.Riparian = Riparian;
+                Site.Wetness = T.Wetness;
+                Site.Shade = T.Shade;
+                const EAnastasisTreeSpecies Species = bSpecies
+                    ? AnastasisPresentation::SelectTreeSpecies(Site, P.VisualSeed, T.X, T.Y)
+                    : EAnastasisTreeSpecies::Any;
+                const EAnastasisFoliageFamily Family = Species != EAnastasisTreeSpecies::Any
+                    ? AnastasisPresentation::FamilyOfSpecies(Species)
+                    : AnastasisPresentation::SelectFoliageFamily(T.Shade, T.Wetness, P.VisualSeed, T.X, T.Y);
                 SiteShade.Add(T.Shade);
                 SiteWetness.Add(T.Wetness);
                 SiteConiferousness.Add(AnastasisPresentation::Coniferousness(T.Shade, T.Wetness));
                 AnastasisPresentation::FResolvedPresentation R;
                 if (!AnastasisPresentation::ResolvePresentation(AnastasisWorld::ETileType::Forest,
-                    P.VisualSeed, T.X, T.Y, R, Stature, Family)) continue;
+                    P.VisualSeed, T.X, T.Y, R, Stature, Family, Species)) continue;
                 auto* M = Prepare(R);
                 if (!M) continue;
                 FTransform Pose = AnastasisPresentation::ResolveInstanceTransform(*R.Entry,
                     P.VisualSeed, T.X, T.Y, T.Alt, R.ScaleBias);
-                Pose.SetScale3D(Pose.GetScale3D() * P.ScaleMultiplier);
-                // Large trunks stay plumb on steep ground; random yaw still varies the skyline.
-                if (bMacro) Pose.SetRotation(FRotator(0.0, Pose.Rotator().Yaw, 0.0).Quaternion());
                 // Actual mesh bounds, not the resolver's 100uu primitive pivot convention.
                 const FBox MeshBounds = R.Mesh->GetBoundingBox();
                 const double MinZ = MeshBounds.Min.Z;
+                if (R.HeightRangeM.Y > 0.0)
+                {
+                    // FOREST_TERRAIN_P1 : UNE hauteur reelle -- l'etendue de l'espece, en metres,
+                    // fois la maturite de l'arbre -- au lieu de trois enveloppes multipliees. La
+                    // couronne varie en largeur independamment (+-12 %) : deux arbres de meme
+                    // taille n'ont pas la meme silhouette.
+                    double HeightM = FMath::Lerp(static_cast<double>(R.HeightRangeM.X), static_cast<double>(R.HeightRangeM.Y),
+                        TreeUnit(P.VisualSeed, T.X, T.Y, 0x31u)) * P.Maturity;
+                    if (Stature == EAnastasisStatureClass::Emergent) HeightM *= EmergentHeightBonus;
+                    const double Vertical = HeightM * 100.0 / FMath::Max(MeshBounds.Max.Z - MinZ, 1.0);
+                    const double Crown = FMath::Lerp(0.88, 1.12, TreeUnit(P.VisualSeed, T.X, T.Y, 0x32u));
+                    Pose.SetScale3D(FVector(Vertical * Crown, Vertical * Crown, Vertical));
+                    ++RealHeightTrees;
+                }
+                else
+                {
+                    Pose.SetScale3D(Pose.GetScale3D() * P.ScaleMultiplier);
+                }
+                // Large trunks stay plumb on steep ground; random yaw still varies the skyline.
+                if (bMacro) Pose.SetRotation(FRotator(0.0, Pose.Rotator().Yaw, 0.0).Quaternion());
                 Pose.SetLocation(FVector(P.Ground.X, P.Ground.Y, GroundZ - MinZ * Pose.GetScale3D().Z));
-                M->AddInstance(Pose, false);
+                const int32 Instance = M->AddInstance(Pose, false);
+                // Secheresse du site [0,1] pour la teinte : seche loin de l'eau, verte sur la rive,
+                // avec une part individuelle -- deux voisins n'ont pas la meme couronne.
+                const double Dryness = FMath::Clamp(1.0 - FMath::Max(Site.Riparian, 1.5 * T.Wetness), 0.0, 1.0)
+                    * FMath::Lerp(0.55, 1.0, TreeUnit(P.VisualSeed, T.X, T.Y, 0x33u));
+                if (Instance != INDEX_NONE && M->NumCustomDataFloats >= 2)
+                {
+                    M->SetCustomDataValue(Instance, 0, static_cast<float>(Dryness), false);
+                    M->SetCustomDataValue(Instance, 1, static_cast<float>(TreeUnit(P.VisualSeed, T.X, T.Y, 0x34u) * 2.0 - 1.0), false);
+                }
+                ++SpeciesCounts[static_cast<uint8>(R.Species) & 7];
                 Canopy.Add(FVector(P.Ground.X, P.Ground.Y,
                     FVector2D(MeshBounds.GetExtent().X, MeshBounds.GetExtent().Y).GetMax() * Pose.GetScale3D().X));
                 ++ForestLayerCounts[static_cast<uint8>(P.Layer)];
@@ -546,6 +615,20 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 At(SiteShade, 0.0), At(SiteShade, 0.5), At(SiteShade, 1.0),
                 At(SiteWetness, 0.0), At(SiteWetness, 0.5), At(SiteWetness, 1.0),
                 At(SiteConiferousness, 0.0), At(SiteConiferousness, 0.5), At(SiteConiferousness, 1.0));
+            // FOREST_TERRAIN_P1 : l'essence REELLEMENT posee (apres repli eventuel sur la grammaire
+            // non etiquetee, qui compte en untagged), et combien d'arbres ont une hauteur reelle.
+            UE_LOG(LogAnastasis_UnrealV2, Display,
+                TEXT("ANASTASIS_TREE_TAXA enabled=%d aleppo_pine=%d cypress=%d holm_oak=%d olive=%d plane_tree=%d black_pine=%d greek_fir=%d untagged=%d real_height=%d altitude_span_uu=%.0f"),
+                bSpecies ? 1 : 0,
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::AleppoPine)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::Cypress)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::HolmOak)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::Olive)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::PlaneTree)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::BlackPine)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::GreekFir)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::Any)],
+                RealHeightTrees, AltitudeSpan);
         }
     }
     UE_LOG(LogAnastasis_UnrealV2, Display,

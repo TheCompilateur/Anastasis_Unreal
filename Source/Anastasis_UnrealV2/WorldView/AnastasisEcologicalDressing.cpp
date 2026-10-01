@@ -230,8 +230,9 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
                 : Choice < 0.25 + Mature * 0.65 ? ELayer::Secondary : ELayer::Young;
             const FVector2D Envelope = P.Layer == ELayer::Canopy ? C.CanopyScale
                 : P.Layer == ELayer::Secondary ? C.SecondaryScale : C.YoungScale;
-            P.ScaleMultiplier = FMath::Lerp(Envelope.X, Envelope.Y, Unit(Hash(Seed,T.X,T.Y,5)))
-                * (bMacro ? C.HeightMultiplier : 1.0);
+            const double Growth = FMath::Lerp(Envelope.X, Envelope.Y, Unit(Hash(Seed,T.X,T.Y,5)));
+            P.ScaleMultiplier = Growth * (bMacro ? C.HeightMultiplier : 1.0);
+            P.Maturity = FMath::Clamp(Growth / C.CanopyScale.Y, 0.05, 1.0);
             P.SourceIndex = T.SourceIndex;
             P.VisualSeed = Seed;
             P.Ground = FVector(XY.X,XY.Y,Z);

@@ -270,7 +270,7 @@ Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
 | `capture-forest-walk.py` | Vues forestieres fixes, tailles des LOD et empreinte des HISM ; ANASTASIS_FOREST_OUT requis, aucun asset sauve, ferme l'editeur dedie |
 | `capture-reed-form.ps1` + `capture-reed-form.py` | comparaison des formes de roseaux dans une scene temporaire |
 | `capture-shore-reeds.ps1` + `capture-shore-reeds.py` | comparaison de silhouettes et proportions de roseaux sur la rive |
-| `capture-tree-lineup.ps1` + `capture-tree-lineup.py` | planche de stature de la grammaire d'arbres |
+| `capture-tree-lineup.ps1` + `capture-tree-lineup.py` | planche de stature de la grammaire d'arbres ; `-Set species [-Shape 01..03]` : planche des sept essences a leur hauteur mediane |
 | `astral-observe.py` | A/B lumière du jour fixe, Ecology seule variable |
 | `measure-tree-cost.ps1` + `measure-tree-cost.py` | triangles, LOD, instances HISM réellement soumis |
 | `inspect_presentation_registry.py` | dump de `DA_AnastasisPresentation` |
@@ -286,12 +286,12 @@ manque puis se contentent de le vérifier ; `*_REBUILD=1` le régénère et écr
 | `shore-water.ps1` + `.py` | `M_AnastasisShoreWater` |
 | `presentation-registry.py` | `DA_AnastasisPresentation` |
 | `atmosphere-profile.py` | `DA_AnastasisAtmosphere` |
-| `create_tree_asset.py` | `SM_Tree_*`, `M_AnastasisVegetation` — régénérés à **chaque** run |
+| `create_tree_asset.py` | `SM_Tree_*` (grille pontique + 7 essences x 3 formes : pin d'Alep, cypres, chene vert, olivier, platane, pin noir, sapin de Cephalonie), `M_AnastasisVegetation`, `M_AnastasisBark` — régénérés à **chaque** run |
 | `create-reed-form.py` | recette isolee de roseaux courbes ; cree les assets de la variante |
 | `world-dressing-01.ps1` + `.py` | trois lieux composes sur Human Geography V2 ; Preview sans sauvegarde, Save ecrit les acteurs WD01 de Lvl_AnastasisSlice et MI_WeatheredStone, Verify relit la map ; preuves via -Out |
 | `create_ruin_asset.py` | `SM_Ruin_Generic_01` |
 | `set_presentation_meshes.py` | câble un mesh par archétype dans `DA_AnastasisPresentation` |
-| `set_tree_grammar.py` | entrée FOREST du registre (variantes d'arbres) |
+| `set_tree_grammar.py` | entrée FOREST du registre (variantes d'arbres, essences et hauteurs reelles) ; apres `create_tree_asset.py` |
 | `set_ruin_variant.py` | entrée Ruin — généralisé depuis par `set_presentation_meshes.py` |
 
 Retoucher un de ces assets à la main dans l'éditeur ne survit pas au prochain rebuild : la valeur
