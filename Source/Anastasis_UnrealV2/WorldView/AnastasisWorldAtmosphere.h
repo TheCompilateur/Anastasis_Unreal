@@ -131,6 +131,12 @@ public:
 	/** Whether the last Apply() ran the realism layer (profile switch AND CVar). */
 	bool WasRealismApplied() const { return bRealismApplied; }
 
+	/** True when the last Apply()/Tick handed forward shading to the moon (ATMOSPHERE_COHERENCE_001). */
+	bool IsMoonLeadingForward() const { return bMoonLeadsForward; }
+
+	/** Directional lights in the level that are neither the adopted sun nor the moon, at the last Apply(). */
+	int32 GetExtraDirectionalLightCount() const { return ExtraDirectionalLights; }
+
 	/** How many of the five rig actors Apply() had to create because the level had none. */
 	int32 GetSpawnedCount() const { return SpawnedCount; }
 
@@ -174,6 +180,19 @@ protected:
 	void ApplyRealism(const UAnastasisAtmosphereProfile& Profile, bool bOn, const FRotator& SunRotation, const FRotator& MoonRotation);
 
 	bool bRealismApplied = false;
+
+	/**
+	 * ATMOSPHERE_COHERENCE_001. The renderer takes ONE directional light for forward shading,
+	 * translucency, single layer water and volumetric fog (highest ForwardShadingPriority). Sun
+	 * and moon both at the default 0 made it warn and fall back to brightness --
+	 * the 75000 lux sun, even set, even shadowless. This gives the lead to the moon exactly when
+	 * the sun is below the horizon (the shadows' own predicate), and scales the sun's
+	 * VolumetricScatteringIntensity by SunFogScattering. Writes only what changed.
+	 */
+	void ArbitrateDirectionalLights(bool bMoonLeads, double SunFogScattering);
+
+	bool bMoonLeadsForward = false;
+	int32 ExtraDirectionalLights = 0;
 
 	/**
 	 * Writes one sky instant: sun and moon orientation and shadows, pinned exposure, cloud

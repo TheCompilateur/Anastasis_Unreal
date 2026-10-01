@@ -3,6 +3,7 @@
 #include "Life/AnastasisVillageRhythm.h"
 #include "World/AnastasisWeather.h"
 #include "WorldView/AnastasisAtmosphereProfile.h"
+#include "WorldView/AnastasisAtmosphereResolver.h"
 #include "WorldView/AnastasisSkyClock.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -216,8 +217,8 @@ bool FAnastasisSkyClockFogAndMistFollowTheLight::RunTest(const FString&)
 	AnastasisSkyClock::FSkyState Noon = At(34.0, 13.0);
 	for (AnastasisSkyClock::FSkyState* S : {&Dawn, &Noon})
 	{
-		S->Humidity = 0.0;
-		S->Weather.Wind = 0.0;
+		S->SkyHumidity = 0.0;
+		S->SkyWind = 0.0;
 	}
 	const double MistDawn = AnastasisSkyClock::MistFactorFor(*Profile, Dawn);
 	const double MistNoon = AnastasisSkyClock::MistFactorFor(*Profile, Noon);
@@ -226,10 +227,10 @@ bool FAnastasisSkyClockFogAndMistFollowTheLight::RunTest(const FString&)
 	TestEqual(TEXT("a high sun leaves the profile's midday trace"), MistNoon, static_cast<double>(Profile->MistMiddayFactor), 1e-6);
 
 	AnastasisSkyClock::FSkyState Humid = Dawn;
-	Humid.Humidity = 0.7;
+	Humid.SkyHumidity = 0.7;
 	TestTrue(TEXT("humid air thickens the mist"), AnastasisSkyClock::MistFactorFor(*Profile, Humid) > MistDawn);
 	AnastasisSkyClock::FSkyState Windy = Dawn;
-	Windy.Weather.Wind = 0.8;
+	Windy.SkyWind = 0.8;
 	TestTrue(TEXT("wind disperses the mist"), AnastasisSkyClock::MistFactorFor(*Profile, Windy) < MistDawn);
 	return true;
 }
@@ -343,6 +344,140 @@ bool FAnastasisSkyClockEyeAdaptation::RunTest(const FString&)
 	TestEqual(TEXT("the target is reached"), EV, Target, 1e-9);
 	TestTrue(TEXT("a full day-to-night change takes seconds, not a frame"), Frames * Dt >= 15.0 / Rate - 1e-6);
 	TestEqual(TEXT("zero elapsed time does not move it"), AnastasisSkyClock::AdaptExposure(5.0, 10.0, 0.0, Rate), 5.0, 1e-12);
+	return true;
+}
+
+/**
+ * ATMOSPHERE_COHERENCE_001 -- the fog must not appear at the stroke of midnight.
+ *
+ * AnastasisWeather rolls a new base and a new wind each simulation day, so the raw humidity the
+ * fog density and the mist read stepped at 00:00. The sky's weather (SkyWeatherAt) cross-fades
+ * over WeatherBlendHours around midnight. Locked here, over two years of seed 12345:
+ *   - the raw weather really does step at midnight (else the test proves nothing);
+ *   - the sky's does not: the last instant of a day and the first of the next agree;
+ *   - no minute of the year moves the sky's humidity, wind or cover by more than a bound far
+ *     below the raw midnight steps;
+ *   - outside the window the sky's weather IS the simulation's, bit for bit.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisSkyClockWeatherHasNoMidnightStep, "Anastasis.Sky.Clock.WeatherHasNoMidnightStep", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisSkyClockWeatherHasNoMidnightStep::RunTest(const FString&)
+{
+	const UAnastasisAtmosphereProfile* Profile = UAnastasisAtmosphereProfile::CreateCodeDefaults(GetTransientPackage());
+	const uint32 Seed = 12345u;
+	const double Blend = Profile->WeatherBlendHours;
+	TestTrue(TEXT("the profile blends the weather across midnight"), Blend > 0.0);
+
+	double MaxRawStep = 0.0;
+	int32 RawSteps = 0;
+	double MaxSkyMidnightGap = 0.0;
+	for (int32 Day = 1; Day < 240; ++Day)
+	{
+		const double LastFrac = 1.0 - 1e-9;
+		const double RawBefore = AnastasisWeather::WeatherHumidityAt(AnastasisWeather::WeatherAt(Seed, Day, nullptr, LastFrac));
+		const double RawAfter = AnastasisWeather::WeatherHumidityAt(AnastasisWeather::WeatherAt(Seed, Day + 1, nullptr, 0.0));
+		const double RawStep = FMath::Abs(RawAfter - RawBefore);
+		MaxRawStep = FMath::Max(MaxRawStep, RawStep);
+		RawSteps += RawStep > 0.05 ? 1 : 0;
+
+		const AnastasisSkyClock::FSkyWeather Before = AnastasisSkyClock::SkyWeatherAt(Seed, Day, LastFrac, Blend);
+		const AnastasisSkyClock::FSkyWeather After = AnastasisSkyClock::SkyWeatherAt(Seed, Day + 1, 0.0, Blend);
+		MaxSkyMidnightGap = FMath::Max(MaxSkyMidnightGap, FMath::Max3(
+			FMath::Abs(After.Humidity - Before.Humidity), FMath::Abs(After.Wind - Before.Wind), FMath::Abs(After.Cover - Before.Cover)));
+	}
+
+	// Minute by minute through the whole of two years: the largest change the sky ever makes.
+	double MaxSkyMinuteStep = 0.0;
+	AnastasisSkyClock::FSkyWeather Prev = AnastasisSkyClock::SkyWeatherAt(Seed, 1.0, 0.0, Blend);
+	const int32 MinutesPerDay = 24 * 60;
+	for (int32 M = 1; M < 240 * MinutesPerDay; ++M)
+	{
+		const double Day = 1.0 + FMath::FloorToDouble(static_cast<double>(M) / MinutesPerDay);
+		const double Frac = static_cast<double>(M % MinutesPerDay) / MinutesPerDay;
+		const AnastasisSkyClock::FSkyWeather Now = AnastasisSkyClock::SkyWeatherAt(Seed, Day, Frac, Blend);
+		MaxSkyMinuteStep = FMath::Max(MaxSkyMinuteStep, FMath::Max3(
+			FMath::Abs(Now.Humidity - Prev.Humidity), FMath::Abs(Now.Wind - Prev.Wind), FMath::Abs(Now.Cover - Prev.Cover)));
+		Prev = Now;
+	}
+
+	AddInfo(FString::Printf(TEXT("ANASTASIS_SKY_MIDNIGHT raw_steps_over_0.05=%d max_raw_step=%.3f max_sky_midnight_gap=%.2e max_sky_minute_step=%.4f"),
+		RawSteps, MaxRawStep, MaxSkyMidnightGap, MaxSkyMinuteStep));
+	TestTrue(TEXT("the simulation's weather does step at midnight (the test has something to prove)"), RawSteps > 0);
+	TestTrue(TEXT("the sky's weather is continuous across midnight"), MaxSkyMidnightGap < 1e-6);
+	TestTrue(TEXT("no minute moves the sky's weather by a tenth of the largest raw midnight step"), MaxSkyMinuteStep < 0.1 * MaxRawStep);
+
+	// Outside the window: the simulation's own weather.
+	const AnastasisWeather::FWeather Raw = AnastasisWeather::WeatherAt(Seed, 8.0, nullptr, 0.5);
+	const AnastasisSkyClock::FSkyWeather Noon = AnastasisSkyClock::SkyWeatherAt(Seed, 8.0, 0.5, Blend);
+	TestEqual(TEXT("midday humidity is the simulation's"), AnastasisSkyClockTest::Bits(Noon.Humidity), AnastasisSkyClockTest::Bits(AnastasisWeather::WeatherHumidityAt(Raw)));
+	TestEqual(TEXT("midday wind is the simulation's"), AnastasisSkyClockTest::Bits(Noon.Wind), AnastasisSkyClockTest::Bits(Raw.Wind));
+	TestEqual(TEXT("midday cover is the simulation's"), AnastasisSkyClockTest::Bits(Noon.Cover), AnastasisSkyClockTest::Bits(Raw.Cover));
+
+	// The simulation's own weather in the sky state is never the blended one.
+	const AnastasisSkyClock::FSkyState Late = AnastasisSkyClock::Evaluate(*Profile, AnastasisSkyClock::SimTimeFor(8.0, 23.9), Seed);
+	const AnastasisWeather::FWeather LateRaw = AnastasisWeather::WeatherAt(Seed, 8.0, nullptr, Late.DayFrac);
+	TestEqual(TEXT("FSkyState::Weather stays the simulation's"), AnastasisSkyClockTest::Bits(Late.Weather.Cover), AnastasisSkyClockTest::Bits(LateRaw.Cover));
+	return true;
+}
+
+/**
+ * ATMOSPHERE_COHERENCE_001 -- one forward light, and no fog lit by a set sun.
+ *
+ * The renderer warned that sun and moon competed for forward shading
+ * (translucency, single layer water, volumetric fog), and its brightness fallback kept the sun,
+ * set and shadowless, as the light of the night's fog. Over a year, minute by minute:
+ *   - exactly one of sun and moon leads, the moon exactly when the sun is under the horizon;
+ *   - the sun scatters nothing in the fog under the horizon, fully above the profile's
+ *     elevation, and never moves by a tenth in one minute of sky.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisSkyClockOneForwardLight, "Anastasis.Sky.Clock.OneForwardLight", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisSkyClockOneForwardLight::RunTest(const FString&)
+{
+	const UAnastasisAtmosphereProfile* Profile = UAnastasisAtmosphereProfile::CreateCodeDefaults(GetTransientPackage());
+	TestTrue(TEXT("lead and follow are different priorities, the lead higher"),
+		AnastasisSkyClock::ForwardPriorityLead > AnastasisSkyClock::ForwardPriorityFollow);
+
+	int32 Wrong = 0;
+	int32 MoonInstants = 0;
+	double MaxScatterStep = 0.0;
+	double MaxScatterBelow = 0.0;
+	double Prev = -1.0;
+	const double Step = 60.0 / 3600.0 / 24.0 * AnastasisSkyClock::DayLengthSeconds;
+	for (double T = 0.0; T < 120.0 * AnastasisSkyClock::DayLengthSeconds; T += Step)
+	{
+		const AnastasisSkyClock::FSkyState S = AnastasisSkyClock::Evaluate(*Profile, T, 12345u);
+		const bool bSunDown = AnastasisAtmosphere::IsBelowHorizon(S.SunRotation);
+		Wrong += S.bMoonLeadsForward != bSunDown ? 1 : 0;
+		MoonInstants += S.bMoonLeadsForward ? 1 : 0;
+		if (bSunDown)
+		{
+			MaxScatterBelow = FMath::Max(MaxScatterBelow, S.SunFogScattering);
+		}
+		if (Prev >= 0.0)
+		{
+			MaxScatterStep = FMath::Max(MaxScatterStep, FMath::Abs(S.SunFogScattering - Prev));
+		}
+		Prev = S.SunFogScattering;
+	}
+	AddInfo(FString::Printf(TEXT("ANASTASIS_SKY_FORWARD moon_instants=%d wrong=%d max_scatter_below_horizon=%.3f max_scatter_step_1min=%.3f"),
+		MoonInstants, Wrong, MaxScatterBelow, MaxScatterStep));
+	TestEqual(TEXT("the moon leads exactly when the sun is down"), Wrong, 0);
+	TestTrue(TEXT("the moon does lead at night"), MoonInstants > 0);
+	TestEqual(TEXT("a set sun scatters nothing in the fog"), MaxScatterBelow, 0.0, 1e-12);
+	TestTrue(TEXT("the sun's fog scattering never jumps (one minute of sky moves it by less than 0.1)"), MaxScatterStep < 0.1);
+	TestEqual(TEXT("a high sun scatters fully"),
+		AnastasisSkyClock::SunFogScatteringFor(*Profile, Profile->SunFogScatterFullElevationDegrees + 1.0), 1.0, 1e-12);
+
+	const AnastasisSkyClock::FSkyState Noon = AnastasisSkyClock::Evaluate(*Profile, AnastasisSkyClock::SimTimeFor(1.0, 12.0), 12345u);
+	const AnastasisSkyClock::FSkyState Midnight = AnastasisSkyClock::Evaluate(*Profile, AnastasisSkyClock::SimTimeFor(1.0, 0.0), 12345u);
+	TestFalse(TEXT("noon: the sun leads"), Noon.bMoonLeadsForward);
+	TestTrue(TEXT("midnight: the moon leads"), Midnight.bMoonLeadsForward);
+
+	// Twilight local exposure: the project's value by day, the profile's with the sun gone.
+	const double DayValue = 0.8;
+	TestEqual(TEXT("day: the project's own highlight contrast"), AnastasisSkyClock::HighlightContrastFor(*Profile, 1.0, DayValue), DayValue, 1e-12);
+	TestEqual(TEXT("night: the profile's twilight highlight contrast"), AnastasisSkyClock::HighlightContrastFor(*Profile, 0.0, DayValue),
+		static_cast<double>(Profile->TwilightHighlightContrastScale), 1e-6);
+	TestTrue(TEXT("twilight compresses highlights, it does not boost them"), Profile->TwilightHighlightContrastScale <= DayValue);
 	return true;
 }
 

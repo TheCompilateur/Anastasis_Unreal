@@ -58,6 +58,18 @@ namespace AnastasisSkyClock
 		AnastasisWeather::FWeather Weather;
 		double Humidity = 0.0;
 		double Wetness = 0.0;
+		/**
+		 * The weather the SKY shows: the simulation's humidity, wind and cover, cross-faded over
+		 * the profile's WeatherBlendHours around midnight (see SkyWeatherAt). Weather above stays
+		 * the simulation's own, bit for bit; only fog, mist and clouds read these.
+		 */
+		double SkyHumidity = 0.0;
+		double SkyWind = 0.0;
+		double SkyCover = 0.0;
+		/** 0..1 share of the sun's light the fog may scatter (SunFogScatteringFor). */
+		double SunFogScattering = 1.0;
+		/** True when the moon, not the sun, is the forward-shading light (MoonLeadsForwardShading). */
+		bool bMoonLeadsForward = false;
 		/** Village phase id ("night", "dawn"...), from the same fraction. */
 		const TCHAR* VillagePhase = TEXT("");
 	};
@@ -108,13 +120,66 @@ namespace AnastasisSkyClock
 	double FogInscatteringScaleFor(double ExposureEV100, double DayEV100);
 
 	/**
+	 * ATMOSPHERE_COHERENCE_001. The renderer lights forward shading, translucency, single layer
+	 * water and volumetric fog with ONE directional light: the highest ForwardShadingPriority,
+	 * brightness as tie-break. Sun and moon both sat at the engine default 0, so the renderer
+	 * warned ("multiple directional lights are competing...") whenever both were rendered and its fallback
+	 * kept the 75000 lux sun -- below the horizon, with its shadows switched off -- as the light
+	 * of the night's fog and water. The rule is the one the shadows already follow: the sun
+	 * leads while it is up, the moon once it has set. Same predicate as IsBelowHorizon.
+	 */
+	inline bool MoonLeadsForwardShading(const double SunElevationDegrees) { return SunElevationDegrees < 0.0; }
+
+	/** ForwardShadingPriority of the leading light and of the other one. Higher wins. */
+	inline constexpr int32 ForwardPriorityLead = 1;
+	inline constexpr int32 ForwardPriorityFollow = 0;
+
+	/**
+	 * Share of the sun's light the fog scatters (the sun's VolumetricScatteringIntensity): 0 with
+	 * the sun at or under the horizon -- it lights nothing through the planet, and fog lit by it
+	 * there is the glowing bank of the first captures -- smoothstep to 1 at the profile's
+	 * SunFogScatterFullElevationDegrees. Continuous, so a sunset dims the fog instead of switching it.
+	 */
+	double SunFogScatteringFor(const UAnastasisAtmosphereProfile& Profile, double SunElevationDegrees);
+
+	/** Humidity, wind and cover as the sky shows them. */
+	struct FSkyWeather
+	{
+		double Humidity = 0.0;
+		double Wind = 0.0;
+		double Cover = 0.0;
+	};
+
+	/**
+	 * The simulation's weather at (Day, DayFrac), made continuous in time for the sky.
+	 *
+	 * AnastasisWeather rolls a new base and a new wind every simulation day: at 00:00 humidity
+	 * (so fog density) and wind (so mist) jumped in one frame -- a fog bank appearing at the
+	 * stroke of midnight. Within BlendHours of midnight the sky cross-fades between the day
+	 * ending (taken at its last instant) and the day starting (at its first), with a smoothstep
+	 * that is exactly one half on both sides of midnight: continuous, deterministic in
+	 * (Seed, Day, DayFrac), and equal to the simulation's weather outside the window. Day 1 has
+	 * no previous day to fade from. BlendHours <= 0 returns the raw weather.
+	 */
+	FSkyWeather SkyWeatherAt(uint32 Seed, double Day, double DayFrac, double BlendHours);
+
+	/**
+	 * Local exposure highlight contrast for this daylight factor: the project's own value (the
+	 * r.DefaultFeature.LocalExposure.HighlightContrastScale passed as DayValue) in full day, the
+	 * profile's TwilightHighlightContrastScale with the sun gone, linear in Daylight between.
+	 * Compresses the bright dusk sky toward the dark ground without touching the pinned EV.
+	 */
+	double HighlightContrastFor(const UAnastasisAtmosphereProfile& Profile, double Daylight, double DayValue);
+
+	/**
 	 * Strength of the wetness-driven mist pockets at this instant, as a multiplier of their
 	 * ATMOSPHERE_002 extinction. Valley and river mist is radiation fog: it forms in the still,
 	 * cool hours and burns off as the sun climbs. So:
 	 *   - full strength with the sun at or below the horizon, MistMiddayFactor with it above
 	 *     MistBurnOffElevationDegrees, smoothstep between (dawn and dusk are symmetric in sun
 	 *     height, the evening mist comes back as the sun sets);
-	 *   - humid air after rain thickens it (x (1 + humidity)), wind disperses it (x (1 - 0.6 wind)).
+	 *   - humid air after rain thickens it (x (1 + humidity)), wind disperses it (x (1 - 0.6 wind)),
+	 *     both read from the sky's cross-faded weather (SkyHumidity, SkyWind).
 	 * The WHERE stays the simulation's wetness field; this only says WHEN and how much.
 	 */
 	double MistFactorFor(const UAnastasisAtmosphereProfile& Profile, const FSkyState& State);

@@ -11,6 +11,7 @@
 #include "HAL/IConsoleManager.h"
 #include "WorldView/AnastasisAtmosphereProfile.h"
 #include "WorldView/AnastasisAtmosphereResolver.h"
+#include "WorldView/AnastasisSkyClock.h"
 #include "WorldView/AnastasisWorldAtmosphere.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -588,6 +589,78 @@ bool FAnastasisAtmosphereRealismMoonGeometry::RunTest(const FString&)
 	const FRotator NoonSun = AnastasisAtmosphere::ResolveSunRotation(*Profile);
 	TestEqual(TEXT("the midnight full moon stands where the noon sun did (equinox)"),
 		static_cast<double>(Midnight.Pitch), static_cast<double>(NoonSun.Pitch), 0.001);
+	return true;
+}
+
+/**
+ * ATMOSPHERE_COHERENCE_001, in a real world. The renderer's warning "multiple directional lights
+ * are competing to be the single one used for forward shading, translucent, water or volumetric
+ * fog" is exactly two directional lights at the same ForwardShadingPriority. With the sky pinned
+ * at noon and at midnight, after Apply(): sun and moon never share a priority, the sun leads at
+ * noon, the moon at midnight, and a set sun scatters nothing in the fog.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisAtmosphereForwardLightOneLeader, "Anastasis.Atmosphere.ForwardLight.OneLeader", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisAtmosphereForwardLightOneLeader::RunTest(const FString&)
+{
+	UWorld* World = FindAtmosphereAutomationWorld();
+	if (!World)
+	{
+		AddInfo(TEXT("no editor/game world available; not exercised"));
+		return true;
+	}
+	const UAnastasisAtmosphereProfile& Profile = AnastasisAtmosphere::GetProfile();
+	IConsoleVariable* Clock = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Sky.Clock"));
+	IConsoleVariable* Hour = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Sky.Hour"));
+	if (!Profile.bRealismEnabled || !Profile.bMoonEnabled || !Profile.bSkyFollowsSimulation || !Clock || !Hour)
+	{
+		AddInfo(TEXT("profile or CVars disable the moon or the sky clock; not exercised"));
+		return true;
+	}
+
+	const FScopedRealismCVar Realism(1);
+	const int32 ClockBefore = Clock->GetInt();
+	const float HourBefore = Hour->GetFloat();
+	Clock->Set(1, ECVF_SetByCode);
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	Params.ObjectFlags |= RF_Transient;
+	AAnastasisWorldAtmosphere* Atmosphere = World->SpawnActor<AAnastasisWorldAtmosphere>(
+		AAnastasisWorldAtmosphere::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+	if (TestNotNull(TEXT("atmosphere actor spawns"), Atmosphere))
+	{
+		for (const float Pinned : {12.0f, 0.0f})
+		{
+			Hour->Set(Pinned, ECVF_SetByCode);
+			const FString At = FString::Printf(TEXT(" at %.0fh"), Pinned);
+			TestTrue(TEXT("apply") + At, Atmosphere->Apply());
+			const UDirectionalLightComponent* SunC = Atmosphere->GetSun() ? Cast<UDirectionalLightComponent>(Atmosphere->GetSun()->GetLightComponent()) : nullptr;
+			const UDirectionalLightComponent* MoonC = Atmosphere->GetMoon() ? Cast<UDirectionalLightComponent>(Atmosphere->GetMoon()->GetLightComponent()) : nullptr;
+			if (!TestNotNull(*(TEXT("sun") + At), SunC) || !TestNotNull(*(TEXT("moon") + At), MoonC))
+			{
+				continue;
+			}
+			const bool bNight = Pinned < 6.0f;
+			TestTrue(TEXT("sun and moon never share a forward priority") + At, SunC->ForwardShadingPriority != MoonC->ForwardShadingPriority);
+			TestTrue(TEXT("the leader is the sun by day, the moon by night") + At, Atmosphere->IsMoonLeadingForward() == bNight);
+			TestEqual(*(TEXT("the leader holds the higher priority") + At),
+				(bNight ? MoonC : SunC)->ForwardShadingPriority, AnastasisSkyClock::ForwardPriorityLead);
+			if (bNight)
+			{
+				TestEqual(*(TEXT("a set sun scatters nothing in the fog") + At), SunC->VolumetricScatteringIntensity, 0.0f);
+			}
+			else
+			{
+				TestEqual(*(TEXT("a high sun scatters fully") + At), SunC->VolumetricScatteringIntensity, 1.0f);
+			}
+		}
+		AddInfo(FString::Printf(TEXT("ANASTASIS_ATMOSPHERE_FORWARD extra_directional_lights=%d"), Atmosphere->GetExtraDirectionalLightCount()));
+		Atmosphere->DestroySpawnedActors();
+		Atmosphere->Destroy();
+	}
+
+	Hour->Set(HourBefore, ECVF_SetByCode);
+	Clock->Set(ClockBefore, ECVF_SetByCode);
 	return true;
 }
 
