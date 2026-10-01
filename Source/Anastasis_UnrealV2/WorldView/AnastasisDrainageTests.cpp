@@ -154,4 +154,39 @@ bool FAnastasisDrainageDeterminism::RunTest(const FString&)
 	TestTrue(TEXT("rejected grid unchanged"), Bad.Geometry.Vertices == Kept);
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisDrainageDryPaint, "Anastasis.Terrain.Drainage.NoWaterPaintOnDryLand",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisDrainageDryPaint::RunTest(const FString&)
+{
+	// FOREST_TERRAIN_P0 : une tuile d'eau de la simulation que le relief corrige laisse hors
+	// d'eau ne doit pas rester peinte en bleu au milieu d'un pre. La teinte d'eau de TileColor
+	// est la seule du sol dont le bleu domine : c'est sa signature.
+	auto BlueDominant = [](const FLinearColor& C) { return C.B > FMath::Max(C.R, C.G); };
+	AnastasisWorldView::FWorldVisualSnapshot S;
+	AnastasisTerrainForge::FMesh M;
+	if (!TestTrue(TEXT("forge"), AnastasisDrainageTestDetail::Forge(true, S, M))) return false;
+	const auto& Before = M.Geometry;
+	int32 DryBlueBefore = 0;
+	for (int32 I = 0; I < Before.Vertices.Num(); ++I)
+	{
+		DryBlueBefore += Before.Vertices[I].Z >= Before.WaterVertices[I].Z && BlueDominant(Before.Colors[I]) ? 1 : 0;
+	}
+	AnastasisDrainage::FNetwork Net;
+	if (!TestTrue(TEXT("drains"), AnastasisDrainage::Apply(S, M, Net))) return false;
+	const auto& Geo = M.Geometry;
+	int32 Dry = 0, DryBlue = 0, Wet = 0, WetBlue = 0;
+	for (int32 I = 0; I < Geo.Vertices.Num(); ++I)
+	{
+		const bool bDry = Geo.Vertices[I].Z >= Geo.WaterVertices[I].Z;
+		const bool bBlue = BlueDominant(Geo.Colors[I]);
+		(bDry ? Dry : Wet) += 1;
+		(bDry ? DryBlue : WetBlue) += bBlue ? 1 : 0;
+	}
+	AddInfo(FString::Printf(TEXT("DRY_WATER_PAINT before_drainage=%d after=%d dry=%d wet=%d wet_blue=%d"),
+		DryBlueBefore, DryBlue, Dry, Wet, WetBlue));
+	TestTrue(TEXT("dry land was probed"), Dry > 0);
+	TestEqual(TEXT("no dry vertex keeps the water paint"), DryBlue, 0);
+	return true;
+}
 #endif

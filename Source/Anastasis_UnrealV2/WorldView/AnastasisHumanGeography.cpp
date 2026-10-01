@@ -48,7 +48,13 @@ const TArray<FVector>& MainRiver()
 }
 const TArray<FVector>& LakeOutlet()
 {
-    static const auto C=Curve({{69,70,2.75},{74,70,2.75},{80,69,2.68},{86,72,2.61},{91,75,2.54},{97,76,2.46}});return C;
+    // FOREST_TERRAIN_P0 : les trois premiers noeuds etaient alignes et au meme niveau -- au sol,
+    // un canal droit de 220 m sous le lac. Comme pour SecondaryBrook : memes noeuds (ce sont les
+    // points de controle de HumanGeography.RiverAndOutlet), un noeud intermediaire decale en
+    // alternance entre chaque paire (1.5 a 0.4 tuile, plus sage vers le bord), eau au niveau
+    // moyen de ses voisins. Sinuosite 1.04 -> 1.13.
+    static const auto C=Curve({{69,70,2.75},{71.5,71.5,2.75},{74,70,2.75},{76.77,68.12,2.715},{80,69,2.68},
+        {82.42,71.66,2.645},{86,72,2.61},{89.12,72.47,2.575},{91,75,2.54},{93.93,75.89,2.5},{97,76,2.46}});return C;
 }
 const TArray<FVector>& SecondaryBrook()
 {

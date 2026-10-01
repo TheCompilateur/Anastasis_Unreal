@@ -1698,16 +1698,36 @@ bool AnastasisDrainage::Apply(
 	}
 
 	// Couleurs et canaux du sol sur la terre reparee : relus depuis la terre voisine.
+	//
+	// FOREST_TERRAIN_P0 : la reparation ne suffit pas. TileColor peint en bleu toute tuile d'eau
+	// de la simulation (alpha 1), et Human_Geography_V2 comme ce reseau redessinent l'eau
+	// APRES cette peinture. Une tuile d'eau que le relief corrige laisse hors d'eau sans
+	// qu'elle soit jamais passee sous la nappe (donc jamais Wet, donc jamais reparee) gardait
+	// sa peinture : une tache bleue en pleine prairie. Toute terre seche encore peinte en eau
+	// est donc repeinte, et la peinture d'eau -- seche ou noyee -- ne sert jamais de bord au
+	// remplissage : sinon le bleu fuirait dans la terre qu'on repeint.
+	//
+	// Seuil : toute teinte de sol de TileColor a le bleu pour canal le plus faible, et un
+	// melange convexe de telles teintes le garde. Ce qui fait virer une terre au bleu, c'est
+	// la part de peinture d'eau (l'alpha bilineaire). La plus grise (Stone, 0.149/0.147/0.141)
+	// bascule des ~4 % de DeepWater : 3 % garde toute terre non repeinte du cote de la terre.
 	{
-		TArray<uint8> Recolor;
+		constexpr float WaterPaint = 0.03f;
+		TArray<uint8> Recolor, Solve;
 		Recolor.SetNumZeroed(N);
-		for (int32 I = 0; I < N; ++I) Recolor[I] = Repair[I] && LakeOf[I] < 0 ? 1 : 0;
+		Solve.SetNumZeroed(N);
+		for (int32 I = 0; I < N; ++I)
+		{
+			const bool bPainted = Geo.Colors[I].A > WaterPaint;
+			Recolor[I] = (Repair[I] && LakeOf[I] < 0) || (bPainted && Ground[I] >= Water[I]) ? 1 : 0;
+			Solve[I] = Recolor[I] || bPainted ? 1 : 0;
+		}
 		TArray<double> Ch;
 		Ch.SetNumUninitialized(N);
 		auto FillChannel = [&](TFunctionRef<double(int32)> Get, TFunctionRef<void(int32, double)> Set)
 		{
 			for (int32 I = 0; I < N; ++I) Ch[I] = Get(I);
-			Harmonic(G, Ch, Recolor, 120);
+			Harmonic(G, Ch, Solve, 120);
 			for (int32 I = 0; I < N; ++I) if (Recolor[I]) Set(I, Ch[I]);
 		};
 		FillChannel([&](int32 I) { return Geo.Colors[I].R; }, [&](int32 I, double V) { Geo.Colors[I].R = static_cast<float>(V); });
