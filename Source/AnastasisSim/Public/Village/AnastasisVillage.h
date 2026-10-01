@@ -48,6 +48,8 @@
 // et le rythme du jour, sans lequel personne ne se couche.
 //
 // ECARTS DECLARES — ce qui n'est pas la reference, et pourquoi :
+// (Registre qui fait autorite : Source/AnastasisSim/ECARTS.md. Un ecart nouveau s'y declare,
+// pas ici ; ce bloc garde le detail des n° 1 a 18.)
 //
 //  1. Table de decision : les 25 lignes de adultScores, dans l'ordre de la
 //     reference, triees de facon stable. `eat`, `rest`, `drink` sont calculees

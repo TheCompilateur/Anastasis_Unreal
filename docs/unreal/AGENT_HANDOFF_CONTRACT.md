@@ -53,6 +53,7 @@ Definitions:
 | `SCN` | Preuve en scene/runtime/editor, ou `UNKNOWN` / `NOT_ATTEMPTED`. |
 | `PLY` | Preuve joueur, controle humain, VR ou experience, ou `UNKNOWN`. |
 | `INTEGRATION_RISK` | Chevauchements, fichiers chauds, hypothese fragile, conflit probable. |
+| `ECARTS` | Requis si la mission touche le C++ de `Source/AnastasisSim/` hors tests : ecarts a la reference JS ouverts, modifies ou fermes (`n° N`, registre `Source/AnastasisSim/ECARTS.md`), ou `AUCUN — <preuve de fidelite>`. Controle par `finish` (`docs/migration/PROTOCOLE_ECARTS.md`). |
 
 ## Invariants
 

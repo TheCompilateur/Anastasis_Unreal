@@ -178,6 +178,22 @@ New-ItemProperty -Path 'HKLM:\SOFTWARE\EpicGames\Unreal Engine\5.8' -Name 'Insta
 - Le simulateur JS (`C:\dev\Jeux IV Kingdoms`) est une **référence de parité**, pas du code à porter.
   `src/render3d/` est obsolète — le rendu se réécrit dans Unreal.
 
+## Portage : un écart se déclare le jour où il entre
+
+La migration absorbe d'abord la masse du simulateur JS, la stabilisation viendra ensuite. Elle ne
+tient que si chaque divergence du harnais se range tout de suite : bug de portage, écart provisoire,
+ou évolution voulue. Donc, dans `Source/AnastasisSim/` :
+
+- tout comportement qui n'est pas la copie fidèle de la référence (branche sautée, repli inventé,
+  flux aléatoire propre, extension) a une fiche dans `Source/AnastasisSim/ECARTS.md` **dans le
+  commit qui l'introduit**, et la marque `ecart n°N` à l'endroit du code ;
+- la passation a une section `## ECARTS` : numéros ouverts, modifiés, fermés, ou `AUCUN — <preuve>` ;
+- seul Alexandre passe un écart à `ASSUME` (évolution définitive) ; un agent écrit `A_TRANCHER`.
+
+`finish` le contrôle (`node tools/migration/check-ecarts.mjs`). Protocole complet :
+`docs/migration/PROTOCOLE_ECARTS.md`. Avant d'enquêter sur une divergence du harnais :
+`node tools/migration/check-ecarts.mjs -section <section>`.
+
 ## Interdit
 
 Ne pas lire, modifier ni générer dans `Intermediate/`, `Saved/` (logs en lecture seule), `DerivedDataCache/`, `Binaries/`.

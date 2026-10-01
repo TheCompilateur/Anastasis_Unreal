@@ -464,6 +464,14 @@ switch ($Command) {
       exit 1
     }
     Write-Output ('PROOFS::' + $(if ($declared.Count) { $declared -join ', ' } else { '(aucune)' }))
+    # Ecarts de portage (docs\migration\PROTOCOLE_ECARTS.md) : une mission qui touche le C++ de
+    # Source\AnastasisSim nomme dans sa fiche ce qu'elle ne porte pas fidelement. Avant le
+    # build : un oubli echoue en quelques secondes, pas apres dix minutes de compilation.
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+      Fail 'FAIL: node introuvable -- requis par tools\migration\check-ecarts.mjs (protocole des ecarts)'
+    }
+    & node (Join-Path $path 'tools\migration\check-ecarts.mjs') -base main -handoff $handoff
+    if ($LASTEXITCODE -ne 0) { Fail 'FAIL: protocole des ecarts -- voir docs\migration\PROTOCOLE_ECARTS.md' }
     # Build seulement si la branche change quelque chose qu'il juge ; la suite, seulement avec
     # -Prove ou -Full (EDITOR_QUEUE_001 : sinon elle attend le lot, un editeur pour tous).
     $mb = (Invoke-Git -C $path merge-base main HEAD).Out[0]
