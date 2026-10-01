@@ -9,6 +9,7 @@
 #include "WorldView/AnastasisDrainage.h"
 #include "WorldView/AnastasisPlaces.h"
 #include "WorldView/AnastasisGroundCover.h"
+#include "WorldView/AnastasisForestStructure.h"
 #include "WorldView/AnastasisUnderstory.h"
 #include "WorldView/AnastasisMicroEcology.h"
 #include "WorldView/AnastasisRiverbank.h"
@@ -530,6 +531,23 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
         }
         else
         {
+            AnastasisForestStructure::FReport StructureReport;
+            TArray<AnastasisForestStructure::FNote> StructureNotes;
+            FString StructureError;
+            if (!AnastasisForestStructure::Shape(CanonicalSource, ForestDressing, bMacro,
+                ForestPlan, StructureNotes, StructureReport, StructureError))
+            {
+                UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_FOREST_STRUCTURE rejected=%s"), *StructureError);
+            }
+            else
+            {
+                UE_LOG(LogAnastasis_UnrealV2, Display,
+                    TEXT("ANASTASIS_FOREST_STRUCTURE before=%d after=%d young=%d mature=%d old=%d disturbed=%d clearing=%d large=%d moved=%d"),
+                    StructureReport.Before, StructureReport.After,
+                    StructureReport.ByStand[0], StructureReport.ByStand[1], StructureReport.ByStand[2],
+                    StructureReport.ByStand[3], StructureReport.ByStand[4],
+                    StructureReport.LargeClearings, StructureReport.Moved);
+            }
             int32 ForestLayerCounts[3] = {};
             int32 StatureCounts[5] = {};
             int32 FamilyCounts[3] = {};
