@@ -4,8 +4,23 @@
 # Sortie : Saved\SkyEvidence\<Label>\<vue>_<etat>.png + sky.json
 #   -States 'h06=anastasis.Sky.Hour 6|h12=anastasis.Sky.Hour 12|h22=anastasis.Sky.Hour 22'
 #   -PreCmds : CVars posees avant le script, communes a tous les etats.
-param([string]$Label='latest', [string]$States='1|0', [string]$PreCmds='', [string]$Views='', [int]$TimeoutSec=1500)
+#   -Preset cycle (ATMOSPHERE_COHERENCE_001) : huit heures du jour 1 (equinoxe : lever 6 h,
+#     coucher 18 h) -- 06 09 12 16 18 20 00 03 -- sous trois humidites epinglees du ciel
+#     (anastasis.Sky.Humidity 0 / 0.5 / 1 : sec, humide, sature), 24 etats. Remplace -States.
+#     Puis : python tools\unreal\atmosphere-metrics.py Saved\SkyEvidence\<Label>
+param([string]$Label='latest', [string]$States='1|0', [string]$PreCmds='', [string]$Views='', [int]$TimeoutSec=1500, [string]$Preset='')
 $ErrorActionPreference='Stop'
+if ($Preset -eq 'cycle') {
+  $cycle = @()
+  foreach ($hum in @(@('dry','0'), @('humid','0.5'), @('sat','1'))) {
+    foreach ($h in @('06','09','12','16','18','20','00','03')) {
+      $cycle += ('h{0}_{1}=anastasis.Sky.Day 1;anastasis.Sky.Hour {2};anastasis.Sky.Humidity {3}' -f $h, $hum[0], [int]$h, $hum[1])
+    }
+  }
+  $States = $cycle -join '|'
+  # 24 etats x 4 vues : la premiere vue d'un etat attend la convergence des nuages et du brouillard.
+  if ($TimeoutSec -lt 3600) { $TimeoutSec = 3600 }
+} elseif ($Preset) { throw "Preset inconnu : $Preset (attendu : cycle)" }
 . (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
 $Editor='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'

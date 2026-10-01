@@ -87,7 +87,8 @@ def seed(asset):
     asset.set_editor_property('mist_max_extinction', 0.65)
     asset.set_editor_property('mist_height_falloff', 220.0)
     asset.set_editor_property('mist_phase_g', 0.35)
-    asset.set_editor_property('mist_albedo', unreal.LinearColor(0.86, 0.90, 0.94, 1.0))
+    # ATMOSPHERE_COHERENCE_001 : 0.86/0.90/0.94 faisait des poches plus claires que le sol qu'elles couvrent.
+    asset.set_editor_property('mist_albedo', unreal.LinearColor(0.60, 0.64, 0.68, 1.0))
 
     # Exposition figee : deux captures doivent rester comparables.
     set_prop(asset, ('fixed_exposure', 'b_fixed_exposure'), True)
