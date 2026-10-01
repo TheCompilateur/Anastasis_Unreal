@@ -30,6 +30,9 @@ BRANCH_HEAD
     `.DeterminismAndSnapshot` (chemin d'avant, inchangé)
   - Ce test a d'abord échoué (12 triangles retournés dans les coudes, 2 800 sommets secs encore bleus) :
     les deux défauts sont corrigés dans le code, pas dans le test.
+- FINISH: `agent-worktree.ps1 finish` sur la branche rebasée sur `main` 13936e4 — `BUILD::PASS` en build
+  **unity** (`Module.Anastasis_UnrealV2.1/2/3.cpp` recompilés, aucune exclusion adaptative),
+  `TESTS::PASS` 188 PASS / 4 KNOWN_EXPECTED_FAILURE / 0 FAIL (192 annoncés), `HANDOFF_READY::YES`.
 - MATERIAL: `tools\unreal\water-look.ps1 -Rebuild` → `WATER_MATERIAL::PASS` (carte `/Engine/Maps/Entry`,
   câblage complet, aucun échec après `WATER_MATERIAL_COMPILE`). L'asset commité est celui des captures.
 - VISUAL: `docs/visual/water-look-001/` — 4 vues avant/après, même build, `hydro-network-capture.ps1`
