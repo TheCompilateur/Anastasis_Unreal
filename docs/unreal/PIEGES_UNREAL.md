@@ -127,6 +127,14 @@ suivant).
 **jamais** retirer le marqueur ni toucher au registre pour ça. Si l'erreur `asyncio` revient sur une machine
 calme, c'est un sujet à part entière.
 
+### Deux tests `AI.Toolsets.AnastasisInspect…` sortent `Fail` d'un coup, dont un marqué
+**Tu vois** dans la même seconde que leur `Result={Fail}` : `LogAudioMixer: Error: FAudioMixerWasapi::PostDeviceSwap
+- null device swap result!`, entouré de `Changing default audio render device to new device`.
+**Cause** : Windows a changé de périphérique audio par défaut pendant le run (casque ou haut-parleur branché ou
+débranché, redémarrage récent). Le contrôleur attribue la ligne `Error` au test en cours. Vu le 2026-10-01
+(riverbank-life-claude-01), 13 lignes `PostDeviceSwap` dans le log.
+**Parade** : relancer la suite ; ne pas toucher au test, au marqueur ni au registre.
+
 ---
 
 ## Python éditeur

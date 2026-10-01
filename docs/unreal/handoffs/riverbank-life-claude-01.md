@@ -21,7 +21,13 @@ BRANCH_HEAD
 ## MEC
 
 - BUILD: `BUILD::PASS` (`tools\unreal\anastasis-unreal.ps1 build`, code final)
-- TESTS: `TESTS::PASS` — 195 PASS / 4 KNOWN_EXPECTED_FAILURE / 0 FAIL, 199 annoncés (`tools\unreal\report-tests.ps1`), dont :
+- FINISH: `agent-worktree.ps1 finish`, branche rebasée sur `main` — build **unity** `BUILD::PASS`, `TESTS::PASS`
+  198 PASS / 4 KNOWN_EXPECTED_FAILURE / 0 FAIL, 202 annoncés (sur `main` e231348 ; refait au versement).
+  - Premier build unity cassé : `using namespace AnastasisRiverbank` dans les tests, ambigu (FPlan, EFamily) dans
+    un lot unity — corrigé (« tests Riverbank sans using namespace »).
+  - Un run sorti avec 2 FAIL dans `AI.Toolsets.AnastasisInspect` : changement de périphérique audio Windows en
+    plein run (`PostDeviceSwap`), relancé sans changement ; piège ajouté à `PIEGES_UNREAL.md`.
+- TESTS (avant rebase) : `TESTS::PASS` — 195 PASS / 4 KNOWN_EXPECTED_FAILURE / 0 FAIL, 199 annoncés (`tools\unreal\report-tests.ps1`), dont :
   - PASS `Anastasis.Terrain.Riverbank.CalmAndFast` — chenal synthétique : 376 roseaux / 29 massifs côté calme, 1 307 galets et 25 blocs côté vif, 0 du mauvais côté, 0 pied hors de sa bande
   - PASS `Anastasis.Terrain.Riverbank.PaintBanks` — 9 sommets de vase, 11 de gravier ; fond immergé, terre lointaine et alpha intacts
   - PASS `Anastasis.Terrain.Riverbank.CanonicalWorld` — 16 133 roseaux / 1 270 massifs, 35 465 galets, 431 blocs, vitesse max 3,50 m/s ; contrôles du réseau à 0 avec les rives de lac continues ; 0 instance hors du sol rendu
