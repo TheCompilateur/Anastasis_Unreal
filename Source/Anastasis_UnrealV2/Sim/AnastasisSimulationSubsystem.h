@@ -121,6 +121,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static int32 CountInside(const UObject* WorldContextObject, const FString& BuildingId);
 
+	/**
+	 * Etat d'un habitant pour les preuves : "goal|activity|insideBuilding|insideGoal|sheltersTaken",
+	 * vide sans hote ou sans cet habitant. Lecture seule.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetNpcState(const UObject* WorldContextObject, const FString& NpcId);
+
 	/** Stock physique de nourriture d'un batiment, -1 sans hote ou sans batiment. */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static int32 GetFoodStock(const UObject* WorldContextObject, const FString& BuildingId);

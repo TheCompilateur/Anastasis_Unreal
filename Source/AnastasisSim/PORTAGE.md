@@ -236,6 +236,20 @@ Deux habitants qui se croisent se parlent, se figent le temps de la session, se 
 l'autre et se racontent les gisements qu'ils ont vus. Texte des répliques et rumeurs hors gisements :
 écart n° 16. Détail : `docs/unreal/BONDS_RUMORS_001.md`.
 
+### Fait — la météo et les habitants (missions env-realism-001, village-weather-001)
+
+| Unreal | Source JS (`fee66ae`) | Preuve |
+| --- | --- | --- |
+| `World/AnastasisWeather.h/.cpp` | `weather.js` : `weatherAt`, `sampleCoverFront`, `coverLobeAt`, `winterSnowAt`, `winterFrostAt`, `weatherWetnessAt`, `weatherHumidityAt` ; `fieldCrops.js` `fieldSeasonFromDay` | `Parite.Meteo`, 1 112 vecteurs (12 212 valeurs ; 39 à 1 ULP, toutes sur cos / sin) |
+| `Core/AnastasisJsNumeric.h` (ajout) | `Math.exp` de V8 = fdlibm `__ieee754_exp` | `Parite.Meteo` : avec l'exp du CRT, 2 échecs à 6 et 8 ULP ; avec fdlibm, 0 |
+| `Life/AnastasisWeatherBehavior.h/.cpp` | `weatherGoalBias.js` : `readSimWeather`, `weatherGoalBiasFromState`, `shouldSeekRainShelter`, `shelterRainScore` ; `npc.js` : `shelterRainDuration`, `applyRainExposure` ; `simulation.js` : bloc pluie de `movementSpeedFactor` | `Parite.MeteoHabitants`, 2 724 vecteurs (4 212 valeurs, 0 échec) ; `MeteoHabitants.Formules` pour les fonctions non exportées |
+| `Village/AnastasisVillage.*` (ajouts) | `score.weather` sur chaque ligne, ligne `shelterRain`, porte d'orage de `commitGoalChoice`, `shelterRainAccess`, `buildingForIndoorAction` / `workplaceAcceptsIndoorGoal` pour `shelterRain`, `performShelterRain`, récupération d'`updateInside` | `MeteoHabitants.Orage`, `.TempsSec`, `.CielDeLaSimulation` |
+| `Sim/AnastasisSimulation.*` (ajout) | `sim.seed` lu par `readSimWeather` | `MeteoHabitants.CielDeLaSimulation` |
+
+Sous l'orage le fermier lâche la cueillette, s'abrite à son grenier le temps de l'averse,
+récupère, puis reprend une activité de lui-même. Sans hôte (tests d'assemblage), pas de météo :
+chaque terme vaut exactement 0. Écart n° 17 dans `Village/AnastasisVillage.h`.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

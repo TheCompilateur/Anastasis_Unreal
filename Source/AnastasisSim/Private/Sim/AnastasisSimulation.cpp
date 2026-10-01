@@ -20,6 +20,8 @@ void FAnastasisSimulation::Reset(uint32 SeedValue, int32 Width, int32 Height)
 	LastRegrownFields = 0;
 	// Le flux de tirages du village (rumeurs) suit la graine du monde.
 	Village.SetRngSeed(Seed);
+	// `readSimWeather` lit `sim.seed` : les habitants voient le ciel que le rendu montre.
+	Village.SetWeatherSeed(Seed);
 	Accumulator = 0.0;
 }
 
