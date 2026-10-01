@@ -118,6 +118,11 @@ protected:
 	UHierarchicalInstancedStaticMeshComponent* GetOrCreateDressingMesh(
 		const AnastasisPresentation::FResolvedPresentation& Resolved);
 
+	UHierarchicalInstancedStaticMeshComponent* GetOrCreateDressingMeshByKey(FName Key, bool bBlock);
+
+	/** A few geographic compositions on the authored relief. Not a second forest. */
+	void PlaceGeographicSites(double SpatialScale);
+
 	int32 DressingInstanceCount = 0;
 
 	UPROPERTY()

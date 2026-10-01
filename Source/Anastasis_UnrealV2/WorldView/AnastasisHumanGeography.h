@@ -14,6 +14,8 @@ struct FSample
     double WaterHeight = 2.75;
     double ValleyWeight = 0;
     double RiverWeight = 0;
+    /** 1 on the saddle centreline between the two valleys. The relief is unchanged. */
+    double PassageWeight = 0;
 };
 FSample Evaluate(double X, double Y, double OriginalHeight);
 void Apply(const AnastasisWorldView::FWorldVisualSnapshot& Snapshot,

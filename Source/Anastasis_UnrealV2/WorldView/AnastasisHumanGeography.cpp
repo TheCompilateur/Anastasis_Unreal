@@ -83,6 +83,7 @@ AnastasisHumanGeography::FSample AnastasisHumanGeography::Evaluate(double X,doub
         const double W=1-Smooth(0.5,3.2,Road.Distance);
         Out.Height=FMath::Lerp(Out.Height,Road.Height+0.035*Road.Distance*Road.Distance,W);
         Out.ValleyWeight=FMath::Max(Out.ValleyWeight,W);
+        Out.PassageWeight=W;
     }
     FNearest River;
     const auto Try=[&](const TArray<FVector>& C)

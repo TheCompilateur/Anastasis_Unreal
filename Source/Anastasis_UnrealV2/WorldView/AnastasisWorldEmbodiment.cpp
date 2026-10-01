@@ -5,6 +5,8 @@
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisTerrainForge.h"
 #include "WorldView/AnastasisHumanGeography.h"
+#include "WorldView/AnastasisSiteDressing.h"
+#include "Misc/Paths.h"
 
 
 #include "Anastasis_UnrealV2.h"
@@ -192,12 +194,8 @@ AAnastasisWorldEmbodiment::AAnastasisWorldEmbodiment()
 	ExperimentalSurface->SetFlags(RF_Transient);
 }
 
-UHierarchicalInstancedStaticMeshComponent* AAnastasisWorldEmbodiment::GetOrCreateDressingMesh(
-	const AnastasisPresentation::FResolvedPresentation& Resolved)
+UHierarchicalInstancedStaticMeshComponent* AAnastasisWorldEmbodiment::GetOrCreateDressingMeshByKey(FName Key, bool bBlock)
 {
-	const FName Key(*FString::Printf(TEXT("Dressing_%s_v%d"),
-		*Resolved.Entry->ArchetypeId.ToString(), Resolved.VariantIndex));
-
 	// The cached component can be stale: a construction-script rerun is free to destroy
 	// components an earlier run created, leaving this map pointing at nothing. Reuse only what
 	// is still valid, and fall through to rebuild otherwise instead of returning null dressing.
@@ -218,7 +216,7 @@ UHierarchicalInstancedStaticMeshComponent* AAnastasisWorldEmbodiment::GetOrCreat
 	// Same reason as the ground meshes: never serialized into the level.
 	Mesh->SetFlags(RF_Transient);
 	Mesh->SetupAttachment(GetRootComponent());
-	Mesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	Mesh->SetCollisionEnabled(bBlock ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 	Mesh->SetCollisionProfileName(TEXT("BlockAll"));
 	Mesh->SetGenerateOverlapEvents(false);
 	Mesh->SetCastShadow(true);
@@ -235,6 +233,14 @@ UHierarchicalInstancedStaticMeshComponent* AAnastasisWorldEmbodiment::GetOrCreat
 		DressingSlotByKey.Add(Key, DressingMeshes.Add(Mesh));
 	}
 	return Mesh;
+}
+
+UHierarchicalInstancedStaticMeshComponent* AAnastasisWorldEmbodiment::GetOrCreateDressingMesh(
+	const AnastasisPresentation::FResolvedPresentation& Resolved)
+{
+	const FName Key(*FString::Printf(TEXT("Dressing_%s_v%d"),
+		*Resolved.Entry->ArchetypeId.ToString(), Resolved.VariantIndex));
+	return GetOrCreateDressingMeshByKey(Key, true);
 }
 
 void AAnastasisWorldEmbodiment::BeginPlay()
@@ -271,6 +277,115 @@ bool AAnastasisWorldEmbodiment::EmbodyFromConsoleVariables()
 bool AAnastasisWorldEmbodiment::Embody(uint32 Seed, int32 Width, int32 Height)
 {
 	return EmbodyCrop(Seed, 0, 0, Width, Height);
+}
+
+void AAnastasisWorldEmbodiment::PlaceGeographicSites(double SpatialScale)
+{
+	TArray<AnastasisSiteDressing::FProp> Props;
+	AnastasisSiteDressing::AppendCompositions(Props);
+	// M_AnastasisStone and M_AnastasisLithos still render as bare white. The engine
+	// basic-shape material is the tint path this project already uses for dressing.
+	UMaterialInterface* Shape = LoadObject<UMaterialInterface>(
+		nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	UMaterialInstanceDynamic* Stone = nullptr;
+	if (Shape)
+	{
+		Stone = UMaterialInstanceDynamic::Create(Shape, this);
+		Stone->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.17f, 0.155f, 0.135f, 1.0f));
+	}
+	const double Unit = AnastasisWorldView::TileWorldSize * SpatialScale;
+	int32 Placed = 0;
+	int32 Refused = 0;
+	for (const AnastasisSiteDressing::FProp& Prop : Props)
+	{
+		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, Prop.Mesh);
+		if (!Mesh)
+		{
+			++Refused;
+			continue;
+		}
+
+		double X = Prop.X;
+		double Y = Prop.Y;
+		double GroundZ = 0.0;
+		bool bFound = false;
+		for (int32 Step = 0; Step < 8; ++Step)
+		{
+			if (X < 2.0 || Y < 2.0 || X > 94.0 || Y > 94.0)
+			{
+				break;
+			}
+			const double WX = (X + 0.5) * Unit;
+			const double WY = (Y + 0.5) * Unit;
+			if (!AnastasisTerrainForge::SampleActive(WX, WY, GroundZ))
+			{
+				X += Prop.StepX;
+				Y += Prop.StepY;
+				continue;
+			}
+			double WaterZ = AnastasisTerrainSurface::WaterPlaneZ;
+			AnastasisTerrainForge::SampleActiveWater(WX, WY, WaterZ);
+			const double Above = GroundZ - WaterZ;
+			const bool bSeat = Prop.Seat == AnastasisSiteDressing::ESeat::Bank
+				? (Above > 8.0 && Above < 380.0)
+				: (Above > 220.0);
+			if (bSeat && !AnastasisSiteDressing::IsFutureSettlement(X, Y))
+			{
+				bFound = true;
+				break;
+			}
+			X += Prop.StepX;
+			Y += Prop.StepY;
+		}
+		if (!bFound)
+		{
+			++Refused;
+			continue;
+		}
+
+		const double WX = (X + 0.5) * Unit;
+		const double WY = (Y + 0.5) * Unit;
+		if (Prop.bTree)
+		{
+			double East = GroundZ;
+			double North = GroundZ;
+			AnastasisTerrainForge::SampleActive(WX + 400.0, WY, East);
+			AnastasisTerrainForge::SampleActive(WX, WY + 400.0, North);
+			const double Rise = FMath::Sqrt(FMath::Square(East - GroundZ) + FMath::Square(North - GroundZ));
+			const double Slope = FMath::RadiansToDegrees(FMath::Atan(Rise / 400.0));
+			if (Slope > 30.0)
+			{
+				++Refused;
+				continue;
+			}
+		}
+
+		const FString AssetName = FPaths::GetBaseFilename(Prop.Mesh);
+		auto* Component = GetOrCreateDressingMeshByKey(FName(*FString::Printf(TEXT("Site_%s"), *AssetName)), Prop.bBlock);
+		if (!Component)
+		{
+			++Refused;
+			continue;
+		}
+		if (Component->GetStaticMesh() != Mesh)
+		{
+			Component->SetStaticMesh(Mesh);
+			if (Prop.bStone && Stone)
+			{
+				Component->SetMaterial(0, Stone);
+			}
+		}
+
+		FTransform Pose(FRotator(0.f, Prop.Yaw, 0.f), FVector(WX, WY, 0.0), FVector(Prop.Scale));
+		const FBox WorldBox = Mesh->GetBoundingBox().TransformBy(Pose);
+		const double Sink = Prop.bSink ? 0.16 * (WorldBox.Max.Z - WorldBox.Min.Z) : 0.0;
+		Pose.SetLocation(FVector(WX, WY, GroundZ - WorldBox.Min.Z - Sink));
+		Component->AddInstance(Pose, false);
+		++DressingInstanceCount;
+		++Placed;
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_SITES placed=%d refused=%d authored=%d"), Placed, Refused, Props.Num());
 }
 
 void AAnastasisWorldEmbodiment::PlaceDressing(
@@ -316,6 +431,9 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	{
 		const AnastasisWorldView::FVisualTile& SourceTile = Snapshot.Tiles[Index];
         if (bEcology && SourceTile.Type == AnastasisWorld::ETileType::Forest) continue;
+        // Ruin tiles stay stone ground. A wall fragment on every one of them is a stamp,
+        // not a place. The authored relief gets a few compositions instead.
+        if (bEcology && Snapshot.bHumanGeography && SourceTile.Type == AnastasisWorld::ETileType::Ruin) continue;
 		AnastasisPresentation::FResolvedPresentation Resolved;
 		if (!AnastasisPresentation::ResolvePresentation(
 				Plan.Types[Index], Seed, SourceTile.X, SourceTile.Y, Resolved))
@@ -397,12 +515,35 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 double WaterZ = AnastasisTerrainSurface::WaterPlaneZ;
                 if (Snapshot.bHumanGeography && AnastasisTerrainForge::SampleActiveWater(P.Ground.X, P.Ground.Y, WaterZ) && GroundZ <= WaterZ + 25.0) continue;
                 const auto& T = CanonicalSource.Tiles[P.SourceIndex];
-                const EAnastasisStatureClass Stature = StatureForLayer(P.Layer, P.VisualSeed, T.X, T.Y);
+                EAnastasisStatureClass Stature = StatureForLayer(P.Layer, P.VisualSeed, T.X, T.Y);
                 // Species comes from the site, not from a blind draw: Shade carries altitude
                 // and exposure, Wetness carries moisture, and both are simulation truth this
-                // layer only reads. Nothing here moves a tree.
-                const EAnastasisFoliageFamily Family = AnastasisPresentation::SelectFoliageFamily(
+                // layer only reads. Nothing here moves a tree. Open valleys and the pass
+                // only decide whether that tree is kept, and as what.
+                EAnastasisFoliageFamily Family = AnastasisPresentation::SelectFoliageFamily(
                     T.Shade, T.Wetness, P.VisualSeed, T.X, T.Y);
+                if (Snapshot.bHumanGeography)
+                {
+                    const double SiteX = P.Ground.X / (AnastasisWorldView::TileWorldSize * CanonicalSource.SpatialScale) - 0.5;
+                    const double SiteY = P.Ground.Y / (AnastasisWorldView::TileWorldSize * CanonicalSource.SpatialScale) - 0.5;
+                    const AnastasisSiteDressing::FRead Site = AnastasisSiteDressing::Read(SiteX, SiteY);
+                    if (AnastasisSiteDressing::ShouldOmitForest(Site, P.VisualSeed))
+                    {
+                        continue;
+                    }
+                    if (Site.bMeadow)
+                    {
+                        Family = EAnastasisFoliageFamily::Broadleaf;
+                        Stature = EAnastasisStatureClass::Canopy;
+                    }
+                    else if (Site.bRiparian)
+                    {
+                        Family = EAnastasisFoliageFamily::Broadleaf;
+                        Stature = Site.River > 0.45
+                            ? EAnastasisStatureClass::Understory
+                            : EAnastasisStatureClass::Subcanopy;
+                    }
+                }
                 SiteShade.Add(T.Shade);
                 SiteWetness.Add(T.Wetness);
                 SiteConiferousness.Add(AnastasisPresentation::Coniferousness(T.Shade, T.Wetness));
@@ -462,6 +603,10 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 At(SiteWetness, 0.0), At(SiteWetness, 0.5), At(SiteWetness, 1.0),
                 At(SiteConiferousness, 0.0), At(SiteConiferousness, 0.5), At(SiteConiferousness, 1.0));
         }
+    }
+    if (bEcology && SurfaceCrop && Snapshot.bHumanGeography)
+    {
+        PlaceGeographicSites(CanonicalSource.SpatialScale);
     }
     UE_LOG(LogAnastasis_UnrealV2, Display,
         TEXT("ANASTASIS_ECOLOGY_COST enabled=%d generation_ms=%.3f components=%d instances=%d"),
