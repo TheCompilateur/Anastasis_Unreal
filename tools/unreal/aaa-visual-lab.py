@@ -882,6 +882,11 @@ def screenshot_loop(cameras):
     cmd('viewmode lit')
     cmd('ShowFlag.Sprites 0')
     cmd('ShowFlag.Grid 0')
+    cmd('ShowFlag.Bounds 0')
+    try:
+        unreal.get_editor_subsystem(unreal.EditorActorSubsystem).set_selected_level_actors([])
+    except Exception as exc:
+        log('deselect %s' % exc)
     state = dict(idx=0, requested=False, mark=time.monotonic(), attempts=0, handle=None)
 
     def tick(dt):
