@@ -497,6 +497,7 @@ bool FAnastasisAtmosphereRealismReversible::RunTest(const FString&)
 	{
 		TestEqual(TEXT("on: mie from the profile"), S->MieScatteringScale, Profile.SkyMieScatteringScale);
 		TestEqual(TEXT("on: aerial perspective from the profile"), S->AerialPespectiveViewDistanceScale, Profile.SkyAerialPerspectiveDistanceScale);
+		TestEqual(TEXT("on: aerial perspective starts past the hamlet"), S->AerialPerspectiveStartDepth, Profile.SkyAerialPerspectiveStartDepthKm);
 	}
 	if (const UExponentialHeightFogComponent* F = FogC())
 	{
@@ -518,6 +519,7 @@ bool FAnastasisAtmosphereRealismReversible::RunTest(const FString&)
 	{
 		TestEqual(TEXT("off: mie back to the engine default"), S->MieScatteringScale, SkyDefault->MieScatteringScale);
 		TestEqual(TEXT("off: aerial perspective back to the engine default"), S->AerialPespectiveViewDistanceScale, SkyDefault->AerialPespectiveViewDistanceScale);
+		TestEqual(TEXT("off: aerial perspective start depth back to the engine default"), S->AerialPerspectiveStartDepth, SkyDefault->AerialPerspectiveStartDepth);
 		TestTrue(TEXT("off: ground albedo back to the engine default"), S->GroundAlbedo == SkyDefault->GroundAlbedo);
 	}
 	if (const UExponentialHeightFogComponent* F = FogC())

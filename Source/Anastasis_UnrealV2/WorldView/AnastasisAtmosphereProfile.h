@@ -247,6 +247,15 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Atmosphere|Realism|Sky", meta = (ClampMin = "0.0", ClampMax = "20.0"))
 	float SkyAerialPerspectiveDistanceScale = 3.0f;
 
+	/**
+	 * Kilometres from the camera before aerial perspective is evaluated. The engine default,
+	 * 0.1, hazes the hamlet along with the ridges. 0.2 keeps the first 200 m clear (the
+	 * settlement); the ray starts there, so the haze is zero at the boundary and grows
+	 * outward. Pixels inside that depth are skipped by the early depth test.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|Realism|Sky", meta = (ClampMin = "0.001", ClampMax = "2.0"))
+	float SkyAerialPerspectiveStartDepthKm = 0.2f;
+
 	/** Vegetated ground under the sky (sRGB). The engine's neutral grey over-brightens the lower dome. */
 	UPROPERTY(EditAnywhere, Category = "Atmosphere|Realism|Sky")
 	FColor SkyGroundAlbedo = FColor(92, 104, 84);

@@ -495,6 +495,7 @@ void AAnastasisWorldAtmosphere::ApplyRealism(const UAnastasisAtmosphereProfile& 
 			const USkyAtmosphereComponent* D = GetDefault<USkyAtmosphereComponent>();
 			SkyComponent->SetMieScatteringScale(bOn ? Profile.SkyMieScatteringScale : D->MieScatteringScale);
 			SkyComponent->SetAerialPespectiveViewDistanceScale(bOn ? Profile.SkyAerialPerspectiveDistanceScale : D->AerialPespectiveViewDistanceScale);
+			SkyComponent->SetAerialPerspectiveStartDepth(bOn ? Profile.SkyAerialPerspectiveStartDepthKm : D->AerialPerspectiveStartDepth);
 			SkyComponent->SetGroundAlbedo(bOn ? Profile.SkyGroundAlbedo : D->GroundAlbedo);
 		}
 	}
