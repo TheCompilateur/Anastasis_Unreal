@@ -7,6 +7,7 @@
 
 class USmartObjectComponent;
 class USmartObjectDefinition;
+class UStaticMeshComponent;
 
 UENUM()
 enum class EAnastasisVillageBuildingKind : uint8
@@ -18,8 +19,9 @@ enum class EAnastasisVillageBuildingKind : uint8
 };
 
 /**
- * Batiment fonctionnel, pas un mesh. Enregistre ses slots dans SmartObjectSubsystem.
- * SimId remonte a la simulation JS — Unreal n'invente pas l'identite.
+ * Batiment fonctionnel. Le mesh reflete le type (puits, maison, grenier) ;
+ * l'identite reste SimId, posee par la simulation.
+ * Enregistre ses slots dans SmartObjectSubsystem.
  */
 UCLASS()
 class AAnastasisVillageBuilding : public AActor
@@ -34,10 +36,14 @@ public:
 	FName GetSimId() const { return SimId; }
 	EAnastasisVillageBuildingKind GetKind() const { return Kind; }
 	USmartObjectComponent* GetSmartObject() const { return SmartObject; }
+	bool HasBody() const;
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis")
 	TObjectPtr<USmartObjectComponent> SmartObject;
+
+	UPROPERTY(VisibleAnywhere, Category = "Anastasis")
+	TObjectPtr<UStaticMeshComponent> Body;
 
 	UPROPERTY()
 	FName SimId;

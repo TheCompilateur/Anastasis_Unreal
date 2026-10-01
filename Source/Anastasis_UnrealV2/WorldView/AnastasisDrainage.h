@@ -108,8 +108,13 @@ struct FNetwork
 	TArray<float> Riparian;
 	int32 GridW = 0, GridH = 0;
 	double GridX0 = 0.0, GridY0 = 0.0, GridStep = 0.0;
-	/** Seuil d'initiation retenu (aire drainee, m2). */
+	/** Aire de reference de la geometrie hydraulique (m2). */
 	double ChannelAreaM2 = 0.0;
+	/** Seuil d'initiation retenu, aire x pente^2 (m2). */
+	double ChannelAreaSlopeM2 = 0.0;
+	/** Cuvettes closes devenues lacs de bassin ferme, et cuvettes comblees. */
+	int32 BasinLakes = 0;
+	int32 FilledPits = 0;
 	/** Sommets immerges avant, hors lacs, que la reparation a rendus a la terre. */
 	int32 RepairedWaterVertices = 0;
 	/** Sommets immerges avant qui sont encore sous l'eau apres (reseau ou lac). */
@@ -119,9 +124,16 @@ struct FNetwork
 
 struct FParams
 {
-	/** Aire drainee d'initiation d'un chenal (m2), relevee jusqu'a MaxHeads. */
-	double ChannelAreaM2 = 40000.0;
-	int32 MaxHeads = 16;
+	/** Aire drainee plancher d'un chenal (m2). */
+	double ChannelAreaM2 = 10000.0;
+	/** Initiation : aire x pente^2 (m2, pente rendue), relevee jusqu'a MaxHeads tetes. */
+	double ChannelAreaSlopeM2 = 50.0;
+	/** Au-dela, un chenal existe quelle que soit la pente (m2). */
+	double ChannelBigAreaM2 = 250000.0;
+	/** Aire de reference de la largeur et de la profondeur (m2). */
+	double WidthRefAreaM2 = 40000.0;
+	/** Tetes avant elagage : les ravines courtes (< MinTributaryM) tombent ensuite. */
+	int32 MaxHeads = 60;
 	/** Affluents de premier ordre plus courts : elagues. */
 	double MinTributaryM = 220.0;
 	double MinWidthM = 6.0;

@@ -52,7 +52,13 @@ const TArray<FVector>& LakeOutlet()
 }
 const TArray<FVector>& SecondaryBrook()
 {
-    static const auto C=Curve({{33,24,4.15},{28,19,3.72},{23,13,3.23},{17,6,2.75}});return C;
+    // HYDRO_NETWORK_001 : les quatre noeuds d'origine etaient alignes -- le ruisseau et son auge
+    // traversaient la crete en ligne droite, ce que la revue a releve comme non naturel.
+    // Memes extremites, meme profil d'eau decroissant ; noeuds intermediaires decales en
+    // alternance de part et d'autre (+-0.4 a +-1.2 tuile, pas regulier), plus sages vers la mer :
+    // virages doux, pas de coude.
+    static const auto C=Curve({{33,24,4.15},{30.62,19.67,3.95},{25.70,17.60,3.70},{24.15,12.54,3.40},
+        {19.75,10.0,3.08},{17,6,2.75}});return C;
 }
 const TArray<FVector>& Pass()
 {

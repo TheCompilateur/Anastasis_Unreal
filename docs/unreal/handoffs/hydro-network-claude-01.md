@@ -56,6 +56,17 @@ Captures avant / après, gros plans, lignes de debug largeur / vitesse, HG coup�
 versant ; défaut restant visible de près : la rive en escalier (voir Limites dans
 `HYDRO_NETWORK_001.md`).
 
+Passe 2 (lacs et mers arrondis, cuvettes closes, initiation aire x pente^2) :
+
+```
+ANASTASIS_DRAINAGE enabled=1 rivers=19 heads=14 confluences=9 max_order=3 length_m=6668
+  lakes=8 interior_lakes=6 wetlands=2 basin_lakes=1 filled_pits=277
+ANASTASIS_DRAINAGE check uphill=0 narrowing=0 confluence_narrower=0 dangling_mouths=0
+  isolated_water=0 lakes_without_role=0 bank_containment=0.942   (HG coupe : 0.929)
+```
+
+Captures `docs/visual/hydro-network-001/pass2_*`.
+
 ## PLY
 
 UNKNOWN — aucune session joueur ; rien n'a été parcouru à pied.
