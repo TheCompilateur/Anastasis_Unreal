@@ -1,0 +1,47 @@
+{
+  "kind": "labo-tolerances",
+  "version": 1,
+  "statut": "PROPOSITION de l'agent labo-ecarts-001, 2026-10-01, ecrite AVANT toute mesure. Non validee par Alexandre. Une tolerance se change par une nouvelle version de ce fichier, jamais apres avoir vu un resultat pour le faire passer.",
+  "lecture": "delta du test d'equivalence (TOST a 5 %) : l'IC a 90 % de la difference moyenne appariee doit tenir dans [-delta, +delta]. `abs` : en unites de la grandeur. `rel` : fraction de la moyenne du bras A (temoin) ; si cette moyenne est nulle, `plancher` en unites. Une grandeur absente de la table n'est pas jugee (rapportee seulement).",
+  "regleDesButs": "part_but.<but> est jugee pour tout but dont la part moyenne dans le bras A est >= 0.02 ; duree_episode.<but> pour les memes buts.",
+  "grandeurs": {
+    "part_but.*":                         { "abs": 0.03,  "echelle": "comportement", "pourquoi": "3 points de temps passe ; un but qui prend 3 % du temps de plus se voit dans le village" },
+    "part_observer":                      { "abs": 0.02,  "echelle": "comportement", "pourquoi": "observer = but non porte dans le C++ ; 2 points suffisent a le remarquer" },
+    "part_dedans":                        { "abs": 0.03,  "echelle": "comportement" },
+    "duree_episode_moy_s":                { "rel": 0.15,  "echelle": "comportement" },
+    "duree_episode.*":                    { "rel": 0.20,  "echelle": "comportement" },
+    "changements_but_par_habitant_jour":  { "rel": 0.15,  "echelle": "comportement" },
+    "survivants_initiaux":                { "abs": 0.1,   "echelle": "monde", "pourquoi": "un mort de plus pour dix repliques" },
+    "population_fin":                     { "abs": 0.1,   "echelle": "monde" },
+    "faim_moy":                           { "abs": 3.0,   "echelle": "monde", "pourquoi": "besoins sur 0-100 ; 3 points ~ un repas d'ecart sur la journee" },
+    "soif_moy":                           { "abs": 3.0,   "echelle": "monde" },
+    "energie_moy":                        { "abs": 3.0,   "echelle": "monde" },
+    "social_moy":                         { "abs": 3.0,   "echelle": "monde" },
+    "loisir_moy":                         { "abs": 3.0,   "echelle": "monde" },
+    "hygiene_moy":                        { "abs": 3.0,   "echelle": "monde" },
+    "moral_moy":                          { "abs": 3.0,   "echelle": "monde" },
+    "sante_min":                          { "abs": 5.0,   "echelle": "monde" },
+    "part_faim_forte":                    { "abs": 0.03,  "echelle": "monde" },
+    "part_soif_forte":                    { "abs": 0.03,  "echelle": "monde" },
+    "stock_bati_moy":                     { "rel": 0.10, "plancher": 2.0, "echelle": "monde" },
+    "nourriture_recoltee_tuiles":         { "rel": 0.10, "plancher": 2.0, "echelle": "monde" },
+    "bois_preleve_tuiles":                { "rel": 0.15, "plancher": 2.0, "echelle": "monde" },
+    "pierre_prelevee_tuiles":             { "rel": 0.15, "plancher": 2.0, "echelle": "monde" },
+    "liens_positifs_fin":                 { "rel": 0.20, "plancher": 1.0, "echelle": "monde" },
+    "liens_somme_fin":                    { "rel": 0.20, "plancher": 5.0, "echelle": "monde" },
+    "oui_dire_fin":                       { "rel": 0.20, "plancher": 1.0, "echelle": "monde" },
+    "batiments_fin":                      { "abs": 0.5,   "echelle": "monde" },
+    "tresor_fin":                         { "rel": 0.10, "plancher": 5.0, "echelle": "monde" }
+  },
+  "rupture": {
+    "lecture": "criteres qualitatifs, verifies avant le verdict DERIVE. Un seul suffit.",
+    "survie": "survivants_initiaux ou population_fin DIFFERENT (IC 95 % excluant 0)",
+    "butQuiApparaitOuDisparait": "un but de part >= 0.02 dans un bras et < 0.002 dans l'autre, en moyenne sur les repliques",
+    "ampleur": "une grandeur jugee DIFFERENT dont |difference| > 3 delta"
+  },
+  "decorrelation": {
+    "lecture": "ratio = separation des positions au dernier jour entre A_k et B_k, divisee par la separation entre A_k et A_(k+1) (deux repliques independantes du temoin). >= 0.8 : trajectoires decorrelees ; < 0.2 : trajectoires tenues.",
+    "seuilDecorrele": 0.8,
+    "seuilTenu": 0.2
+  }
+}

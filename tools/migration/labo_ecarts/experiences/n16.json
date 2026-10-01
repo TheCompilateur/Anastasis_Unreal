@@ -1,0 +1,45 @@
+{
+  "kind": "labo-experience",
+  "ecart": "n16",
+  "titre": "Liens et rumeurs : un flux aleatoire propre au village (VillageRng)",
+  "dossier": "docs/migration/ecarts/n16.md",
+  "terrains": [
+    { "terrain": "endurance", "repliques": 40, "jours": 3 },
+    { "terrain": "genese", "repliques": 30, "jours": 3 }
+  ],
+  "bras": ["aucun", "n16"],
+  "comparaisons": [
+    { "id": "principal", "A": "aucun", "B": "n16", "question": "que change le flux propre des rumeurs dans la reference ?" }
+  ],
+  "every": 60,
+  "empreinteEvery": 900,
+  "cone": [
+    { "titre": "Le tirage detourne : createInformResourceSpotActs", "entrees": ["createInformResourceSpotActs"], "profondeur": 2, "champs": ["spots", "hearsay"] },
+    { "titre": "Ses appelants : socialize et shareRumors", "entrees": ["socialize", "shareRumors"], "profondeur": 1 }
+  ],
+  "predictions": {
+    "endurance/principal": {
+      "ecriteLe": "2026-10-01, avant toute mesure",
+      "nature": "chaotique",
+      "attendus": [
+        { "grandeur": "micro.decorrelation", "attendu": ">=0.8", "pourquoi": "un tirage de moins dans sim.rng decale tous les tirages suivants" },
+        { "grandeur": "oui_dire_fin", "attendu": "equivalent", "pourquoi": "le tirage ne choisit que l'indice de depart parmi les gisements connus ; loi uniforme dans les deux bras" },
+        { "grandeur": "liens_somme_fin", "attendu": "equivalent" },
+        { "grandeur": "faim_moy", "attendu": "equivalent" },
+        { "grandeur": "changements_but_par_habitant_jour", "attendu": "equivalent" },
+        { "grandeur": "survivants_initiaux", "attendu": "equivalent" }
+      ]
+    },
+    "genese/principal": {
+      "ecriteLe": "2026-10-01, avant toute mesure",
+      "nature": "chaotique",
+      "attendus": [
+        { "grandeur": "micro.decorrelation", "attendu": ">=0.8" },
+        { "grandeur": "oui_dire_fin", "attendu": "equivalent" },
+        { "grandeur": "liens_somme_fin", "attendu": "equivalent" },
+        { "grandeur": "faim_moy", "attendu": "equivalent" },
+        { "grandeur": "population_fin", "attendu": "equivalent" }
+      ]
+    }
+  }
+}
