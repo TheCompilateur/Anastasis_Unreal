@@ -65,6 +65,16 @@ function Write-GuardLog($msg) {
 
 $HWND_BOTTOM = [IntPtr]1
 $SWP_NOSIZE = 0x0001; $SWP_NOACTIVATE = 0x0010; $SWP_NOOWNERZORDER = 0x0200
+# Asynchrone : le deplacement est poste au thread de la fenetre. Si ce thread est occupe,
+# le gardien n'attend pas -- il continue de surveiller les autres fenetres, et le
+# deplacement s'applique des que l'editeur traite ses messages.
+$SWP_ASYNCWINDOWPOS = 0x4000
+$moveFlags = $SWP_NOSIZE -bor $SWP_NOACTIVATE -bor $SWP_NOOWNERZORDER -bor $SWP_ASYNCWINDOWPOS
+# Une fenetre encore a l'ecran (deplacement en attente, ou repositionnee par l'editeur)
+# n'est renvoyee qu'une fois toutes les 2 s : sans cela, une file de messages bouchee
+# recevait une demande toutes les 150 ms, et le journal une ligne a chaque tour.
+$retryAfter = [TimeSpan]::FromSeconds(2)
+$lastMove = @{}
 # Au-dela du bord gauche de tout le bureau virtuel, quelle que soit la disposition des ecrans.
 Add-Type -AssemblyName System.Windows.Forms
 $vs = [System.Windows.Forms.SystemInformation]::VirtualScreen
@@ -86,11 +96,13 @@ while ($true) {
     $r = New-Object AnastasisWin+RECT
     [void][AnastasisWin]::GetWindowRect($h, [ref]$r)
     $onScreen = $r.L -gt ($offX + 1000)
-    if (-not $seen.ContainsKey($key) -or ($Mode -eq 'offscreen' -and $onScreen)) {
+    $due = $onScreen -and (-not $lastMove.ContainsKey($key) -or ((Get-Date) - $lastMove[$key]) -ge $retryAfter)
+    if (-not $seen.ContainsKey($key) -or ($Mode -eq 'offscreen' -and $due)) {
       $title = [AnastasisWin]::Title($h)
       Write-GuardLog ("WINDOW hwnd=$key title='$title' rect=($($r.L),$($r.T),$($r.R),$($r.B)) iconic=" + [AnastasisWin]::IsIconic($h))
-      if ($Mode -eq 'offscreen' -and $onScreen) {
-        $ok = [AnastasisWin]::SetWindowPos($h, $HWND_BOTTOM, $offX, $offY, 0, 0, $SWP_NOSIZE -bor $SWP_NOACTIVATE -bor $SWP_NOOWNERZORDER)
+      if ($Mode -eq 'offscreen' -and $due) {
+        $ok = [AnastasisWin]::SetWindowPos($h, $HWND_BOTTOM, $offX, $offY, 0, 0, $moveFlags)
+        $lastMove[$key] = Get-Date
         Write-GuardLog "MOVED hwnd=$key ok=$ok"
       }
       $seen[$key] = $true

@@ -30,6 +30,15 @@ démarrage se bloque dans cette console sans fenêtre (2026-09-30).
 **Parade** : un exécutable console garde `Start-Process -WindowStyle Hidden` — c'est ce que fait
 `Start-AnastasisEditor` pour `-Cmd.exe`. Tuer l'orphelin `cmd.exe` s'il est le tien.
 
+### Une fenêtre d'éditeur « Ne répond pas » reste à l'écran malgré le gardien
+**Tu vois** : une fenêtre d'éditeur figée au milieu de l'écran, le gardien vivant, rien dans son journal.
+**Cause** : après 5 s sans réponse, Windows masque la vraie fenêtre et affiche à sa place une **fenêtre
+fantôme** qui appartient au système, pas à l'éditeur : le gardien ne la voit pas et ne peut pas la déplacer.
+Si l'éditeur s'est figé alors qu'il était encore à l'écran — gardien pas encore démarré (14 s mesurées sur
+une machine saturée le 2026-10-01), ou chargement lourd — le fantôme reste là jusqu'à ce que l'éditeur
+réponde ; le gardien le renvoie alors dans les 150 ms. Banc reproductible : deux fenêtres, l'une figée 30 s.
+**Parade** : ne pas la fermer (c'est la preuve d'un agent). Libérer de la mémoire ; elle partira seule.
+
 ### Une boîte de dialogue invisible fait expirer le script
 **Tu vois** : l'éditeur ne progresse plus, sans erreur, jusqu'au timeout.
 **Cause** : depuis les éditeurs discrets, une modale est hors écran, personne ne la voit.
