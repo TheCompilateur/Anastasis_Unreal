@@ -69,7 +69,7 @@ namespace AnastasisVillage
 		bool IsPortedGoal(const FString& Goal)
 		{
 			return Goal == GoalEat || Goal == GoalRest || Goal == GoalDrink || Goal == TEXT("gatherFood") || Goal == TEXT("deliver")
-				|| Goal == TEXT("socialize") || Goal == TEXT("relax");
+				|| Goal == TEXT("socialize") || Goal == TEXT("relax") || Goal == GoalShelterRain;
 		}
 
 		FString TargetKey(const FPoint& P)
@@ -131,6 +131,12 @@ namespace AnastasisVillage
 	{
 		// catalog.js : granary `group: "food"`. Le puits est civique, la maison un logement.
 		return Type == GranaryType;
+	}
+
+	bool IsCivicGroupType(const FString& Type)
+	{
+		// catalog.js : well `group: "civic"` (la taverne aussi, absente ici).
+		return Type == WellType;
 	}
 
 	double ComputeMealTtlSeconds(double TravelSeconds, double Base)
@@ -975,9 +981,110 @@ namespace AnastasisVillage
 		return true;
 	}
 
+	const FBuilding* FVillage::ShelterBuildingNearActor(const FNpc& Npc) const
+	{
+		// `buildingForIndoorAction(actor, "shelterRain")` : pas un but domestique, donc pas de
+		// foyer d'abord. Son poste a 3,4 tuiles (`workplaceAcceptsIndoorGoal` : toujours vrai
+		// pour shelterRain), sinon le batiment a portee, s'il abrite.
+		if (!Npc.WorkplaceId.IsEmpty())
+		{
+			const FBuilding* Post = Buildings.FindById(Npc.WorkplaceId);
+			if (Post && Post->Progress >= 1.0 && DistToBuilding(Npc, *Post) <= 3.4) return Post;
+		}
+		const FBuilding* Building = BuildingNearActor(Npc, IndoorBuildingRadius);
+		if (!Building || Building->Progress < 1.0 || !IsKnownType(Building->Type)) return nullptr;
+		const FString& Living = Npc.LivingHomeId();
+		const bool bAtOwn = !Living.IsEmpty() && Living == Building->Id;
+		// `afford(atOwn || housing || socialiser || trade || civic || fabriquer)`.
+		return bAtOwn || HousingOfType(Building->Type) > 0 || IsCivicGroupType(Building->Type) ? Building : nullptr;
+	}
+
+	bool FVillage::ShelterRainTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource)
+	{
+		// `shelterRainAccess` : lit connu (non porte : le foyer en tient lieu), foyer, taverne
+		// (absente), poste, premier batiment couvert, sinon la place.
+		const FString& Living = Npc.LivingHomeId();
+		if (!Living.IsEmpty())
+		{
+			const FBuilding* Home = Buildings.FindById(Living);
+			if (Home && Home->Progress >= 1.0 && BuildingAccessPointById(Living, &Npc, OutTarget))
+			{
+				Npc.DestBuildingId = Living;
+				OutSource = TEXT("home");
+				return true;
+			}
+		}
+		if (!Npc.WorkplaceId.IsEmpty())
+		{
+			const FBuilding* Post = Buildings.FindById(Npc.WorkplaceId);
+			if (Post && Post->Progress >= 1.0 && BuildingAccessPointById(Npc.WorkplaceId, &Npc, OutTarget))
+			{
+				Npc.DestBuildingId = Npc.WorkplaceId;
+				OutSource = TEXT("workplace");
+				return true;
+			}
+		}
+		for (const FBuilding& B : Buildings.GetItems())
+		{
+			// `(b.progress ?? 1) >= 1 && (housing || socialiser || trade || civic)`, dans l'ordre de `sim.buildings`.
+			if (B.Progress < 1.0) continue;
+			if (HousingOfType(B.Type) > 0 || IsCivicGroupType(B.Type))
+			{
+				const FString Id = B.Id;
+				if (BuildingAccessPointById(Id, &Npc, OutTarget))
+				{
+					Npc.DestBuildingId = Id;
+					OutSource = TEXT("roofed");
+					return true;
+				}
+			}
+		}
+		return SocialPos(Npc, OutTarget, OutSource);
+	}
+
+	bool FVillage::PerformShelterRain(FNpc& Npc)
+	{
+		// Encore dehors : garder la cible abri (l'entree passe par TryEnterIndoorAction) et ne
+		// PAS reussir au seuil, sinon l'acte serait valide sans toit.
+		if (!Npc.Inside.bActive)
+		{
+			if (!Npc.bHasTarget)
+			{
+				FPoint Access;
+				FString Source;
+				if (ShelterRainTarget(Npc, Access, Source))
+				{
+					Npc.bHasTarget = true;
+					Npc.Target = Access;
+				}
+			}
+			return false;
+		}
+		Npc.Needs.Energy = Clamp(Npc.Needs.Energy + AnastasisWeatherBehavior::Shelter::EnergyRecover, 0.0, 100.0);
+		Npc.Needs.Morale = Clamp(Npc.Needs.Morale + 2.0, 0.0, 100.0);
+		++Npc.SheltersTaken;
+		const FString Resume = Npc.ShelterResumeGoal;
+		Npc.ShelterResumeGoal.Reset();
+		Npc.ShelterCooldownUntil = Now + AnastasisWeatherBehavior::Shelter::CooldownSeconds;
+		// Reprendre le travail expose ; sinon `craft` dans la reference, non porte : observer.
+		Npc.Goal = !Resume.IsEmpty() && Resume != GoalShelterRain && AnastasisWeatherBehavior::IsRainExposedGoal(Resume)
+			&& IsPortedGoalFor(Npc, Resume)
+			? Resume : FString(GoalObserver);
+		Npc.GoalSince = Now;
+		return true;
+	}
+
 	bool FVillage::TryEnterIndoorAction(FNpc& Npc)
 	{
-		if (Npc.Inside.bActive || !IsDomesticGoal(Npc.Goal)) return false;
+		if (Npc.Inside.bActive) return false;
+		if (Npc.Goal == GoalShelterRain)
+		{
+			// `indoorDuration(shelterRain)` = shelterRainDuration ; `waitingActivity` = « abrite ».
+			const FBuilding* Shelter = ShelterBuildingNearActor(Npc);
+			return Shelter && EnterBuilding(Npc, *Shelter, TEXT("abrite"),
+				AnastasisWeatherBehavior::ShelterRainDuration(TickWeather.Rain));
+		}
+		if (!IsDomesticGoal(Npc.Goal)) return false;
 		// Supply scenario: no hunger reduction by sitting in an empty granary.
 		// Preserve the reference-only granary/house fixtures when supply is inactive.
 		if (FoodSources.Num() > 0 && Npc.Goal == GoalEat && !FindMealReservation(Npc.Id)) return false;
@@ -1122,6 +1229,9 @@ namespace AnastasisVillage
 			return;
 		}
 		Now = Time;
+		// La meteo ne change pas dans un tick : lue une fois, pour tous les habitants.
+		TickWeather = CurrentWeather();
+		TickDailyRain = DailyRain();
 		TArray<FNpc>& Items = Actors.GetItemsMutable();
 		// `rebuildActorSpatialIndex` : une fois par tick, avant la boucle (positions du debut de tick).
 		TArray<FVector2D> Points;
@@ -1137,6 +1247,25 @@ namespace AnastasisVillage
 	bool FVillage::IsNight() const
 	{
 		return AnastasisRhythm::IsNightPhase(Now);
+	}
+
+	AnastasisWeatherBehavior::FSimWeather FVillage::CurrentWeather() const
+	{
+		// `readSimWeather` : `sim.forceWeather` d'abord (ses champs, le reste a 0 / ete), puis
+		// `weatherAt(sim.seed >>> 0, sim.day || 1, null, dayFrac)`.
+		if (bForcedWeather) return ForcedWeather;
+		// Sans graine de simulation (pas d'hote) : ciel d'ete sec, tous les termes meteo a 0.
+		if (!bWeatherSeeded) return AnastasisWeatherBehavior::FSimWeather();
+		return AnastasisWeatherBehavior::ReadSimWeather(WeatherSeed, Day(), Now);
+	}
+
+	double FVillage::DailyRain() const
+	{
+		// `movementSpeedFactor` : `weatherAt(sim.seed, 1 + sim.time / DAY_LENGTH)`, SANS heure —
+		// la base journaliere, pas le front de l'heure (le forcage, lui, vaut pour les deux).
+		if (bForcedWeather) return ForcedWeather.Rain;
+		if (!bWeatherSeeded) return 0.0;
+		return AnastasisWeather::WeatherAt(WeatherSeed, 1.0 + Now / AnastasisRhythm::DayLength).Rain;
 	}
 
 	AnastasisRhythm::FPhaseSubject FVillage::PhaseSubjectOf(const FNpc& Npc) const
@@ -1177,6 +1306,9 @@ namespace AnastasisVillage
 				: Npc.Goal == TEXT("gatherFood");
 			AnastasisNeeds::TickNeeds(Npc.Needs, Dt, bDrinking, bWorking);
 		}
+		// `applyRainExposure`, juste apres `tickNeeds` : dehors sous l'orage, l'energie fond.
+		AnastasisWeatherBehavior::ApplyRainExposure(TickWeather.Rain, Npc.Inside.bActive, Npc.Goal, Dt,
+			Npc.Needs.Energy, Npc.Needs.Health);
 		// `tickMoodlets` : l'humeur d'une amitie neuve monte le moral, plafonnee.
 		AnastasisBonds::TickMoodlets(Npc.Moodlets, Npc.Needs.Morale, Dt, Now);
 
@@ -1196,6 +1328,13 @@ namespace AnastasisVillage
 		// Dedans : ni pensee, ni marche, seulement le temps qui passe.
 		if (Npc.Inside.bActive)
 		{
+			// `updateInside` : sous l'auvent, recuperation lente (`energyDrainPerSec * 0.55 * dt`).
+			if (Npc.Goal == GoalShelterRain && Dt > 0.0)
+			{
+				Npc.Needs.Energy = Clamp(Npc.Needs.Energy
+					+ AnastasisWeatherBehavior::Shelter::EnergyDrainPerSec * AnastasisWeatherBehavior::Shelter::InsideRecoverFactor * Dt,
+					0.0, 100.0);
+			}
 			UpdateInside(Npc);
 			return;
 		}
@@ -1274,6 +1413,9 @@ namespace AnastasisVillage
 			if (G == GoalEat) Score = Trace.NeedScores.Eat + EatJobPriorityBias;
 			else if (G == GoalRest) Score = Trace.NeedScores.Rest + RestJobPriorityBias;
 			else if (G == GoalDrink) Score = Trace.NeedScores.Drink + (Wells > 0 ? 6.0 : 0.0);
+			// `{ goal: "shelterRain", score: shelterRainScore(sim, npc) + goalNoise(sim, 6) }` (sans bruit, ecart n°1).
+			else if (G == GoalShelterRain) Score = AnastasisWeatherBehavior::ShelterRainScore(
+				TickWeather.Rain, Npc.Inside.bActive, Npc.Goal, Npc.JobId, Now, Npc.ShelterCooldownUntil);
 			else if (G == GoalSocialize || G == GoalRelax)
 			{
 				const double Need = G == GoalSocialize ? Trace.NeedScores.Socialize : Trace.NeedScores.Relax;
@@ -1297,6 +1439,14 @@ namespace AnastasisVillage
 			Rows.Add(TPair<FString, double>(G, Score));
 		}
 
+		// `addScore(score, "score.weather", ..., weatherGoalBias(sim, npc, score.goal))` : sur CHAQUE
+		// ligne, dans la chaine des biais de chooseGoal, donc avant commitGoalChoice et Noûs.
+		Trace.WeatherRain = TickWeather.Rain;
+		for (TPair<FString, double>& Row : Rows)
+		{
+			Row.Value += AnastasisWeatherBehavior::WeatherGoalBias(TickWeather, Npc.JobId, Row.Key);
+		}
+
 		// commitGoalChoice : (collant non porte) Noûs biaise la table avant le tri.
 		ApplyAlgorithmicScoreBias(Npc, Rows);
 		// `applyGoalEligibility` : `deliver` n'est candidat qu'avec une charge.
@@ -1315,6 +1465,7 @@ namespace AnastasisVillage
 			else if (Row.Key == GoalRelax) Trace.RelaxRowScore = Row.Value;
 			else if (bWorker && Row.Key == GoalGatherFood) Trace.GatherRowScore = Row.Value;
 			else if (bWorker && Row.Key == GoalDeliver) Trace.DeliverRowScore = Row.Value;
+			else if (Row.Key == GoalShelterRain) Trace.ShelterRowScore = Row.Value;
 			else if (Row.Value > Trace.FloorScore)
 			{
 				Trace.FloorScore = Row.Value;
@@ -1338,6 +1489,23 @@ namespace AnastasisVillage
 			Next = TEXT("deliver");
 		if (!bWorker && FoodSources.Num() > 0 && Next == TEXT("gatherFood") && (!HasKnownFoodSource(Npc) || Npc.InventoryFood > 0 || !KnownFoodDepot(Npc)))
 			Next = GoalObserver;
+		// « Orage : quitter le travail outdoor pour un toit (sauf cargo / urgence) » — commitGoalChoice.
+		// `criticalReliefGoals` n'est consulte que hors besoin critique : il y est vide, la garde
+		// `needsCritical` suffit. `fetchInput` / `haulJob` ne sont pas portes (jamais gagnants ici).
+		{
+			const FString& Previous = Npc.Goal;
+			if (Next != GoalShelterRain && Next != GoalDeliver
+				&& !NeedsCritical(Npc.Needs)
+				&& AnastasisWeatherBehavior::ShouldSeekRainShelter(TickWeather.Rain, Npc.Inside.bActive, Npc.Goal, Npc.JobId, Now, Npc.ShelterCooldownUntil)
+				&& (AnastasisWeatherBehavior::IsRainExposedGoal(Next) || AnastasisWeatherBehavior::IsRainExposedGoal(Previous)))
+			{
+				const FString Resume = AnastasisWeatherBehavior::IsRainExposedGoal(Previous) ? Previous
+					: AnastasisWeatherBehavior::IsRainExposedGoal(Next) ? Next : FString();
+				if (!Resume.IsEmpty()) Npc.ShelterResumeGoal = Resume;
+				Next = GoalShelterRain;
+				Trace.bStormGate = true;
+			}
+		}
 		CommitGoal(Npc, Next, Trace);
 	}
 
@@ -1374,6 +1542,7 @@ namespace AnastasisVillage
 		else if (IsGranaryWorker(Npc) && Npc.Goal == GoalGatherFood) bFound = GatherTarget(Npc, Target, Source);
 		else if (IsGranaryWorker(Npc) && Npc.Goal == GoalDeliver) bFound = DeliverTarget(Npc, Target, Source);
 		else if (Npc.Goal == TEXT("gatherFood") || Npc.Goal == TEXT("deliver")) bFound = FoodSupplyTarget(Npc, Target, Source);
+		else if (Npc.Goal == GoalShelterRain) bFound = ShelterRainTarget(Npc, Target, Source);
 		else
 		{
 			Npc.bHasTarget = false;
@@ -1457,6 +1626,15 @@ namespace AnastasisVillage
 			return;
 		}
 
+		// `tryEnterIndoorAction` a l'arrivee, pour tout but : ici le seul non domestique qui entre
+		// est `shelterRain` (son poste, son foyer, un logement, le puits).
+		if (Npc.Goal == GoalShelterRain && TryEnterIndoorAction(Npc))
+		{
+			Npc.DoorStuckAt = 0.0;
+			Npc.DoorApproachAt = 0.0;
+			return;
+		}
+
 		if (IsDomesticGoal(Npc.Goal))
 		{
 			if (TryEnterIndoorAction(Npc))
@@ -1530,6 +1708,7 @@ namespace AnastasisVillage
 				: Npc.Goal == GoalGatherFood ? TEXT("cueille")
 				: Npc.Goal == GoalSocialize ? TEXT("discute")
 				: Npc.Goal == GoalRelax ? TEXT("relaxe")
+				: Npc.Goal == GoalShelterRain ? TEXT("abrite")
 				: RestActivity(IsNight());
 			return;
 		}
@@ -1590,6 +1769,12 @@ namespace AnastasisVillage
 			AnastasisNeeds::SatisfyRelax(Npc.Needs, Npc.Inside.bActive);
 			++Npc.RelaxesTaken;
 			return true;
+		}
+		if (Npc.Goal == GoalShelterRain)
+		{
+			// `case "shelterRain"` : setActivity("abrite"), performShelterRain().
+			Npc.Activity = TEXT("abrite");
+			return PerformShelterRain(Npc);
 		}
 		if (Npc.Goal == GoalDeliver)
 		{
@@ -1702,7 +1887,8 @@ namespace AnastasisVillage
 		FPoint Waypoint = NextWaypoint(Npc, Target, Dt);
 
 		// Pas de marche de la reference : budget de distance, enchaine jusqu'a 8 noeuds.
-		double Budget = Npc.Speed * FMath::Max(0.0, Dt);
+		// `speed * movementSpeedFactor(...)` : seul le bloc pluie de ce facteur est porte (ecarts n°4, n°17).
+		double Budget = Npc.Speed * AnastasisWeatherBehavior::RainSpeedFactor(TickDailyRain, Npc.Goal, Npc.JobId) * FMath::Max(0.0, Dt);
 		for (int32 Guard = 0; Guard < 8 && Budget > 1e-4; ++Guard)
 		{
 			if (Guard > 0)
