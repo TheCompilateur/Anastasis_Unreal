@@ -167,6 +167,20 @@ tools\unreal\anastasis-unreal.ps1 editor   # lance l'éditeur (pas une vérifica
 Le script refuse de tourner hors de la racine canonique ou d'un worktree sous `C:\dev\ANASTASIS_WORKTREES`,
 et valide l'identité moteur (5.8.2 / CL 56702186).
 
+## Procédures (skills)
+
+Les procédures répétées sont écrites une fois, dans `.claude/skills/<nom>/SKILL.md`. Claude Code les charge
+quand la tâche s'y prête ; tout autre agent (Codex…) les lit comme des documents ordinaires. Elles donnent
+l'ordre et les décisions ; les règles restent ici, les pièges dans `docs/unreal/PIEGES_UNREAL.md`.
+
+| Skill | Quand |
+|---|---|
+| `anastasis-mission` | avant de modifier un fichier du projet ; avant toute intégration ou tout push |
+| `anastasis-editeur-mcp` | avant tout appel `mcp__unreal__*` : bon port, bon éditeur, bon groupe d'outils |
+| `anastasis-capture` | quand le verdict est une image : A/B à une seule variable, regarder, mesurer (`compare.py`) |
+
+Une procédure qui change (nouveau portail, nouveau script) se corrige dans son skill, dans le même commit.
+
 ## Éditeur vivant : MCP Unreal
 
 Le plugin `ModelContextProtocol` (expérimental, UE 5.8) démarre avec l'éditeur un serveur MCP sur
