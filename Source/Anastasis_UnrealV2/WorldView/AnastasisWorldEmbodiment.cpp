@@ -10,6 +10,7 @@
 #include "WorldView/AnastasisPlaces.h"
 #include "WorldView/AnastasisGroundCover.h"
 #include "WorldView/AnastasisUnderstory.h"
+#include "WorldView/AnastasisMicroEcology.h"
 
 #include "Anastasis_UnrealV2.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
@@ -73,6 +74,19 @@ static TAutoConsoleVariable<int32> CVarUnderstoryInAutomation(
     TEXT("0=pas de maquis ni de rochers pendant les tests d'automatisation (defaut, comme l'herbe), 1=aussi sous automatisation."), ECVF_Default);
 
 // SOL SOUS L'HERBE. Coupable pour l'A/B : memes touffes, sol teinte ou non.
+// MICRO_ECOLOGY_001. Poches de berge, lisiere, sous-bois. 0 = le dressing deja en place, sans cette couche.
+static TAutoConsoleVariable<int32> CVarMicroEcology(
+	TEXT("anastasis.Dressing.MicroEcology"), 1,
+	TEXT("0=pas de micro-ecologie, 1=berges en poches, lisiere et sous-bois (defaut) ; applique a l'incarnation."), ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarMicroEcologySoil(
+	TEXT("anastasis.MicroEcology.Soil"), 1,
+	TEXT("0=couleur de sol inchangee, 1=poches de boue, roche, sol nu et secheresse (defaut) ; applique a l'incarnation."), ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarMicroEcologyInAutomation(
+	TEXT("anastasis.MicroEcology.InAutomation"), 0,
+	TEXT("0=pas de micro-ecologie pendant les tests d'automatisation (defaut), 1=aussi sous automatisation."), ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarGroundCoverSoilTint(
     TEXT("anastasis.GroundCover.SoilTint"), 1,
     TEXT("0=sol non teinte sous l'herbe, 1=sol fonce et verdi sous la prairie, brun sous les laiches, terre sous la lande (defaut) ; applique a l'incarnation."), ECVF_Default);
@@ -678,6 +692,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 		SurfaceCrop ? TEXT("surface") : TEXT("slab"), DressingInstanceCount, UngroundedTiles);
 	PlaceUnderstory(CanonicalSource, Canopy, bEcology);
 	PlaceGroundCover(CanonicalSource, Places, Canopy, bEcology);
+	PlaceMicroEcology(CanonicalSource, Places, Canopy, bEcology);
 	EmbodyPlaces(PlaceInputs, Places, bPlaces, CanonicalSource, SupersededRuins);
 }
 
@@ -1104,6 +1119,61 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 		Cover.SlopeBins[0], Cover.SlopeBins[1], Cover.SlopeBins[2], Cover.SlopeBins[3], Cover.SlopeBins[4], Cover.SlopeBins[5],
 		Cover.RejectedCanopySteep, Cover.LandeAboveFloor[0] / 100.0, Cover.LandeAboveFloor[1] / 100.0, Cover.LandeAboveFloor[2] / 100.0,
 		In.ValleyFloorZ);
+}
+
+void AAnastasisWorldEmbodiment::PlaceMicroEcology(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,
+	const AnastasisPlaces::FPlan& Places, const TArray<FVector>& Canopy, bool bEnabled)
+{
+	for (UHierarchicalInstancedStaticMeshComponent* M : MicroEcologyMeshes)
+	{
+		if (IsValid(M)) M->ClearInstances();
+	}
+	MicroEcologyMeshes.RemoveAll([](const TObjectPtr<UHierarchicalInstancedStaticMeshComponent>& M) { return !IsValid(M); });
+	const bool bAutomation = GIsAutomationTesting && CVarMicroEcologyInAutomation.GetValueOnGameThread() == 0;
+	if (!bEnabled || CVarMicroEcology.GetValueOnGameThread() == 0 || bAutomation)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_MICRO_ECOLOGY enabled=0 ecology=%d automation=%d"), bEnabled, bAutomation);
+		return;
+	}
+	const double Start = FPlatformTime::Seconds();
+	const double T = AnastasisWorldView::TileWorldSize * CanonicalSource.SpatialScale;
+	AnastasisMicroEcology::FInputs In;
+	In.SampleHeight = [](double X, double Y, double& Z) { return AnastasisTerrainForge::SampleActive(X, Y, Z); };
+	In.SampleWaterHeight = [](double X, double Y, double& Z) { return AnastasisTerrainForge::SampleActiveWater(X, Y, Z); };
+	In.SampleWetness = [](double X, double Y, double& W) { return AnastasisDrainage::RiparianAt(X, Y, W); };
+	In.Mask = [&CanonicalSource](double X, double Y)
+	{
+		return FMath::Max(AnastasisPlaces::ValleyWeightAt(CanonicalSource, X, Y),
+			AnastasisGroundCoverEmbody::OpennessAt(CanonicalSource, X, Y));
+	};
+	In.Bounds = FBox2D(FVector2D(CanonicalSource.OriginX * T, CanonicalSource.OriginY * T),
+		FVector2D((CanonicalSource.OriginX + CanonicalSource.W) * T, (CanonicalSource.OriginY + CanonicalSource.H) * T));
+	In.Canopy = Canopy;
+	In.Seed = CanonicalSource.Seed;
+	for (const AnastasisPlaces::FPlace& P : Places.Places)
+	{
+		if (P.Kind == AnastasisPlaces::EKind::Hamlet) In.Clearings.Add({P.Center, P.Radius});
+	}
+	AnastasisMicroEcology::FPlan Eco;
+	FString Error;
+	if (!AnastasisMicroEcology::Build(In, AnastasisMicroEcology::FSettings(), Eco, Error))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_MICRO_ECOLOGY rejected=%s"), *Error);
+		return;
+	}
+	const double PlanMs = (FPlatformTime::Seconds() - Start) * 1000.0;
+	const AnastasisMicroEcology::FEmbodyResult Embodied = AnastasisMicroEcology::Embody(*this, Eco, BaseShapeMaterial, MicroEcologyMeshes);
+	int32 Tinted = 0;
+	if (CVarMicroEcologySoil.GetValueOnGameThread() != 0)
+	{
+		Tinted = AnastasisMicroEcology::ApplySoil(ExperimentalSurface, Eco.Soil, 1.0);
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_MICRO_ECOLOGY enabled=1 pebble=%d reed=%d tuft=%d drift=%d branch=%d stone=%d bush=%d edge_bush=%d edge_sapling=%d log=%d stump=%d under_branch=%d roots=%d under_sapling=%d instances=%d components=%d missing_meshes=%d tinted=%d truncated=%d plan_ms=%.1f total_ms=%.1f"),
+		Eco.Counts[0], Eco.Counts[1], Eco.Counts[2], Eco.Counts[3], Eco.Counts[4], Eco.Counts[5], Eco.Counts[6],
+		Eco.Counts[7], Eco.Counts[8], Eco.Counts[9], Eco.Counts[10], Eco.Counts[11], Eco.Counts[12], Eco.Counts[13],
+		Embodied.Instances, Embodied.Components, Embodied.MissingMeshes, Tinted, Eco.bTruncated,
+		PlanMs, (FPlatformTime::Seconds() - Start) * 1000.0);
 }
 
 FVector AAnastasisWorldEmbodiment::GetFrameTimingsMs() const

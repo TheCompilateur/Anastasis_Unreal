@@ -116,6 +116,11 @@ protected:
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> UnderstoryMeshes;
 	/** Strate arbustive et rochers, apres les arbres et avant l'herbe ; ajoute leurs emprises a Canopy. */
 	void PlaceUnderstory(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource, TArray<FVector>& Canopy, bool bEnabled);
+	/** MICRO_ECOLOGY_001 : poches de berge, prairie, lisiere et sous-bois, apres l'herbe. */
+	void PlaceMicroEcology(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,
+		const AnastasisPlaces::FPlan& Places, const TArray<FVector>& Canopy, bool bEnabled);
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> MicroEcologyMeshes;
 	/** Compose les lieux sur le sol rendu ; false = lieux coupes (plan vide). */
 	bool ComposePlaces(const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop,
 		const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource, AnastasisPlaces::FInputs& In, AnastasisPlaces::FPlan& Places);
