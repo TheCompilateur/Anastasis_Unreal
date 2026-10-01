@@ -15,7 +15,10 @@ $Editor='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.e
 $dir=Join-Path $Root "Saved\HorizonEvidence\$Label"
 New-Item -ItemType Directory -Force $dir | Out-Null
 $py=(Join-Path $Root 'tools\unreal\capture-horizon.py').Replace('\','/')
-$plan = if ($States -eq 'AB') { @(@('0','A'), @('1','B')) } else { @(,@('1','B')) }
+# Affectation directe, pas via un `if` : la sortie d'un `if` passe par le pipeline, qui
+# aplatit @(,@('1','B')) en '1','B' -- l'etat devenait une chaine et le suffixe d'image, vide.
+$plan = @(@('0','A'), @('1','B'))
+if ($States -eq 'B') { $plan = @(,$plan[1]) }
 foreach ($state in $plan) {
  $log=Join-Path $dir "capture_$($state[1]).log"
  if(Test-Path $log){Remove-Item $log}

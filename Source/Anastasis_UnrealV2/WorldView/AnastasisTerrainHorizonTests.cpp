@@ -367,4 +367,65 @@ bool FAnastasisTerrainHorizonNoSlivers::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisTerrainHorizonPalette, "Anastasis.Terrain.Horizon.Palette",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisTerrainHorizonPalette::RunTest(const FString&)
+{
+	AnastasisTerrainForge::FMesh Forge;
+	AnastasisTerrainHorizon::FRing Ring;
+	if (!TestTrue(TEXT("forge"), ForgeCanonical(Forge)) || !TestTrue(TEXT("anneau"), AnastasisTerrainHorizon::Build(Forge, 12345, Ring)))
+	{
+		return false;
+	}
+	// HORIZON_BLEND_001 : la premiere teinte lointaine etait la moyenne de toute la terre,
+	// sol de foret compris -- un taupe absent de la carte, lu comme un desert autour d'un pays
+	// vert (captures realism H3/H4). L'anneau emprunte maintenant aux prairies.
+	FLinearColor AllLand(0.f, 0.f, 0.f, 0.f);
+	int32 LandCount = 0;
+	for (int32 I = 0; I < Forge.Geometry.Vertices.Num(); ++I)
+	{
+		if (Forge.Geometry.Colors[I].A < 0.5f)
+		{
+			AllLand += Forge.Geometry.Colors[I];
+			++LandCount;
+		}
+	}
+	AllLand /= static_cast<float>(FMath::Max(1, LandCount));
+
+	TestTrue(FString::Printf(TEXT("assez de prairie pour une palette (%d donneurs)"), Ring.PaletteDonors), Ring.PaletteDonors >= 64);
+	auto Greenish = [](const FLinearColor& C) { return C.G > C.R && C.G > C.B; };
+	TestTrue(TEXT("prairie verte : le vert domine"), Greenish(Ring.LushColor));
+	TestTrue(TEXT("prairie seche : le vert domine encore"), Greenish(Ring.DryColor));
+
+	// Au-dela du fondu, chaque sommet est un melange des deux palettes : sa couleur reste dans
+	// leur boite, canal par canal.
+	const auto& G = Ring.Geometry;
+	const double BlendDist = AnastasisTerrainHorizon::BlendTiles * AnastasisWorldView::TileWorldSize * Forge.SpatialScale;
+	const FLinearColor Lo(FMath::Min(Ring.LushColor.R, Ring.DryColor.R), FMath::Min(Ring.LushColor.G, Ring.DryColor.G), FMath::Min(Ring.LushColor.B, Ring.DryColor.B));
+	const FLinearColor Hi(FMath::Max(Ring.LushColor.R, Ring.DryColor.R), FMath::Max(Ring.LushColor.G, Ring.DryColor.G), FMath::Max(Ring.LushColor.B, Ring.DryColor.B));
+	constexpr float Eps = 1.e-4f;
+	int32 Far = 0, Outside = 0;
+	FLinearColor FarMean(0.f, 0.f, 0.f, 0.f);
+	for (int32 V = Ring.Perimeter; V < G.Vertices.Num(); ++V)
+	{
+		if (Ring.Distances[Ring.RingOf(V)] < BlendDist)
+		{
+			continue;
+		}
+		const FLinearColor& C = G.Colors[V];
+		++Far;
+		FarMean += C;
+		Outside += (C.R < Lo.R - Eps || C.R > Hi.R + Eps || C.G < Lo.G - Eps || C.G > Hi.G + Eps || C.B < Lo.B - Eps || C.B > Hi.B + Eps) ? 1 : 0;
+	}
+	FarMean /= static_cast<float>(FMath::Max(1, Far));
+	TestTrue(TEXT("des sommets au-dela du fondu"), Far > 0);
+	TestEqual(TEXT("aucune teinte lointaine hors des deux palettes"), Outside, 0);
+	TestTrue(TEXT("la teinte lointaine moyenne est verte"), Greenish(FarMean));
+
+	AddInfo(FString::Printf(TEXT("HORIZON_PALETTE donors=%d lush=(%.3f,%.3f,%.3f) dry=(%.3f,%.3f,%.3f) far_mean=(%.3f,%.3f,%.3f) old_all_land=(%.3f,%.3f,%.3f) far_vertices=%d"),
+		Ring.PaletteDonors, Ring.LushColor.R, Ring.LushColor.G, Ring.LushColor.B, Ring.DryColor.R, Ring.DryColor.G, Ring.DryColor.B,
+		FarMean.R, FarMean.G, FarMean.B, AllLand.R, AllLand.G, AllLand.B, Far));
+	return true;
+}
+
 #endif

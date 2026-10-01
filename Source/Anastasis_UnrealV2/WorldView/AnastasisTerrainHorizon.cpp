@@ -37,6 +37,90 @@ double FarAltitude(double TileX, double TileY, double DistTiles, uint32 Seed)
 	return Hills + Range;
 }
 
+/** Une teinte de sol avec ses canaux morphologiques, tels que le materiau de sol les lit. */
+struct FHorizonPaletteEntry
+{
+	FLinearColor Color = FLinearColor(0.f, 0.f, 0.f, 0.f);
+	FVector2D UV0 = FVector2D::ZeroVector;
+	FVector2D UV1 = FVector2D::ZeroVector;
+
+	static FHorizonPaletteEntry Lerp(const FHorizonPaletteEntry& A, const FHorizonPaletteEntry& B, double T)
+	{
+		FHorizonPaletteEntry Out;
+		Out.Color = FMath::Lerp(A.Color, B.Color, static_cast<float>(T));
+		Out.UV0 = FMath::Lerp(A.UV0, B.UV0, T);
+		Out.UV1 = FMath::Lerp(A.UV1, B.UV1, T);
+		return Out;
+	}
+};
+
+/**
+ * Prairies de la carte : sommets de terre dont l'herbe domine (1 - Rock - Litter - Worked
+ * >= 0.6) hors des zones humides (Wetness < 0.35). Tries par luminance ; Lush = moyenne de la
+ * moitie sombre, Dry = moyenne de la moitie claire. Renvoie le nombre de donneurs. Moins de
+ * 64 donneurs (carte sans prairie) : repli sur toute la terre, les deux palettes egales.
+ */
+int32 BuildHorizonPalette(const AnastasisTerrainSurface::FGeometry& Src, FHorizonPaletteEntry& OutLush, FHorizonPaletteEntry& OutDry)
+{
+	auto Entry = [&Src](int32 I)
+	{
+		FHorizonPaletteEntry E;
+		E.Color = Src.Colors[I];
+		E.Color.A = 0.f;
+		E.UV0 = Src.UV0.IsValidIndex(I) ? Src.UV0[I] : FVector2D::ZeroVector;
+		E.UV1 = Src.UV1.IsValidIndex(I) ? Src.UV1[I] : FVector2D::ZeroVector;
+		return E;
+	};
+	auto Mean = [&Entry](const TArray<int32>& Indices, int32 Begin, int32 End)
+	{
+		FHorizonPaletteEntry Sum;
+		for (int32 K = Begin; K < End; ++K)
+		{
+			const FHorizonPaletteEntry E = Entry(Indices[K]);
+			Sum.Color += E.Color;
+			Sum.UV0 += E.UV0;
+			Sum.UV1 += E.UV1;
+		}
+		const double N = static_cast<double>(FMath::Max(1, End - Begin));
+		Sum.Color /= static_cast<float>(N);
+		Sum.UV0 /= N;
+		Sum.UV1 /= N;
+		Sum.Color.A = 0.f;
+		return Sum;
+	};
+
+	TArray<int32> Meadow, Land;
+	for (int32 I = 0; I < Src.Vertices.Num(); ++I)
+	{
+		if (Src.Colors[I].A >= 0.5f)
+		{
+			continue;
+		}
+		Land.Add(I);
+		const FHorizonPaletteEntry E = Entry(I);
+		const double Grass = 1.0 - E.UV0.X - E.UV0.Y - E.UV1.X;
+		if (Grass >= 0.6 && E.UV1.Y < 0.35)
+		{
+			Meadow.Add(I);
+		}
+	}
+	TArray<int32>& Donors = Meadow.Num() >= 64 ? Meadow : Land;
+	if (Donors.Num() == 0)
+	{
+		return 0;
+	}
+	if (&Donors == &Land)
+	{
+		OutLush = OutDry = Mean(Land, 0, Land.Num());
+		return Land.Num();
+	}
+	Donors.Sort([&Src](int32 A, int32 B) { return Src.Colors[A].GetLuminance() < Src.Colors[B].GetLuminance(); });
+	const int32 Half = Donors.Num() / 2;
+	OutLush = Mean(Donors, 0, Half);
+	OutDry = Mean(Donors, Half, Donors.Num());
+	return Donors.Num();
+}
+
 /** Somme circulaire par prefixes : moyenne d'une fenetre de 2R+1 colonnes en deux lectures. */
 template <typename T>
 struct TCircularMean
@@ -180,30 +264,21 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 		Out.RingLevel.Add(bCoarsen ? Prev + 1 : Prev);
 	}
 
-	// Teinte et canaux lointains : la moyenne de la terre forgee, pas une couleur
-	// inventee. Le materiau de sol reste celui de la carte ; la roche des montagnes
-	// vient de sa lecture de pente, plus un peu de famille Rock sur la chaine.
-	FLinearColor LandColor(0.f, 0.f, 0.f, 0.f);
-	FVector2D LandUV0 = FVector2D::ZeroVector;
-	int32 LandCount = 0;
-	for (int32 I = 0; I < Src.Vertices.Num(); ++I)
-	{
-		if (Src.Colors[I].A < 0.5f)
-		{
-			LandColor += Src.Colors[I];
-			if (Src.UV0.IsValidIndex(I))
-			{
-				LandUV0 += Src.UV0[I];
-			}
-			++LandCount;
-		}
-	}
-	if (LandCount > 0)
-	{
-		LandColor /= static_cast<float>(LandCount);
-		LandUV0 /= static_cast<double>(LandCount);
-	}
-	LandColor.A = 0.f;
+	// Teinte et canaux lointains : empruntes aux PRAIRIES de la carte, pas inventes.
+	//
+	// HORIZON_BLEND_001. La premiere version prenait la moyenne de toute la terre forgee.
+	// Elle inclut le sol des forets (famille Litter, brune) : la moyenne tombait sur un taupe
+	// qui n'existe nulle part sur la carte, et l'anneau se lisait comme un desert autour d'un
+	// pays vert. L'anneau n'a pas d'arbres ; ce qu'il montre est un sol nu, donc un sol de
+	// prairie : sommets dont l'herbe (1 - Rock - Litter - Worked) domine, hors des zones
+	// humides. Deux palettes, la moitie sombre (prairie verte) et la moitie claire (prairie
+	// seche), melangees en mosaique a grande echelle. Le materiau de sol reste celui de la
+	// carte ; la roche des montagnes vient de sa lecture de pente, plus un peu de famille Rock
+	// sur la chaine.
+	FHorizonPaletteEntry Lush, Dry;
+	Out.PaletteDonors = BuildHorizonPalette(Src, Lush, Dry);
+	Out.LushColor = Lush.Color;
+	Out.DryColor = Dry.Color;
 
 	// Profil de bord lisse le long du pourtour, par fenetre circulaire qui s'elargit avec
 	// la distance. Sans lui, chaque anneau recopie le bord forge colonne par colonne --
@@ -353,11 +428,18 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 
 				const FVector4 EC = ColorMean.Mean(I, R);
 				const FVector4 EU = UVMean.Mean(I, R);
-				const FVector2D FarUV0(FMath::Clamp(LandUV0.X + 0.45 * Range, 0.0, 1.0), LandUV0.Y * (1.0 - Range));
-				G.Colors[V] = FMath::Lerp(FLinearColor(EC.X, EC.Y, EC.Z, 0.f), LandColor, static_cast<float>(Blend));
+				// Mosaique de prairie : ~900 m de longueur d'onde (45 tuiles), bornes douces
+				// pour que les plages se fondent au lieu de dessiner des taches nettes.
+				const double Mosaic = HorizonSmoothStep(0.38, 0.62, AnastasisWorldNoise::Fbm(
+					NoiseAt.X / TileStep / 45.0, NoiseAt.Y / TileStep / 45.0, static_cast<double>(Seed) + 2203.0));
+				const FHorizonPaletteEntry Ground = FHorizonPaletteEntry::Lerp(Lush, Dry, Mosaic);
+				const FVector2D FarUV0(FMath::Clamp(Ground.UV0.X + 0.45 * Range, 0.0, 1.0), Ground.UV0.Y * (1.0 - Range));
+				G.Colors[V] = FMath::Lerp(FLinearColor(EC.X, EC.Y, EC.Z, 0.f), Ground.Color, static_cast<float>(Blend));
 				G.Colors[V].A = 0.f;
 				G.UV0[V] = FMath::Lerp(FVector2D(EU.X, EU.Y), FarUV0, Blend);
-				G.UV1[V] = FMath::Lerp(FVector2D(EU.Z, EU.W), FVector2D::ZeroVector, Blend);
+				// Worked (champs) n'a pas de sens hors de la carte : il tombe a zero ; l'humidite
+				// suit la palette.
+				G.UV1[V] = FMath::Lerp(FVector2D(EU.Z, EU.W), FVector2D(0.0, Ground.UV1.Y), Blend);
 			}
 			MinZ = FMath::Min(MinZ, G.Vertices[V].Z);
 			MaxZ = FMath::Max(MaxZ, G.Vertices[V].Z);
