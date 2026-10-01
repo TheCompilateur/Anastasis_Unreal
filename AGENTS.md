@@ -323,6 +323,12 @@ se change dans le script.
 | `create-village-buildings.ps1` + `.py` | Forge le puits, la maison et le grenier dans VillageBuildings, meme matiere que les props. `-Rebuild` regenere. |
 | `capture-refugee-props.ps1` + `capture-refugee-props.py` | Capture en studio les quatre objets, sans sauvegarder de niveau. |
 
+### AAA visual lab
+
+| Script | Role |
+|---|---|
+| `aaa-visual-lab.ps1` + `.py` | LookDev isole `/Game/Anastasis/LookDev/AAA_Lab` : materiau maitre, zone 30 m, trois cameras, audit meshes en lecture seule. Ne sauve pas la map du jeu ni les materiaux existants. |
+
 ### Camp shelter 009
 
 | Script | Role |
