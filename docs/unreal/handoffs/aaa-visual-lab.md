@@ -15,14 +15,16 @@ Laboratoire visuel isolé de 30 m. Prouver si le pipeline actuel peut porter une
 
 ## COMMIT
 
-PENDING
+`feat(lookdev): isoler un laboratoire visuel de 30 m` puis le commit des `.uasset` du labo.
 
 ## MEC
 
-- BUILD: PASS (worktree, cible éditeur, 14 actions). Pas de C++ de mission : le module du projet seulement.
-- TESTS: aucun. Pas de changement C++.
-- ÉDITEUR: ouvert sur `/Engine/Maps/Entry`, MCP 8559. Bloqué dans `QueryTargets` derrière l'UBT d'un autre worktree. RAM libre 1,21 Go / 15,90 Go. Processus arrêté. Log : `Saved/SliceEvidence/aaa-visual-lab/lab.log`. Pas de ligne `AAA_LAB_COMPLETE`.
-- COMMANDES, quand la RAM libre dépasse 4 Go et qu'aucun `UnrealBuildTool` ne tient le verrou :
+- BUILD: PASS (worktree, cible éditeur). Pas de C++ de mission.
+- ÉDITEUR: `AAA_LAB::CAPTURE_COMPLETE` sur `/Engine/Maps/Entry`, MCP 8559. Log `Saved/SliceEvidence/aaa-visual-lab-001/lab.log`. Ligne `AAA_LAB_COMPLETE cameras=3`.
+- AUDIT: 115 meshes, B 34, C 79, D 2, A 0. Nanite production : 0. Labo : Nanite sur sol, pierre, mur, poutre, dalles.
+- DÉCAL: non posé (`DecalBlendMode` protégé).
+- TESTS: voir `finish`.
+- COMMANDES :
 
 ```powershell
 cd C:\dev\ANASTASIS_WORKTREES\aaa-visual-lab
@@ -35,7 +37,7 @@ tools\unreal\aaa-visual-lab.ps1 -OutDir C:\dev\ANASTASIS_WORKTREES\aaa-visual-la
 
 ## SCN
 
-Le niveau n'existe pas encore sur le disque. Le script le crée depuis `/Engine/Maps/Entry` et quitte s'il n'est pas dans `AAA_Lab`. Caméras écrites dans le script : A (380, -620, 165) → (40, -80, 90) ; B (980, -1280, 250) → (40, 180, 110) ; C (1750, -2100, 780) → (0, 280, 90).
+`/Game/Anastasis/LookDev/AAA_Lab/Lvl_AAA_VisualLab`, 30 m. Caméras : A (380, -620, 165) → (40, -80, 90) ; B (980, -1280, 250) → (40, 180, 110) ; C (1750, -2100, 780) → (0, 280, 90). Captures `cam_a.png`, `cam_b.png`, `cam_c.png`. Le sous-système d'interaction du village s'initialise dans tout monde du module : le log signale des SmartObject sans schéma. Aucun PNJ n'est placé.
 
 ## PLY
 
@@ -43,13 +45,12 @@ NOT_IMPLEMENTED. Le mannequin du labo est une boîte de 180 cm, hors du système
 
 ## INTEGRATION_RISK
 
-- `AGENTS.md` est un fichier que d'autres agents éditent : une seule ligne ajoutée.
-- Les `.uasset` du labo n'existent qu'après l'éditeur. Les intégrer avant ce run n'apporte que la recette.
+- `AGENTS.md` est un fichier que d'autres agents éditent : une seule section ajoutée, rebasée sur `main`.
+- Les `.uasset` sont confinés à `/Game/Anastasis/LookDev/AAA_Lab/`.
 - Aucun matériau ni mesh de production n'est réécrit.
 
 ## STOP
 
-- Pas de captures `cam_a/b/c`.
-- Pas de `pipeline.json` runtime : l'anti-aliasing, le screen percentage et le flag Nanite projet ne sont pas dans `DefaultEngine.ini`, donc non affirmés.
-- Pas de FPS du labo.
+- Pas de FPS du labo. Les CVars runtime n'ont pas été relues (`ConsoleManager` absent du module Python).
+- Le décal stain n'est pas livré.
 - Pas de modification de Lumen, du ciel, de l'herbe, des PNJ, de la rivière, de la map.

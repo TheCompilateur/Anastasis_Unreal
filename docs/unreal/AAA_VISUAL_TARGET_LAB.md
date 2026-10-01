@@ -1,11 +1,17 @@
 # AAA Visual Target Lab
 
-Worktree `C:\dev\ANASTASIS_WORKTREES\aaa-visual-lab`, branche `agent/aaa-visual-lab`, base `main` `e70871b`.
+Worktree `C:\dev\ANASTASIS_WORKTREES\aaa-visual-lab`, branche `agent/aaa-visual-lab`, rebase sur `main` `84dab0c`.
 Port MCP de ce worktree : `http://localhost:8559/mcp`.
 
 Réponse : **PARTIELLEMENT**. Le pipeline de rendu peut porter une scène haut de gamme. La base visuelle actuelle, elle, est un prototype procédural cohérent à moyenne distance, et elle casse dès que la caméra s'approche d'un corps, d'une feuille ou d'une arête.
 
-Les `.uasset` du labo et les captures ne sont pas sur le disque. Le build éditeur du worktree est `BUILD::PASS`. Un éditeur a été ouvert sur `/Engine/Maps/Entry` (port MCP 8559, pas la map du jeu). Il est resté bloqué dans `Build.bat -Mode=QueryTargets` : un autre `UnrealBuildTool` tenait le verrou. RAM libre mesurée ensuite : **1,21 Go / 15,90 Go**. Cet éditeur, le sien seulement, a été arrêté. Il n'avait pas encore lancé le script Python. Le `.ps1` refuse maintenant un nouveau lancement sous 4 Go libres.
+Créé le 2026-10-01 dans l'éditeur du worktree (`AAA_LAB::CAPTURE_COMPLETE`). Le script a ouvert `/Engine/Maps/Entry`, pas la map du jeu. Le décal `M_AAA_Lab_Stain` n'est pas dans le niveau : `DecalBlendMode` est protégé en Python, le vertex paint reste la couche d'imperfection.
+
+Audit : **115** static meshes sous `/Game/Anastasis` (hors personnages et map). Classes : **B 34, C 79, D 2, A 0**. Nanite activé sur **0** mesh de production. Les meshes du labo, eux, sont en Nanite sauf le mannequin.
+
+Les deux D : `SM_Ecotone_Bush_Low_01` (464 triangles, 47 cm) et `SM_Ecotone_Sapling_01` (144 triangles, 118 cm). Les arbres de la forêt sont en B (3 LOD, 7 000 à 11 000 triangles au LOD0) mais leur boîte native fait **100 cm** : la forêt les met à l'échelle à l'instance. Posés à l'échelle 1 dans le labo, l'understory mesure 62 × 58 × 100 cm. Ce n'est pas la hauteur en jeu.
+
+Triangles du labo : sol 9 800, pierre 2 304, mur 418, poutre 100, dalles 12, mannequin 48. Captures : `Saved/SliceEvidence/aaa-visual-lab-001/cam_a.png`, `cam_b.png`, `cam_c.png`. La lecture des CVars par `ConsoleManager` a échoué (`unreal` n'a pas cet attribut) : le pipeline reste celui de `DefaultEngine.ini`, pas un relevé runtime.
 
 ## 1. Emplacement
 
