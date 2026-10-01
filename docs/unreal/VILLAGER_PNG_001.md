@@ -168,6 +168,15 @@ Decision d'Alexandre (2026-10-01) : **jour d'environ 40 min, habitants a ~3 m/s*
   `anastasis.Sim.TimeScale 1` avant le PIE : leur comportement d'avant, a l'identique. `smoke-pie` (verify)
   garde le rythme du jeu.
 
+Mesures en PIE (`villager-pie.ps1`, village du lancement, `TimeScale` 0,0375), 2026-10-01 :
+
+| Run | Images/s | Vitesse moyenne | Pointe par frame | Plus grand saut en une frame | Verdict |
+|---|---|---|---|---|---|
+| 12:54 | ~28 | **2,99 m/s** | (diviseur faux, corrige ensuite) | **19,5 cm** (un pas de simulation ferait 133 cm) | interpolation prouvee |
+| 13:01 | ~1 (machine saturee) | 1,14 m/s (marche puis arret) | **3,0 m/s** | 120 cm sur une frame d'~1 s | `VILLAGER_PIE PASS` ; a 1 image/s saut et interpolation ne se distinguent pas |
+
+Premier habitant en marche 74 s apres le lancement (run 13:01) : la cadence de decision de Nous.
+
 ## 6. Limites connues
 
 - **Pose fixe quelle que soit l'activite** : le simulateur fait boire, manger, se reposer, se detendre ;

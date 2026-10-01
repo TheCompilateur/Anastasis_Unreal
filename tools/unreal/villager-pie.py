@@ -225,7 +225,9 @@ def tick(dt):
         pos = {x['npc']: (x['x'], x['y']) for x in v if not x['hidden']}
         now = time.monotonic()
         if m['last']:
-            dt = max(now - m['tlast'], 1.0 / 240.0)
+            # La duree de la frame du JEU, pas l'ecart entre deux rappels Python : 19,5 cm sur une frame de
+            # jeu de 65 ms divises par 16 ms de rappel donnaient 12 m/s pour une carte a 3 m/s.
+            dt = max(unreal.GameplayStatics.get_world_delta_seconds(world), now - m['tlast'], 1.0 / 240.0)
             for k, (x, y) in pos.items():
                 if k in m['last']:
                     d = ((x - m['last'][k][0]) ** 2 + (y - m['last'][k][1]) ** 2) ** 0.5

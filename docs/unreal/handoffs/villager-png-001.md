@@ -70,6 +70,12 @@ carte redessinee a l'embauche) : un garde, un moine, une mere au bebe ne sont pl
 `Anastasis.Village` 7/7 Success ; `VILLAGER_PIE PASS` avec `FirstFarmer 1` (fermier en portrait de
 fermier).
 
+## SUITE (critique d'Alexandre, point 4)
+
+`anastasis.Sim.TimeScale` 0.0375 et cartes interpolees entre les pas : en PIE, 2,99 m/s de moyenne et 19,5 cm
+au plus par frame a ~28 images/s (run 12:54) ; `VILLAGER_PIE PASS` (run 13:01, pointe 3,0 m/s). Neuf preuves PIE
+existantes posent `TimeScale 1`. `Anastasis.Village` 7/7 Success, dont l'interpolation.
+
 ## STOP
 
 Aucun code de simulation PNJ modifie. Pas d'animation, pas de vues de dos ou de profil, pas de portrait par
