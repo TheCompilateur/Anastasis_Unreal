@@ -20,7 +20,8 @@ Laboratoire visuel isolé de 30 m. Prouver si le pipeline actuel peut porter une
 ## MEC
 
 - BUILD: PASS (worktree, cible éditeur). Pas de C++ de mission.
-- ÉDITEUR: `AAA_LAB::CAPTURE_COMPLETE` sur `/Engine/Maps/Entry`, MCP 8559. Log `Saved/SliceEvidence/aaa-visual-lab-001/lab.log`. Ligne `AAA_LAB_COMPLETE cameras=3`.
+- ÉDITEUR: `AAA_LAB::CAPTURE_COMPLETE` sur `/Engine/Maps/Entry`, MCP 8559. Log `Saved/SliceEvidence/aaa-visual-lab-006/lab.log`. Ligne `AAA_LAB_COMPLETE cameras=3`.
+- SOL: `SM_AAA_Ground_30m` dalle de 8 cm, 20160 triangles, Nanite, bornes (−1500,−1500,−23)–(1500,1500,15). `cam_a` pixel médian y=810 : RGB 183,175,152.
 - AUDIT: 115 meshes, B 34, C 79, D 2, A 0. Nanite production : 0. Labo : Nanite sur sol, pierre, mur, poutre, dalles.
 - DÉCAL: non posé (`DecalBlendMode` protégé).
 - TESTS: voir `finish`.
@@ -53,5 +54,5 @@ NOT_IMPLEMENTED. Le mannequin du labo est une boîte de 180 cm, hors du système
 
 - Pas de FPS du labo. Les CVars runtime n'ont pas été relues (`ConsoleManager` absent du module Python).
 - Le décal stain n'est pas livré.
-- Le sol du labo est noir sur `cam_a` : pixel (960, 810) = RGB 0,0,0. Le script demande ensuite un matériau two-sided et Nanite off sur `SM_AAA_Ground_30m`. Ce rebake n'est pas dans les `.uasset` tant qu'un éditeur n'a pas rejoué le script.
+- La normale analytique du sol ondule fort en gros plan. Ce n'est pas un trou : le plan est continu.
 - Pas de modification de Lumen, du ciel, de l'herbe, des PNJ, de la rivière, de la map.

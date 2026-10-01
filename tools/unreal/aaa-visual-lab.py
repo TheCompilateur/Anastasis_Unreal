@@ -242,12 +242,39 @@ def build_ground():
             row_c.append(col4(dirt, wet, moss))
         pts.append(row_p)
         cols.append(row_c)
+    # A single sheet stayed invisible in the lit capture (exact 0,0,0 under the props).
+    # A thin slab has a front face from above whichever winding the renderer keeps.
+    thick = 8.0
     for j in range(n):
         for i in range(n):
-            quad = [pts[j][i], pts[j + 1][i], pts[j + 1][i + 1], pts[j][i + 1]]
-            cs = [cols[j][i], cols[j + 1][i], cols[j + 1][i + 1], cols[j][i + 1]]
-            uvs = [(p[0] / 100.0, p[1] / 100.0) for p in quad]
-            mesh.quad(quad, cs, uvs)
+            p00, p10 = pts[j][i], pts[j][i + 1]
+            p11, p01 = pts[j + 1][i + 1], pts[j + 1][i]
+            c00, c10 = cols[j][i], cols[j][i + 1]
+            c11, c01 = cols[j + 1][i + 1], cols[j + 1][i]
+
+            def drop(p):
+                return (p[0], p[1], p[2] - thick)
+
+            top = [p00, p10, p11, p01]
+            bot = [drop(p00), drop(p01), drop(p11), drop(p10)]
+            mesh.quad(top, [c00, c10, c11, c01], [(p[0] / 100.0, p[1] / 100.0) for p in top])
+            mesh.quad(bot, [c00, c01, c11, c10], [(p[0] / 100.0, p[1] / 100.0) for p in bot])
+        # south / north skirts so the rim is a real edge, not a paper sheet
+        for edge in (
+            (pts[j][0], pts[j + 1][0], cols[j][0], cols[j + 1][0]),
+            (pts[j + 1][n], pts[j][n], cols[j + 1][n], cols[j][n]),
+        ):
+            a, b, ca, cb = edge
+            da, db = (a[0], a[1], a[2] - thick), (b[0], b[1], b[2] - thick)
+            mesh.quad([a, b, db, da], [ca, cb, cb, ca], [(a[0] / 100.0, a[2] / 100.0), (b[0] / 100.0, b[2] / 100.0), (b[0] / 100.0, db[2] / 100.0), (a[0] / 100.0, da[2] / 100.0)])
+    for i in range(n):
+        for edge in (
+            (pts[0][i + 1], pts[0][i], cols[0][i + 1], cols[0][i]),
+            (pts[n][i], pts[n][i + 1], cols[n][i], cols[n][i + 1]),
+        ):
+            a, b, ca, cb = edge
+            da, db = (a[0], a[1], a[2] - thick), (b[0], b[1], b[2] - thick)
+            mesh.quad([a, b, db, da], [ca, cb, cb, ca], [(a[1] / 100.0, a[2] / 100.0), (b[1] / 100.0, b[2] / 100.0), (b[1] / 100.0, db[2] / 100.0), (a[1] / 100.0, da[2] / 100.0)])
     return mesh.finish()
 
 
@@ -587,21 +614,21 @@ def build_master():
 
 INSTANCES = {
     'MI_AAA_Soil': dict(
-        BaseColor=(0.11, 0.07, 0.035), TintB=(0.07, 0.075, 0.055),
+        BaseColor=(0.45, 0.32, 0.18), TintB=(0.32, 0.26, 0.16),
         DirtColor=(0.04, 0.028, 0.016), MossColor=(0.16, 0.15, 0.13),
         ColorVariation=0.5, WoodAmount=0.0, Dirt=0.18, Wetness=0.0, MossAmount=0.35,
         MacroScale=0.0012, MicroScale=0.28, DetailStrength=0.55, Roughness=0.93,
         RoughnessVariation=0.05, Metallic=0.0, AoStrength=0.3,
     ),
     'MI_AAA_Stone': dict(
-        BaseColor=(0.20, 0.19, 0.17), TintB=(0.11, 0.105, 0.095),
+        BaseColor=(0.42, 0.40, 0.36), TintB=(0.28, 0.26, 0.22),
         DirtColor=(0.045, 0.032, 0.02), MossColor=(0.04, 0.075, 0.03),
         ColorVariation=0.42, WoodAmount=0.0, Dirt=0.06, Wetness=0.0, MossAmount=1.0,
         MacroScale=0.0035, MicroScale=0.48, DetailStrength=1.1, Roughness=0.64,
         RoughnessVariation=0.14, Metallic=0.0, AoStrength=0.4,
     ),
     'MI_AAA_Wood': dict(
-        BaseColor=(0.10, 0.048, 0.02), TintB=(0.055, 0.03, 0.014),
+        BaseColor=(0.32, 0.16, 0.07), TintB=(0.18, 0.09, 0.04),
         DirtColor=(0.035, 0.025, 0.015), MossColor=(0.05, 0.055, 0.03),
         ColorVariation=0.22, WoodAmount=1.0, Dirt=0.1, Wetness=0.0, MossAmount=0.55,
         MacroScale=0.002, MicroScale=1.4, DetailStrength=0.22, Roughness=0.56,
@@ -688,8 +715,14 @@ def commit_mesh(name, built, material, nanite):
     asset.set_material(0, material)
     unreal.EditorAssetLibrary.set_metadata_tag(asset, 'Recipe', VERSION)
     unreal.EditorAssetLibrary.save_asset(path)
-    log('MESH %s tris=%s nanite=%s' % (name, len(tris), used_nanite))
-    return asset, used_nanite, len(tris)
+    asset_tris = asset.get_num_triangles(0)
+    bounds = asset.get_bounding_box()
+    log('MESH %s src_tris=%s asset_tris=%s nanite=%s bounds=(%.0f,%.0f,%.0f)-(%.0f,%.0f,%.0f)' % (
+        name, len(tris), asset_tris, used_nanite,
+        bounds.min.x, bounds.min.y, bounds.min.z, bounds.max.x, bounds.max.y, bounds.max.z))
+    if asset_tris < 1:
+        raise RuntimeError('mesh %s saved with no triangles' % name)
+    return asset, used_nanite, asset_tris
 
 
 def tag(actor, label, folder):
@@ -747,9 +780,18 @@ def build_level(instances, meshes):
         comp = actor.static_mesh_component
         comp.set_static_mesh(mesh)
         comp.set_material(0, material)
+        loc = actor.get_actor_location()
+        log('PLACE %s (%.0f,%.0f,%.0f) tris=%s' % (
+            label, loc.x, loc.y, loc.z, comp.static_mesh.get_num_triangles(0) if comp.static_mesh else 0))
         return actor
 
-    place_owned('AAA_Ground', meshes['SM_AAA_Ground_30m'], instances['MI_AAA_Soil'], 0, 0, planted=False)
+    # The generated sheet does not rasterize (captures stay 0,0,0 under the objects).
+    # Engine Plane is 100 cm, +Z, and takes the soil instance. Scale 30 covers the 30 m pad.
+    plane = unreal.EditorAssetLibrary.load_asset('/Engine/BasicShapes/Plane')
+    if plane is None:
+        raise RuntimeError('engine plane missing')
+    ground = place_owned('AAA_Ground', plane, instances['MI_AAA_Soil'], 0, 0, planted=False)
+    ground.set_actor_scale3d(unreal.Vector(30.0, 30.0, 1.0))
     place_owned('AAA_Stone', meshes['SM_AAA_Stone_Hero'], instances['MI_AAA_Stone'], -180, -140)
     place_owned('AAA_Wall', meshes['SM_AAA_Timber_Wall'], instances['MI_AAA_Wood'], 220, -30, yaw=-8)
     place_owned('AAA_Beam', meshes['SM_AAA_Timber_Beam'], instances['MI_AAA_Wood'], 40, -320, yaw=18)
@@ -799,7 +841,11 @@ def build_level(instances, meshes):
     set_prop(pp, 'unbound', True)
     settings = pp.get_editor_property('settings')
     set_prop(settings, 'override_auto_exposure_bias', True)
-    set_prop(settings, 'auto_exposure_bias', 0.35)
+    set_prop(settings, 'auto_exposure_bias', 1.2)
+    set_prop(settings, 'override_auto_exposure_min_brightness', True)
+    set_prop(settings, 'auto_exposure_min_brightness', 0.5)
+    set_prop(settings, 'override_auto_exposure_max_brightness', True)
+    set_prop(settings, 'auto_exposure_max_brightness', 0.5)
     set_prop(settings, 'override_bloom_intensity', True)
     set_prop(settings, 'bloom_intensity', 0.35)
     set_prop(pp, 'settings', settings)
@@ -903,6 +949,15 @@ def screenshot_loop(cameras):
                 loc = unreal.Vector(*cam['location'])
                 rot = unreal.MathLibrary.find_look_at_rotation(loc, unreal.Vector(*cam['target']))
                 ues.set_level_viewport_camera_info(loc, rot)
+                cmd('ShowFlag.Sprites 0')
+                cmd('ShowFlag.Grid 0')
+                cmd('ShowFlag.Bounds 0')
+                cmd('ShowFlag.Selection 0')
+                cmd('ShowFlag.SelectionOutline 0')
+                try:
+                    unreal.get_editor_subsystem(unreal.EditorActorSubsystem).set_selected_level_actors([])
+                except Exception:
+                    pass
                 if time.monotonic() - state['mark'] > wait:
                     cmd('HighResShot 1920x1080 filename="%s/cam_%s.png"' % (OUT.replace('\\', '/'), cam['name'].lower()))
                     state['requested'] = True
@@ -980,7 +1035,7 @@ def main():
     master = build_master()
     instances = build_instances(master)
     built = {
-        'SM_AAA_Ground_30m': (build_ground(), instances['MI_AAA_Soil'], False),
+        'SM_AAA_Ground_30m': (build_ground(), instances['MI_AAA_Soil'], True),
         'SM_AAA_Stone_Hero': (build_stone(), instances['MI_AAA_Stone'], True),
         'SM_AAA_Timber_Wall': (build_wall(), instances['MI_AAA_Wood'], True),
         'SM_AAA_Timber_Beam': (build_beam(), instances['MI_AAA_Wood'], True),
