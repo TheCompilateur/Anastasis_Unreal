@@ -27,6 +27,10 @@ Un écart d'un ulp n'est pas cosmétique : `Math.floor(hash2d(...) * n)` bascule
 catégorie au bord, et ce sont des arbres, des roches et des herbes qui changent de
 place. Sur une comparaison `dist < radius`, c'est une décision de PNJ qui bascule.
 
+Ce qui n'est pas fidèle se **déclare** : registre `ECARTS.md` (dans ce dossier), une fiche par
+écart dès le commit qui l'introduit, classe et destin (`A_FERMER` / `A_TRANCHER` / `ASSUME`).
+Protocole : `docs/migration/PROTOCOLE_ECARTS.md`.
+
 ### Comment la parité est vérifiée
 
 `tools/unreal/gen-parity-vectors.mjs` (dans le dépôt JS) importe les modules de

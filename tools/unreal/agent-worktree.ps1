@@ -214,6 +214,14 @@ switch ($Command) {
       Write-Output '    Fermeture propre : quit_editor() par MCP, ou Stop-Process -Id <pid> (c est le tien : son chemin est ce worktree).'
       exit 1
     }
+    # Ecarts de portage (docs\migration\PROTOCOLE_ECARTS.md) : une mission qui touche le C++ de
+    # Source\AnastasisSim nomme dans sa fiche ce qu'elle ne porte pas fidelement. Avant le
+    # build : un oubli echoue en quelques secondes, pas apres dix minutes de compilation.
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+      Fail 'FAIL: node introuvable -- requis par tools\migration\check-ecarts.mjs (protocole des ecarts)'
+    }
+    & node (Join-Path $path 'tools\migration\check-ecarts.mjs') -base main -handoff $handoff
+    if ($LASTEXITCODE -ne 0) { Fail 'FAIL: protocole des ecarts -- voir docs\migration\PROTOCOLE_ECARTS.md' }
     & (Join-Path $path 'tools\unreal\anastasis-unreal.ps1') build
     if ($LASTEXITCODE -ne 0) { Fail 'FAIL: build' }
     & (Join-Path $path 'tools\unreal\report-tests.ps1')

@@ -29,11 +29,16 @@ tools\unreal\anastasis-unreal.ps1 build                         # premier build 
   machine ; `finish` refuse sinon).
 - Un nouveau script dans `tools/unreal/` → une ligne dans l'index d'`AGENTS.md` (`finish` refuse sinon).
 - Commits : message dans un fichier, `git commit -F <fichier>` (les `"` cassent `-m` sous PS 5.1).
+- Portage dans `Source/AnastasisSim/` : ce qui n'est pas fidèle à la référence JS se déclare **dans le
+  même commit** : fiche dans `Source/AnastasisSim/ECARTS.md` (prochain numéro libre, `A_FERMER` ou
+  `A_TRANCHER`, jamais `ASSUME`), marque `ecart n°N` dans le code. Ce que tu portes enfin : fiche
+  `FERME`, marques retirées. `docs/migration/PROTOCOLE_ECARTS.md`.
 
 ## 3. Passer la main
 
 1. Fiche `docs/unreal/handoffs/<mission>.md` depuis `_TEMPLATE.md` : MISSION, FILES_OWNED, COMMIT, MEC
-   (commandes et **valeurs** obtenues), SCN, PLY, INTEGRATION_RISK, STOP (ce que tu ne revendiques pas).
+   (commandes et **valeurs** obtenues), SCN, PLY, ECARTS (si `Source/AnastasisSim/` est touché),
+   INTEGRATION_RISK, STOP (ce que tu ne revendiques pas).
 2. Tout commiter.
 3. `tools\unreal\agent-worktree.ps1 finish -Mission <mission>` → attendre `HANDOFF_READY::YES`.
    Rapporter PASS / KNOWN_EXPECTED_FAILURE / FAIL séparément, jamais un total « vert ».
@@ -43,6 +48,7 @@ Si `finish` échoue :
 | Ce que tu vois | Quoi faire |
 |---|---|
 | `MISSING` / `STALE` | mettre l'index d'`AGENTS.md` à jour |
+| `ECARTS::FAIL` | lire les lignes `FAIL` : section `## ECARTS` de la fiche, fiche du registre, marque `ecart n°N`, tirage hors `sim.rng` ; `node tools/migration/check-ecarts.mjs -base main -handoff <fiche>` pour rejouer en quelques secondes |
 | `Unreal lance sans Start-AnastasisEditor` | convertir la ligne citée |
 | `TESTS::FAIL lanceur bloque`, ou `RUN_INCOMPLET` | lire le log avant tout : `PIEGES_UNREAL.md` (éditeur fermé, VRAM, machine saturée) |
 | un test marqué sort `Fail` | lire la sortie du test lui-même ; ne jamais toucher au marqueur ni au registre |
