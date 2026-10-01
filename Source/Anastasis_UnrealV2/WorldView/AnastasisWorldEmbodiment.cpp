@@ -81,6 +81,15 @@ static TAutoConsoleVariable<int32> CVarShoreline(
     TEXT("0=nappe d'eau opaque historique, 1=rive graduee M_AnastasisShoreWater (defaut); applique a l'incarnation."),
     ECVF_Default);
 
+// WATER_LOOK_001 : l'eau se lisait comme de la peinture (aplat translucide, a fleur
+// d'herbe, bords en escalier, immobile). 1 = M_AnastasisWater (Single Layer Water :
+// absorption selon la profondeur, reflets, vagues advectees par le courant), rubans
+// d'eau lisses par riviere (section 2), berges marquees et fond de vase. 0 = l'eau d'avant.
+static TAutoConsoleVariable<int32> CVarWaterLook(
+    TEXT("anastasis.Terrain.WaterLook"), 1,
+    TEXT("1=eau Single Layer Water + rubans de riviere + berges marquees (defaut), 0=nappe de rive d'avant; applique a l'incarnation."),
+    ECVF_Default);
+
 // Le bouton qui rend la comparaison possible. Les deux chemins batissent EXACTEMENT
 // la meme geometrie et les memes canaux de sommet : seule change la fonction qui les
 // lit. Une capture A/B a camera, graine, soleil et exposition identiques ne mesure
@@ -1051,6 +1060,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 if (SurfaceMode == 2 && AnastasisDrainage::IsEnabled())
                 {
                     AnastasisDrainage::FParams DrainageParams;
+                    DrainageParams.bWaterLook = CVarWaterLook.GetValueOnGameThread() != 0;
                     if (ForgeMesh.bBasinFound || ForgeMesh.bHumanGeography) DrainageParams.Protected.Add(FVector2D(ForgeMesh.BasinX, ForgeMesh.BasinY));
                     if (ForgeMesh.bLandmarkFound) DrainageParams.Protected.Add(FVector2D(ForgeMesh.LandmarkX, ForgeMesh.LandmarkY));
                     if (AnastasisDrainage::Apply(Crop, ForgeMesh, Drainage, DrainageParams))
@@ -1119,7 +1129,13 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 Geometry.Colors, TArray<FProcMeshTangent>{}, true);
             // Section 1 : nappe d'eau plate au niveau de la mer, encastree dans le relief.
             ExperimentalSurface->ClearMeshSection(1);
-            bWaterSurfaceBuilt = Geometry.WaterTriangles.Num() > 0;
+            ExperimentalSurface->ClearMeshSection(2);
+            // WATER_LOOK_001 : seulement si le drainage a tourne -- ses rubans et sa liste de
+            // triangles sans rivieres en dependent.
+            const AnastasisDrainage::FNetwork& ActiveDrainage = AnastasisDrainage::GetActive();
+            const bool bWaterLook = CVarWaterLook.GetValueOnGameThread() != 0 && ActiveDrainage.GridW > 0;
+            const TArray<int32>& WaterTriangles = bWaterLook ? ActiveDrainage.LakeWaterTriangles : Geometry.WaterTriangles;
+            bWaterSurfaceBuilt = WaterTriangles.Num() > 0;
             const bool bShoreline = CVarShoreline.GetValueOnGameThread() != 0;
             if (bWaterSurfaceBuilt)
             {
@@ -1129,7 +1145,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 // sommet reste celle d'avant -- c'est le repli, et c'est ce que rend le
                 // mode 0. La geometrie est identique dans les deux cas : seuls les canaux
                 // et le materiau changent, sinon l'A/B ne prouverait rien.
-                ExperimentalSurface->CreateMeshSection_LinearColor(1, Geometry.WaterVertices, Geometry.WaterTriangles,
+                ExperimentalSurface->CreateMeshSection_LinearColor(1, Geometry.WaterVertices, WaterTriangles,
                     Geometry.WaterNormals,
                     bShoreline ? Geometry.WaterUV0 : TArray<FVector2D>{},
                     bShoreline ? Geometry.WaterUV1 : TArray<FVector2D>{},
@@ -1145,7 +1161,28 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             // anastasis.Terrain.Shoreline 0 doit rendre l'eau comme avant, pas la peindre
             // en terre.
             UMaterialInterface* SurfaceMaterial = ResolveGroundMaterial();
-            UMaterialInterface* ShoreMaterial = bShoreline ? ResolveWaterMaterial() : ResolveSliceMaterial();
+            UMaterialInterface* ShoreMaterial = bWaterLook ? ResolveWaterLookMaterial()
+                : bShoreline ? ResolveWaterMaterial() : ResolveSliceMaterial();
+            // Section 2 : rubans d'eau des rivieres, meme materiau que la nappe.
+            if (bWaterLook)
+            {
+                AnastasisDrainage::FWaterRibbons Ribbons;
+                AnastasisDrainage::BuildRiverRibbons(ActiveDrainage, Ribbons);
+                if (Ribbons.Triangles.Num() > 0)
+                {
+                    ExperimentalSurface->CreateMeshSection_LinearColor(2, Ribbons.Vertices, Ribbons.Triangles, Ribbons.Normals,
+                        Ribbons.UV0, TArray<FVector2D>{}, Ribbons.UV2, TArray<FVector2D>{},
+                        Ribbons.Colors, TArray<FProcMeshTangent>{}, false);
+                    if (ShoreMaterial) ExperimentalSurface->SetMaterial(2, ShoreMaterial);
+                }
+                UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_WATER_LOOK enabled=1 material=%s ribbons=%d ribbon_triangles=%d still_water_triangles=%d"),
+                    ShoreMaterial ? *ShoreMaterial->GetName() : TEXT("none"), ActiveDrainage.Rivers.Num(),
+                    Ribbons.Triangles.Num() / 3, WaterTriangles.Num() / 3);
+            }
+            else
+            {
+                UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_WATER_LOOK enabled=0"));
+            }
             if (SurfaceMaterial)
             {
                 ExperimentalSurface->SetMaterial(0, SurfaceMaterial);
@@ -1309,6 +1346,16 @@ UMaterialInterface* AAnastasisWorldEmbodiment::ResolveGroundMaterial()
 			nullptr, TEXT("/Game/Anastasis/Materials/M_AnastasisSlice.M_AnastasisSlice"));
 	}
 	return SliceMaterial ? SliceMaterial.Get() : BaseShapeMaterial.Get();
+}
+
+UMaterialInterface* AAnastasisWorldEmbodiment::ResolveWaterLookMaterial()
+{
+	if (!WaterLookMaterial)
+	{
+		WaterLookMaterial = LoadObject<UMaterialInterface>(
+			nullptr, TEXT("/Game/Anastasis/Materials/M_AnastasisWater.M_AnastasisWater"));
+	}
+	return WaterLookMaterial ? WaterLookMaterial.Get() : ResolveWaterMaterial();
 }
 
 UMaterialInterface* AAnastasisWorldEmbodiment::ResolveWaterMaterial()

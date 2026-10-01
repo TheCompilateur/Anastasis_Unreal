@@ -1061,7 +1061,9 @@ bool AnastasisDrainage::Apply(
 		{
 			const double Hill = HillAt(I);
 			// Incision : berge basse en plaine, chenal encaisse en colline.
-			const double Freeboard = FMath::Lerp(60.0, 240.0, Hill) + 15.0 * (Strahler[I] - 1);
+			// Berge marquee (WaterLook) : en plaine la riviere coule 1 m sous la prairie, pas a
+			// fleur d'herbe -- sinon elle se lit comme un trait de peinture pose sur le sol.
+			const double Freeboard = FMath::Lerp(Params.bWaterLook ? 100.0 : 60.0, 240.0, Hill) + 15.0 * (Strahler[I] - 1);
 			Raw = Valley[I] - Freeboard;
 		}
 		double Cap = TNumericLimits<double>::Max();
@@ -1241,7 +1243,8 @@ bool AnastasisDrainage::Apply(
 			P.Order = Pts[K].Order;
 			P.Hill = Pts[K].Hill;
 			// Berge large et douce en plaine, courte en colline.
-			P.BankFalloff = FMath::Clamp(FMath::Lerp(FMath::Max(3.0 * WMax, 2500.0), FMath::Max(1.0 * WMax, 800.0), Pts[K].Hill), 800.0, 6000.0);
+			const double PlainBank = Params.bWaterLook ? FMath::Max(1.5 * WMax, 1000.0) : FMath::Max(3.0 * WMax, 2500.0);
+			P.BankFalloff = FMath::Clamp(FMath::Lerp(PlainBank, FMath::Max(1.0 * WMax, 800.0), Pts[K].Hill), 800.0, 6000.0);
 			River.bAuthored |= Pts[K].bAuthored;
 		}
 		// Source de versant : le chenal nait, il n'est pas coupe a l'emporte-piece. Largeur et
@@ -1469,6 +1472,8 @@ bool AnastasisDrainage::Apply(
 	}
 
 	TSortedMap<int32, TPair<double, int32>> NearestPerRiver;
+	TArray<uint8> RiverWater;
+	RiverWater.SetNumZeroed(N);
 	TArray<double> Ground = R, Water, Flow, Wetness;
 	Water.Init(TNumericLimits<double>::Lowest(), N);
 	Flow.Init(0.0, N);
@@ -1497,6 +1502,10 @@ bool AnastasisDrainage::Apply(
 		// noierait la berge que le recepteur a abaissee.
 		double ChannelWs = TNumericLimits<double>::Max();
 		bool bHit = false;
+		// WaterLook : talus droit qui traverse la ligne d'eau (pente BankSlope, en cm par cm).
+		// Sans lui le lit s'arrete a 10 cm sous l'eau et la berge repart 12 cm au-dessus dans la
+		// meme maille de 5 m : la rive suivait la grille, en escalier sous le ruban d'eau.
+		constexpr double BankSlope = 0.15;
 		// Une seule cible par riviere : celle de son segment le plus proche. Prendre le minimum
 		// sur tous les segments laisserait la levee d'un segment aval, plus basse, entamer la
 		// berge du segment d'en face -- l'eau fuirait sur la pente.
@@ -1537,6 +1546,7 @@ bool AnastasisDrainage::Apply(
 				// Lit parabolique : bord mouille a 10 cm sous la surface, fond a Depth.
 				const double U = Dist / FMath::Max(HalfW, 1.0);
 				Tg = WsHere - 10.0 - (Depth - 10.0) * FMath::Pow(FMath::Max(1.0 - U * U, 0.0), 0.7);
+				if (Params.bWaterLook) Tg = FMath::Max(Tg, WsHere + BankSlope * (Dist - HalfW));
 			}
 			else
 			{
@@ -1544,9 +1554,17 @@ bool AnastasisDrainage::Apply(
 				const double Natural = R[I];
 				const double Edge = WsHere + 12.0;
 				Tg = Tb >= 1.0 ? Natural : Edge + (Natural - Edge) * FMath::Pow(SmoothStep(0.0, 1.0, Tb), 0.8);
+				// Plancher de levee : en WaterLook il part de la ligne d'eau sur le talus droit.
+				const double Lin = WsHere + BankSlope * (Dist - HalfW);
+				const double EdgeFloor = Params.bWaterLook ? FMath::Min(Edge, Lin) : Edge;
+				if (Params.bWaterLook && Tb < 1.0)
+				{
+					const double Curve = WsHere + (Natural - WsHere) * FMath::Pow(SmoothStep(0.0, 1.0, Tb), 0.8);
+					Tg = Natural >= WsHere ? FMath::Min(FMath::Max(Lin, Curve), Natural) : Curve;
+				}
 				// Levee minimale, bornee a 60 cm au-dessus du terrain : la riviere ne deborde pas
 				// sur une plaine un peu plus basse qu'elle, mais on n'eleve pas de digue.
-				if (Tb < 1.0) Tg = FMath::Max(Tg, (Dist - HalfW) < 2.0 * G.S ? Edge : FMath::Min(Edge, Natural + 60.0));
+				if (Tb < 1.0) Tg = FMath::Max(Tg, (Dist - HalfW) < 2.0 * G.S ? EdgeFloor : FMath::Min(EdgeFloor, Natural + 60.0));
 				if (bZone)
 				{
 					// Plaine d'inondation : terrain ramene juste au-dessus de l'eau, jamais releve.
@@ -1555,7 +1573,7 @@ bool AnastasisDrainage::Apply(
 					{
 						const double Plain = WsHere + 35.0 + 25.0 * Tf * Tf;
 						Tg = FMath::Min(Tg, FMath::Lerp(Plain, Natural, SmoothStep(0.7, 1.0, Tf)));
-						Tg = FMath::Max(Tg, FMath::Min(Edge, Natural + 60.0));
+						Tg = FMath::Max(Tg, FMath::Min(EdgeFloor, Natural + 60.0));
 					}
 				}
 			}
@@ -1575,7 +1593,7 @@ bool AnastasisDrainage::Apply(
 		{
 			// Dans un lac, le fond reste celui du lac : un lit de riviere creuse sous la nappe
 			// se verrait comme une rayure a travers l'eau.
-			if (L < 0) { Ground[I] = Target; Water[I] = ChannelWs < TNumericLimits<double>::Max() ? ChannelWs : BestWs; }
+			if (L < 0) { Ground[I] = Target; Water[I] = ChannelWs < TNumericLimits<double>::Max() ? ChannelWs : BestWs; RiverWater[I] = 1; }
 			Flow[I] = BestFlow;
 			Wetness[I] = BestWet;
 		}
@@ -1702,6 +1720,19 @@ bool AnastasisDrainage::Apply(
 		TArray<uint8> Recolor;
 		Recolor.SetNumZeroed(N);
 		for (int32 I = 0; I < N; ++I) Recolor[I] = Repair[I] && LakeOf[I] < 0 ? 1 : 0;
+		// WaterLook : toute terre seche qui porte encore le bleu d'une tuile d'eau reprend la
+		// couleur de ses voisines -- sinon un halo cyan, de la peinture d'eau sans eau, borde les
+		// rives et les anciens bras. Critere B > R : aucune teinte de terre (TileColor) n'a plus
+		// de bleu que de rouge, alors que meme un melange a moitie herbe d'une eau peu profonde
+		// en a ; tester B > G manquerait ces melanges, ou le vert de l'herbe l'emporte.
+		if (Params.bWaterLook)
+		{
+			for (int32 I = 0; I < N; ++I)
+			{
+				const FLinearColor& C = Geo.Colors[I];
+				if (Ground[I] >= Water[I] && C.B > C.R + 0.04f) Recolor[I] = 1;
+			}
+		}
 		TArray<double> Ch;
 		Ch.SetNumUninitialized(N);
 		auto FillChannel = [&](TFunctionRef<double(int32)> Get, TFunctionRef<void(int32, double)> Set)
@@ -1725,6 +1756,30 @@ bool AnastasisDrainage::Apply(
 		}
 	}
 
+	// WaterLook : l'humidite que lit le sol (UV1.y) ne vaut que pres d'une eau reellement
+	// rendue. Celle de la simulation couvre aussi les tuiles d'eau que ce reseau a assechees ;
+	// M_AnastasisGround y abaisse la rugosite, et le sol mouille reflete le ciel : une aureole
+	// cyan, de l'eau peinte sans eau. Plafond : 1 au contact, 0 a 8 mailles (40 m).
+	TArray<int32> WaterSteps;
+	if (Params.bWaterLook && Geo.UV1.Num() == N)
+	{
+		WaterSteps.Init(MAX_int32, N);
+		TArray<int32> Queue;
+		for (int32 I = 0; I < N; ++I) if (Ground[I] < Water[I]) { WaterSteps[I] = 0; Queue.Add(I); }
+		for (int32 Q = 0; Q < Queue.Num(); ++Q)
+		{
+			const int32 I = Queue[Q];
+			if (WaterSteps[I] >= 8) continue;
+			for (int32 K = 0; K < 4; ++K)
+			{
+				const int32 X = I % G.W + Off4X[K], Y = I / G.W + Off4Y[K];
+				if (!G.In(X, Y)) continue;
+				const int32 J = Y * G.W + X;
+				if (WaterSteps[J] == MAX_int32) { WaterSteps[J] = WaterSteps[I] + 1; Queue.Add(J); }
+			}
+		}
+	}
+
 	// Ecriture.
 	Geo.RiverFlow.SetNumZeroed(N);
 	for (int32 I = 0; I < N; ++I)
@@ -1734,7 +1789,21 @@ bool AnastasisDrainage::Apply(
 		Geo.RiverFlow[I] = static_cast<float>(Flow[I]);
 		const bool bUnder = Ground[I] < Water[I];
 		if (Geo.UV1.Num() == N) Geo.UV1[I].Y = FMath::Max(Geo.UV1[I].Y, Wetness[I]);
+		if (WaterSteps.Num() == N)
+		{
+			const double Cap = WaterSteps[I] == MAX_int32 ? 0.0 : 1.0 - SmoothStep(0.0, 8.0, WaterSteps[I]);
+			Geo.UV1[I].Y = static_cast<float>(FMath::Min(static_cast<double>(Geo.UV1[I].Y), Cap));
+		}
 		Geo.Colors[I].A = bUnder ? 1.0f : 0.0f;
+		if (Params.bWaterLook && bUnder)
+		{
+			// Fond immerge : gravier clair au bord, vase sombre au large. Le bleu de tuile n'a
+			// plus de raison d'etre : c'est la nappe Single Layer Water qui absorbe la lumiere.
+			const double Deep = SmoothStep(0.0, 180.0, Water[I] - Ground[I]);
+			const FLinearColor Gravel(0.30f, 0.27f, 0.20f), Silt(0.13f, 0.12f, 0.085f);
+			const FLinearColor Bed = FMath::Lerp(Gravel, Silt, static_cast<float>(Deep));
+			Geo.Colors[I] = FLinearColor(Bed.R, Bed.G, Bed.B, 1.0f);
+		}
 		if (Wet[I] && LakeOf[I] < 0) (bUnder ? Out.KeptWaterVertices : Out.RepairedWaterVertices) += 1;
 		else if (Wet[I]) Out.KeptWaterVertices += 1;
 	}
@@ -1747,6 +1816,12 @@ bool AnastasisDrainage::Apply(
 			if (Ground[A] < Water[A] || Ground[B] < Water[B] || Ground[C] < Water[C] || Ground[D] < Water[D])
 			{
 				Geo.WaterTriangles.Append({A, C, B, B, C, D});
+				// Les rivieres sont dessinees par leurs rubans : la grille ne garde que les quads
+				// ou un sommet mouille n'est pas de riviere (lac, mer, mare, embouchure).
+				const int32 Q[4] = {A, B, C, D};
+				bool bStill = false;
+				for (const int32 V : Q) bStill |= Ground[V] < Water[V] && !RiverWater[V];
+				if (bStill) Out.LakeWaterTriangles.Append({A, C, B, B, C, D});
 			}
 		}
 	}
@@ -2004,4 +2079,57 @@ bool AnastasisDrainage::DumpIfRequested(const FNetwork& Network)
 	}
 	Json += FString::Printf(TEXT("],\"summary\":\"%s\"}"), *Describe(Network));
 	return FFileHelper::SaveStringToFile(Json, *Path);
+}
+
+void AnastasisDrainage::BuildRiverRibbons(const FNetwork& Network, FWaterRibbons& Out)
+{
+	Out = FWaterRibbons{};
+	for (int32 RI = 0; RI < Network.Rivers.Num(); ++RI)
+	{
+		const FRiver& River = Network.Rivers[RI];
+		const int32 Num = River.Points.Num();
+		if (Num < 2) continue;
+		// Profondeur dans l'arbre : chaque affluent 1.5 cm sous son recepteur ; toute riviere
+		// 2 cm sous les lacs (ses embouchures plongent sous la nappe du lac, qui les couvre).
+		int32 Tier = 0;
+		for (int32 P = River.Parent, Guard = 0; P != INDEX_NONE && Guard < 64; P = Network.Rivers[P].Parent, ++Guard) ++Tier;
+		const double Lower = 2.0 + 1.5 * Tier;
+		const int32 Base = Out.Vertices.Num();
+		double Arc = 0.0;
+		for (int32 K = 0; K < Num; ++K)
+		{
+			const FRiverPoint& P = River.Points[K];
+			if (K > 0) Arc += FVector::Dist2D(River.Points[K - 1].Location, P.Location);
+			const FVector2D Tangent = (FVector2D(River.Points[FMath::Min(K + 1, Num - 1)].Location)
+				- FVector2D(River.Points[FMath::Max(K - 1, 0)].Location)).GetSafeNormal();
+			const FVector2D Normal(-Tangent.Y, Tangent.X);
+			// 3.5 m sous chaque berge (le talus y est ~50 cm au-dessus de l eau) : la rive visible
+			// est l intersection avec le talus, meme dans les coudes ou le ruban se deforme.
+			const double Half = 0.5 * P.Width + 350.0;
+			const double Z = P.Location.Z - Lower;
+			const FVector2D C(P.Location);
+			const FVector2D L = C + Normal * Half, R = C - Normal * Half;
+			const FVector2D Flow = Tangent * FMath::Clamp(P.Velocity / 3.0, 0.0, 1.0);
+			Out.Vertices.Add(FVector(L.X, L.Y, Z));
+			Out.Vertices.Add(FVector(R.X, R.Y, Z));
+			Out.UV0.Add(FVector2D(Arc / 1000.0, -1.0));
+			Out.UV0.Add(FVector2D(Arc / 1000.0, 1.0));
+			for (int32 Side = 0; Side < 2; ++Side)
+			{
+				Out.Normals.Add(FVector::UpVector);
+				Out.UV2.Add(Flow);
+				Out.Colors.Add(FLinearColor(0.043f, 0.176f, 0.290f, 1.0f));
+			}
+		}
+		for (int32 K = 0; K + 1 < Num; ++K)
+		{
+			const int32 L0 = Base + 2 * K, R0 = L0 + 1, L1 = L0 + 2, R1 = L0 + 3;
+			// Meme sens d'enroulement que la grille (face visible vers le haut) : on teste le
+			// signe plutot que de supposer de quel cote tombe la normale de la polyligne.
+			const FVector A = Out.Vertices[L0], B = Out.Vertices[R0], Cc = Out.Vertices[L1];
+			const double Cross = (Cc.X - A.X) * (B.Y - A.Y) - (Cc.Y - A.Y) * (B.X - A.X);
+			if (Cross < 0.0) Out.Triangles.Append({L0, L1, R0, R0, L1, R1});
+			else Out.Triangles.Append({L0, R0, L1, R0, R1, L1});
+		}
+	}
 }

@@ -284,6 +284,7 @@ manque puis se contentent de le vérifier ; `*_REBUILD=1` le régénère et écr
 | `observe-slice.py` | `M_AnastasisSlice`, `Lvl_AnastasisSlice` |
 | `ground-material.ps1` + `.py` | `M_AnastasisGround`, `MI_AnastasisGround` |
 | `shore-water.ps1` + `.py` | `M_AnastasisShoreWater` |
+| `water-look.ps1` + `.py` | `M_AnastasisWater` (Single Layer Water, WATER_LOOK_001) |
 | `presentation-registry.py` | `DA_AnastasisPresentation` |
 | `atmosphere-profile.py` | `DA_AnastasisAtmosphere` |
 | `create_tree_asset.py` | `SM_Tree_*`, `M_AnastasisVegetation` — régénérés à **chaque** run |
