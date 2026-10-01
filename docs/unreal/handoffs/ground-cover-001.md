@@ -80,4 +80,11 @@ non mesuré) ; la clairière du hameau n'a pas d'effet visible sur la carte rée
 
 ## Preuves finales
 
-PENDING
+Refaites après chaque rebase (`main` a avancé trois fois pendant la passation) :
+
+- UNITY : `Build.bat` direct sur arbre propre, aucune exclusion adaptative,
+  `Module.Anastasis_UnrealV2.{1,2,3}.cpp` + `Module.AnastasisSim.cpp` recompilés, `Result: Succeeded`.
+- `agent-worktree.ps1 finish` sur `bc8974b` (base `e0be35f`) : `BUILD::PASS`, 168 PASS /
+  4 KNOWN_EXPECTED_FAILURE / 0 FAIL, 172 annoncés, 172 vus, `HANDOFF_READY::YES`.
+- Rejoués sur la base finale juste avant `integrate` (même commande, enchaînée) ; le versement
+  s'arrête au premier échec.
