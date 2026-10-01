@@ -10,19 +10,19 @@ Laboratoire visuel isolé de 30 m. Prouver si le pipeline actuel peut porter une
 - `tools/unreal/aaa-visual-lab.ps1`
 - `docs/unreal/AAA_VISUAL_TARGET_LAB.md`
 - `docs/unreal/handoffs/aaa-visual-lab.md`
-- `AGENTS.md` (une ligne d'index)
-- à la première exécution éditeur seulement : `/Game/Anastasis/LookDev/AAA_Lab/**`
+- `AGENTS.md` (une section d'index)
+- `/Game/Anastasis/LookDev/AAA_Lab/**`
 
 ## COMMIT
 
-`feat(lookdev): isoler un laboratoire visuel de 30 m` puis le commit des `.uasset` du labo.
+`feat(lookdev): isoler un laboratoire visuel de 30 m` et les commits qui suivent sur `agent/aaa-visual-lab`.
 
 ## MEC
 
-- BUILD: PASS (worktree, cible éditeur). Pas de C++ de mission.
-- ÉDITEUR: `AAA_LAB::CAPTURE_COMPLETE` sur `/Engine/Maps/Entry`, MCP 8559. Log `Saved/SliceEvidence/aaa-visual-lab-006/lab.log`. Ligne `AAA_LAB_COMPLETE cameras=3`.
-- SOL: `SM_AAA_Ground_30m` dalle de 8 cm, 20160 triangles, Nanite, bornes (−1500,−1500,−23)–(1500,1500,15). `cam_a` pixel médian y=810 : RGB 183,175,152.
-- AUDIT: 115 meshes, B 34, C 79, D 2, A 0. Nanite production : 0. Labo : Nanite sur sol, pierre, mur, poutre, dalles.
+- BUILD: relancé par `finish`. Pas de C++ de mission.
+- ÉDITEUR: `AAA_LAB::CAPTURE_COMPLETE` sur `/Engine/Maps/Entry`, MCP 8559. Dossier `Saved/SliceEvidence/aaa-visual-lab-007/`. Ligne `AAA_LAB_COMPLETE cameras=3`.
+- SOL: le plan moteur à l'échelle 30, `MI_AAA_Soil`. `cam_a` centre bas RGB environ 184,176,153. La feuille `SM_AAA_Ground_30m` (9 800 triangles, Nanite off) ne s'affiche pas.
+- AUDIT: 115 meshes, B 34, C 79, D 2, A 0. Nanite production : 0. Labo : Nanite sur pierre, mur, poutre, dalles.
 - DÉCAL: non posé (`DecalBlendMode` protégé).
 - TESTS: voir `finish`.
 - COMMANDES :
@@ -30,15 +30,14 @@ Laboratoire visuel isolé de 30 m. Prouver si le pipeline actuel peut porter une
 ```powershell
 cd C:\dev\ANASTASIS_WORKTREES\aaa-visual-lab
 tools\unreal\anastasis-unreal.ps1 build
-tools\unreal\aaa-visual-lab.ps1 -OutDir C:\dev\ANASTASIS_WORKTREES\aaa-visual-lab\Saved\SliceEvidence\aaa-visual-lab-001
+tools\unreal\aaa-visual-lab.ps1 -OutDir C:\dev\ANASTASIS_WORKTREES\aaa-visual-lab\Saved\SliceEvidence\aaa-visual-lab-007
 ```
 
 - `python -m py_compile tools/unreal/aaa-visual-lab.py` : OK.
-- Le dossier `Saved/SliceEvidence/aaa-visual-lab` existe déjà (log du run interrompu). Le prochain `-OutDir` doit être un dossier neuf.
 
 ## SCN
 
-`/Game/Anastasis/LookDev/AAA_Lab/Lvl_AAA_VisualLab`, 30 m. Caméras : A (380, -620, 165) → (40, -80, 90) ; B (980, -1280, 250) → (40, 180, 110) ; C (1750, -2100, 780) → (0, 280, 90). Captures `cam_a.png`, `cam_b.png`, `cam_c.png`. Le sous-système d'interaction du village s'initialise dans tout monde du module : le log signale des SmartObject sans schéma. Aucun PNJ n'est placé.
+`/Game/Anastasis/LookDev/AAA_Lab/Lvl_AAA_VisualLab`, 30 m. Caméras : A (380, -620, 165) → (40, -80, 90) ; B (980, -1280, 250) → (40, 180, 110) ; C (1750, -2100, 780) → (0, 280, 90). Le sous-système d'interaction du village s'initialise dans tout monde du module : le log signale des SmartObject sans schéma. Aucun PNJ n'est placé.
 
 ## PLY
 
@@ -46,13 +45,14 @@ NOT_IMPLEMENTED. Le mannequin du labo est une boîte de 180 cm, hors du système
 
 ## INTEGRATION_RISK
 
-- `AGENTS.md` est un fichier que d'autres agents éditent : une seule section ajoutée, rebasée sur `main`.
+- `AGENTS.md` est un fichier que d'autres agents éditent : une seule section ajoutée.
 - Les `.uasset` sont confinés à `/Game/Anastasis/LookDev/AAA_Lab/`.
-- Aucun matériau ni mesh de production n'est réécrit.
+- Aucun matériau ni mesh de production n'est réécrit. Le sol du niveau référence `/Engine/BasicShapes/Plane`.
 
 ## STOP
 
 - Pas de FPS du labo. Les CVars runtime n'ont pas été relues (`ConsoleManager` absent du module Python).
 - Le décal stain n'est pas livré.
-- La normale analytique du sol ondule fort en gros plan. Ce n'est pas un trou : le plan est continu.
+- `SM_AAA_Ground_30m` ne rasterise pas. Le niveau pose le plan moteur à la place.
+- Les captures gardent les icônes de lumière et le cadre de sélection.
 - Pas de modification de Lumen, du ciel, de l'herbe, des PNJ, de la rivière, de la map.
