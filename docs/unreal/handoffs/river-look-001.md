@@ -36,6 +36,7 @@ BRANCH_HEAD
   - `tools\unreal\hydro-network-capture.ps1 -Label avant -States 1 -Shots docs\visual\river-look-001\shots.json -PreCmds "ShowFlag.Fog 1;ShowFlag.VolumetricFog 1;anastasis.Terrain.WaterLook 1;anastasis.Sky.Hour 11"`
   - même commande `-Label retake2 -Shots docs\visual\river-look-001\shots-retake.json` après le matériau adouci
   - `tools\unreal\report-tests.ps1 -Filter Anastasis.Terrain.Drainage.WaterLook`
+- FOND (essais retirés, matériau revenu) : `I_fond` à `34493,65416` vers `2275`. Sonde rouge 35,42 %. Translucide : pixels du ruban `(61,85,78)` → `(135,115,63)`, berge G 47 %. Composition : berge, bas du cadre `(1,1,1)`, 52 %. Planches `docs/visual/river-look-001/{probe-red,see-through,composed,contact-avant}/`.
 
 ## SCN
 
@@ -60,3 +61,4 @@ UNKNOWN — PLAYER reste NOT_IMPLEMENTED.
 - Pas de coucher ni de nuit rephotographiés : l'heure épinglée est 11, et le matériau n'encode pas l'heure.
 - Le coin noir au premier plan de la vue étroite et les arêtes de ruban vues d'en haut sont la géométrie des rubans, déjà là avant ce matériau.
 - Coût GPU du shader non mesuré en instructions.
+- Le lit à 18 cm n'est pas visible. Single Layer Water peint SurfaceColor (sonde rouge, extinction nulle, ruban rouge, 35 %). Le translucide montre le sol sec et tue le miroir de berge. La composition manuelle noircit la berge. Ces essais sont retirés : le matériau intégré est inchangé. Voir `RIVER_LOOK_001.md`, section « Fond à 18 cm ».

@@ -101,6 +101,48 @@ Aucun Niagara, aucun acteur, aucun tick. Deux sections de mesh comme avant.
 Le surcoût est un shader un peu plus long sur les pixels de rivière ; les lacs
 prennent la branche d'avant. Pas de Scene Capture.
 
+## Fond à 18 cm — le sol se voit, l'eau non
+
+Sur le monde intégré, à `34493, 65416`, le sol rendu est à 18 cm sous la nappe.
+Vu d'aplomb, le ruban est un bandeau bleu-vert opaque (`contact-avant/I_fond_1.png`).
+
+Le moteur multiplie l'extinction par la profondeur en centimètres
+(`SingleLayerWaterShading.ush`). Les coefficients du matériau sont écrits par
+mètre : 0,55 /m sur 18 cm devrait laisser voir le fond, 0,55 par centimètre le
+ferme. Passer à 0,01 (`MetersToCentimeters`) ne change pas l'image : 1,87 % des
+pixels, sous le bruit.
+
+Sortir les rubans sur un composant à part (`RiverSurface`), pour que le sol
+reste dans la profondeur opaque, ne l'ouvre pas non plus : 4,96 % en vue
+d'aplomb, le bandeau reste bleu.
+
+Une sonde ensuite : `SurfaceColor` rouge, absorption et diffusion à zéro.
+`probe-red/I_fond_1.png` change de 35 % et le ruban est rouge plein. D'aplomb,
+Single Layer Water peint la couleur de surface. Il ne montre pas le sol.
+
+Le translucide, dessiné après le sol, le montre. Les pixels du ruban passent
+de `(61, 85, 78)` à `(135, 115, 63)`, le tan du terrain autour
+(`see-through/I_fond_1.png`, 7,8 % du cadre : le ruban seul). Ce qui apparaît
+est le même sol sec, pas un lit. De la berge (`G`), le miroir des arbres
+disparaît : 47 % du cadre, l'eau devient une nappe sombre.
+
+Composer le pixel à la main (non éclairé : SceneColor teinté par l'épaisseur,
+plus un SceneColor décalé par la normale au ras de l'eau) refait la même chose
+d'aplomb (`composed/I_fond_1.png`, 8,3 %, mêmes pixels tan). De la berge le
+bas du cadre tombe à `(1, 1, 1)` : le reflet d'écran est noir
+(`composed/G_peu_profonde_1.png`, 52 %).
+
+Ces essais sont retirés. `M_AnastasisWater` et `water-look.py` sont revenus
+au Single Layer Water intégré, celui qui garde le miroir.
+
+La couleur du ruban, d'aplomb, n'est donc pas la loi de Beer de ces 18 cm.
+Ouvrir le ruban montre le sol de la berge, et ferme le reflet.
+
+Quatre mètres en aval de cette cellule, le sol est déjà au-dessus de la nappe :
+une vue zénithale mal calée photographie la berge. Un essai précédent (vagues
+alignées, absorption des hauts-fonds plus faible) restait dans le bruit de l'eau
+animée, 6 à 16 % entre deux prises du même état.
+
 ## Non exécuté
 
 - Étranglements locaux de largeur : ils casseraient `NarrowingSteps == 0`.
