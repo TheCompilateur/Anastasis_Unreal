@@ -3,6 +3,16 @@
 Mission `labo-ecarts-001`, 2026-10-01. Discipline de claim (`P3_PLAN.md`) : `OBS` observé · `EVD` mesuré ·
 `INF` déduit · `DEC` décidé · `UNK` inconnu.
 
+## Dossiers jugés
+
+| Écart | Au bit | Statistique (règle v2) | Nature mesurée | Prédiction | Dossier |
+|---|---|---|---|---|---|
+| n° 5, cadence | `DIVERGE` tick 1 | `RUPTURE` (ampleur) contre la référence du harnais ; indiscernable du bruit A/A contre la référence vue du village | rupture | dérivant faible : **réfutée** | `n05.md` |
+| n° 16, flux propre des rumeurs | `DIVERGE` au premier tirage détourné | `INDETERMINE`, profil de la calibration A/A | chaotique (`INF`) | chaotique : non démontrée formellement, aucun attendu contredit hormis « peut-être dormant » | `n16.md` |
+
+Les deux archétypes se séparent nettement : la méthode distingue un écart qui change la vie du village d'un
+écart qui ne fait que décaler les tirages. Elle ne sait pas encore **certifier** le second (`NEUTRE`).
+
 ## La question
 
 Le harnais (`P3_PLAN.md` §2) répond à une seule question : la trace C++ est-elle identique **au bit près**
@@ -74,6 +84,19 @@ l'agent, non validées par Alexandre**. Verdict d'une grandeur : `EQUIVALENT` (T
 qualitatif se déclenche (survie, but qui apparaît ou disparaît, ampleur > 3 δ), sinon `DERIVE` si une
 grandeur est `DIFFERENT`, sinon `INDETERMINE` si une grandeur l'est, sinon `NEUTRE` ; `DORMANT` si
 l'injection ne s'active dans aucun passage.
+
+**Règles de décision et calibration A/A.** La règle ci-dessus, déclarée avant la première mesure, est la
+**v1**. Une comparaison sans aucun écart (témoin contre témoin-bis, puis quatre jeux de témoins deux à deux)
+l'a prise en défaut le jour même : **6 paires A/A sur 6 déclarées `DERIVE`** sur `endurance`, faute de
+correction pour ~45 grandeurs testées ensemble (`n05.md`). La **v2** exige pour `DIFFERENT` un p corrigé
+par Holm < 0,05 ; sur les mêmes paires : 1/6 `DERIVE`, 5/6 `INDETERMINE`, 0/6 `NEUTRE`. Les deux règles
+sont calculées et rapportées ; les verdicts des dossiers sont en v2. Conséquences, à garder en tête :
+
+- chaque expérience juge aussi ses paires A/A (`calibration` dans `experiences/nNN.json`, par défaut
+  témoin / témoin-bis) : un verdict ne se lit qu'à côté du bruit A/A du même terrain ;
+- à N = 40, D = 3, l'instrument **reconnaît un effet fort mais ne sait pas conclure `NEUTRE`** ; un écart
+  chaotique sort `INDETERMINE` avec le même profil que la calibration. Pour atteindre `NEUTRE` : plus de
+  répliques, ou des tolérances v2 sur les grandeurs bruitées — **déclarées avant** la mesure suivante.
 
 Les interactions entre écarts viennent dans un second temps (deux injections dans le même bras : le
 format le permet, aucune expérience ne le fait encore).

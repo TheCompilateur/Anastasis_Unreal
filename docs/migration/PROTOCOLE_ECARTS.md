@@ -145,6 +145,12 @@ marque dans le code**. C'est le cas que ce protocole veut rendre impossible pour
 - Elle n'est expliquée par aucun écart : **c'est un bug de portage.** C'est la seule catégorie qui
   demande une enquête.
 
+Le harnais dit **si** une section diverge, pas si l'écart **compte**. Pour le savoir, le laboratoire
+de jugement (`docs/migration/ecarts/METHODE.md`, `tools/migration/labo_ecarts/`) réinjecte l'écart dans
+la référence JS et mesure son effet sur la vie du village, avec un verdict au bit et un verdict
+statistique. Le résultat s'inscrit dans le champ `jugement` de la fiche ; il éclaire le `destin`, il ne
+le décide pas.
+
 ## Ce que ce protocole ne fait pas
 
 - Il ne prouve pas qu'un écart non déclaré n'existe pas. Le contrôleur repère les aveux (« non

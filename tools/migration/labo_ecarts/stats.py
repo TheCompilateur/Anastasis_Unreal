@@ -72,6 +72,27 @@ def p_inversion_signe(d: list[float], b: int = B_PERMUTATION, graine: int = GRAI
     return (extremes + 1) / (b + 1)
 
 
+def holm(jugees: dict, alpha: float = 0.05) -> None:
+    """Correction de Holm sur les `p_signe` d'une famille de grandeurs ; ecrit `p_holm` et `verdictHolm`.
+
+    DIFFERENT sous Holm : l'IC 95 % exclut 0 ET le p corrige est < alpha. L'equivalence (TOST) n'est
+    pas corrigee : sans correction elle est deja du cote prudent (elle conclut moins souvent).
+    """
+    cles = sorted(jugees, key=lambda c: jugees[c]["p_signe"])
+    m = len(cles)
+    courant = 0.0
+    for i, c in enumerate(cles):
+        courant = max(courant, min(1.0, (m - i) * jugees[c]["p_signe"]))
+        jugees[c]["p_holm"] = courant
+    for c, r in jugees.items():
+        if r["equivalent"]:
+            r["verdictHolm"] = "EQUIVALENT"
+        elif r["exclutZero"] and r["p_holm"] < alpha:
+            r["verdictHolm"] = "DIFFERENT"
+        else:
+            r["verdictHolm"] = "INDETERMINE"
+
+
 def juger(a: list[float], b: list[float], delta: float | None) -> dict:
     """Jugement d'une grandeur : a et b alignes par replique (None = absent, paire ecartee)."""
     paires = [(x, y) for x, y in zip(a, b) if x is not None and y is not None

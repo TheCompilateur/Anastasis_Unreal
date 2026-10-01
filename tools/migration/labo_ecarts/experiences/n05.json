@@ -4,61 +4,186 @@
   "titre": "Pas de cadence de simulation par bande (consumeNpcSimulationCadence non branchee)",
   "dossier": "docs/migration/ecarts/n05.md",
   "terrains": [
-    { "terrain": "endurance", "repliques": 40, "jours": 3 },
-    { "terrain": "genese", "repliques": 30, "jours": 3 }
+    {
+      "terrain": "endurance",
+      "repliques": 40,
+      "jours": 3
+    },
+    {
+      "terrain": "genese",
+      "repliques": 30,
+      "jours": 3
+    }
   ],
-  "bras": ["aucun", "n05", "vue_village"],
+  "bras": [
+    "aucun",
+    "n05",
+    "vue_village"
+  ],
   "comparaisons": [
-    { "id": "principal", "A": "aucun", "B": "n05", "question": "que change l'ecart n° 5 dans la reference ?" },
-    { "id": "controle", "A": "vue_village", "B": "n05", "question": "le C++ sans cadence est-il le jeu vu d'une camera posee sur le village ?" }
+    {
+      "id": "principal",
+      "A": "aucun",
+      "B": "n05",
+      "question": "que change l'ecart n° 5 dans la reference ?"
+    },
+    {
+      "id": "controle",
+      "A": "vue_village",
+      "B": "n05",
+      "question": "le C++ sans cadence est-il le jeu vu d'une camera posee sur le village ?"
+    }
   ],
   "every": 60,
   "empreinteEvery": 900,
   "cone": [
-    { "titre": "Le code omis : la porte de cadence", "entrees": ["consumeNpcSimulationCadence"], "profondeur": 1, "champs": ["_simBudgetAccum"] },
-    { "titre": "Ce que la porte commande : le reste d'updateNpc", "entrees": ["updateNpc"], "profondeur": 1, "champs": ["aiThinkAt"] }
+    {
+      "titre": "Le code omis : la porte de cadence",
+      "entrees": [
+        "consumeNpcSimulationCadence"
+      ],
+      "profondeur": 1,
+      "champs": [
+        "_simBudgetAccum"
+      ]
+    },
+    {
+      "titre": "Ce que la porte commande : le reste d'updateNpc",
+      "entrees": [
+        "updateNpc"
+      ],
+      "profondeur": 1,
+      "champs": [
+        "aiThinkAt"
+      ]
+    }
   ],
   "predictions": {
     "endurance/principal": {
       "ecriteLe": "2026-10-01, avant toute mesure de N repliques (voir docs/migration/ecarts/n05.md, section Prediction, et l'essai de fumee declare)",
       "nature": "derivant",
       "attendus": [
-        { "grandeur": "bit.tDivReduite", "attendu": "<=1", "pourquoi": "la porte ecrit _simBudgetAccum et gele les besoins au tick 1" },
-        { "grandeur": "micro.decorrelation", "attendu": ">=0.8", "pourquoi": "le tirage de reconsideration (sim.rng) est fait a chaque pensee ; 1 pensee/s contre 1 toutes les 0,12 s" },
-        { "grandeur": "changements_but_par_habitant_jour", "attendu": "hausse", "pourquoi": "un habitant sans cible redecide au tick suivant, pas a la seconde suivante" },
-        { "grandeur": "faim_moy", "attendu": "equivalent", "pourquoi": "tickNeeds est lineaire en dt par branche : meme temps integre" },
-        { "grandeur": "soif_moy", "attendu": "equivalent" },
-        { "grandeur": "survivants_initiaux", "attendu": "equivalent" },
-        { "grandeur": "nourriture_recoltee_tuiles", "attendu": "equivalent" }
+        {
+          "grandeur": "bit.tDivReduite",
+          "attendu": "<=1",
+          "pourquoi": "la porte ecrit _simBudgetAccum et gele les besoins au tick 1"
+        },
+        {
+          "grandeur": "micro.decorrelation",
+          "attendu": ">=0.8",
+          "pourquoi": "le tirage de reconsideration (sim.rng) est fait a chaque pensee ; 1 pensee/s contre 1 toutes les 0,12 s"
+        },
+        {
+          "grandeur": "changements_but_par_habitant_jour",
+          "attendu": "hausse",
+          "pourquoi": "un habitant sans cible redecide au tick suivant, pas a la seconde suivante"
+        },
+        {
+          "grandeur": "faim_moy",
+          "attendu": "equivalent",
+          "pourquoi": "tickNeeds est lineaire en dt par branche : meme temps integre"
+        },
+        {
+          "grandeur": "soif_moy",
+          "attendu": "equivalent"
+        },
+        {
+          "grandeur": "survivants_initiaux",
+          "attendu": "equivalent"
+        },
+        {
+          "grandeur": "nourriture_recoltee_tuiles",
+          "attendu": "equivalent"
+        }
       ]
     },
     "genese/principal": {
       "ecriteLe": "2026-10-01, avant toute mesure de N repliques",
       "nature": "derivant",
       "attendus": [
-        { "grandeur": "bit.tDivReduite", "attendu": "<=1" },
-        { "grandeur": "micro.decorrelation", "attendu": ">=0.8" },
-        { "grandeur": "changements_but_par_habitant_jour", "attendu": "hausse" },
-        { "grandeur": "faim_moy", "attendu": "equivalent" },
-        { "grandeur": "survivants_initiaux", "attendu": "equivalent" }
+        {
+          "grandeur": "bit.tDivReduite",
+          "attendu": "<=1"
+        },
+        {
+          "grandeur": "micro.decorrelation",
+          "attendu": ">=0.8"
+        },
+        {
+          "grandeur": "changements_but_par_habitant_jour",
+          "attendu": "hausse"
+        },
+        {
+          "grandeur": "faim_moy",
+          "attendu": "equivalent"
+        },
+        {
+          "grandeur": "survivants_initiaux",
+          "attendu": "equivalent"
+        }
       ]
     },
     "endurance/controle": {
       "ecriteLe": "2026-10-01, avant toute mesure de N repliques",
       "nature": "chaotique",
       "attendus": [
-        { "grandeur": "micro.decorrelation", "attendu": ">=0.8", "pourquoi": "les habitants dedans restent a 10 Hz (bande medium) dans le controle, a chaque tick avec l'ecart : les tirages se decalent" },
-        { "grandeur": "changements_but_par_habitant_jour", "attendu": "equivalent" },
-        { "grandeur": "faim_moy", "attendu": "equivalent" }
+        {
+          "grandeur": "micro.decorrelation",
+          "attendu": ">=0.8",
+          "pourquoi": "les habitants dedans restent a 10 Hz (bande medium) dans le controle, a chaque tick avec l'ecart : les tirages se decalent"
+        },
+        {
+          "grandeur": "changements_but_par_habitant_jour",
+          "attendu": "equivalent"
+        },
+        {
+          "grandeur": "faim_moy",
+          "attendu": "equivalent"
+        }
       ]
     },
     "genese/controle": {
       "ecriteLe": "2026-10-01, avant toute mesure de N repliques",
       "nature": "chaotique",
       "attendus": [
-        { "grandeur": "micro.decorrelation", "attendu": ">=0.8" },
-        { "grandeur": "changements_but_par_habitant_jour", "attendu": "equivalent" }
+        {
+          "grandeur": "micro.decorrelation",
+          "attendu": ">=0.8"
+        },
+        {
+          "grandeur": "changements_but_par_habitant_jour",
+          "attendu": "equivalent"
+        }
       ]
     }
-  }
+  },
+  "calibration": {
+    "endurance": [
+      [
+        "aucun",
+        "aucun@bis"
+      ],
+      [
+        "aucun",
+        "aucun@200000"
+      ],
+      [
+        "aucun",
+        "aucun@300000"
+      ],
+      [
+        "aucun@bis",
+        "aucun@200000"
+      ],
+      [
+        "aucun@bis",
+        "aucun@300000"
+      ],
+      [
+        "aucun@200000",
+        "aucun@300000"
+      ]
+    ]
+  },
+  "calibrationAjouteeLe": "2026-10-01, APRES la premiere analyse : la paire temoin / temoin-bis de `endurance` sortait DERIVE ; deux temoins de plus (reseed 200000+k, 300000+k) pour savoir lequel est atypique. Predictions et tolerances inchangees."
 }

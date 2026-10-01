@@ -36,6 +36,7 @@ Les numéros ne se réutilisent jamais ; un écart fermé garde sa fiche (`statu
 | `activation` | comment il s'active ; un scénario du harnais ne doit jamais l'activer | si `EXTENSION` |
 | `ferme_par` | mission et commit qui l'ont fermé | si `FERME` |
 | `detail` | document ou bloc de code qui en dit plus | non |
+| `jugement` | dossier du laboratoire (`docs/migration/ecarts/nNN.md`) et ses deux verdicts par terrain : **au bit** (`IDENTIQUE` / `DIVERGE`) et **statistique** (`NEUTRE` / `DERIVE` / `RUPTURE` / `INDETERMINE` / `DORMANT`). Une mesure dans la référence JS, pas une décision : il ne change pas le `destin` | non |
 
 **Seul Alexandre fait passer un écart à `ASSUME`.** Un agent écrit `A_TRANCHER` et pose la question.
 
@@ -121,6 +122,7 @@ contournement local, pas de verrou de seuil domestique en route.
 - **harnais** : actors
 - **masques** : lodLogique
 - **detail** : `docs/migration/phase3/P3_PREMIER_RAPPORT.md`
+- **jugement** : `docs/migration/ecarts/n05.md` (2026-10-01, labo-ecarts-001) — au bit `DIVERGE` tick 1 ; statistique `RUPTURE` contre la référence du harnais (vue 0,0 : bande far), indiscernable du bruit A/A contre la référence vue du village (`endurance` N=40, `genese` N=30, 3 j)
 
 **Premier tick divergent du premier rapport JS / Unreal (tick 1).** En JS, un habitant en bande
 *far* pense à 1 Hz avec un `dt` accumulé (`_simBudgetAccum`) ; en C++, chaque habitant pense à chaque
@@ -288,6 +290,7 @@ l'origine. La scène de foyer vaut 0.
 - **cpp** : `Village/AnastasisVillage.cpp` ; `VillageRng` dans `Public/Village/AnastasisVillage.h`
 - **harnais** : actors, rng
 - **detail** : `Public/Village/AnastasisVillage.h`, n° 16 ; `docs/unreal/BONDS_RUMORS_001.md`
+- **jugement** : `docs/migration/ecarts/n16.md` (2026-10-01, labo-ecarts-001), substitution de flux seule — au bit `DIVERGE` au premier tirage détourné ; statistique `INDETERMINE`, même profil que la calibration A/A : chaotique (`INF`), `NEUTRE` non démontrable à N=40
 
 Les tirages des rumeurs viennent de `VillageRng`, pas de `sim.rng` : la trajectoire JS n'est pas
 promise au tirage près. Rumeurs de gisements seulement ; texte des répliques non porté (le refus est

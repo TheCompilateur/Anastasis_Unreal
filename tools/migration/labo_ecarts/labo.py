@@ -43,11 +43,18 @@ def lire_experience(chemin: str) -> dict:
     return exp
 
 
+def calibration_de(exp: dict, terrain: str) -> list[list[str]]:
+    """Paires A/A d'un terrain : `exp["calibration"][terrain]`, par defaut temoin contre temoin-bis."""
+    return (exp.get("calibration") or {}).get(terrain, [["aucun", "aucun@bis"]])
+
+
 def bras_a_lancer(exp: dict) -> list[dict]:
-    """Tous les passages : (terrain, replique, bras). Le temoin-bis (`aucun@bis`) est toujours ajoute."""
-    bras = list(dict.fromkeys(exp["bras"] + ["aucun@bis"]))
+    """Tous les passages : (terrain, replique, bras). Le temoin-bis (`aucun@bis`) est toujours ajoute,
+    et tout temoin nomme par une paire de calibration (`aucun@<base>` : reseed base + k)."""
     out = []
     for t in exp["terrains"]:
+        calib = [b for paire in calibration_de(exp, t["terrain"]) for b in paire]
+        bras = list(dict.fromkeys(exp["bras"] + ["aucun@bis"] + calib))
         for k in range(t["repliques"]):
             for b in bras:
                 out.append({"terrain": t["terrain"], "replique": k, "bras": b, "jours": t["jours"]})
@@ -80,6 +87,8 @@ def commande_bras(ref: str, exp: dict, p: dict, sortie: Path) -> list[str]:
            "-empreinte-every", str(exp.get("empreinteEvery", 900)), "-out", str(sortie)]
     if bis == "bis":
         cmd += ["-reseed", str(RESEED_BIS + p["replique"])]
+    elif bis is not None:
+        cmd += ["-reseed", str(int(bis) + p["replique"])]
     return cmd
 
 
@@ -138,7 +147,7 @@ def analyser_comparaison(exp, tol, out: Path, terrain: dict, comp: dict) -> dict
     a_id, b_id = comp["A"], comp["B"]
     N = terrain["repliques"]
     rel = {}
-    for bras in {a_id, b_id, "aucun", "aucun@bis"}:
+    for bras in dict.fromkeys([a_id, b_id, "aucun", "aucun@bis"]):
         rel[bras] = [obs.lire_releve(chemin_releve(out, exp, {"terrain": terrain["terrain"], "replique": k, "bras": bras}))
                      for k in range(N)]
     gA = [obs.grandeurs(r) for r in rel[a_id]]
@@ -179,47 +188,13 @@ def analyser_comparaison(exp, tol, out: Path, terrain: dict, comp: dict) -> dict
         r["echelle"] = (tol["grandeurs"].get(cle) or tol["grandeurs"].get(cle.split(".")[0] + ".*") or {}).get("echelle")
         (jugees if delta is not None else rapportees)[cle] = r
 
-    # ruptures.
-    ruptures = []
-    for cle in ("survivants_initiaux", "population_fin"):
-        if cle in jugees and jugees[cle]["exclutZero"]:
-            ruptures.append(f"survie : {cle} {jugees[cle]['diff']:+.3f}")
-    buts = {c.split(".", 1)[1] for c in cles if c.startswith("part_but.")}
-    for but in sorted(buts):
-        pa = stats.moyenne([g.get(f"part_but.{but}", 0.0) or 0.0 for g in gA])
-        pb = stats.moyenne([g.get(f"part_but.{but}", 0.0) or 0.0 for g in gB])
-        if (pa >= 0.02 and pb < 0.002) or (pb >= 0.02 and pa < 0.002):
-            ruptures.append(f"but `{but}` : part {pa:.3f} -> {pb:.3f}")
-    for cle, r in jugees.items():
-        if r["verdict"] == "DIFFERENT" and r["delta"] and abs(r["diff"]) > 3 * r["delta"]:
-            ruptures.append(f"ampleur : {cle} {r['diff']:+.3g} > 3 x delta ({r['delta']:.3g})")
-
-    differents = {c: r for c, r in jugees.items() if r["verdict"] == "DIFFERENT"}
-    indetermines = {c: r for c, r in jugees.items() if r["verdict"] == "INDETERMINE"}
-    if sum(act_b) == 0 and sum(act_a) == 0:
-        verdict = "DORMANT"
-    elif ruptures:
-        verdict = "RUPTURE"
-    elif differents:
-        verdict = "DERIVE"
-    elif indetermines:
-        verdict = "INDETERMINE"
-    else:
-        verdict = "NEUTRE"
-    seuils = tol["decorrelation"]
+    # Regle v2 : correction de Holm sur les p des grandeurs jugees (familles = une comparaison).
+    stats.holm(jugees)
     ratio_moy = stats.moyenne(ratios) if ratios else float("nan")
-    if verdict == "DORMANT":
-        nature = "dormant"
-    elif verdict == "RUPTURE":
-        nature = "rupture"
-    elif verdict == "DERIVE":
-        nature = "derivant"
-    elif verdict == "NEUTRE" and ratio_moy >= seuils["seuilDecorrele"]:
-        nature = "chaotique"
-    elif verdict == "NEUTRE":
-        nature = "local (neutre, trajectoires non decorrelees)"
-    else:
-        nature = "indeterminee (N insuffisant)"
+    dormant = sum(act_b) == 0 and sum(act_a) == 0 and not comp.get("calibration")
+    v1 = decider(jugees, gA, gB, cles, dormant, ratio_moy, tol["decorrelation"], cle_verdict="verdict")
+    v2 = decider(jugees, gA, gB, cles, dormant, ratio_moy, tol["decorrelation"], cle_verdict="verdictHolm")
+    verdict, nature, ruptures = v2["verdict"], v2["nature"], v2["ruptures"]
 
     return {
         "terrain": terrain,
@@ -246,9 +221,58 @@ def analyser_comparaison(exp, tol, out: Path, terrain: dict, comp: dict) -> dict
         "ruptures": ruptures,
         "verdict": verdict,
         "nature": nature,
+        "regleV1": v1,
         "cout_s": {"A": _resume([r["fin"]["secondes"] for r in rel[a_id]]),
                    "B": _resume([r["fin"]["secondes"] for r in rel[b_id]])},
     }
+
+
+def decider(jugees, gA, gB, cles, dormant, ratio_moy, seuils, cle_verdict) -> dict:
+    """Verdict d'une comparaison. `cle_verdict` : `verdict` (regle v1, sans correction) ou `verdictHolm` (v2).
+
+    v1 est la regle declaree avant la premiere mesure. Elle juge chaque grandeur a 5 % sans tenir
+    compte du nombre de grandeurs (~50) : la calibration A/A (temoin contre temoin-bis) montre ce
+    que cela coute. v2 exige, pour DIFFERENT, que le p corrige par Holm soit < 0.05.
+    """
+    ruptures = []
+    for cle in ("survivants_initiaux", "population_fin"):
+        if cle in jugees and jugees[cle][cle_verdict] == "DIFFERENT":
+            ruptures.append(f"survie : {cle} {jugees[cle]['diff']:+.3f}")
+    buts = {c.split(".", 1)[1] for c in cles if c.startswith("part_but.")}
+    for but in sorted(buts):
+        pa = stats.moyenne([g.get(f"part_but.{but}", 0.0) or 0.0 for g in gA])
+        pb = stats.moyenne([g.get(f"part_but.{but}", 0.0) or 0.0 for g in gB])
+        if (pa >= 0.02 and pb < 0.002) or (pb >= 0.02 and pa < 0.002):
+            ruptures.append(f"but `{but}` : part {pa:.3f} -> {pb:.3f}")
+    for cle, r in jugees.items():
+        if r[cle_verdict] == "DIFFERENT" and r["delta"] and abs(r["diff"]) > 3 * r["delta"]:
+            ruptures.append(f"ampleur : {cle} {r['diff']:+.3g} > 3 x delta ({r['delta']:.3g})")
+    differents = sorted(c for c, r in jugees.items() if r[cle_verdict] == "DIFFERENT")
+    indetermines = sorted(c for c, r in jugees.items() if r[cle_verdict] == "INDETERMINE")
+    if dormant:
+        verdict = "DORMANT"
+    elif ruptures:
+        verdict = "RUPTURE"
+    elif differents:
+        verdict = "DERIVE"
+    elif indetermines:
+        verdict = "INDETERMINE"
+    else:
+        verdict = "NEUTRE"
+    if verdict == "DORMANT":
+        nature = "dormant"
+    elif verdict == "RUPTURE":
+        nature = "rupture"
+    elif verdict == "DERIVE":
+        nature = "derivant"
+    elif verdict == "NEUTRE" and ratio_moy >= seuils["seuilDecorrele"]:
+        nature = "chaotique"
+    elif verdict == "NEUTRE":
+        nature = "local (neutre, trajectoires non decorrelees)"
+    else:
+        nature = "indeterminee (N insuffisant)"
+    return {"verdict": verdict, "nature": nature, "ruptures": ruptures, "differents": differents,
+            "indetermines": indetermines}
 
 
 def serie_mediane(series: list[list], points: int = 12) -> list:
@@ -309,7 +333,11 @@ def analyser(args) -> dict:
     resultats = {"kind": "labo-resultats", "ecart": exp["ecart"], "experience": exp, "tolerances": tol["version"],
                  "analyseLe": time.strftime("%Y-%m-%d"), "terrains": []}
     for terrain in exp["terrains"]:
-        for comp in exp["comparaisons"]:
+        calibrations = [{"id": f"calibration_AA:{a}/{b}", "A": a, "B": b, "calibration": True,
+                         "question": "deux temoins : meme mecanique, autres suites de tirages. Ce que la methode "
+                                     "declare sans aucun ecart = son taux de faux positifs."}
+                        for a, b in calibration_de(exp, terrain["terrain"])]
+        for comp in exp["comparaisons"] + calibrations:
             res = analyser_comparaison(exp, tol, out, terrain, comp)
             pred = (exp.get("predictions") or {}).get(f"{terrain['terrain']}/{comp['id']}")
             if pred:
@@ -317,8 +345,16 @@ def analyser(args) -> dict:
             resultats["terrains"].append(res)
     if args.json:
         Path(args.json).parent.mkdir(parents=True, exist_ok=True)
-        leger = json.loads(json.dumps(resultats, default=float))
-        Path(args.json).write_text(json.dumps(leger, indent=1, ensure_ascii=False, allow_nan=True) + "\n", encoding="utf-8")
+        def arrondi(o):
+            if isinstance(o, float):
+                return o if (math.isnan(o) or math.isinf(o) or o == 0) else float(f"{o:.6g}")
+            if isinstance(o, dict):
+                return {k: arrondi(v) for k, v in o.items()}
+            if isinstance(o, (list, tuple)):
+                return [arrondi(v) for v in o]
+            return o
+        leger = arrondi(json.loads(json.dumps(resultats, default=float)))
+        Path(args.json).write_text(json.dumps(leger, separators=(",", ":"), ensure_ascii=False, allow_nan=True) + "\n", encoding="utf-8")
     md = markdown(resultats)
     if args.md:
         Path(args.md).write_text(md, encoding="utf-8")
@@ -346,7 +382,10 @@ def markdown(R: dict) -> str:
         t, c = res["terrain"], res["comparaison"]
         L.append(f"## {t['terrain']} — {c['id']} : A = `{c['A']}`, B = `{c['B']}` — N = {t['repliques']}, D = {t['jours']} j")
         L.append("")
-        L.append(f"**Verdict statistique : {res['verdict']}** — nature mesuree : **{res['nature']}**  ")
+        v1 = res["regleV1"]
+        L.append(f"**Verdict statistique (regle v2, Holm) : {res['verdict']}** — nature mesuree : **{res['nature']}**  ")
+        L.append(f"Regle v1 (declaree, sans correction) : {v1['verdict']} / {v1['nature']} — "
+                 f"{len(v1['differents'])} grandeur(s) DIFFERENT, {len(v1['indetermines'])} INDETERMINE  ")
         b = res["bit"]
         td = b["tDivReduite"]
         L.append(f"**Verdict au bit : {b['verdict']}** ({b['pairesDivergentes']}/{b['paires']} paires ; premier tick divergent "
@@ -372,19 +411,19 @@ def markdown(R: dict) -> str:
             L.append("")
             L.append("Criteres de rupture declenches : " + " ; ".join(res["ruptures"]))
         L.append("")
-        L.append("| grandeur | echelle | A | B | diff | IC95 | IC90 | delta | p | effet (sd) | verdict |")
-        L.append("|---|---|---:|---:|---:|---|---|---:|---:|---:|---|")
+        L.append("| grandeur | echelle | A | B | diff | IC95 | IC90 | delta | p | p Holm | effet (sd) | v1 | v2 (Holm) |")
+        L.append("|---|---|---:|---:|---:|---|---|---:|---:|---:|---:|---|---|")
         for cle, r in sorted(res["jugees"].items(), key=lambda kv: (kv[1].get("echelle") or "", kv[0])):
             L.append(f"| `{cle}` | {r.get('echelle') or ''} | {_f(r['moyenneA'])} | {_f(r['moyenneB'])} | {_f(r['diff'])} | "
                      f"[{_f(r['ic95'][0])} ; {_f(r['ic95'][1])}] | [{_f(r['ic90'][0])} ; {_f(r['ic90'][1])}] | {_f(r['delta'])} | "
-                     f"{_f(r['p_signe'], 2)} | {_f(r['effet_sd'], 2)} | {r['verdict']} |")
+                     f"{_f(r['p_signe'], 2)} | {_f(r['p_holm'], 2)} | {_f(r['effet_sd'], 2)} | {r['verdict']} | {r['verdictHolm']} |")
         conf = res.get("confrontation")
         if conf:
             L.append("")
             L.append(f"Prediction : nature predite **{conf['naturePredite']}**, mesuree **{conf['natureMesuree']}** → **{conf['nature']}**")
             for at in conf["attendus"]:
                 L.append(f"- `{at['grandeur']}` attendu {at['attendu']} — mesure {_f(at['mesure'])} — "
-                         f"{'TENU' if at['tenu'] else 'NON TENU' if at['tenu'] is False else 'non jugeable'}")
+                         f"{'TENU' if at['tenu'] else 'NON TENU (non demontre ou contraire)' if at['tenu'] is False else 'non jugeable'}")
         L.append("")
     return "\n".join(L)
 
