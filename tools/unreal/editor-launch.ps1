@@ -35,6 +35,9 @@
 # minutes (45), EDITOR_GATE::TIMEOUT. Le compte d'editeurs couvre la montee en memoire d'un
 # editeur qui vient de demarrer, que la RAM ne montre pas encore. Le verrou nomme rend
 # "verifier puis lancer" atomique entre agents. ANASTASIS_EDITOR_GATE=0 : pas de porte.
+# Le premier editeur passe toujours : le 2026-10-01, apres un redemarrage, sessions Claude
+# et Cursor laissaient 0,6 Go de RAM disponible sans aucun Unreal ouvert. Des seuils de
+# memoire appliques au premier editeur n'auraient laisse travailler personne.
 
 if (-not ('AnastasisLaunch' -as [type])) {
   Add-Type -TypeDefinition @'
@@ -143,8 +146,10 @@ function Invoke-AnastasisEditorGated {
       $load = Get-AnastasisEditorLoad
       $blocked = @()
       if ($load.Editors -ge $MaxEditors) { $blocked += "editeurs=$($load.Editors)/$MaxEditors (pids $($load.Pids))" }
-      if ($load.RamGB -lt $MinRamGB) { $blocked += "ram_dispo=$($load.RamGB)/$MinRamGB Go" }
-      if ($load.CommitGB -lt $MinCommitGB) { $blocked += "marge_engagee=$($load.CommitGB)/$MinCommitGB Go" }
+      if ($load.Editors -gt 0) {
+        if ($load.RamGB -lt $MinRamGB) { $blocked += "ram_dispo=$($load.RamGB)/$MinRamGB Go" }
+        if ($load.CommitGB -lt $MinCommitGB) { $blocked += "marge_engagee=$($load.CommitGB)/$MinCommitGB Go" }
+      }
       if (-not $blocked.Count) {
         try { $launched = & $Launch } finally { $gate.ReleaseMutex() }
         $waitedMin = ((Get-Date) - $gateStart).TotalMinutes
@@ -192,6 +197,21 @@ function Start-AnastasisEditor {
   if ($env:ANASTASIS_EDITOR_GUARD_LOG) { $guardArgs += @('-Log', ('"' + $env:ANASTASIS_EDITOR_GUARD_LOG + '"')) }
   Start-Process powershell.exe -WindowStyle Hidden -ArgumentList $guardArgs | Out-Null
   return $p
+}
+
+# Editeurs Unreal encore ouverts sur le projet de $Root. Appele par `agent-worktree.ps1 finish` :
+# un editeur interactif (`anastasis-unreal.ps1 editor`) ne se ferme pas seul, il reste hors ecran
+# avec ses 8-13 Go apres la fin de la mission, et la porte memoire retient alors tous les autres.
+# Le separateur final evite qu'une mission en couvre une autre (`x-001` / `x-001b`).
+function Find-WorktreeEditor([string]$Root) {
+  $needle = ($Root.TrimEnd('\', '/') + '\').Replace('/', '\')
+  Get-CimInstance Win32_Process -Filter "Name like 'UnrealEditor%'" | Where-Object {
+    $_.CommandLine -and $_.CommandLine.Replace('/', '\').IndexOf($needle, [StringComparison]::OrdinalIgnoreCase) -ge 0
+  } | ForEach-Object {
+    $p = Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue
+    '{0} pid={1} depuis {2} engage={3:N1} Go' -f $_.Name, $_.ProcessId, $(if ($p) { $p.StartTime.ToString('HH:mm') } else { '?' }),
+      $(if ($p) { $p.PrivateMemorySize64 / 1GB } else { 0 })
+  }
 }
 
 # Lancements d'Unreal qui contournent Start-AnastasisEditor dans tools/unreal/. Appele par

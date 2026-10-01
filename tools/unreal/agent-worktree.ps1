@@ -205,6 +205,15 @@ switch ($Command) {
       $raw | ForEach-Object { Write-Output "    $_" }
       exit 1
     }
+    # Un editeur laisse ouvert garde sa memoire apres la mission, hors ecran, et bloque la
+    # porte memoire de tous les autres agents (AGENTS.md, « Porte memoire »).
+    $open = @(Find-WorktreeEditor $path)
+    if ($open.Count -gt 0) {
+      Write-Output 'FAIL: editeur Unreal encore ouvert sur ce worktree -- le fermer avant de passer la main'
+      $open | ForEach-Object { Write-Output "    $_" }
+      Write-Output '    Fermeture propre : quit_editor() par MCP, ou Stop-Process -Id <pid> (c est le tien : son chemin est ce worktree).'
+      exit 1
+    }
     & (Join-Path $path 'tools\unreal\anastasis-unreal.ps1') build
     if ($LASTEXITCODE -ne 0) { Fail 'FAIL: build' }
     & (Join-Path $path 'tools\unreal\report-tests.ps1')

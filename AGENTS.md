@@ -53,7 +53,7 @@ Cycle de vie, un outil unique : `tools\unreal\agent-worktree.ps1`
 |---|---|
 | `create -Mission <m>` | branche + worktree depuis `main`, port MCP du worktree enregistré |
 | `status` | tous les worktrees : modifications, avance/retard sur `main`, branches non intégrées |
-| `finish -Mission <m>` | portail de fin : index `tools/unreal/` à jour, aucun Unreal lancé hors `Start-AnastasisEditor`, build + `report-tests`, refuse de passer la main si du travail n'est pas commité |
+| `finish -Mission <m>` | portail de fin : index `tools/unreal/` à jour, aucun Unreal lancé hors `Start-AnastasisEditor`, aucun éditeur encore ouvert sur le worktree, build + `report-tests`, refuse de passer la main si du travail n'est pas commité |
 | `mcp -Mission <m>` | (ré)enregistre le port MCP d'un worktree existant côté Claude Code |
 | `integrate -Mission <m>` | rôle intégrateur : avance rapide de **`main`** (jamais de la branche extraite du canonique), après avoir rejoué index et lancements Unreal sur l'arbre versé ; canonique hors `main` → copie de travail intacte |
 | `prune -Mission <m>` | après versement : worktree, branche et enregistrement MCP local supprimés ; refuse si un commit manque à `main` ou si le worktree n'est pas propre |
@@ -245,13 +245,20 @@ compilation : tout gelait, puis un éditeur mourait, et son agent cherchait une 
 | Condition | Défaut | Variable |
 |---|---|---|
 | éditeurs Unreal ouverts (`UnrealEditor`, `UnrealEditor-Cmd`, **celui d'Alexandre compris**) | < 2 | `ANASTASIS_EDITOR_MAX` |
-| RAM disponible | ≥ 3 Go | `ANASTASIS_EDITOR_MIN_RAM_GB` |
-| marge avant la limite de mémoire engagée | ≥ 8 Go | `ANASTASIS_EDITOR_MIN_COMMIT_GB` |
+| RAM disponible, dès qu'un éditeur est déjà ouvert | ≥ 3 Go | `ANASTASIS_EDITOR_MIN_RAM_GB` |
+| marge avant la limite de mémoire engagée, idem | ≥ 8 Go | `ANASTASIS_EDITOR_MIN_COMMIT_GB` |
+
+Le premier éditeur passe toujours : après un redémarrage, les sessions Claude et Cursor laissent à elles
+seules moins d'1 Go de RAM disponible ; des seuils mémoire sur le premier éditeur bloqueraient tout le monde.
 
 Pendant l'attente, une ligne `EDITOR_GATE::WAIT` par minute dit ce qui bloque. Au bout de 45 min
 (`ANASTASIS_EDITOR_WAIT_MIN`) : `EDITOR_GATE::TIMEOUT`, levé comme une erreur. **C'est une machine saturée,
 pas une régression** : relancer plus tard. Ne jamais fermer l'éditeur d'un autre pour passer.
 `ANASTASIS_EDITOR_GATE=0` supprime la porte — sur demande d'Alexandre seulement.
+
+Un éditeur interactif (`anastasis-unreal.ps1 editor`) ne se ferme pas seul : hors écran, il garde sa mémoire
+après la mission et bloque la porte des autres. `finish` refuse donc la passation tant qu'un éditeur est
+ouvert sur le worktree (`Find-WorktreeEditor`), et donne son pid.
 
 ## Index de `tools/unreal/`
 
