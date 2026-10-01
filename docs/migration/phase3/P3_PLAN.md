@@ -148,6 +148,9 @@ toutes les sections de `serialize` comparées, 0 divergence.
   ne fait pas avancer l'indicateur attend la fin du jalon B.
 - **Un module JS porté l'est en entier**, ou sa fiche dit quelles fonctions restent et pourquoi.
   Fini le « réduit » silencieux.
+- **Tout écart se déclare dans le commit qui l'introduit** : fiche dans
+  `Source/AnastasisSim/ECARTS.md`, marque `ecart n°N` dans le code, section `## ECARTS` de la
+  passation. `finish` le contrôle (`docs/migration/PROTOCOLE_ECARTS.md`).
 - **Aucun nouveau flux aléatoire.** Tout tirage passe par `sim.rng` dans l'ordre de la
   référence ; un écart de tirage est une divergence, pas un détail.
 - **Les vecteurs ne se corrigent jamais à la main**, et les masques de scénario ne s'ajoutent
