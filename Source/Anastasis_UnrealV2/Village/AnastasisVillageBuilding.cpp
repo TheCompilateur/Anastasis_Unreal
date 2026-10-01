@@ -42,6 +42,18 @@ bool AAnastasisVillageBuilding::HasBody() const
 	return Body && Body->GetStaticMesh() != nullptr;
 }
 
+void AAnastasisVillageBuilding::SetConstructionProgress(double Progress)
+{
+	if (!Body) return;
+	// Un chantier sans piece montre encore ses fondations : 6 % de la hauteur.
+	const double Z = Progress >= 1.0 ? 1.0 : FMath::Clamp(Progress, 0.06, 1.0);
+	const FVector Current = Body->GetRelativeScale3D();
+	if (!FMath::IsNearlyEqual(Current.Z, Z))
+	{
+		Body->SetRelativeScale3D(FVector(Current.X, Current.Y, Z));
+	}
+}
+
 void AAnastasisVillageBuilding::Configure(
 	EAnastasisVillageBuildingKind InKind,
 	FName InSimId,

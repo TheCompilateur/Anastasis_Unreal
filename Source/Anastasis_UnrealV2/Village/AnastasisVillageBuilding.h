@@ -38,6 +38,12 @@ public:
 	USmartObjectComponent* GetSmartObject() const { return SmartObject; }
 	bool HasBody() const;
 
+	/**
+	 * Chantier : le corps monte avec les pieces posees (0..1, 1 = acheve). Une
+	 * echelle verticale tient lieu des 22 pieces du plan de la reference.
+	 */
+	void SetConstructionProgress(double Progress);
+
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis")
 	TObjectPtr<USmartObjectComponent> SmartObject;

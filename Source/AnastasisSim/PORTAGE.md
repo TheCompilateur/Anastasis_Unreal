@@ -250,6 +250,17 @@ Sous l'orage le fermier lâche la cueillette, s'abrite à son grenier le temps d
 récupère, puis reprend une activité de lui-même. Sans hôte (tests d'assemblage), pas de météo :
 chaque terme vaut exactement 0. Écart n° 17 dans `Village/AnastasisVillage.h`.
 
+### Fait — le chantier (mission build-001)
+
+| Unreal | Source JS (`fee66ae`) | Preuve |
+| --- | --- | --- |
+| `Work/AnastasisBuild.h/.cpp` | `simulation.js` buildCost / costMultiplier / siteCanPlacePiece / consumeSiteMaterials, `constructionPieces.js`, `craftWork.js` (profil build), `craftToolSwitch.js`, tables métiers / traits | `Parite.Chantier`, 432 vecteurs |
+| `Village/AnastasisVillage.*` (ajouts) | ligne `build` d'adultScores (besoin 85), `constructionAccessPoint`, `progressBuildWork`, `pickBuildSite`, `workConstruction` | `Village.Chantier.*` |
+
+Un bâtiment ouvert par l'hôte monte en 22 pièces sous les coups des bâtisseurs, chaque pièce prend sa
+part du devis au stock du site, et le bâtiment achevé sert. Ouverture par les habitants, livraisons,
+bois et pierre : écart n° 18, build-002. Détail : `docs/unreal/BUILD_001.md`.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

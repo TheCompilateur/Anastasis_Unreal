@@ -15,7 +15,7 @@
 //   sim/fieldCrops.js fieldSeasonFromDay, fieldSeasonGatherAmount
 //   sim/fieldWorkPosts preferredFieldPostIndex, fieldPostWorld, nearestFieldPostIndex
 //   life/skills.js    gainDomainSkill, skillGoalBias
-//   sim/content.js    TRAITS ; metiers/catalog.js farmer, settler
+//   sim/content.js    TRAITS ; metiers/catalog.js farmer, settler, builder
 //
 // L'habitant n'a ni ambition, ni technique, ni nature tiree au sort : sa
 // nature est moyenne (corps, esprit, coeur a 1, sans qualite ni defaut). Ce

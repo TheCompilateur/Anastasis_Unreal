@@ -157,6 +157,21 @@
 //     un but repris qui n'est pas expose devient `craft` dans la reference : non porte, donc
 //     `observer`. Parite : `Anastasis.Sim.Parite.MeteoHabitants` (vecteurs) et
 //     `Anastasis.Sim.MeteoHabitants.*` (formules non exportees, boucle assemblee).
+// 18. Chantier (build-001) : un batiment inacheve monte piece par piece (22) sous les
+//     coups des batisseurs ; chaque piece consomme sa part du devis dans le stock du
+//     site ; a la derniere, le batiment est acheve et sert. La ligne `build` est
+//     calculee pour TOUS les adultes des qu'un chantier est ouvert (besoin collectif
+//     85, comme la reference) ; sans chantier, elle reste au plancher des buts non
+//     portes. Non porte, et pourquoi :
+//       - l'OUVERTURE d'un chantier par un habitant (`tryOpenNewConstruction` : choix
+//         collectif du type, emplacement, salaire d'ouverture, apport initial) : c'est
+//         l'hote qui ouvre (`OpenSite`), devis livre sur place ou non ;
+//       - les LIVRAISONS au chantier (`requestSiteDeliveries`, porteurs) : un chantier
+//         a sec attend ; le bois et la pierre ne se recoltent pas encore ;
+//       - la memoire d'echec et de danger d'un chantier bloque, le relais de pieces
+//         (rendu), les episodes, la reputation, l'annonce, les postes ouverts par le
+//         batiment acheve, la restitution du reliquat (aucun depot de bois ni de pierre) ;
+//       - le rate de coup (ecart n°11) et le bruit de but (ecart n°1), comme ailleurs.
 // 13. Reference : `fee66ae`, commitee. Sa copie de travail porte, NON commitee,
 //     `load > 11` au lieu de `load > 9` pour rentrer livrer : non suivi.
 //
@@ -174,6 +189,7 @@
 #include "Life/AnastasisNeeds.h"
 #include "Life/AnastasisVillageRhythm.h"
 #include "Life/AnastasisWeatherBehavior.h"
+#include "Work/AnastasisBuild.h"
 #include "Work/AnastasisGather.h"
 #include "World/AnastasisEntityTable.h"
 #include "World/AnastasisNavGrid.h"
@@ -282,6 +298,17 @@ namespace AnastasisVillage
 		/** `building.stock.food` — `{physical, reserved}`, reserved <= physical. Grenier seulement. */
 		int32 FoodPhysical = 0;
 		int32 FoodReserved = 0;
+
+		/** Chantier : pieces posees (0..22), devis / consomme / stock du site, qui l'a ouvert. */
+		int32 PiecesPlaced = 0;
+		bool bHasMaterials = false;
+		AnastasisBuild::FSiteMaterials Materials;
+		FString BuilderId;
+		/** `building.workers[npcId]` : pieces posees par chacun, dans l'ordre d'arrivee. */
+		TArray<TPair<FString, int32>> Workers;
+		/** `completedDay`, `completedById` : -1 / vide tant qu'il n'est pas acheve sous les coups. */
+		int32 CompletedDay = -1;
+		FString CompletedById;
 
 		bool IsCompleted() const { return Progress >= 1.0; }
 		int32 FoodAvailable() const { return FMath::Max(0, FoodPhysical - FoodReserved); }
@@ -421,6 +448,9 @@ namespace AnastasisVillage
 		int32 SwingsDone = 0;
 		/** < 0 = null. */
 		double LastSwingAt = -1.0;
+		/** Chantier : le batiment travaille (`buildingId`), coups accumules pour une piece. */
+		FString BuildingId;
+		int32 ActionAcc = 0;
 	};
 
 	/** `npc.inside` — present pendant qu'un habitant est DANS un batiment. */
@@ -452,6 +482,8 @@ namespace AnastasisVillage
 		/** Lignes `socialize` et `relax`, rythme et biais compris, apres biais Noûs. */
 		double SocializeRowScore = 0.0;
 		double RelaxRowScore = 0.0;
+		/** Ligne `build` (calculee seulement quand un chantier est ouvert). */
+		double BuildRowScore = 0.0;
 		/** Ligne `eat` : needs.eat + jobPriority + phaseBias, puis biais Noûs. */
 		double EatRowScore = 0.0;
 		/** Lignes calculees d'un fermier (ecart n°10), apres biais Noûs ; NaN sinon ou retiree. */
@@ -551,6 +583,13 @@ namespace AnastasisVillage
 		double Skill = 1.0;
 		double SkillGather = 1.0;
 		double SkillTrade = 1.0;
+		/** `skills.craft` : le domaine du but `build`. */
+		double SkillCraft = 1.0;
+		/** `npc.buildBinding` : le chantier auquel il s'est engage. */
+		FString BuildBinding;
+		/** Observation : `deeds.workedConstruction` (pieces posees), `deeds.built` (achevements). */
+		int32 PiecesPlaced = 0;
+		int32 BuildingsCompleted = 0;
 		/** `mind.spots`, dans l'ordre d'insertion. */
 		TArray<FResourceSpot> Spots;
 		/** `mind.scanX`, `mind.scanY` : ou il se tenait au dernier balayage des tuiles. */
@@ -675,6 +714,25 @@ namespace AnastasisVillage
 
 		/** Fermier dont le poste est un grenier acheve : ses lignes gatherFood / deliver sont calculees. */
 		bool IsGranaryWorker(const FNpc& Npc) const;
+
+		/**
+		 * `npc.jobId` sans poste (ecart n°18) : le batisseur de la reference n'a pas
+		 * besoin d'un batiment pour batir. Refuse un metier inconnu du portage.
+		 */
+		bool SetJob(const FString& NpcId, const FString& JobId);
+
+		/**
+		 * Ouverture d'un chantier par l'hote (ecart n°18) : `addBuilding(type, x, y,
+		 * { progress: 0, materialsNeeded: buildCost(type) })`. `bDelivered` : le devis
+		 * entier est deja dans le stock du site (borne par sa capacite). Rend l'id.
+		 */
+		FString OpenSite(const FString& Type, int32 TileX, int32 TileY, bool bDelivered);
+
+		/** `activeConstructions()` : les batiments inacheves, dans l'ordre du tableau. */
+		TArray<const FBuilding*> ActiveSites() const;
+
+		/** Ajoute au stock d'un chantier (borne par sa capacite) ; rend la quantite entree. */
+		int32 CreditSiteMaterials(const FString& BuildingId, int32 Wood, int32 Stone);
 
 		/** `sim.market.stock.food` : la somme des stocks physiques (ecart n°12). */
 		int32 MarketFood() const;
@@ -915,6 +973,21 @@ namespace AnastasisVillage
 		bool DeliverTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
 		/** `progressCraftGather` : 1 = working, 2 = done, 0 = false. */
 		int32 ProgressCraftGather(FNpc& Npc);
+
+		// Chantier (npc.js progressBuildWork, simulation.js workConstruction).
+		/** `progressBuildWork` : 0 = echec, 1 = au travail, 2 = fini. */
+		int32 ProgressBuildWork(FNpc& Npc, double Dt);
+		bool WorkConstruction(FBuilding& Site, FNpc& Npc);
+		FBuilding* BoundBuildSite(FNpc& Npc);
+		FBuilding* PickBuildSite(FNpc& Npc);
+		static bool SitePieceReady(const FBuilding& Site);
+		void EnsureBuildSession(FNpc& Npc, const FBuilding& Site);
+		/** `constructionAccessPoint(npc)` : le seuil du premier chantier ouvert. */
+		bool ConstructionAccessPoint(FNpc& Npc, FPoint& OutTarget);
+		/** La ligne `build` d'adultScores quand un chantier est ouvert. */
+		double BuildRowScore(const FNpc& Npc, double PhaseBias, const FWorkRowContext& Work) const;
+		/** `goalForWorkSession(npc)` : le but du metier de la session en cours. */
+		static FString SessionGoalOf(const FNpc& Npc);
 		/** Index de la premiere tuile de la ressource dans le 3 x 3 de l'habitant, -1 sinon. */
 		int32 ResourceTileNear(const FNpc& Npc, AnastasisWorld::EResource Resource) const;
 		AnastasisWorld::FTile LiveTile(int32 Index) const;

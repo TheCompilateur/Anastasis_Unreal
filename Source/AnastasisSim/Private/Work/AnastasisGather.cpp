@@ -27,6 +27,11 @@ namespace AnastasisGather
 			TEXT("sell"), TEXT("buy"), TEXT("build"), TEXT("socialize"), TEXT("relax"), TEXT("visitFamily"), TEXT("explore"),
 		};
 
+		const TCHAR* const BuilderPriority[] = {
+			TEXT("eat"), TEXT("rest"), TEXT("build"), TEXT("buy"), TEXT("maintain"), TEXT("gatherWood"),
+			TEXT("gatherStone"), TEXT("sell"), TEXT("socialize"), TEXT("relax"), TEXT("visitFamily"), TEXT("explore"),
+		};
+
 		template <int32 N>
 		int32 RankIn(const TCHAR* const (&List)[N], const FString& Goal)
 		{
@@ -82,6 +87,7 @@ namespace AnastasisGather
 		int32 Rank = INDEX_NONE;
 		if (JobId == JobFarmer) Rank = RankIn(FarmerPriority, Goal);
 		else if (JobId == JobSettler) Rank = RankIn(SettlerPriority, Goal);
+		else if (JobId == TEXT("builder")) Rank = RankIn(BuilderPriority, Goal);
 		return Rank < 0 ? 0.0 : FMath::Max(0.0, 18.0 - Rank * 2.5);
 	}
 

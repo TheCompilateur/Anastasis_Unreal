@@ -931,6 +931,92 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVillageForceWeather(
 			Weather.Rain >= AnastasisWeatherBehavior::Shelter::RainHeavy ? 1 : 0);
 	}));
 
+FString UAnastasisSimulationSubsystem::SeedFirstSite(const FString& Type, int32 BuilderCount, bool bDelivered, int32 TileX, int32 TileY)
+{
+	ReplaceStartVillage();
+	using namespace AnastasisVillage;
+	if (!Simulation.IsRunning())
+	{
+		return FString();
+	}
+	FVillage& V = Simulation.GetVillage();
+	const AnastasisWorld::FWorld& W = Simulation.GetWorld();
+	for (int32 R = 0; R <= 12; ++R)
+	{
+		for (int32 DY = -R; DY <= R; ++DY)
+		{
+			for (int32 DX = -R; DX <= R; ++DX)
+			{
+				if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) != R) continue;
+				const int32 X = TileX + DX;
+				const int32 Y = TileY + DY;
+				if (X < 2 || Y < 2 || X > W.W - 3 || Y > W.H - 3) continue;
+				if (V.LiveTileAt(X, Y).Resource != AnastasisWorld::EResource::None || V.IsFootBlocked(X + 0.5, Y + 0.5)) continue;
+				const FString Site = V.OpenSite(Type, X, Y, bDelivered);
+				if (Site.IsEmpty()) continue;
+				const FBuilding* Building = V.FindBuilding(Site);
+				if (Building->AccessPoints.Num() == 0)
+				{
+					V.RemoveBuilding(Site);
+					continue;
+				}
+				const FPoint Start = Building->AccessPoints[0];
+				for (int32 K = 0; K < FMath::Max(1, BuilderCount); ++K)
+				{
+					AnastasisNeeds::FNeeds N;
+					N.Hunger = 10.0;
+					N.Energy = 90.0;
+					N.Social = 80.0;
+					N.Leisure = 80.0;
+					N.Hygiene = 80.0;
+					N.Thirst = 5.0;
+					N.Health = 95.0;
+					N.Morale = 60.0;
+					const FString Id = V.SpawnNpc(Start.X, Start.Y, N);
+					V.SetJob(Id, AnastasisBuild::JobBuilder);
+				}
+				FirstSiteId = Site;
+				SyncVillagePresentation();
+				UE_LOG(LogAnastasis_UnrealV2, Display,
+					TEXT("ANASTASIS_VILLAGE first site %s type=%s at (%d,%d) delivered=%d wood=%d stone=%d builders=%d"),
+					*Site, *Type, X, Y, bDelivered ? 1 : 0, Building->Materials.NeedWood, Building->Materials.NeedStone, FMath::Max(1, BuilderCount));
+				FAnastasisVillagePresentation::LogStatus(V, Simulation.GetTime());
+				return Site;
+			}
+		}
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VILLAGE first site: no free tile for %s near (%d,%d)"), *Type, TileX, TileY);
+	return FString();
+}
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVillageFirstSite(
+	TEXT("Anastasis.Village.FirstSite"),
+	TEXT("Anastasis.Village.FirstSite [Type=house] [BuilderCount=2] [Delivered=1] [TileX] [TileY] - opens a construction site (well, house, granary) near a tile (default: settlement), its estimate delivered on site, and builders who raise it piece by piece."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		if (UAnastasisSimulationSubsystem* Host = VillageHost(World))
+		{
+			const AnastasisVillage::FPoint Settlement = Host->GetSimulation().GetVillage().GetSettlement();
+			const FString Type = Args.IsValidIndex(0) ? Args[0] : FString(AnastasisVillage::HouseType);
+			const int32 Count = Args.IsValidIndex(1) ? FCString::Atoi(*Args[1]) : 2;
+			const bool bDelivered = Args.IsValidIndex(2) ? FCString::Atoi(*Args[2]) != 0 : true;
+			const int32 X = Args.IsValidIndex(3) ? FCString::Atoi(*Args[3]) : FMath::FloorToInt32(Settlement.X);
+			const int32 Y = Args.IsValidIndex(4) ? FCString::Atoi(*Args[4]) : FMath::FloorToInt32(Settlement.Y);
+			Host->SeedFirstSite(Type, Count, bDelivered, X, Y);
+		}
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVillageDeliverSite(
+	TEXT("Anastasis.Village.DeliverSite"),
+	TEXT("Anastasis.Village.DeliverSite <BuildingId> <Wood> <Stone> - credits materials to a construction site's stock (the porters are not ported)."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		UAnastasisSimulationSubsystem* Host = VillageHost(World);
+		if (!Host || Args.Num() < 3) return;
+		const int32 In = Host->GetSimulation().GetVillage().CreditSiteMaterials(Args[0], FCString::Atoi(*Args[1]), FCString::Atoi(*Args[2]));
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE deliver site %s: %d units in"), *Args[0], In);
+	}));
+
 FString UAnastasisSimulationDebugLibrary::GetGatherStatus(const UObject* WorldContextObject)
 {
 	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
@@ -973,6 +1059,42 @@ FString UAnastasisSimulationDebugLibrary::GetGatherStatus(const UObject* WorldCo
 		Farmer ? *Farmer->Goal : TEXT(""), Farmer ? *Farmer->Activity : TEXT(""),
 		Farmer && Farmer->WorkSession.bActive ? TEXT("true") : TEXT("false"),
 		G.X, G.Y, G.Z, F.X, F.Y, F.Z, N.X, N.Y, N.Z);
+}
+
+FString UAnastasisSimulationDebugLibrary::GetBuildStatus(const UObject* WorldContextObject)
+{
+	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	const UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+	if (!Host || !Host->GetSimulation().IsRunning()) return TEXT("{}");
+	const FAnastasisSimulation& Sim = Host->GetSimulation();
+	const AnastasisVillage::FVillage& V = Sim.GetVillage();
+	const AnastasisWorld::FWorld& W = Sim.GetWorld();
+	const AnastasisVillage::FBuilding* Site = V.FindBuilding(Host->GetFirstSiteId());
+	if (!Site) return TEXT("{\"site\":false}");
+	int32 ByNpcs = 0;
+	const AnastasisVillage::FNpc* Builder = nullptr;
+	int32 Building = 0;
+	for (const AnastasisVillage::FNpc& N : V.GetActors())
+	{
+		ByNpcs += N.PiecesPlaced;
+		if (N.Goal == AnastasisBuild::GoalBuild) ++Building;
+		if (!Builder && N.JobId == AnastasisBuild::JobBuilder) Builder = &N;
+	}
+	UWorld* PresentationWorld = const_cast<UWorld*>(World);
+	const FVector S = FAnastasisVillagePresentation::SimToUnreal(W, Site->X + 0.5, Site->Y + 0.5, PresentationWorld);
+	const FVector N = Builder ? FAnastasisVillagePresentation::SimToUnreal(W, Builder->X, Builder->Y, PresentationWorld) : S;
+	const AnastasisBuild::FSiteMaterials& M = Site->Materials;
+	return FString::Printf(
+		TEXT("{\"site\":true,\"time\":%.4f,\"type\":\"%s\",\"progress\":%.4f,\"pieces\":%d,\"completed\":%s,")
+		TEXT("\"needWood\":%d,\"needStone\":%d,\"consumedWood\":%d,\"consumedStone\":%d,\"stockWood\":%d,\"stockStone\":%d,")
+		TEXT("\"workers\":%d,\"byNpcs\":%d,\"building\":%d,\"goal\":\"%s\",\"activity\":\"%s\",\"session\":%s,")
+		TEXT("\"sx\":%.1f,\"sy\":%.1f,\"sz\":%.1f,\"nx\":%.1f,\"ny\":%.1f,\"nz\":%.1f}"),
+		Sim.GetTime(), *Site->Type, Site->Progress, Site->PiecesPlaced, Site->Progress >= 1.0 ? TEXT("true") : TEXT("false"),
+		M.NeedWood, M.NeedStone, M.ConsumedWood, M.ConsumedStone, M.StockWood, M.StockStone,
+		Site->Workers.Num(), ByNpcs, Building,
+		Builder ? *Builder->Goal : TEXT(""), Builder ? *Builder->Activity : TEXT(""),
+		Builder && Builder->WorkSession.bActive ? TEXT("true") : TEXT("false"),
+		S.X, S.Y, S.Z, N.X, N.Y, N.Z);
 }
 
 FString UAnastasisSimulationDebugLibrary::GetVillagerCards(const UObject* WorldContextObject)

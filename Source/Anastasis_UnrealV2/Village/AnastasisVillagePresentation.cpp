@@ -138,8 +138,12 @@ int32 FAnastasisVillagePresentation::Sync(
 
 	for (const AnastasisVillage::FBuilding& Building : Village.GetBuildings())
 	{
-		if (Actors.Contains(Building.Id))
+		if (const TWeakObjectPtr<AAnastasisVillageBuilding>* Existing = Actors.Find(Building.Id))
 		{
+			if (AAnastasisVillageBuilding* Actor = Existing->Get())
+			{
+				Actor->SetConstructionProgress(Building.Progress);
+			}
 			continue;
 		}
 		EAnastasisVillageBuildingKind Kind;
@@ -172,6 +176,7 @@ int32 FAnastasisVillagePresentation::Sync(
 #if WITH_EDITOR
 		Actor->SetActorLabel(FString::Printf(TEXT("SimBuilding_%s_%s"), *Building.Type, *Building.Id));
 #endif
+		Actor->SetConstructionProgress(Building.Progress);
 		Actors.Add(Building.Id, Actor);
 		++Changes;
 		UE_LOG(
@@ -372,6 +377,21 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 			DrawDebugPoint(World, SimToUnreal(SimWorld, P.X, P.Y, World) + FVector(0, 0, 10), 12.f, FColor::Turquoise, false, 0.f);
 		}
 		const TArray<FString> Users = Village.UsersOf(Building.Id);
+		if (Building.Progress < 1.0)
+		{
+			// Chantier : pieces posees, materiaux poses / devis, stock du site.
+			const AnastasisBuild::FSiteMaterials& M = Building.Materials;
+			DrawDebugString(
+				World,
+				Base + FVector(0, 0, bMesh ? 480.0 : Tile * 0.9),
+				FString::Printf(TEXT("%s chantier %s  %d/%d  bois %d/%d (site %d)  pierre %d/%d (site %d)  bras=%d"),
+					*Building.Id, *Building.Type, Building.PiecesPlaced, AnastasisBuild::PieceTotal,
+					M.ConsumedWood, M.NeedWood, M.StockWood, M.ConsumedStone, M.NeedStone, M.StockStone, Building.Workers.Num()),
+				nullptr,
+				FColor::Silver,
+				0.f);
+			continue;
+		}
 		DrawDebugString(
 			World,
 			Base + FVector(0, 0, bMesh ? 480.0 : Tile * 0.9),
@@ -487,12 +507,19 @@ void FAnastasisVillagePresentation::LogStatus(const AnastasisVillage::FVillage& 
 		UE_LOG(
 			LogAnastasis_UnrealV2,
 			Display,
-			TEXT("ANASTASIS_VILLAGE building %s type=%s tile=(%.0f,%.0f) progress=%.2f owner=%s occupants=%d/%d food=%d reserved=%d inside=[%s] access=%s users=[%s]"),
+			TEXT("ANASTASIS_VILLAGE building %s type=%s tile=(%.0f,%.0f) progress=%.2f pieces=%d site=%d/%d+%d,%d/%d+%d owner=%s occupants=%d/%d food=%d reserved=%d inside=[%s] access=%s users=[%s]"),
 			*B.Id,
 			*B.Type,
 			B.X,
 			B.Y,
 			B.Progress,
+			B.PiecesPlaced,
+			B.Materials.ConsumedWood,
+			B.Materials.NeedWood,
+			B.Materials.StockWood,
+			B.Materials.ConsumedStone,
+			B.Materials.NeedStone,
+			B.Materials.StockStone,
 			B.Owner.IsEmpty() ? TEXT("-") : *B.Owner,
 			Village.CountShelterOccupants(B.Id),
 			Village.ShelterCapacity(B),

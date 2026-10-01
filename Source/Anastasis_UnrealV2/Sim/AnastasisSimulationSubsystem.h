@@ -68,6 +68,15 @@ public:
 	 */
 	FString SeedFirstFarmer(int32 FarmerCount, int32 TileX, int32 TileY);
 	const FString& GetFarmerGranaryId() const { return FarmerGranaryId; }
+
+	/**
+	 * Le chantier (mission build-001) : un chantier `Type` ouvert pres de (TileX, TileY)
+	 * sur la premiere case libre, devis livre sur place si `bDelivered`, et
+	 * `BuilderCount` batisseurs poses a son seuil. L'ouverture par les habitants et
+	 * les livraisons ne sont pas portees : c'est l'hote qui ouvre.
+	 */
+	FString SeedFirstSite(const FString& Type, int32 BuilderCount, bool bDelivered, int32 TileX, int32 TileY);
+	const FString& GetFirstSiteId() const { return FirstSiteId; }
 	FIntPoint GetFarmerField() const { return FarmerField; }
 
 	/** Reflete les batiments de la simulation en acteurs. Appele a chaque Tick. */
@@ -91,6 +100,7 @@ private:
 	FAnastasisSimulation Simulation;
 	FAnastasisVillagePresentation VillagePresentation;
 	FString FarmerGranaryId;
+	FString FirstSiteId;
 	FIntPoint FarmerField = FIntPoint(-1, -1);
 	int32 LoggedDay = 0;
 	/** True only after OnWorldBeginPlay. Tests ResetCanonical without the engine ticker. */
@@ -149,6 +159,14 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetGatherStatus(const UObject* WorldContextObject);
+
+	/**
+	 * Etat du chantier ouvert par FirstSite, en JSON : temps, progres et pieces,
+	 * devis / pose / stock du site, bras inscrits, pieces posees par les habitants,
+	 * but et session du premier batisseur, positions Unreal du chantier et du batisseur.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetBuildStatus(const UObject* WorldContextObject);
 
 	/**
 	 * VILLAGER_PNG_001, en JSON : nombre d'habitants simules et de cartes, puis une ligne par

@@ -1154,6 +1154,7 @@ namespace AnastasisVillage
 		const AnastasisGather::FTrait& Trait = AnastasisGather::TraitAt(Npc.TraitIndex);
 		Npc.SkillGather = AnastasisGather::TintedGatherSkill(Trait);
 		Npc.SkillTrade = AnastasisGather::TintedTradeSkill(Trait);
+		Npc.SkillCraft = AnastasisBuild::TintedCraftSkill(Trait);
 		const FString Id = Npc.Id;
 		Actors.Add(MoveTemp(Npc));
 		// `spawnNpc` : `perceive(this, npc, true)`.
@@ -1219,6 +1220,7 @@ namespace AnastasisVillage
 	bool FVillage::IsPortedGoalFor(const FNpc& Npc, const FString& Goal) const
 	{
 		if (IsPortedGoal(Goal)) return true;
+		if (Goal == AnastasisBuild::GoalBuild) return true;
 		return (Goal == GoalGatherFood || Goal == GoalDeliver) && IsGranaryWorker(Npc);
 	}
 
@@ -1389,8 +1391,10 @@ namespace AnastasisVillage
 
 		// Fermier au grenier (ecart n°10) : ses lignes de travail sont calculees.
 		const bool bWorker = IsGranaryWorker(Npc);
+		// Un chantier ouvert : la ligne `build` de chacun lit le meme facteur de travail.
+		const bool bSite = ActiveSites().Num() > 0;
 		FWorkRowContext Work;
-		if (bWorker)
+		if (bWorker || bSite)
 		{
 			// s = believedStock : sans souvenir de marche, la presomption bruitee.
 			Work.Believed = AnastasisGather::BelievedFoodPresumed(Npc.Id);
@@ -1420,6 +1424,11 @@ namespace AnastasisVillage
 			{
 				const double Need = G == GoalSocialize ? Trace.NeedScores.Socialize : Trace.NeedScores.Relax;
 				Rows.Add(TPair<FString, double>(G, SocialRowScore(Npc, G, Need, AnastasisRhythm::PhaseBias(Phase, Subject, G))));
+				continue;
+			}
+			else if (bSite && G == AnastasisBuild::GoalBuild)
+			{
+				Rows.Add(TPair<FString, double>(G, BuildRowScore(Npc, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work)));
 				continue;
 			}
 			else if (bWorker && (G == GoalGatherFood || G == GoalDeliver))
@@ -1464,6 +1473,7 @@ namespace AnastasisVillage
 			else if (Row.Key == GoalSocialize) Trace.SocializeRowScore = Row.Value;
 			else if (Row.Key == GoalRelax) Trace.RelaxRowScore = Row.Value;
 			else if (bWorker && Row.Key == GoalGatherFood) Trace.GatherRowScore = Row.Value;
+			else if (bSite && Row.Key == AnastasisBuild::GoalBuild) Trace.BuildRowScore = Row.Value;
 			else if (bWorker && Row.Key == GoalDeliver) Trace.DeliverRowScore = Row.Value;
 			else if (Row.Key == GoalShelterRain) Trace.ShelterRowScore = Row.Value;
 			else if (Row.Value > Trace.FloorScore)
@@ -1543,6 +1553,11 @@ namespace AnastasisVillage
 		else if (IsGranaryWorker(Npc) && Npc.Goal == GoalDeliver) bFound = DeliverTarget(Npc, Target, Source);
 		else if (Npc.Goal == TEXT("gatherFood") || Npc.Goal == TEXT("deliver")) bFound = FoodSupplyTarget(Npc, Target, Source);
 		else if (Npc.Goal == GoalShelterRain) bFound = ShelterRainTarget(Npc, Target, Source);
+		else if (Npc.Goal == AnastasisBuild::GoalBuild)
+		{
+			bFound = ConstructionAccessPoint(Npc, Target);
+			Source = TEXT("site");
+		}
 		else
 		{
 			Npc.bHasTarget = false;
@@ -1620,7 +1635,7 @@ namespace AnastasisVillage
 		if (Npc.bHasTarget && !ReachedMoveTarget(Npc, Npc.Target))
 		{
 			// `if (!CRAFT_GOALS.has(npc.goal)) clearWorkSession(npc)`.
-			if (Npc.Goal != GoalGatherFood) ClearWorkSession(Npc);
+			if (Npc.Goal != GoalGatherFood && Npc.Goal != AnastasisBuild::GoalBuild) ClearWorkSession(Npc);
 			Npc.Activity = TEXT("marche");
 			MoveActor(Npc, Npc.Target, Dt);
 			return;
@@ -1687,6 +1702,25 @@ namespace AnastasisVillage
 			if (ProgressCraftGather(Npc) != 0)
 			{
 				Npc.FailedActions = 0;
+				return;
+			}
+			Npc.Activity = TEXT("attend");
+			if (++Npc.FailedActions >= 3) RedirectAfterFailure(Npc);
+			return;
+		}
+		if (Npc.Goal == AnastasisBuild::GoalBuild)
+		{
+			const int32 Craft = ProgressBuildWork(Npc, Dt);
+			if (Craft != 0)
+			{
+				Npc.FailedActions = 0;
+				if (Craft == 2)
+				{
+					// Un travail de chantier fini (achevement, ou chantier a sec) relache la cible :
+					// la reference repense a chaque pensee, ce portage seulement sans cible (ecart n°2).
+					Npc.bHasTarget = false;
+					ClearNavigation(Npc);
+				}
 				return;
 			}
 			Npc.Activity = TEXT("attend");
@@ -2006,6 +2040,18 @@ namespace AnastasisVillage
 			Writer.Key(TEXT("owner"));
 			if (B.Owner.IsEmpty()) Writer.Null(); else Writer.String(B.Owner);
 			Writer.Key(TEXT("housePhase")).Number(B.HousePhase);
+			Writer.Key(TEXT("piecesPlaced")).Number(B.PiecesPlaced);
+			if (B.bHasMaterials)
+			{
+				Writer.Key(TEXT("site")).BeginObject();
+				Writer.Key(TEXT("needWood")).Number(B.Materials.NeedWood);
+				Writer.Key(TEXT("needStone")).Number(B.Materials.NeedStone);
+				Writer.Key(TEXT("consumedWood")).Number(B.Materials.ConsumedWood);
+				Writer.Key(TEXT("consumedStone")).Number(B.Materials.ConsumedStone);
+				Writer.Key(TEXT("stockWood")).Number(B.Materials.StockWood);
+				Writer.Key(TEXT("stockStone")).Number(B.Materials.StockStone);
+				Writer.EndObject();
+			}
 			Writer.Key(TEXT("food")).BeginObject();
 			Writer.Key(TEXT("physical")).Number(B.FoodPhysical);
 			Writer.Key(TEXT("reserved")).Number(B.FoodReserved);
@@ -3116,7 +3162,7 @@ namespace AnastasisVillage
 		// `inventoryLoad` : la nourriture est la seule charge portee ; le grenier la prend (depotResourceOf).
 		const int32 Load = Npc.InventoryFood;
 		const int32 DepotLoad = Npc.InventoryFood;
-		const FString SessionGoal = Npc.WorkSession.bActive && Npc.WorkSession.CraftId == TEXT("farm") ? FString(GoalGatherFood) : FString();
+		const FString SessionGoal = SessionGoalOf(Npc);
 		double Score = 0.0;
 		double DomainSkill = 1.0;
 		if (Goal == GoalGatherFood)
@@ -3550,7 +3596,7 @@ namespace AnastasisVillage
 		Score += PhaseBias;
 		// workplaceGoalBias : 0 (aubergiste, pretre seulement) ; completionBias pour tous.
 		const int32 DepotLoad = IsGranaryWorker(Npc) ? Npc.InventoryFood : 0;
-		const FString SessionGoal = Npc.WorkSession.bActive && Npc.WorkSession.CraftId == TEXT("farm") ? FString(GoalGatherFood) : FString();
+		const FString SessionGoal = SessionGoalOf(Npc);
 		Score += G::CompletionBias(Goal, Npc.InventoryFood, DepotLoad, SessionGoal, NeedsCritical(Npc.Needs));
 		// `moodletGoalBias` (lu sur une copie : `tickMoodlets` elague deja a chaque tick).
 		TArray<AnastasisBonds::FMoodlet> Moodlets = Npc.Moodlets;
@@ -4236,5 +4282,253 @@ namespace AnastasisVillage
 			Npc.Spots.RemoveAll([&](const FResourceSpot& S) { return DayNow - S.Day > 14; });
 			BD::ForgetStalePeople(Npc.People, DayNow);
 		}
+	}
+	// --- Chantier (npc.js progressBuildWork, simulation.js workConstruction) -------
+
+	bool FVillage::SetJob(const FString& NpcId, const FString& JobId)
+	{
+		FNpc* Npc = Actors.FindById(NpcId);
+		if (!Npc) return false;
+		if (JobId != AnastasisGather::JobSettler && JobId != AnastasisGather::JobFarmer && JobId != AnastasisBuild::JobBuilder) return false;
+		Npc->JobId = JobId;
+		return true;
+	}
+
+	FString FVillage::OpenSite(const FString& Type, int32 TileX, int32 TileY, bool bDelivered)
+	{
+		namespace B = AnastasisBuild;
+		B::FBuildCost Base;
+		if (!B::BaseCost(Type, Base)) return FString();
+		// `buildCost(type)` : le multiplicateur compte les acheves du type, avant l'ajout.
+		const B::FBuildCost Cost = B::BuildCost(Type, CountBuildings(Type));
+		const FString Id = AddBuilding(Type, TileX, TileY, 0.0, Day());
+		if (Id.IsEmpty()) return Id;
+		FBuilding* Site = Buildings.FindById(Id);
+		Site->PiecesPlaced = 0;
+		Site->bHasMaterials = true;
+		Site->Materials.NeedWood = Cost.Wood;
+		Site->Materials.NeedStone = Cost.Stone;
+		if (bDelivered)
+		{
+			CreditSiteMaterials(Id, Cost.Wood, Cost.Stone);
+		}
+		return Id;
+	}
+
+	TArray<const FBuilding*> FVillage::ActiveSites() const
+	{
+		TArray<const FBuilding*> Sites;
+		for (const FBuilding& B : Buildings.GetItems())
+		{
+			if (B.Progress >= 1.0) continue;
+			Sites.Add(&B);
+		}
+		return Sites;
+	}
+
+	int32 FVillage::CreditSiteMaterials(const FString& BuildingId, int32 Wood, int32 Stone)
+	{
+		namespace B = AnastasisBuild;
+		FBuilding* Site = Buildings.FindById(BuildingId);
+		if (!Site || Site->Progress >= 1.0) return 0;
+		// `creditStock` : borne par la capacite du profil de chantier.
+		const int32 W = FMath::Min(FMath::Max(0, Wood), FMath::Max(0, B::SiteWoodCap - Site->Materials.StockWood));
+		const int32 S = FMath::Min(FMath::Max(0, Stone), FMath::Max(0, B::SiteStoneCap - Site->Materials.StockStone));
+		Site->Materials.StockWood += W;
+		Site->Materials.StockStone += S;
+		return W + S;
+	}
+
+	FString FVillage::SessionGoalOf(const FNpc& Npc)
+	{
+		if (!Npc.WorkSession.bActive) return FString();
+		if (Npc.WorkSession.CraftId == TEXT("farm")) return GoalGatherFood;
+		if (Npc.WorkSession.CraftId == AnastasisBuild::CraftBuild) return AnastasisBuild::GoalBuild;
+		return FString();
+	}
+
+	bool FVillage::SitePieceReady(const FBuilding& Site)
+	{
+		// `siteCanPlacePiece` : sans devis, toujours posable.
+		return !Site.bHasMaterials || AnastasisBuild::SiteCanPlacePiece(Site.Materials, Site.PiecesPlaced);
+	}
+
+	FBuilding* FVillage::BoundBuildSite(FNpc& Npc)
+	{
+		if (Npc.BuildBinding.IsEmpty()) return nullptr;
+		FBuilding* Site = Buildings.FindById(Npc.BuildBinding);
+		// Le lien meurt avec son objet : chantier disparu ou acheve.
+		if (!Site || Site->Progress >= 1.0)
+		{
+			Npc.BuildBinding.Reset();
+			return nullptr;
+		}
+		return Site;
+	}
+
+	FBuilding* FVillage::PickBuildSite(FNpc& Npc)
+	{
+		const bool bFarmDone = CountBuildings(TEXT("farm")) > 0;
+		FBuilding* Best = nullptr;
+		double BestScore = -AnastasisNav::Infinity;
+		for (FBuilding& Site : Buildings.GetItemsMutable())
+		{
+			if (Site.Progress >= 1.0) continue;
+			FPoint Access{ Site.X + 0.5, Site.Y + 0.5 };
+			BuildingAccessPoint(Site, &Npc, Access);
+			const double D = Dist(Npc.X, Npc.Y, Access.X, Access.Y);
+			const bool bSessionHere = Npc.WorkSession.bActive && !Npc.WorkSession.BuildingId.IsEmpty() && Npc.WorkSession.BuildingId == Site.Id;
+			const double Score = AnastasisBuild::SiteScore(D, bSessionHere, Site.BuilderId == Npc.Id, SitePieceReady(Site),
+				bFarmDone, Site.Type == TEXT("farm"));
+			if (Score > BestScore)
+			{
+				BestScore = Score;
+				Best = &Site;
+			}
+		}
+		return Best;
+	}
+
+	bool FVillage::ConstructionAccessPoint(FNpc& Npc, FPoint& OutTarget)
+	{
+		// `activeConstruction()` : le premier chantier du tableau, pas le mieux note.
+		for (FBuilding& Site : Buildings.GetItemsMutable())
+		{
+			if (Site.Progress >= 1.0) continue;
+			if (!BuildingAccessPoint(Site, &Npc, OutTarget)) return false;
+			Npc.DestBuildingId = Site.Id;
+			return true;
+		}
+		return false;
+	}
+
+	void FVillage::EnsureBuildSession(FNpc& Npc, const FBuilding& Site)
+	{
+		namespace B = AnastasisBuild;
+		const FWorkSession& Existing = Npc.WorkSession;
+		if (Existing.bActive && Existing.CraftId == B::CraftBuild && Existing.BuildingId == Site.Id)
+		{
+			return;
+		}
+		// `craftToolSwitchSeconds(from, "build")` : un autre metier en main se range d'abord.
+		const FString From = Existing.bActive && Existing.CraftId != B::CraftBuild ? Existing.CraftId : FString();
+		const double SwitchUntil = Now + B::CraftToolSwitchSeconds(From, B::CraftBuild);
+		FWorkSession Session;
+		Session.bActive = true;
+		Session.CraftId = B::CraftBuild;
+		Session.TileX = static_cast<int32>(Site.X);
+		Session.TileY = static_cast<int32>(Site.Y);
+		Session.BuildingId = Site.Id;
+		Session.ArrivedAt = Now;
+		Session.NextSwingAt = SwitchUntil + B::ArriveSeconds;
+		Npc.WorkSession = Session;
+	}
+
+	bool FVillage::WorkConstruction(FBuilding& Site, FNpc& Npc)
+	{
+		namespace B = AnastasisBuild;
+		if (Site.Progress >= 1.0) return false;
+		if (Site.bHasMaterials && !B::ConsumeSiteMaterials(Site.Materials, Site.PiecesPlaced))
+		{
+			// `requestSiteDeliveries` : livraisons non portees (ecart n°18), le chantier attend.
+			return false;
+		}
+		TPair<FString, int32>* Worker = Site.Workers.FindByPredicate([&](const TPair<FString, int32>& W) { return W.Key == Npc.Id; });
+		if (Worker) ++Worker->Value;
+		else Site.Workers.Add(TPair<FString, int32>(Npc.Id, 1));
+		// Un appel = une piece posee. Plus de flottant.
+		const bool bPiece = B::PlaceConstructionPiece(Site.PiecesPlaced, Site.Progress);
+		++Npc.PiecesPlaced;
+		Npc.Needs.Morale = Clamp(Npc.Needs.Morale + B::PieceMorale, 0.0, 100.0);
+		if (!bPiece) return false;
+		if (Site.Progress < 1.0) return true;
+
+		// Acheve. Episode, reputation, annonce, postes, restitution du reliquat : non portes.
+		Site.CompletedDay = Day();
+		Site.CompletedById = Npc.Id;
+		++Npc.BuildingsCompleted;
+		Npc.Needs.Morale = Clamp(Npc.Needs.Morale + B::CompletionMorale, 0.0, 100.0);
+		return true;
+	}
+
+	int32 FVillage::ProgressBuildWork(FNpc& Npc, double Dt)
+	{
+		namespace B = AnastasisBuild;
+		// `tryOpenNewConstruction` : l'ouverture n'est pas portee (ecart n°18), aucun creneau.
+		// Preference, pas epinglage : on garde l'objet de l'intention tant qu'il est posable.
+		FBuilding* Bound = BoundBuildSite(Npc);
+		FBuilding* Site = (Bound && SitePieceReady(*Bound)) ? Bound : PickBuildSite(Npc);
+		if (Site) Npc.BuildBinding = Site->Id;
+		if (!Site)
+		{
+			// `tryBuild` : rien a ouvrir, aucun chantier a travailler.
+			return 0;
+		}
+		FPoint SiteTarget{ Site->X + 0.5, Site->Y + 0.5 };
+		BuildingAccessPoint(*Site, &Npc, SiteTarget);
+		Npc.Target = SiteTarget;
+		Npc.bHasTarget = true;
+		if (Dist(Npc.X, Npc.Y, SiteTarget.X, SiteTarget.Y) > B::SiteReachDistance)
+		{
+			Npc.Activity = TEXT("chantier");
+			MoveActor(Npc, SiteTarget, Dt);
+			return 1;
+		}
+		EnsureBuildSession(Npc, *Site);
+		Npc.Activity = TEXT("chantier");
+		if (Now < Npc.WorkSession.NextSwingAt) return 1;
+
+		// `rollCraftMiss` tire `sim.rng` : pas de rate (ecart n°11). `markCraftSwing` :
+		FWorkSession& S = Npc.WorkSession;
+		S.SwingsDone += 1;
+		S.ActionAcc += 1;
+		S.LastSwingAt = Now;
+		S.NextSwingAt = Now + B::SwingPeriod(Npc.Skill, S.SwingsDone, Npc.Needs.Energy);
+		if (S.ActionAcc < B::SwingsPerAction) return 1;
+		S.ActionAcc = 0;
+
+		const bool bOk = WorkConstruction(*Site, Npc);
+		// `gainSkill(npc, 0.004)` : domaine du but `build`, la main (craft).
+		if (bOk) AnastasisGather::GainDomainSkill(Npc.Skill, Npc.SkillCraft, B::BuildSkillGain);
+		if (bOk && Site->Progress >= 1.0)
+		{
+			ClearWorkSession(Npc);
+			return 2;
+		}
+		if (!bOk)
+		{
+			// Croyance de danger et memoire d'echec : non portees. Materiaux incomplets :
+			// casser le collant et basculer vers un chantier pret.
+			Npc.WorkSession.BuildingId.Reset();
+			FBuilding* Alt = PickBuildSite(Npc);
+			if (Alt && Alt->Id != Site->Id && SitePieceReady(*Alt))
+			{
+				FPoint AltTarget{ Alt->X + 0.5, Alt->Y + 0.5 };
+				BuildingAccessPoint(*Alt, &Npc, AltTarget);
+				Npc.Target = AltTarget;
+				return 1;
+			}
+			ClearWorkSession(Npc);
+			return 2;
+		}
+		return 1;
+	}
+
+	double FVillage::BuildRowScore(const FNpc& Npc, double PhaseBias, const FWorkRowContext& Work) const
+	{
+		namespace B = AnastasisBuild;
+		namespace G = AnastasisGather;
+		const G::FTrait& Trait = G::TraitAt(Npc.TraitIndex);
+		// `(buildScore + goalNoise(sim, 14)) * wf("build")` — sans bruit (ecart n°1).
+		double Score = B::BuildScoreActiveSite(Trait.Build, Npc.JobId) * G::SurvivalWorkFactor(B::GoalBuild, Work.WorkFactor, Work.bMealBlocked);
+		// Les biais, dans l'ordre d'adultScores. Le poste (grenier) ne pese pas sur `build` ;
+		// statut, age, district, foyer, episodes, scenes, humeur, plans, meteo, nature
+		// (moyenne), memoire sociale et d'echec, ordres, prevision, risque, urgence : nuls.
+		Score += PhaseBias;
+		const int32 DepotLoad = IsGranaryWorker(Npc) ? Npc.InventoryFood : 0;
+		Score += G::CompletionBias(B::GoalBuild, Npc.InventoryFood, DepotLoad, SessionGoalOf(Npc), NeedsCritical(Npc.Needs));
+		Score += G::TraitGoalBias(Trait, B::GoalBuild);
+		Score += G::SkillGoalBias(Npc.SkillCraft);
+		return Score;
 	}
 }
