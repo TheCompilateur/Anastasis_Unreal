@@ -193,7 +193,9 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 	const AnastasisWorld::FWorld& World,
 	UWorld* PresentationWorld,
 	const UAnastasisPresentationRegistry& Registry,
-	bool bEnabled)
+	bool bEnabled,
+	double StepAlpha,
+	bool bStepped)
 {
 	int32 Changes = 0;
 	for (auto It = Villagers.CreateIterator(); It; ++It)
@@ -208,6 +210,7 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 			Actor->Destroy();
 		}
 		VillagerJobs.Remove(It.Key());
+		VillagerTracks.Remove(It.Key());
 		It.RemoveCurrent();
 		++Changes;
 	}
@@ -219,7 +222,20 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 	TMap<FName, TArray<int32>> Pools;
 	for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
 	{
-		const FVector Feet = SimToUnreal(World, Npc.X, Npc.Y, PresentationWorld);
+		const FVector2D Now(Npc.X, Npc.Y);
+		FVillagerTrack& Track = VillagerTracks.FindOrAdd(Npc.Id, FVillagerTrack{ Now, Now });
+		if (bStepped)
+		{
+			// Un pas a eu lieu : l'ancienne position courante devient le depart de l'interpolation.
+			Track.Prev = FVector2D::Distance(Track.Curr, Now) > 2.0 ? Now : Track.Curr;
+			Track.Curr = Now;
+		}
+		else if (FVector2D::Distance(Track.Curr, Now) > 2.0)
+		{
+			Track = FVillagerTrack{ Now, Now };
+		}
+		const FVector2D Drawn = FMath::Lerp(Track.Prev, Track.Curr, FMath::Clamp(StepAlpha, 0.0, 1.0));
+		const FVector Feet = SimToUnreal(World, Drawn.X, Drawn.Y, PresentationWorld);
 		const FName Job(*Npc.JobId);
 		AAnastasisVillagerVisual* Actor = FindVillager(Npc.Id);
 		if (Actor && VillagerJobs.FindRef(Npc.Id) != Job)
@@ -298,6 +314,7 @@ void FAnastasisVillagePresentation::Clear(UAnastasisVillageInteractionSubsystem*
 	}
 	Villagers.Reset();
 	VillagerJobs.Reset();
+	VillagerTracks.Reset();
 
 	for (const TPair<FString, TWeakObjectPtr<AAnastasisVillageBuilding>>& Pair : Actors)
 	{

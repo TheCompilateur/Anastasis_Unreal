@@ -96,6 +96,8 @@ private:
 	/** True only after OnWorldBeginPlay. Tests ResetCanonical without the engine ticker. */
 	bool bPumpFromEngineTick = false;
 	bool bStartVillage = false;
+	/** Miroir de l'accumulateur de la simulation : fraction du pas en cours, pour interpoler les cartes. */
+	double PresentationAccumulator = 0.0;
 };
 
 /**

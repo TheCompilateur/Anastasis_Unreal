@@ -13,7 +13,9 @@ A chaque echantillon (GetVillagerCards) :
   - adultes et aines debout seulement, et du METIER simule de l'habitant (l'objet peint est celui
     du metier : fourche ou panier pour un fermier, mains vides sans metier) ;
   - carte cachee <=> habitant dedans.
-Prises : 00-demarrage (le village du lancement), 01-proche (un habitant, carte seule), 02-debug (sa sphere de simulation + sa carte :
+Rythme (point 4) : 5 s de positions au rythme du jeu (anastasis.Sim.TimeScale) -- marche <= 4,5 m/s,
+aucune frame au-dela de 8 m/s instantanes (interpolation entre les pas), au moins 60 frames. Les prises gelent par
+TimeScale 0. Prises : 00-demarrage (le village du lancement), 01-proche (un habitant, carte seule), 02-debug (sa sphere de simulation + sa carte :
 memes pieds), 03-voisins (lui et son plus proche voisin), 05-fermier (`FirstFarmer 1`) ; puis `Anastasis.Village.RemoveNpc` : la carte de l'habitant retire disparait.
 Une verification qui echoue echoue ; jamais de PASS raconte.
 """
@@ -29,6 +31,9 @@ OUT = Path(os.environ.get('ANASTASIS_VILLAGER_PIE_OUT', str(ROOT / 'Saved' / 'Vi
 OUT.mkdir(parents=True, exist_ok=True)
 NPC_COUNT = int(os.environ.get('ANASTASIS_VILLAGER_PIE_NPCS', '12'))
 START_COUNT = 12  # anastasis.Village.StartVillagers par defaut
+# Le rythme du jeu (point 4) : la preuve le garde, sauf pendant une prise ou elle gele (TimeScale 0 ;
+# Sim.Speed 0 ne gele rien, PumpFrame lit toute vitesse < 1 comme 1).
+GAME_TIME_SCALE = unreal.SystemLibrary.get_console_variable_float_value('anastasis.Sim.TimeScale')
 # Les portraits attribuables : debout, adultes et aines (ecrit par villager-png.py sheets).
 EXTRACT = ROOT / 'SourceArt' / 'Characters' / 'villager-extract.json'
 # Portrait -> metiers simules dont il porte l'objet (debout, adultes et aines).
@@ -116,7 +121,7 @@ def shoot(world, name, npc=None, offset=None):
     path = OUT / (name + '.png')
     if path.exists():
         path.unlink()
-    unreal.SystemLibrary.execute_console_command(world, 'anastasis.Sim.Speed 0')
+    unreal.SystemLibrary.execute_console_command(world, 'anastasis.Sim.TimeScale 0')
     state['pending'] = {'path': path, 'at': time.monotonic(), 'fired': False, 'before': existing_shots(), 'name': name,
                         'npc': npc, 'offset': offset, 'aimed': npc is None}
     log('SHOT ' + name)
@@ -136,7 +141,7 @@ def tick(dt):
             return
         # Aucune commande de scenario ici : le village doit deja etre la.
         for cmd in ('anastasis.Village.Debug 0', 'anastasis.Village.Portraits 1', 'showflag.Fog 0',
-                    'r.MotionBlurQuality 0', 'anastasis.Sim.Speed 2'):
+                    'r.MotionBlurQuality 0', 'anastasis.Sim.Speed 1'):
             unreal.SystemLibrary.execute_console_command(world, cmd)
         cams = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.CameraActor)
         state['camera'] = next((c for c in cams if c.get_actor_label() == 'VillagerProofCamera'), None)
@@ -177,7 +182,7 @@ def tick(dt):
         if p['path'].is_file() or time.monotonic() - p['at'] > 20:
             state['shots'].append({'file': p['path'].name, 'written': p['path'].is_file()})
             state['pending'] = None
-            unreal.SystemLibrary.execute_console_command(world, 'anastasis.Sim.Speed 2')
+            unreal.SystemLibrary.execute_console_command(world, 'anastasis.Sim.TimeScale %g' % GAME_TIME_SCALE)
         return
 
     c = cards(world)
@@ -200,6 +205,11 @@ def tick(dt):
     def chest(x):
         return unreal.Vector(x['x'], x['y'], x['z'] + 110)
     if step == 0:
+        # Attendre les cartes, pas l'horloge murale : au premier PIE d'un worktree l'editeur compile ses
+        # shaders et ne rend qu'une frame toutes les ~30 s (premier run du point 4 : 0 carte a 6 s).
+        if c['cards'] < c['npcs']:
+            if time.monotonic() - state['seeded_at'] < 90:
+                return
         check(c, '00-demarrage')
         if c['npcs'] != START_COUNT:
             state['failures'].append('00-demarrage: %d habitants au lancement, %d attendus' % (c['npcs'], START_COUNT))
@@ -207,6 +217,52 @@ def tick(dt):
         log('FRAME 00-demarrage ' + near[0]['npc'] + ' ' + near[0]['look'])
         shoot(world, '00-demarrage', near[0]['npc'], unreal.Vector(-300, -400, 60))
     elif step == 1:
+        # Rythme (point 4) : 5 s de positions de cartes, a chaque frame, au rythme du jeu.
+        # Vitesse instantanee par frame (deplacement / duree de la frame) : une carte qui sauterait de pas
+        # en pas (1,3 m d'un coup) y monterait a ~80 m/s quel que soit le nombre d'images par seconde.
+        m = state.setdefault('meas', {'t0': time.monotonic(), 'last': None, 'tlast': None, 'path': {}, 'jump': 0.0,
+                                      'inst': 0.0, 'frames': 0})
+        pos = {x['npc']: (x['x'], x['y']) for x in v if not x['hidden']}
+        now = time.monotonic()
+        if m['last']:
+            dt = max(now - m['tlast'], 1.0 / 240.0)
+            for k, (x, y) in pos.items():
+                if k in m['last']:
+                    d = ((x - m['last'][k][0]) ** 2 + (y - m['last'][k][1]) ** 2) ** 0.5
+                    m['path'][k] = m['path'].get(k, 0.0) + d
+                    m['jump'] = max(m['jump'], d)
+                    m['inst'] = max(m['inst'], d / 100.0 / dt)
+            m['frames'] += 1
+        m['last'], m['tlast'] = pos, now
+        # La fenetre commence au premier pas observe : un habitant ne decide que toutes les 2,2 s
+        # simulees (Nous), soit ~59 s reelles a TimeScale 0.0375 -- au lancement, tout le monde attend.
+        if not any(m['path'].values()):
+            m.setdefault('wait0', now)
+            if now - m['wait0'] < 150.0:
+                m['t0'], m['frames'], m['jump'], m['inst'] = now, 0, 0.0, 0.0
+                return
+        elif 'moving_after_s' not in m:
+            m['moving_after_s'] = round(now - m.get('wait0', now), 1)
+        if (m['frames'] < 60 or now - m['t0'] < 5.0) and now - m['t0'] < 120.0:
+            return
+        dur = now - m['t0']
+        speeds = sorted(((p / 100.0 / dur), k) for k, p in m['path'].items())
+        vmax = speeds[-1][0] if speeds else 0.0
+        rec = {'at': 'rythme', 'time_scale': GAME_TIME_SCALE, 'seconds': round(dur, 2), 'frames': m['frames'],
+               'vmax_m_s': round(vmax, 2), 'moving': sum(1 for v_, _ in speeds if v_ > 0.3),
+               'max_jump_cm': round(m['jump'], 1), 'max_instant_m_s': round(m['inst'], 2),
+               'first_motion_after_s': m.get('moving_after_s'),
+               'speeds_m_s': {k: round(v_, 2) for v_, k in speeds}}
+        state['checks'].append(rec)
+        log('RYTHME ' + json.dumps(rec))
+        if vmax > 4.5:
+            state['failures'].append('rythme: %.2f m/s, plus vite qu une marche' % vmax)
+        if vmax < 0.3:
+            state['failures'].append('rythme: personne ne marche pendant la mesure (inconcluant)')
+        if m['frames'] < 60:
+            state['failures'].append('rythme: %d frames seulement en 120 s (mesure inconcluante)' % m['frames'])
+        if m['inst'] > 8.0:
+            state['failures'].append('rythme: %.1f m/s instantanes sur une frame (la carte saute de pas en pas)' % m['inst'])
         unreal.SystemLibrary.execute_console_command(world, 'Anastasis.Village.FirstWell %d' % NPC_COUNT)
         log('SCENARIO FirstWell %d' % NPC_COUNT)
         state['seeded_at'] = time.monotonic()

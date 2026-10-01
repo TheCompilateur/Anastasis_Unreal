@@ -46,13 +46,21 @@ public:
 	 * (l'objet peint est celui du metier) ; un metier qui change -> la carte redessinee ; un habitant disparu -> la carte
 	 * detruite ; un habitant dedans -> la carte cachee. `bEnabled` faux retire toutes les cartes.
 	 * Rend le nombre de cartes creees + detruites.
+	 *
+	 * Interpolation (point 4) : la simulation avance par pas fixes ; ralentie, un pas ne tombe que
+	 * toutes les ~27 frames. La carte est posee entre la position d'avant le dernier pas et la
+	 * position courante, a `StepAlpha` (fraction du pas en cours) ; `bStepped` = au moins un pas
+	 * simule cette frame. Retard visuel : au plus un pas. Un saut de plus de 2 tuiles (scenario,
+	 * remise a zero) est pris tel quel. Par defaut (1, vrai) : la position simulee exacte.
 	 */
 	int32 SyncVillagers(
 		const AnastasisVillage::FVillage& Village,
 		const AnastasisWorld::FWorld& World,
 		UWorld* PresentationWorld,
 		const UAnastasisPresentationRegistry& Registry,
-		bool bEnabled);
+		bool bEnabled,
+		double StepAlpha = 1.0,
+		bool bStepped = true);
 
 	AAnastasisVillagerVisual* FindVillager(const FString& NpcId) const;
 	int32 NumVillagers() const { return Villagers.Num(); }
@@ -71,5 +79,8 @@ private:
 	TMap<FString, TWeakObjectPtr<AAnastasisVillagerVisual>> Villagers;
 	/** The simulated job each card was drawn for: a change of job redraws the card. */
 	TMap<FString, FName> VillagerJobs;
+	/** Position simulee avant le dernier pas, et courante (tuiles), pour l'interpolation. */
+	struct FVillagerTrack { FVector2D Prev = FVector2D::ZeroVector; FVector2D Curr = FVector2D::ZeroVector; };
+	TMap<FString, FVillagerTrack> VillagerTracks;
 	bool bWarnedNoLooks = false;
 };
