@@ -151,6 +151,7 @@ namespace AnastasisVillage
 	void FVillage::Bind(const AnastasisWorld::FWorld& InWorld)
 	{
 		World = &InWorld;
+		bRefreshRetainedSleepUrgency = false;
 		Nav = AnastasisNav::FNavGrid();
 		AnastasisNav::InitFromWorld(Nav, InWorld);
 		AnastasisNav::RebuildMoveCosts(Nav, InWorld);
@@ -2303,6 +2304,19 @@ namespace AnastasisVillage
 				if (bKeep && !Exclude.Contains(Current.Type))
 				{
 					Chosen = Current;
+					// Diagnostic intervention: change one scalar after the unchanged inertia vote.
+					// JS keeps the complete old decision. Default behavior remains identical.
+					if (bRefreshRetainedSleepUrgency && Current.Type == TEXT("sleep"))
+					{
+						for (const AnastasisNous::FDecision& Fresh : Scored.Candidates)
+						{
+							if (Fresh.Type == Current.Type)
+							{
+								Chosen.Urgency = Fresh.Urgency;
+								break;
+							}
+						}
+					}
 				}
 			}
 		}

@@ -16,6 +16,12 @@ static TAutoConsoleVariable<float> CVarSimSpeed(
 	TEXT("Simulation speed scale (JS 1/2/5/10). Default 10 so midnight is visible in a short PIE. Set 1 for JS realtime."),
 	ECVF_Default);
 
+static TAutoConsoleVariable<int32> CVarRefreshRetainedSleepUrgency(
+	TEXT("anastasis.Village.RefreshRetainedSleepUrgency"),
+	0,
+	TEXT("Experimental A/B: 1 refreshes only retained sleep urgency. Default 0 preserves JS behavior. Set before PIE/reset."),
+	ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarVillageDebug(
 	TEXT("anastasis.Village.Debug"),
 	1,
@@ -63,6 +69,7 @@ void UAnastasisSimulationSubsystem::Deinitialize()
 void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 {
 	Simulation.Reset(Seed, AnastasisWorldView::ReferenceWidth, AnastasisWorldView::ReferenceHeight);
+	Simulation.GetVillage().SetRefreshRetainedSleepUrgency(CVarRefreshRetainedSleepUrgency.GetValueOnGameThread() != 0);
 	LoggedDay = Simulation.GetDay();
 	UE_LOG(
 		LogAnastasis_UnrealV2,

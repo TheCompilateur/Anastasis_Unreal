@@ -376,6 +376,10 @@ namespace AnastasisVillage
 		void Bind(const AnastasisWorld::FWorld& InWorld);
 		bool IsBound() const { return World != nullptr; }
 
+		/** Experimental A/B only; default false preserves JS retained-decision semantics.
+		 * Refreshes only retained sleep urgency, not its score, target or creation time. */
+		void SetRefreshRetainedSleepUrgency(bool bEnabled) { bRefreshRetainedSleepUrgency = bEnabled; }
+
 		/** `sim.settlement` : l'origine vers laquelle les portes s'ouvrent. Centre du monde par defaut. */
 		void SetSettlement(double InX, double InY) { Settlement = { InX, InY }; }
 		FPoint GetSettlement() const { return Settlement; }
@@ -554,6 +558,7 @@ namespace AnastasisVillage
 		void ResolveStuckActor(FNpc& Npc, const FPoint& Target);
 		void ClearNavigation(FNpc& Npc);
 
+		bool bRefreshRetainedSleepUrgency = false;
 		const AnastasisWorld::FWorld* World = nullptr;
 		AnastasisNav::FNavGrid Nav;
 		int32 NavVersion = 0;
