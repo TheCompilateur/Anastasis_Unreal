@@ -20,14 +20,23 @@ ses jours oisifs s'accumulent. Détail : `docs/unreal/TIME_WARP_001.md`.
 
 ## COMMIT
 
-PENDING
+`ab73b47` (code), puis cette fiche.
 
 ## MEC
 
-- BUILD: PENDING
-- TESTS: PENDING
+- BUILD: `BUILD::PASS` (adaptatif), puis `Build.bat ... -DisableAdaptiveUnity` : `Module.Anastasis_UnrealV2.1.cpp`
+  et `.3.cpp` recompilés avec les nouveaux fichiers, `Result: Succeeded`. Le premier build avait échoué dans
+  `AnastasisUnderstoryTests.cpp` (`FInputs` / `FPlan` / `EKind` ambigus) : corrigé dans ce commit.
+- TESTS (`finish`, 2026-10-01 19:15) : PASS 231, KNOWN_EXPECTED_FAILURE 4 (les quatre du registre), FAIL 0,
+  TOTAL 235 = annoncés 235. `HANDOFF_READY::YES`.
+  - `Anastasis.Sim.TimeWarp.Presets` / `.ParseAdvance` / `.Advance` / `.Pump` / `.Witness` : Success
+  - `Anastasis.Sim.Tick.HostPumps` (chemin `Warp 1`) : Success
+  - `Anastasis.Understory.EdgesRiversAndSpecies` / `.SlopeAltitudeAndReserves` : Success
+- Valeurs vérifiées par les tests : un jour = 540 pas de 1/6 s, temps exact à 1e-9 ; ×1000 pendant 1 s = 1000 s
+  simulées, ~100 pas/frame ; une semaine sautée → présence e^-3,5 ≈ 3 %, 7 jours oisifs ; un jour joué ensuite → 64 %.
 - COMMANDS:
   - `tools\unreal\anastasis-unreal.ps1 build`
+  - `Build.bat Anastasis_UnrealV2Editor Win64 Development -Project=... -DisableAdaptiveUnity`
   - `tools\unreal\agent-worktree.ps1 finish -Mission sim-time-warp-001`
 
 ## SCN
