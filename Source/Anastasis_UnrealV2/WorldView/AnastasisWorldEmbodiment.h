@@ -83,6 +83,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Terrain")
 	FVector GetTerrainForgeLandmark() const { return ForgeLandmark; }
 
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Hydrology")
+	FVector GetHydrologyTorrentSite() const { return HydroTorrent; }
+
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Hydrology")
+	FVector GetHydrologyValleySite() const { return HydroValley; }
+
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Hydrology")
+	FVector GetHydrologyInflowSite() const { return HydroInflow; }
+
 protected:
 	UPROPERTY()
 	TObjectPtr<UProceduralMeshComponent> ExperimentalSurface;
@@ -115,6 +124,11 @@ protected:
 	void PlaceDressing(uint32 Seed, const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop,
         const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource);
 
+	/** Flow ribbons, wet banks and channel props. Presentation only; reads the snapshot. */
+	void ApplyHydrologyDressing(
+		const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,
+		const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop);
+
 	UHierarchicalInstancedStaticMeshComponent* GetOrCreateDressingMesh(
 		const AnastasisPresentation::FResolvedPresentation& Resolved);
 
@@ -144,4 +158,7 @@ protected:
 	FBox ActiveFootprintBounds = FBox(ForceInit);
 	FVector ForgeBasin = FVector::ZeroVector;
 	FVector ForgeLandmark = FVector::ZeroVector;
+	FVector HydroTorrent = FVector::ZeroVector;
+	FVector HydroValley = FVector::ZeroVector;
+	FVector HydroInflow = FVector::ZeroVector;
 };

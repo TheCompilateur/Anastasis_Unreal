@@ -4,6 +4,7 @@
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisTerrainForge.h"
+#include "WorldView/AnastasisHydrologyDressing.h"
 
 
 #include "Anastasis_UnrealV2.h"
@@ -18,6 +19,11 @@
 static TAutoConsoleVariable<int32> CVarEcologicalDressing(
     TEXT("anastasis.Dressing.Ecology"), 1,
     TEXT("0=legacy tile dressing, 1=forest grammar on continuous terrain; applied on embodiment."), ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarHydrologyDressing(
+    TEXT("anastasis.Dressing.Hydrology"), 1,
+    TEXT("0=flat sea plane only. 1=HYDRA_FORGE flow ribbons, wet banks and channel props from sim FlowAmt/Shore/Wetness. Presentation only."),
+    ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
@@ -439,9 +445,92 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 			Mesh->MarkRenderStateDirty();
 		}
 	}
-	UE_LOG(LogAnastasis_UnrealV2, Display,
+    UE_LOG(LogAnastasis_UnrealV2, Display,
 		TEXT("ANASTASIS_DRESSING ground=%s instances=%d refused_ungrounded=%d"),
 		SurfaceCrop ? TEXT("surface") : TEXT("slab"), DressingInstanceCount, UngroundedTiles);
+}
+
+void AAnastasisWorldEmbodiment::ApplyHydrologyDressing(
+	const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,
+	const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop)
+{
+	HydroTorrent = FVector::ZeroVector;
+	HydroValley = FVector::ZeroVector;
+	HydroInflow = FVector::ZeroVector;
+	if (!ExperimentalSurface)
+	{
+		return;
+	}
+	ExperimentalSurface->ClearMeshSection(2);
+	ExperimentalSurface->ClearMeshSection(3);
+	ExperimentalSurface->ClearMeshSection(4);
+	if (!SurfaceCrop || CVarHydrologyDressing.GetValueOnGameThread() == 0)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_HYDROLOGY enabled=0"));
+		return;
+	}
+
+	AnastasisHydrologyDressing::FPlan Hydro;
+	FString Error;
+	if (!AnastasisHydrologyDressing::Build(CanonicalSource, SurfaceCrop, Hydro, Error))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_HYDROLOGY rejected=%s"), *Error);
+		return;
+	}
+
+	auto SnapMesh = [SurfaceCrop](AnastasisHydrologyDressing::FMesh& Mesh)
+	{
+		for (int32 I = 0; I < Mesh.Vertices.Num(); ++I)
+		{
+			if (Mesh.SnapToGround[I] == 0)
+			{
+				continue;
+			}
+			FVector& V = Mesh.Vertices[I];
+			double GroundZ = 0.0;
+			if (AnastasisTerrainForge::SampleActive(V.X, V.Y, GroundZ)
+				|| AnastasisTerrainSurface::SampleHeight(*SurfaceCrop, V.X, V.Y, GroundZ))
+			{
+				if (FMath::Abs(GroundZ - V.Z) <= 22.0)
+				{
+					V.Z = GroundZ + 2.0;
+				}
+			}
+		}
+	};
+	SnapMesh(Hydro.Bank);
+	SnapMesh(Hydro.Props);
+
+	UMaterialInterface* SurfaceMaterial = ResolveSliceMaterial();
+	auto ApplySection = [this, SurfaceMaterial](int32 Section, const AnastasisHydrologyDressing::FMesh& Mesh)
+	{
+		if (Mesh.Triangles.Num() < 3 || Mesh.Vertices.Num() < 3)
+		{
+			return;
+		}
+		ExperimentalSurface->CreateMeshSection_LinearColor(
+			Section, Mesh.Vertices, Mesh.Triangles, Mesh.Normals,
+			TArray<FVector2D>{}, Mesh.Colors, TArray<FProcMeshTangent>{}, false);
+		if (SurfaceMaterial)
+		{
+			ExperimentalSurface->SetMaterial(Section, SurfaceMaterial);
+		}
+	};
+	ApplySection(2, Hydro.Flow);
+	ApplySection(3, Hydro.Bank);
+	ApplySection(4, Hydro.Props);
+
+	HydroTorrent = Hydro.Torrent.Centroid;
+	HydroValley = Hydro.Valley.Centroid;
+	HydroInflow = Hydro.Inflow.Centroid;
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_HYDROLOGY flowing=%d still=%d torrent=%d valley=%d inflow=%d rocks=%d reeds=%d foam=%d flow_tris=%d bank_tris=%d torrent=(%.0f,%.0f,%.0f) valley=(%.0f,%.0f,%.0f) inflow=(%.0f,%.0f,%.0f)"),
+		Hydro.FlowingTiles, Hydro.StillTiles, Hydro.TorrentTiles, Hydro.ValleyTiles, Hydro.InflowTiles,
+		Hydro.RockCount, Hydro.ReedCount, Hydro.FoamCount,
+		Hydro.Flow.Triangles.Num() / 3, Hydro.Bank.Triangles.Num() / 3,
+		HydroTorrent.X, HydroTorrent.Y, HydroTorrent.Z,
+		HydroValley.X, HydroValley.Y, HydroValley.Z,
+		HydroInflow.X, HydroInflow.Y, HydroInflow.Z);
 }
 
 bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 OriginY, int32 Width, int32 Height)
@@ -627,6 +716,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
     // Le dressing vient APRES la decision de terrain : on ne pose pas un objet sur un
     // sol dont on ignore encore la forme.
     PlaceDressing(Seed, bSurfaceBuilt ? &BuiltSurfaceCrop : nullptr, CanonicalSource);
+    ApplyHydrologyDressing(CanonicalSource, bSurfaceBuilt ? &BuiltSurfaceCrop : nullptr);
 
     LogEmbodiment();
     return GetInstanceCount() == Plan.TileCount;
