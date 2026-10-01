@@ -1,5 +1,6 @@
 # GROUND_COVER_001 -- A/B de la strate herbacee aux memes cameras, dans la meme session.
 # -States "on,off" (defaut) ; "on,noshadow,off" mesure aussi le cout des ombres. Voir ground-cover-capture.py.
+# GROUND_TEXTURE_001 : "on,on_notex,bare,bare_notex" = A/B des textures photo du sol, herbe posee puis retiree.
 # Sortie : Saved\GroundCoverEvidence\<Label>\<vue>_<on|off>.png + ground-cover.json
 param([string]$Label='latest', [string]$States='on,off', [int]$TimeoutSec=1500)
 $ErrorActionPreference='Stop'

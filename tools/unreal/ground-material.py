@@ -31,9 +31,19 @@ CE QUE LE MATERIAU LIT, ET D'OU CA VIENT (AnastasisTerrainSurface::Build) :
 
 Aucune de ces entrees n'est inventee ici. Le materiau projette, il ne simule pas.
 
+TEXTURES PHOTO (GROUND_TEXTURE_001). Huit textures CC0, deux par famille, importees dans
+/Game/Anastasis/Materials/GroundTextures depuis Saved/GroundTextures/packed, que produit
+tools/unreal/ground-textures.py (Python systeme, a lancer AVANT). Elles portent ce que la
+geometrie a un sommet par metre ne peut pas porter : le detail sous le metre. Elles ne
+portent PAS la teinte : l'albedo photo est stocke divise par sa moyenne, et module la
+couleur calee au lieu de la remplacer (voir l'en-tete de ground-textures.py). Une fois
+importees, ce script ne les reimporte plus, sauf ANASTASIS_GROUND_TEXTURES_REIMPORT=1.
+
 Variables d'environnement :
-  ANASTASIS_GROUND_REBUILD  "1" regenere les deux assets (ecrase l'existant)
+  ANASTASIS_GROUND_REBUILD             "1" regenere les deux assets (ecrase l'existant)
+  ANASTASIS_GROUND_TEXTURES_REIMPORT   "1" reimporte les huit textures depuis packed/
 """
+import json
 import os
 import time
 import unreal
@@ -47,6 +57,17 @@ eal = unreal.EditorAssetLibrary
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 
 REBUILD = os.environ.get('ANASTASIS_GROUND_REBUILD', '0') == '1'
+TEX_REIMPORT = os.environ.get('ANASTASIS_GROUND_TEXTURES_REIMPORT', '0') == '1'
+
+TEX_PKG = PKG + '/GroundTextures'
+# Ordre = ordre des composantes du melange dans le HLSL : herbe, litiere, travaillee, roche.
+# Taille = cote reel de la photo en cm (fiche Poly Haven), donc l'echelle par defaut est
+# l'echelle physique : un caillou de la photo a la taille d'un caillou.
+TEX_FAMILIES = (('Grass', 200.0), ('Litter', 300.0), ('Worked', 130.0), ('Rock', 300.0))
+# Inverse de DETAIL_MEAN de ground-textures.py : l'albedo de detail est stocke a une
+# moyenne de 0.4, le materiau le ramene a 1. Les deux nombres vont ensemble ;
+# import_textures() le verifie contre le manifeste a chaque import.
+TEX_DETAIL_MEAN = 0.4
 
 
 def log(msg):
@@ -234,6 +255,39 @@ class Graph:
         self.link(a, ao, n, '')
         return n
 
+    def custom(self, code, desc, out_type, inputs, extra_outputs, x, y):
+        """Noeud Custom HLSL, entrees et sorties supplementaires RELUES apres ecriture.
+
+        Les tableaux de structures ne passent pas par node() : l'egalite d'un tableau de
+        FCustomInput relu n'est pas celle de la liste Python ecrite. On compare donc les
+        NOMS que le noeud expose reellement -- c'est ce que link() verra. Une sortie
+        supplementaire qui n'existe pas ferait echouer la liaison plus loin, avec un
+        message bien moins lisible que celui-ci.
+        """
+        n = self.node(unreal.MaterialExpressionCustom, x, y, code=code, description=desc,
+                      output_type=out_type)
+        ins = []
+        for name in inputs:
+            ci = unreal.CustomInput()
+            ci.set_editor_property('input_name', name)
+            ins.append(ci)
+        n.set_editor_property('inputs', ins)
+        outs = []
+        for name, t in extra_outputs:
+            co = unreal.CustomOutput()
+            co.set_editor_property('output_name', name)
+            co.set_editor_property('output_type', t)
+            outs.append(co)
+        n.set_editor_property('additional_outputs', outs)
+        got_in = [str(s) for s in mel.get_material_expression_input_names(n)]
+        if got_in != list(inputs):
+            raise RuntimeError('Custom %s : entrees %s, attendues %s' % (desc, got_in, list(inputs)))
+        got_out = [str(s) for s in mel.get_material_expression_output_names(n)]
+        missing = [name for name, _ in extra_outputs if name not in got_out]
+        if missing:
+            raise RuntimeError('Custom %s : sorties %s absentes de %s' % (desc, missing, got_out))
+        return n
+
 
 # ENoiseFunction : index 2 = NOISEFUNCTION_GradientTex3D ("Fast Gradient - 3D Texture",
 # ~16 instructions et 1 lookup par niveau, la seule variante assez bon marche pour deux
@@ -244,9 +298,168 @@ NOISE_FAST_GRADIENT_3D = enum_of(unreal.NoiseFunction, 2,
                                  'NOISEFUNCTION_GradientTex3D')
 VECTOR_NOISE_PERLIN_GRADIENT = enum_of(unreal.VectorNoiseFunction, 2,
                                        'VNF_GRADIENT_ALU', 'VNF_GRADIENTALU', 'VNF_GradientALU')
+CMOT_FLOAT1 = enum_of(unreal.CustomMaterialOutputType, 0, 'CMOT_FLOAT1', 'CMOT_Float1')
+CMOT_FLOAT3 = enum_of(unreal.CustomMaterialOutputType, 2, 'CMOT_FLOAT3', 'CMOT_Float3')
+SAMPLER_COLOR = enum_of(unreal.MaterialSamplerType, 0, 'SAMPLERTYPE_COLOR', 'SAMPLERTYPE_Color')
+SAMPLER_LINEAR_COLOR = enum_of(unreal.MaterialSamplerType, 3, 'SAMPLERTYPE_LINEAR_COLOR',
+                               'SAMPLERTYPE_LinearColor')
 
 
-def build_master():
+# --------------------------------------------------------------------------------------
+# Textures photo
+# --------------------------------------------------------------------------------------
+def tex_path(family, suffix):
+    return '%s/T_Ground_%s_%s' % (TEX_PKG, family, suffix)
+
+
+def import_textures():
+    """Importe les huit textures si elles manquent (ou sur REIMPORT), puis les rend.
+
+    AH : sRGB, la couleur de detail est perceptuelle et 8 bits lineaires la
+    postériseraient dans les sombres. NR : LINEAIRE -- c'est une normale, une rugosite
+    et une occlusion, pas une couleur ; decodee en sRGB, la normale serait tordue.
+    Les deux en BC7 : BC1 n'a pas d'alpha, BC3 abime la normale ; BC7 garde les quatre
+    canaux propres pour 1 octet par texel.
+    """
+    packed = os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir()),
+                          'GroundTextures', 'packed')
+    manifest_checked = False
+    out = {}
+    for family, _ in TEX_FAMILIES:
+        for suffix, srgb in (('AH', True), ('NR', False)):
+            path = tex_path(family, suffix)
+            if TEX_REIMPORT or not eal.does_asset_exist(path):
+                if not manifest_checked:
+                    with open(os.path.join(packed, '..', 'manifest.json'), encoding='utf-8') as f:
+                        mean = json.load(f)['detail_mean']
+                    if abs(mean - TEX_DETAIL_MEAN) > 1e-6:
+                        raise RuntimeError('manifest detail_mean=%s, materiau=%s : les deux scripts '
+                                           'ne parlent plus de la meme texture' % (mean, TEX_DETAIL_MEAN))
+                    manifest_checked = True
+                src = os.path.join(packed, 'T_Ground_%s_%s.png' % (family, suffix))
+                if not os.path.isfile(src):
+                    raise RuntimeError('%s absent : lancer d abord python tools/unreal/ground-textures.py'
+                                       % src)
+                task = unreal.AssetImportTask()
+                task.set_editor_property('filename', src)
+                task.set_editor_property('destination_path', TEX_PKG)
+                task.set_editor_property('destination_name', 'T_Ground_%s_%s' % (family, suffix))
+                task.set_editor_property('replace_existing', True)
+                task.set_editor_property('automated', True)
+                task.set_editor_property('save', False)
+                tools.import_asset_tasks([task])
+                tex = unreal.load_asset(path)
+                if tex is None:
+                    raise RuntimeError('import de %s echoue' % src)
+                tex.set_editor_property('srgb', srgb)
+                tex.set_editor_property('compression_settings',
+                                        unreal.TextureCompressionSettings.TC_BC7)
+                tex.set_editor_property('lod_group', unreal.TextureGroup.TEXTUREGROUP_WORLD)
+                eal.save_asset(path)
+                log('TEXTURE_IMPORTED %s srgb=%s' % (path, srgb))
+            tex = unreal.load_asset(path)
+            if tex is None:
+                raise RuntimeError('texture %s introuvable' % path)
+            if bool(tex.get_editor_property('srgb')) != srgb:
+                raise RuntimeError('%s srgb=%s, attendu %s' % (path, tex.get_editor_property('srgb'), srgb))
+            out[(family, suffix)] = tex
+    log('TEXTURES_READY count=%d' % len(out))
+    return out
+
+
+# Projection triplanaire d'UNE famille. Les axes dont le poids est negligeable ne sont pas
+# echantillonnes : sur un terrain, le plat ne paie que l'axe Z. D'ou [branch] et
+# SampleGrad -- un echantillonnage implicite dans une branche divergente lirait des
+# derivees indefinies, et les mips sauteraient en damier aux bords de branche.
+#
+# Normale : "whiteout" de Ben Golus, axe par axe. Chaque projection pose sa normale
+# tangente sur la normale de sommet, dans le repere ou u et v suivent DEUX axes du monde
+# nommes explicitement ; aucune tangente n'est donc necessaire -- le maillage n'en a pas.
+# La normale DirectX d'Unreal a +G vers +v, ce qui fait correspondre tn.xy a (u, v) sans
+# inversion. Le signe de l'axe retourne u sur les faces arriere, pour ne pas les mirer.
+_AXES = (
+    # (poids, signe, uv, gradient, normale tangente posee, swizzle vers le monde)
+    ('tw.x', 'sg.x', 'float2(P.z * sg.x, P.y)', 'float2({d}.z * sg.x, {d}.y)', 'float3(xy + Nn.zy, z * Nn.x)', 'zyx'),
+    ('tw.y', 'sg.y', 'float2(P.x * sg.y, P.z)', 'float2({d}.x * sg.y, {d}.z)', 'float3(xy + Nn.xz, z * Nn.y)', 'xzy'),
+    ('tw.z', 'sg.z', 'float2(P.x * sg.z, P.y)', 'float2({d}.x * sg.z, {d}.y)', 'float3(xy + Nn.xy, z * Nn.z)', 'xyz'),
+)
+
+
+def _family_hlsl(i, family, comp):
+    lines = ['[branch] if (W.%s > 0.002) {' % comp,
+             '    float t = 1.0 / TexSize%s;' % family,
+             '    float ns = NSf.%s;' % comp]
+    for w, s, uv, grad, tn, swz in _AXES:
+        lines += [
+            '    [branch] if (%s > 0.01) {' % w,
+            '        float2 uv = %s * t;' % uv,
+            '        float2 gx = %s * t;' % grad.format(d='dPx'),
+            '        float2 gy = %s * t;' % grad.format(d='dPy'),
+            '        float4 a = Texture2DSampleGrad(%sAH, %sAHSampler, uv, gx, gy);' % (family, family),
+            '        float4 n = Texture2DSampleGrad(%sNR, %sNRSampler, uv, gx, gy);' % (family, family),
+            '        float2 xy0 = n.xy * 2.0 - 1.0;',
+            '        float z = sqrt(saturate(1.0 - dot(xy0, xy0)));',
+            '        float2 xy = xy0 * ns;',
+            '        xy.x *= %s;' % s,
+            '        A%d += a * %s; R%d += n * %s; N%d += (%s).%s * %s;' % (i, w, i, w, i, tn, swz, w),
+            '    }']
+    lines += ['    H.%s = A%d.a;' % (comp, i), '}']
+    return '\n'.join(lines)
+
+
+def ground_texture_hlsl():
+    """Corps du noeud Custom : poids de famille, projection, melange par hauteur.
+
+    Retour (float3) : facteur d'albedo, neutre en moyenne -- detail * occlusion.
+    TexNormal : normale monde, deja posee sur la normale de sommet.
+    TexRough  : ecart de rugosite signe, a ajouter a la rugosite calee.
+
+    Melange par hauteur : chaque famille concourt avec poids + hauteur*HeightBlend, et
+    seules celles a moins de BlendDepth du maximum restent. La terre remplit donc d'abord
+    les creux entre les cailloux au lieu de se fondre en fondu enchaine -- c'est ce qui
+    fait une transition de sol, par opposition a un degrade.
+    """
+    comps = 'xyzw'
+    body = '\n'.join(_family_hlsl(i, f, comps[i]) for i, (f, _) in enumerate(TEX_FAMILIES))
+    return '''TexNormal = normalize(N);
+TexRough = 0.0;
+[branch] if (Fade < 0.001) { return float3(1.0, 1.0, 1.0); }
+float3 Nn = TexNormal;
+float3 sg = float3(Nn.x >= 0.0 ? 1.0 : -1.0, Nn.y >= 0.0 ? 1.0 : -1.0, Nn.z >= 0.0 ? 1.0 : -1.0);
+float3 tw = pow(abs(Nn), 8.0);
+tw /= max(tw.x + tw.y + tw.z, 1e-5);
+float3 dPx = ddx(P);
+float3 dPy = ddy(P);
+// Poids des familles : la roche est le masque du materiau (simulation + pente + meso),
+// le reste se partage herbe / litiere / travaillee au prorata des canaux UV.
+float g = saturate(1.0 - RockW - Litter - Worked);
+float s = Litter + Worked + g;
+float4 W = s > 1e-3 ? float4(g, Litter, Worked, 0.0) / s : float4(1.0, 0.0, 0.0, 0.0);
+W.xyz *= 1.0 - RockMask;
+W.w = RockMask;
+float4 NSf = NormalStrength * float4(1.0, 1.0, 1.0, RockNormalScale);
+float4 H = 0;
+float4 A0 = 0, A1 = 0, A2 = 0, A3 = 0;
+float4 R0 = 0, R1 = 0, R2 = 0, R3 = 0;
+float3 N0 = 0, N1 = 0, N2 = 0, N3 = 0;
+%s
+float4 hw = W + H * HeightBlend;
+float m = max(max(hw.x, hw.y), max(hw.z, hw.w)) - BlendDepth;
+float4 b = max(hw - m, 0.0) * saturate((W - 0.002) * 25.0);
+b /= max(dot(b, 1.0), 1e-5);
+float3 alb = (b.x * A0.rgb + b.y * A1.rgb + b.z * A2.rgb + b.w * A3.rgb) * %.6f;
+float4 nr = b.x * R0 + b.y * R1 + b.z * R2 + b.w * R3;
+float3 nw = b.x * N0 + b.y * N1 + b.z * N2 + b.w * N3;
+nw = dot(nw, nw) > 1e-8 ? normalize(nw) : Nn;
+float ao = lerp(1.0, nr.a * 2.0, AOStrength);
+float3 detail = lerp(float3(1.0, 1.0, 1.0), alb, AlbedoStrength) * ao;
+TexNormal = normalize(lerp(Nn, nw, Fade));
+TexRough = (nr.b - 0.5) * 2.0 * RoughnessStrength * Fade;
+return lerp(float3(1.0, 1.0, 1.0), detail, Fade);
+''' % (body, 1.0 / TEX_DETAIL_MEAN)
+
+
+def build_master(textures):
     mat = tools.create_asset('M_AnastasisGround', PKG, unreal.Material, unreal.MaterialFactoryNew())
     if mat is None:
         raise RuntimeError('create_asset M_AnastasisGround failed')
@@ -454,6 +667,54 @@ def build_master():
     meso_damp = g.addc(g.mulc(n_meso, '', 0.8, -1700, 780), '', 0.6, -1540, 780)
     damp_mask = g.sat(g.mul(damp, '', meso_damp, '', -1380, 470), '', -1240, 470)
 
+    # ------------------------------------------------------------------ textures photo
+    # Le detail sous le metre, que la geometrie ne porte pas. Un seul noeud Custom : la
+    # projection triplanaire branchee, le melange par hauteur et la pose de la normale
+    # sont des boucles et des max, que des noeuds rendraient illisibles (et ~300 de plus).
+    # Tout le reglage reste dans des parametres, donc dans l'instance.
+    T = 'Ground|Texture'
+    tex_params = {
+        'AlbedoStrength': g.scalar('TexAlbedoStrength', 0.85, T, -1900, 1300),
+        'AOStrength': g.scalar('TexAOStrength', 0.5, T, -1900, 1360),
+        'RoughnessStrength': g.scalar('TexRoughnessStrength', 0.12, T, -1900, 1420),
+        'NormalStrength': g.scalar('TexNormalStrength', 0.8, T, -1900, 1480),
+        # Meme constat que RockBumpScale : une face raide est deja pres du terminateur,
+        # une normale forte y fait des taches noires, pas de la roche.
+        'RockNormalScale': g.scalar('TexRockNormalScale', 0.6, T, -1900, 1540),
+        'HeightBlend': g.scalar('TexHeightBlend', 0.6, T, -1900, 1600),
+        'BlendDepth': g.scalar('TexBlendDepth', 0.2, T, -1900, 1660),
+    }
+    for i, (family, size) in enumerate(TEX_FAMILIES):
+        tex_params['TexSize' + family] = g.scalar('TexSize' + family, size, T, -1900, 1720 + 60 * i)
+    # Fondu lointain. Les mips ramenent deja le detail a sa moyenne -- neutre, par
+    # construction de ground-textures.py -- mais la REPETITION d'une photo de 2 m se lit
+    # en grille entre 30 et 100 m bien avant que les mips ne l'effacent. Au-dela de la fin
+    # du fondu le noeud ne lit plus aucune texture : le lointain ne paie rien.
+    p_tex_near = g.scalar('TexFadeStart', 3000.0, T, -1900, 1960)
+    p_tex_far = g.scalar('TexFadeEnd', 12000.0, T, -1900, 2020)
+    tex_fade = g.one_minus(
+        g.smoothstep(p_tex_near, '', p_tex_far, '', depth, '', -1540, 1960), '', -1380, 1960)
+
+    tex_inputs = ['P', 'N', 'RockMask', 'RockW', 'Litter', 'Worked', 'Fade'] + list(tex_params.keys())
+    tex_objects = {}
+    for family, _ in TEX_FAMILIES:
+        for suffix, sampler in (('AH', SAMPLER_COLOR), ('NR', SAMPLER_LINEAR_COLOR)):
+            name = family + suffix
+            tex_inputs.append(name)
+            tex_objects[name] = g.node(unreal.MaterialExpressionTextureObjectParameter,
+                                       -1700, 2100 + 80 * len(tex_objects),
+                                       parameter_name='Tex' + name, group=T,
+                                       texture=textures[(family, suffix)], sampler_type=sampler)
+    tex = g.custom(ground_texture_hlsl(), 'GroundTexture', CMOT_FLOAT3, tex_inputs,
+                   (('TexNormal', CMOT_FLOAT3), ('TexRough', CMOT_FLOAT1)), -1100, 1500)
+    for name, src in (('P', wp), ('N', nws), ('RockMask', rock_mask), ('RockW', w_rock),
+                      ('Litter', w_litter), ('Worked', w_worked), ('Fade', tex_fade)):
+        g.link(src, '', tex, name)
+    for name, src in tex_params.items():
+        g.link(src, '', tex, name)
+    for name, src in tex_objects.items():
+        g.link(src, '', tex, name)
+
     # ------------------------------------------------------------------------- albedo
     base = g.mask(vc, '', True, True, True, -1240, -240)
     base = g.lerp(base, '', g.mul(base, '', p_litter_tint, '', -1080, -200), '', w_litter, '', -920, -240)
@@ -473,6 +734,8 @@ def build_master():
     base = g.mul(base, '', meso_val, '', 40, -240)
     grain_val = g.addc(g.mul(grain_amt, '', d_grain, '', -280, 900), '', 1.0, -120, 900)
     base = g.mul(base, '', grain_val, '', 200, -240)
+    # Detail photo : un facteur neutre en moyenne, pose APRES les teintes calees.
+    base = g.mul(base, '', tex, '', 280, -240)
 
     # Sol detrempe : plus sombre, comme un sol reellement mouille.
     dark = g.mul(base, '', p_damp_dark, '', 360, -120)
@@ -485,6 +748,7 @@ def build_master():
     r = g.lerp(p_soil_rough, '', p_rock_rough, '', rock_mask, '', -120, 400)
     r = g.lerp(r, '', p_damp_rough, '', damp_mask, '', 40, 400)
     r = g.add(r, '', g.mul(g.mul(p_rough_grain, '', detail_fade, '', 200, 520), '', d_grain, '', 200, 460), '', 360, 400)
+    r = g.add(r, '', tex, 'TexRough', 440, 400)
     r = g.sat(r, '', 520, 400)
     g.prop(r, '', unreal.MaterialProperty.MP_ROUGHNESS)
     g.prop(p_soil_spec, '', unreal.MaterialProperty.MP_SPECULAR)
@@ -523,7 +787,10 @@ def build_master():
     bump_amt = g.mul(bump_amt, '', detail_fade, '', -940, 1200)
     perturb = g.mul(tangential, '', bump_amt, '', -740, 1120)
     out_normal = g.node(unreal.MaterialExpressionNormalize, -580, 1120)
-    g.link(g.sub(nws, '', perturb, '', -740, 1000), '', out_normal, '')
+    # Le relief micro procedural s'incline desormais depuis la normale PHOTO, qui est
+    # deja posee sur la normale de sommet : les deux echelles se cumulent (1,6 m et
+    # sous le metre) au lieu de se remplacer.
+    g.link(g.sub(tex, 'TexNormal', perturb, '', -740, 1000), '', out_normal, '')
     g.prop(out_normal, '', unreal.MaterialProperty.MP_NORMAL)
 
     # LE garde-fou qui manquait au premier jet. recompile_material RETOURNE les erreurs
@@ -531,6 +798,9 @@ def build_master():
     # moteur remplace silencieusement par le Default Material au rendu. C'est exactement
     # ce qui est arrive : un sol beige uniforme, sans eau ni semantique, qu'on aurait pu
     # prendre pour un mauvais reglage artistique au lieu d'un materiau mort.
+    # Marqueur pour ground-material.ps1 : un "Failed to compile Material" APRES lui est le
+    # vrai verdict ; ceux d'avant sont les etats intermediaires du graphe en construction.
+    log('RECOMPILE_BEGIN')
     errors = list(mel.recompile_material(mat))
     if errors:
         for e in errors:
@@ -597,9 +867,14 @@ def run():
     # REBUILD force la recreation sans reinterroger does_asset_exist : juste apres un
     # delete_asset le registre d'assets repond encore True, et on repartait alors sur
     # l'ancienne instance -- pointant vers un maitre qui venait d'etre supprime.
+    # Les textures d'abord, et meme sans REBUILD quand on les reimporte : le maitre
+    # existant les reference par chemin, il voit donc les nouvelles sans regeneration.
+    if TEX_REIMPORT and not REBUILD:
+        import_textures()
+
     if REBUILD or not eal.does_asset_exist(MASTER):
         log('CREATE ' + MASTER)
-        master_asset = build_master()
+        master_asset = build_master(import_textures())
     else:
         master_asset = unreal.load_asset(MASTER)
         log('LOAD ' + MASTER)
