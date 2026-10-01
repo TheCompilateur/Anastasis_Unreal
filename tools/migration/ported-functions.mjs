@@ -156,6 +156,21 @@ export const PORTAGE_DECLARE = [
     fonctions: ["readSimWeather", "weatherGoalBiasFromState", "shouldSeekRainShelter", "shelterRainScore"],
   },
   { module: "src/sim/constructionPieces.js", cpp: "Work/AnastasisBuild", source: "build-001", entier: true },
+
+  // --- Vague 4, etat et sauvegarde: le lecteur du harnais -------------------
+  // Le format JS est LU (harnais), jamais ecrit par le jeu (P2_MODELE_DONNEES.md).
+  {
+    module: "src/sim/save.js", cpp: "Harness/AnastasisJsSave", source: "sim-state-reader-001 (lecteur du harnais)",
+    citation: false,
+    fonctions: ["tileDiff"],
+    // serialize / deserialize / applyTileDiff / unpackActor : sections du perimetre
+    // du scenario seulement, lignes de tileDiff au format courant seulement.
+    reduites: ["serialize", "deserialize", "applyTileDiff", "unpackActor"],
+  },
+  {
+    module: "src/sim/pristineWorld.js", cpp: "Harness/AnastasisJsSave (GenerateWorld)", source: "sim-state-reader-001",
+    fonctions: ["pristineReference", "storePristineRef"],
+  },
   { module: "src/sim/craftToolSwitch.js", cpp: "Work/AnastasisBuild, Village/AnastasisVillage", source: "build-001", entier: true },
 ];
 

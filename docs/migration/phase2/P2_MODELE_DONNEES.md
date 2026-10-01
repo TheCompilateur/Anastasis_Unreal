@@ -153,5 +153,5 @@ C'est le seul point que les mesures ne tranchent pas.
 | `Anastasis.Sim.Entites.Ordre` / `.Index` | **PASS** (2026-09-13) |
 | Suite `Anastasis.Sim` | 14 PASS, 2 KNOWN_EXPECTED_FAILURE, 0 FAIL |
 | Structures d'entités (habitant, bâtiment, animal) | vague 4 — 151 champs à porter avec leurs systèmes, pas d'avance |
-| Lecteur du format JS | à écrire quand le harnais aura un état C++ à charger |
+| Lecteur du format JS | **écrit** (sim-state-reader-001, 2026-10-01) : `Harness/AnastasisJsSave.h`, sections du périmètre du scénario `endurance` ; `Anastasis.Sim.Harnais.Lecture` PASS — même empreinte qu’au tick 0 JS. Ne fait pas encore tourner l’état lu. |
 | Format de sauvegarde natif | à écrire quand il y aura un état à sauver |

@@ -261,6 +261,27 @@ Un bâtiment ouvert par l'hôte monte en 22 pièces sous les coups des bâtisseu
 part du devis au stock du site, et le bâtiment achevé sert. Ouverture par les habitants, livraisons,
 bois et pierre : écart n° 18, build-002. Détail : `docs/unreal/BUILD_001.md`.
 
+### Fait — le lecteur de sauvegarde JS du harnais (mission sim-state-reader-001)
+
+Vague 4, côté harnais seulement : le format JS est **lu** comme instrument, jamais écrit
+(`docs/migration/phase2/P2_MODELE_DONNEES.md`, décision 2). Il charge un scénario
+(`tools/migration/scenarios/*.json`, `docs/migration/phase3/P3_SCENARIOS.md`) en état C++ et le
+reprojette sur les sections de `serialize`.
+
+| Unreal | Source JS (`anastasis-ref-p3`) | Preuve |
+| --- | --- | --- |
+| `Core/AnastasisJson.h/.cpp` | `JSON.parse` (nombres au bit près, clé répétée), `digestValue` sur un arbre | `Harnais.Json` |
+| `Harness/AnastasisJsSave.h/.cpp` | `save.js` : `tileDiff`, `applyTileDiff` (format courant), lecture des sections `seed rng w h time day tileDiff buildings actors mealReservations` ; `pristineWorld.js` | `Harnais.Lecture`, vecteurs `tools/migration/gen-scenario-vectors.mjs` |
+
+Au tick 0 du scénario `endurance`, les 10 sections du périmètre projetées depuis l'état C++ rendent
+l'empreinte que la référence calcule (35 sections, global `47a2a2ffc0e5d98a`). `tileDiff` est
+**recalculé** depuis le monde C++ contre une génération vierge : la génération C++ sur 108 × 114
+rend exactement les 590 cases de la référence. Pour bâtiments, habitants et réservations, la
+projection repart de l'objet d'origine et y **réécrit** chaque champ lu depuis la valeur C++ ; les
+champs non lus (un habitant JS en a 105 au premier niveau) sont **recopiés**, figés. Le lecteur ne
+fait pas encore tourner l'état lu : brancher `FState` sur `FVillage` / `FAnastasisSimulation` est le
+travail de `sim-digest-emitter-001`.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules
