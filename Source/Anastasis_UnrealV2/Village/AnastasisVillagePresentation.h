@@ -57,7 +57,7 @@ public:
 	int32 NumVillagers() const { return Villagers.Num(); }
 
 	/**
-	 * Debug : puits (cylindre), seuils, habitants (sphere coloree par la soif),
+	 * Debug : volumes seulement si le mesh du batiment manque, seuils, habitants (sphere coloree par la soif),
 	 * trait vers la cible, texte « id  but  activite  soif  -> batiment ».
 	 */
 	static void DrawDebug(UWorld* World, const AnastasisVillage::FVillage& Village, const AnastasisWorld::FWorld& SimWorld);

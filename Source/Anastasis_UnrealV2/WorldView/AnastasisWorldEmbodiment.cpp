@@ -47,6 +47,15 @@ static TAutoConsoleVariable<int32> CVarGroundCoverShadows(
     TEXT("anastasis.GroundCover.Shadows"), 1,
     TEXT("0=herbe sans ombres portees, 1=ombres des touffes proches (< 55 m) ; applique a l'incarnation."), ECVF_Default);
 
+// Pas d'herbe pendant les tests d'automatisation. La suite incarne le monde a chaque test qui fait
+// apparaitre l'acteur (16 fois le 2026-10-01), ~1,08 M de touffes chaque fois, jamais rendues entre
+// deux tests : 12 Go de memoire virtuelle et la suite tuee au test EmbodimentSpawn ("fichier de
+// pagination insuffisant"). Les regles de placement se testent sans incarnation
+// (Anastasis.GroundCover.*, Build pur) ; 1 = herbe aussi sous automatisation.
+static TAutoConsoleVariable<int32> CVarGroundCoverInAutomation(
+    TEXT("anastasis.GroundCover.InAutomation"), 0,
+    TEXT("0=pas d'herbe pendant les tests d'automatisation (defaut), 1=herbe aussi sous automatisation ; applique a l'incarnation."), ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainForge(
@@ -577,8 +586,23 @@ double TileOpenness(AnastasisWorld::ETileType Type)
 	}
 }
 
+/** Habitat de lande d'une tuile : la roche y est chez elle, au contraire de la prairie (EZ1). */
+double LandeOpenness(AnastasisWorld::ETileType Type)
+{
+	using AnastasisWorld::ETileType;
+	switch (Type)
+	{
+	case ETileType::Stone: case ETileType::Grass: case ETileType::Scrub: return 1.0;
+	case ETileType::Forest: return 0.7;
+	case ETileType::Water: case ETileType::Ruin: return 0.6;
+	case ETileType::Field: return 0.5;
+	default: return 0.0;
+	}
+}
+
 /** Ouverture interpolee entre centres de tuiles : pas de marche de 20 m a la frontiere d'une tuile. */
-double OpennessAt(const AnastasisWorldView::FWorldVisualSnapshot& S, double X, double Y)
+double OpennessAt(const AnastasisWorldView::FWorldVisualSnapshot& S, double X, double Y,
+	double (*Openness)(AnastasisWorld::ETileType) = &TileOpenness)
 {
 	const double T = AnastasisWorldView::TileWorldSize * S.SpatialScale;
 	const double U = X / T - 0.5, V = Y / T - 0.5;
@@ -592,7 +616,7 @@ double OpennessAt(const AnastasisWorldView::FWorldVisualSnapshot& S, double X, d
 			const AnastasisWorldView::FVisualTile* Tile = AnastasisWorldView::FindTile(S, IX + DX, IY + DY);
 			if (!Tile) continue;
 			const double W = (DX ? FX : 1.0 - FX) * (DY ? FY : 1.0 - FY);
-			Sum += W * TileOpenness(Tile->Type);
+			Sum += W * Openness(Tile->Type);
 			Weight += W;
 		}
 	}
@@ -616,10 +640,11 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 	double Probe;
 	const bool bGround = AnastasisTerrainForge::SampleActive((CanonicalSource.OriginX + CanonicalSource.W * 0.5) * T,
 		(CanonicalSource.OriginY + CanonicalSource.H * 0.5) * T, Probe);
-	if (!bEnabled || CVarGroundCover.GetValueOnGameThread() == 0 || !bGround)
+	const bool bAutomation = GIsAutomationTesting && CVarGroundCoverInAutomation.GetValueOnGameThread() == 0;
+	if (!bEnabled || CVarGroundCover.GetValueOnGameThread() == 0 || !bGround || bAutomation)
 	{
-		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_GROUND_COVER enabled=0 ecology=%d rendered_ground=%d"),
-			bEnabled, bGround);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_GROUND_COVER enabled=0 ecology=%d rendered_ground=%d automation=%d"),
+			bEnabled, bGround, bAutomation);
 		return;
 	}
 	const double Start = FPlatformTime::Seconds();
@@ -635,6 +660,14 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 		return FMath::Max(AnastasisPlaces::ValleyWeightAt(CanonicalSource, X, Y),
 			AnastasisGroundCoverEmbody::OpennessAt(CanonicalSource, X, Y));
 	};
+	// Versants 20-45 deg : la lande (H6) lit son propre habitat, roche comprise.
+	In.LandeMask = [&CanonicalSource](double X, double Y)
+	{
+		return AnastasisGroundCoverEmbody::OpennessAt(CanonicalSource, X, Y, &AnastasisGroundCoverEmbody::LandeOpenness);
+	};
+	// Fond de vallee habitable de la forge : la callune se mesure depuis lui.
+	In.bHasValleyFloor = !ForgeBasin.IsZero();
+	In.ValleyFloorZ = ForgeBasin.Z;
 	In.Bounds = FBox2D(FVector2D(CanonicalSource.OriginX * T, CanonicalSource.OriginY * T),
 		FVector2D((CanonicalSource.OriginX + CanonicalSource.W) * T, (CanonicalSource.OriginY + CanonicalSource.H) * T));
 	In.Canopy = Canopy;
@@ -752,11 +785,17 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 		++Chunks;
 	}
 	UE_LOG(LogAnastasis_UnrealV2, Display,
-		TEXT("ANASTASIS_GROUND_COVER enabled=1 tall=%d short=%d sedge=%d placed=%d near=%d far=%d chunks=%d outside_valley=%d shadows=%d candidates=%d refused_mask=%d refused_ground=%d refused_water=%d refused_slope=%d refused_canopy=%d refused_density=%d crowns=%d clearings=%d truncated=%d missing_meshes=%d plan_ms=%.1f total_ms=%.1f"),
-		Cover.Counts[0], Cover.Counts[1], Cover.Counts[2], Placed, PerTier[0], PerTier[1], Chunks, OutsideValley, bShadows,
+		TEXT("ANASTASIS_GROUND_COVER enabled=1 tall=%d short=%d sedge=%d heath=%d heather=%d placed=%d near=%d far=%d chunks=%d outside_valley=%d shadows=%d candidates=%d refused_mask=%d refused_ground=%d refused_water=%d refused_slope=%d refused_canopy=%d refused_density=%d crowns=%d clearings=%d truncated=%d missing_meshes=%d plan_ms=%.1f total_ms=%.1f"),
+		Cover.Counts[0], Cover.Counts[1], Cover.Counts[2], Cover.Counts[3], Cover.Counts[4], Placed, PerTier[0], PerTier[1], Chunks, OutsideValley, bShadows,
 		Cover.Candidates, Cover.RejectedMask, Cover.RejectedGround, Cover.RejectedWater, Cover.RejectedSlope,
 		Cover.RejectedCanopy, Cover.RejectedDensity, Canopy.Num(), In.Clearings.Num(), Cover.bTruncated, Missing,
 		PlanMs, (FPlatformTime::Seconds() - Start) * 1000.0);
+	// La lande se juge sur le relief reellement mesure : ou sont les pentes, et ce qui les refuse.
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_GROUND_SLOPES dry_candidates_by_slope 0-10=%d 10-20=%d 20-30=%d 30-45=%d 45-60=%d 60+=%d steep_refused_canopy=%d lande_above_floor_m=[%.1f %.1f %.1f] valley_floor_z=%.0f"),
+		Cover.SlopeBins[0], Cover.SlopeBins[1], Cover.SlopeBins[2], Cover.SlopeBins[3], Cover.SlopeBins[4], Cover.SlopeBins[5],
+		Cover.RejectedCanopySteep, Cover.LandeAboveFloor[0] / 100.0, Cover.LandeAboveFloor[1] / 100.0, Cover.LandeAboveFloor[2] / 100.0,
+		In.ValleyFloorZ);
 }
 
 FVector AAnastasisWorldEmbodiment::GetFrameTimingsMs() const

@@ -179,8 +179,14 @@ protected:
 	 * Writes one sky instant: sun and moon orientation and shadows, pinned exposure, cloud
 	 * coverage and fog density from the weather. Called by Apply() and, while the clock is
 	 * active, every Tick. Logs a line when the village phase changes (or when bForceLog).
+	 * AdaptSeconds > 0 moves the exposure toward the hour's value at the profile's eye-adaptation
+	 * rate (Tick); 0 snaps to it (Apply, captures).
 	 */
-	void UpdateSky(const UAnastasisAtmosphereProfile& Profile, bool bForceLog);
+	void UpdateSky(const UAnastasisAtmosphereProfile& Profile, bool bForceLog, float AdaptSeconds = 0.0f);
+
+	/** The exposure actually on screen, which lags the hour's target while the eye adapts. */
+	double AppliedExposureEV = 0.0;
+	bool bHasAppliedExposure = false;
 
 	/** Coverage lives on a material parameter: the engine instance is shared, so this actor drives its own dynamic instance. */
 	UPROPERTY()

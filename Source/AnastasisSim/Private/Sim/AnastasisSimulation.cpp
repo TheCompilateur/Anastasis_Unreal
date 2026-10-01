@@ -16,8 +16,10 @@ void FAnastasisSimulation::Reset(uint32 SeedValue, int32 Width, int32 Height)
 	Day = 1;
 	NewDayCount = 0;
 	DeferredRemaining = 0;
-	bLandRegenPending = false;
+	DeferredJobs.Reset();
 	LastRegrownFields = 0;
+	// Le flux de tirages du village (rumeurs) suit la graine du monde.
+	Village.SetRngSeed(Seed);
 	Accumulator = 0.0;
 }
 
@@ -100,26 +102,47 @@ void FAnastasisSimulation::OnNewDay(bool bDefer)
 	// que `assignSheltersDaily` (les sans-toit recoivent un lit). Achats de maison,
 	// agrandissements, loyers : economie, non portee.
 	Village.AssignSheltersDaily();
-	// `enqueueDayDeferred` : de la file, seul le premier job est porte, `landRegen`
-	// (regen du sol). Collectif, vie, metiers, betail, immigration : NOT_IMPLEMENTED.
-	bLandRegenPending = true;
-	DeferredRemaining = 1;
+	// `enqueueDayDeferred` : les 17 travaux, ajoutes derriere un eventuel reliquat.
+	// Portes : `landRegen` (regen du sol) et `memory` (oubli). Collectif, ordres, doctrine,
+	// chapitres, chartes, sites, transports, routes, guets, vie, carrieres, fondateurs,
+	// conseils, betail, immigration : NOT_IMPLEMENTED, ils ne font que tenir leur rang.
+	for (int32 Job = 0; Job < DayDeferredJobCount; ++Job)
+	{
+		DeferredJobs.Add(Job);
+	}
+	DeferredRemaining = DeferredJobs.Num();
 	if (!bDefer)
 	{
 		// `flushDayDeferred` : tout, tout de suite.
-		RunLandRegen();
-		DeferredRemaining = 0;
+		ProcessDayDeferred(DeferredJobs.Num());
 	}
 }
 
 void FAnastasisSimulation::ProcessDayDeferred(int32 MaxJobs)
 {
 	// DETERMINISME JS: budget en NOMBRE de jobs, jamais en duree.
-	if (MaxJobs > 0 && bLandRegenPending)
+	int32 Done = 0;
+	while (Done < MaxJobs && DeferredJobs.Num() > 0)
+	{
+		const int32 Job = DeferredJobs[0];
+		DeferredJobs.RemoveAt(0);
+		RunDayJob(Job);
+		++Done;
+	}
+	DeferredRemaining = DeferredJobs.Num();
+}
+
+void FAnastasisSimulation::RunDayJob(int32 Job)
+{
+	if (Job == DayJobLandRegen)
 	{
 		RunLandRegen();
 	}
-	DeferredRemaining = bLandRegenPending ? 1 : 0;
+	else if (Job == DayJobMemory)
+	{
+		// `memory` : forgetStale + forgetStalePeople pour chacun (fadeEpisodes : non porte).
+		Village.ForgetStaleDaily(Day);
+	}
 }
 
 void FAnastasisSimulation::RunLandRegen()
@@ -128,5 +151,4 @@ void FAnastasisSimulation::RunLandRegen()
 	// La foret : `regrowWoodTile` rend toujours false dans la reference (fee66ae),
 	// rien ne repousse. Les cours de stock sont une vue, pas de l'etat.
 	LastRegrownFields = Village.RegrowFieldsDaily(Day);
-	bLandRegenPending = false;
 }

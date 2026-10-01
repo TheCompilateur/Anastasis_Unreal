@@ -78,6 +78,9 @@ def tick(dt):
     village_phase = DBG.get_village_phase(world)
 
     if step == 0 and now - mark > 1.5:
+        # anastasis.Sim.Speed vaut 1 par defaut depuis sky-transitions-001 ; cette preuve a ete
+        # etablie a 10 et le reste.
+        cmd(world, 'anastasis.Sim.Speed 10')
         cmd(world, 'Anastasis.Village.FirstHouse 4')
         cmd(world, 'Anastasis.Village.Status')
         step = 1

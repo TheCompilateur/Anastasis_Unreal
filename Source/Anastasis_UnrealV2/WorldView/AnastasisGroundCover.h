@@ -5,13 +5,14 @@
 /**
  * GROUND_COVER_001 -- la strate herbacee des espaces ouverts.
  *
- * Trois familles, lues sur les planches Etat Zero (docs/visual/reference/) :
- *   H1 MeadowTall  prairie haute de clairiere naturelle (EZ5, EZ1)   : plat, a decouvert
- *   H2 MeadowShort prairie basse, terre seche ou tassee (EZ5, EZ2)    : pente moderee, sol pietine
- *   H3 Sedge       prairie humide, laiches et carex (EZ5, EZ4, EZ2)   : rive, creux mouilles
- * Les trois autres familles de la note de cadrage (joncs de rive, herbacees de sous-bois,
- * lande d'eboulis) sont des passes suivantes : au-dela de MaxSlopeDegrees et sous la couronne
- * d'un arbre, cette passe ne pose rien.
+ * Cinq familles, lues sur les planches Etat Zero (docs/visual/reference/) :
+ *   H1  MeadowTall   prairie haute de clairiere naturelle (EZ5, EZ1)   : plat, a decouvert
+ *   H2  MeadowShort  prairie basse, terre seche ou tassee (EZ5, EZ2)    : pente moderee, sol pietine
+ *   H3  Sedge        prairie humide, laiches et carex (EZ5, EZ4, EZ2)   : rive, creux mouilles
+ *   H6a HeathTussock touffe d'eboulis, graminee dure (EZ1 "rochers, eboulis") : versant 20-45 deg
+ *   H6b Heather      callune de lande, epis mauves (EZ1 "pente subalpine : landes") : haut de versant
+ * Restent a faire : joncs de rive (H4), herbacees de sous-bois (H5). Au-dela de
+ * MaxSlopeDegrees (falaise) et sous la couronne d'un arbre, rien n'est pose.
  *
  * Pure et deterministe : aucune dependance UObject, aucun etat global. L'incarnation fournit
  * le sol, l'eau et l'humidite REELLEMENT rendus, le masque des espaces ouverts et les
@@ -19,7 +20,7 @@
  */
 namespace AnastasisGroundCover
 {
-enum class EFamily : uint8 { MeadowTall, MeadowShort, Sedge, Count };
+enum class EFamily : uint8 { MeadowTall, MeadowShort, Sedge, HeathTussock, Heather, Count };
 
 inline constexpr int32 FamilyCount = static_cast<int32>(EFamily::Count);
 
@@ -33,9 +34,31 @@ struct FSettings
 	double CellUU = 120.0;
 	/** Rayon des sondes de pente : celui de la foret macro, pour que les deux lisent le meme sol. */
 	double ProbeUU = 60.0;
-	/** Bandes de pente du plan V2 : 0-10 prairie haute, 10-20 prairie basse, au-dela rien (lande = passe suivante). */
+	/** Bandes de pente du plan V2 : 0-10 prairie haute, 10-20 prairie basse, 20-45 lande, au-dela falaise nue. */
 	double TallSlopeDegrees = 10.0;
-	double MaxSlopeDegrees = 20.0;
+	double MeadowSlopeDegrees = 20.0;
+	double MaxSlopeDegrees = 45.0;
+	/** Demi-largeur du fondu prairie -> lande autour de MeadowSlopeDegrees : pas de ligne de partage. */
+	double LandeBlendDegrees = 2.0;
+	/**
+	 * Densite de la lande au pied du versant, puis a MaxSlopeDegrees : elle s'eclaircit en montant.
+	 * v1 a 0.6 / 0.15, plancher 0.25, ombre pleine : ~5 % de couverture, invisible a 10 m.
+	 */
+	double LandeDensity = 0.9;
+	double LandeDensitySteep = 0.3;
+	/** Plancher de densite d'une tache de lande : plus clairsemee que la prairie, la roche affleure. */
+	double LandePatchFloor = 0.35;
+	/** Part de l'ombre des couronnes qui eteint la lande (prairie : 0.75) : un versant boise clair en garde. */
+	double LandeShade = 0.5;
+	/** Touffes de lande agrandies : petites et serrees, elles doivent encore couvrir le versant. */
+	double LandeScale = 1.3;
+	/**
+	 * Callune au-dela de cette hauteur au-dessus du fond de vallee, pleinement a + HeatherRangeUU.
+	 * Mesure sur la carte de reference (ANASTASIS_GROUND_SLOPES) : la lande est posee entre 0,6 et
+	 * 34,8 m au-dessus du fond (p10 / p90, mediane 14,9 m). Une bande 15-50 m la manquait presque.
+	 */
+	double HeatherAboveFloorUU = 800.0;
+	double HeatherRangeUU = 2000.0;
 	/** Largeur du fondu entre prairie haute et basse autour de TallSlopeDegrees. */
 	double BlendDegrees = 3.0;
 	/** Sol au moins a cette hauteur au-dessus de la nappe rendue. */
@@ -79,6 +102,15 @@ struct FInputs
 	TFunction<bool(double, double, double&)> SampleWetness;
 	/** Espace ouvert [0,1] : ou une prairie a le droit d'exister. Obligatoire. */
 	TFunction<double(double, double)> Mask;
+	/** Habitat de lande [0,1] (la roche y compte, au contraire de la prairie). Optionnel : Mask sinon. */
+	TFunction<double(double, double)> LandeMask;
+	/**
+	 * Fond de vallee habitable (uu) : la callune tient le haut des versants, mesure depuis lui.
+	 * Pas la nappe : hors rivieres et lacs, le drainage la pose a 1 m sous le sol partout (v1 :
+	 * 6 140 callunes seulement). Sans fond connu, la callune ne suit que ses taches.
+	 */
+	bool bHasValleyFloor = false;
+	double ValleyFloorZ = 0.0;
 	/** Emprise parcourue, uu. */
 	FBox2D Bounds = FBox2D(ForceInit);
 	/** Couronnes deja posees : X, Y, rayon (uu). */
@@ -112,6 +144,12 @@ struct FPlan
 	int32 RejectedSlope = 0;
 	int32 RejectedCanopy = 0;
 	int32 RejectedDensity = 0;
+	/** Candidates sur sol sec par pente mesuree : 0-10, 10-20, 20-30, 30-45, 45-60, 60+ deg. */
+	int32 SlopeBins[6] = {};
+	/** Candidates de versant (> MeadowSlopeDegrees) refusees par une couronne. */
+	int32 RejectedCanopySteep = 0;
+	/** Hauteur au-dessus du fond de vallee des touffes de lande posees : p10, p50, p90 (uu). */
+	double LandeAboveFloor[3] = {};
 	bool bTruncated = false;
 };
 

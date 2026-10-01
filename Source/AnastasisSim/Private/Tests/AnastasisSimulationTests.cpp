@@ -98,7 +98,11 @@ bool FAnastasisSimTickDayAdvance::RunTest(const FString&)
 	TestEqual(TEXT("one onNewDay"), Sim.GetNewDayCount(), 1);
 	TestTrue(TEXT("time reached DAY_LENGTH"), Sim.GetTime() >= FAnastasisSimulation::DayLength);
 	TestTrue(TEXT("previous tick was still day 1"), TimeBeforeCross < FAnastasisSimulation::DayLength);
-	TestEqual(TEXT("empty deferred queue"), Sim.GetDeferredRemaining(), 0);
+	// 17 travaux de minuit, 2 par tick : il en reste 15 apres le tick du changement de jour.
+	TestEqual(TEXT("deferred queue after first budget"), Sim.GetDeferredRemaining(),
+		FAnastasisSimulation::DayDeferredJobCount - FAnastasisSimulation::DayDeferredJobsPerTick);
+	for (int32 I = 0; I < 8; ++I) Sim.Tick(Step);
+	TestEqual(TEXT("deferred queue drained in nine ticks"), Sim.GetDeferredRemaining(), 0);
 	return true;
 }
 

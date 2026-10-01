@@ -5,6 +5,8 @@ PROPRIETE DES ASSETS. Ce script est la SOURCE D'AUTORITE de
   /Game/Anastasis/GroundCover/SM_Grass_MeadowTall_01    H1 prairie haute (clairiere naturelle)
   /Game/Anastasis/GroundCover/SM_Grass_MeadowShort_01   H2 prairie basse (terre seche, tassee)
   /Game/Anastasis/GroundCover/SM_Grass_Sedge_01         H3 prairie humide (laiches, carex)
+  /Game/Anastasis/GroundCover/SM_Grass_HeathTussock_01  H6a touffe d'eboulis (lande, graminee dure)
+  /Game/Anastasis/GroundCover/SM_Grass_Heather_01       H6b callune de lande, epis mauves
   /Game/Anastasis/Materials/M_AnastasisGrass
 Il les recree a l'identique a chaque run (graine fixe). Une touffe se change ICI, dans les
 chiffres : une retouche a la main ne survit pas au run suivant.
@@ -114,6 +116,37 @@ FAMILIES = [
         'straw': (c(0.110, 0.100, 0.060), c(0.230, 0.200, 0.110)),
         'heads': 0,
     },
+    # LANDE (H6). EZ1 : "pente subalpine : coniferes, landes", "rochers, eboulis : affleurements,
+    # mousses, lichens". Plus petite, plus serree, plus seche que la prairie : un versant de
+    # lande se lit par touffes isolees sur la roche, pas par nappe.
+    {
+        'name': 'SM_Grass_HeathTussock_01',
+        'note': 'H6a touffe d eboulis : graminee dure et serree, 14-38 cm, 30 % de paille',
+        # v1 : rayon 32, 150 lames -- ~0,5 m2 par touffe, ~12 % du versant couvert (mesure) :
+        # le versant se lisait nu. Plus large et plus fournie, toujours plus serree qu'une prairie.
+        'radius': 46.0, 'tufts': 4, 'blades': 230, 'spread': 8.0, 'fill': 0.15,
+        'height': (16.0, 42.0), 'width': (0.5, 0.9), 'lean': (0.15, 0.60), 'bend': (0.40, 1.20),
+        'segments': 3,
+        'base': c(0.046, 0.052, 0.022),
+        'tips': [(0.45, c(0.200, 0.185, 0.090)), (0.25, c(0.110, 0.140, 0.050)), (0.30, None)],
+        'straw': (c(0.140, 0.120, 0.064), c(0.300, 0.255, 0.135)),
+        'heads': 6, 'head_height': (30.0, 48.0), 'head_color': c(0.210, 0.180, 0.100),
+    },
+    {
+        # Callune (Calluna vulgaris) : petit buisson raide brun-vert ; en fin d'ete, ses epis
+        # mauves sont la seule couleur florale franche de la lande -- et la premiere de la carte.
+        'name': 'SM_Grass_Heather_01',
+        'note': 'H6b callune : rameaux raides 16-38 cm, brun-vert, epis mauves',
+        'radius': 44.0, 'tufts': 5, 'blades': 230, 'spread': 9.0, 'fill': 0.3,
+        'height': (16.0, 38.0), 'width': (0.35, 0.60), 'lean': (0.05, 0.35), 'bend': (0.05, 0.30),
+        'segments': 3,
+        'base': c(0.040, 0.030, 0.020),
+        'tips': [(0.70, c(0.050, 0.075, 0.035)), (0.30, c(0.085, 0.065, 0.040))],
+        'straw': (c(0.070, 0.055, 0.035), c(0.120, 0.095, 0.060)),
+        # Mauve sourd, pas magenta : v1 a (0.200, 0.085, 0.170) sortait rose vif sous le soleil du banc.
+        'heads': 60, 'head_height': (18.0, 36.0), 'head_color': c(0.150, 0.070, 0.135),
+        'head_size': (6.0, 0.9),
+    },
 ]
 
 
@@ -186,14 +219,18 @@ def blade(buf, base, yaw, height, width, lean, bend, segments, col_base, col_tip
     buf.tri(a0, tip, a1)
 
 
-def seed_head(buf, base, yaw, height, lean, color_stem, color_head, outward):
-    """Tige fine puis epi en fuseau : ce qui fait lire une prairie haute a 20 m."""
+def seed_head(buf, base, yaw, height, lean, color_stem, color_head, outward, size=(9.0, 0.55)):
+    """Tige fine puis epi en fuseau : ce qui fait lire une prairie haute a 20 m.
+
+    size = (longueur, rayon) de l'epi : fin et long pour une graminee, court et renfle pour
+    la grappe de la callune.
+    """
     blade(buf, base, yaw, height, 0.6, lean, 0.15, 2, color_stem, color_stem, outward)
     angle = lean + 0.15
     top = (base[0] + math.cos(yaw) * math.sin(angle) * height,
            base[1] + math.sin(yaw) * math.sin(angle) * height,
            base[2] + math.cos(angle) * height)
-    length, radius = 9.0, 0.55
+    length, radius = size
     axis = (math.cos(yaw) * math.sin(angle), math.sin(yaw) * math.sin(angle), math.cos(angle))
     normal = up_normal(outward)
     alpha = max(0.0, min(1.0, top[2] / 100.0))
@@ -281,7 +318,7 @@ def build_lod(spec, blades, heads, lod):
             if h['keep'] >= (1.0, 0.6)[lod]:
                 continue
             seed_head(buf, h['base'], h['yaw'], h['height'], h['lean'], stem, spec['head_color'],
-                      (math.cos(h['yaw']), math.sin(h['yaw'])))
+                      (math.cos(h['yaw']), math.sin(h['yaw'])), spec.get('head_size', (9.0, 0.55)))
     if not buf.t:
         raise RuntimeError('%s LOD%d: aucun triangle' % (spec['name'], lod))
     return buf.mesh(), len(buf.t)

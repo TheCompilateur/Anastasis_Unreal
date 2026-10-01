@@ -242,11 +242,18 @@ void AAnastasisWorldAtmosphere::Tick(const float DeltaSeconds)
 	uint32 Seed = 0;
 	const double SimTime = ResolveSkySimTime(Seed);
 	LastSky = AnastasisSkyClock::Evaluate(Profile, SimTime, Seed);
-	UpdateSky(Profile, /*bForceLog*/ false);
+	UpdateSky(Profile, /*bForceLog*/ false, DeltaSeconds);
 }
 
-void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Profile, const bool bForceLog)
+void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Profile, const bool bForceLog, const float AdaptSeconds)
 {
+	// Eye adaptation: the screen's exposure follows the hour's target at a bounded rate, so a
+	// dusk compressed into seconds by anastasis.Sim.Speed fades instead of flashing.
+	AppliedExposureEV = (AdaptSeconds > 0.0f && bHasAppliedExposure)
+		? AnastasisSkyClock::AdaptExposure(AppliedExposureEV, LastSky.ExposureEV100, AdaptSeconds, Profile.MaxExposureChangePerSecond)
+		: LastSky.ExposureEV100;
+	bHasAppliedExposure = true;
+
 	const bool bSunUp = !AnastasisAtmosphere::IsBelowHorizon(LastSky.SunRotation);
 
 	// --- Sun and moon ------------------------------------------------------------------
@@ -281,7 +288,7 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 	// --- Exposure: pinned, but pinned to the hour --------------------------------------
 	if (Profile.bFixedExposure && ExposureVolume)
 	{
-		const float EV = static_cast<float>(LastSky.ExposureEV100);
+		const float EV = static_cast<float>(AppliedExposureEV);
 		if (FMath::Abs(EV - LastExposureWritten) > 0.005f)
 		{
 			ExposureVolume->Settings.AutoExposureMinBrightness = EV;
@@ -318,7 +325,7 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 
 			// The authored inscattering is an absolute luminance tuned for the day's EV: it has
 			// to dim with the light, or the night fog glows (see FogInscatteringScaleFor).
-			const float Inscatter = static_cast<float>(AnastasisSkyClock::FogInscatteringScaleFor(LastSky.ExposureEV100, Profile.ExposureEV100));
+			const float Inscatter = static_cast<float>(AnastasisSkyClock::FogInscatteringScaleFor(AppliedExposureEV, Profile.ExposureEV100));
 			const FLinearColor Scattered = Profile.FogInscatteringColor * Inscatter;
 			if (!FogComponent->FogInscatteringLuminance.Equals(Scattered, 1e-7f))
 			{

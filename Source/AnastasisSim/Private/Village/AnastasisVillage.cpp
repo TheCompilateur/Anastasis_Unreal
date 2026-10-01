@@ -1123,6 +1123,11 @@ namespace AnastasisVillage
 		}
 		Now = Time;
 		TArray<FNpc>& Items = Actors.GetItemsMutable();
+		// `rebuildActorSpatialIndex` : une fois par tick, avant la boucle (positions du debut de tick).
+		TArray<FVector2D> Points;
+		Points.Reserve(Items.Num());
+		for (const FNpc& Npc : Items) Points.Add(FVector2D(Npc.X, Npc.Y));
+		Grid.Rebuild(Points);
 		for (int32 Index = 0; Index < Items.Num(); ++Index)
 		{
 			UpdateNpc(Items[Index], Dt);
@@ -1171,6 +1176,21 @@ namespace AnastasisVillage
 				? (Npc.Goal == GoalGatherFood || Npc.Goal == GoalDeliver) && !Npc.Inside.bActive
 				: Npc.Goal == TEXT("gatherFood");
 			AnastasisNeeds::TickNeeds(Npc.Needs, Dt, bDrinking, bWorking);
+		}
+		// `tickMoodlets` : l'humeur d'une amitie neuve monte le moral, plafonnee.
+		AnastasisBonds::TickMoodlets(Npc.Moodlets, Npc.Needs.Morale, Dt, Now);
+
+		// `holdTalkAct` : en conversation, l'habitant est fige (ni pensee, ni marche).
+		if (HoldTalk(Npc))
+		{
+			return;
+		}
+		if (Npc.bTalkAnchor)
+		{
+			// Fin de session : l'ancre du regard n'est pas une destination (voir ecart n°16).
+			Npc.bTalkAnchor = false;
+			Npc.bHasTarget = false;
+			ClearNavigation(Npc);
 		}
 
 		// Dedans : ni pensee, ni marche, seulement le temps qui passe.
@@ -1549,12 +1569,18 @@ namespace AnastasisVillage
 		}
 		if (Npc.Goal == GoalSocialize)
 		{
-			// `case "socialize"` : socialize(), branche sans compagnon (ecart n°15) :
-			// `satisfySocial(npc, NEEDS.socialAmbient)` puis moral +1.
+			// `case "socialize"` : socialize(). Compagnon le mieux place a portee (ecart n°16),
+			// sinon la branche ambiante : `satisfySocial(npc, NEEDS.socialAmbient)` puis moral +1.
 			Npc.Activity = TEXT("discute");
+			++Npc.SocialsTaken;
+			const double MaxDistance = Npc.Inside.bActive ? AnastasisBonds::MaxIndoor : AnastasisBonds::MaxOutdoor;
+			if (FNpc* Other = PickSocialCompanion(Npc, MaxDistance))
+			{
+				SocializeWithCompanion(Npc, *Other);
+				return true;
+			}
 			AnastasisNeeds::SatisfySocial(Npc.Needs, AnastasisNeeds::Constants::SocialAmbient, Npc.Inside.bActive);
 			Npc.Needs.Morale = Clamp(Npc.Needs.Morale + 1.0, 0.0, 100.0);
-			++Npc.SocialsTaken;
 			return true;
 		}
 		if (Npc.Goal == GoalRelax)
@@ -3340,8 +3366,17 @@ namespace AnastasisVillage
 		const int32 DepotLoad = IsGranaryWorker(Npc) ? Npc.InventoryFood : 0;
 		const FString SessionGoal = Npc.WorkSession.bActive && Npc.WorkSession.CraftId == TEXT("farm") ? FString(GoalGatherFood) : FString();
 		Score += G::CompletionBias(Goal, Npc.InventoryFood, DepotLoad, SessionGoal, NeedsCritical(Npc.Needs));
+		// `moodletGoalBias` (lu sur une copie : `tickMoodlets` elague deja a chaque tick).
+		TArray<AnastasisBonds::FMoodlet> Moodlets = Npc.Moodlets;
+		Score += AnastasisBonds::MoodletGoalBias(Moodlets, Goal, Now);
 		Score += G::TraitGoalBias(G::TraitAt(Npc.TraitIndex), Goal);
 		// natureGoalBias (coeur 1) et skillGoalBias (soin 1) : 0.
+		if (Goal == GoalSocialize)
+		{
+			// `socialMemoryBias` puis `socialSeekBias` (une personne memorisee a rejoindre).
+			Score += AnastasisBonds::SocialMemoryBiasSocialize(Npc.People);
+			Score += PickRememberedSeekFor(Npc).IsEmpty() ? 0.0 : AnastasisBonds::SeekBias;
+		}
 		// « Pression morale : sociabilite (deuil / desespoir) sans ecraser les besoins. »
 		Score += (G::MoralSocialMul(Npc.Needs.Morale, MarketFood(), Day()) - 1.0) * 18.0;
 		return Score;
@@ -3374,8 +3409,20 @@ namespace AnastasisVillage
 	{
 		// Base `socialPos` ; rythme : soir et nuit -> taverne (aucune) puis socialPos ; midi ->
 		// premier puits acheve, sinon place / socialPos ; sinon socialPos. Tous menent au puits.
-		// Couches liens, memoire, age : sans relations, la cible de base.
-		return SocialPos(Npc, OutTarget, OutSource);
+		// Puis `bondSocialTarget` (rejoindre un ami), `rememberedSocialTarget` (la personne
+		// memorisee) ; la couche age n'a rien a faire sans enfants ni aines.
+		bool bHave = SocialPos(Npc, OutTarget, OutSource);
+		if (BondSocialTarget(Npc, OutTarget))
+		{
+			bHave = true;
+			OutSource = TEXT("bonds");
+		}
+		if (RememberedSocialTarget(Npc, OutTarget))
+		{
+			bHave = true;
+			OutSource = TEXT("memory");
+		}
+		return bHave;
 	}
 
 	bool FVillage::RelaxTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource)
@@ -3415,5 +3462,593 @@ namespace AnastasisVillage
 			}
 		}
 		return bHave;
+	}
+	// --- Liens, paroles, rumeurs (bonds.js, talk.js, socialMemory.js, speechActs.js) ---
+
+	namespace
+	{
+		namespace BD = AnastasisBonds;
+
+		bool IsWorkingGoalForBonds(const FString& Goal)
+		{
+			return Goal.StartsWith(TEXT("gather"), ESearchCase::CaseSensitive)
+				|| Goal == TEXT("craft") || Goal == TEXT("build") || Goal == TEXT("deliver")
+				|| Goal == TEXT("sell") || Goal == TEXT("maintain");
+		}
+
+		double& RelationRef(TArray<TPair<FString, double>>& Relations, const FString& Id)
+		{
+			for (TPair<FString, double>& R : Relations)
+			{
+				if (R.Key == Id) return R.Value;
+			}
+			Relations.Add(TPair<FString, double>(Id, 0.0));
+			return Relations.Last().Value;
+		}
+
+		/** `noteBondStageCross` : montee vers ami / proche / intrigue -> moodlet newFriend aux deux. */
+		void NoteStageCross(double PrevRel, double NextRel, TArray<BD::FMoodlet>& MoodletsA, double& MoraleA,
+			TArray<BD::FMoodlet>& MoodletsB, double& MoraleB, double Now)
+		{
+			const int32 From = BD::BondStageRank(PrevRel);
+			const int32 To = BD::BondStageRank(NextRel);
+			if (From == To) return;
+			// Descente vers « rival » (rivalHeat) : la conversation ne fait que monter les relations.
+			if (To > From && To >= 2)
+			{
+				BD::StampNewFriend(MoodletsA, MoraleA, Now);
+				BD::StampNewFriend(MoodletsB, MoraleB, Now);
+			}
+		}
+
+		FLastTalk MakeLastTalk(const FString& WithId, double At, bool bRefuse)
+		{
+			FLastTalk T;
+			T.bValid = true;
+			T.WithId = WithId;
+			T.At = At;
+			T.bRefuse = bRefuse;
+			return T;
+		}
+	}
+
+	bool CanStartTalkFor(double Now, bool bALast, double ALastAt, bool bBLast, double BLastAt,
+		int32 FatigueAB, double FatigueABAt, int32 FatigueBA, double FatigueBAAt)
+	{
+		if (bALast && Now - ALastAt < BD::PairCooldownSeconds) return false;
+		if (bBLast && Now - BLastAt < BD::PairCooldownSeconds) return false;
+		auto Level = [Now](int32 Count, double At) { return Count > 0 && !(Now - At > BD::FatigueWindowSeconds) ? Count : 0; };
+		return FMath::Max(Level(FatigueAB, FatigueABAt), Level(FatigueBA, FatigueBAAt)) < BD::FatigueBlockCount;
+	}
+
+	void BumpRelationPair(FBondPair& Pair, double DeltaA, double DeltaB, double Now)
+	{
+		const double Prev = Pair.RelAB;
+		Pair.RelAB = Clamp(Prev + DeltaA, -100.0, 100.0);
+		Pair.RelBA = Clamp(Pair.RelBA + DeltaB, -100.0, 100.0);
+		NoteStageCross(Prev, Pair.RelAB, Pair.MoodletsA, Pair.MoraleA, Pair.MoodletsB, Pair.MoraleB, Now);
+	}
+
+	TArray<FSpotAct> CreateInformSpotActs(const TArray<FResourceSpot>& Source, const TArray<FResourceSpot>& Target,
+		const FString& SourceId, double R01, int32 Limit)
+	{
+		TArray<FSpotAct> Acts;
+		const int32 N = Source.Num();
+		if (N == 0) return Acts;
+		const int32 Start = static_cast<int32>(AnastasisJs::Floor(R01 * N));
+		for (int32 I = 0; I < N && Acts.Num() < FMath::Max(1, Limit); ++I)
+		{
+			const FResourceSpot& Spot = Source[(Start + I) % N];
+			// Seul ce qu'on a vu de ses yeux se colporte ; rien que l'autre sait deja.
+			if (Spot.bHearsay || Target.ContainsByPredicate([&](const FResourceSpot& T) { return T.Key == Spot.Key; })) continue;
+			FSpotAct Act;
+			Act.SourceId = SourceId;
+			Act.Key = Spot.Key;
+			Act.Resource = Spot.Resource;
+			Act.X = Spot.X;
+			Act.Y = Spot.Y;
+			Act.Amount = Spot.Amount;
+			Act.Day = Spot.Day;
+			Act.HopCount = Spot.HopCount;
+			Act.OriginalSourceId = Spot.OriginalSourceId.IsEmpty() ? SourceId : Spot.OriginalSourceId;
+			Acts.Add(MoveTemp(Act));
+		}
+		return Acts;
+	}
+
+	bool CommitHearsaySpot(TArray<FResourceSpot>& Target, const FSpotAct& Act, int32 Day, double Time)
+	{
+		const FString Key = FString::Printf(TEXT("%d,%d"),
+			static_cast<int32>(AnastasisJs::Floor(Act.X)), static_cast<int32>(AnastasisJs::Floor(Act.Y)));
+		if (Target.ContainsByPredicate([&](const FResourceSpot& T) { return T.Key == Key; })) return false;
+		FResourceSpot Spot;
+		Spot.Key = Key;
+		Spot.X = Act.X;
+		Spot.Y = Act.Y;
+		Spot.Resource = Act.Resource;
+		Spot.Amount = Act.Amount;
+		// Le jour d'OBSERVATION de la source, pas le jour d'ecoute : l'on-dit herite de l'age du souvenir.
+		Spot.Day = Act.Day;
+		Spot.bHearsay = true;
+		Spot.SourceId = Act.SourceId;
+		Spot.OriginalSourceId = Act.OriginalSourceId;
+		Spot.HopCount = FMath::Max(1, Act.HopCount + 1);
+		Spot.ReceivedDay = Day;
+		Spot.ReceivedAt = Time;
+		Target.Add(MoveTemp(Spot));
+		TrimSpots(Target);
+		return true;
+	}
+
+	double FVillage::RelationOf(const FNpc& Npc, const FString& OtherId)
+	{
+		for (const TPair<FString, double>& R : Npc.Relations)
+		{
+			if (R.Key == OtherId) return R.Value;
+		}
+		return 0.0;
+	}
+
+	bool FVillage::IsTalking(const FNpc& Npc) const
+	{
+		return !Npc.TalkWithId.IsEmpty() && FMath::IsFinite(Npc.TalkUntil) && Now < Npc.TalkUntil;
+	}
+
+	void FVillage::ClearTalkSession(FNpc& Npc)
+	{
+		Npc.TalkWithId.Reset();
+		Npc.TalkUntil = 0.0;
+		Npc.TalkTurn = 0;
+		Npc.TalkMaxTurns = 0;
+		Npc.TalkStarterId.Reset();
+		Npc.TalkNextAt = 0.0;
+		Npc.bTalkChain = false;
+	}
+
+	bool FVillage::IsSociallyAvailable(const FNpc& Other) const
+	{
+		if (!Other.TalkWithId.IsEmpty()) return true;
+		if (Other.Goal == GoalSocialize || Other.Goal == TEXT("visitFamily") || Other.Goal == TEXT("play")) return true;
+		return Other.Activity == TEXT("socialise") || Other.Activity == TEXT("joue");
+	}
+
+	int32 FVillage::TalkFatigueLevel(const FNpc& A, const FNpc& B) const
+	{
+		const FTalkFatigue* E = A.TalkFatigue.FindByPredicate([&](const FTalkFatigue& F) { return F.Id == B.Id; });
+		if (!E) return 0;
+		if (Now - E->At > BD::FatigueWindowSeconds) return 0;
+		return E->Count;
+	}
+
+	bool FVillage::CanStartTalk(const FNpc& A, const FNpc& B) const
+	{
+		if (A.LastTalk.bValid && A.LastTalk.WithId == B.Id && Now - A.LastTalk.At < BD::PairCooldownSeconds) return false;
+		if (B.LastTalk.bValid && B.LastTalk.WithId == A.Id && Now - B.LastTalk.At < BD::PairCooldownSeconds) return false;
+		return FMath::Max(TalkFatigueLevel(A, B), TalkFatigueLevel(B, A)) < BD::FatigueBlockCount;
+	}
+
+	int32 FVillage::VillageEmitCount() const
+	{
+		int32 N = 0;
+		for (const double At : RecentVillageEmits)
+		{
+			if (Now - At <= BD::VillageEmitWindow) ++N;
+		}
+		return N;
+	}
+
+	FNpc* FVillage::PickSocialCompanion(FNpc& Npc, double MaxDistance)
+	{
+		TArray<FNpc>& Items = Actors.GetItemsMutable();
+		FNpc* Best = nullptr;
+		double BestScore = -AnastasisNav::Infinity;
+		Grid.ForEachNear(Npc.X, Npc.Y, MaxDistance, [&](int32 Index)
+		{
+			if (!Items.IsValidIndex(Index)) return;
+			FNpc& Other = Items[Index];
+			if (&Other == &Npc) return;
+			const double D = Dist(Npc.X, Npc.Y, Other.X, Other.Y);
+			if (D > MaxDistance) return;
+			const BD::FPersonRow* Row = BD::FindPerson(Npc.People, Other.Id);
+			const double Affinity = BD::CompanionAffinity(RelationOf(Npc, Other.Id), Row ? Row->Trust : 0.0,
+				Row ? Row->Tag : BD::EPersonTag::None, Npc.JobId == Other.JobId, IsSociallyAvailable(Other));
+			const double Score = Affinity - D * BD::DistWeight;
+			if (Score > BestScore)
+			{
+				BestScore = Score;
+				Best = &Other;
+			}
+		});
+		return Best;
+	}
+
+	void FVillage::BumpRelation(FNpc& A, FNpc& B, double DeltaA, double DeltaB)
+	{
+		double& AB = RelationRef(A.Relations, B.Id);
+		const double Prev = AB;
+		AB = Clamp(Prev + DeltaA, -100.0, 100.0);
+		const double Next = AB;
+		double& BA = RelationRef(B.Relations, A.Id);
+		BA = Clamp(BA + DeltaB, -100.0, 100.0);
+		NoteStageCross(Prev, Next, A.Moodlets, A.Needs.Morale, B.Moodlets, B.Needs.Morale, Now);
+	}
+
+	void FVillage::NoteMeeting(FNpc& A, FNpc& B)
+	{
+		const int32 Today = Day();
+		BD::NotePersonDirect(A.People, B.Id, Today, BD::MeetTrust);
+		BD::NotePersonDirect(B.People, A.Id, Today, BD::MeetTrust * 0.85);
+		BD::ObserveMind(A.Tom, B.Id, B.Goal, RelationOf(B, A.Id), Today);
+		BD::ObserveMind(B.Tom, A.Id, A.Goal, RelationOf(A, B.Id), Today);
+	}
+
+	bool FVillage::BeginTalkSession(FNpc& Speaker, FNpc& Listener, bool bContinue)
+	{
+		if (Dist(Speaker.X, Speaker.Y, Listener.X, Listener.Y) > BD::SessionMaxDistance) return false;
+		if (Speaker.Inside.bActive && Listener.Inside.bActive && Speaker.Inside.BuildingId != Listener.Inside.BuildingId) return false;
+		if (!bContinue)
+		{
+			// `canBeginTalkSession` : budget de gels simultanes.
+			const bool bPair = (IsTalking(Speaker) && Speaker.TalkWithId == Listener.Id)
+				|| (IsTalking(Listener) && Listener.TalkWithId == Speaker.Id);
+			if (!bPair)
+			{
+				int32 Talking = 0;
+				for (const FNpc& N : Actors.GetItems()) Talking += IsTalking(N) ? 1 : 0;
+				const int32 Need = (IsTalking(Speaker) ? 0 : 1) + (IsTalking(Listener) ? 0 : 1);
+				const int32 Budget = FMath::Max(BD::MaxConcurrentTalkers,
+					static_cast<int32>(FMath::CeilToDouble(Actors.Num() * BD::ConcurrentTalkFrac)));
+				if (Talking + Need > Budget) return false;
+			}
+		}
+		const bool bUrgent = BD::IsTalkUrgent(Speaker.Needs) || BD::IsTalkUrgent(Listener.Needs);
+		const bool bWork = BD::IsTalkWorkBusy(Speaker.Goal, Speaker.Inside.bActive) || BD::IsTalkWorkBusy(Listener.Goal, Listener.Inside.bActive);
+		const double Beat = BD::TalkHoldDuration(bUrgent, bWork);
+		if (Beat <= 0.0) return false;
+		if (!bContinue)
+		{
+			const int32 Fatigue = FMath::Max(TalkFatigueLevel(Speaker, Listener), TalkFatigueLevel(Listener, Speaker));
+			const BD::EBondKind Kind = BD::BondKindBetween(RelationOf(Speaker, Listener.Id), RelationOf(Listener, Speaker.Id), Speaker.JobId, Listener.JobId);
+			const int32 MaxTurns = BD::TalkMaxTurns(Speaker.Id, Listener.Id, bUrgent, bWork, Kind, Fatigue);
+			const double Total = MaxTurns <= 1 ? Beat : BD::TurnSeconds * MaxTurns;
+			const double Until = Now + Total;
+			const double NextAt = Now + (MaxTurns <= 1 ? Beat : BD::TurnSeconds);
+			for (FNpc* N : { &Speaker, &Listener })
+			{
+				N->TalkWithId = N == &Speaker ? Listener.Id : Speaker.Id;
+				N->TalkUntil = Until;
+				N->TalkTurn = 1;
+				N->TalkMaxTurns = MaxTurns;
+				N->TalkStarterId = Speaker.Id;
+				N->TalkNextAt = NextAt;
+			}
+			return true;
+		}
+		// Tour suivant : prolonge d'un tour sans remettre les compteurs.
+		const double Until = Now + BD::TurnSeconds;
+		Speaker.TalkWithId = Listener.Id;
+		Speaker.TalkUntil = FMath::Max(Speaker.TalkUntil, Until);
+		Listener.TalkWithId = Speaker.Id;
+		Listener.TalkUntil = FMath::Max(Listener.TalkUntil, Until);
+		return true;
+	}
+
+	void FVillage::RecordTalk(FNpc& Speaker, FNpc& Listener, bool bContinue)
+	{
+		const BD::EBondKind Kind = BD::BondKindBetween(RelationOf(Speaker, Listener.Id), RelationOf(Listener, Speaker.Id), Speaker.JobId, Listener.JobId);
+		if (!bContinue)
+		{
+			if (!CanStartTalk(Speaker, Listener)) return;
+			if (Speaker.LastTalk.bValid && Speaker.LastTalk.WithId == Listener.Id && Now - Speaker.LastTalk.At < BD::PairCooldownSeconds) return;
+			// Porte d'impulsion : `shouldSpeakNow`.
+			const double Worth = BD::SpeakWorth(Speaker.Needs, Listener.Needs, Speaker.bTalkChain, Kind);
+			if (!BD::ShouldSpeakNow(Worth, VillageEmitCount(), Speaker.Id, Listener.Id, Now)) return;
+		}
+		const bool bAllowReply = bContinue || !Listener.LastTalk.bValid || Now - Listener.LastTalk.At > BD::ReplyQuietSeconds;
+		const int32 Fatigue = FMath::Max(TalkFatigueLevel(Listener, Speaker), TalkFatigueLevel(Speaker, Listener));
+		const int64 BaseSalt = static_cast<int64>(AnastasisJs::Floor(Now * 10.0))
+			+ (bContinue ? static_cast<int64>(Speaker.TalkTurn != 0 ? Speaker.TalkTurn : 1) * 13 : 0);
+		// Ecart n°16 : le refus est evalue au premier tirage (`attempt` = 0) ; le texte n'est pas porte.
+		const bool bRefuse = bAllowReply
+			&& BD::RefusesReply(Listener.Needs, Kind, Fatigue, BD::HashTalk(Listener.Id, Speaker.Id, BaseSalt + 17));
+
+		Speaker.LastTalk = MakeLastTalk(Listener.Id, Now, false);
+		Speaker.bTalkChain = true;
+		Listener.bTalkChain = true;
+		if (bAllowReply)
+		{
+			Listener.LastTalk = MakeLastTalk(Speaker.Id, Now, bRefuse);
+			if (bRefuse)
+			{
+				Speaker.TalkMaxTurns = Speaker.TalkTurn != 0 ? Speaker.TalkTurn : 1;
+				Listener.TalkMaxTurns = Listener.TalkTurn != 0 ? Listener.TalkTurn : 1;
+				const double Cut = Now + BD::SessionSecondsUrgent;
+				Speaker.TalkUntil = FMath::Min(Speaker.TalkUntil != 0.0 ? Speaker.TalkUntil : Cut, Cut);
+				Listener.TalkUntil = FMath::Min(Listener.TalkUntil != 0.0 ? Listener.TalkUntil : Cut, Cut);
+			}
+		}
+		if (!bContinue)
+		{
+			// `bumpTalkFatigue` dans les deux sens, puis `rememberVillageEmit`.
+			for (TPair<FNpc*, FNpc*> P : { TPair<FNpc*, FNpc*>(&Speaker, &Listener), TPair<FNpc*, FNpc*>(&Listener, &Speaker) })
+			{
+				FTalkFatigue* E = P.Key->TalkFatigue.FindByPredicate([&](const FTalkFatigue& F) { return F.Id == P.Value->Id; });
+				if (!E)
+				{
+					FTalkFatigue New;
+					New.Id = P.Value->Id;
+					E = &P.Key->TalkFatigue.Add_GetRef(New);
+					E->Count = 0;
+					E->At = -AnastasisNav::Infinity;
+				}
+				if (Now - E->At > BD::FatigueWindowSeconds) E->Count = 1;
+				else E->Count += 1;
+				E->At = Now;
+			}
+			RecentVillageEmits.Add(Now);
+			RecentVillageEmits.RemoveAll([&](double At) { return !(Now - At <= BD::VillageEmitWindow); });
+			const int32 Keep = FMath::Max(8, BD::VillageEmitLimit * 3);
+			if (RecentVillageEmits.Num() > Keep) RecentVillageEmits.RemoveAt(0, RecentVillageEmits.Num() - Keep);
+		}
+		BeginTalkSession(Speaker, Listener, bContinue);
+		// Refus apres l'ouverture : on recoupe si l'ouverture a re-etendu.
+		if (Listener.LastTalk.bValid && Listener.LastTalk.bRefuse)
+		{
+			const double Cut = Now + BD::SessionSecondsUrgent;
+			Speaker.TalkMaxTurns = Speaker.TalkTurn != 0 ? Speaker.TalkTurn : 1;
+			Listener.TalkMaxTurns = Listener.TalkTurn != 0 ? Listener.TalkTurn : 1;
+			Speaker.TalkUntil = Cut;
+			Listener.TalkUntil = Cut;
+		}
+	}
+
+	void FVillage::AdvanceTalkTurn(FNpc& Driver, FNpc& Partner)
+	{
+		const int32 Turn = Driver.TalkTurn + 1;
+		if (Turn > Driver.TalkMaxTurns) return;
+		const FString StarterId = Driver.TalkStarterId.IsEmpty() ? Driver.Id : Driver.TalkStarterId;
+		FNpc& Starter = Driver.Id == StarterId ? Driver : Partner;
+		FNpc& Other = &Starter == &Driver ? Partner : Driver;
+		// Tours impairs : le starter ; pairs : l'autre.
+		FNpc& Speaker = Turn % 2 == 1 ? Starter : Other;
+		FNpc& Listener = &Speaker == &Starter ? Other : Starter;
+		Driver.TalkTurn = Turn;
+		Partner.TalkTurn = Turn;
+		Driver.TalkNextAt = Now + BD::TurnSeconds;
+		Partner.TalkNextAt = Now + BD::TurnSeconds;
+		RecordTalk(Speaker, Listener, /*bContinue=*/true);
+	}
+
+	bool FVillage::HoldTalk(FNpc& Npc)
+	{
+		if (!IsTalking(Npc))
+		{
+			if (!Npc.TalkWithId.IsEmpty()) ClearTalkSession(Npc);
+			return false;
+		}
+		FNpc* Partner = Actors.FindById(Npc.TalkWithId);
+		if (!Partner)
+		{
+			ClearTalkSession(Npc);
+			return false;
+		}
+		// Urgence vitale ou partenaire trop loin : on lache tout de suite, les deux.
+		if (BD::IsTalkUrgent(Npc.Needs) || BD::IsTalkUrgent(Partner->Needs)
+			|| Dist(Npc.X, Npc.Y, Partner->X, Partner->Y) > BD::SessionMaxDistance * 1.35)
+		{
+			ClearTalkSession(Npc);
+			if (Partner->TalkWithId == Npc.Id) ClearTalkSession(*Partner);
+			return false;
+		}
+		if (Partner->TalkWithId != Npc.Id || !IsTalking(*Partner))
+		{
+			ClearTalkSession(Npc);
+			return false;
+		}
+		// Multi-tours : le starter avance la conversation pendant le gel.
+		if (Npc.TalkStarterId == Npc.Id && Npc.TalkTurn < Npc.TalkMaxTurns && Now >= Npc.TalkNextAt
+			&& !BD::IsTalkUrgent(Npc.Needs) && !BD::IsTalkUrgent(Partner->Needs))
+		{
+			AdvanceTalkTurn(Npc, *Partner);
+		}
+		Npc.Activity = TEXT("socialise");
+		if (!Npc.Inside.bActive)
+		{
+			// Le regard ancre sur le partenaire, sans marcher : la cible d'origine est ecrasee.
+			Npc.Target = { Partner->X, Partner->Y };
+			Npc.bHasTarget = true;
+			Npc.bTalkAnchor = true;
+		}
+		return true;
+	}
+
+	void FVillage::ExchangeSpotRumors(FNpc& A, FNpc& B)
+	{
+		// Les deux sens sont prepares AVANT tout depot (chacun voit l'etat d'avant l'echange).
+		const double RA = A.Spots.Num() > 0 ? VillageRng.Next() : 0.0;
+		const TArray<FSpotAct> AB = CreateInformSpotActs(A.Spots, B.Spots, A.Id, RA, 2);
+		const double RB = B.Spots.Num() > 0 ? VillageRng.Next() : 0.0;
+		const TArray<FSpotAct> BA = CreateInformSpotActs(B.Spots, A.Spots, B.Id, RB, 2);
+		const int32 Today = Day();
+		for (const FSpotAct& Act : AB)
+		{
+			if (CommitHearsaySpot(B.Spots, Act, Today, Now))
+			{
+				++A.RumorsShared;
+				++B.RumorsHeard;
+			}
+		}
+		for (const FSpotAct& Act : BA)
+		{
+			if (CommitHearsaySpot(A.Spots, Act, Today, Now))
+			{
+				++B.RumorsShared;
+				++A.RumorsHeard;
+			}
+		}
+	}
+
+	void FVillage::SocializeWithCompanion(FNpc& Npc, FNpc& Other)
+	{
+		namespace C = AnastasisNeeds::Constants;
+		if (!CanStartTalk(Npc, Other))
+		{
+			// Trop parle ensemble : compagnie ambiante, sans nouvel echange ni moral +1.
+			AnastasisNeeds::SatisfySocial(Npc.Needs, C::SocialAmbient, Npc.Inside.bActive);
+			return;
+		}
+		const int32 Gain = BD::BondTalkGain(RelationOf(Npc, Other.Id) >= BD::FriendAt);
+		BumpRelation(Npc, Other, Gain, FMath::Max(4, Gain - 1));
+		AnastasisNeeds::SatisfySocial(Npc.Needs, C::SocialRelief + (Gain > 6 ? 6.0 : 0.0), Npc.Inside.bActive);
+		Other.Needs.Social = Clamp(Other.Needs.Social + 12.0 + (Gain > 6 ? 4.0 : 0.0), 0.0, 100.0);
+		Other.Needs.Morale = Clamp(Other.Needs.Morale + (Gain > 6 ? 2.0 : 1.0), 0.0, 100.0);
+		// Echo de rumeur locale : toujours vide a ce commit. Actes de parole sur les gisements :
+		// prepares avant la parole, deposes apres (`commitResourceSpotActs`).
+		const double RA = Npc.Spots.Num() > 0 ? VillageRng.Next() : 0.0;
+		const TArray<FSpotAct> AB = CreateInformSpotActs(Npc.Spots, Other.Spots, Npc.Id, RA, 2);
+		const double RB = Other.Spots.Num() > 0 ? VillageRng.Next() : 0.0;
+		const TArray<FSpotAct> BA = CreateInformSpotActs(Other.Spots, Npc.Spots, Other.Id, RB, 2);
+		RecordTalk(Npc, Other, /*bContinue=*/false);
+		const int32 Today = Day();
+		for (const FSpotAct& Act : AB)
+		{
+			if (CommitHearsaySpot(Other.Spots, Act, Today, Now))
+			{
+				++Npc.RumorsShared;
+				++Other.RumorsHeard;
+			}
+		}
+		for (const FSpotAct& Act : BA)
+		{
+			if (CommitHearsaySpot(Npc.Spots, Act, Today, Now))
+			{
+				++Other.RumorsShared;
+				++Npc.RumorsHeard;
+			}
+		}
+		// `shareRumors(..., { resourceSpots: false })` : croyances non portees (ecart n°16).
+		NoteMeeting(Npc, Other);
+		++Npc.TalksWithCompanion;
+	}
+
+	bool FVillage::BondSocialTarget(FNpc& Npc, FPoint& InOutTarget)
+	{
+		const bool bLonely = Npc.Needs.Social <= BD::LonelySocialAt;
+		const double Range = (bLonely || Npc.Goal == GoalSocialize) ? BD::SeekSocialRange : BD::SeekKinRange;
+		TArray<FNpc>& Items = Actors.GetItemsMutable();
+		const FNpc* BestMutual = nullptr;
+		double BestMutualScore = -AnastasisNav::Infinity;
+		const FNpc* BestKin = nullptr;
+		double BestKinScore = -AnastasisNav::Infinity;
+		const FString Living = Npc.LivingHomeId();
+		Grid.ForEachNear(Npc.X, Npc.Y, Range, [&](int32 Index)
+		{
+			if (!Items.IsValidIndex(Index)) return;
+			const FNpc& Other = Items[Index];
+			if (&Other == &Npc) return;
+			// Sans famille ni partenaire : seuls les amis comptent.
+			if (RelationOf(Npc, Other.Id) < BD::FriendAt) return;
+			const double D = Dist(Npc.X, Npc.Y, Other.X, Other.Y);
+			if (D > Range) return;
+			if (Other.Inside.bActive && Other.Inside.BuildingId != Living && !IsSociallyAvailable(Other)) return;
+			const BD::FPersonRow* Row = BD::FindPerson(Npc.People, Other.Id);
+			const double Affinity = BD::CompanionAffinity(RelationOf(Npc, Other.Id), Row ? Row->Trust : 0.0,
+				Row ? Row->Tag : BD::EPersonTag::None, Npc.JobId == Other.JobId, IsSociallyAvailable(Other));
+			if (IsSociallyAvailable(Other))
+			{
+				const double Score = Affinity + BD::MutualSocialBonus - D * 0.55;
+				if (Score > BestMutualScore)
+				{
+					BestMutualScore = Score;
+					BestMutual = &Other;
+				}
+			}
+			else if (bLonely)
+			{
+				if (IsWorkingGoalForBonds(Other.Goal)) return;
+				const double Score = Affinity - D * 0.8;
+				if (Score > BestKinScore)
+				{
+					BestKinScore = Score;
+					BestKin = &Other;
+				}
+			}
+		});
+		// `rendezvousPoint` : son batiment s'il est dedans, le milieu si les deux sont disponibles, sinon lui.
+		auto Rendezvous = [&](const FNpc& Other)
+		{
+			if (Other.Inside.bActive)
+			{
+				FPoint Access;
+				if (BuildingAccessPointById(Other.Inside.BuildingId, &Npc, Access)) InOutTarget = Access;
+				return;
+			}
+			if (IsSociallyAvailable(Other) && IsSociallyAvailable(Npc))
+			{
+				InOutTarget = { (Npc.X + Other.X) * 0.5, (Npc.Y + Other.Y) * 0.5 };
+				return;
+			}
+			InOutTarget = { Other.X, Other.Y };
+		};
+		if (BestMutual)
+		{
+			Rendezvous(*BestMutual);
+			return true;
+		}
+		if (BestKin)
+		{
+			if (!BestKin->Inside.bActive) Rendezvous(*BestKin);
+			else
+			{
+				FPoint Access;
+				if (BuildingAccessPointById(BestKin->Inside.BuildingId, &Npc, Access)) InOutTarget = Access;
+			}
+			return true;
+		}
+		return false;
+	}
+
+	FString FVillage::PickRememberedSeekFor(const FNpc& Npc) const
+	{
+		return BD::PickRememberedSeek(Npc.People, Npc.Tom, Npc.Id, Npc.X, Npc.Y, Npc.Needs.Social,
+			[&](const FString& Id, double& X, double& Y)
+			{
+				const FNpc* Other = Actors.FindById(Id);
+				if (!Other) return false;
+				X = Other->X;
+				Y = Other->Y;
+				return true;
+			});
+	}
+
+	bool FVillage::RememberedSocialTarget(FNpc& Npc, FPoint& InOutTarget)
+	{
+		const FString SeekId = PickRememberedSeekFor(Npc);
+		if (SeekId.IsEmpty())
+		{
+			Npc.SocialSeekId.Reset();
+			return false;
+		}
+		Npc.SocialSeekId = SeekId;
+		const FNpc* Seek = Actors.FindById(SeekId);
+		if (Seek->Inside.bActive)
+		{
+			FPoint Access;
+			InOutTarget = BuildingAccessPointById(Seek->Inside.BuildingId, &Npc, Access) ? Access : FPoint{ Seek->X, Seek->Y };
+			return true;
+		}
+		InOutTarget = { Seek->X, Seek->Y };
+		return true;
+	}
+
+	void FVillage::ForgetStaleDaily(int32 DayNow)
+	{
+		for (FNpc& Npc : Actors.GetItemsMutable())
+		{
+			// `forgetStale` : un gisement jamais revu depuis 14 jours s'efface (on-dit compris,
+			// avec l'age du souvenir d'origine). Les croyances de stock : non portees (ecart n°9).
+			Npc.Spots.RemoveAll([&](const FResourceSpot& S) { return DayNow - S.Day > 14; });
+			BD::ForgetStalePeople(Npc.People, DayNow);
+		}
 	}
 }

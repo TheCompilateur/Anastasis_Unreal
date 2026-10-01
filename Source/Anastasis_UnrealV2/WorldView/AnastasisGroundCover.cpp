@@ -45,8 +45,16 @@ bool ValidSettings(const FSettings& C)
 	const auto Finite = [](double V) { return FMath::IsFinite(V); };
 	return Finite(C.CellUU) && C.CellUU >= 20.0 && C.CellUU <= 2000.0
 		&& Finite(C.ProbeUU) && C.ProbeUU > 0.0 && C.ProbeUU <= 500.0
-		&& Finite(C.TallSlopeDegrees) && Finite(C.MaxSlopeDegrees)
-		&& C.TallSlopeDegrees > 0.0 && C.TallSlopeDegrees < C.MaxSlopeDegrees && C.MaxSlopeDegrees < 90.0
+		&& Finite(C.TallSlopeDegrees) && Finite(C.MeadowSlopeDegrees) && Finite(C.MaxSlopeDegrees)
+		&& C.TallSlopeDegrees > 0.0 && C.TallSlopeDegrees < C.MeadowSlopeDegrees
+		&& C.MeadowSlopeDegrees < C.MaxSlopeDegrees && C.MaxSlopeDegrees < 90.0
+		&& Finite(C.LandeBlendDegrees) && C.LandeBlendDegrees >= 0.0
+		&& Finite(C.LandeDensity) && C.LandeDensity > 0.0 && C.LandeDensity <= 1.0
+		&& Finite(C.LandeDensitySteep) && C.LandeDensitySteep >= 0.0 && C.LandeDensitySteep <= C.LandeDensity
+		&& Finite(C.LandePatchFloor) && C.LandePatchFloor >= 0.0 && C.LandePatchFloor <= 1.0
+		&& Finite(C.LandeShade) && C.LandeShade >= 0.0 && C.LandeShade <= 1.0
+		&& Finite(C.LandeScale) && C.LandeScale > 0.0 && C.LandeScale <= 4.0
+		&& Finite(C.HeatherAboveFloorUU) && Finite(C.HeatherRangeUU) && C.HeatherRangeUU > 0.0
 		&& Finite(C.BlendDegrees) && C.BlendDegrees >= 0.0
 		&& Finite(C.WaterClearanceUU) && C.WaterClearanceUU >= 0.0
 		&& Finite(C.SedgeWetness) && C.SedgeWetness > 0.0 && C.SedgeWetness <= 1.0
@@ -111,6 +119,8 @@ const TCHAR* AnastasisGroundCover::FamilyName(EFamily Family)
 	case EFamily::MeadowTall: return TEXT("MeadowTall");
 	case EFamily::MeadowShort: return TEXT("MeadowShort");
 	case EFamily::Sedge: return TEXT("Sedge");
+	case EFamily::HeathTussock: return TEXT("HeathTussock");
+	case EFamily::Heather: return TEXT("Heather");
 	default: return TEXT("Unknown");
 	}
 }
@@ -128,6 +138,7 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 	if (!ValidSettings(C)) { OutError = TEXT("ground cover: invalid settings"); return false; }
 	if (!In.SampleHeight) { OutError = TEXT("ground cover: no ground sampler"); return false; }
 	if (!In.Mask) { OutError = TEXT("ground cover: no open-ground mask"); return false; }
+	if (In.bHasValleyFloor && !FMath::IsFinite(In.ValleyFloorZ)) { OutError = TEXT("ground cover: non-finite valley floor"); return false; }
 	if (!In.Bounds.bIsValid || !FMath::IsFinite(In.Bounds.Min.X) || !FMath::IsFinite(In.Bounds.Max.X)
 		|| !FMath::IsFinite(In.Bounds.Min.Y) || !FMath::IsFinite(In.Bounds.Max.Y)
 		|| In.Bounds.Max.X <= In.Bounds.Min.X || In.Bounds.Max.Y <= In.Bounds.Min.Y)
@@ -171,6 +182,7 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 					const double PX = In.Bounds.Min.X + (BX + Block * SX / 4.0) * C.CellUU;
 					const double PY = In.Bounds.Min.Y + (BY + Block * SY / 4.0) * C.CellUU;
 					BlockMask = FMath::Max(BlockMask, In.Mask(PX, PY));
+					if (In.LandeMask) BlockMask = FMath::Max(BlockMask, In.LandeMask(PX, PY));
 				}
 			}
 			// Marge : le masque est lisse, une cellule du bloc peut depasser les sondes.
@@ -184,7 +196,8 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 					const double X = In.Bounds.Min.X + (GX + Unit(Hash(In.Seed, GX, GY, 11))) * C.CellUU;
 					const double Y = In.Bounds.Min.Y + (GY + Unit(Hash(In.Seed, GX, GY, 12))) * C.CellUU;
 					const double Mask = FMath::Clamp(In.Mask(X, Y), 0.0, 1.0);
-					if (!(Mask >= C.MinMask)) { ++Row.RejectedMask; continue; }
+					const double Lande = In.LandeMask ? FMath::Clamp(In.LandeMask(X, Y), 0.0, 1.0) : Mask;
+					if (!(FMath::Max(Mask, Lande) >= C.MinMask)) { ++Row.RejectedMask; continue; }
 
 					double Z, East, West, North, South;
 					if (!In.SampleHeight(X, Y, Z) || !In.SampleHeight(X + R, Y, East) || !In.SampleHeight(X - R, Y, West)
@@ -220,10 +233,16 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 					const double DX = FMath::Max(FMath::Abs(East - Z), FMath::Abs(West - Z)) / R;
 					const double DY = FMath::Max(FMath::Abs(North - Z), FMath::Abs(South - Z)) / R;
 					const double Slope = FMath::RadiansToDegrees(FMath::Atan(FMath::Sqrt(DX * DX + DY * DY)));
+					++Row.SlopeBins[Slope < 10.0 ? 0 : Slope < 20.0 ? 1 : Slope < 30.0 ? 2 : Slope < 45.0 ? 3 : Slope < 60.0 ? 4 : 5];
 					if (Slope > C.MaxSlopeDegrees) { ++Row.RejectedSlope; continue; }
 
 					const double CrownDistance = Canopy.Nearest(X, Y);
-					if (CrownDistance < C.CanopyExclusion) { ++Row.RejectedCanopy; continue; }
+					if (CrownDistance < C.CanopyExclusion)
+					{
+						++Row.RejectedCanopy;
+						Row.RejectedCanopySteep += Slope > C.MeadowSlopeDegrees ? 1 : 0;
+						continue;
+					}
 					const double Shade = C.CanopyShade > C.CanopyExclusion
 						? 1.0 - Smooth((CrownDistance - C.CanopyExclusion) / (C.CanopyShade - C.CanopyExclusion))
 						: 0.0;
@@ -247,20 +266,52 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 						Trampled = FMath::Min(Trampled, FMath::Lerp(FMath::Clamp(Cl.Keep, 0.0, 1.0), 1.0, Smooth((D - 0.7) / 0.6)));
 					}
 
-					const double Patchy = Patch(In.Seed, X, Y, C.PatchSpanUU, 21);
-					const double Density = C.Density
-						* Smooth((Mask - C.MinMask) / 0.3)
-						* FMath::Lerp(C.PatchFloor, 1.0, Smooth((Patchy - 0.25) / 0.5))
-						* (1.0 - 0.45 * Smooth((Slope - 12.0) / 8.0))
-						* (1.0 - 0.75 * Shade)
-						* Trampled;
+					// Lande ou prairie : un tirage dans le fondu autour de MeadowSlopeDegrees, pas une
+					// courbe de niveau. EZ5 : "aucune ligne fixe mais un gradient de vie".
+					const double LandeChance = C.LandeBlendDegrees > 0.0
+						? Smooth((Slope - (C.MeadowSlopeDegrees - C.LandeBlendDegrees)) / (2.0 * C.LandeBlendDegrees))
+						: (Slope > C.MeadowSlopeDegrees ? 1.0 : 0.0);
+					const bool bLande = Unit(Hash(In.Seed, GX, GY, 19)) < LandeChance;
+					const double Habitat = bLande ? Lande : Mask;
+					if (!(Habitat >= C.MinMask)) { ++Row.RejectedMask; continue; }
+
+					double Density;
+					if (bLande)
+					{
+						// La lande s'eclaircit en montant ; ses taches sont plus maigres que celles
+						// de la prairie : la roche affleure (EZ1, "rochers, eboulis").
+						const double Steep = Smooth((Slope - C.MeadowSlopeDegrees) / (C.MaxSlopeDegrees - C.MeadowSlopeDegrees));
+						Density = FMath::Lerp(C.LandeDensity, C.LandeDensitySteep, Steep)
+							* Smooth((Habitat - C.MinMask) / 0.3)
+							* FMath::Lerp(C.LandePatchFloor, 1.0, Smooth((Patch(In.Seed, X, Y, C.PatchSpanUU, 41) - 0.25) / 0.5))
+							* (1.0 - C.LandeShade * Shade);
+					}
+					else
+					{
+						const double Patchy = Patch(In.Seed, X, Y, C.PatchSpanUU, 21);
+						Density = C.Density
+							* Smooth((Mask - C.MinMask) / 0.3)
+							* FMath::Lerp(C.PatchFloor, 1.0, Smooth((Patchy - 0.25) / 0.5))
+							* (1.0 - 0.45 * Smooth((Slope - 12.0) / 8.0))
+							* (1.0 - 0.75 * Shade)
+							* Trampled;
+					}
 					if (Unit(Hash(In.Seed, GX, GY, 13)) >= Density) { ++Row.RejectedDensity; continue; }
 
-					// Famille. Humidite d'abord (laiches), puis la pente decide haute ou basse ;
-					// une seconde tache melange les hauteurs sur le plat : "hauteurs melees", pas un gazon.
+					// Famille. Lande : la callune tient le haut des versants, loin du fond de vallee,
+					// la touffe d'eboulis le reste. Prairie : humidite d'abord (laiches), puis la pente
+					// decide haute ou basse ; une seconde tache melange les hauteurs sur le plat.
 					EFamily Family;
 					const double WetDraw = C.SedgeWetness + 0.12 * (Unit(Hash(In.Seed, GX, GY, 14)) - 0.5);
-					if (Wet >= WetDraw)
+					if (bLande)
+					{
+						const double High = In.bHasValleyFloor
+							? Smooth((Z - In.ValleyFloorZ - C.HeatherAboveFloorUU) / C.HeatherRangeUU) : 1.0;
+						const double HeatherChance = 0.75 * High
+							* FMath::Lerp(0.25, 1.0, Smooth((Patch(In.Seed, X, Y, C.PatchSpanUU * 0.8, 51) - 0.2) / 0.5));
+						Family = Unit(Hash(In.Seed, GX, GY, 20)) < HeatherChance ? EFamily::Heather : EFamily::HeathTussock;
+					}
+					else if (Wet >= WetDraw)
 					{
 						Family = EFamily::Sedge;
 					}
@@ -280,7 +331,8 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 					P.Normal = FVector(-(East - West) / (2.0 * R), -(North - South) / (2.0 * R), 1.0).GetSafeNormal();
 					P.Yaw = 360.0 * Unit(Hash(In.Seed, GX, GY, 16));
 					P.Scale = FMath::Lerp(C.ScaleMin, C.ScaleMax, Unit(Hash(In.Seed, GX, GY, 17)))
-						* (Family == EFamily::MeadowTall ? FMath::Lerp(0.85, 1.0, Mask) : 1.0);
+						* (Family == EFamily::MeadowTall ? FMath::Lerp(0.85, 1.0, Mask) : 1.0)
+						* (bLande ? C.LandeScale : 1.0);
 					P.SlopeDegrees = Slope;
 					P.Wetness = Wet;
 					P.Family = Family;
@@ -298,6 +350,8 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 		Out.RejectedSlope += Row.RejectedSlope;
 		Out.RejectedCanopy += Row.RejectedCanopy;
 		Out.RejectedDensity += Row.RejectedDensity;
+		Out.RejectedCanopySteep += Row.RejectedCanopySteep;
+		for (int32 B = 0; B < 6; ++B) Out.SlopeBins[B] += Row.SlopeBins[B];
 		for (const FPlacement& P : Row.Instances)
 		{
 			if (Out.Instances.Num() >= C.MaxInstances) { Out.bTruncated = true; break; }
@@ -305,6 +359,19 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 			++Out.Counts[static_cast<int32>(P.Family)];
 		}
 		Row.Instances.Empty();
+	}
+	if (In.bHasValleyFloor)
+	{
+		TArray<double> Above;
+		for (const FPlacement& P : Out.Instances)
+		{
+			if (P.Family == EFamily::HeathTussock || P.Family == EFamily::Heather) Above.Add(P.Ground.Z - In.ValleyFloorZ);
+		}
+		Above.Sort();
+		for (int32 Q = 0; Q < 3 && Above.Num() > 0; ++Q)
+		{
+			Out.LandeAboveFloor[Q] = Above[FMath::Clamp(FMath::FloorToInt((0.1 + 0.4 * Q) * (Above.Num() - 1)), 0, Above.Num() - 1)];
+		}
 	}
 	return true;
 }

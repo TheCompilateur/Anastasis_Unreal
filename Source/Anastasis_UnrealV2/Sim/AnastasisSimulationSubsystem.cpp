@@ -12,10 +12,15 @@
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisWorldView.h"
 
+// Default 1 since SKY_TRANSITIONS_001 (2026-09-30), the JS reference's realtime: one day = 90 s.
+// At the former default of 10, now that the sky follows the simulation, a day lasted ~12 real
+// seconds and the sun swept the sky at ~30 deg/s -- Alexandre: "on dirait la magie". Proofs that
+// need a fast night set the speed themselves (gather-deliver-pie.py does: 'anastasis.Sim.Speed 10');
+// those that only wait for night still find it within their 240 s timeout (night falls ~41 s in).
 static TAutoConsoleVariable<float> CVarSimSpeed(
 	TEXT("anastasis.Sim.Speed"),
-	10.0f,
-	TEXT("Simulation speed scale (JS 1/2/5/10). Default 10 so midnight is visible in a short PIE. Set 1 for JS realtime."),
+	1.0f,
+	TEXT("Simulation speed scale (JS 1/2/5/10). Default 1 = JS realtime, a 90 s day. Set 10 in a proof that needs midnight quickly."),
 	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarVillageDebug(
