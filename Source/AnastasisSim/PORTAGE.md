@@ -212,6 +212,18 @@ nourriture est conservée, personne n'a faim, et la limite de la table réduite 
 `socialize`, la solitude devient critique au jour 3 et le travail s'arrête. Détail :
 `docs/unreal/FIELD_REGROW_001.md`.
 
+### Fait — socialiser et se détendre (mission social-relax-001)
+
+| Unreal | Source JS (`fee66ae`) | Preuve |
+| --- | --- | --- |
+| `Life/AnastasisNeeds.*` (ajouts) | `tickNeeds` branches socialize / relax, `satisfySocial`, `satisfyRelax` | `Parite.Besoins` (+142) |
+| `Work/AnastasisGather.*` (ajout) | `moralPressure(...).socialMul` | `Parite.Recolte`, cas Moral |
+| `Village/AnastasisVillage.*` (ajouts) | lignes socialize / relax d'adultScores, `socialPos`, `rhythmTarget` / `domesticTarget` relax, `socialize()` sans compagnon, entrée relax | `Village.Endurance` |
+
+La branche « compagnon » de `socialize()` (liens, paroles, rumeurs) n'est pas portée (écart n° 15).
+Avec ces deux remèdes, les fermiers de l'endurance livrent chaque jour sur 12 jours. Détail :
+`docs/unreal/SOCIAL_RELAX_001.md`.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules
