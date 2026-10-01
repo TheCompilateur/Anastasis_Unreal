@@ -83,4 +83,5 @@ private:
 	struct FVillagerTrack { FVector2D Prev = FVector2D::ZeroVector; FVector2D Curr = FVector2D::ZeroVector; };
 	TMap<FString, FVillagerTrack> VillagerTracks;
 	bool bWarnedNoLooks = false;
+	bool bWarnedNoBody = false;
 };

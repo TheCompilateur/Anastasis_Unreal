@@ -8,6 +8,8 @@
 class UStaticMesh;
 class UMaterialInterface;
 class UTexture2D;
+class USkeletalMesh;
+class UBlendSpace;
 
 /**
  * Editor-facing mirror of AnastasisWorld::ETileType.
@@ -234,6 +236,21 @@ struct FAnastasisVillagerLook
 	 */
 	UPROPERTY(EditAnywhere, Category = "Villagers")
 	TArray<FName> Jobs;
+
+	/**
+	 * VILLAGER_BODY_3D_001 -- the colours of this person's 3D body, measured on the portrait
+	 * (`villager-png.py colours`, sRGB): the garment on the chest, the skin of the face, what covers
+	 * the head (hair, veil, cap). Alpha 0: not measured, the body falls back to a palette. They make
+	 * the body and the card the same person when the villager crosses anastasis.Village.BodyDistance.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Villagers|Body")
+	FColor BodyGarment = FColor(0, 0, 0, 0);
+
+	UPROPERTY(EditAnywhere, Category = "Villagers|Body")
+	FColor BodySkin = FColor(0, 0, 0, 0);
+
+	UPROPERTY(EditAnywhere, Category = "Villagers|Body")
+	FColor BodyHead = FColor(0, 0, 0, 0);
 };
 
 /** What one semantic type looks like. The simulation never sees this struct. */
@@ -315,6 +332,26 @@ public:
 	/** Masked card material with a `Portrait` texture and a `Mirror` scalar parameter (M_AnastasisVillager). */
 	UPROPERTY(EditAnywhere, Category = "Villagers")
 	TSoftObjectPtr<UMaterialInterface> VillagerMaterial;
+
+	/**
+	 * VILLAGER_BODY_3D_001 -- the 3D body a villager walks in near the camera (the portrait card
+	 * stays for the distance). Defaults point at the Epic mannequins already in the project, so an
+	 * asset saved before these fields existed gets them without being rewritten. Any of them
+	 * missing: no body, the card is drawn at every distance, as before.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Villagers|Body")
+	TSoftObjectPtr<USkeletalMesh> VillagerBodyMale = TSoftObjectPtr<USkeletalMesh>(FSoftObjectPath(TEXT("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple.SKM_Manny_Simple")));
+
+	UPROPERTY(EditAnywhere, Category = "Villagers|Body")
+	TSoftObjectPtr<USkeletalMesh> VillagerBodyFemale = TSoftObjectPtr<USkeletalMesh>(FSoftObjectPath(TEXT("/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple.SKM_Quinn_Simple")));
+
+	/** Idle -> walk -> run, driven by the speed (cm/s) the villager is drawn at. */
+	UPROPERTY(EditAnywhere, Category = "Villagers|Body")
+	TSoftObjectPtr<UBlendSpace> VillagerLocomotion = TSoftObjectPtr<UBlendSpace>(FSoftObjectPath(TEXT("/Game/Characters/Mannequins/Anims/Unarmed/BS_Idle_Walk_Run.BS_Idle_Walk_Run")));
+
+	/** Clothes painted on the bind pose (M_AnastasisVillagerBody, tools/unreal/create-villager-body.py). */
+	UPROPERTY(EditAnywhere, Category = "Villagers|Body")
+	TSoftObjectPtr<UMaterialInterface> VillagerBodyMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Anastasis/Characters/M_AnastasisVillagerBody.M_AnastasisVillagerBody")));
 
 	/** First enabled entry for this type, or nullptr. */
 	const FAnastasisPresentationEntry* FindEntry(AnastasisWorld::ETileType Type) const;

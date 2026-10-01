@@ -4,6 +4,8 @@ SOURCE D'AUTORITE de :
   /Game/Anastasis/Characters/PNG/<Categorie>/CHR_*      une texture par PNG de SourceArt/Characters/PNG
   /Game/Anastasis/Characters/M_AnastasisVillager        carte masquee, `Portrait` (texture) et `Mirror` (0/1)
   DA_AnastasisPresentation.Villagers / .VillagerMaterial
+  DA_AnastasisPresentation.Villagers[].BodyGarment / BodySkin / BodyHead   (VILLAGER_BODY_3D_001, depuis
+                                                       SourceArt/Characters/villager-colours.json)
 
 Chaque run reimporte les PNG presents (la source fait foi), reecrit le materiau, reecrit la liste
 du registre a partir du manifeste, puis RELIT tout et verifie. Les PNG absents sont simplement
@@ -20,6 +22,9 @@ ROOT = os.path.abspath(unreal.Paths.convert_relative_path_to_full(unreal.Paths.p
 MANIFEST = os.path.join(ROOT, 'SourceArt', 'Characters', 'villager-population.json')
 # La population : ecrite par `villager-png.py sheets` (ids, categories, statures, pose).
 EXTRACT = os.path.join(ROOT, 'SourceArt', 'Characters', 'villager-extract.json')
+# Teintes du corps 3D mesurees sur les PNG : ecrit par `villager-png.py colours` (VILLAGER_BODY_3D_001).
+COLOURS = os.path.join(ROOT, 'SourceArt', 'Characters', 'villager-colours.json')
+BODY_KEYS = (('garment', 'body_garment'), ('skin', 'body_skin'), ('head', 'body_head'))
 SOURCE = os.path.join(ROOT, 'SourceArt', 'Characters', 'PNG')
 DEST = '/Game/Anastasis/Characters/PNG'
 MATERIAL_PATH = '/Game/Anastasis/Characters/M_AnastasisVillager'
@@ -211,12 +216,28 @@ def ensure_material(default_texture):
 
 # ------------------------------------------------------------------------------------------ registry
 
+def load_colours():
+    if not os.path.exists(COLOURS):
+        log('COLOURS absent (%s) : corps 3D aux couleurs de la palette' % COLOURS)
+        return {}
+    with open(COLOURS, encoding='utf-8') as f:
+        return {c['id']: c for c in json.load(f)['people']}
+
+
+def body_colour(rgb):
+    """sRGB mesure -> FColor ; alpha 0 = non mesure (le C++ retombe sur la palette)."""
+    if not rgb:
+        return unreal.Color(r=0, g=0, b=0, a=0)
+    return unreal.Color(r=int(rgb[0]), g=int(rgb[1]), b=int(rgb[2]), a=255)
+
+
 def write_registry(imported, material):
     reg = unreal.EditorAssetLibrary.load_asset(REGISTRY_PATH)
     if reg is None:
         fail('registre introuvable : ' + REGISTRY_PATH + ' (tools/unreal/presentation-registry.py le cree)')
         return
     looks = []
+    colours = load_colours()
     for p, tex in imported:
         look = unreal.AnastasisVillagerLook()
         look.set_editor_property('look_id', p['id'])
@@ -226,6 +247,9 @@ def write_registry(imported, material):
         set_first(look, IN_GAME_NAMES, bool(p.get('in_game', True)))
         # Metiers simules dont le portrait porte l'objet (vide : jamais attribue).
         look.set_editor_property('jobs', [unreal.Name(j) for j in p.get('jobs', [])])
+        c = colours.get(p['id'], {})
+        for key, prop in BODY_KEYS:
+            look.set_editor_property(prop, body_colour(c.get(key)))
         looks.append(look)
     reg.set_editor_property('villagers', looks)
     reg.set_editor_property('villager_material', material)
@@ -234,7 +258,11 @@ def write_registry(imported, material):
 
 # ------------------------------------------------------------------------------------------ verify
 
+COLOURS_BY_ID = {}
+
+
 def verify(people, canvas):
+    COLOURS_BY_ID.update(load_colours())
     reg = unreal.EditorAssetLibrary.load_asset(REGISTRY_PATH)
     looks = list(reg.get_editor_property('villagers')) if reg else []
     by_id = {str(l.get_editor_property('look_id')): l for l in looks}
@@ -266,6 +294,11 @@ def verify(people, canvas):
             'en_jeu': get_first(look, IN_GAME_NAMES) == bool(p.get('in_game', True)),
             'metiers': sorted(str(j) for j in look.get_editor_property('jobs')) == sorted(p.get('jobs', [])),
         }
+        c = COLOURS_BY_ID.get(p['id'], {})
+        for key, prop in BODY_KEYS:
+            got = look.get_editor_property(prop)
+            want = c.get(key)
+            checks['teinte_' + key] = (got.a == 0) if not want else ((got.r, got.g, got.b, got.a) == (want[0], want[1], want[2], 255))
         try:
             checks['couverture_alpha'] = bool(tex.get_editor_property('do_scale_mips_for_alpha_coverage'))
         except Exception:

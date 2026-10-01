@@ -7,6 +7,7 @@ SourceArt/Characters/villager-population.json dit ou est chacun. Ce script n'inv
     python tools/unreal/villager-png.py prep      # Raw/<id>.png -> PNG/<Categorie>/<id>.png (canevas commun)
     python tools/unreal/villager-png.py board     # planches de comparaison -> docs/visual/villager-png-001/
     python tools/unreal/villager-png.py check     # ressemblance silhouette / visage, par paire, par categorie
+    python tools/unreal/villager-png.py colours   # teintes du corps 3D (vetement, peau, tete) -> villager-colours.json
 
 sheets : chaque panneau est detoure sur son fond creme ; les etiquettes CHR_* sous les figures
 donnent les colonnes (coupees aux k-1 plus grands ecarts : les etiquettes de la serie 2 se touchent
@@ -31,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CHARACTERS = ROOT / "SourceArt" / "Characters"
 MANIFEST = CHARACTERS / "villager-population.json"
 EXTRACT = CHARACTERS / "villager-extract.json"
+COLOURS = CHARACTERS / "villager-colours.json"
 RAW = CHARACTERS / "Raw"
 OUT = CHARACTERS / "PNG"
 BOARDS = ROOT / "docs" / "visual" / "villager-png-001"
@@ -623,9 +625,113 @@ def cmd_check(m):
     print(f"CHECK::{'PASS' if flagged == 0 else 'A_REVOIR'} paires_signalees={flagged} (seuils silhouette>{sil_max} visage>{face_max})")
 
 
+# --------------------------------------------------------------------------------------------- colours
+
+def dominant(pixels, min_count=20, ink=55.0, k=3):
+    """Teinte dominante : k-means a `k` groupes, le plus peuple gagne, sa mediane est la teinte.
+    - Le trait d'encre et les hachures (luminance < `ink`) sont ecartes d'abord : sur ces planches
+      ils font la majorite des pixels (premier run : vetement noir pour un homme en tunique beige).
+      S'il ne reste presque rien, l'etoffe EST sombre (robe de moine) : on garde tout.
+    - Un mode d'histogramme (deuxieme run) donnait le cuir des sangles : la tunique, degradee sur
+      plusieurs teintes, s'eparpillait dans plusieurs bacs. Le groupe le plus peuple est l'etoffe."""
+    if len(pixels) < min_count:
+        return None
+    lum = pixels @ np.array([0.2126, 0.7152, 0.0722])
+    lit = pixels[lum >= ink]
+    if len(lit) >= max(min_count, 0.25 * len(pixels)):
+        pixels = lit
+    # Graines deterministes : les quantiles de luminance (sombre, moyen, clair).
+    lum = pixels @ np.array([0.2126, 0.7152, 0.0722])
+    order = np.argsort(lum)
+    centres = pixels[order[[int((i + 0.5) * len(order) / k) for i in range(k)]]].astype(np.float64)
+    for _ in range(12):
+        d = ((pixels[:, None, :] - centres[None, :, :]) ** 2).sum(axis=2)
+        label = d.argmin(axis=1)
+        centres = np.array([pixels[label == i].mean(axis=0) if (label == i).any() else centres[i] for i in range(k)])
+    biggest = np.bincount(label, minlength=k).argmax()
+    return [int(round(c)) for c in np.median(pixels[label == biggest], axis=0)]
+
+
+def skin_like(px):
+    r, g, b = px[:, 0], px[:, 1], px[:, 2]
+    return (r > 90) & (r > g) & (g > b) & (r - b > 25) & (r - g > 8) & (r - g < 75)
+
+
+def colours_one(m, p):
+    """Bandes en fraction de la stature, depuis les pieds (4 px/cm, pieds a foot_margin_px du bas)."""
+    im = np.asarray(Image.open(OUT / p["category"] / f"{p['id']}.png").convert("RGBA")).astype(np.float64)
+    cv = m["canvas"]
+    px_per_cm = cv["height"] / cv["cm_per_canvas_height"]
+    feet = cv["height"] - cv["foot_margin_px"]
+    tall = p["stature_cm"] * px_per_cm
+
+    def band(h0, h1, central=1.0):
+        rows = range(max(0, int(feet - h1 * tall)), min(cv["height"], int(feet - h0 * tall)))
+        out = []
+        for y in rows:
+            xs = np.nonzero(im[y, :, 3] > 200)[0]
+            if len(xs) < 3:
+                continue
+            # Le milieu de la silhouette sur la ligne : pas le baton, pas le bord du manteau.
+            lo, hi = xs.min(), xs.max()
+            pad = (hi - lo) * (1.0 - central) / 2.0
+            keep = xs[(xs >= lo + pad) & (xs <= hi - pad)]
+            out.append(im[y, keep, :3])
+        return np.concatenate(out) if out else np.zeros((0, 3))
+
+    # Vetement : la poitrine, sous les epaules et au-dessus de la ceinture.
+    torso = band(0.60, 0.75, central=0.8)
+    garment = dominant(torso)
+    # Peau : le visage ; a defaut (barbe, voile), les avant-bras et les mains.
+    face = band(0.86, 0.94, central=0.6)
+    skin = dominant(face[skin_like(face)]) if len(face) else None
+    if skin is None:
+        arms = band(0.45, 0.66)
+        skin = dominant(arms[skin_like(arms)]) if len(arms) else None
+    # Tete : cheveux, voile ou bonnet -- ce qui couvre le crane sur le dessin.
+    head = dominant(band(0.95, 1.0, central=0.7), min_count=8)
+    return {"id": p["id"], "garment": garment, "skin": skin, "head": head}
+
+
+def cmd_colours(m):
+    people = [p for p in m["people"] if (OUT / p["category"] / f"{p['id']}.png").exists()]
+    rows = []
+    for p in people:
+        c = colours_one(m, p)
+        rows.append(c)
+        missing = [k for k in ("garment", "skin", "head") if c[k] is None]
+        print(f"COLOURS::{'OK' if not missing else 'PARTIEL'} {c['id']} vetement={c['garment']} peau={c['skin']} tete={c['head']}"
+              + (f" manque={','.join(missing)}" if missing else ""))
+    COLOURS.write_text(json.dumps({
+        "_doc": "Ecrit par villager-png.py colours -- ne pas editer. Teintes sRGB mesurees sur les PNG prepares : "
+                "vetement (poitrine), peau (visage, sinon bras), tete (cheveux ou couvre-chef). "
+                "Lu par import-villagers.py (DA_AnastasisPresentation.Villagers[].Body*). VILLAGER_BODY_3D_001.",
+        "people": rows}, indent=1, ensure_ascii=False), encoding="utf-8")
+
+    # Planche de controle : chaque portrait et ses trois pastilles, pour juger a l'oeil.
+    board_dir = ROOT / "docs" / "visual" / "villager-body-3d-001"
+    board_dir.mkdir(parents=True, exist_ok=True)
+    cell_w, cell_h, cols = 128, 300, 13
+    shown = [(p, c) for p, c in zip(people, rows) if p.get("in_game", True) and not p["category"].startswith("Child")]
+    board = Image.new("RGB", (cell_w * cols, cell_h * ((len(shown) + cols - 1) // cols)), (58, 54, 48))
+    draw = ImageDraw.Draw(board)
+    for i, (p, c) in enumerate(shown):
+        x, y = (i % cols) * cell_w, (i // cols) * cell_h
+        im = Image.open(OUT / p["category"] / f"{p['id']}.png").convert("RGBA").resize((128, 256), Image.LANCZOS)
+        board.paste(im, (x, y), im)
+        for j, key in enumerate(("garment", "skin", "head")):
+            col = tuple(c[key]) if c[key] else (255, 0, 255)
+            draw.rectangle([x + 4 + j * 40, y + 258, x + 38 + j * 40, y + 282], fill=col, outline=(0, 0, 0))
+        draw.text((x + 4, y + 284), c["id"].replace("CHR_", ""), fill=(230, 230, 230), font=font(11))
+    dst = board_dir / "A_teintes_mesurees.png"
+    board.save(dst, optimize=True)
+    partial = sum(1 for c in rows if None in (c["garment"], c["skin"], c["head"]))
+    print(f"COLOURS::TOTAL {len(rows)} partiels={partial} -> {COLOURS.relative_to(ROOT)} ; planche {dst.relative_to(ROOT)}")
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 2 or sys.argv[1] not in ("sheets", "prep", "board", "check"):
+    if len(sys.argv) < 2 or sys.argv[1] not in ("sheets", "prep", "board", "check", "colours"):
         print(__doc__)
         sys.exit(2)
     manifest = load_manifest()
-    {"sheets": cmd_sheets, "board": cmd_board, "check": cmd_check}.get(sys.argv[1], lambda mm: cmd_prep(mm, sys.argv[2:] or None))(manifest)
+    {"sheets": cmd_sheets, "board": cmd_board, "check": cmd_check, "colours": cmd_colours}.get(sys.argv[1], lambda mm: cmd_prep(mm, sys.argv[2:] or None))(manifest)

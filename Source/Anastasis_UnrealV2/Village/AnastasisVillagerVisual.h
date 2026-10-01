@@ -4,10 +4,14 @@
 #include "GameFramework/Actor.h"
 #include "AnastasisVillagerVisual.generated.h"
 
+class UBlendSpace;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UProceduralMeshComponent;
+class USkeletalMesh;
+class USkeletalMeshComponent;
 class UTexture2D;
+namespace AnastasisVillagerLooks { struct FBodyLook; }
 
 /**
  * The face of one simulated villager: a cut-out portrait on a vertical card (VILLAGER_PNG_001).
@@ -17,6 +21,12 @@ class UTexture2D;
  * only (a cylindrical billboard: it stays upright under a high camera), toward the first local
  * player's camera in a game world. Portraits are painted facing three-quarters LEFT; walking
  * toward the right of the screen mirrors the card, standing still keeps the last facing.
+ *
+ * VILLAGER_BODY_3D_001 -- near the camera the villager is a 3D body instead: a skinned mannequin,
+ * dressed by its material, that walks with its legs at the speed it is drawn at, breathes when it
+ * stands, and turns toward where it goes. Beyond `anastasis.Village.BodyDistance` the card takes
+ * over (a person is a dozen pixels tall there). `anastasis.Village.Bodies` 0 = cards only,
+ * 1 = bodies near (default), 2 = bodies everywhere. No body bound (assets missing): the card, always.
  *
  * Pure presentation: spawned and moved by FAnastasisVillagePresentation from the simulation,
  * it reads nothing back into it.
@@ -49,10 +59,38 @@ public:
 	/** Puts the feet at `Feet` and remembers the step, which picks the facing in Tick. */
 	void MoveFeetTo(const FVector& Feet);
 
+	/**
+	 * Binds the 3D body: `Mesh` played through `Locomotion` (single-node blend space, X = direction
+	 * relative to the facing, Y = speed in cm/s), `Material` instanced on every slot with the dress of `Look`. False if a piece is missing:
+	 * the villager then keeps its card at every distance.
+	 */
+	bool SetBody(USkeletalMesh* Mesh, UBlendSpace* Locomotion, UMaterialInterface* Material, const AnastasisVillagerLooks::FBodyLook& Look);
+
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Villagers")
+	bool HasBody() const;
+
+	/** True when the body, not the card, is drawn this frame. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Villagers")
+	bool IsShowingBody() const { return bShowingBody; }
+
+	/** Ground speed the body is animated at, cm/s (smoothed). */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Villagers")
+	float GetBodySpeed() const { return BodySpeed; }
+
+	/** Where the body faces, degrees (world yaw of its walking direction). */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Villagers")
+	float GetBodyHeading() const { return BodyHeading; }
+
+	/** Card or body, by hand (a lineup has no player camera to measure the distance from). */
+	UFUNCTION(BlueprintCallable, Category = "Anastasis|Villagers")
+	void ShowBody(bool bBody);
+
 	virtual void Tick(float DeltaSeconds) override;
 
 private:
 	void BuildCard();
+	/** Speed and heading from the feet's motion since the last frame. */
+	void UpdateBodyMotion(float DeltaSeconds);
 
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis|Villagers")
 	TObjectPtr<USceneComponent> FeetRoot;
@@ -63,7 +101,17 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> PortraitMaterial;
 
+	UPROPERTY(VisibleAnywhere, Category = "Anastasis|Villagers")
+	TObjectPtr<USkeletalMeshComponent> Body;
+
 	FName LookId;
 	bool bMirrored = false;
 	FVector LastStep = FVector::ZeroVector;
+
+	bool bShowingBody = false;
+	float BodyScale = 1.0f;
+	float BodySpeed = 0.0f;
+	float BodyHeading = 0.0f;
+	bool bHasLastFeet = false;
+	FVector LastFeet = FVector::ZeroVector;
 };

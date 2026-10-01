@@ -49,4 +49,47 @@ namespace AnastasisVillagerLooks
 	 * are all different. Any other identifier falls back to its CRC.
 	 */
 	int32 PickLook(const TArray<int32>& Pool, const FString& NpcId);
+
+	/**
+	 * How the 3D body of a villager is dressed (VILLAGER_BODY_3D_001). Colours are linear; heights
+	 * are fractions of the body's own height on the bind pose (the material reads the pre-skinned
+	 * position, so a band stays on the same piece of body while it walks).
+	 */
+	struct FBodyLook
+	{
+		bool bFemale = false;
+		/** Uniform scale of the mannequin: Epic's mannequins stand ~180 cm, an ancient villager less. */
+		float Scale = 1.0f;
+		FLinearColor Skin = FLinearColor::White;
+		FLinearColor Hair = FLinearColor::Black;
+		FLinearColor Garment = FLinearColor::White;
+		/** Belt and hem border. */
+		FLinearColor Trim = FLinearColor::Black;
+		/** Lowest point of the garment: knee for a man's chiton, ankle for a woman's peplos. */
+		float Hem = 0.3f;
+		/** Lowest point of the hair at the back of the head. */
+		float HairLow = 0.86f;
+		/** Locomotion play-rate jitter, so a crowd does not walk in step. */
+		float PlayRate = 1.0f;
+	};
+
+	/**
+	 * A pure function of the portrait id and its category: a portrait is always dressed the same
+	 * way, and no simulation RNG is consumed. Mostly undyed wool and linen, some natural dyes
+	 * (madder, faded woad, olive, dark brown) -- what a village of refugees would wear -- and never
+	 * a garment within MinGarmentContrast of the skin it covers. Elders get grey or white hair;
+	 * women a long garment and long hair.
+	 */
+	FBodyLook BodyLookFor(FName LookId, EAnastasisVillagerCategory Category);
+
+	/**
+	 * The same, then the colours measured on the portrait (FAnastasisVillagerLook::Body*) where they
+	 * exist: the body wears what the card wears. Measured skin loses a third of its saturation (painted
+	 * light); a measured garment too close to the skin is pushed lighter or darker, keeping its hue.
+	 */
+	FBodyLook BodyLookFor(const FAnastasisVillagerLook& Portrait);
+
+	/** Largest sRGB channel difference, 0..255: below MinGarmentContrast a garment vanishes into the skin. */
+	int32 ColourContrast(const FColor& A, const FColor& B);
+	inline constexpr int32 MinGarmentContrast = 48;
 }

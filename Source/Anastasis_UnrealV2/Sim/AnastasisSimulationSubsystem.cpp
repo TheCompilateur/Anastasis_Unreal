@@ -1288,11 +1288,17 @@ FString UAnastasisSimulationDebugLibrary::GetVillagerCards(const UObject* WorldC
 		const AAnastasisVillagerVisual* Card = Host->GetVillagePresentation().FindVillager(N.Id);
 		const FVector P = Card ? Card->GetActorLocation() : FVector::ZeroVector;
 		Rows.Add(FString::Printf(
-			TEXT("{\"npc\":\"%s\",\"job\":\"%s\",\"look\":\"%s\",\"x\":%.1f,\"y\":%.1f,\"z\":%.1f,\"hidden\":%s,\"mirrored\":%s,\"inside\":%s}"),
+			TEXT("{\"npc\":\"%s\",\"job\":\"%s\",\"look\":\"%s\",\"x\":%.1f,\"y\":%.1f,\"z\":%.1f,\"hidden\":%s,\"mirrored\":%s,\"inside\":%s,")
+			TEXT("\"has_body\":%s,\"body\":%s,\"speed\":%.1f,\"heading\":%.1f}"),
 			*N.Id, *N.JobId, Card ? *Card->GetLookId().ToString() : TEXT(""), P.X, P.Y, P.Z,
 			Card && Card->IsHidden() ? TEXT("true") : TEXT("false"),
 			Card && Card->IsMirrored() ? TEXT("true") : TEXT("false"),
-			N.Inside.bActive ? TEXT("true") : TEXT("false")));
+			N.Inside.bActive ? TEXT("true") : TEXT("false"),
+			// VILLAGER_BODY_3D_001 : corps 3D monte, montre cette frame, vitesse (cm/s) et cap de son animation.
+			Card && Card->HasBody() ? TEXT("true") : TEXT("false"),
+			Card && Card->IsShowingBody() ? TEXT("true") : TEXT("false"),
+			Card ? Card->GetBodySpeed() : 0.0f,
+			Card ? Card->GetBodyHeading() : 0.0f));
 	}
 	return FString::Printf(TEXT("{\"npcs\":%d,\"cards\":%d,\"villagers\":[%s]}"),
 		V.GetActors().Num(), Host->GetVillagePresentation().NumVillagers(), *FString::Join(Rows, TEXT(",")));

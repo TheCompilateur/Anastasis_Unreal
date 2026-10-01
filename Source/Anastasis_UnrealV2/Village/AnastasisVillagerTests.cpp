@@ -5,6 +5,9 @@
 #include "Engine/Engine.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
+#include "Animation/BlendSpace.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "Materials/Material.h"
 #include "Sim/AnastasisSimulation.h"
 #include "Village/AnastasisVillage.h"
@@ -343,6 +346,167 @@ bool FAnastasisVillagerPresentationTest::RunTest(const FString&)
 	TestEqual(TEXT("registre vide : aucune carte"), Presentation.SyncVillagers(Sim.GetVillage(), Sim.GetWorld(), World, *Empty, true), 0);
 
 	Presentation.Clear(nullptr);
+	return true;
+}
+
+/**
+ * VILLAGER_BODY_3D_001 -- la tenue du corps 3D : une fonction pure du portrait.
+ *
+ * - meme portrait, meme tenue (aucun tirage) ;
+ * - femmes : vetement long (cheville) et cheveux longs ; hommes : chiton au genou ;
+ * - aines : cheveux plus clairs que tout cheveu d'adulte (gris ou blancs) ;
+ * - taille d'un villageois antique : 145 a 175 cm sur un mannequin de 180 cm ;
+ * - un village de 24 ne s'habille pas d'une seule couleur ;
+ * - aucun vetement de la couleur de la peau qu'il couvre.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAnastasisVillagerBodyLookTest,
+	"Anastasis.Village.Villagers.BodyLook",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAnastasisVillagerBodyLookTest::RunTest(const FString&)
+{
+	using namespace AnastasisVillagerLooks;
+	const auto FakePortrait = [](int32 Index)
+	{
+		return TSoftObjectPtr<UTexture2D>(FSoftObjectPath(FString::Printf(TEXT("/Game/Fake/T_%d.T_%d"), Index, Index)));
+	};
+	const TArray<FAnastasisVillagerLook> Looks = AnastasisVillagerTest::ManifestShapedLooks(FakePortrait);
+	float DarkestElderHair = 1.0f;
+	float LightestAdultHair = 0.0f;
+	TSet<uint32> Garments;
+	for (const FAnastasisVillagerLook& Look : Looks)
+	{
+		if (!IsAssignableInVillage(Look.Category))
+		{
+			continue;
+		}
+		const FBodyLook Body = BodyLookFor(Look.LookId, Look.Category);
+		const FBodyLook Again = BodyLookFor(Look.LookId, Look.Category);
+		const FString Id = Look.LookId.ToString();
+		TestTrue(Id + TEXT(" : meme tenue a chaque appel"), Body.Garment.Equals(Again.Garment) && Body.Skin.Equals(Again.Skin) && Body.Scale == Again.Scale);
+		const bool bFemale = Look.Category == EAnastasisVillagerCategory::AdultFemale || Look.Category == EAnastasisVillagerCategory::ElderFemale;
+		const bool bElder = Look.Category == EAnastasisVillagerCategory::ElderMale || Look.Category == EAnastasisVillagerCategory::ElderFemale;
+		TestEqual(Id + TEXT(" : corps de femme"), Body.bFemale, bFemale);
+		TestTrue(Id + TEXT(" : ourlet (femme a la cheville, homme au genou)"), bFemale ? Body.Hem < 0.12f : (Body.Hem > 0.18f && Body.Hem < 0.35f));
+		// Manny et Quinn mesurent tous deux 180 cm (create-villager-body.py).
+		const float Stature = 180.0f * Body.Scale;
+		TestTrue(FString::Printf(TEXT("%s : stature %.0f cm dans [145, 175]"), *Id, Stature), Stature >= 145.0f && Stature <= 175.0f);
+		TestTrue(Id + TEXT(" : cadence de marche plausible"), Body.PlayRate > 0.8f && Body.PlayRate < 1.1f);
+		const float HairLuma = Body.Hair.GetLuminance();
+		if (bElder)
+		{
+			DarkestElderHair = FMath::Min(DarkestElderHair, HairLuma);
+		}
+		else
+		{
+			LightestAdultHair = FMath::Max(LightestAdultHair, HairLuma);
+		}
+		Garments.Add(Body.Garment.ToFColor(true).DWColor());
+		// Premiere capture PIE : un chiton ocre sur une peau halee -- l'habitant paraissait nu.
+		const int32 Contrast = ColourContrast(Body.Garment.ToFColor(true), Body.Skin.ToFColor(true));
+		TestTrue(FString::Printf(TEXT("%s : vetement distinct de la peau (%d >= %d)"), *Id, Contrast, MinGarmentContrast),
+			Contrast >= MinGarmentContrast - 1);
+	}
+	TestTrue(FString::Printf(TEXT("aines plus gris que les adultes (%.3f > %.3f)"), DarkestElderHair, LightestAdultHair), DarkestElderHair > LightestAdultHair);
+	TestTrue(FString::Printf(TEXT("au moins 4 teintures sur 24 habitants (%d)"), Garments.Num()), Garments.Num() >= 4);
+
+	// Teintes mesurees sur le portrait : le corps porte celles du dessin.
+	FAnastasisVillagerLook Painted = Looks[0];
+	Painted.BodyGarment = FColor(146, 50, 40, 255);
+	Painted.BodySkin = FColor(200, 140, 90, 255);
+	Painted.BodyHead = FColor(30, 24, 20, 255);
+	const FBodyLook Measured = BodyLookFor(Painted);
+	TestTrue(TEXT("vetement mesure porte tel quel (contraste suffisant)"), Measured.Garment.ToFColor(true) == FColor(146, 50, 40, 255));
+	TestTrue(TEXT("tete mesuree -> cheveux"), Measured.Hair.ToFColor(true) == FColor(30, 24, 20, 255));
+	const FColor MeasuredSkin = Measured.Skin.ToFColor(true);
+	TestTrue(TEXT("peau mesuree desaturee (moins d'ecart R-B que le dessin)"), MeasuredSkin.R - MeasuredSkin.B < 200 - 90 && MeasuredSkin.R > MeasuredSkin.B);
+
+	// Un vetement dessine de la couleur de la peau est ecarte de la peau, sa teinte gardee.
+	Painted.BodyGarment = Painted.BodySkin;
+	const FBodyLook Pushed = BodyLookFor(Painted);
+	const int32 PushedContrast = ColourContrast(Pushed.Garment.ToFColor(true), Pushed.Skin.ToFColor(true));
+	TestTrue(FString::Printf(TEXT("vetement couleur de peau ecarte (%d >= %d)"), PushedContrast, MinGarmentContrast), PushedContrast >= MinGarmentContrast - 1);
+
+	// Rien de mesure : la palette, a l'identique.
+	const FBodyLook Unmeasured = BodyLookFor(Looks[0]);
+	const FBodyLook Palette = BodyLookFor(Looks[0].LookId, Looks[0].Category);
+	TestTrue(TEXT("sans mesure : palette"), Unmeasured.Garment.Equals(Palette.Garment) && Unmeasured.Skin.Equals(Palette.Skin));
+	return true;
+}
+
+/**
+ * VILLAGER_BODY_3D_001 -- le corps se monte avec les assets du registre, et la bascule carte / corps
+ * ne montre jamais les deux, ni aucun des deux.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAnastasisVillagerBodyActorTest,
+	"Anastasis.Village.Villagers.Body",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAnastasisVillagerBodyActorTest::RunTest(const FString&)
+{
+	UWorld* World = AnastasisVillagerTest::FindWorld();
+	if (!TestNotNull(TEXT("monde"), World))
+	{
+		return false;
+	}
+	const UAnastasisPresentationRegistry* Registry = GetDefault<UAnastasisPresentationRegistry>();
+	USkeletalMesh* Male = Registry->VillagerBodyMale.LoadSynchronous();
+	USkeletalMesh* Female = Registry->VillagerBodyFemale.LoadSynchronous();
+	UBlendSpace* Locomotion = Registry->VillagerLocomotion.LoadSynchronous();
+	UMaterialInterface* Dress = Registry->VillagerBodyMaterial.LoadSynchronous();
+	TestNotNull(TEXT("corps d'homme (defaut du registre)"), Male);
+	TestNotNull(TEXT("corps de femme (defaut du registre)"), Female);
+	TestNotNull(TEXT("marche (defaut du registre)"), Locomotion);
+	TestNotNull(TEXT("M_AnastasisVillagerBody (create-villager-body.ps1)"), Dress);
+	if (!Male || !Female || !Locomotion || !Dress)
+	{
+		return false;
+	}
+	TestTrue(TEXT("la marche joue sur le squelette des deux corps"),
+		Locomotion->GetSkeleton() == Male->GetSkeleton() && Locomotion->GetSkeleton() == Female->GetSkeleton());
+
+	FActorSpawnParameters Params;
+	Params.ObjectFlags |= RF_Transient;
+	AAnastasisVillagerVisual* Actor = World->SpawnActor<AAnastasisVillagerVisual>(FVector(0, 0, 100000), FRotator::ZeroRotator, Params);
+	if (!TestNotNull(TEXT("acteur"), Actor))
+	{
+		return false;
+	}
+	TestFalse(TEXT("sans corps : HasBody faux"), Actor->HasBody());
+	Actor->ShowBody(true);
+	TestFalse(TEXT("sans corps : jamais montre"), Actor->IsShowingBody());
+
+	const AnastasisVillagerLooks::FBodyLook Look = AnastasisVillagerLooks::BodyLookFor(TEXT("CHR_M_Adult_001"), EAnastasisVillagerCategory::AdultMale);
+	TestFalse(TEXT("piece manquante : refuse"), Actor->SetBody(Male, nullptr, Dress, Look));
+	TestTrue(TEXT("corps monte"), Actor->SetBody(Male, Locomotion, Dress, Look));
+	TestTrue(TEXT("HasBody"), Actor->HasBody());
+
+	USkeletalMeshComponent* Body = Actor->FindComponentByClass<USkeletalMeshComponent>();
+	TestNotNull(TEXT("composant squelettique"), Body);
+	if (Body)
+	{
+		Actor->ShowBody(true);
+		TestTrue(TEXT("corps montre"), Actor->IsShowingBody() && Body->IsVisible());
+		bool bCardVisible = false;
+		for (UActorComponent* Component : Actor->GetComponents())
+		{
+			if (const UPrimitiveComponent* Prim = Cast<UPrimitiveComponent>(Component); Prim && Prim != Body && Prim->IsVisible())
+			{
+				bCardVisible = true;
+			}
+		}
+		TestFalse(TEXT("corps montre : carte cachee"), bCardVisible);
+		for (int32 Slot = 0; Slot < Body->GetNumMaterials(); ++Slot)
+		{
+			UMaterialInterface* Used = Body->GetMaterial(Slot);
+			TestTrue(FString::Printf(TEXT("emplacement %d habille"), Slot), Used && Used->GetBaseMaterial() == Dress->GetBaseMaterial());
+		}
+		Actor->ShowBody(false);
+		TestFalse(TEXT("carte : corps cache"), Body->IsVisible());
+	}
+	Actor->Destroy();
 	return true;
 }
 

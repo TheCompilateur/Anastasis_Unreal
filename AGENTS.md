@@ -389,10 +389,21 @@ Pour aller plus vite sans toucher a ce rythme : section « Temps accelere » ci-
 
 | Script | Role |
 |---|---|
-| `villager-png.py` | **hors editeur** (Python systeme, Pillow + numpy) : `sheets` (decoupe des planches → `Raw/` + `villager-extract.json`, statures mesurees), `prep` (→ `SourceArt/Characters/PNG/<Categorie>/`, canevas 512x1024 = 128x256 cm, pieds alignes), `board` (planches → `docs/visual/villager-png-001/`), `check` (ressemblance silhouette / visage par paire) |
-| `import-villagers.ps1` + `import-villagers.py` | **ecrit** dans `Content/` : textures `/Game/Anastasis/Characters/PNG/<Categorie>/CHR_*` (BC7, sRGB, Character, Clamp, hors streaming, couverture alpha), `M_AnastasisVillager`, et `DA_AnastasisPresentation.Villagers` ; relit, verifie, refuse un materiau qui ne compile pas ; editeur dedie qui se ferme |
+| `villager-png.py` | **hors editeur** (Python systeme, Pillow + numpy) : `sheets` (decoupe des planches → `Raw/` + `villager-extract.json`, statures mesurees), `prep` (→ `SourceArt/Characters/PNG/<Categorie>/`, canevas 512x1024 = 128x256 cm, pieds alignes), `board` (planches → `docs/visual/villager-png-001/`), `check` (ressemblance silhouette / visage par paire), `colours` (teintes du corps 3D mesurees sur chaque PNG : vetement, peau, tete → `SourceArt/Characters/villager-colours.json` + planche `docs/visual/villager-body-3d-001/`) |
+| `import-villagers.ps1` + `import-villagers.py` | **ecrit** dans `Content/` : textures `/Game/Anastasis/Characters/PNG/<Categorie>/CHR_*` (BC7, sRGB, Character, Clamp, hors streaming, couverture alpha), `M_AnastasisVillager`, et `DA_AnastasisPresentation.Villagers` (avec les teintes `Body*` de `villager-colours.json`) ; relit, verifie, refuse un materiau qui ne compile pas ; editeur dedie qui se ferme |
 | `villager-lineup.ps1` + `villager-lineup.py` | planche dans Unreal (vrais acteurs `AnastasisVillagerVisual`) : population entiere puis par groupe, sur un arc, temoin 180 cm → `Saved/VillagerEvidence/<Label>/` ; niveau jamais sauve |
 | `villager-pie.ps1` + `villager-pie.py` | preuve PIE : village du lancement sans commande, puis `FirstWell 12` (le remplace), `RemoveNpc`, `FirstFarmer 1` ; une carte par habitant, portraits distincts et du METIER simule de chacun → `Saved/VillagerEvidence/pie/` |
+
+### Corps 3D des habitants (VILLAGER_BODY_3D_001)
+
+De pres, chaque habitant est un mannequin anime (Manny / Quinn, `BS_Idle_Walk_Run`) habille par son materiau ;
+au-dela de `anastasis.Village.BodyDistance` (80 m), sa carte portrait. `anastasis.Village.Bodies` 0 = cartes
+seules, 1 = corps de pres (defaut), 2 = corps partout. Voir `docs/unreal/VILLAGER_BODY_3D_001.md`.
+
+| Script | Role |
+|---|---|
+| `create-villager-body.ps1` + `create-villager-body.py` | **ecrit** dans `Content/` : `M_AnastasisVillagerBody` (tenue peinte sur la pose de liaison), regenere a chaque run ; mesure d'abord les os de Manny et Quinn et en tire les seuils (cou, ceinture, manches, chevilles) ; editeur dedie qui se ferme |
+| `villager-body-pie.ps1` + `villager-body-pie.py` | preuve PIE au rythme du jeu, sans gel : corps monte pour chaque habitant, pieds d'un marcheur qui balaient > 20 cm, cap qui suit la marche, main et tete qui bougent a l'arret, bascule corps / carte a la distance ; prises de profil en rafale, face, groupe, lointain → `Saved/VillagerEvidence/body/` |
 
 ## Temps accelere (TIME_WARP_001)
 

@@ -11,6 +11,8 @@
 #include "Village/AnastasisVillagerVisual.h"
 #include "World/AnastasisWorld.h"
 #include "WorldView/AnastasisPresentationRegistry.h"
+#include "Animation/BlendSpace.h"
+#include "Engine/SkeletalMesh.h"
 #include "Engine/Texture2D.h"
 #include "Materials/MaterialInterface.h"
 #include "WorldView/AnastasisWorldView.h"
@@ -284,16 +286,33 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 			{
 				continue;
 			}
-			const FName LookId = Registry.Villagers[LookIndex].LookId;
+			const FAnastasisVillagerLook& Look = Registry.Villagers[LookIndex];
+			const FName LookId = Look.LookId;
 			Actor->SetLook(LookId, Portrait, Material);
+			// VILLAGER_BODY_3D_001 : le corps 3D de pres, aux teintes mesurees sur le portrait. Une piece absente :
+			// la carte reste seule, a toute distance, comme avant.
+			const AnastasisVillagerLooks::FBodyLook BodyLook = AnastasisVillagerLooks::BodyLookFor(Look);
+			const bool bBody = Actor->SetBody(
+				(BodyLook.bFemale ? Registry.VillagerBodyFemale : Registry.VillagerBodyMale).LoadSynchronous(),
+				Registry.VillagerLocomotion.LoadSynchronous(),
+				Registry.VillagerBodyMaterial.LoadSynchronous(),
+				BodyLook);
+			if (!bBody && !bWarnedNoBody)
+			{
+				bWarnedNoBody = true;
+				UE_LOG(LogAnastasis_UnrealV2, Warning,
+					TEXT("ANASTASIS_VILLAGE villager bodies: missing (mesh=%s locomotion=%s material=%s) -- cards only, see VILLAGER_BODY_3D_001"),
+					*(BodyLook.bFemale ? Registry.VillagerBodyFemale : Registry.VillagerBodyMale).ToString(),
+					*Registry.VillagerLocomotion.ToString(), *Registry.VillagerBodyMaterial.ToString());
+			}
 #if WITH_EDITOR
 			Actor->SetActorLabel(FString::Printf(TEXT("Villager_%s_%s"), *Npc.Id, *LookId.ToString()));
 #endif
 			Villagers.Add(Npc.Id, Actor);
 			VillagerJobs.Add(Npc.Id, Job);
 			++Changes;
-			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE villager %s (%s) -> look %s at %s"),
-				*Npc.Id, *Job.ToString(), *LookId.ToString(), *Feet.ToCompactString());
+			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE villager %s (%s) -> look %s at %s body=%s"),
+				*Npc.Id, *Job.ToString(), *LookId.ToString(), *Feet.ToCompactString(), bBody ? TEXT("3d") : TEXT("card"));
 		}
 		Actor->MoveFeetTo(Feet);
 		// Dedans : la simulation garde la position du seuil, la carte ne doit pas y rester plantee.
