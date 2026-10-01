@@ -773,9 +773,9 @@ void AAnastasisWorldEmbodiment::PlaceUnderstory(const AnastasisWorldView::FWorld
 	In.WaterPlaneZ = AnastasisTerrainSurface::WaterPlaneZ;
 	In.AltitudeSpanUU = FMath::Max(ActiveFootprintBounds.IsValid
 		? ActiveFootprintBounds.Max.Z - AnastasisTerrainSurface::WaterPlaneZ : 0.0, 100.0);
-	US::FPlan Plan;
+	US::FPlan UnderPlan;
 	FString Error;
-	if (!US::Build(In, US::FSettings(), Plan, Error))
+	if (!US::Build(In, US::FSettings(), UnderPlan, Error))
 	{
 		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_UNDERSTORY rejected=%s"), *Error);
 		return;
@@ -795,7 +795,7 @@ void AAnastasisWorldEmbodiment::PlaceUnderstory(const AnastasisWorldView::FWorld
 	TMap<FString, UHierarchicalInstancedStaticMeshComponent*> ByPath;
 	TSet<FString> MissingPaths;
 	int32 Placed = 0;
-	for (const US::FInstance& P : Plan.Instances)
+	for (const US::FInstance& P : UnderPlan.Instances)
 	{
 		const bool bRock = P.Kind == US::EKind::Rock;
 		const FString Path = bRock ? US::RockMeshPath(P.Rock, P.Variant) : US::ShrubMeshPath(P.Kind, P.Variant);
@@ -880,10 +880,10 @@ void AAnastasisWorldEmbodiment::PlaceUnderstory(const AnastasisWorldView::FWorld
 	}
 	UE_LOG(LogAnastasis_UnrealV2, Display,
 		TEXT("ANASTASIS_UNDERSTORY enabled=1 lentisk=%d kermes_oak=%d broom=%d bramble=%d rock=%d placed=%d cells=%d refused_water=%d refused_reserved=%d components=%d missing_meshes=%d truncated=%d plan_ms=%.1f total_ms=%.1f"),
-		Plan.Counts[static_cast<int32>(US::EKind::Lentisk)], Plan.Counts[static_cast<int32>(US::EKind::KermesOak)],
-		Plan.Counts[static_cast<int32>(US::EKind::Broom)], Plan.Counts[static_cast<int32>(US::EKind::Bramble)],
-		Plan.Counts[static_cast<int32>(US::EKind::Rock)], Placed, Plan.Cells, Plan.RejectedWater, Plan.RejectedReserved,
-		UnderstoryMeshes.Num(), MissingPaths.Num(), Plan.bTruncated ? 1 : 0, PlanMs, (FPlatformTime::Seconds() - Start) * 1000.0);
+		UnderPlan.Counts[static_cast<int32>(US::EKind::Lentisk)], UnderPlan.Counts[static_cast<int32>(US::EKind::KermesOak)],
+		UnderPlan.Counts[static_cast<int32>(US::EKind::Broom)], UnderPlan.Counts[static_cast<int32>(US::EKind::Bramble)],
+		UnderPlan.Counts[static_cast<int32>(US::EKind::Rock)], Placed, UnderPlan.Cells, UnderPlan.RejectedWater, UnderPlan.RejectedReserved,
+		UnderstoryMeshes.Num(), MissingPaths.Num(), UnderPlan.bTruncated ? 1 : 0, PlanMs, (FPlatformTime::Seconds() - Start) * 1000.0);
 }
 
 void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,

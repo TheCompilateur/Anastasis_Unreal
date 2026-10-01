@@ -269,7 +269,7 @@ bool FAnastasisForestEdgesAndOpenings::RunTest(const FString&)
     FAnastasisForestDressingSettings C;
     FRenderedHabitat H;
     H.SampleHeight = [](double,double,double& Z) { Z=5000; return true; };
-    FPlan P;
+    AnastasisEcologicalDressing::FPlan P;
     FString E;
     if (!TestTrue(TEXT("edge fixture builds"), Build(S,C,P,E,&H))) return false;
 
