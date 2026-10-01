@@ -207,6 +207,7 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 		{
 			Actor->Destroy();
 		}
+		VillagerJobs.Remove(It.Key());
 		It.RemoveCurrent();
 		++Changes;
 	}
@@ -215,18 +216,32 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 		return Changes;
 	}
 
-	TArray<int32> Pool;
+	TMap<FName, TArray<int32>> Pools;
 	for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
 	{
 		const FVector Feet = SimToUnreal(World, Npc.X, Npc.Y, PresentationWorld);
+		const FName Job(*Npc.JobId);
 		AAnastasisVillagerVisual* Actor = FindVillager(Npc.Id);
+		if (Actor && VillagerJobs.FindRef(Npc.Id) != Job)
+		{
+			// Le metier a change (embauche au grenier) : l'objet peint doit suivre. Le visage change
+			// avec lui -- aucun individu des planches n'existe avec deux objets.
+			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE villager %s job %s -> %s: card redrawn"),
+				*Npc.Id, *VillagerJobs.FindRef(Npc.Id).ToString(), *Job.ToString());
+			Actor->Destroy();
+			Villagers.Remove(Npc.Id);
+			VillagerJobs.Remove(Npc.Id);
+			Actor = nullptr;
+			++Changes;
+		}
 		if (!Actor)
 		{
-			if (Pool.IsEmpty())
+			TArray<int32>* Pool = Pools.Find(Job);
+			if (!Pool)
 			{
-				Pool = AnastasisVillagerLooks::VillagePool(Registry.Villagers);
+				Pool = &Pools.Add(Job, AnastasisVillagerLooks::VillagePool(Registry.Villagers, Job));
 			}
-			const int32 LookIndex = AnastasisVillagerLooks::PickLook(Pool, Npc.Id);
+			const int32 LookIndex = AnastasisVillagerLooks::PickLook(*Pool, Npc.Id);
 			UMaterialInterface* Material = Registry.VillagerMaterial.LoadSynchronous();
 			UTexture2D* Portrait = LookIndex != INDEX_NONE ? Registry.Villagers[LookIndex].Portrait.LoadSynchronous() : nullptr;
 			if (!Portrait || !Material)
@@ -235,8 +250,8 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 				{
 					bWarnedNoLooks = true;
 					UE_LOG(LogAnastasis_UnrealV2, Warning,
-						TEXT("ANASTASIS_VILLAGE villager cards: none drawn (looks=%d pool=%d material=%s) -- see VILLAGER_PNG_001"),
-						Registry.Villagers.Num(), Pool.Num(), Material ? TEXT("ok") : TEXT("missing"));
+						TEXT("ANASTASIS_VILLAGE villager cards: none for job %s (looks=%d pool=%d material=%s) -- see VILLAGER_PNG_001"),
+						*Job.ToString(), Registry.Villagers.Num(), Pool->Num(), Material ? TEXT("ok") : TEXT("missing"));
 				}
 				continue;
 			}
@@ -254,9 +269,10 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 			Actor->SetActorLabel(FString::Printf(TEXT("Villager_%s_%s"), *Npc.Id, *LookId.ToString()));
 #endif
 			Villagers.Add(Npc.Id, Actor);
+			VillagerJobs.Add(Npc.Id, Job);
 			++Changes;
-			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE villager %s -> look %s at %s"),
-				*Npc.Id, *LookId.ToString(), *Feet.ToCompactString());
+			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE villager %s (%s) -> look %s at %s"),
+				*Npc.Id, *Job.ToString(), *LookId.ToString(), *Feet.ToCompactString());
 		}
 		Actor->MoveFeetTo(Feet);
 		// Dedans : la simulation garde la position du seuil, la carte ne doit pas y rester plantee.
@@ -281,6 +297,7 @@ void FAnastasisVillagePresentation::Clear(UAnastasisVillageInteractionSubsystem*
 		}
 	}
 	Villagers.Reset();
+	VillagerJobs.Reset();
 
 	for (const TPair<FString, TWeakObjectPtr<AAnastasisVillageBuilding>>& Pair : Actors)
 	{

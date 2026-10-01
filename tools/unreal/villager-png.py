@@ -477,6 +477,8 @@ def cmd_sheets(m):
                 people.append({"id": pid, "category": panel["category"], "stature_cm": stature,
                                "body_px": int(body), "sheet": sheet["file"],
                                "in_game": o.get("pose", "debout") == "debout", "facing": o.get("facing", "left"),
+                               # Metier simule dont le portrait porte l'objet ; vide = role que la simulation n'a pas.
+                               "jobs": [o["job"]] if o.get("job") else [],
                                "pose": o.get("pose", "debout"), "note": o.get("note", "")})
                 print(f"SHEETS::{'A_REVOIR' if cut else 'OK'} {pid} corps={body}px stature={stature}cm "
                       f"boite={shape[1]}x{shape[0]} pieces_ecartees={dropped}"
@@ -488,7 +490,8 @@ def cmd_sheets(m):
                                    "people": people}, indent=1, ensure_ascii=False), encoding="utf-8")
     counts = {c: sum(1 for p in people if p["category"] == c) for c in CATEGORY_ORDER}
     print("SHEETS::TOTAL " + " ".join(f"{c}={n}" for c, n in counts.items()) + f" total={len(people)}"
-          + f" en_jeu={sum(1 for p in people if p['in_game'] and not p['category'].startswith('Child'))}")
+          + f" en_jeu={sum(1 for p in people if p['in_game'] and p['jobs'] and not p['category'].startswith('Child'))}"
+          + " " + " ".join(f"{j}={sum(1 for p in people if j in p['jobs'] and p['in_game'] and not p['category'].startswith('Child'))}" for j in ("settler", "farmer")))
 
 
 # ----------------------------------------------------------------------------------------------- board

@@ -9,8 +9,11 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "fourche"
   },
   {
    "id": "CHR_M_Adult_002",
@@ -20,8 +23,9 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "porteur (marteau, sac)"
   },
   {
    "id": "CHR_M_Adult_003",
@@ -31,8 +35,9 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "artisan (marteau)"
   },
   {
    "id": "CHR_M_Adult_004",
@@ -42,8 +47,9 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "garde (lance, bouclier)"
   },
   {
    "id": "CHR_F_Adult_001",
@@ -53,8 +59,11 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "panier"
   },
   {
    "id": "CHR_F_Adult_002",
@@ -64,8 +73,9 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "porteuse d'eau (cruche)"
   },
   {
    "id": "CHR_F_Adult_003",
@@ -75,8 +85,11 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "herbes"
   },
   {
    "id": "CHR_F_Adult_004",
@@ -86,8 +99,11 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "panier"
   },
   {
    "id": "CHR_M_Child_001",
@@ -97,6 +113,7 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": false,
    "facing": "left",
+   "jobs": [],
    "pose": "court",
    "note": ""
   },
@@ -108,6 +125,7 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -119,6 +137,7 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -130,6 +149,7 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -141,6 +161,7 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -152,6 +173,7 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -163,8 +185,11 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "baton"
   },
   {
    "id": "CHR_M_Elder_002",
@@ -174,8 +199,11 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "canne"
   },
   {
    "id": "CHR_M_Elder_003",
@@ -185,8 +213,9 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "pretre (livre, chapelet)"
   },
   {
    "id": "CHR_F_Elder_001",
@@ -196,8 +225,11 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "panier"
   },
   {
    "id": "CHR_F_Elder_002",
@@ -207,8 +239,11 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "canne"
   },
   {
    "id": "CHR_F_Elder_003",
@@ -218,6 +253,7 @@
    "sheet": "Sheets/serie-1.png",
    "in_game": false,
    "facing": "left",
+   "jobs": [],
    "pose": "assis",
    "note": ""
   },
@@ -229,8 +265,9 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "porteur (sac)"
   },
   {
    "id": "CHR_M_Adult_006",
@@ -240,8 +277,11 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "baton de marche"
   },
   {
    "id": "CHR_M_Adult_007",
@@ -251,8 +291,9 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "porteur (poutre)"
   },
   {
    "id": "CHR_M_Adult_008",
@@ -262,8 +303,9 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "artisan (hachette)"
   },
   {
    "id": "CHR_M_Adult_009",
@@ -273,8 +315,9 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "pecheur (filet)"
   },
   {
    "id": "CHR_M_Adult_010",
@@ -284,8 +327,11 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "baton de marche"
   },
   {
    "id": "CHR_M_Adult_011",
@@ -295,8 +341,9 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "moine"
   },
   {
    "id": "CHR_M_Adult_012",
@@ -306,8 +353,9 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "garde (lance, bouclier)"
   },
   {
    "id": "CHR_F_Adult_005",
@@ -317,8 +365,11 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "panier"
   },
   {
    "id": "CHR_F_Adult_006",
@@ -328,8 +379,11 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "mains vides"
   },
   {
    "id": "CHR_F_Adult_007",
@@ -339,8 +393,9 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "porteuse d'eau (cruche)"
   },
   {
    "id": "CHR_F_Adult_008",
@@ -350,8 +405,11 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "panier"
   },
   {
    "id": "CHR_F_Adult_009",
@@ -361,8 +419,11 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "panier"
   },
   {
    "id": "CHR_F_Adult_010",
@@ -372,8 +433,11 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "herbes"
   },
   {
    "id": "CHR_F_Adult_011",
@@ -383,8 +447,9 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "porteuse (cruche, panier)"
   },
   {
    "id": "CHR_F_Adult_012",
@@ -394,8 +459,9 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "mere (bebe)"
   },
   {
    "id": "CHR_M_Child_004",
@@ -405,6 +471,7 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -416,6 +483,7 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -427,6 +495,7 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": false,
    "facing": "left",
+   "jobs": [],
    "pose": "court",
    "note": ""
   },
@@ -438,6 +507,7 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -449,6 +519,7 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -460,6 +531,7 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -471,6 +543,7 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -482,6 +555,7 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -493,6 +567,7 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -504,6 +579,7 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -515,6 +591,7 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -526,6 +603,7 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -537,8 +615,11 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "baton"
   },
   {
    "id": "CHR_M_Elder_005",
@@ -548,8 +629,9 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "pretre"
   },
   {
    "id": "CHR_M_Elder_006",
@@ -559,6 +641,7 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": false,
    "facing": "left",
+   "jobs": [],
    "pose": "assis",
    "note": ""
   },
@@ -570,8 +653,9 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "moine (chapelet)"
   },
   {
    "id": "CHR_F_Elder_004",
@@ -581,8 +665,11 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "panier"
   },
   {
    "id": "CHR_F_Elder_005",
@@ -592,8 +679,11 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "canne"
   },
   {
    "id": "CHR_F_Elder_006",
@@ -603,8 +693,11 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "mains vides"
   },
   {
    "id": "CHR_F_Elder_007",
@@ -614,6 +707,7 @@
    "sheet": "Sheets/serie-2.png",
    "in_game": false,
    "facing": "left",
+   "jobs": [],
    "pose": "assis",
    "note": ""
   },
@@ -625,8 +719,9 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "porteuse d'eau (amphore)"
   },
   {
    "id": "CHR_F_Adult_014",
@@ -636,8 +731,11 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "mains vides"
   },
   {
    "id": "CHR_F_Adult_015",
@@ -647,8 +745,11 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "deux paniers d'herbes"
   },
   {
    "id": "CHR_F_Adult_016",
@@ -658,8 +759,9 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "femme pieuse (croix)"
   },
   {
    "id": "CHR_F_Adult_017",
@@ -669,8 +771,9 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "tisseuse (etoffes)"
   },
   {
    "id": "CHR_F_Adult_018",
@@ -680,8 +783,9 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "boulangere (pain)"
   },
   {
    "id": "CHR_F_Adult_019",
@@ -691,8 +795,11 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "panier de fruits"
   },
   {
    "id": "CHR_F_Adult_020",
@@ -702,8 +809,9 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "artisane (panier, sacoche)"
   },
   {
    "id": "CHR_F_Adult_021",
@@ -713,8 +821,11 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "herbes"
   },
   {
    "id": "CHR_F_Adult_022",
@@ -724,8 +835,9 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "porteuse de bois"
   },
   {
    "id": "CHR_F_Adult_023",
@@ -735,8 +847,11 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "mains vides"
   },
   {
    "id": "CHR_F_Adult_024",
@@ -746,8 +861,9 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "voyageuse (baton)"
   },
   {
    "id": "CHR_F_Child_010",
@@ -757,6 +873,7 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -768,6 +885,7 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -779,6 +897,7 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -790,6 +909,7 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -801,6 +921,7 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -812,6 +933,7 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -823,8 +945,11 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "canne"
   },
   {
    "id": "CHR_F_Elder_010",
@@ -834,6 +959,7 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": false,
    "facing": "left",
+   "jobs": [],
    "pose": "assis",
    "note": ""
   },
@@ -845,6 +971,7 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": false,
    "facing": "left",
+   "jobs": [],
    "pose": "assis",
    "note": ""
   },
@@ -856,8 +983,11 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "herbes"
   },
   {
    "id": "CHR_F_Elder_013",
@@ -867,6 +997,7 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": false,
    "facing": "left",
+   "jobs": [],
    "pose": "assis",
    "note": ""
   },
@@ -878,6 +1009,7 @@
    "sheet": "Sheets/serie-4.png",
    "in_game": false,
    "facing": "left",
+   "jobs": [],
    "pose": "assis",
    "note": ""
   },
@@ -889,8 +1021,11 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "farmer"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "fourche"
   },
   {
    "id": "CHR_M_Adult_014",
@@ -900,8 +1035,9 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "pecheur (filet)"
   },
   {
    "id": "CHR_M_Adult_015",
@@ -911,8 +1047,9 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "bucheron (hache)"
   },
   {
    "id": "CHR_M_Adult_016",
@@ -922,8 +1059,11 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "mains vides, outils a la ceinture"
   },
   {
    "id": "CHR_M_Adult_017",
@@ -933,8 +1073,11 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "mains vides"
   },
   {
    "id": "CHR_M_Adult_018",
@@ -944,8 +1087,9 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "porteur (hotte)"
   },
   {
    "id": "CHR_M_Adult_019",
@@ -955,8 +1099,11 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "mains vides"
   },
   {
    "id": "CHR_M_Adult_020",
@@ -966,8 +1113,9 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "garde (lance, bouclier)"
   },
   {
    "id": "CHR_M_Adult_021",
@@ -977,8 +1125,9 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "moine (livre)"
   },
   {
    "id": "CHR_M_Adult_022",
@@ -988,8 +1137,9 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "berger (houlette)"
   },
   {
    "id": "CHR_M_Adult_023",
@@ -999,8 +1149,9 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "voyageur (baton)"
   },
   {
    "id": "CHR_M_Adult_024",
@@ -1010,8 +1161,9 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
-   "note": ""
+   "note": "bucheron (hache, fagot)"
   },
   {
    "id": "CHR_M_Child_010",
@@ -1021,6 +1173,7 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -1032,6 +1185,7 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -1043,6 +1197,7 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -1054,6 +1209,7 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -1065,6 +1221,7 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -1076,6 +1233,7 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [],
    "pose": "debout",
    "note": ""
   },
@@ -1087,8 +1245,11 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": true,
    "facing": "left",
+   "jobs": [
+    "settler"
+   ],
    "pose": "debout",
-   "note": ""
+   "note": "canne"
   },
   {
    "id": "CHR_M_Elder_010",
@@ -1098,6 +1259,7 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": false,
    "facing": "left",
+   "jobs": [],
    "pose": "assis",
    "note": ""
   },
@@ -1109,6 +1271,7 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": false,
    "facing": "left",
+   "jobs": [],
    "pose": "assis",
    "note": ""
   },
@@ -1120,6 +1283,7 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": false,
    "facing": "left",
+   "jobs": [],
    "pose": "assis",
    "note": ""
   },
@@ -1131,6 +1295,7 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": false,
    "facing": "left",
+   "jobs": [],
    "pose": "assis",
    "note": ""
   },
@@ -1142,6 +1307,7 @@
    "sheet": "Sheets/serie-5.png",
    "in_game": false,
    "facing": "left",
+   "jobs": [],
    "pose": "assis",
    "note": ""
   }

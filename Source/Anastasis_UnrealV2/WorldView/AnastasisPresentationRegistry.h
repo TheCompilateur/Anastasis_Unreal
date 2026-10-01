@@ -179,6 +179,14 @@ struct FAnastasisVillagerLook
 	 */
 	UPROPERTY(EditAnywhere, Category = "Villagers")
 	bool bInGame = true;
+
+	/**
+	 * Simulated jobs (AnastasisVillage::FNpc::JobId: "settler", "farmer") this portrait may stand for.
+	 * The object in the painted hands is the job's: a pitchfork or a basket for a farmer, empty hands
+	 * for a settler. Empty: no simulated job matches (guard, monk, fisher...), never handed out.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Villagers")
+	TArray<FName> Jobs;
 };
 
 /** What one semantic type looks like. The simulation never sees this struct. */

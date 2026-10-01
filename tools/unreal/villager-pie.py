@@ -10,10 +10,11 @@ Puis `Anastasis.Village.FirstWell 12` : le scenario REMPLACE ce village (12 habi
 A chaque echantillon (GetVillagerCards) :
   - une carte par habitant simule, ni plus ni moins ;
   - portraits tous differents (12 <= 24 portraits attribuables) ;
-  - adultes et aines seulement (la simulation n'a pas d'enfants), jamais un portrait assis ;
+  - adultes et aines debout seulement, et du METIER simule de l'habitant (l'objet peint est celui
+    du metier : fourche ou panier pour un fermier, mains vides sans metier) ;
   - carte cachee <=> habitant dedans.
 Prises : 00-demarrage (le village du lancement), 01-proche (un habitant, carte seule), 02-debug (sa sphere de simulation + sa carte :
-memes pieds), 03-voisins (lui et son plus proche voisin) ; puis `Anastasis.Village.RemoveNpc` : la carte de l'habitant retire disparait.
+memes pieds), 03-voisins (lui et son plus proche voisin), 05-fermier (`FirstFarmer 1`) ; puis `Anastasis.Village.RemoveNpc` : la carte de l'habitant retire disparait.
 Une verification qui echoue echoue ; jamais de PASS raconte.
 """
 import json
@@ -30,8 +31,9 @@ NPC_COUNT = int(os.environ.get('ANASTASIS_VILLAGER_PIE_NPCS', '12'))
 START_COUNT = 12  # anastasis.Village.StartVillagers par defaut
 # Les portraits attribuables : debout, adultes et aines (ecrit par villager-png.py sheets).
 EXTRACT = ROOT / 'SourceArt' / 'Characters' / 'villager-extract.json'
-IN_GAME = {p['id'] for p in json.loads(EXTRACT.read_text(encoding='utf-8'))['people']
-           if p.get('in_game', True) and not p['category'].startswith('Child')}
+# Portrait -> metiers simules dont il porte l'objet (debout, adultes et aines).
+JOBS = {p['id']: set(p.get('jobs', [])) for p in json.loads(EXTRACT.read_text(encoding='utf-8'))['people']
+        if p.get('in_game', True) and not p['category'].startswith('Child')}
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 DBG = unreal.AnastasisSimulationDebugLibrary
@@ -55,7 +57,7 @@ def finish(reason):
     if state['finished']:
         return
     state['finished'] = True
-    ok = not state['failures'] and all(s['written'] for s in state['shots']) and len(state['shots']) == 4
+    ok = not state['failures'] and all(s['written'] for s in state['shots']) and len(state['shots']) == 5
     report = {'pass': ok, 'reason': reason, 'failures': state['failures'], 'shots': state['shots'], 'checks': state['checks']}
     (OUT / 'villager-pie.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
     log(('PASS ' if ok else 'FAIL ') + reason + ('' if ok else ' ' + json.dumps(state['failures'])))
@@ -78,8 +80,9 @@ def check(c, label):
         errs.append('habitant sans carte')
     if len(set(looks)) != len(looks) and len(looks) <= 24:
         errs.append('portraits en double: %s' % sorted(looks))
-    if any(l not in IN_GAME for l in looks if l):
-        errs.append('portrait non attribuable (enfant ou assis): %s' % [l for l in looks if l and l not in IN_GAME])
+    wrong = ['%s(%s)=%s' % (x['npc'], x['job'], x['look']) for x in v if x['look'] and x['job'] not in JOBS.get(x['look'], set())]
+    if wrong:
+        errs.append('portrait d un autre metier, assis ou enfant: %s' % wrong)
     if any(x['hidden'] != x['inside'] for x in v):
         errs.append('carte cachee != habitant dedans')
     state['checks'].append({'at': label, 'npcs': c.get('npcs'), 'cards': c.get('cards'), 'errors': errs})
@@ -241,7 +244,26 @@ def tick(dt):
         state['checks'].append({'at': '04-retrait', 'removed': r, 'cards_after': c['cards'], 'ok': ok})
         if not ok:
             state['failures'].append('04-retrait: carte de %s encore presente ou compte faux (%d -> %d)' % (r['npc'], r['before'], c['cards']))
-        finish('%d habitants, %d cartes, portraits distincts, retrait suivi' % (c['npcs'] + 1, r['before']))
+        # Un fermier embauche : son portrait doit porter un outil de fermier.
+        unreal.SystemLibrary.execute_console_command(world, 'Anastasis.Village.FirstFarmer 1')
+        log('SCENARIO FirstFarmer 1')
+        state['seeded_at'] = time.monotonic()
+    elif step == 7:
+        farmers = [x for x in v if x['job'] == 'farmer']
+        if not farmers:
+            if time.monotonic() - state['seeded_at'] < 15:
+                return
+            state['failures'].append('05-fermier: aucun habitant de metier farmer apres FirstFarmer')
+            finish('pas de fermier')
+            return
+        check(c, '05-fermier')
+        x = farmers[0]
+        log('FRAME 05-fermier %s %s' % (x['npc'], x['look']))
+        shoot(world, '05-fermier', x['npc'], unreal.Vector(-260, -340, 40))
+    elif step == 8:
+        farmers = [x for x in v if x['job'] == 'farmer']
+        finish('%d habitants, portraits distincts et du bon metier, retrait suivi, fermier %s en %s' % (
+            state['removed']['before'], farmers[0]['npc'] if farmers else '-', farmers[0]['look'] if farmers else '-'))
         return
     state['step'] += 1
 

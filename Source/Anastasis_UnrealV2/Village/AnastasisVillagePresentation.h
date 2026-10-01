@@ -42,7 +42,8 @@ public:
 	/**
 	 * VILLAGER_PNG_001 -- une carte portrait par habitant simule, meme sens unique que les
 	 * batiments : un habitant present -> une carte a ses pieds, son portrait choisi par
-	 * AnastasisVillagerLooks dans le registre de presentation ; un habitant disparu -> la carte
+	 * AnastasisVillagerLooks dans le registre de presentation, parmi ceux de son METIER simule
+	 * (l'objet peint est celui du metier) ; un metier qui change -> la carte redessinee ; un habitant disparu -> la carte
 	 * detruite ; un habitant dedans -> la carte cachee. `bEnabled` faux retire toutes les cartes.
 	 * Rend le nombre de cartes creees + detruites.
 	 */
@@ -68,5 +69,7 @@ public:
 private:
 	TMap<FString, TWeakObjectPtr<AAnastasisVillageBuilding>> Actors;
 	TMap<FString, TWeakObjectPtr<AAnastasisVillagerVisual>> Villagers;
+	/** The simulated job each card was drawn for: a change of job redraws the card. */
+	TMap<FString, FName> VillagerJobs;
 	bool bWarnedNoLooks = false;
 };

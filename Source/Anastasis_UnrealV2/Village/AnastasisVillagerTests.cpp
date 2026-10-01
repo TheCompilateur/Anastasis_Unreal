@@ -58,6 +58,7 @@ namespace AnastasisVillagerTest
 				Look.LookId = FName(*FString::Printf(TEXT("%s%03d"), Row.Prefix, I));
 				Look.Category = Row.Category;
 				Look.Portrait = PortraitFor(Looks.Num());
+				Look.Jobs = { FName(TEXT("settler")) };
 				Looks.Add(Look);
 			}
 		}
@@ -82,6 +83,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FAnastasisVillagerLookPoolTest::RunTest(const FString&)
 {
 	using namespace AnastasisVillagerLooks;
+	const FName Settler(TEXT("settler"));
+	const FName Farmer(TEXT("farmer"));
 	const auto FakePortrait = [](int32 Index)
 	{
 		return TSoftObjectPtr<UTexture2D>(FSoftObjectPath(FString::Printf(TEXT("/Game/Fake/T_%d.T_%d"), Index, Index)));
@@ -89,7 +92,7 @@ bool FAnastasisVillagerLookPoolTest::RunTest(const FString&)
 	TArray<FAnastasisVillagerLook> Looks = AnastasisVillagerTest::ManifestShapedLooks(FakePortrait);
 	TestEqual(TEXT("32 individus"), Looks.Num(), 32);
 
-	const TArray<int32> Pool = VillagePool(Looks);
+	const TArray<int32> Pool = VillagePool(Looks, Settler);
 	TestEqual(TEXT("adultes et aines seulement : 24"), Pool.Num(), 24);
 	for (int32 Index : Pool)
 	{
@@ -99,7 +102,7 @@ bool FAnastasisVillagerLookPoolTest::RunTest(const FString&)
 	// Ordre des entrees inverse : memes visages pour les memes habitants.
 	TArray<FAnastasisVillagerLook> Reversed = Looks;
 	Algo::Reverse(Reversed);
-	const TArray<int32> PoolReversed = VillagePool(Reversed);
+	const TArray<int32> PoolReversed = VillagePool(Reversed, Settler);
 	TSet<FName> Distinct;
 	for (int32 N = 0; N < 60; ++N)
 	{
@@ -146,13 +149,53 @@ bool FAnastasisVillagerLookPoolTest::RunTest(const FString&)
 	TestEqual(TEXT("pool vide : aucun visage"), PickLook(TArray<int32>(), TEXT("npc-0")), static_cast<int32>(INDEX_NONE));
 
 	Looks[Pool[0]].Portrait.Reset();
-	TestEqual(TEXT("une entree sans portrait sort du tirage"), VillagePool(Looks).Num(), 23);
+	TestEqual(TEXT("une entree sans portrait sort du tirage"), VillagePool(Looks, Settler).Num(), 23);
 	Looks[Pool[1]].bInGame = false;
-	TestEqual(TEXT("un portrait assis (bInGame faux) sort du tirage"), VillagePool(Looks).Num(), 22);
+	TestEqual(TEXT("un portrait assis (bInGame faux) sort du tirage"), VillagePool(Looks, Settler).Num(), 22);
 	for (int32 N = 0; N < 40; ++N)
 	{
-		TestTrue(TEXT("jamais attribue s'il est hors jeu"), Looks[PickLook(VillagePool(Looks), FString::Printf(TEXT("npc-%d"), N))].bInGame);
+		TestTrue(TEXT("jamais attribue s'il est hors jeu"), Looks[PickLook(VillagePool(Looks, Settler), FString::Printf(TEXT("npc-%d"), N))].bInGame);
 	}
+
+	// Le metier choisit le pool : l'objet peint est celui du metier simule.
+	TArray<FAnastasisVillagerLook> ByJob = AnastasisVillagerTest::ManifestShapedLooks(FakePortrait);
+	TSet<FName> Farmers;
+	for (FAnastasisVillagerLook& Look : ByJob)
+	{
+		const FString Id = Look.LookId.ToString();
+		if (Id == TEXT("CHR_M_Adult_001") || Id == TEXT("CHR_F_Adult_001") || Id == TEXT("CHR_F_Adult_002") || Id == TEXT("CHR_F_Elder_001"))
+		{
+			Look.Jobs = { Farmer };
+			Farmers.Add(Look.LookId);
+		}
+		if (Id == TEXT("CHR_M_Adult_002"))
+		{
+			Look.Jobs.Reset();  // un garde : aucun metier simule
+		}
+	}
+	const TArray<int32> FarmerPool = VillagePool(ByJob, Farmer);
+	const TArray<int32> SettlerPool = VillagePool(ByJob, Settler);
+	TestEqual(TEXT("pool fermier : les quatre portraits du metier"), FarmerPool.Num(), 4);
+	TestEqual(TEXT("pool sans-metier : 24 - 4 fermiers - 1 garde"), SettlerPool.Num(), 19);
+	for (int32 Index : FarmerPool)
+	{
+		TestTrue(TEXT("un fermier porte un portrait de fermier"), Farmers.Contains(ByJob[Index].LookId));
+	}
+	for (int32 Index : SettlerPool)
+	{
+		TestFalse(TEXT("un sans-metier ne porte jamais l'outil d'un fermier"), Farmers.Contains(ByJob[Index].LookId));
+		TestFalse(TEXT("un portrait sans metier simule n'est jamais attribue"), ByJob[Index].LookId == FName(TEXT("CHR_M_Adult_002")));
+	}
+	TestEqual(TEXT("metier inconnu : aucun portrait"), VillagePool(ByJob, FName(TEXT("guard"))).Num(), 0);
+
+	// Demographie du village, pas des planches : 12 habitants, au plus 4 aines (15 % + 15 %).
+	int32 Elders = 0;
+	for (int32 N = 0; N < 12; ++N)
+	{
+		const EAnastasisVillagerCategory C = ByJob[PickLook(SettlerPool, FString::Printf(TEXT("npc-%d"), N))].Category;
+		Elders += (C == EAnastasisVillagerCategory::ElderMale || C == EAnastasisVillagerCategory::ElderFemale) ? 1 : 0;
+	}
+	TestTrue(*FString::Printf(TEXT("12 habitants : %d aines, au plus 4"), Elders), Elders <= 4 && Elders >= 2);
 	return true;
 }
 
@@ -236,6 +279,22 @@ bool FAnastasisVillagerPresentationTest::RunTest(const FString&)
 	TestTrue(TEXT("face a la vue, en lacet seulement"), First->GetActorRotation().Equals(FRotator(0.0, 90.0, 0.0), 0.01));
 	First->SetMirrored(true);
 	TestTrue(TEXT("miroir pose"), First->IsMirrored());
+
+	// Embauche : le metier change, l'objet peint doit suivre -- carte detruite puis recreee.
+	for (FAnastasisVillagerLook& Look : Registry->Villagers)
+	{
+		if (Look.Category == EAnastasisVillagerCategory::AdultFemale)
+		{
+			Look.Jobs = { FName(TEXT("farmer")) };
+		}
+	}
+	Village.FindNpcMutable(Ids[2])->JobId = TEXT("farmer");
+	TestEqual(TEXT("metier change : une destruction, une creation"), Presentation.SyncVillagers(Village, Sim.GetWorld(), World, *Registry, true), 2);
+	const FString NewLook = Presentation.FindVillager(Ids[2])->GetLookId().ToString();
+	TestTrue(*FString::Printf(TEXT("le fermier porte un portrait de fermier (%s)"), *NewLook), NewLook.StartsWith(TEXT("CHR_F_Adult_")));
+	TestEqual(TEXT("metier inchange : rien a refaire"), Presentation.SyncVillagers(Village, Sim.GetWorld(), World, *Registry, true), 0);
+	Village.FindNpcMutable(Ids[2])->JobId = TEXT("settler");
+	Presentation.SyncVillagers(Village, Sim.GetWorld(), World, *Registry, true);
 
 	// Dedans : la position reste le seuil, la carte se cache.
 	Village.FindNpcMutable(Ids[1])->Inside.bActive = true;

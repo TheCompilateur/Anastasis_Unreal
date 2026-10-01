@@ -372,7 +372,7 @@
     }
   ],
   "overrides": {
-    "_doc": "pose 'assis' : portrait sur la planche, jamais attribue a un habitant qui marche ; stature = 72 % de la categorie. Releve a l'oeil sur les planches decoupees, 2026-10-01.",
+    "_doc": "pose 'assis' : portrait sur la planche, jamais attribue a un habitant qui marche ; stature = 72 % de la categorie. job : metier SIMULE dont le portrait porte l'objet (farmer) ou mains vides (settler) ; sans job, le portrait reste sur la planche (role que la simulation n'a pas). Releve a l'oeil sur les planches decoupees, 2026-10-01.",
     "CHR_F_Elder_003": {
       "pose": "assis"
     },
@@ -414,6 +414,223 @@
     },
     "CHR_M_Child_006": {
       "pose": "court"
+    },
+    "CHR_M_Adult_001": {
+      "note": "fourche",
+      "job": "farmer"
+    },
+    "CHR_M_Adult_013": {
+      "note": "fourche",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_001": {
+      "note": "panier",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_003": {
+      "note": "herbes",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_004": {
+      "note": "panier",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_005": {
+      "note": "panier",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_008": {
+      "note": "panier",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_009": {
+      "note": "panier",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_010": {
+      "note": "herbes",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_019": {
+      "note": "panier de fruits",
+      "job": "farmer"
+    },
+    "CHR_F_Adult_021": {
+      "note": "herbes",
+      "job": "farmer"
+    },
+    "CHR_F_Elder_001": {
+      "note": "panier",
+      "job": "farmer"
+    },
+    "CHR_F_Elder_004": {
+      "note": "panier",
+      "job": "farmer"
+    },
+    "CHR_F_Elder_012": {
+      "note": "herbes",
+      "job": "farmer"
+    },
+    "CHR_M_Adult_006": {
+      "note": "baton de marche",
+      "job": "settler"
+    },
+    "CHR_M_Adult_010": {
+      "note": "baton de marche",
+      "job": "settler"
+    },
+    "CHR_M_Adult_016": {
+      "note": "mains vides, outils a la ceinture",
+      "job": "settler"
+    },
+    "CHR_M_Adult_017": {
+      "note": "mains vides",
+      "job": "settler"
+    },
+    "CHR_M_Adult_019": {
+      "note": "mains vides",
+      "job": "settler"
+    },
+    "CHR_F_Adult_006": {
+      "note": "mains vides",
+      "job": "settler"
+    },
+    "CHR_F_Adult_014": {
+      "note": "mains vides",
+      "job": "settler"
+    },
+    "CHR_F_Adult_023": {
+      "note": "mains vides",
+      "job": "settler"
+    },
+    "CHR_M_Elder_001": {
+      "note": "baton",
+      "job": "settler"
+    },
+    "CHR_M_Elder_002": {
+      "note": "canne",
+      "job": "settler"
+    },
+    "CHR_M_Elder_004": {
+      "note": "baton",
+      "job": "settler"
+    },
+    "CHR_M_Elder_009": {
+      "note": "canne",
+      "job": "settler"
+    },
+    "CHR_F_Elder_002": {
+      "note": "canne",
+      "job": "settler"
+    },
+    "CHR_F_Elder_005": {
+      "note": "canne",
+      "job": "settler"
+    },
+    "CHR_F_Elder_006": {
+      "note": "mains vides",
+      "job": "settler"
+    },
+    "CHR_F_Elder_009": {
+      "note": "canne",
+      "job": "settler"
+    },
+    "CHR_M_Adult_004": {
+      "note": "garde (lance, bouclier)"
+    },
+    "CHR_M_Adult_012": {
+      "note": "garde (lance, bouclier)"
+    },
+    "CHR_M_Adult_020": {
+      "note": "garde (lance, bouclier)"
+    },
+    "CHR_M_Adult_011": {
+      "note": "moine"
+    },
+    "CHR_M_Adult_021": {
+      "note": "moine (livre)"
+    },
+    "CHR_M_Elder_003": {
+      "note": "pretre (livre, chapelet)"
+    },
+    "CHR_M_Elder_005": {
+      "note": "pretre"
+    },
+    "CHR_M_Elder_007": {
+      "note": "moine (chapelet)"
+    },
+    "CHR_M_Adult_002": {
+      "note": "porteur (marteau, sac)"
+    },
+    "CHR_M_Adult_005": {
+      "note": "porteur (sac)"
+    },
+    "CHR_M_Adult_007": {
+      "note": "porteur (poutre)"
+    },
+    "CHR_M_Adult_018": {
+      "note": "porteur (hotte)"
+    },
+    "CHR_M_Adult_003": {
+      "note": "artisan (marteau)"
+    },
+    "CHR_M_Adult_008": {
+      "note": "artisan (hachette)"
+    },
+    "CHR_F_Adult_017": {
+      "note": "tisseuse (etoffes)"
+    },
+    "CHR_F_Adult_018": {
+      "note": "boulangere (pain)"
+    },
+    "CHR_F_Adult_020": {
+      "note": "artisane (panier, sacoche)"
+    },
+    "CHR_M_Adult_009": {
+      "note": "pecheur (filet)"
+    },
+    "CHR_M_Adult_014": {
+      "note": "pecheur (filet)"
+    },
+    "CHR_M_Adult_015": {
+      "note": "bucheron (hache)"
+    },
+    "CHR_M_Adult_024": {
+      "note": "bucheron (hache, fagot)"
+    },
+    "CHR_F_Adult_022": {
+      "note": "porteuse de bois"
+    },
+    "CHR_M_Adult_022": {
+      "note": "berger (houlette)"
+    },
+    "CHR_M_Adult_023": {
+      "note": "voyageur (baton)"
+    },
+    "CHR_F_Adult_024": {
+      "note": "voyageuse (baton)"
+    },
+    "CHR_F_Adult_002": {
+      "note": "porteuse d'eau (cruche)"
+    },
+    "CHR_F_Adult_007": {
+      "note": "porteuse d'eau (cruche)"
+    },
+    "CHR_F_Adult_011": {
+      "note": "porteuse (cruche, panier)"
+    },
+    "CHR_F_Adult_013": {
+      "note": "porteuse d'eau (amphore)"
+    },
+    "CHR_F_Adult_012": {
+      "note": "mere (bebe)"
+    },
+    "CHR_F_Adult_016": {
+      "note": "femme pieuse (croix)"
+    },
+    "CHR_F_Adult_015": {
+      "note": "deux paniers d'herbes",
+      "job": "farmer"
     }
   }
 }

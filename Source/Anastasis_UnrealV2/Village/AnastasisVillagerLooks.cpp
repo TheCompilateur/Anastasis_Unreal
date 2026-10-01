@@ -19,14 +19,30 @@ namespace AnastasisVillagerLooks
 		}
 	}
 
-	TArray<int32> VillagePool(const TArray<FAnastasisVillagerLook>& Looks)
+	double VillageShare(EAnastasisVillagerCategory Category)
+	{
+		switch (Category)
+		{
+		case EAnastasisVillagerCategory::AdultMale:
+		case EAnastasisVillagerCategory::AdultFemale:
+			return 0.35;
+		case EAnastasisVillagerCategory::ElderMale:
+		case EAnastasisVillagerCategory::ElderFemale:
+			return 0.15;
+		default:
+			return 0.0;
+		}
+	}
+
+	TArray<int32> VillagePool(const TArray<FAnastasisVillagerLook>& Looks, FName Job)
 	{
 		// One queue per category, each in CRC order of its ids: stable on the id, not on the asset
 		// order, so re-importing in another order changes nobody's face.
 		TSortedMap<uint8, TArray<int32>> Queues;
 		for (int32 Index = 0; Index < Looks.Num(); ++Index)
 		{
-			if (IsAssignableInVillage(Looks[Index].Category) && Looks[Index].bInGame && !Looks[Index].Portrait.IsNull())
+			const FAnastasisVillagerLook& Look = Looks[Index];
+			if (IsAssignableInVillage(Look.Category) && Look.bInGame && Look.Jobs.Contains(Job) && !Look.Portrait.IsNull())
 			{
 				Queues.FindOrAdd(static_cast<uint8>(Looks[Index].Category)).Add(Index);
 			}
@@ -43,9 +59,9 @@ namespace AnastasisVillagerLooks
 			Total += Queue.Value.Num();
 		}
 
-		// Proportional interleave: next comes the category furthest behind its share. A pure CRC
-		// order gave 8 women out of the first 12 villagers (first PIE run); with 8/8/4/4 portraits
-		// this yields man, woman, old man, old woman, man, woman... at every village size.
+		// Next comes the category furthest behind its VILLAGE share. A pure CRC order gave 8 women out
+		// of the first 12 villagers (first PIE run); a share proportional to the portrait counts gave
+		// a village half old (the settler pool is 8 adults for 8 elders).
 		TArray<int32> Pool;
 		TMap<uint8, int32> Taken;
 		while (Pool.Num() < Total)
@@ -60,7 +76,7 @@ namespace AnastasisVillagerLooks
 				{
 					continue;
 				}
-				const double Progress = (Used + 0.5) / Queue.Value.Num();
+				const double Progress = (Used + 0.5) / VillageShare(static_cast<EAnastasisVillagerCategory>(Queue.Key));
 				if (Progress < BestProgress)
 				{
 					Best = &Queue.Value;

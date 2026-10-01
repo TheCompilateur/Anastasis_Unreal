@@ -3,8 +3,10 @@
 Mission : donner un visage aux habitants de la simulation, par des PNG detoures, **sans toucher au
 simulateur**, et les faire apparaitre dans le jeu.
 
-**Etat (2026-10-01)** : 104 individus decoupes des planches d'Alexandre, importes, attribues ; au
-lancement du jeu, 12 habitants portent deja leur portrait, sans aucune commande.
+**Etat (2026-10-01)** : 104 individus decoupes des planches d'Alexandre, importes ; au lancement du
+jeu, 12 habitants portent deja leur portrait, sans aucune commande. **Un portrait ne porte que l'objet
+du metier simule de son habitant** : fourche ou panier pour un fermier, mains vides sans metier ; garde,
+moine, pecheur, mere au bebe... restent sur la planche tant que la simulation n'a pas ces roles.
 
 ## 1. Ce qui existait (inspecte, pas suppose)
 
@@ -90,10 +92,23 @@ Les preuves PIE des autres missions retrouvent donc exactement l'etat d'avant.
 
 ### 3.5 Attribution (`AnastasisVillagerLooks`)
 
-Pool = portraits adultes et aines, `bInGame` (debout). Chaque categorie ordonnee par CRC de l'id,
-categories entrelacees en proportion : tout village de N habitants reflete la population (autant
-d'hommes que de femmes a toute taille paire, teste). `npc-N` -> N-ieme du pool : les 62 premiers
-habitants ont 62 visages differents. Aucun tirage dans le RNG de la simulation, aucune ecriture.
+**Premiere critique d'Alexandre, 2026-10-01** : « ils prennent leur objet en permanence ». L'objet est
+peint dans le portrait ; le tirer au hasard donnait un garde a bouclier ou une mere au bebe a n'importe
+quel habitant, pour toujours. Correction (point 1 de la critique) :
+
+- chaque portrait debout est etiquete a l'oeil (`overrides` du manifeste, champ `note`) et porte les
+  metiers SIMULES dont il tient l'objet (`FAnastasisVillagerLook::Jobs`) : `farmer` (fourche, panier,
+  herbes : 15 portraits), `settler` (mains vides ; baton ou canne admis : 16) ; les 31 autres (gardes,
+  moines, pretres, porteurs, artisans, pecheurs, bucherons, bergers, voyageurs, porteuses d'eau, mere au
+  bebe, femme a la croix) n'ont aucun metier simule et ne sont jamais attribues ;
+- pool PAR METIER (`VillagePool(Looks, Job)`), entrelace selon la demographie VISEE du village
+  (35 % hommes, 35 % femmes, 15 % + 15 % aines), pas selon le nombre de portraits ;
+- un metier qui change (embauche) redessine la carte dans le pool du nouveau metier -- le visage change
+  avec l'objet, aucun individu des planches n'existant avec deux objets.
+
+`npc-N` -> N-ieme du pool de son metier. Aucun tirage dans le RNG de la simulation, aucune ecriture.
+Pool sans-metier reel : 5 hommes, 3 femmes, 8 aines -- un village de 12 a 5 hommes, 3 femmes, 4 aines
+(seules 3 femmes des planches ont les mains vides).
 
 ## 4. Code
 
@@ -118,7 +133,7 @@ habitants ont 62 visages differents. Aucun tirage dans le RNG de la simulation, 
 | `import-villagers.ps1` | `VILLAGERS_IMPORT::PASS imported=104 registry=104 failures=0`, `MATERIAL_OK` |
 | tests `Anastasis.Village` | 7/7 Success, dont `Villagers.LookPool` (pose assise exclue) et `Villagers.Presentation` (digest du village inchange) |
 | `villager-lineup.ps1 -Label population-v1` | `VILLAGER_LINEUP::PASS shots=13/13` (population entiere puis lots de douze) |
-| `villager-pie.ps1` | `VILLAGER_PIE PASS` : **12 habitants et 12 cartes au lancement, sans commande** (`00-demarrage`) ; `FirstWell 12` remplace ce village (12 habitants, pas 24) ; portraits distincts, aucun assis ; retrait suivi |
+| `villager-pie.ps1` | `VILLAGER_PIE PASS` : **12 habitants et 12 cartes au lancement, sans commande** (`00-demarrage`, tous mains vides / canne / baton) ; `FirstWell 12` remplace ce village (12, pas 24) ; portraits distincts, chacun du metier de son habitant ; retrait suivi ; `FirstFarmer 1` : le fermier `npc-12` porte `CHR_F_Adult_005` (panier) |
 
 Images : `docs/visual/villager-png-001/` -- A a E planches hors moteur ; F `F_jeu_demarrage_sans_commande`,
 G sphere de simulation et carte aux memes pieds, H voisins devant le puits, I a K planches dans Unreal.
@@ -132,6 +147,13 @@ PIE vides (gel PUIS cadrage). La premiere prise `02-debug` vide n'a pas de cause
 montre aucune reprise de vue par le controleur ; elle est passee au run suivant, habitant immobile.
 
 ## 6. Limites connues
+
+- **Pose fixe quelle que soit l'activite** : le simulateur fait boire, manger, se reposer, se detendre ;
+  la carte reste la meme image debout. Changer de portrait selon l'activite changerait la PERSONNE :
+  il faut la meme personne dans plusieurs poses (point 2 de la critique).
+- **Glisse sans marcher**, **face camera** (pas de dos ni de profil), **lumiere peinte contre lumiere du
+  moteur**, **2D peinte dans un monde 3D simple** : limites de la carte elle-meme (point 3 : personnages
+  3D de pres, cartes au loin).
 
 - **Hommes adultes** : le groupe le plus repetitif des planches (bruns barbus de 30-40 ans, distingues
   surtout par le couvre-chef et la silhouette). Le detecteur ne crie pas au clone ; l'oeil, un peu.

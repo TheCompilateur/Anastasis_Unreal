@@ -29,13 +29,19 @@ namespace AnastasisVillagerLooks
 	bool IsAssignableInVillage(EAnastasisVillagerCategory Category);
 
 	/**
-	 * Indices into `Looks` of the portraits a villager may wear. Each category is ordered by CRC
-	 * of LookId (independent of the asset order); the categories are then interleaved in
-	 * proportion to their size, so any first N villagers mirror the population's make-up
-	 * (8/8/4/4: man, woman, old man, old woman, man, woman...). Entries without a portrait, or
-	 * marked !bInGame (a seated pose), are left out.
+	 * Target make-up of a village, by category: 35 % men, 35 % women, 15 % old men, 15 % old women.
+	 * Interleaving in proportion to the PORTRAIT counts gave a village half old (the settler pool
+	 * holds as many elders as adults); the share is the village's, not the sheets'.
 	 */
-	TArray<int32> VillagePool(const TArray<FAnastasisVillagerLook>& Looks);
+	double VillageShare(EAnastasisVillagerCategory Category);
+
+	/**
+	 * Indices into `Looks` of the portraits a villager of this simulated job may wear: the job is in
+	 * Look.Jobs, the pose is a walking one (bInGame), the category is assignable, the portrait is set.
+	 * Each category is ordered by CRC of LookId (independent of the asset order); the categories are
+	 * then interleaved by VillageShare, so any first N villagers mirror the village's make-up.
+	 */
+	TArray<int32> VillagePool(const TArray<FAnastasisVillagerLook>& Looks, FName Job);
 
 	/**
 	 * Index into `Looks` for this villager, INDEX_NONE if the pool is empty.

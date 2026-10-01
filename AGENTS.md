@@ -331,7 +331,7 @@ Au lancement, `anastasis.Village.StartVillagers` (12) habitants autour du premie
 | `villager-png.py` | **hors editeur** (Python systeme, Pillow + numpy) : `sheets` (decoupe des planches → `Raw/` + `villager-extract.json`, statures mesurees), `prep` (→ `SourceArt/Characters/PNG/<Categorie>/`, canevas 512x1024 = 128x256 cm, pieds alignes), `board` (planches → `docs/visual/villager-png-001/`), `check` (ressemblance silhouette / visage par paire) |
 | `import-villagers.ps1` + `import-villagers.py` | **ecrit** dans `Content/` : textures `/Game/Anastasis/Characters/PNG/<Categorie>/CHR_*` (BC7, sRGB, Character, Clamp, hors streaming, couverture alpha), `M_AnastasisVillager`, et `DA_AnastasisPresentation.Villagers` ; relit, verifie, refuse un materiau qui ne compile pas ; editeur dedie qui se ferme |
 | `villager-lineup.ps1` + `villager-lineup.py` | planche dans Unreal (vrais acteurs `AnastasisVillagerVisual`) : population entiere puis par groupe, sur un arc, temoin 180 cm → `Saved/VillagerEvidence/<Label>/` ; niveau jamais sauve |
-| `villager-pie.ps1` + `villager-pie.py` | preuve PIE : `Anastasis.Village.FirstWell 12`, une carte par habitant, portraits distincts, adultes et aines debout seulement, retrait suivi (`RemoveNpc`) → `Saved/VillagerEvidence/pie/` |
+| `villager-pie.ps1` + `villager-pie.py` | preuve PIE : village du lancement sans commande, puis `FirstWell 12` (le remplace), `RemoveNpc`, `FirstFarmer 1` ; une carte par habitant, portraits distincts et du METIER simule de chacun → `Saved/VillagerEvidence/pie/` |
 
 ## Tests
 

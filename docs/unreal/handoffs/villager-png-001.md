@@ -60,6 +60,13 @@ carte. `PLAYER` reste NOT_IMPLEMENTED.
 - Vitesse apparente des habitants (~80 m/s a `Sim.Speed 1`) : ecart d'echelle anterieur, pas corrige ici.
 - Avance rapide seulement.
 
+## SUITE (critique d'Alexandre, point 1)
+
+Portraits choisis par metier simule (`FAnastasisVillagerLook::Jobs`, pool par metier, demographie visee,
+carte redessinee a l'embauche) : un garde, un moine, une mere au bebe ne sont plus jamais attribues.
+`Anastasis.Village` 7/7 Success ; `VILLAGER_PIE PASS` avec `FirstFarmer 1` (fermier en portrait de
+fermier).
+
 ## STOP
 
 Aucun code de simulation PNJ modifie. Pas d'animation, pas de vues de dos ou de profil, pas de portrait par

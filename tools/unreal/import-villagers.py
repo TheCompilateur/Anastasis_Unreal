@@ -224,6 +224,8 @@ def write_registry(imported, material):
         look.set_editor_property('portrait', tex)
         # Assis : sur la planche, jamais sur un habitant qui marche.
         set_first(look, IN_GAME_NAMES, bool(p.get('in_game', True)))
+        # Metiers simules dont le portrait porte l'objet (vide : jamais attribue).
+        look.set_editor_property('jobs', [unreal.Name(j) for j in p.get('jobs', [])])
         looks.append(look)
     reg.set_editor_property('villagers', looks)
     reg.set_editor_property('villager_material', material)
@@ -262,6 +264,7 @@ def verify(people, canvas):
             'hors_streaming': tex.get_editor_property('never_stream'),
             'categorie': look.get_editor_property('category') == getattr(unreal.AnastasisVillagerCategory, CATEGORY_ENUM[p['category']]),
             'en_jeu': get_first(look, IN_GAME_NAMES) == bool(p.get('in_game', True)),
+            'metiers': sorted(str(j) for j in look.get_editor_property('jobs')) == sorted(p.get('jobs', [])),
         }
         try:
             checks['couverture_alpha'] = bool(tex.get_editor_property('do_scale_mips_for_alpha_coverage'))
@@ -301,7 +304,7 @@ def main():
         material = ensure_material(imported[0][1])
         write_registry(imported, material)
     counts, n = verify(people, manifest['canvas'])
-    log('POPULATION ' + ' '.join('%s=%d' % (c, counts.get(c, 0)) for c in CATEGORY_ENUM) + ' total=%d en_jeu=%d' % (n, sum(1 for p in people if p.get('in_game', True) and not p['category'].startswith('Child') and os.path.exists(os.path.join(SOURCE, p['category'], p['id'] + '.png')))))
+    log('POPULATION ' + ' '.join('%s=%d' % (c, counts.get(c, 0)) for c in CATEGORY_ENUM) + ' total=%d en_jeu=%d' % (n, sum(1 for p in people if p.get('in_game', True) and p.get('jobs') and not p['category'].startswith('Child') and os.path.exists(os.path.join(SOURCE, p['category'], p['id'] + '.png')))))
     print('VILLAGERS_IMPORT::%s imported=%d registry=%d failures=%d' % ('PASS' if not FAILURES else 'FAIL', len(imported), n, len(FAILURES)))
     unreal.log('VILLAGERS_IMPORT::%s imported=%d registry=%d failures=%d' % ('PASS' if not FAILURES else 'FAIL', len(imported), n, len(FAILURES)))
 
