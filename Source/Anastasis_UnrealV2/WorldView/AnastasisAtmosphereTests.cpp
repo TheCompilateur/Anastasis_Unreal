@@ -636,22 +636,22 @@ bool FAnastasisAtmosphereForwardLightOneLeader::RunTest(const FString&)
 			TestTrue(TEXT("apply") + At, Atmosphere->Apply());
 			const UDirectionalLightComponent* SunC = Atmosphere->GetSun() ? Cast<UDirectionalLightComponent>(Atmosphere->GetSun()->GetLightComponent()) : nullptr;
 			const UDirectionalLightComponent* MoonC = Atmosphere->GetMoon() ? Cast<UDirectionalLightComponent>(Atmosphere->GetMoon()->GetLightComponent()) : nullptr;
-			if (!TestNotNull(TEXT("sun") + At, SunC) || !TestNotNull(TEXT("moon") + At, MoonC))
+			if (!TestNotNull(*(TEXT("sun") + At), SunC) || !TestNotNull(*(TEXT("moon") + At), MoonC))
 			{
 				continue;
 			}
 			const bool bNight = Pinned < 6.0f;
 			TestTrue(TEXT("sun and moon never share a forward priority") + At, SunC->ForwardShadingPriority != MoonC->ForwardShadingPriority);
-			TestEqual(TEXT("the leader is the sun by day, the moon by night") + At, Atmosphere->IsMoonLeadingForward(), bNight);
-			TestEqual(TEXT("the leader holds the higher priority") + At,
+			TestTrue(TEXT("the leader is the sun by day, the moon by night") + At, Atmosphere->IsMoonLeadingForward() == bNight);
+			TestEqual(*(TEXT("the leader holds the higher priority") + At),
 				(bNight ? MoonC : SunC)->ForwardShadingPriority, AnastasisSkyClock::ForwardPriorityLead);
 			if (bNight)
 			{
-				TestEqual(TEXT("a set sun scatters nothing in the fog") + At, SunC->VolumetricScatteringIntensity, 0.0f);
+				TestEqual(*(TEXT("a set sun scatters nothing in the fog") + At), SunC->VolumetricScatteringIntensity, 0.0f);
 			}
 			else
 			{
-				TestEqual(TEXT("a high sun scatters fully") + At, SunC->VolumetricScatteringIntensity, 1.0f);
+				TestEqual(*(TEXT("a high sun scatters fully") + At), SunC->VolumetricScatteringIntensity, 1.0f);
 			}
 		}
 		AddInfo(FString::Printf(TEXT("ANASTASIS_ATMOSPHERE_FORWARD extra_directional_lights=%d"), Atmosphere->GetExtraDirectionalLightCount()));
