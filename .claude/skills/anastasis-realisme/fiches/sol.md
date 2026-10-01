@@ -1,0 +1,71 @@
+# Sol : matériau et textures
+
+## Unreal
+
+- **PBR** : la couleur de base (albédo) est la part de lumière que la surface renvoie, sans ombre ni
+  reflet. C'est une valeur physique. Ordres de grandeur réels : neige fraîche 0,8–0,9 ; sable sec
+  0,3–0,4 ; herbe 0,10–0,25 ; terre sombre 0,05–0,15 ; asphalte 0,05–0,10. Le charbon est à environ 0,04 :
+  rien de naturel ne descend sous 0,02 ou ne monte au-dessus de 0,9.
+- La **rugosité** dit si le reflet est net (0) ou diffus (1). Un sol naturel sec est à 0,8–1,0 ; mouillé,
+  il descend fortement. Le métal (`Metallic`) vaut 0 pour tout sol naturel.
+- **Landscape Material** : matériau multi-couches peint couche par couche sur un Landscape.
+- **Runtime Virtual Texture (RVT)** : une texture géante calculée à la volée, page par page, où l'on
+  « cuit » le mélange des couches et des décalques. Elle économise le coût des matériaux superposés sur de
+  grandes surfaces. Elle a un coût mémoire et une latence de mise à jour (`r.VT.MaxUploadsPerFrame`), et
+  le format YCoCg améliore la couleur au prix de la mémoire.
+- **Répétition** : une texture qui se répète se lit en damier à moyenne distance. Les remèdes sont le
+  mélange multi-échelles (macro / méso / micro), le passe-haut sur la photo, la projection triplanaire et
+  la variation pilotée par la morphologie (pente, humidité, courbure).
+
+## ANÁSTASIS aujourd'hui
+
+| Quoi | Valeur / mécanisme | Où |
+|---|---|---|
+| Matériau | `MI_AnastasisGround` (instance de `M_AnastasisGround`), repli `M_AnastasisSlice` | script d'autorité `tools/unreal/ground-material.ps1` + `.py` |
+| Sémantique | couleur de sommet = teinte de la simulation (type, rive, humidité) ; UV0 = (roche, litière), UV1 = (travaillé, humidité) | `GROUND_SURFACE_001.md` |
+| Albédos | recalés sur le réel : herbe humide 0,10–0,18, litière 0,05–0,10, roche mouillée 0,12–0,20 | idem |
+| Textures | 4 photos CC0 Poly Haven 2K (`sparse_grass`, `forest_leaves_02`, `brown_mud_02`, `mossy_rock`), empaquetées par `tools/unreal/ground-textures.py` (Python système) | `GROUND_TEXTURE_001.md` |
+| Projection | triplanaire dans un nœud Custom HLSL, normale en espace monde (le maillage n'a pas de tangentes) | idem |
+| Variation | bruits à ~600 m, ~60 m, ~11 m, ~70 cm | `ground-material.py`, `handoffs/forest-terrain-p4.md` |
+| Coût | 924 instructions pixel, 10 samplers ; GPU dans le bruit (prairie basse 11,0 → 10,9 ms) | `GROUND_TEXTURE_001.md` |
+| Absents | RVT, tessellation, displacement, Landscape Material | `AAA_VISUAL_TARGET_LAB.md` : RVT sur le terrain = `DANGEROUS_TO_CHANGE` |
+
+## Règles
+
+- **SOL-01** — Un albédo de sol reste dans la plage réelle de sa matière (tableau ci-dessus). À EV100 14
+  sous 75 000 lux, un albédo de 0,5 sort blanc : c'est la cause du « monde de plâtre » corrigé par
+  `GROUND_SURFACE_001`.
+- **SOL-02** — La photo **module**, elle ne colore pas : albédo divisé par sa moyenne locale, facteur
+  neutre en moyenne. La couleur reste celle de la simulation.
+- **SOL-03** — Toute photo de sol passe le passe-haut à 15 cm à l'empaquetage : sans lui, le damier
+  apparaît à 35 m (interdit par la direction artistique).
+- **SOL-04** — Le matériau se change dans `ground-material.py` puis se régénère ; le script refuse un
+  matériau qui ne compile pas. Une erreur de `recompile_material` ignorée remplace le sol par le
+  matériau par défaut.
+- **SOL-05** — Une valeur qui dépend de la pente se recale après chaque changement de forge
+  (`fiches/terrain.md`). Aujourd'hui `SlopeRockStart`/`End` (0,62 / 0,82) ne sont plus atteints après
+  l'érosion : la roche de pente n'apparaît que sur les berges.
+
+## Vérifier
+
+```powershell
+tools\unreal\capture-ground-cover.ps1 -States on,on_notex,bare,bare_notex   # A/B textures photo
+```
+
+Puis `compare.py` (skill `anastasis-capture`). Au loin, les mips doivent converger vers le sol sans
+texture : un écart lointain entre `on` et `on_notex` est un défaut.
+
+## Ne pas faire
+
+- Poser une texture Megascans ou Poly Haven brute en couleur de base : elle efface les albédos calés et
+  la sémantique de la simulation.
+- Activer le RVT, Nanite ou le displacement sur le terrain procédural sans mandat
+  (`DANGEROUS_TO_CHANGE`).
+- Construire le mélange en ~300 nœuds au lieu du nœud Custom.
+- Faire `ComponentMask` sur l'alpha d'un `VertexColor` : ne compile pas sous UE 5.8
+  (`GROUND_SURFACE_001.md`).
+
+## Ouvert
+
+- Recalibrer les seuils de roche de pente (SOL-05) : à trancher.
+- Le RVT ne servirait qu'avec des décalques en masse (pistes, ornières). Pas de besoin mesuré.
