@@ -32,7 +32,16 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisMicroEcologyDeterminism, "Anastasis.M
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnastasisMicroEcologyDeterminism::RunTest(const FString&)
 {
-	using namespace AnastasisMicroEcology;
+	using AnastasisMicroEcology::BankPocket;
+	using AnastasisMicroEcology::Build;
+	using AnastasisMicroEcology::EPocket;
+	using AnastasisMicroEcology::ERole;
+	using AnastasisMicroEcology::FInputs;
+	using AnastasisMicroEcology::FPlacement;
+	using AnastasisMicroEcology::FPlan;
+	using AnastasisMicroEcology::FSettings;
+	using AnastasisMicroEcology::PocketCount;
+	using AnastasisMicroEcology::TintSoil;
 	const FInputs In = AnastasisMicroEcologyTest::Channel();
 	FPlan A, B;
 	FString Error;
@@ -62,7 +71,16 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisMicroEcologyBankPockets, "Anastasis.M
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnastasisMicroEcologyBankPockets::RunTest(const FString&)
 {
-	using namespace AnastasisMicroEcology;
+	using AnastasisMicroEcology::BankPocket;
+	using AnastasisMicroEcology::Build;
+	using AnastasisMicroEcology::EPocket;
+	using AnastasisMicroEcology::ERole;
+	using AnastasisMicroEcology::FInputs;
+	using AnastasisMicroEcology::FPlacement;
+	using AnastasisMicroEcology::FPlan;
+	using AnastasisMicroEcology::FSettings;
+	using AnastasisMicroEcology::PocketCount;
+	using AnastasisMicroEcology::TintSoil;
 	const FSettings Settings;
 	int32 Hist[PocketCount] = {};
 	int32 Disagree = 0, Pairs = 0;
@@ -121,7 +139,16 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisMicroEcologyMeadowClusters, "Anastasi
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnastasisMicroEcologyMeadowClusters::RunTest(const FString&)
 {
-	using namespace AnastasisMicroEcology;
+	using AnastasisMicroEcology::BankPocket;
+	using AnastasisMicroEcology::Build;
+	using AnastasisMicroEcology::EPocket;
+	using AnastasisMicroEcology::ERole;
+	using AnastasisMicroEcology::FInputs;
+	using AnastasisMicroEcology::FPlacement;
+	using AnastasisMicroEcology::FPlan;
+	using AnastasisMicroEcology::FSettings;
+	using AnastasisMicroEcology::PocketCount;
+	using AnastasisMicroEcology::TintSoil;
 	FPlan Plan;
 	FString Error;
 	TestTrue(TEXT("meadow builds"), Build(AnastasisMicroEcologyTest::Channel(), FSettings(), Plan, Error));
@@ -161,7 +188,16 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisMicroEcologyForestEdge, "Anastasis.Mi
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnastasisMicroEcologyForestEdge::RunTest(const FString&)
 {
-	using namespace AnastasisMicroEcology;
+	using AnastasisMicroEcology::BankPocket;
+	using AnastasisMicroEcology::Build;
+	using AnastasisMicroEcology::EPocket;
+	using AnastasisMicroEcology::ERole;
+	using AnastasisMicroEcology::FInputs;
+	using AnastasisMicroEcology::FPlacement;
+	using AnastasisMicroEcology::FPlan;
+	using AnastasisMicroEcology::FSettings;
+	using AnastasisMicroEcology::PocketCount;
+	using AnastasisMicroEcology::TintSoil;
 	FInputs In;
 	In.SampleHeight = [](double, double, double& Z) { Z = 400.0; return true; };
 	In.SampleWaterHeight = [](double, double, double& W) { W = -4000.0; return true; };
@@ -214,7 +250,16 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisMicroEcologySlopeAndClearing, "Anasta
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnastasisMicroEcologySlopeAndClearing::RunTest(const FString&)
 {
-	using namespace AnastasisMicroEcology;
+	using AnastasisMicroEcology::BankPocket;
+	using AnastasisMicroEcology::Build;
+	using AnastasisMicroEcology::EPocket;
+	using AnastasisMicroEcology::ERole;
+	using AnastasisMicroEcology::FInputs;
+	using AnastasisMicroEcology::FPlacement;
+	using AnastasisMicroEcology::FPlan;
+	using AnastasisMicroEcology::FSettings;
+	using AnastasisMicroEcology::PocketCount;
+	using AnastasisMicroEcology::TintSoil;
 	FPlan Steep;
 	FString Error;
 	TestTrue(TEXT("steep builds"), Build(AnastasisMicroEcologyTest::Channel(40.0), FSettings(), Steep, Error));
@@ -240,7 +285,16 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisMicroEcologySoilTint, "Anastasis.Micr
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnastasisMicroEcologySoilTint::RunTest(const FString&)
 {
-	using namespace AnastasisMicroEcology;
+	using AnastasisMicroEcology::BankPocket;
+	using AnastasisMicroEcology::Build;
+	using AnastasisMicroEcology::EPocket;
+	using AnastasisMicroEcology::ERole;
+	using AnastasisMicroEcology::FInputs;
+	using AnastasisMicroEcology::FPlacement;
+	using AnastasisMicroEcology::FPlan;
+	using AnastasisMicroEcology::FSettings;
+	using AnastasisMicroEcology::PocketCount;
+	using AnastasisMicroEcology::TintSoil;
 	const FLinearColor Grass(0.070f, 0.110f, 0.040f, 1.0f);
 	TestTrue(TEXT("untouched pocket keeps the colour"), TintSoil(Grass, EPocket::None, 1.0).Equals(Grass));
 	TestTrue(TEXT("plants do not repaint the soil"), TintSoil(Grass, EPocket::Vegetated, 1.0).Equals(Grass));
@@ -258,7 +312,16 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisMicroEcologyRejects, "Anastasis.Micro
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnastasisMicroEcologyRejects::RunTest(const FString&)
 {
-	using namespace AnastasisMicroEcology;
+	using AnastasisMicroEcology::BankPocket;
+	using AnastasisMicroEcology::Build;
+	using AnastasisMicroEcology::EPocket;
+	using AnastasisMicroEcology::ERole;
+	using AnastasisMicroEcology::FInputs;
+	using AnastasisMicroEcology::FPlacement;
+	using AnastasisMicroEcology::FPlan;
+	using AnastasisMicroEcology::FSettings;
+	using AnastasisMicroEcology::PocketCount;
+	using AnastasisMicroEcology::TintSoil;
 	FPlan Plan;
 	FString Error;
 	FInputs Missing = AnastasisMicroEcologyTest::Channel();
