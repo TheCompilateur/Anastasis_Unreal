@@ -307,6 +307,16 @@ def build_master():
     p_macro_tiling = g.scalar('MacroTiling', 1.0 / 6000.0, 'Ground|Macro', -2560, 500)
     p_meso_tiling = g.scalar('MesoTiling', 1.0 / 1100.0, 'Ground|Macro', -2560, 680)
     p_detail_tiling = g.scalar('DetailTiling', 1.0 / 70.0, 'Ground|Detail', -2560, 860)
+    # FOREST_TERRAIN_P4 -- ECHELLE REGIONALE. La "macro" de 60 m a ete reglee pour un monde de
+    # 9 600 uu ; a l'echelle 5 la carte en fait 192 000, et rien ne variait au-dela de quelques
+    # dizaines de metres : un versant entier avait la meme teinte. ~600 m : des pans de colline
+    # plus secs ou plus verts, ce que donne une carte mediterraneenne vue de loin.
+    p_region_tiling = g.scalar('RegionTiling', 1.0 / 60000.0, 'Ground|Region', -2560, 1300)
+    n_region = g.node(unreal.MaterialExpressionNoise, -2200, 1300,
+                      scale=1.0, levels=2, quality=1, turbulence=False,
+                      output_min=0.0, output_max=1.0,
+                      noise_function=NOISE_FAST_GRADIENT_3D)
+    g.link(g.mul(wp, '', p_region_tiling, '', -2380, 1300), '', n_region, 'World Position')
 
     n_macro = g.node(unreal.MaterialExpressionNoise, -2200, 520,
                      scale=1.0, levels=2, quality=1, turbulence=False,
@@ -463,6 +473,25 @@ def build_master():
     # Masses macro : une modulation de TEINTE, pas une seconde couleur posee par-dessus.
     macro_tint = g.lerp(p_macro_cool, '', p_macro_warm, '', n_macro, '', -440, 40)
     base = g.lerp(base, '', g.mul(base, '', macro_tint, '', -280, 0), '', p_macro_amt, '', -120, -240)
+
+    # FOREST_TERRAIN_P4 -- pans regionaux, puis terre rouge (terra rossa) a nu sur les pentes
+    # seches : le sol mediterraneen se montre entre l'herbe et le maquis, pas sur le plat
+    # gras ni au bord de l'eau, jamais sur la roche (elle a deja sa couleur).
+    p_region_dry = g.vector('RegionDryTint', (1.16, 1.06, 0.74), P + 'Region', -1900, 1360)
+    p_region_green = g.vector('RegionGreenTint', (0.90, 1.00, 0.86), P + 'Region', -1900, 1440)
+    p_region_amt = g.scalar('RegionContrast', 0.55, P + 'Region', -1900, 1520)
+    region_tint = g.lerp(p_region_green, '', p_region_dry, '', n_region, '', -440, 1360)
+    base = g.lerp(base, '', g.mul(base, '', region_tint, '', -280, 1320), '', p_region_amt, '', -120, 1300)
+    p_rossa = g.vector('TerraRossa', (0.215, 0.125, 0.075), P + 'Soil', -1900, 1600)
+    p_rossa_amt = g.scalar('TerraRossaAmount', 0.55, P + 'Soil', -1900, 1680)
+    rossa_patch = g.smoothstep(g.const(0.55, -1700, 1600), '', g.const(0.85, -1700, 1640), '', n_meso, '', -1540, 1600)
+    rossa_slope = g.smoothstep(g.const(0.04, -1700, 1700), '', g.const(0.20, -1700, 1740), '', slope, '', -1540, 1700)
+    rossa_mask = g.mul(rossa_patch, '', rossa_slope, '', -1380, 1640)
+    rossa_mask = g.mul(rossa_mask, '', g.one_minus(damp_mask, '', -1380, 1720), '', -1220, 1640)
+    rossa_mask = g.mul(rossa_mask, '', g.one_minus(rock_mask, '', -1220, 1720), '', -1060, 1640)
+    rossa_mask = g.mul(rossa_mask, '', g.addc(g.mulc(n_region, '', 0.6, -1060, 1720), '', 0.4, -900, 1720), '', -900, 1640)
+    rossa_mask = g.sat(g.mul(rossa_mask, '', p_rossa_amt, '', -740, 1640), '', -580, 1640)
+    base = g.lerp(base, '', p_rossa, '', rossa_mask, '', -120, 1500)
 
     # Meso et grain : des modulations de VALEUR centrees sur 1, donc neutres en moyenne.
     # Moduler ainsi plutot que multiplier par le bruit lui-meme evite d'assombrir

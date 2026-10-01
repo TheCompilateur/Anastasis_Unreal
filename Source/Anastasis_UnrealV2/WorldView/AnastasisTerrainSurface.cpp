@@ -26,9 +26,14 @@ FLinearColor SurfaceTypeColor(ETileType Type)
 {
     switch (Type)
     {
-    case ETileType::Grass:  return FLinearColor(0.118f, 0.171f, 0.078f);
-    case ETileType::Forest: return FLinearColor(0.062f, 0.097f, 0.052f);
-    case ETileType::Scrub:  return FLinearColor(0.152f, 0.158f, 0.092f);
+    // FOREST_TERRAIN_P4 -- palette mediterraneenne, meme niveau d'albedo. L'herbe humide
+    // pontique (0.118, 0.171, 0.078) devient une prairie olive-paille ; le sol forestier une
+    // litiere brune de chene et de pin, plus le vert sombre des mousses ; la garrigue (Scrub)
+    // laisse voir la terre rousse entre les buissons. Le bleu reste le canal le plus faible
+    // partout : la terre n'est jamais bleue, et le seuil de repeinte d'AnastasisDrainage tient.
+    case ETileType::Grass:  return FLinearColor(0.140f, 0.150f, 0.078f);
+    case ETileType::Forest: return FLinearColor(0.080f, 0.078f, 0.050f);
+    case ETileType::Scrub:  return FLinearColor(0.170f, 0.142f, 0.088f);
     case ETileType::Field:  return FLinearColor(0.196f, 0.163f, 0.086f);
     case ETileType::Stone:  return FLinearColor(0.149f, 0.147f, 0.141f);
     case ETileType::Ruin:   return FLinearColor(0.146f, 0.131f, 0.120f);

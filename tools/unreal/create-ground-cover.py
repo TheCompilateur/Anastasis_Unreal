@@ -90,7 +90,10 @@ FAMILIES = [
         # EZ5 clairiere : un vert sourd sous des epis dores, pas une savane. v2 a 40 % d'ocre
         # se lisait brun-sec (capture prairie_eye v2) : l'ocre reste, minoritaire.
         'base': c(0.048, 0.072, 0.024),
-        'tips': [(0.62, c(0.140, 0.190, 0.056)), (0.26, c(0.265, 0.215, 0.082)), (0.12, None)],
+        # FOREST_TERRAIN_P4 : prairie mediterraneenne de debut d'ete -- le vert vire a l'olive et
+        # la part d'ocre et de paille passe de 38 a 55 %. Meme luminance : la prairie reste au
+        # niveau du sol (MI_AnastasisGround) et des couronnes, elle change de saison, pas de valeur.
+        'tips': [(0.45, c(0.135, 0.165, 0.058)), (0.35, c(0.265, 0.215, 0.082)), (0.20, None)],
         'straw': (c(0.150, 0.128, 0.064), c(0.320, 0.270, 0.135)),
         'heads': 18, 'head_height': (62.0, 92.0), 'head_color': c(0.250, 0.205, 0.105),
     },
@@ -101,7 +104,7 @@ FAMILIES = [
         'height': (12.0, 30.0), 'width': (0.8, 1.4), 'lean': (0.10, 0.50), 'bend': (0.30, 1.00),
         'segments': 3,
         'base': c(0.052, 0.074, 0.026),
-        'tips': [(0.70, c(0.150, 0.195, 0.060)), (0.25, c(0.230, 0.205, 0.085)), (0.05, None)],
+        'tips': [(0.58, c(0.145, 0.175, 0.060)), (0.30, c(0.230, 0.205, 0.085)), (0.12, None)],
         'straw': (c(0.140, 0.122, 0.064), c(0.285, 0.245, 0.130)),
         'heads': 0,
     },

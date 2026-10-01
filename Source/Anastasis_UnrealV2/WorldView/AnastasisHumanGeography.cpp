@@ -138,7 +138,13 @@ void AnastasisHumanGeography::Apply(const AnastasisWorldView::FWorldVisualSnapsh
         if(V.ValleyWeight>0 && V.Height>V.WaterHeight)
         {
             const float Blend=static_cast<float>(V.ValleyWeight);
-            G.Colors[I]=FMath::Lerp(G.Colors[I],FLinearColor(0.31f,0.40f,0.19f,0.0f),Blend);
+            // FOREST_TERRAIN_P4 : plus une couleur unique (0.31, 0.40, 0.19), 2.5 fois plus claire
+            // que toute herbe calibree et identique sur tout le fond : une prairie alluviale a
+            // l'albedo du sol, qui alterne pres et chaumes paille par parcelles de 100 a 200 m.
+            const double TX=P.X/(AnastasisWorldView::TileWorldSize*Scale), TY=P.Y/(AnastasisWorldView::TileWorldSize*Scale);
+            const float Parcel=static_cast<float>(0.5+0.5*FMath::Sin(TX*0.9+1.3*FMath::Sin(TY*0.7))*FMath::Sin(TY*1.1+0.3*TX));
+            const FLinearColor Alluvium=FMath::Lerp(FLinearColor(0.120f,0.150f,0.068f,0.0f),FLinearColor(0.165f,0.152f,0.085f,0.0f),Parcel);
+            G.Colors[I]=FMath::Lerp(G.Colors[I],Alluvium,Blend);
             G.UV0[I]*=(1.0-Blend);
             G.UV1[I].X=FMath::Lerp(G.UV1[I].X,0.15,static_cast<double>(Blend));
         }
