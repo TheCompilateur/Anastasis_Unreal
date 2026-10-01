@@ -383,6 +383,7 @@ Au lancement, `anastasis.Village.StartVillagers` (12) habitants autour du premie
 **Rythme** : `anastasis.Sim.TimeScale` (0.0375 par defaut) ralentit le temps simule -- jour ~40 min, habitants
 ~3 m/s. Une preuve PIE qui attend sur le temps simule pose `anastasis.Sim.TimeScale 1` avant le PIE.
 `anastasis.Sim.Speed 0` ne gele rien (`PumpFrame` lit < 1 comme 1) : geler par `TimeScale 0`.
+Pour aller plus vite sans toucher a ce rythme : section « Temps accelere » ci-dessous.
 
 | Script | Role |
 |---|---|
@@ -390,6 +391,21 @@ Au lancement, `anastasis.Village.StartVillagers` (12) habitants autour du premie
 | `import-villagers.ps1` + `import-villagers.py` | **ecrit** dans `Content/` : textures `/Game/Anastasis/Characters/PNG/<Categorie>/CHR_*` (BC7, sRGB, Character, Clamp, hors streaming, couverture alpha), `M_AnastasisVillager`, et `DA_AnastasisPresentation.Villagers` ; relit, verifie, refuse un materiau qui ne compile pas ; editeur dedie qui se ferme |
 | `villager-lineup.ps1` + `villager-lineup.py` | planche dans Unreal (vrais acteurs `AnastasisVillagerVisual`) : population entiere puis par groupe, sur un arc, temoin 180 cm → `Saved/VillagerEvidence/<Label>/` ; niveau jamais sauve |
 | `villager-pie.ps1` + `villager-pie.py` | preuve PIE : village du lancement sans commande, puis `FirstWell 12` (le remplace), `RemoveNpc`, `FirstFarmer 1` ; une carte par habitant, portraits distincts et du METIER simule de chacun → `Saved/VillagerEvidence/pie/` |
+
+## Temps accelere (TIME_WARP_001)
+
+Par-dessus `TimeScale` et `Speed`, pour le joueur comme pour les agents. Detail : `docs/unreal/TIME_WARP_001.md`.
+
+| Pour | Comment |
+|---|---|
+| attendre la nuit, un jour, une semaine dans une preuve | `Anastasis.Sim.Advance @22` / `6h` / `3d` / `45` : la simulation saute dans la frame, ligne `ANASTASIS_SIM advance` au log |
+| regarder le village vivre plus vite | `anastasis.Sim.Warp 8` (0 = pause, jusqu'a 1000) ; en PIE pave num. `+` / `-` et `Pause` |
+| un editeur batch deja accelere | `-dpcvars=anastasis.Sim.Warp=64` ; `anastasis.Sim.WarpBudgetMs 0` si le debit prime sur les images |
+| lire l'etat | `Anastasis.Sim.TimeStatus`, ou `AnastasisSimulationDebugLibrary.get_time_warp_status` (JSON) |
+
+Le pas ne depasse jamais 10 x FixedDt (la reference) : c'est le nombre de pas par frame qui monte. `Warp 1` reprend
+exactement le chemin `PumpFrame`. Une preuve qui attendait sur l'horloge murale (`TimeScale 1` + `Speed 10` + 240 s)
+peut passer a `Advance` : meme simulation, quelques secondes.
 
 ## Tests
 

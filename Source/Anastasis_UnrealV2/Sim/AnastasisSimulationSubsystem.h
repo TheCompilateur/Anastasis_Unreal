@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Sim/AnastasisSimulation.h"
+#include "Sim/AnastasisTimeWarp.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "Village/AnastasisVillagePresentation.h"
@@ -86,6 +87,22 @@ public:
 	FAnastasisSimulation& GetSimulation() { return Simulation; }
 	const FAnastasisSimulation& GetSimulation() const { return Simulation; }
 
+	/**
+	 * TIME_WARP_001 -- avance instantanee (Anastasis.Sim.Advance) : `Seconds` simulees dans cette
+	 * frame, presentation resynchronisee, temoin informe (tout ce temps est oisif pour le village).
+	 * Rend le nombre de Tick consommes.
+	 */
+	int32 AdvanceBy(double Seconds);
+
+	/** Ce que le village a vu du joueur (presence, jours oisifs). Voir AnastasisTimeWarp::FWitness. */
+	const AnastasisTimeWarp::FWitness& GetWitness() const { return Witness; }
+
+	/** Secondes simulees par seconde reelle, lissees : l'acceleration obtenue, pas la demandee. */
+	double GetEffectiveRate() const { return EffectiveRate; }
+
+	/** Vrai si la derniere frame acceleree a ete coupee par anastasis.Sim.WarpBudgetMs. */
+	bool WasWarpBudgetCut() const { return bWarpBudgetCut; }
+
 private:
 	void DrawOverlay() const;
 	void LogDayIfChanged();
@@ -108,6 +125,11 @@ private:
 	bool bStartVillage = false;
 	/** Miroir de l'accumulateur de la simulation : fraction du pas en cours, pour interpoler les cartes. */
 	double PresentationAccumulator = 0.0;
+	/** Voie acceleree (anastasis.Sim.Warp != 1). */
+	AnastasisTimeWarp::FWarpPump WarpPump;
+	AnastasisTimeWarp::FWitness Witness;
+	double EffectiveRate = 0.0;
+	bool bWarpBudgetCut = false;
 };
 
 /**
@@ -175,4 +197,12 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetVillagerCards(const UObject* WorldContextObject);
+
+	/**
+	 * TIME_WARP_001, en JSON : temps et jour simules, Warp / Speed / TimeScale demandes, acceleration
+	 * obtenue (secondes simulees par seconde reelle), coupe budget, presence et jours oisifs du temoin.
+	 * `{}` sans hote.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetTimeWarpStatus(const UObject* WorldContextObject);
 };

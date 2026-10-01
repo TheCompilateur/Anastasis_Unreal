@@ -6,6 +6,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
+#include "HAL/PlatformTime.h"
 #include "Core/AnastasisSimClock.h"
 #include "Village/AnastasisVillage.h"
 #include "Village/AnastasisVillageInteractionSubsystem.h"
@@ -28,6 +29,19 @@ static TAutoConsoleVariable<float> CVarSimTimeScale(
 	TEXT("anastasis.Sim.TimeScale"),
 	0.0375f,
 	TEXT("Simulated seconds fed per real second, before anastasis.Sim.Speed (VILLAGER_PNG_001, point 4). 1 = JS realtime: a 90 s day, villagers at 4 tiles/s = 80 m/s on 20 m tiles. Default 0.0375: villagers ~3 m/s, a day ~40 min. 0 freezes the simulation (Sim.Speed 0 does not: PumpFrame reads any speed below 1 as 1). Proof scripts that wait on simulated time set 1."),
+	ECVF_Default);
+
+// TIME_WARP_001. Multiplie tout le reste ; 1 reprend exactement l'ancien chemin (PumpFrame).
+static TAutoConsoleVariable<float> CVarSimWarp(
+	TEXT("anastasis.Sim.Warp"),
+	1.0f,
+	TEXT("Time warp for the player and for agents (TIME_WARP_001): multiplies simulated time after anastasis.Sim.TimeScale and anastasis.Sim.Speed. 1 = unchanged (the JS PumpFrame path), 0 = pause, up to 1000. Steps never exceed the reference's 10 x FixedDt; more steps run per frame, under anastasis.Sim.WarpBudgetMs. PIE keys: numpad +/- and Pause. Batch editors: -dpcvars=anastasis.Sim.Warp=64."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<float> CVarSimWarpBudgetMs(
+	TEXT("anastasis.Sim.WarpBudgetMs"),
+	8.0f,
+	TEXT("Wall-clock milliseconds the time warp may spend simulating per frame (TIME_WARP_001). Past it, the backlog is dropped and the overlay shows the warp actually reached. 0 = unlimited (headless proofs: the frame rate drops, simulated time does not)."),
 	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarVillageDebug(
@@ -134,22 +148,53 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 	}
 
 	const double Speed = static_cast<double>(CVarSimSpeed.GetValueOnGameThread());
+	const double Warp = FMath::Clamp(static_cast<double>(CVarSimWarp.GetValueOnGameThread()), 0.0, AnastasisTimeWarp::MaxWarp);
 	// Le temps simule avance plus lentement que le temps reel : sans cela un habitant (4 tuiles par
 	// seconde simulee, une tuile = 20 m a l'ecran) traverse le pre a 80 m/s. Tout ralentit ensemble --
 	// marche, besoins, jour, ciel -- la simulation reste fidele a elle-meme, seul le rythme change.
 	const double SimWall = static_cast<double>(DeltaTime)
 		* FMath::Clamp(static_cast<double>(CVarSimTimeScale.GetValueOnGameThread()), 0.0, 1.0);
+	const double TimeBefore = Simulation.GetTime();
+	const double Multiplier = FMath::Max(1.0, AnastasisJs::NumberOr(Speed, 1.0)) * Warp;
 
-	// Miroir de l'accumulateur de PumpFrame (memes regles publiques d'AnastasisSimClock) : la fraction
-	// du pas en cours sert a interpoler les cartes. Un pas fixe vaut 1/60 s simulee ; ralenti, il ne
-	// tombe qu'une frame sur ~27 et les habitants sauteraient de 1,3 m a chaque pas.
-	const AnastasisSimClock::FStepPlan Plan = AnastasisSimClock::StepPlan(Speed);
-	PresentationAccumulator += FMath::Max(0.0, AnastasisSimClock::FrameDelta(SimWall * 1000.0).Dt)
-		* FMath::Max(1.0, AnastasisJs::NumberOr(Speed, 1.0));
-	const int32 Steps = Simulation.PumpFrame(SimWall, Speed);
-	PresentationAccumulator = FMath::Clamp(PresentationAccumulator - Steps * Plan.StepDt, 0.0,
-		Plan.StepDt * static_cast<double>(FMath::Max(1, Plan.TargetSteps)));
-	const double StepAlpha = Plan.StepDt > 0.0 ? FMath::Clamp(PresentationAccumulator / Plan.StepDt, 0.0, 1.0) : 1.0;
+	int32 Steps = 0;
+	double StepAlpha = 1.0;
+	if (Warp == 1.0)
+	{
+		WarpPump.Reset();
+		bWarpBudgetCut = false;
+		// Miroir de l'accumulateur de PumpFrame (memes regles publiques d'AnastasisSimClock) : la fraction
+		// du pas en cours sert a interpoler les cartes. Un pas fixe vaut 1/60 s simulee ; ralenti, il ne
+		// tombe qu'une frame sur ~27 et les habitants sauteraient de 1,3 m a chaque pas.
+		const AnastasisSimClock::FStepPlan Plan = AnastasisSimClock::StepPlan(Speed);
+		PresentationAccumulator += FMath::Max(0.0, AnastasisSimClock::FrameDelta(SimWall * 1000.0).Dt)
+			* FMath::Max(1.0, AnastasisJs::NumberOr(Speed, 1.0));
+		Steps = Simulation.PumpFrame(SimWall, Speed);
+		PresentationAccumulator = FMath::Clamp(PresentationAccumulator - Steps * Plan.StepDt, 0.0,
+			Plan.StepDt * static_cast<double>(FMath::Max(1, Plan.TargetSteps)));
+		StepAlpha = Plan.StepDt > 0.0 ? FMath::Clamp(PresentationAccumulator / Plan.StepDt, 0.0, 1.0) : 1.0;
+	}
+	else
+	{
+		// Voie acceleree (TIME_WARP_001) : memes pas que la reference, plus de pas par frame. Un accroc
+		// de chargement est borne comme dans FrameDelta (0,1 s), sinon la premiere frame apres un hitch
+		// a x64 teleporterait le village.
+		PresentationAccumulator = 0.0;
+		const AnastasisTimeWarp::FPumpResult Result = WarpPump.Pump(Simulation, FMath::Min(SimWall, 0.1), Multiplier,
+			static_cast<double>(CVarSimWarpBudgetMs.GetValueOnGameThread()));
+		Steps = Result.Steps;
+		StepAlpha = Result.StepAlpha;
+		bWarpBudgetCut = Result.bBudgetCut;
+	}
+
+	const double Advanced = Simulation.GetTime() - TimeBefore;
+	Witness.Observe(Advanced, Multiplier, FAnastasisSimulation::DayLength);
+	if (DeltaTime > 0.0f)
+	{
+		// Lisse sur ~1 s : a vitesse lente un pas ne tombe qu'une frame sur plusieurs, la valeur brute clignoterait.
+		const double Alpha = FMath::Clamp(static_cast<double>(DeltaTime), 0.0, 1.0);
+		EffectiveRate += (Advanced / static_cast<double>(DeltaTime) - EffectiveRate) * Alpha;
+	}
 	LogDayIfChanged();
 	SyncVillagePresentation();
 	VillagePresentation.SyncVillagers(
@@ -344,6 +389,58 @@ void UAnastasisSimulationSubsystem::DrawOverlay() const
 			Minute,
 			Simulation.GetTime(),
 			Simulation.GetSeed()));
+
+	// TIME_WARP_001 : la vitesse demandee, celle obtenue (une machine chargee coupe), la duree d'un jour
+	// a ce rythme, et ce que le village voit du joueur.
+	const double Warp = static_cast<double>(CVarSimWarp.GetValueOnGameThread());
+	if (Warp != 1.0 || Witness.Presence < 0.999)
+	{
+		const double DaySeconds = EffectiveRate > 1e-6 ? FAnastasisSimulation::DayLength / EffectiveRate : 0.0;
+		const FString DayText = Warp <= 0.0 ? FString(TEXT("PAUSE"))
+			: DaySeconds <= 0.0 ? FString(TEXT("-"))
+			: DaySeconds >= 120.0 ? FString::Printf(TEXT("1 jour = %.0f min"), DaySeconds / 60.0)
+			: FString::Printf(TEXT("1 jour = %.0f s"), DaySeconds);
+		GEngine->AddOnScreenDebugMessage(
+			0xA51A52,
+			0.0f,
+			Witness.Presence < 0.5 ? FColor::Orange : FColor::Cyan,
+			FString::Printf(
+				TEXT("TEMPS  x%g%s  %s   presence %.0f %%  oisif %.1f j"),
+				Warp,
+				bWarpBudgetCut ? TEXT(" (machine saturee)") : TEXT(""),
+				*DayText,
+				Witness.Presence * 100.0,
+				Witness.IdleDays(FAnastasisSimulation::DayLength)));
+	}
+}
+
+int32 UAnastasisSimulationSubsystem::AdvanceBy(double Seconds)
+{
+	if (!Simulation.IsRunning() || !(Seconds > 0.0))
+	{
+		return 0;
+	}
+	const double From = Simulation.GetTime();
+	const int32 FromDay = Simulation.GetDay();
+	const double Start = FPlatformTime::Seconds();
+	const int32 Steps = AnastasisTimeWarp::Advance(Simulation, Seconds);
+	const double WallMs = (FPlatformTime::Seconds() - Start) * 1000.0;
+	// Le joueur n'a rien fait de tout ce temps : multiplicateur infini.
+	Witness.Observe(Simulation.GetTime() - From, TNumericLimits<double>::Max(), FAnastasisSimulation::DayLength);
+	WarpPump.Reset();
+	PresentationAccumulator = 0.0;
+	LogDayIfChanged();
+	SyncVillagePresentation();
+	UWorld* World = GetWorld();
+	VillagePresentation.SyncVillagers(
+		Simulation.GetVillage(), Simulation.GetWorld(), World,
+		AnastasisPresentation::GetRegistry(), CVarVillagePortraits.GetValueOnGameThread() != 0,
+		1.0, true);
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_SIM advance from=%.4f to=%.4f day=%d->%d ticks=%d wallMs=%.1f presence=%.4f idleDays=%.3f"),
+		From, Simulation.GetTime(), FromDay, Simulation.GetDay(), Steps, WallMs,
+		Witness.Presence, Witness.IdleDays(FAnastasisSimulation::DayLength));
+	return Steps;
 }
 
 static FAutoConsoleCommandWithWorld CmdAnastasisSimStatus(
@@ -363,6 +460,88 @@ static FAutoConsoleCommandWithWorld CmdAnastasisSimStatus(
 		{
 			UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_SIM status: no subsystem in this world"));
 		}
+	}));
+
+// --- TIME_WARP_001 -------------------------------------------------------------------------------
+
+namespace
+{
+	void SetWarp(double Warp, const TCHAR* Why)
+	{
+		if (IConsoleVariable* Var = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Sim.Warp")))
+		{
+			Var->Set(static_cast<float>(FMath::Clamp(Warp, 0.0, AnastasisTimeWarp::MaxWarp)), ECVF_SetByConsole);
+		}
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_SIM warp=%g (%s)"), Warp, Why);
+	}
+
+	/** La vitesse que Pause rend. Etat de la session, pas une CVar : il n'a de sens qu'en jeu. */
+	double GWarpBeforePause = 1.0;
+}
+
+static FAutoConsoleCommand CmdAnastasisSimFaster(
+	TEXT("Anastasis.Sim.Faster"),
+	TEXT("Next time warp preset (x0.25 .. x128). From pause, resumes at x1. PIE: numpad +."),
+	FConsoleCommandDelegate::CreateLambda([]()
+	{
+		SetWarp(AnastasisTimeWarp::StepPreset(CVarSimWarp.GetValueOnGameThread(), +1), TEXT("Faster"));
+	}));
+
+static FAutoConsoleCommand CmdAnastasisSimSlower(
+	TEXT("Anastasis.Sim.Slower"),
+	TEXT("Previous time warp preset (x128 .. x0.25). PIE: numpad -."),
+	FConsoleCommandDelegate::CreateLambda([]()
+	{
+		SetWarp(AnastasisTimeWarp::StepPreset(CVarSimWarp.GetValueOnGameThread(), -1), TEXT("Slower"));
+	}));
+
+static FAutoConsoleCommand CmdAnastasisSimPause(
+	TEXT("Anastasis.Sim.Pause"),
+	TEXT("Toggles the simulation pause (anastasis.Sim.Warp 0), then back to the previous warp. PIE: Pause key."),
+	FConsoleCommandDelegate::CreateLambda([]()
+	{
+		const double Current = CVarSimWarp.GetValueOnGameThread();
+		if (Current > 0.0)
+		{
+			GWarpBeforePause = Current;
+			SetWarp(0.0, TEXT("Pause"));
+		}
+		else
+		{
+			SetWarp(GWarpBeforePause > 0.0 ? GWarpBeforePause : 1.0, TEXT("Resume"));
+		}
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisSimAdvance(
+	TEXT("Anastasis.Sim.Advance"),
+	TEXT("Anastasis.Sim.Advance <45 | 45s | 6h | 3d | @22 | @6:30> - jumps the simulation forward NOW, in the reference's 10x steps "
+		"(seconds, simulated hours, days, or until the next given hour of the simulated day). For agents and proofs; "
+		"logs ANASTASIS_SIM advance. All of it counts as idle time for the village (TIME_WARP_001)."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+		if (!Host || !Host->GetSimulation().IsRunning())
+		{
+			UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_SIM advance: no running simulation in this world (PIE only)"));
+			return;
+		}
+		double Seconds = 0.0;
+		FString Error;
+		if (!AnastasisTimeWarp::ParseAdvance(Args.IsValidIndex(0) ? Args[0] : FString(), Host->GetSimulation().GetTime(),
+				FAnastasisSimulation::DayLength, Seconds, Error))
+		{
+			UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_SIM advance refused: %s"), *Error);
+			return;
+		}
+		Host->AdvanceBy(Seconds);
+	}));
+
+static FAutoConsoleCommandWithWorld CmdAnastasisSimTimeStatus(
+	TEXT("Anastasis.Sim.TimeStatus"),
+	TEXT("Logs the time warp: requested warp, speed, time scale, achieved simulated seconds per real second, presence and idle days (TIME_WARP_001)."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_SIM time %s"), *UAnastasisSimulationDebugLibrary::GetTimeWarpStatus(World));
 	}));
 
 FString UAnastasisSimulationSubsystem::SeedFirstHouse(int32 NpcCount, int32 TileX, int32 TileY)
@@ -1117,4 +1296,19 @@ FString UAnastasisSimulationDebugLibrary::GetVillagerCards(const UObject* WorldC
 	}
 	return FString::Printf(TEXT("{\"npcs\":%d,\"cards\":%d,\"villagers\":[%s]}"),
 		V.GetActors().Num(), Host->GetVillagePresentation().NumVillagers(), *FString::Join(Rows, TEXT(",")));
+}
+
+FString UAnastasisSimulationDebugLibrary::GetTimeWarpStatus(const UObject* WorldContextObject)
+{
+	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	const UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+	if (!Host || !Host->GetSimulation().IsRunning()) return TEXT("{}");
+	const FAnastasisSimulation& Sim = Host->GetSimulation();
+	const AnastasisTimeWarp::FWitness& W = Host->GetWitness();
+	return FString::Printf(
+		TEXT("{\"time\":%.4f,\"day\":%d,\"warp\":%g,\"speed\":%g,\"timeScale\":%g,\"rate\":%.4f,\"budgetCut\":%s,\"presence\":%.4f,\"idleDays\":%.4f}"),
+		Sim.GetTime(), Sim.GetDay(),
+		CVarSimWarp.GetValueOnGameThread(), CVarSimSpeed.GetValueOnGameThread(), CVarSimTimeScale.GetValueOnGameThread(),
+		Host->GetEffectiveRate(), Host->WasWarpBudgetCut() ? TEXT("true") : TEXT("false"),
+		W.Presence, W.IdleDays(FAnastasisSimulation::DayLength));
 }
