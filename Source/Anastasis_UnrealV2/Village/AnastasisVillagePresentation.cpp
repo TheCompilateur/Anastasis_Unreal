@@ -16,6 +16,22 @@
 namespace
 {
 	/** Le vocabulaire de la simulation vers l'enum de presentation de `main`. */
+	bool BuildingHasBody(UWorld* World, const FString& SimId)
+	{
+		if (!World)
+		{
+			return false;
+		}
+		for (TActorIterator<AAnastasisVillageBuilding> It(World); It; ++It)
+		{
+			if (It->GetSimId() == FName(*SimId) && It->HasBody())
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	bool KindForType(const FString& Type, EAnastasisVillageBuildingKind& OutKind)
 	{
 		if (Type == AnastasisVillage::WellType)
@@ -127,7 +143,22 @@ int32 FAnastasisVillagePresentation::Sync(
 			continue;
 		}
 		const FVector Location = SimToUnreal(World, Building.X + 0.5, Building.Y + 0.5, Rooms.GetWorld());
-		AAnastasisVillageBuilding* Actor = Rooms.SpawnBuilding(Kind, FName(*Building.Id), FTransform(Location));
+		// Maison et grenier ont leur porte sur +Y. Le puits a son joug sur Y :
+		// +X traverse entre les deux montants.
+		const bool bDoorOnY = Kind == EAnastasisVillageBuildingKind::House
+			|| Kind == EAnastasisVillageBuildingKind::Granary;
+		FRotator Face(0.0, bDoorOnY ? -90.0 : 0.0, 0.0);
+		if (Building.AccessPoints.Num() > 0)
+		{
+			const AnastasisVillage::FPoint& Approach = Building.AccessPoints[0];
+			const double DX = Approach.X - (Building.X + 0.5);
+			const double DY = Approach.Y - (Building.Y + 0.5);
+			if (DX * DX + DY * DY > 1.0e-6)
+			{
+				Face.Yaw = FMath::RadiansToDegrees(FMath::Atan2(DY, DX)) + (bDoorOnY ? -90.0 : 0.0);
+			}
+		}
+		AAnastasisVillageBuilding* Actor = Rooms.SpawnBuilding(Kind, FName(*Building.Id), FTransform(Face, Location));
 		if (!Actor)
 		{
 			UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VILLAGE presentation: spawn refused for %s"), *Building.Id);
@@ -189,17 +220,21 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 		const FVector Base = SimToUnreal(SimWorld, Building.X + 0.5, Building.Y + 0.5, World);
 		const bool bHouse = Building.Type == AnastasisVillage::HouseType;
 		const bool bGranary = Building.Type == AnastasisVillage::GranaryType;
-		if (bGranary)
+		const bool bMesh = BuildingHasBody(World, Building.Id);
+		if (!bMesh)
 		{
-			DrawDebugBox(World, Base + FVector(0, 0, Tile * 0.3), FVector(Tile * 0.4, Tile * 0.4, Tile * 0.3), FColor::Yellow, false, 0.f, 0, 4.f);
-		}
-		else if (bHouse)
-		{
-			DrawDebugBox(World, Base + FVector(0, 0, Tile * 0.35), FVector(Tile * 0.45, Tile * 0.45, Tile * 0.35), FColor::Orange, false, 0.f, 0, 4.f);
-		}
-		else
-		{
-			DrawDebugCylinder(World, Base, Base + FVector(0, 0, Tile * 0.6), Tile * 0.35, 16, FColor::Cyan, false, 0.f, 0, 4.f);
+			if (bGranary)
+			{
+				DrawDebugBox(World, Base + FVector(0, 0, Tile * 0.3), FVector(Tile * 0.4, Tile * 0.4, Tile * 0.3), FColor::Yellow, false, 0.f, 0, 4.f);
+			}
+			else if (bHouse)
+			{
+				DrawDebugBox(World, Base + FVector(0, 0, Tile * 0.35), FVector(Tile * 0.45, Tile * 0.45, Tile * 0.35), FColor::Orange, false, 0.f, 0, 4.f);
+			}
+			else
+			{
+				DrawDebugCylinder(World, Base, Base + FVector(0, 0, Tile * 0.6), Tile * 0.35, 16, FColor::Cyan, false, 0.f, 0, 4.f);
+			}
 		}
 		for (const AnastasisVillage::FPoint& P : Building.AccessPoints)
 		{
@@ -208,7 +243,7 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 		const TArray<FString> Users = Village.UsersOf(Building.Id);
 		DrawDebugString(
 			World,
-			Base + FVector(0, 0, Tile * 0.9),
+			Base + FVector(0, 0, bMesh ? 480.0 : Tile * 0.9),
 			bGranary
 				? FString::Printf(TEXT("%s granary  nourriture %d (reserve %d)  dedans=%d  users=[%s]"),
 					*Building.Id, Building.FoodPhysical, Building.FoodReserved,
