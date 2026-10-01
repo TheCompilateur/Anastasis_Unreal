@@ -39,7 +39,22 @@ BRANCH_HEAD sur `agent/ecarts-protocole-001`.
 
 ### Banc du portail
 
-Rempli après le banc, voir la fin de la fiche.
+Worktree jetable, base = ce commit, une mission simulée par cas, `-base <base> -handoff` : **19/19**
+au verdict attendu.
+
+| Cas | Verdict |
+|---|---|
+| docs seuls ; test C++ seul (`Private/Tests/`) | `NON_CONCERNE` |
+| sim touchée sans section `## ECARTS` ; section au gabarit ; `AUCUN` nu | `FAIL` |
+| `AUCUN — <preuve>`, code propre ; plage « n° 1 à 18 » | `PASS` |
+| `AUCUN` mais une ligne ajoutée dit « non porte » | `FAIL` |
+| `FMath::RandRange` ajouté ; `rand()` dans un fichier sim non suivi | `FAIL` |
+| `FMath::Rand` en commentaire seulement | `PASS` |
+| nouveau `FAnastasisRng` | `PASS` + `WARN` |
+| fiche n° 20 + marque, nommée ; non nommée | `PASS` ; `FAIL` |
+| marque vers n° 99 ; n° 2 `FERME` avec ses marques restées | `FAIL` |
+| n° 6 → `ASSUME` sans décision ; avec décision datée | `FAIL` ; `PASS` + `WARN` |
+| masque inconnu de `masks.mjs` | `FAIL` |
 
 ## SCN
 
