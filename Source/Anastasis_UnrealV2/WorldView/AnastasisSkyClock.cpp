@@ -31,6 +31,42 @@ double ExposureForSunElevation(const double ElevationDegrees, const double DayEV
 	return NightEV100 + (DayEV100 - NightEV100) * S;
 }
 
+double ExposureForSunElevation(const UAnastasisAtmosphereProfile& Profile, const double ElevationDegrees)
+{
+	const TArray<FVector2D>& Keys = Profile.ExposureStopsBelowDay;
+	double Stops = 0.0;
+	if (Keys.Num() > 0)
+	{
+		if (ElevationDegrees <= Keys[0].X)
+		{
+			Stops = Keys[0].Y;
+		}
+		else if (ElevationDegrees >= Keys.Last().X)
+		{
+			Stops = Keys.Last().Y;
+		}
+		else
+		{
+			for (int32 I = 1; I < Keys.Num(); ++I)
+			{
+				if (ElevationDegrees <= Keys[I].X)
+				{
+					const double Span = FMath::Max(1e-9, Keys[I].X - Keys[I - 1].X);
+					Stops = FMath::Lerp(Keys[I - 1].Y, Keys[I].Y, (ElevationDegrees - Keys[I - 1].X) / Span);
+					break;
+				}
+			}
+		}
+	}
+	return FMath::Max(static_cast<double>(Profile.NightExposureEV100), Profile.ExposureEV100 - Stops);
+}
+
+double AdaptExposure(const double Current, const double Target, const double DeltaSeconds, const double MaxPerSecond)
+{
+	const double Step = FMath::Max(0.0, MaxPerSecond * DeltaSeconds);
+	return Current + FMath::Clamp(Target - Current, -Step, Step);
+}
+
 FSkyState Evaluate(const UAnastasisAtmosphereProfile& Profile, const double SimTime, const uint32 Seed)
 {
 	FSkyState State;
@@ -49,9 +85,8 @@ FSkyState Evaluate(const UAnastasisAtmosphereProfile& Profile, const double SimT
 		FMath::Fmod(State.Hours + 12.0, 24.0), Profile.LatitudeDegrees, -State.DeclinationDegrees);
 	State.SunElevationDegrees = ElevationOf(State.SunRotation);
 
-	State.ExposureEV100 = ExposureForSunElevation(State.SunElevationDegrees, Profile.ExposureEV100,
-		Profile.NightExposureEV100, Profile.NightElevationDegrees, Profile.DayElevationDegrees);
-	// The same curve, as a 0..1 daylight factor: night vision fades in exactly as the exposure drops.
+	State.ExposureEV100 = ExposureForSunElevation(Profile, State.SunElevationDegrees);
+	// A 0..1 daylight factor for night vision, on the twilight band.
 	State.Daylight = ExposureForSunElevation(State.SunElevationDegrees, 1.0, 0.0,
 		Profile.NightElevationDegrees, Profile.DayElevationDegrees);
 	State.ColorSaturation = FMath::Lerp(static_cast<double>(Profile.NightColorSaturation), 1.0, State.Daylight);

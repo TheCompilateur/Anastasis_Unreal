@@ -1,0 +1,29 @@
+﻿ANASTASIS_SIM reset seed=12345 day=1 time=37.799999999999997 tiles=9216 speed=1
+ANASTASIS_SKY day=1 hour=10.08 phase=morning season=spring decl=0.00 sun_elev=41.40 moon_elev=-41.40 ev100=14.00 cover=0.168 rain=0.035 snow=0.000 humidity=0.037 wind=0.457 weather=1 mist_factor=0.113
+SKY_PIE_SAMPLE real=3.2 sim_time=37.817 village_phase=morning
+SKY_PIE_SAMPLE real=9.5 sim_time=37.917 village_phase=morning
+SKY_PIE_SAMPLE real=14.5 sim_time=41.600 village_phase=morning
+ANASTASIS_SKY day=1 hour=11.50 phase=midday season=spring decl=0.00 sun_elev=48.44 moon_elev=-48.44 ev100=14.00 cover=0.124 rain=0.035 snow=0.000 humidity=0.027 wind=0.457 weather=1 mist_factor=0.112
+SKY_PIE_SAMPLE real=19.5 sim_time=46.167 village_phase=midday
+ANASTASIS_SKY day=1 hour=13.50 phase=afternoon season=spring decl=0.00 sun_elev=44.19 moon_elev=-44.19 ev100=14.00 cover=0.061 rain=0.035 snow=0.000 humidity=0.024 wind=0.457 weather=1 mist_factor=0.112
+SKY_PIE_SAMPLE real=24.5 sim_time=51.033 village_phase=afternoon
+SKY_PIE_SAMPLE real=29.6 sim_time=55.900 village_phase=afternoon
+SKY_PIE_SAMPLE real=34.6 sim_time=60.783 village_phase=afternoon
+ANASTASIS_SKY day=1 hour=17.50 phase=evening season=spring decl=0.00 sun_elev=5.63 moon_elev=-5.63 ev100=12.40 cover=0.009 rain=0.035 snow=0.000 humidity=0.024 wind=0.457 weather=1 mist_factor=0.662
+SKY_PIE_SAMPLE real=39.6 sim_time=65.667 village_phase=evening
+SKY_PIE_SAMPLE real=44.6 sim_time=70.600 village_phase=evening
+SKY_PIE_SAMPLE real=49.6 sim_time=75.583 village_phase=evening
+ANASTASIS_SKY day=1 hour=21.00 phase=night season=spring decl=0.00 sun_elev=-32.30 moon_elev=32.30 ev100=-1.00 cover=0.006 rain=0.035 snow=0.000 humidity=0.024 wind=0.457 weather=1 mist_factor=0.744
+SKY_PIE_SAMPLE real=54.7 sim_time=80.533 village_phase=night
+SKY_PIE_SAMPLE real=59.7 sim_time=85.550 village_phase=night
+ANASTASIS_SIM_DAY seed=12345 day=2 time=90.016666666663696 newDays=1
+SKY_PIE_SAMPLE real=64.7 sim_time=90.567 village_phase=night
+SKY_PIE_SAMPLE real=69.7 sim_time=95.117 village_phase=night
+SKY_PIE_SAMPLE real=74.7 sim_time=99.867 village_phase=night
+SKY_PIE_SAMPLE real=79.7 sim_time=104.733 village_phase=night
+ANASTASIS_SKY day=2 hour=5.00 phase=dawn season=spring decl=1.23 sun_elev=-10.39 moon_elev=10.39 ev100=-1.00 cover=0.505 rain=0.035 snow=0.000 humidity=0.111 wind=0.195 weather=1 mist_factor=0.981
+SKY_PIE_SAMPLE real=84.8 sim_time=109.317 village_phase=dawn
+SKY_PIE_SAMPLE real=89.8 sim_time=113.333 village_phase=dawn
+ANASTASIS_SKY day=2 hour=7.00 phase=morning season=spring decl=1.23 sun_elev=12.13 moon_elev=-12.13 ev100=13.25 cover=0.489 rain=0.035 snow=0.000 humidity=0.108 wind=0.195 weather=1 mist_factor=0.581
+SKY_PIE_SAMPLE real=94.8 sim_time=117.283 village_phase=morning
+SKY_PIE_SAMPLE real=99.8 sim_time=121.400 village_phase=morning

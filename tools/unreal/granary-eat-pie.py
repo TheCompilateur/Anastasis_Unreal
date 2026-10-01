@@ -76,6 +76,9 @@ def tick(dt):
     meals = DBG.count_meals_taken(world)
 
     if step == 0 and now - mark > 1.5:
+        # anastasis.Sim.Speed vaut 1 par defaut depuis sky-transitions-001 ; cette preuve a ete
+        # etablie a 10 et le reste.
+        cmd(world, 'anastasis.Sim.Speed 10')
         cmd(world, 'Anastasis.Village.FirstGranary 4 6')
         cmd(world, 'Anastasis.Village.Status')
         mark = t

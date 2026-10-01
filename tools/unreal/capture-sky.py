@@ -31,6 +31,9 @@ def parse_state(s):
     return (label.strip(), [c.strip() for c in cvars.split(';') if c.strip()])
 
 
+# ANASTASIS_SKY_VIEWS : sous-ensemble de vues (ov_sw,valley_long,ridge_long,sun_ridge), vide = toutes.
+# Un balayage fin d'heures n'a pas besoin des quatre vues a chaque etat.
+ONLY = [v.strip() for v in os.environ.get('ANASTASIS_SKY_VIEWS', '').split(',') if v.strip()]
 STATES = [parse_state(s.strip()) for s in os.environ.get('ANASTASIS_SKY_STATES', '1|0').split('|') if s.strip()]
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
 SEED = 12345
@@ -197,7 +200,7 @@ def tick(_dt):
                 finish('SKY_CAPTURE_COMPLETE views=%d states=%d' % (len(views) + 1, len(STATES)))
                 return
             apply_state(STATES[state_i])
-            queue = [(STATES[state_i], v) for v in views + [sun_view()]]
+            queue = [(STATES[state_i], v) for v in views + [sun_view()] if not ONLY or v[0] in ONLY]
             # Nuages volumetriques, brouillard volumetrique et capture temps reel du ciel ont
             # besoin de frames pour converger : la premiere vue d'un etat attend plus longtemps.
             first, mark = True, time.monotonic()

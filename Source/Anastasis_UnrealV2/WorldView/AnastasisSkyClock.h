@@ -72,11 +72,21 @@ namespace AnastasisSkyClock
 	inline double ElevationOf(const FRotator& LightRotation) { return -LightRotation.Pitch; }
 
 	/**
-	 * Pinned exposure as a function of sun elevation: NightEV at and below LowElevation,
-	 * DayEV at and above HighElevation, smoothstep between. Monotonic by construction.
+	 * Smoothstep band in sun elevation: NightValue at and below LowElevation, DayValue at and
+	 * above HighElevation. Since SKY_TRANSITIONS_001 it drives night vision only (the 0..1
+	 * daylight factor); exposure uses the calibrated overload below.
 	 */
 	double ExposureForSunElevation(double ElevationDegrees, double DayEV100, double NightEV100,
 		double LowElevationDegrees, double HighElevationDegrees);
+
+	/**
+	 * The pinned exposure for a sun elevation: day EV minus the profile's ExposureStopsBelowDay
+	 * (linear between keys, flat beyond), floored at the night EV.
+	 */
+	double ExposureForSunElevation(const UAnastasisAtmosphereProfile& Profile, double ElevationDegrees);
+
+	/** One step of eye adaptation toward Target: at most MaxPerSecond * DeltaSeconds. */
+	double AdaptExposure(double Current, double Target, double DeltaSeconds, double MaxPerSecond);
 
 	/** The whole sky at one simulation instant. Deterministic in (Profile, SimTime, Seed). */
 	FSkyState Evaluate(const UAnastasisAtmosphereProfile& Profile, double SimTime, uint32 Seed);

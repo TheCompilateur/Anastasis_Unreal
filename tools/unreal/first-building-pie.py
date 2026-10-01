@@ -25,6 +25,8 @@ unreal.log('FIRST_BUILDING_MAP_LOAD=' + str(les.load_level('/Game/Anastasis/Maps
 
 # (secondes apres PIE actif, commande)
 SCRIPT = [
+    # anastasis.Sim.Speed vaut 1 par defaut depuis sky-transitions-001 ; preuve etablie a 10.
+    (0.0, 'anastasis.Sim.Speed 10'),
     (2.0, 'Anastasis.Village.FirstWell 4'),
     (3.0, 'Anastasis.Village.Status'),
     (6.0, 'Anastasis.Village.Status'),

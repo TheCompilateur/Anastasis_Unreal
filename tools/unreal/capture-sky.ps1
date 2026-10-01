@@ -4,7 +4,7 @@
 # Sortie : Saved\SkyEvidence\<Label>\<vue>_<etat>.png + sky.json
 #   -States 'h06=anastasis.Sky.Hour 6|h12=anastasis.Sky.Hour 12|h22=anastasis.Sky.Hour 22'
 #   -PreCmds : CVars posees avant le script, communes a tous les etats.
-param([string]$Label='latest', [string]$States='1|0', [string]$PreCmds='', [int]$TimeoutSec=1500)
+param([string]$Label='latest', [string]$States='1|0', [string]$PreCmds='', [string]$Views='', [int]$TimeoutSec=1500)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
@@ -15,6 +15,7 @@ $log=Join-Path $dir 'capture.log'
 if(Test-Path $log){Remove-Item $log}
 $env:ANASTASIS_SKY_OUT=$dir
 $env:ANASTASIS_SKY_STATES=$States
+$env:ANASTASIS_SKY_VIEWS=$Views
 $py=(Join-Path $Root 'tools\unreal\capture-sky.py').Replace('\','/')
 $exec = if ($PreCmds) { $PreCmds + ',py ' + $py } else { 'py ' + $py }
 $launchArgs=@(

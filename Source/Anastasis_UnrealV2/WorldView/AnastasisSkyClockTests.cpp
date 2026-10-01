@@ -234,4 +234,116 @@ bool FAnastasisSkyClockFogAndMistFollowTheLight::RunTest(const FString&)
 	return true;
 }
 
+/**
+ * SKY_TRANSITIONS_001 -- the sunset "flash". Measured 2026-09-30 on Lvl_AnastasisSlice (day 1,
+ * capture-sky sunset_before): with the first exposure curve the valley view's mean luma ROSE as
+ * the sun set (141 at +2.26 deg, 183 at -1.13 deg), the overview's too (144 -> 192), then both
+ * crashed (24 by -9.03 deg).
+ *
+ * The scene's own light per elevation, for the valley and the overview, is recovered from a
+ * second sweep (sunset_after) as log2(mean luma) + the EV100 logged for that capture --
+ * tonemapper ignored, an approximation stated. Replaying it against a curve predicts the
+ * displayed log-luma of both views. Required of the current curve: no step brightens a view by
+ * more than a quarter stop (the scatter of the measurement itself), and nothing after the first
+ * frame is brighter than it. Required of the FIRST curve on the same data: that it fails --
+ * otherwise this test would prove nothing.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisSkyClockSunsetOnlyDarkens, "Anastasis.Sky.Clock.SunsetOnlyDarkens", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisSkyClockSunsetOnlyDarkens::RunTest(const FString&)
+{
+	const UAnastasisAtmosphereProfile* Profile = UAnastasisAtmosphereProfile::CreateCodeDefaults(GetTransientPackage());
+
+	// (sun elevation deg, scene log-light: valley view, overview)
+	struct FSample { double Elevation; double Valley; double Overview; };
+	const FSample Sweep[] = {
+		{ 4.52, 19.44, 19.10 }, { 3.39, 18.33, 18.31 }, { 2.26, 17.00, 17.34 }, { 1.13, 16.16, 16.44 },
+		{ 0.00, 15.30, 15.52 }, { -1.13, 14.41, 14.49 }, { -2.26, 13.37, 13.48 }, { -3.39, 12.25, 12.40 },
+		{ -4.52, 10.97, 11.18 }, { -5.65, 9.26, 9.23 }, { -6.78, 7.53, 7.74 }, { -7.91, 5.87, 6.27 },
+		{ -9.03, 4.19, 4.18 },
+	};
+	constexpr double Tolerance = 0.25; // stops
+
+	auto Darkens = [&Sweep, Tolerance](TFunctionRef<double(double)> CurveEV, FString* Trace)
+	{
+		bool bOk = true;
+		for (const bool bValley : {true, false})
+		{
+			double First = 0.0, Previous = 0.0;
+			for (int32 I = 0; I < UE_ARRAY_COUNT(Sweep); ++I)
+			{
+				const double Shown = (bValley ? Sweep[I].Valley : Sweep[I].Overview) - CurveEV(Sweep[I].Elevation);
+				if (I == 0)
+				{
+					First = Shown;
+				}
+				else
+				{
+					bOk &= Shown <= Previous + Tolerance && Shown <= First + Tolerance;
+				}
+				Previous = Shown;
+				if (Trace)
+				{
+					*Trace += FString::Printf(TEXT(" %s%.2f:%.0f"), bValley ? TEXT("v") : TEXT("o"), Sweep[I].Elevation, FMath::Pow(2.0, Shown));
+				}
+			}
+		}
+		return bOk;
+	};
+
+	FString Trace;
+	const bool bNew = Darkens([Profile](double E) { return AnastasisSkyClock::ExposureForSunElevation(*Profile, E); }, &Trace);
+	const bool bOld = Darkens([Profile](double E)
+	{
+		return AnastasisSkyClock::ExposureForSunElevation(E, Profile->ExposureEV100, Profile->NightExposureEV100,
+			Profile->NightElevationDegrees, Profile->DayElevationDegrees);
+	}, nullptr);
+	AddInfo(TEXT("ANASTASIS_SKY_SUNSET predicted_luma") + Trace);
+	TestFalse(TEXT("the replay reproduces the flash with the first curve"), bOld);
+	TestTrue(TEXT("with the calibrated curve both views only darken through sunset"), bNew);
+
+	// The curve itself: never darker by day than by night, day EV at a high sun, night floor below -9 deg.
+	double Previous = -1e9;
+	bool bMonotonic = true;
+	for (double E = -30.0; E <= 60.0; E += 0.25)
+	{
+		const double EV = AnastasisSkyClock::ExposureForSunElevation(*Profile, E);
+		bMonotonic &= EV >= Previous - 1e-9;
+		Previous = EV;
+	}
+	TestTrue(TEXT("exposure never darkens as the sun rises"), bMonotonic);
+	TestEqual(TEXT("high sun: the day exposure"), AnastasisSkyClock::ExposureForSunElevation(*Profile, 45.0), static_cast<double>(Profile->ExposureEV100), 1e-9);
+	TestEqual(TEXT("deep night: the night floor"), AnastasisSkyClock::ExposureForSunElevation(*Profile, -30.0), static_cast<double>(Profile->NightExposureEV100), 1e-9);
+	return true;
+}
+
+/**
+ * Eye adaptation: a running sky never jumps. However fast anastasis.Sim.Speed makes the dusk,
+ * the exposure on screen moves at most MaxExposureChangePerSecond per real second, and does
+ * reach its target.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisSkyClockEyeAdaptation, "Anastasis.Sky.Clock.EyeAdaptation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisSkyClockEyeAdaptation::RunTest(const FString&)
+{
+	const UAnastasisAtmosphereProfile* Profile = UAnastasisAtmosphereProfile::CreateCodeDefaults(GetTransientPackage());
+	const double Rate = Profile->MaxExposureChangePerSecond;
+	const double Dt = 1.0 / 60.0;
+	double EV = 14.0;
+	const double Target = -1.0;
+	int32 Frames = 0;
+	bool bBounded = true;
+	while (FMath::Abs(EV - Target) > 1e-9 && Frames < 100000)
+	{
+		const double Next = AnastasisSkyClock::AdaptExposure(EV, Target, Dt, Rate);
+		bBounded &= FMath::Abs(Next - EV) <= Rate * Dt + 1e-12;
+		EV = Next;
+		++Frames;
+	}
+	AddInfo(FString::Printf(TEXT("ANASTASIS_SKY_ADAPT day_to_night_seconds=%.2f"), Frames * Dt));
+	TestTrue(TEXT("no frame moves the exposure faster than the eye adapts"), bBounded);
+	TestEqual(TEXT("the target is reached"), EV, Target, 1e-9);
+	TestTrue(TEXT("a full day-to-night change takes seconds, not a frame"), Frames * Dt >= 15.0 / Rate - 1e-6);
+	TestEqual(TEXT("zero elapsed time does not move it"), AnastasisSkyClock::AdaptExposure(5.0, 10.0, 0.0, Rate), 5.0, 1e-12);
+	return true;
+}
+
 #endif

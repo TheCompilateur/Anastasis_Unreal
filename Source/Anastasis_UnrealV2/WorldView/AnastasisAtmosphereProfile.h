@@ -359,9 +359,53 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock")
 	float NightElevationDegrees = -12.0f;
 
-	/** Sun elevation (deg) at and above which the day exposure (ExposureEV100) holds. */
+	/**
+	 * Sun elevation (deg) at and above which night vision is fully off (saturation 1, 6500 K).
+	 * Since SKY_TRANSITIONS_001 it no longer shapes the exposure: ExposureStopsBelowDay does.
+	 */
 	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock")
 	float DayElevationDegrees = 10.0f;
+
+	/**
+	 * Pinned exposure by sun elevation, as stops BELOW the day exposure: X = elevation (deg),
+	 * Y = stops; linear between keys, held flat beyond them, floored at NightExposureEV100.
+	 *
+	 * SKY_TRANSITIONS_001. The first curve (a smoothstep from -12 to +10 deg) brightened the
+	 * image AT sunset -- measured on Lvl_AnastasisSlice, valley view: mean luma 141 at +2.3 deg,
+	 * 183 at -1.1 deg -- then crashed to 24 by -9 deg. At Sim.Speed 10 that is three seconds:
+	 * Alexandre's "flash". These keys are calibrated on a second sweep (capture-sky
+	 * sunset_after; scene log-light = log2(mean luma) + EV per elevation, valley AND overview
+	 * views, the brighter one governing) for a displayed brightness falling ~0.15 stop per
+	 * degree of sun: ~147 luma at +4.5 deg, ~93 at sunset, ~37 by -9 deg. Empirical, scene-
+	 * and tonemapper-dependent, stated as such; Anastasis.Sky.Clock.SunsetOnlyDarkens replays
+	 * the measurement and locks it.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock")
+	TArray<FVector2D> ExposureStopsBelowDay = {
+		FVector2D(-9.0, 15.0),
+		FVector2D(-7.91, 13.10),
+		FVector2D(-6.78, 11.79),
+		FVector2D(-5.65, 10.44),
+		FVector2D(-4.52, 8.69),
+		FVector2D(-3.39, 7.63),
+		FVector2D(-2.26, 6.72),
+		FVector2D(-1.13, 5.88),
+		FVector2D(0.0, 5.01),
+		FVector2D(1.13, 4.26),
+		FVector2D(2.26, 3.53),
+		FVector2D(3.39, 2.70),
+		FVector2D(4.52, 1.76),
+		FVector2D(10.0, 0.95),
+		FVector2D(20.0, 0.0),
+	};
+
+	/**
+	 * Eye adaptation: the most the pinned exposure may move per REAL second while the clock
+	 * runs. Captures (Apply) snap to the hour's value; a running sky never jumps, whatever
+	 * anastasis.Sim.Speed does to the length of a dusk.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock", meta = (ClampMin = "0.1", ClampMax = "100.0"))
+	float MaxExposureChangePerSecond = 3.0f;
 
 	/**
 	 * Night vision, not night grading. Under moonlight the eye is scotopic: colour fades and
