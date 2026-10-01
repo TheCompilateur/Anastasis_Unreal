@@ -124,3 +124,59 @@ tick 298) se jugeront **après** : tant que `actors` diverge au tick 1, elles di
   de la simulation C++ mais une absence de lecture (STOP de `sim-state-reader-001`).
 - `rng` côté C++ est l'état lu, figé : le C++ n'a pas de flux `sim.rng` (écart n° 16). La section ne
   convergera qu'avec `goal-noise-001`.
+
+---
+
+## Rapport 2 — la cadence branchée, la vue épinglée sur le village (budget-cadence-001)
+
+Décision d'Alexandre (2026-10-01) : **la vue du budget est épinglée sur le village**, le cas du jeu
+(option B). Le scénario passe au format 2 avec un champ `vue` = `settlement` de la sauvegarde,
+(54, 57), compris dans son empreinte (`52f66b01c0766137`) et appliqué des deux côtés :
+`pinSimulationView` après `deserialize` côté JS, `FVillage::SetSimulationView` côté C++. La cadence est
+branchée en tête de `FVillage::UpdateNpc` dès qu'une vue est posée (écart n° 5 réécrit : le reste est
+« sans vue »).
+
+Mesure indépendante, session `labo-ecarts-001` (`docs/migration/ecarts/n05.md`, N = 40 répliques)
+`EVD` : avec la vue en (0, 0), la référence elle-même se comporte autrement (épisodes `helpFarm`
+46 → 11 s, temps dedans 0,38 → 0,55) parce qu'en bande *far* elle reconsidère ses buts 8 fois moins ;
+vue épinglée sur le village, elle rejoint le profil d'un village regardé. Le choix B est le bon cas.
+
+`Anastasis.Sim` : 94 PASS / 2 KNOWN_EXPECTED_FAILURE / 0 FAIL (dont `Anastasis.Sim.Village.Cadence` :
+near à chaque tick ; medium accumule `_simBudgetAccum` et tourne au 6e tick avec 0,1 s ; sans vue,
+inchangé).
+
+### Le rapport `EVD`
+
+```
+PREMIER TICK DIVERGENT : 1  (jour 1, temps 37.81666666666666)
+Sections divergentes a ce tick (1) :
+  actors                 A=4cc03c8b776700c0  B=8b3a4d5cb53808f9
+Premiere divergence par section — l'ordre est l'ordre de travail :
+  tick        1  actors
+  tick       32  buildings
+  tick       32  rng
+  tick      133  mealReservations
+  tick      257  tileDiff
+Sections jugees restees identiques sur toute la trace (5) : day, h, seed, time, w
+```
+
+Le premier tick divergent reste **1**, mais ce n'est plus la cadence. L'empreinte C++ au tick 1 est la
+même qu'au rapport 1 (les habitants sont en *near* : ils tournaient déjà à chaque tick) ; c'est le JS
+qui a changé : ses habitants tournent eux aussi au tick 1.
+
+### Le forage au tick 1 `EVD`
+
+L'état C++ au tick 1 a été reconstruit depuis le forage du rapport 1 (même empreinte : reconstruction
+vérifiée, `8b3a4d5cb53808f9`). 45 champs diffèrent, en deux familles :
+
+| Famille | Champs | Cause `INF` |
+|---|---|---|
+| Besoins **personnels** | `hunger`, `thirst`, `energy` (par ex. npc-0 : faim 10,011328 contre 10,009667) | `tickNeeds` applique à chaque habitant `metabolicDemandFactor`, `hydrationLossFactor`, `fatigueRecoveryFactor` (génome, mode de vie, conditionnement), que `needs.js` garde « à porter » dans l'inventaire. `health`, `hygiene`, `leisure`, `social` sont, eux, **identiques**. |
+| Champs non tenus ou non projetés | `workTimer` (JS += dt, C++ 0) ; `aiThinkAt`, `villagePhase` (tenus par le C++, non projetés par le lecteur) ; `placeMemory` ; `lifestyle.lastNotedDay` | Lecteur et portage incomplets (STOP de `sim-state-reader-001`). |
+
+**Ordres de travail, dans l'ordre** :
+1. Les facteurs personnels des besoins (`needs.js` : `metabolicDemandFactor`, `hydrationLossFactor`,
+   `fatigueRecoveryFactor`, `fatigueAdaptationFactor`, `recoveryConditioningFactor`) avec les champs qu'ils
+   lisent (génome, mode de vie, conditionnement) — par le lecteur d'abord, le portage ensuite.
+2. Le lecteur : projeter `aiThinkAt` et `villagePhase` (le C++ les tient déjà), suivre `workTimer`.
+3. `placeMemory` et `lifestyleDailyUpdate` : petits, mais à chaque tick.

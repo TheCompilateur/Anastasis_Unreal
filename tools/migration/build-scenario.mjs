@@ -112,9 +112,15 @@ for (;;) {
 // 4) Audit des tirages: ce que chaque systeme tire dans sim.rng, masques
 //    leves puis poses. Dans un processus neuf (etat de module propre), par
 //    l'emetteur: c'est lui qui applique les masques en usage reel.
+// La vue du budget : `"settlement"` = le centre du village de la sauvegarde.
+let vue = null;
+if (meta.vue === "settlement") vue = { x: save.settlement.x, y: save.settlement.y };
+else if (meta.vue && Number.isFinite(meta.vue.x) && Number.isFinite(meta.vue.y)) vue = { x: meta.vue.x, y: meta.vue.y };
+else if (meta.vue != null) { console.error(`vue inconnue : ${JSON.stringify(meta.vue)}`); process.exit(2); }
+
 const brouillon = {
   kind: "anastasis-scenario", format: FORMAT_SCENARIO, name: meta.name,
-  seed: meta.seed, dt: meta.dt, dayDeferred: meta.dayDeferred,
+  seed: meta.seed, dt: meta.dt, dayDeferred: meta.dayDeferred, vue,
   sections: meta.sections, masques: meta.masques, save,
 };
 brouillon.empreinte = empreinteScenario(brouillon);
@@ -160,6 +166,7 @@ const scenario = {
   seed: meta.seed,
   dt: meta.dt,
   dayDeferred: meta.dayDeferred,
+  vue,
   sections: meta.sections,
   masques: meta.masques,
   masquesDetail: masques,

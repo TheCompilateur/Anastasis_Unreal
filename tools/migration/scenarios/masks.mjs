@@ -77,6 +77,7 @@ export async function chargerReference(REF) {
     createSimulationBudgetDirector: budget.createSimulationBudgetDirector,
     resetSimulationBudgetStats: budget.resetSimulationBudgetStats,
     simulationBudgetMultipliers: budget.simulationBudgetMultipliers,
+    pinSimulationView: budget.pinSimulationView,
     beginNavTick: nav.beginNavTick,
     processNavQueue: nav.processNavQueue,
     tickLogicalVillageLod: lod.tickLogicalVillageLod,

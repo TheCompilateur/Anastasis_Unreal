@@ -43,6 +43,10 @@ namespace AnastasisHarnessTrace
 		FString DayDeferred;
 		TArray<FString> Sections;
 		AnastasisJson::FValue Masques;
+		/** `vue` : la vue du budget, epinglee des deux cotes (format 2). Sans elle, pas de cadence (ecart n°5). */
+		bool bHasVue = false;
+		double VueX = 0.0;
+		double VueY = 0.0;
 	};
 
 	/** Lit un fichier de scenario (tools/migration/scenarios/*.json) : en-tete et etat. */

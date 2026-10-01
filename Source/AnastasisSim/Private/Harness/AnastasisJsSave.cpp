@@ -496,7 +496,8 @@ namespace AnastasisJsSave
 		// workTimer, jobId, workplaceId, homeId, shelterId, skill,
 		// skills.{gather, trade, craft}, inventory.food, target, pathStep,
 		// pathCooldown, pathFailed, stuckTimer, doorStuckAt, doorApproachAt,
-		// talkWithId, talkUntil, inside (null seulement).
+		// talkWithId, talkUntil, inside (null seulement), _simBudgetAccum (cle presente
+		// ou non : la reference ne l'ecrit qu'apres un passage hors de la bande near).
 
 		bool ReadActor(FReader& R, const FValue& A, const FString& Where, AnastasisVillage::FNpc& Out)
 		{
@@ -543,6 +544,11 @@ namespace AnastasisJsSave
 			if (!R.OptBool(A, TEXT("pathFailed"), Where, Out.bPathFailed) || !R.OptDouble(A, TEXT("stuckTimer"), Where, Out.StuckTimer)) return false;
 			if (!R.OptDouble(A, TEXT("doorStuckAt"), Where, Out.DoorStuckAt) || !R.OptDouble(A, TEXT("doorApproachAt"), Where, Out.DoorApproachAt)) return false;
 			if (!R.OptId(A, TEXT("talkWithId"), Where, Out.TalkWithId) || !R.OptDouble(A, TEXT("talkUntil"), Where, Out.TalkUntil)) return false;
+			if (A.Find(TEXT("_simBudgetAccum")))
+			{
+				if (!R.OptDouble(A, TEXT("_simBudgetAccum"), Where, Out.SimBudgetAccum)) return false;
+				Out.bHasSimBudgetAccum = true;
+			}
 			if (const FValue* Inside = A.Find(TEXT("inside")); Inside && !Inside->IsNull())
 			{
 				return R.Fail(FReader::At(Where, TEXT("inside")), TEXT("habitant a l'interieur : non lu par ce lecteur (inside non nul)"));
@@ -608,6 +614,11 @@ namespace AnastasisJsSave
 			Put(Out, TEXT("doorApproachAt"), Num(N.DoorApproachAt), bNew);
 			Put(Out, TEXT("talkWithId"), IdOrNull(N.TalkWithId), bNew);
 			Put(Out, TEXT("talkUntil"), Num(N.TalkUntil), bNew);
+			// La cle apparait des que la cadence l'ecrit, qu'elle soit ou non dans la sauvegarde.
+			if (N.bHasSimBudgetAccum)
+			{
+				Out.Set(TEXT("_simBudgetAccum"), Num(N.SimBudgetAccum));
+			}
 			// `inside` non nul n'est pas lu (ReadActor refuse) : un habitant lu est dehors.
 			Put(Out, TEXT("inside"), FValue(), bNew);
 			return Out;

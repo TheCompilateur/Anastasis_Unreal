@@ -92,6 +92,19 @@ namespace AnastasisHarnessTrace
 			return false;
 		}
 		OutInfo.Masques = *Masques;
+		if (const FValue* Vue = Root.Find(TEXT("vue")); Vue && !Vue->IsNull())
+		{
+			const FValue* X = Vue->Find(TEXT("x"));
+			const FValue* Y = Vue->Find(TEXT("y"));
+			if (!X || !Y || !X->IsNumber() || !Y->IsNumber())
+			{
+				OutError = TEXT("scenario : vue {x, y} attendue");
+				return false;
+			}
+			OutInfo.bHasVue = true;
+			OutInfo.VueX = X->Number;
+			OutInfo.VueY = Y->Number;
+		}
 		const FValue* Save = Root.Find(TEXT("save"));
 		if (!Save)
 		{
@@ -210,6 +223,11 @@ namespace AnastasisHarnessTrace
 		{
 			return false;
 		}
+		// `pinSimulationView(sim.simulationBudget, vue.x, vue.y)`, comme l'emetteur JS apres `deserialize`.
+		if (Info.bHasVue)
+		{
+			Sim.GetVillage().SetSimulationView(Info.VueX, Info.VueY);
+		}
 
 		TArray<FString> Lines;
 		{
@@ -220,6 +238,17 @@ namespace AnastasisHarnessTrace
 			FValue Sections = FValue::MakeArray();
 			for (const FString& S : Info.Sections) Sections.Items.Add(FValue::MakeString(S));
 			Scenario.Set(TEXT("sections"), Sections);
+			if (Info.bHasVue)
+			{
+				FValue Vue = FValue::MakeObject();
+				Vue.Set(TEXT("x"), FValue::MakeNumber(Info.VueX));
+				Vue.Set(TEXT("y"), FValue::MakeNumber(Info.VueY));
+				Scenario.Set(TEXT("vue"), Vue);
+			}
+			else
+			{
+				Scenario.Set(TEXT("vue"), FValue());
+			}
 			Scenario.Set(TEXT("avertissementsChargement"), FValue::MakeNumber(0.0));
 
 			FValue Header = FValue::MakeObject();

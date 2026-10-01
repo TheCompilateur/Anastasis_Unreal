@@ -1,6 +1,6 @@
 // GENERE AUTOMATIQUEMENT - ne pas editer a la main.
 // Source: tools/migration/gen-scenario-vectors.mjs
-// Scenario: tools/migration/scenarios/endurance.json (endurance, empreinte a7c317b02da7be0f)
+// Scenario: tools/migration/scenarios/endurance.json (endurance, empreinte 52f66b01c0766137)
 // Reference: anastasis-ref-p3 @ fee66ae
 //
 // Empreintes de `serialize` au tick 0 de la REFERENCE: deserialize(scenario.save)
@@ -12,7 +12,7 @@
 
 static const TCHAR* const ScenarioPath = TEXT("tools/migration/scenarios/endurance.json");
 static const TCHAR* const ScenarioName = TEXT("endurance");
-static const TCHAR* const ScenarioEmpreinte = TEXT("a7c317b02da7be0f");
+static const TCHAR* const ScenarioEmpreinte = TEXT("52f66b01c0766137");
 static constexpr int32 ScenarioW = 108;
 static constexpr int32 ScenarioH = 114;
 static constexpr int32 ScenarioTileDiffRows = 590;

@@ -33,6 +33,10 @@ export const meta = {
   // (processDayDeferred) — comme le C++. `flush` viderait la file au tick de
   // minuit: c'est ce que fait la trace sans scenario, pas le jeu.
   dayDeferred: "tick",
+  // La vue du budget epinglee sur le village : le joueur le regarde (decision
+  // d'Alexandre, 2026-10-01, P3_PREMIER_RAPPORT.md). Les habitants dehors sont en
+  // bande near (chaque tick) ; dedans, en medium (10 Hz).
+  vue: "settlement",
   // Perimetre: ce que le premier lecteur C++ projettera (P3_PLAN.md §3,
   // sim-state-reader-001). Le reste de `serialize` est hors perimetre.
   sections: ["seed", "rng", "w", "h", "time", "day", "tileDiff", "buildings", "actors", "mealReservations"],

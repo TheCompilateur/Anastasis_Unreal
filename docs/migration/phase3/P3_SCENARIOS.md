@@ -48,6 +48,7 @@ changent parce que `deserialize` complète des valeurs par défaut — `trafficT
 | `name` | nom de la recette |
 | `reference` | `{ tag, commit, modifie }` du dépôt JS de construction |
 | `seed`, `dt` | graine et pas de temps de la trace |
+| `vue` | format 2 : `{ x, y }`, la vue du budget épinglée des deux côtés (`pinSimulationView`) ; `endurance` : le `settlement`, (54, 57). Sans elle, la vue reste en (0, 0) et le village est simulé « de loin » (bande *far*, 1 Hz). Voir `P3_PREMIER_RAPPORT.md`, rapport 2 |
 | `dayDeferred` | `"tick"` : 2 travaux de minuit par tick (`processDayDeferred`), comme le jeu et le C++ ; `"flush"` : file vidée après chaque tick (trace sans scénario) |
 | `sections` | **périmètre** : sections de `serialize` que le harnais juge |
 | `masques` | identifiants du registre `tools/migration/scenarios/masks.mjs` |
@@ -89,7 +90,9 @@ Ce que la recette a posé `EVD` (`recette` du fichier) :
 | `npc-2` à `npc-4` | sans-métier |
 
 Périmètre : `seed, rng, w, h, time, day, tileDiff, buildings, actors, mealReservations` — ce que
-le premier lecteur C++ projettera (`P3_PLAN.md` §3). Empreinte `a7c317b02da7be0f`.
+le premier lecteur C++ projettera (`P3_PLAN.md` §3). Empreinte `a7c317b02da7be0f` au format 1 ;
+**`52f66b01c0766137` au format 2** (vue épinglée, budget-cadence-001). Les chiffres d'audit
+ci-dessous sont ceux du format 1 (vue en (0, 0)) ; le fichier `endurance.json` porte ceux du format 2.
 
 ## 3. Les masques
 

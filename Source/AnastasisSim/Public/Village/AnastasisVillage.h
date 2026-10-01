@@ -68,8 +68,13 @@
 //  4. Pilotage reduit : pas de file de porte (crowdNav), pas d'hesitation, pas
 //     de facteur de vitesse, pas de contournement local ; escalade anti-blocage
 //     en trois paliers ; pas de verrou de seuil domestique en route.
-//  5. Pas de cadence LOD : chaque habitant est « proche du point de vue ». La
-//     cadence de pensee est celle de Noûs (2,2 s ; 0,55 s en besoin critique),
+//  5. Cadence LOD (`consumeNpcSimulationCadence`) : BRANCHEE en tete d'`UpdateNpc` des
+//     qu'une vue est posee (`SetSimulationView`, budget-cadence-001) — near a chaque
+//     tick, medium (dedans, ou < 42) 10 Hz, far 1 Hz, invisible 0,25 Hz, temps accumule
+//     dans `_simBudgetAccum`. Reste de l'ecart : SANS vue posee (tests d'assemblage, jeu
+//     sans camera branchee), chaque habitant est « proche du point de vue » ; la
+//     reference, elle, a toujours une vue ((0, 0) sans camera). Pression toujours 0.
+//     La cadence de pensee reste celle de Noûs (2,2 s ; 0,55 s en besoin critique),
 //     avec la bascule de phase qui force une pensee, comme la reference.
 //  6. RemoveBuilding n'existe pas dans la reference — elle ne demolit jamais.
 //  7. Foyer minimal : `assignHomeToHousehold` sans famille (le proprietaire seul),
@@ -184,6 +189,7 @@
 #include "CoreMinimal.h"
 #include "Ai/AnastasisNous.h"
 #include "Core/AnastasisRng.h"
+#include "Core/AnastasisSimBudget.h"
 #include "Core/AnastasisSpatialGrid.h"
 #include "Life/AnastasisBonds.h"
 #include "Life/AnastasisNeeds.h"
@@ -658,6 +664,14 @@ namespace AnastasisVillage
 		/** `npc.shelterCooldownUntil` ; < 0 = absent. */
 		double ShelterCooldownUntil = -1.0;
 
+		/**
+		 * `npc._simBudgetAccum` : le temps accumule par la cadence du budget hors de la
+		 * bande near (simulationBudget.js). La cle n'existe dans la reference qu'apres le
+		 * premier passage hors near ; `bHasSimBudgetAccum` en tient la presence.
+		 */
+		double SimBudgetAccum = 0.0;
+		bool bHasSimBudgetAccum = false;
+
 		/** `npc.relations` (ordre d'insertion), `mind.people`, `mind.tom`, `npc.moodlets`. */
 		TArray<TPair<FString, double>> Relations;
 		TArray<AnastasisBonds::FPersonRow> People;
@@ -869,6 +883,27 @@ namespace AnastasisVillage
 		 */
 		void SetWeatherSeed(uint32 Seed) { WeatherSeed = Seed; bWeatherSeeded = true; }
 		uint32 GetWeatherSeed() const { return WeatherSeed; }
+
+		/**
+		 * Cadence du budget (budget-cadence-001) : `pinSimulationView(budget, x, y)`. Une fois
+		 * la vue posee, chaque habitant passe d'abord par `consumeNpcSimulationCadence`, comme
+		 * la premiere instruction d'`updateNpc` : near (< 18 cases de la vue) a chaque tick,
+		 * medium (dedans, ou < 42) a 10 Hz, far a 1 Hz, invisible a 0,25 Hz, avec le temps
+		 * accumule dans `_simBudgetAccum`.
+		 *
+		 * ECART DECLARE n°5 (reste) — sans vue posee (tests d'assemblage, jeu sans camera branchee),
+		 * PAS de cadence : chaque habitant tourne a chaque tick. La reference, elle, a toujours
+		 * une vue ((0, 0) par defaut) : c'est l'hote qui doit la poser.
+		 */
+		void SetSimulationView(double InX, double InY)
+		{
+			BudgetDirector.ViewX = InX;
+			BudgetDirector.ViewY = InY;
+			BudgetDirector.bViewPinned = true;
+			bSimulationView = true;
+		}
+		bool HasSimulationView() const { return bSimulationView; }
+		const AnastasisBudget::FDirector& GetBudgetDirector() const { return BudgetDirector; }
 
 		/**
 		 * `sim.forceWeather` de la reference (« Hook verifies / debug ») : impose l'etat lu par les
@@ -1146,6 +1181,9 @@ namespace AnastasisVillage
 		AnastasisWeatherBehavior::FSimWeather ForcedWeather;
 		AnastasisWeatherBehavior::FSimWeather TickWeather;
 		double TickDailyRain = 0.0;
+		/** `sim.simulationBudget` : la vue et la pression ; `bSimulationView` = cadence active (ecart n°5). */
+		AnastasisBudget::FDirector BudgetDirector;
+		bool bSimulationView = false;
 		/** `sim.mealReservations` : ordre d'insertion = ordre de `Object.keys`. */
 		TArray<FMealReservation> MealReservations;
 		TArray<FFoodSource> FoodSources;

@@ -165,6 +165,8 @@ if (scenario) {
   sim = new ref.Simulation({ deferred: true, seed: scenario.seed });
   const { warnings } = deserialize(sim, JSON.parse(JSON.stringify(scenario.save)));
   avertissementsChargement = warnings.length;
+  // La vue du budget n'est pas dans `serialize` : le scenario la declare, on l'epingle.
+  if (scenario.vue) ref.pinSimulationView(sim.simulationBudget, scenario.vue.x, scenario.vue.y);
   const applique = appliquerMasques(sim, ref, MASQUES_ACTIFS, {
     recompose: MODE_TICK === "recompose",
     etiqueteur: AUDIT ? { courante: "hors-tick", poser(e) { const p = this.courante; this.courante = e; return p; } } : null,
@@ -221,6 +223,7 @@ lignes.push(JSON.stringify({
     empreinte: scenario.empreinte,
     masques: MASQUES_ACTIFS,
     sections: scenario.sections,
+    vue: scenario.vue ?? null,
     avertissementsChargement,
   } : null,
   perturb: PERTURB >= 0 ? { tick: PERTURB, path: PERTURB_PATH } : null,

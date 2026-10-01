@@ -7,6 +7,10 @@
 //   reference   { tag, commit, modifie } — le commit JS contre lequel il a ete construit
 //   seed, dt    graine et pas de temps de la trace
 //   dayDeferred "tick" (2 travaux de minuit par tick, comme le jeu et le C++) | "flush"
+//   vue         { x, y } : la vue du budget de simulation, epinglee des deux cotes
+//               (`pinSimulationView`). `simulationBudget` n'est pas dans `serialize`:
+//               sans ce champ, la vue reste en (0, 0) et le village est simule « de
+//               loin » (bande far, 1 Hz). null = vue par defaut.
 //   sections    perimetre: les sections de `serialize` que le harnais compare
 //   masques     identifiants du registre (masks.mjs), appliques par l'emetteur
 //   masquesDetail, etatVide, nonMasquables, auditRng, pointFixe, recette — documentation
@@ -24,7 +28,8 @@ import { execFileSync } from "node:child_process";
 
 import { digestState } from "../state-digest.mjs";
 
-export const FORMAT_SCENARIO = 1;
+// 2 : la vue du budget (`vue`) entre dans le scenario et dans son empreinte.
+export const FORMAT_SCENARIO = 2;
 
 export function empreinteScenario(s) {
   return digestState({
@@ -33,6 +38,7 @@ export function empreinteScenario(s) {
     seed: s.seed,
     dt: s.dt,
     dayDeferred: s.dayDeferred,
+    vue: s.vue ?? null,
     sections: s.sections,
     masques: s.masques,
     save: s.save,

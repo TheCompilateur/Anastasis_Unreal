@@ -1330,6 +1330,29 @@ namespace AnastasisVillage
 
 	void FVillage::UpdateNpc(FNpc& Npc, double Dt)
 	{
+		// `consumeNpcSimulationCadence(sim, npc, dt, { critical: needsCritical(npc) })`, premiere
+		// instruction d'`updateNpc` : hors de la bande near, l'habitant accumule le temps et ne
+		// tourne qu'a l'intervalle de sa bande, avec le temps accumule. Sans vue : ecart n°5.
+		if (bSimulationView)
+		{
+			AnastasisBudget::FNpcView View;
+			View.X = Npc.X;
+			View.Y = Npc.Y;
+			View.bInside = Npc.Inside.bActive;
+			const AnastasisBudget::FCadenceStep Step =
+				AnastasisBudget::ConsumeCadence(BudgetDirector, View, Dt, Npc.SimBudgetAccum, NeedsCritical(Npc.Needs));
+			// La reference n'ecrit `npc._simBudgetAccum` que hors de near (et hors critique).
+			if (Step.Band != AnastasisBudget::EBand::Near)
+			{
+				Npc.bHasSimBudgetAccum = true;
+			}
+			if (!Step.bRun)
+			{
+				return;
+			}
+			Dt = Step.Dt;
+		}
+
 		if (Npc.Inside.bActive && Npc.Inside.Goal == GoalRest)
 		{
 			AnastasisNeeds::TickNeedsRestInside(Npc.Needs, Dt, IsNight(), SleepQualityOf(Npc));
