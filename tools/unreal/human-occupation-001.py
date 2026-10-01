@@ -1,9 +1,10 @@
 """Micro-implantation humaine dans le bassin deja reserve par la geographie.
 
 Isolee : les acteurs portent le tag HumanOccupation001 et sont enregistres dans
-Lvl_HumanOccupation. Lvl_AnastasisSlice n'est pas sauvegardee. Aucun systeme
-PNJ, simulateur, meteo, ciel ou foret n'est modifie ; l'heure du ciel n'est
-epinglee que le temps des captures, dans cet editeur, apres la sauvegarde.
+Lvl_HumanOccupation. Lvl_AnastasisSlice n'est pas sauvegardee. Le sentier
+(HO01_Tread) et la cour du puits (HO01_Yard) sont des clairieres d'herbe :
+l'incarnation les lit, la grammaire de foret ne change pas. L'heure du ciel
+n'est epinglee que le temps des captures, dans cet editeur, apres la sauvegarde.
 """
 import os, json, math, random, time, traceback
 import unreal
@@ -338,6 +339,8 @@ def drop(key, x, y, yaw, label, scale=None):
     comp = actor.static_mesh_component
     comp.set_mobility(unreal.ComponentMobility.MOVABLE)
     comp.set_static_mesh(mesh)
+    if key in ('house', 'granary', 'well'):
+        comp.set_material(0, building_mat)
     actor.set_actor_scale3d(unreal.Vector(s, s, s))
     comp.set_editor_property('can_ever_affect_navigation', False)
     rot = actor.get_actor_rotation()
@@ -346,10 +349,116 @@ def drop(key, x, y, yaw, label, scale=None):
     records.append({'label': label, 'mesh': mesh.get_name(), 'xy': [round(x, 1), round(y, 1)], 'z': round(z, 1), 'yaw': round(yaw, 1), 'scale': round(s, 3), 'size_cm': [round(v, 1) for v in mesh_size(mesh)[:3]]})
     return actor
 
+def ensure_building_surface():
+    # Recree a chaque passe. N'habille que les acteurs de cette implantation :
+    # les meshes partages gardent M_VillageBuilding_Surface.
+    path = '/Game/Anastasis/HumanOccupation/M_HO_Building'
+    if unreal.EditorAssetLibrary.does_asset_exist(path) and not unreal.EditorAssetLibrary.delete_asset(path):
+        path = '/Game/Anastasis/HumanOccupation/M_HO_Building_B'
+        if unreal.EditorAssetLibrary.does_asset_exist(path):
+            unreal.EditorAssetLibrary.delete_asset(path)
+    name = path.rsplit('/', 1)[-1]
+    folder = path.rsplit('/', 1)[0]
+    mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+        name, folder, unreal.Material, unreal.MaterialFactoryNew())
+    mel = unreal.MaterialEditingLibrary
+    uv = mel.create_material_expression(mat, unreal.MaterialExpressionTextureCoordinate, -520, 0)
+    vc = mel.create_material_expression(mat, unreal.MaterialExpressionVertexColor, -520, 180)
+
+    def custom(code, out_type, y, pins):
+        node = mel.create_material_expression(mat, unreal.MaterialExpressionCustom, -160, y)
+        node.set_editor_property('output_type', out_type)
+        node.set_editor_property('code', code)
+        inputs = []
+        for pin in pins:
+            ci = unreal.CustomInput()
+            ci.set_editor_property('input_name', pin)
+            inputs.append(ci)
+        node.set_editor_property('inputs', inputs)
+        return node
+
+    # Alpha de sommet, convention village-buildings-001 : bois .84, pierre .75, tuile .62, fer < .5.
+    # UV auteur : 1 unite = 1 m (x local, z local).
+    color = custom("""
+        float isWood = step(0.80, R) * (1.0 - step(0.88, R));
+        float isStone = step(0.70, R) * (1.0 - step(0.80, R));
+        float isTile = step(0.55, R) * (1.0 - step(0.70, R));
+        float isIron = 1.0 - step(0.50, R);
+        float2 uv = UV;
+        float grain = sin(uv.x * 70.0 + 2.2 * sin(uv.y * 13.0));
+        float plank = frac(uv.y * 7.0);
+        float seam = smoothstep(0.0, 0.035, plank) * smoothstep(0.14, 0.07, plank);
+        float woodCol = (0.72 + 0.28 * saturate(grain * 0.5 + 0.5)) * lerp(0.62, 1.0, seam);
+        float course = frac(uv.y * 4.6 + floor(uv.x * 2.8) * 0.41);
+        float joint = smoothstep(0.0, 0.055, course);
+        float block = 0.78 + 0.22 * sin(floor(uv.x * 2.8) * 1.7 + floor(uv.y * 4.6) * 2.1);
+        float stoneCol = block * lerp(0.58, 1.0, joint);
+        float tile = frac(uv.x * 4.2 + step(0.5, frac(uv.y * 5.5)) * 0.5);
+        float tileSeam = smoothstep(0.0, 0.07, tile);
+        float tileCol = (0.84 + 0.16 * sin(floor(uv.x * 4.2) + floor(uv.y * 5.5))) * lerp(0.72, 1.0, tileSeam);
+        float shade = lerp(1.0, woodCol, isWood);
+        shade = lerp(shade, stoneCol, isStone);
+        shade = lerp(shade, tileCol, isTile);
+        float3 col = C * shade;
+        col = lerp(col, col * float3(0.55, 0.58, 0.62), isIron);
+        return col;
+    """, unreal.CustomMaterialOutputType.CMOT_FLOAT3, -40, ('UV', 'C', 'R'))
+    rough = custom("""
+        float isWood = step(0.80, R) * (1.0 - step(0.88, R));
+        float isStone = step(0.70, R) * (1.0 - step(0.80, R));
+        float isIron = 1.0 - step(0.50, R);
+        float grain = sin(UV.x * 70.0);
+        float rough = lerp(0.84, 0.62, isWood);
+        rough = lerp(rough, 0.90, isStone);
+        rough = lerp(rough, 0.42, isIron);
+        rough += 0.07 * grain * isWood;
+        return saturate(rough);
+    """, unreal.CustomMaterialOutputType.CMOT_FLOAT1, 220, ('UV', 'R'))
+    normal = custom("""
+        float isWood = step(0.80, R) * (1.0 - step(0.88, R));
+        float isStone = step(0.70, R) * (1.0 - step(0.80, R));
+        float2 uv = UV;
+        float plank = frac(uv.y * 7.0);
+        float seam = 1.0 - smoothstep(0.0, 0.05, plank) * smoothstep(0.16, 0.08, plank);
+        float course = frac(uv.y * 4.6);
+        float joint = 1.0 - smoothstep(0.0, 0.07, course);
+        float hx = isWood * 0.35 * cos(uv.x * 70.0) + isStone * 0.12 * sin(uv.x * 16.0);
+        float hy = -isWood * 0.55 * seam - isStone * 0.7 * joint;
+        return normalize(float3(hx, hy, 1.0));
+    """, unreal.CustomMaterialOutputType.CMOT_FLOAT3, 420, ('UV', 'R'))
+    metal = custom("""
+        return 1.0 - step(0.50, R);
+    """, unreal.CustomMaterialOutputType.CMOT_FLOAT1, 620, ('R',))
+    for node, pins in ((color, (('UV', uv, ''), ('C', vc, ''), ('R', vc, 'A'))),
+                       (rough, (('UV', uv, ''), ('R', vc, 'A'))),
+                       (normal, (('UV', uv, ''), ('R', vc, 'A'))),
+                       (metal, (('R', vc, 'A'),))):
+        for pin, src, src_pin in pins:
+            if not mel.connect_material_expressions(src, src_pin, node, pin):
+                fail('Building material link failed ' + pin)
+    if not mel.connect_material_property(color, '', unreal.MaterialProperty.MP_BASE_COLOR):
+        fail('Building base color link failed')
+    if not mel.connect_material_property(rough, '', unreal.MaterialProperty.MP_ROUGHNESS):
+        fail('Building roughness link failed')
+    if not mel.connect_material_property(normal, '', unreal.MaterialProperty.MP_NORMAL):
+        fail('Building normal link failed')
+    if not mel.connect_material_property(metal, '', unreal.MaterialProperty.MP_METALLIC):
+        fail('Building metallic link failed')
+    errors = list(mel.recompile_material(mat))
+    if errors:
+        fail('Building material compile failed ' + ';'.join(str(e) for e in errors))
+    if not unreal.EditorAssetLibrary.save_asset(path, False):
+        fail('Building material save failed')
+    return mat
+
+building_mat = ensure_building_surface()
+
 yard = placed_xy['well']
 for name, key in (('house_a', 'house'), ('house_b', 'house'), ('house_c', 'house'), ('granary', 'granary'), ('well', 'well'), ('shelter', 'shelter')):
     x, y, _z = placed_xy[name]
-    drop(key, x, y, yaw_toward(x, y, yard[0], yard[1]), 'HO01_' + name)
+    actor = drop(key, x, y, yaw_toward(x, y, yard[0], yard[1]), 'HO01_' + name)
+    if name == 'well':
+        actor.tags = [TAG, 'HO01_Yard']
 
 # Devant chaque batiment, le depart du sentier.
 def door(name, reach):
@@ -412,7 +521,7 @@ def organic(a, b, bow):
     px, py = -dy / length, dx / length
     cx = (a[0] + b[0]) * 0.5 + px * bow
     cy = (a[1] + b[1]) * 0.5 + py * bow
-    steps = max(2, int(length / 280))
+    steps = max(2, int(length / 130))
     pts = []
     for i in range(steps + 1):
         t = i / steps
@@ -428,22 +537,51 @@ for name, reach, bow in (('house_a', 220, 140), ('house_b', 220, -160), ('house_
 path_pts.extend(organic(well_xy, landing_xy, 280)[1:])
 path_pts.extend(organic(door('shelter', 260), wood_xy, -90)[1:])
 
+def foot_contact(name, key):
+    # Tablier d'un pas autour du soubassement. Le disque d'herbe (rayon 100) est
+    # centre sur le bord : ~70 cm de terre visible a l'exterieur, le reste sous le mur.
+    x, y, _z = placed_xy[name]
+    yaw = yaw_toward(x, y, yard[0], yard[1])
+    box = loaded[key].get_bounding_box()
+    rad = math.radians(yaw)
+    ax, ay = math.cos(rad), math.sin(rad)
+    bx, by = -math.sin(rad), math.cos(rad)
+    corners = []
+    for lx, ly in ((box.min.x, box.min.y), (box.max.x, box.min.y), (box.max.x, box.max.y), (box.min.x, box.max.y)):
+        corners.append((x + ax * lx + bx * ly, y + ay * lx + by * ly))
+    pts = []
+    for i in range(4):
+        x0, y0 = corners[i]
+        x1, y1 = corners[(i + 1) % 4]
+        length = math.hypot(x1 - x0, y1 - y0) or 1.0
+        tangent = math.degrees(math.atan2(y1 - y0, x1 - x0))
+        n = max(1, int(round(length / 130.0)))
+        for k in range(n):
+            t = (k + 0.5) / n
+            px = x0 + (x1 - x0) * t
+            py = y0 + (y1 - y0) * t
+            ox, oy = px - x, py - y
+            od = math.hypot(ox, oy) or 1.0
+            px += ox / od * 18 + rng.uniform(-10, 10)
+            py += oy / od * 18 + rng.uniform(-10, 10)
+            pts.append((px, py, tangent + rng.uniform(-8, 8)))
+    return pts
+
+foot_pts = []
+for name, key in (('house_a', 'house'), ('house_b', 'house'), ('house_c', 'house'), ('granary', 'granary'), ('well', 'well'), ('shelter', 'shelter')):
+    foot_pts.extend(foot_contact(name, key))
+
 decals = 0
-previous = None
-for x, y in path_pts:
+
+def stamp(x, y, yaw, size, kind):
+    global decals
     z, fb = freeboard(x, y)
     if z is None or fb < 55:
-        continue
-    if previous is None:
-        heading = rng.uniform(0, 360)
-    else:
-        heading = math.degrees(math.atan2(y - previous[1], x - previous[0]))
-    previous = (x, y)
-    yaw = heading + rng.uniform(-10, 10)
+        return
     actor = eas.spawn_actor_from_class(unreal.DecalActor, unreal.Vector(x, y, z + 30), unreal.Rotator(pitch=-90, yaw=yaw, roll=0))
-    actor.set_actor_label('HO01_Path_%03d' % decals)
+    actor.set_actor_label('HO01_%s_%03d' % (kind, decals))
     actor.set_folder_path('HUMAN_OCCUPATION/Paths')
-    actor.tags = [TAG]
+    actor.tags = [TAG, 'HO01_Tread']
     for kind_name in ('ArrowComponent', 'BillboardComponent'):
         kind = getattr(unreal, kind_name, None)
         if kind is None:
@@ -460,9 +598,23 @@ for x, y in path_pts:
             pass
     comp = actor.get_component_by_class(unreal.DecalComponent)
     comp.set_decal_material(decal_mat)
-    # X = profondeur de projection. Y/Z = demi-largeur d'une trace, pas une route.
-    comp.set_editor_property('decal_size', unreal.Vector(180, 170, 80))
+    comp.set_editor_property('decal_size', size)
     decals += 1
+
+previous = None
+for x, y in path_pts:
+    if previous is None:
+        heading = rng.uniform(0, 360)
+    else:
+        heading = math.degrees(math.atan2(y - previous[1], x - previous[0]))
+    previous = (x, y)
+    stamp(x, y, heading + rng.uniform(-10, 10), unreal.Vector(130, 95, 48), 'Path')
+for x, y, yaw in foot_pts:
+    stamp(x, y, yaw, unreal.Vector(80, 85, 42), 'Foot')
+
+unreal.log('HO01 embody again so the trodden path clears the grass')
+if not emb.call_method('EmbodyCanonical', args=(12345,)):
+    fail('EmbodyCanonical after the path failed')
 
 def look(a, b):
     return unreal.MathLibrary.find_look_at_rotation(unreal.Vector(*a), unreal.Vector(*b))

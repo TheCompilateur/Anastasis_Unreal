@@ -10,30 +10,32 @@ Micro-implantation visuelle dans le bassin habitable, dans un niveau isole. Troi
 - tools/unreal/human-occupation-001.py
 - Content/Anastasis/Maps/Lvl_HumanOccupation.umap
 - Content/Anastasis/HumanOccupation/M_HO_Tread.uasset
+- Content/Anastasis/HumanOccupation/M_HO_Building.uasset
+- Source/Anastasis_UnrealV2/WorldView/AnastasisWorldEmbodiment.cpp
+- Source/Anastasis_UnrealV2/WorldView/AnastasisWorldEmbodiment.h
 - docs/visual/human-occupation-001/
 - AGENTS.md (une ligne d'index)
 - docs/unreal/handoffs/human-occupation-001.md
 
 ## COMMIT
 
-HEAD de agent/human-occupation-001 (rejeu inclus).
+HEAD de agent/human-occupation-001.
 
 ## MEC
 
-- BUILD: BUILD::PASS apres rebase (10 actions, 51 s).
-- TESTS: voir finish. La mission ne change pas le C++.
+- BUILD: voir finish. Le C++ ajoute des clairieres d'herbe la ou des acteurs portent HO01_Tread ou HO01_Yard.
+- TESTS: voir finish.
 - COMMANDS:
   - `tools\unreal\human-occupation-001.ps1 -Out Saved\HumanOccupationEvidence`
-  - Rejeu apres rebase sur main : HUMAN_OCCUPATION::PASS
+  - Derniere passe : HUMAN_OCCUPATION::PASS
   - site 102000, 109000 cm, franc-bord 584 cm, relief 7,9 cm, berge a 3600 cm
-  - bassin 106000, 106000, z 882,4 cm — memes hauteurs qu'avant rebase
-  - 16 StaticMeshActor, 27 decals, niveau sauve, Lvl_AnastasisSlice non sauvee
-  - arbre debout le plus proche : 14581 cm (la passe foret de main a rapproche la lisiere)
-  - frame pendant capture : 14 ms jeu, 19 ms GPU, pas un benchmark
+  - 16 StaticMeshActor, 123 decals (sentier + tablier au pied), Lvl_AnastasisSlice non sauvee
+  - M_HO_Building sur maisons, grenier et puits seulement
+  - frame pendant capture : 12 ms jeu, 19 ms GPU, pas un benchmark
 
 ## SCN
 
-OBSERVED. Captures 1600x900 dans docs/visual/human-occupation-001, rejouees apres rebase : sol, distance, riviere vers le groupe, groupe vers la foret, lisiere vers le groupe, heure 8 et 17,5. Le sentier est une suite de decals de terre. L'arbre debout le plus proche cote interieur est a 146 m.
+OBSERVED. Captures 1600x900 dans docs/visual/human-occupation-001 : sol, distance, riviere, foret. Le sentier et le tablier sont une suite de decals de terre. Le bardage, la pierre et les tuiles se lisent a hauteur d'homme. L'arbre debout le plus proche cote interieur est a 146 m.
 
 ## PLY
 
@@ -41,7 +43,7 @@ UNKNOWN. Aucun joueur.
 
 ## INTEGRATION_RISK
 
-Nouveau .umap et un materiau de decal. Ne remplace pas Lvl_AnastasisSlice. Recette rejouee apres rebase : le site et les hauteurs n'ont pas bouge, un decal de moins, lisiere a 146 m au lieu de 186 m. AGENTS.md n'ajoute qu'une ligne d'index.
+Nouveau .umap, M_HO_Tread, M_HO_Building. Ne remplace pas Lvl_AnastasisSlice. L'incarnation n'ecarte l'herbe que si des acteurs HO01_Tread ou HO01_Yard sont dans le niveau : la carte principale n'en a pas. Les meshes partages du village gardent leur materiau.
 
 ## STOP
 

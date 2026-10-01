@@ -111,6 +111,13 @@ protected:
 	/** Strate herbacee des espaces ouverts, posee apres les arbres (Canopy = couronnes posees : X, Y, rayon). */
 	void PlaceGroundCover(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,
 		const AnastasisPlaces::FPlan& Places, const TArray<FVector>& Canopy, bool bEnabled);
+	/**
+	 * L'incarnation d'ouverture peut tourner avant que les decals du sentier soient enregistres.
+	 * Un tick plus tard, s'ils sont la, on refait l'herbe. Sans tag, aucun second passage.
+	 */
+	void ScheduleOccupationTread();
+	bool bApplyingOccupationTread = false;
+	bool bOccupationTreadScheduled = false;
 	/** FOREST_TERRAIN_P3 : maquis, ronces et rochers ; un HISM par mesh, transitoires, vides puis reremplis. */
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> UnderstoryMeshes;

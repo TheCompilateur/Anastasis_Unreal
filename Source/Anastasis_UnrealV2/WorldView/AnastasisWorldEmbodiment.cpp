@@ -17,7 +17,9 @@
 #include "Anastasis_UnrealV2.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
+#include "Containers/Ticker.h"
 #include "Engine/StaticMesh.h"
+#include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/Paths.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -372,14 +374,43 @@ void AAnastasisWorldEmbodiment::OnConstruction(const FTransform& Transform)
 	Super::OnConstruction(Transform);
 
 	const UWorld* OwningWorld = GetWorld();
-	if (!OwningWorld || OwningWorld->IsGameWorld())
+	if (!OwningWorld || OwningWorld->IsGameWorld() || bApplyingOccupationTread)
 	{
 		return;
 	}
 
 	EmbodyFromConsoleVariables();
+	ScheduleOccupationTread();
 }
 #endif
+
+void AAnastasisWorldEmbodiment::ScheduleOccupationTread()
+{
+	if (bOccupationTreadScheduled || bApplyingOccupationTread) return;
+	UWorld* World = GetWorld();
+	if (!World || World->IsGameWorld()) return;
+	bOccupationTreadScheduled = true;
+	TWeakObjectPtr<AAnastasisWorldEmbodiment> Self(this);
+	FTSTicker::GetCoreTicker().AddTicker(TEXT("AnastasisOccupationTread"), 0.0f, [Self](float) -> bool
+	{
+		AAnastasisWorldEmbodiment* Actor = Self.Get();
+		if (!Actor || !Actor->GetWorld()) return false;
+		bool bTrodden = false;
+		for (TActorIterator<AActor> It(Actor->GetWorld()); It; ++It)
+		{
+			if (It->ActorHasTag(TEXT("HO01_Tread")))
+			{
+				bTrodden = true;
+				break;
+			}
+		}
+		if (!bTrodden) return false;
+		Actor->bApplyingOccupationTread = true;
+		Actor->EmbodyFromConsoleVariables();
+		Actor->bApplyingOccupationTread = false;
+		return false;
+	});
+}
 
 bool AAnastasisWorldEmbodiment::EmbodyFromConsoleVariables()
 {
@@ -982,6 +1013,17 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 	{
 		// Le hameau : sol pietine (planche lisiere apres defrichement), herbe rase et clairsemee.
 		if (P.Kind == AnastasisPlaces::EKind::Hamlet) In.Clearings.Add({P.Center, P.Radius, 0.3});
+	}
+	// Micro-implantation : le sentier (HO01_Tread) est de la terre battue, la cour du puits
+	// (HO01_Yard) une herbe rase. Aucun acteur tague : la carte principale ne change pas.
+	if (UWorld* World = GetWorld())
+	{
+		for (TActorIterator<AActor> It(World); It; ++It)
+		{
+			const FVector Loc = It->GetActorLocation();
+			if (It->ActorHasTag(TEXT("HO01_Tread"))) In.Clearings.Add({FVector2D(Loc.X, Loc.Y), 100.0, 0.0});
+			else if (It->ActorHasTag(TEXT("HO01_Yard"))) In.Clearings.Add({FVector2D(Loc.X, Loc.Y), 380.0, 0.22});
+		}
 	}
 	GC::FPlan Cover;
 	FString Error;
