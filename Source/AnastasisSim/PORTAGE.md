@@ -299,16 +299,23 @@ Deux pièges payés une fois, corrigés dans l'atelier pour tous les modules à 
 
 ### Ce qu'il reste — l'inventaire
 
-`docs/migration/phase2/P2_INVENTAIRE_JS.md` classe les 234 modules du noyau JS en
-**porter / générer / jeter**, avec leur vague et leur chantier. Il se régénère, il ne
-s'édite pas :
+`docs/migration/phase2/P2_INVENTAIRE_JS.md` classe les 233 modules du noyau JS en
+**porté / partiellement porté / porter / générer / jeter**, avec leur vague et leur chantier.
+Il se régénère, il ne s'édite pas, et seulement contre un checkout **propre** du tag de
+référence (`docs/migration/phase3/REFERENCE_JS.md`) — il refuse une copie de travail modifiée :
 
 ```bash
-node tools/migration/inventory-js-sim.mjs -out docs/migration/phase2/P2_INVENTAIRE_JS.md
+node tools/migration/inventory-js-sim.mjs -ref <checkout de anastasis-ref-p3> -out docs/migration/phase2/P2_INVENTAIRE_JS.md
 ```
 
-Au 2026-09-13 (référence `fee66ae`) : 198 modules à porter — **63 492 lignes de code**,
-commentaires et lignes vides déduits — 4 tables à générer, 24 modules à ne pas porter.
+Ce qui est porté se déclare **fonction par fonction** dans `tools/migration/ported-functions.mjs`,
+recopie des tableaux ci-dessus : une mission qui porte met à jour les deux dans le même commit.
+
+Au 2026-10-01 (tag `anastasis-ref-p3` = `fee66ae`) : 9 modules portés, 31 partiellement portés
+(17 379 lignes de code y restent), 166 à porter (41 342) — **58 721 lignes de code à porter** au
+total, commentaires et lignes vides déduits — 4 tables à générer, 23 modules à ne pas porter.
+L'inventaire du 2026-09-13 (234 modules, 63 492 lignes) avait été tiré de la copie de travail
+modifiée : il comptait `sim/observability.js`, qui n'est pas dans `fee66ae`.
 
 ### Comment la parité se vérifiera au-delà des fonctions pures
 
