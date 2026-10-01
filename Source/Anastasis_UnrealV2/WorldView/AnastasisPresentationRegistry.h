@@ -7,6 +7,7 @@
 
 class UStaticMesh;
 class UMaterialInterface;
+class UTexture2D;
 
 /**
  * Editor-facing mirror of AnastasisWorld::ETileType.
@@ -131,6 +132,47 @@ struct FAnastasisPresentationVariant
 	float ScaleBias = 1.0f;
 };
 
+/**
+ * Who a villager portrait depicts. A PRESENTATION category, not a demographic of the
+ * simulation: AnastasisVillage::FNpc carries no age and no sex (deviation 8 of
+ * AnastasisVillage.h -- every villager is an adult). The category only decides which
+ * portraits may be handed to a simulated villager (see AnastasisVillagerLooks).
+ */
+UENUM(BlueprintType)
+enum class EAnastasisVillagerCategory : uint8
+{
+	AdultMale = 0,
+	AdultFemale = 1,
+	ElderMale = 2,
+	ElderFemale = 3,
+	ChildMale = 4,
+	ChildFemale = 5,
+};
+
+/**
+ * One individual of the visual population (VILLAGER_PNG_001): a cut-out PNG, one person.
+ *
+ * Every portrait shares the canvas of SourceArt/Characters/villager-population.json: 512 x 1024 px
+ * for 100 x 200 cm, feet on the vertical axis, 16 px above the bottom edge. The person's
+ * stature is therefore baked into the image, and every card is drawn at the same size.
+ */
+USTRUCT(BlueprintType)
+struct FAnastasisVillagerLook
+{
+	GENERATED_BODY()
+
+	/** CHR_M_Adult_001... -- the manifest id, stable across re-imports. */
+	UPROPERTY(EditAnywhere, Category = "Villagers")
+	FName LookId;
+
+	UPROPERTY(EditAnywhere, Category = "Villagers")
+	EAnastasisVillagerCategory Category = EAnastasisVillagerCategory::AdultMale;
+
+	/** Soft, like meshes: the registry stays loadable without pulling 32 textures in. */
+	UPROPERTY(EditAnywhere, Category = "Villagers")
+	TSoftObjectPtr<UTexture2D> Portrait;
+};
+
 /** What one semantic type looks like. The simulation never sees this struct. */
 USTRUCT(BlueprintType)
 struct FAnastasisPresentationEntry
@@ -198,6 +240,18 @@ class UAnastasisPresentationRegistry : public UDataAsset
 public:
 	UPROPERTY(EditAnywhere, Category = "Presentation")
 	TArray<FAnastasisPresentationEntry> Entries;
+
+	/**
+	 * The visual population, written by tools/unreal/import-villagers.py from the manifest.
+	 * Empty -- the code fallback, or an asset older than this field -- draws no villager
+	 * card; the debug spheres (anastasis.Village.Debug) still show the simulation.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Villagers")
+	TArray<FAnastasisVillagerLook> Villagers;
+
+	/** Masked card material with a `Portrait` texture and a `Mirror` scalar parameter (M_AnastasisVillager). */
+	UPROPERTY(EditAnywhere, Category = "Villagers")
+	TSoftObjectPtr<UMaterialInterface> VillagerMaterial;
 
 	/** First enabled entry for this type, or nullptr. */
 	const FAnastasisPresentationEntry* FindEntry(AnastasisWorld::ETileType Type) const;

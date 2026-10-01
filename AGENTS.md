@@ -318,6 +318,18 @@ se change dans le script.
 | `create-ground-cover.ps1` + `create-ground-cover.py` | **ecrit** dans `Content/` : les trois touffes `SM_Grass_MeadowTall/MeadowShort/Sedge_01` (`/Game/Anastasis/GroundCover`) et `M_AnastasisGrass`, regeneres a chaque run ; editeur dedie qui se ferme |
 | `capture-ground-cover.ps1` + `ground-cover-capture.py` | A/B de l'herbe (`anastasis.Dressing.GroundCover 1/0`) aux memes cameras : prairie, riviere, lisiere, vallee B, oblique, hameau ; frame p50/p95 par vue → `Saved/GroundCoverEvidence/<Label>/` |
 
+### Population visuelle (VILLAGER_PNG_001)
+
+Autorite : `SourceArt/Characters/villager-population.json` (un individu par entree, stature, physionomie).
+Les habitants simules portent un portrait ; la simulation n'en sait rien. Voir `docs/unreal/VILLAGER_PNG_001.md`.
+
+| Script | Role |
+|---|---|
+| `villager-png.py` | **hors editeur** (Python systeme, Pillow + numpy) : `prompts` (fiche ChatGPT), `prep` (detourage `Raw/` → `SourceArt/Characters/PNG/<Categorie>/`, 512x1024, pieds alignes, stature du manifeste), `board` (planches → `docs/visual/villager-png-001/`), `check` (ressemblance silhouette / visage par paire) |
+| `import-villagers.ps1` + `import-villagers.py` | **ecrit** dans `Content/` : textures `/Game/Anastasis/Characters/PNG/<Categorie>/CHR_*` (BC7, sRGB, Character, Clamp, couverture alpha), `M_AnastasisVillager`, et `DA_AnastasisPresentation.Villagers` ; relit et verifie ; editeur dedie qui se ferme |
+| `villager-lineup.ps1` + `villager-lineup.py` | planche dans Unreal (vrais acteurs `AnastasisVillagerVisual`) : population entiere puis groupes de huit, sur un arc, temoin 180 cm → `Saved/VillagerEvidence/<Label>/` ; niveau jamais sauve |
+| `villager-pie.ps1` + `villager-pie.py` | preuve PIE : `Anastasis.Village.FirstWell 12`, une carte par habitant, portraits distincts, adultes et aines seulement, retrait suivi (`RemoveNpc`) → `Saved/VillagerEvidence/pie/` |
+
 ## Tests
 
 ```powershell

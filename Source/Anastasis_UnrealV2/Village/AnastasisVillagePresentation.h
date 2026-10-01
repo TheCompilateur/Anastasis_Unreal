@@ -4,6 +4,8 @@
 #include "UObject/WeakObjectPtrTemplates.h"
 
 class AAnastasisVillageBuilding;
+class AAnastasisVillagerVisual;
+class UAnastasisPresentationRegistry;
 class UAnastasisVillageInteractionSubsystem;
 class UWorld;
 namespace AnastasisVillage { class FVillage; }
@@ -38,6 +40,23 @@ public:
 	int32 Num() const { return Actors.Num(); }
 
 	/**
+	 * VILLAGER_PNG_001 -- une carte portrait par habitant simule, meme sens unique que les
+	 * batiments : un habitant present -> une carte a ses pieds, son portrait choisi par
+	 * AnastasisVillagerLooks dans le registre de presentation ; un habitant disparu -> la carte
+	 * detruite ; un habitant dedans -> la carte cachee. `bEnabled` faux retire toutes les cartes.
+	 * Rend le nombre de cartes creees + detruites.
+	 */
+	int32 SyncVillagers(
+		const AnastasisVillage::FVillage& Village,
+		const AnastasisWorld::FWorld& World,
+		UWorld* PresentationWorld,
+		const UAnastasisPresentationRegistry& Registry,
+		bool bEnabled);
+
+	AAnastasisVillagerVisual* FindVillager(const FString& NpcId) const;
+	int32 NumVillagers() const { return Villagers.Num(); }
+
+	/**
 	 * Debug : puits (cylindre), seuils, habitants (sphere coloree par la soif),
 	 * trait vers la cible, texte « id  but  activite  soif  -> batiment ».
 	 */
@@ -48,4 +67,6 @@ public:
 
 private:
 	TMap<FString, TWeakObjectPtr<AAnastasisVillageBuilding>> Actors;
+	TMap<FString, TWeakObjectPtr<AAnastasisVillagerVisual>> Villagers;
+	bool bWarnedNoLooks = false;
 };

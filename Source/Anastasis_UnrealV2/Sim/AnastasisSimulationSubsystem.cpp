@@ -8,6 +8,8 @@
 #include "HAL/IConsoleManager.h"
 #include "Village/AnastasisVillage.h"
 #include "Village/AnastasisVillageInteractionSubsystem.h"
+#include "Village/AnastasisVillagerVisual.h"
+#include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisWorldView.h"
 
 static TAutoConsoleVariable<float> CVarSimSpeed(
@@ -20,6 +22,12 @@ static TAutoConsoleVariable<int32> CVarVillageDebug(
 	TEXT("anastasis.Village.Debug"),
 	1,
 	TEXT("1 = draw the simulated village (buildings, access points, inhabitants, targets) in PIE."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarVillagePortraits(
+	TEXT("anastasis.Village.Portraits"),
+	1,
+	TEXT("1 = draw each simulated villager as its portrait card (VILLAGER_PNG_001). 0 = remove the cards; the debug spheres stay under anastasis.Village.Debug."),
 	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarSimOverlay(
@@ -86,6 +94,9 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 	Simulation.PumpFrame(static_cast<double>(DeltaTime), Speed);
 	LogDayIfChanged();
 	SyncVillagePresentation();
+	VillagePresentation.SyncVillagers(
+		Simulation.GetVillage(), Simulation.GetWorld(), GetWorld(),
+		AnastasisPresentation::GetRegistry(), CVarVillagePortraits.GetValueOnGameThread() != 0);
 	if (CVarVillageDebug.GetValueOnGameThread() != 0)
 	{
 		FAnastasisVillagePresentation::DrawDebug(GetWorld(), Simulation.GetVillage(), Simulation.GetWorld());
@@ -849,4 +860,26 @@ FString UAnastasisSimulationDebugLibrary::GetGatherStatus(const UObject* WorldCo
 		Farmer ? *Farmer->Goal : TEXT(""), Farmer ? *Farmer->Activity : TEXT(""),
 		Farmer && Farmer->WorkSession.bActive ? TEXT("true") : TEXT("false"),
 		G.X, G.Y, G.Z, F.X, F.Y, F.Z, N.X, N.Y, N.Z);
+}
+
+FString UAnastasisSimulationDebugLibrary::GetVillagerCards(const UObject* WorldContextObject)
+{
+	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	const UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+	if (!Host || !Host->GetSimulation().IsRunning()) return TEXT("{}");
+	const AnastasisVillage::FVillage& V = Host->GetSimulation().GetVillage();
+	TArray<FString> Rows;
+	for (const AnastasisVillage::FNpc& N : V.GetActors())
+	{
+		const AAnastasisVillagerVisual* Card = Host->GetVillagePresentation().FindVillager(N.Id);
+		const FVector P = Card ? Card->GetActorLocation() : FVector::ZeroVector;
+		Rows.Add(FString::Printf(
+			TEXT("{\"npc\":\"%s\",\"look\":\"%s\",\"x\":%.1f,\"y\":%.1f,\"z\":%.1f,\"hidden\":%s,\"mirrored\":%s,\"inside\":%s}"),
+			*N.Id, Card ? *Card->GetLookId().ToString() : TEXT(""), P.X, P.Y, P.Z,
+			Card && Card->IsHidden() ? TEXT("true") : TEXT("false"),
+			Card && Card->IsMirrored() ? TEXT("true") : TEXT("false"),
+			N.Inside.bActive ? TEXT("true") : TEXT("false")));
+	}
+	return FString::Printf(TEXT("{\"npcs\":%d,\"cards\":%d,\"villagers\":[%s]}"),
+		V.GetActors().Num(), Host->GetVillagePresentation().NumVillagers(), *FString::Join(Rows, TEXT(",")));
 }
