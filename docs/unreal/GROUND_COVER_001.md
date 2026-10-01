@@ -62,7 +62,10 @@ ruine 0,4 ; roche 0,2 (lande = H6). Les v1-v3 ne lisaient que la vallée : hors 
 | `tools/unreal/capture-ground-cover.ps1` + `ground-cover-capture.py` | A/B `-States on,off,on2,noshadow`, frame et temps GPU par vue |
 
 CVars (appliquées à l'incarnation) : `anastasis.Dressing.GroundCover` (1 ; 0 = sol nu, pour
-l'A/B), `anastasis.GroundCover.Shadows` (1 ; ombres des touffes proches). Journal :
+l'A/B), `anastasis.GroundCover.Shadows` (1 ; ombres des touffes proches),
+`anastasis.GroundCover.InAutomation` (0 ; pas d'herbe pendant les tests d'automatisation : la
+suite incarne le monde ~16 fois, et 16 × 1 M de touffes non rendues entre deux tests ont tué la
+suite par manque de mémoire le 2026-10-01). Journal :
 `ANASTASIS_GROUND_COVER tall= short= sedge= placed= near= far= chunks= outside_valley= ... plan_ms= total_ms=`.
 
 ## Rendu et coût

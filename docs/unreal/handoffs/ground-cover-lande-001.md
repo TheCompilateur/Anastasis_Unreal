@@ -65,6 +65,12 @@ NOT_IMPLEMENTED — aucune interaction joueur ; la lande n'a ni collision ni nav
 
 ## INTEGRATION_RISK
 
+- **Herbe coupée sous automatisation** (`GIsAutomationTesting`, CVar `anastasis.GroundCover.InAutomation`
+  0 par défaut). Sans ça, deux runs complets de la suite sont morts par manque de mémoire au test
+  `Anastasis.WorldView.EmbodimentSpawn` (180 / 185) : 16 incarnations × ~1,08 M de touffes non
+  rendues entre deux tests, processus de test à 12,1 Go virtuels. Le défaut existait déjà sur
+  `main` depuis ground-cover-001 (passé de justesse).
+
 - Mêmes fichiers chauds que ground-cover-001 (`AnastasisWorldEmbodiment.cpp`).
 - `FSettings::MaxSlopeDegrees` change de sens : 20 → 45 (borne haute de la lande) ; la borne de
   la prairie est `MeadowSlopeDegrees`. Aucun autre appelant hors de ce module.

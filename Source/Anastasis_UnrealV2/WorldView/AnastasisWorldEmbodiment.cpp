@@ -47,6 +47,15 @@ static TAutoConsoleVariable<int32> CVarGroundCoverShadows(
     TEXT("anastasis.GroundCover.Shadows"), 1,
     TEXT("0=herbe sans ombres portees, 1=ombres des touffes proches (< 55 m) ; applique a l'incarnation."), ECVF_Default);
 
+// Pas d'herbe pendant les tests d'automatisation. La suite incarne le monde a chaque test qui fait
+// apparaitre l'acteur (16 fois le 2026-10-01), ~1,08 M de touffes chaque fois, jamais rendues entre
+// deux tests : 12 Go de memoire virtuelle et la suite tuee au test EmbodimentSpawn ("fichier de
+// pagination insuffisant"). Les regles de placement se testent sans incarnation
+// (Anastasis.GroundCover.*, Build pur) ; 1 = herbe aussi sous automatisation.
+static TAutoConsoleVariable<int32> CVarGroundCoverInAutomation(
+    TEXT("anastasis.GroundCover.InAutomation"), 0,
+    TEXT("0=pas d'herbe pendant les tests d'automatisation (defaut), 1=herbe aussi sous automatisation ; applique a l'incarnation."), ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarTerrainSurface(TEXT("anastasis.Terrain.Surface"), 2, TEXT("Center-sampled terrain. 0=legacy DEBUG slabs, 1=sealed 32x32 canonical slice, 2=surface over the whole embodied crop (default); applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarTerrainForge(
@@ -631,10 +640,11 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 	double Probe;
 	const bool bGround = AnastasisTerrainForge::SampleActive((CanonicalSource.OriginX + CanonicalSource.W * 0.5) * T,
 		(CanonicalSource.OriginY + CanonicalSource.H * 0.5) * T, Probe);
-	if (!bEnabled || CVarGroundCover.GetValueOnGameThread() == 0 || !bGround)
+	const bool bAutomation = GIsAutomationTesting && CVarGroundCoverInAutomation.GetValueOnGameThread() == 0;
+	if (!bEnabled || CVarGroundCover.GetValueOnGameThread() == 0 || !bGround || bAutomation)
 	{
-		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_GROUND_COVER enabled=0 ecology=%d rendered_ground=%d"),
-			bEnabled, bGround);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_GROUND_COVER enabled=0 ecology=%d rendered_ground=%d automation=%d"),
+			bEnabled, bGround, bAutomation);
 		return;
 	}
 	const double Start = FPlatformTime::Seconds();
