@@ -7,11 +7,11 @@ Réponse : **PARTIELLEMENT**. Le pipeline de rendu peut porter une scène haut d
 
 Créé le 2026-10-01 dans l'éditeur du worktree (`AAA_LAB::CAPTURE_COMPLETE`). Le script a ouvert `/Engine/Maps/Entry`, pas la map du jeu. Le décal `M_AAA_Lab_Stain` n'est pas dans le niveau : `DecalBlendMode` est protégé en Python, le vertex paint reste la couche d'imperfection.
 
-Audit : **115** static meshes sous `/Game/Anastasis` (hors personnages et map). Classes : **B 34, C 79, D 2, A 0**. Nanite activé sur **0** mesh de production. Dans le labo, Nanite est sur la pierre, le mur, la poutre et les dalles. Pas sur le mannequin. Le sol posé est le plan moteur, pas un mesh Nanite.
+Audit : **115** static meshes sous `/Game/Anastasis` (hors personnages et map). Classes : **B 34, C 79, D 2, A 0**. Nanite activé sur **0** mesh de production. Dans le labo, Nanite est sur la pierre, le mur, la poutre et les dalles. Pas sur le mannequin ni sur la dalle de sol.
 
 Les deux D : `SM_Ecotone_Bush_Low_01` (464 triangles, 47 cm) et `SM_Ecotone_Sapling_01` (144 triangles, 118 cm). Les arbres de la forêt sont en B (3 LOD, 7 000 à 11 000 triangles au LOD0) mais leur boîte native fait **100 cm** : la forêt les met à l'échelle à l'instance. Posés à l'échelle 1 dans le labo, l'understory mesure 62 × 58 × 100 cm. Ce n'est pas la hauteur en jeu.
 
-Triangles générés : sol feuille 9 800 (non posé), pierre 2 304, mur 418, poutre 100, dalles 12, mannequin 48. Le sol du niveau est `/Engine/BasicShapes/Plane` à l'échelle 30, instance `MI_AAA_Soil`. La feuille `SM_AAA_Ground_30m` est sauvée mais ne s'affiche pas : sur les runs 001 à 005, le bas de `cam_a` est exactement RGB 0,0,0 alors que le mur et la pierre, même maître, sont lisibles. Run 007 (`Saved/SliceEvidence/aaa-visual-lab-007/`) : le plan est visible, ombre de contact au pied du mur, sol autour de RGB 180,170,150 au centre de `cam_a`. La lecture des CVars par `ConsoleManager` a échoué (`unreal` n'a pas cet attribut) : le pipeline reste celui de `DefaultEngine.ini`, pas un relevé runtime.
+Le sol posé est `SM_AAA_Ground_30m`, dalle de 8 cm, 20 160 triangles, Nanite off, photo `T_Ground_Worked` (lecture seule, déjà dans `GroundTextures`). La pierre lit `T_Ground_Rock`. Run 012 : terre granuleuse, ombre au pied du mur, taches `SM_AAA_Contact` (pied de mur, bout de poutre, flaque). Les icônes de lumière de l'éditeur sont encore dans l'image. La lecture des CVars par `ConsoleManager` a échoué (`unreal` n'a pas cet attribut) : le pipeline reste celui de `DefaultEngine.ini`, pas un relevé runtime.
 
 ## 1. Emplacement
 
@@ -165,9 +165,9 @@ Trois caméras fixes, mêmes chiffres à chaque run. Hauteur des yeux pour A : 1
 
 Le fond de la zone (Y positif) reçoit, à l'échelle native, un arbre understory, un rocher, un mur de ruine, un lithos, un bois flotté, trois touffes d'herbe. Le premier plan (Y négatif) est la pierre, le mur de planches, la poutre, les dalles. Même lumière, même sol. L'écart se voit dans le cadre, il n'est pas un autre éclairage.
 
-Lumière locale au niveau : directionnelle 10 lux, soleil d'atmosphère, contact shadow length 0,1, skylight temps réel, `SkyAtmosphere` moteur, post-process non borné **dans ce niveau seul** (biais 1,2, exposition min et max à 0,5, bloom 0,35). Pas l'acteur d'atmosphère du jeu.
+Lumière locale au niveau : directionnelle 10 lux, soleil d'atmosphère, contact shadow length 0,2, skylight temps réel, `SkyAtmosphere` moteur, post-process non borné **dans ce niveau seul** (biais 1,2, exposition min et max à 0,5, bloom 0,35). Pas l'acteur d'atmosphère du jeu.
 
-Captures du run 007 : `cam_a.png`, `cam_b.png`, `cam_c.png` dans `Saved/SliceEvidence/aaa-visual-lab-007/`. Les icônes de lumière et le cadre de sélection de l'éditeur sont encore dans l'image.
+Captures du run 012 : `cam_a.png`, `cam_b.png`, `cam_c.png` dans `Saved/SliceEvidence/aaa-visual-lab-012/`. Les icônes de lumière et le cadre de sélection de l'éditeur sont encore dans l'image.
 
 ## 9. Benchmark performance
 
