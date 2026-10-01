@@ -62,6 +62,12 @@ static TAutoConsoleVariable<int32> CVarSkyWeather(
 	TEXT("1=the simulation's weather drives cloud coverage and fog density; 0=fixed fair-weather sky."),
 	ECVF_Default);
 
+static TAutoConsoleVariable<float> CVarSkyHumidity(
+	TEXT("anastasis.Sky.Humidity"),
+	-1.0f,
+	TEXT("Pins the humidity the SKY shows [0,1] (fog density, mist) for captures; -1 follows the simulation's weather. Never moves the simulation."),
+	ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarRealism(
 	TEXT("anastasis.Atmosphere.Realism"),
 	1,
@@ -120,6 +126,21 @@ namespace
 		{
 			Component->SetMobility(EComponentMobility::Movable);
 		}
+	}
+
+	/** Capture pins that change what the sky SHOWS, never the simulation (cf. anastasis.Sky.Hour). */
+	void ApplySkyPins(AnastasisSkyClock::FSkyState& State)
+	{
+		const float PinnedHumidity = CVarSkyHumidity.GetValueOnAnyThread();
+		if (PinnedHumidity >= 0.0f)
+		{
+			State.SkyHumidity = FMath::Clamp(static_cast<double>(PinnedHumidity), 0.0, 1.0);
+		}
+	}
+
+	UDirectionalLightComponent* DirectionalComponentOf(ADirectionalLight* Light)
+	{
+		return Light ? Cast<UDirectionalLightComponent>(Light->GetLightComponent()) : nullptr;
 	}
 }
 
@@ -242,7 +263,37 @@ void AAnastasisWorldAtmosphere::Tick(const float DeltaSeconds)
 	uint32 Seed = 0;
 	const double SimTime = ResolveSkySimTime(Seed);
 	LastSky = AnastasisSkyClock::Evaluate(Profile, SimTime, Seed);
+	ApplySkyPins(LastSky);
 	UpdateSky(Profile, /*bForceLog*/ false, DeltaSeconds);
+}
+
+void AAnastasisWorldAtmosphere::ArbitrateDirectionalLights(const bool bMoonLeads, const double SunFogScattering)
+{
+	// Without a moon there is nothing to arbitrate against: the sun leads whatever the hour.
+	const bool bMoonLeadsNow = bMoonLeads && Moon != nullptr;
+	if (UDirectionalLightComponent* SunComponent = DirectionalComponentOf(Sun))
+	{
+		const int32 Priority = bMoonLeadsNow ? AnastasisSkyClock::ForwardPriorityFollow : AnastasisSkyClock::ForwardPriorityLead;
+		if (SunComponent->ForwardShadingPriority != Priority)
+		{
+			SunComponent->SetForwardShadingPriority(Priority);
+		}
+		// The engine default (1) times the share the fog may scatter: a set sun lights no fog.
+		const float Scattering = static_cast<float>(FMath::Clamp(SunFogScattering, 0.0, 1.0));
+		if (!FMath::IsNearlyEqual(SunComponent->VolumetricScatteringIntensity, Scattering, 1e-4f))
+		{
+			SunComponent->SetVolumetricScatteringIntensity(Scattering);
+		}
+	}
+	if (UDirectionalLightComponent* MoonComponent = DirectionalComponentOf(Moon))
+	{
+		const int32 Priority = bMoonLeadsNow ? AnastasisSkyClock::ForwardPriorityLead : AnastasisSkyClock::ForwardPriorityFollow;
+		if (MoonComponent->ForwardShadingPriority != Priority)
+		{
+			MoonComponent->SetForwardShadingPriority(Priority);
+		}
+	}
+	bMoonLeadsForward = bMoonLeadsNow;
 }
 
 void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Profile, const bool bForceLog, const float AdaptSeconds)
@@ -285,6 +336,9 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 		}
 	}
 
+	// --- One forward light: the sun while it is up, the moon after ---------------------
+	ArbitrateDirectionalLights(LastSky.bMoonLeadsForward, LastSky.SunFogScattering);
+
 	// --- Exposure: pinned, but pinned to the hour --------------------------------------
 	if (Profile.bFixedExposure && ExposureVolume)
 	{
@@ -306,6 +360,16 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 			ExposureVolume->Settings.ColorSaturation = FVector4(Sat, Sat, Sat, 1.0f);
 			ExposureVolume->Settings.bOverride_WhiteTemp = true;
 			ExposureVolume->Settings.WhiteTemp = static_cast<float>(LastSky.WhiteTemp);
+			// Twilight: the sky is the only light and far brighter than the ground it lights.
+			// Local exposure compresses that sky instead of a lower EV darkening the land. The
+			// day value is the project's own, read where the project sets it.
+			if (IConsoleVariable* DayHighlight =
+				IConsoleManager::Get().FindConsoleVariable(TEXT("r.DefaultFeature.LocalExposure.HighlightContrastScale")))
+			{
+				ExposureVolume->Settings.bOverride_LocalExposureHighlightContrastScale = true;
+				ExposureVolume->Settings.LocalExposureHighlightContrastScale = static_cast<float>(
+					AnastasisSkyClock::HighlightContrastFor(Profile, LastSky.Daylight, DayHighlight->GetFloat()));
+			}
 			LastExposureWritten = EV;
 		}
 	}
@@ -316,7 +380,7 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 	{
 		if (UExponentialHeightFogComponent* FogComponent = Fog->GetComponent())
 		{
-			const double Scale = bWeather ? AnastasisSkyClock::FogDensityScaleFor(Profile, LastSky.Humidity) : 1.0;
+			const double Scale = bWeather ? AnastasisSkyClock::FogDensityScaleFor(Profile, LastSky.SkyHumidity) : 1.0;
 			const float Density = static_cast<float>(Profile.FogDensity * Scale);
 			if (!FMath::IsNearlyEqual(FogComponent->FogDensity, Density, 1e-6f))
 			{
@@ -366,7 +430,7 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 			if (CloudMaterialInstance)
 			{
 				CloudMaterialInstance->SetScalarParameterValue(TEXT("Cloud_GlobalCoverage"),
-					static_cast<float>(AnastasisSkyClock::CloudCoverageFor(Profile, LastSky.Weather.Cover)));
+					static_cast<float>(AnastasisSkyClock::CloudCoverageFor(Profile, LastSky.SkyCover)));
 			}
 		}
 	}
@@ -377,12 +441,15 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 		LastLoggedPhase = Phase;
 		UE_LOG(LogAnastasis_UnrealV2, Display,
 			TEXT("ANASTASIS_SKY day=%.0f hour=%.2f phase=%s season=%s decl=%.2f sun_elev=%.2f moon_elev=%.2f ev100=%.2f ")
-			TEXT("cover=%.3f rain=%.3f snow=%.3f humidity=%.3f wind=%.3f weather=%d mist_factor=%.3f"),
+			TEXT("cover=%.3f rain=%.3f snow=%.3f humidity=%.3f wind=%.3f weather=%d mist_factor=%.3f ")
+			TEXT("sky_humidity=%.3f sky_wind=%.3f sky_cover=%.3f forward_light=%s sun_fog_scatter=%.3f"),
 			LastSky.Day, LastSky.Hours, *Phase, AnastasisWeather::SeasonId(LastSky.Weather.Season),
 			LastSky.DeclinationDegrees, LastSky.SunElevationDegrees,
 			AnastasisSkyClock::ElevationOf(LastSky.MoonRotation), LastSky.ExposureEV100,
 			LastSky.Weather.Cover, LastSky.Weather.Rain, LastSky.Weather.Snow, LastSky.Humidity,
-			LastSky.Weather.Wind, bWeather ? 1 : 0, MistFactor);
+			LastSky.Weather.Wind, bWeather ? 1 : 0, MistFactor,
+			LastSky.SkyHumidity, LastSky.SkyWind, LastSky.SkyCover,
+			bMoonLeadsForward ? TEXT("moon") : TEXT("sun"), LastSky.SunFogScattering);
 	}
 }
 
@@ -592,6 +659,7 @@ bool AAnastasisWorldAtmosphere::Apply()
 		uint32 Seed = 0;
 		const double SimTime = ResolveSkySimTime(Seed);
 		LastSky = AnastasisSkyClock::Evaluate(Profile, SimTime, Seed);
+		ApplySkyPins(LastSky);
 	}
 	const FRotator SunRotation = bSkyClockActive ? LastSky.SunRotation : AnastasisAtmosphere::ResolveSunRotation(Profile);
 	const FRotator MoonRotation = bSkyClockActive ? LastSky.MoonRotation : AnastasisAtmosphere::ResolveMoonRotation(Profile);
@@ -676,6 +744,7 @@ bool AAnastasisWorldAtmosphere::Apply()
 			// Night vision belongs to the sky clock (UpdateSky); the fixed rig never set it.
 			ExposureVolume->Settings.bOverride_ColorSaturation = false;
 			ExposureVolume->Settings.bOverride_WhiteTemp = false;
+			ExposureVolume->Settings.bOverride_LocalExposureHighlightContrastScale = false;
 		}
 
 		// Pinning the post-process exposure above says nothing to Lumen's CACHED lighting
@@ -697,6 +766,33 @@ bool AAnastasisWorldAtmosphere::Apply()
 	// After the five rig actors, because it writes into them. Run in both states: "off" is an
 	// active restore, not a skip.
 	ApplyRealism(Profile, Profile.bRealismEnabled && IsRealismEnabledByCVar(), SunRotation, MoonRotation);
+
+	// --- Directional lights: exactly one leads (ATMOSPHERE_COHERENCE_001) -------------
+	// After the realism layer, which creates or removes the moon. The clock re-decides it every
+	// tick; the fixed rig decides it once, from the same predicate.
+	{
+		const double SunElevation = AnastasisSkyClock::ElevationOf(SunRotation);
+		ArbitrateDirectionalLights(AnastasisSkyClock::MoonLeadsForwardShading(SunElevation),
+			AnastasisSkyClock::SunFogScatteringFor(Profile, SunElevation));
+	}
+	ExtraDirectionalLights = 0;
+	FString ExtraNames;
+	for (TActorIterator<ADirectionalLight> It(World); It; ++It)
+	{
+		if (IsValid(*It) && *It != Sun && *It != Moon)
+		{
+			++ExtraDirectionalLights;
+			ExtraNames += (ExtraNames.IsEmpty() ? TEXT("") : TEXT(",")) + It->GetName();
+		}
+	}
+	if (ExtraDirectionalLights > 0)
+	{
+		// Not adopted, not silenced: a third directional light is a level-authoring problem, and
+		// any two at the same ForwardShadingPriority bring the renderer's warning back.
+		UE_LOG(LogAnastasis_UnrealV2, Warning,
+			TEXT("ANASTASIS_ATMOSPHERE extra_directional_lights=%d names=%s (only the sun and the moon are arbitrated)"),
+			ExtraDirectionalLights, *ExtraNames);
+	}
 
 	// --- Sky clock (DAY_NIGHT_WEATHER_001) ----------------------------------------------
 	// Last, because it overrides what the fixed profile just wrote: exposure by sun
@@ -721,14 +817,16 @@ bool AAnastasisWorldAtmosphere::Apply()
 
 	LastSummary = FString::Printf(
 		TEXT("ANASTASIS_ATMOSPHERE applied=1 profile=%s sun_source=%s sun_pitch=%.3f sun_yaw=%.3f lux=%.1f ")
-		TEXT("fog=%d fog_density=%.4f ev100=%.2f adopted=%d spawned=%d realism=%d moon=%d clouds=%d volumetric_fog=%d"),
+		TEXT("fog=%d fog_density=%.4f ev100=%.2f adopted=%d spawned=%d realism=%d moon=%d clouds=%d volumetric_fog=%d ")
+		TEXT("forward_light=%s extra_directional_lights=%d"),
 		Source,
 		Profile.bDeriveSunFromTimeOfDay ? TEXT("time_of_day") : TEXT("explicit"),
 		SunRotation.Pitch, SunRotation.Yaw, Profile.SunIntensityLux,
 		Profile.bFogEnabled ? 1 : 0, Profile.FogDensity, Profile.ExposureEV100,
 		AdoptedCount, SpawnedCount,
 		bRealismApplied ? 1 : 0, Moon ? 1 : 0, Cloud ? 1 : 0,
-		(Fog && Fog->GetComponent() && Fog->GetComponent()->bEnableVolumetricFog) ? 1 : 0);
+		(Fog && Fog->GetComponent() && Fog->GetComponent()->bEnableVolumetricFog) ? 1 : 0,
+		bMoonLeadsForward ? TEXT("moon") : TEXT("sun"), ExtraDirectionalLights);
 	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("%s"), *LastSummary);
 
 	return true;

@@ -96,7 +96,84 @@ FSkyState Evaluate(const UAnastasisAtmosphereProfile& Profile, const double SimT
 	State.Weather = AnastasisWeather::WeatherAt(Seed, State.Day, nullptr, State.DayFrac);
 	State.Humidity = AnastasisWeather::WeatherHumidityAt(State.Weather);
 	State.Wetness = AnastasisWeather::WeatherWetnessAt(State.Weather);
+
+	const FSkyWeather Sky = SkyWeatherAt(Seed, State.Day, State.DayFrac, Profile.WeatherBlendHours);
+	State.SkyHumidity = Sky.Humidity;
+	State.SkyWind = Sky.Wind;
+	State.SkyCover = Sky.Cover;
+
+	State.SunFogScattering = SunFogScatteringFor(Profile, State.SunElevationDegrees);
+	State.bMoonLeadsForward = MoonLeadsForwardShading(State.SunElevationDegrees);
 	return State;
+}
+
+double SunFogScatteringFor(const UAnastasisAtmosphereProfile& Profile, const double SunElevationDegrees)
+{
+	const double Span = FMath::Max(1e-3, static_cast<double>(Profile.SunFogScatterFullElevationDegrees));
+	const double T = FMath::Clamp(SunElevationDegrees / Span, 0.0, 1.0);
+	return T * T * (3.0 - 2.0 * T);
+}
+
+namespace
+{
+	FSkyWeather SkyClockRawWeather(const uint32 Seed, const double Day, const double DayFrac)
+	{
+		const AnastasisWeather::FWeather W = AnastasisWeather::WeatherAt(Seed, Day, nullptr, DayFrac);
+		FSkyWeather Out;
+		Out.Humidity = AnastasisWeather::WeatherHumidityAt(W);
+		Out.Wind = W.Wind;
+		Out.Cover = W.Cover;
+		return Out;
+	}
+
+	FSkyWeather SkyClockLerpWeather(const FSkyWeather& A, const FSkyWeather& B, const double Alpha)
+	{
+		FSkyWeather Out;
+		Out.Humidity = FMath::Lerp(A.Humidity, B.Humidity, Alpha);
+		Out.Wind = FMath::Lerp(A.Wind, B.Wind, Alpha);
+		Out.Cover = FMath::Lerp(A.Cover, B.Cover, Alpha);
+		return Out;
+	}
+
+	double SkyClockSmoothStep(const double X)
+	{
+		const double T = FMath::Clamp(X, 0.0, 1.0);
+		return T * T * (3.0 - 2.0 * T);
+	}
+
+	/** The last instant of a day, as WeatherAt sees it (DayFrac is [0,1)). */
+	constexpr double SkyClockLastDayFrac = 1.0 - 1e-9;
+}
+
+FSkyWeather SkyWeatherAt(const uint32 Seed, const double Day, const double DayFrac, const double BlendHours)
+{
+	const double D = FMath::Max(1.0, FMath::FloorToDouble(Day));
+	const FSkyWeather Here = SkyClockRawWeather(Seed, D, DayFrac);
+	if (BlendHours <= 0.0)
+	{
+		return Here;
+	}
+
+	// Half the window on each side of midnight, as a fraction of the day.
+	const double Half = FMath::Min(0.5, BlendHours / 48.0);
+	if (DayFrac > 1.0 - Half)
+	{
+		// Evening: fade toward the day to come. Alpha runs 0 -> 0.5 up to midnight.
+		const double Alpha = SkyClockSmoothStep((DayFrac - (1.0 - Half)) / (2.0 * Half));
+		return SkyClockLerpWeather(Here, SkyClockRawWeather(Seed, D + 1.0, 0.0), Alpha);
+	}
+	if (DayFrac < Half && D > 1.0)
+	{
+		// Small hours: finish the fade from the day that ended. Alpha runs 0.5 -> 1.
+		const double Alpha = SkyClockSmoothStep((DayFrac + Half) / (2.0 * Half));
+		return SkyClockLerpWeather(SkyClockRawWeather(Seed, D - 1.0, SkyClockLastDayFrac), Here, Alpha);
+	}
+	return Here;
+}
+
+double HighlightContrastFor(const UAnastasisAtmosphereProfile& Profile, const double Daylight, const double DayValue)
+{
+	return FMath::Lerp(static_cast<double>(Profile.TwilightHighlightContrastScale), DayValue, FMath::Clamp(Daylight, 0.0, 1.0));
 }
 
 double CloudCoverageFor(const UAnastasisAtmosphereProfile& Profile, const double Cover)
@@ -121,8 +198,8 @@ double MistFactorFor(const UAnastasisAtmosphereProfile& Profile, const FSkyState
 	const double T = FMath::Clamp(State.SunElevationDegrees / Span, 0.0, 1.0);
 	const double BurnOff = T * T * (3.0 - 2.0 * T);
 	const double Diurnal = FMath::Lerp(1.0, static_cast<double>(Profile.MistMiddayFactor), BurnOff);
-	const double Humid = 1.0 + FMath::Clamp(State.Humidity, 0.0, 1.0);
-	const double Wind = 1.0 - 0.6 * FMath::Clamp(State.Weather.Wind, 0.0, 1.0);
+	const double Humid = 1.0 + FMath::Clamp(State.SkyHumidity, 0.0, 1.0);
+	const double Wind = 1.0 - 0.6 * FMath::Clamp(State.SkyWind, 0.0, 1.0);
 	return FMath::Clamp(Diurnal * Humid * Wind, 0.0, 2.0);
 }
 

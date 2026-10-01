@@ -58,7 +58,8 @@
 //     forcer `eat` ou `rest`. Un but non porte qui gagne donne `observer`. Sans `goalNoise`
 //     (le bruit consomme `sim.rng()` dans l'ordre de TOUTE la table), sans
 //     `statusBias` (misere = or <= 2 et sans toit : l'or n'existe pas encore),
-//     sans mode de vie, district, meteo, age, memoire, prevision de survie.
+//     sans mode de vie, district, age, memoire, prevision de survie. La meteo
+//     (`weatherGoalBias`) est portee : ecart n°17.
 //  2. Pas de reconsideration aleatoire (`sim.rng() < chance`) ni de collant de
 //     but (`goalStickinessBonus`) : un habitant qui a une cible la garde jusqu'a
 //     l'arrivee, l'echec ou la disparition ; il redecide des qu'il n'en a plus.
@@ -140,6 +141,22 @@
 // 14. Cohabitation avec l'extension food-supply (non fidele, voir plus haut) : elle
 //     ne s'applique qu'aux habitants qui ne sont PAS le fermier d'un grenier ; une
 //     tuile ouverte par ActivateFoodSource n'a qu'une verite, son registre fini.
+// 17. Meteo (village-weather-001). Porte : `readSimWeather` (graine de la SIMULATION, posee
+//     par l'hote), `weatherGoalBias` ajoute a CHAQUE ligne de la table (`score.weather`),
+//     la ligne `shelterRain` calculee (`shelterRainScore`, sans `goalNoise`), la porte
+//     d'orage de `commitGoalChoice` (lacher un but expose pour `shelterRain`, memoriser le
+//     but a reprendre), `shelterRainAccess`, l'entree (son POSTE a 3,4 tuiles —
+//     `workplaceAcceptsIndoorGoal` accepte toujours `shelterRain`, le fermier s'abrite donc au
+//     grenier ; sinon `afford` : foyer, logement, civique — le PUITS est civique dans la
+//     reference, il abrite donc ; un grenier qui n'est pas son poste, groupe food, non),
+//     la duree d'abri, la recuperation sous l'auvent, `performShelterRain` (energie +14,
+//     moral +2, delai de grace 18 s, reprise du but expose), `applyRainExposure`, et le bloc
+//     pluie de `movementSpeedFactor` (le reste de ce facteur n'est pas porte : ecart n°4).
+//     Non porte : `bestKnownBed` (le foyer en tient lieu), la taverne (absente), le biais
+//     `shelterRain` de la prevision de survie, `weatherGoalLabel` (inspecteur). Apres l'abri,
+//     un but repris qui n'est pas expose devient `craft` dans la reference : non porte, donc
+//     `observer`. Parite : `Anastasis.Sim.Parite.MeteoHabitants` (vecteurs) et
+//     `Anastasis.Sim.MeteoHabitants.*` (formules non exportees, boucle assemblee).
 // 13. Reference : `fee66ae`, commitee. Sa copie de travail porte, NON commitee,
 //     `load > 11` au lieu de `load > 9` pour rentrer livrer : non suivi.
 //
@@ -156,6 +173,7 @@
 #include "Life/AnastasisBonds.h"
 #include "Life/AnastasisNeeds.h"
 #include "Life/AnastasisVillageRhythm.h"
+#include "Life/AnastasisWeatherBehavior.h"
 #include "Work/AnastasisGather.h"
 #include "World/AnastasisEntityTable.h"
 #include "World/AnastasisNavGrid.h"
@@ -183,6 +201,8 @@ namespace AnastasisVillage
 	/** Portes pour un fermier dont le poste est un grenier (ecart n°10). */
 	inline const TCHAR* const GoalGatherFood = AnastasisGather::GoalGatherFood;
 	inline const TCHAR* const GoalDeliver = AnastasisGather::GoalDeliver;
+	/** Porte pour tous (village-weather-001) : sous l'orage, lacher le travail pour un toit. */
+	inline const TCHAR* const GoalShelterRain = AnastasisWeatherBehavior::GoalShelterRain;
 
 	/** `NPC_AI` de npc.js (chemin classique) — conserve pour `aiThinkStagger`. */
 	inline constexpr double ThinkEvery = 0.12;
@@ -457,6 +477,11 @@ namespace AnastasisVillage
 		FString BuildingId;
 		/** D'ou vient la cible : well, shore, home, shelter, housing, open-shelter, settlement, none. */
 		FString TargetSource;
+		/** Meteo lue a ce choix (`readSimWeather`) et la ligne `shelterRain` (score + biais + rythme). */
+		double WeatherRain = 0.0;
+		double ShelterRowScore = 0.0;
+		/** La porte d'orage de commitGoalChoice a-t-elle remplace le gagnant ? */
+		bool bStormGate = false;
 	};
 
 	/** Ce que les lignes de travail d'un fermier partagent a une decision. */
@@ -555,6 +580,13 @@ namespace AnastasisVillage
 		int32 MealsTaken = 0;
 		int32 SocialsTaken = 0;
 		int32 RelaxesTaken = 0;
+		/** `deeds.sheltered` : abris pris sous l'orage. */
+		int32 SheltersTaken = 0;
+
+		/** `npc.shelterResumeGoal` : le travail expose a reprendre apres l'abri ; vide = null. */
+		FString ShelterResumeGoal;
+		/** `npc.shelterCooldownUntil` ; < 0 = absent. */
+		double ShelterCooldownUntil = -1.0;
 
 		/** `npc.relations` (ordre d'insertion), `mind.people`, `mind.tom`, `npc.moodlets`. */
 		TArray<TPair<FString, double>> Relations;
@@ -676,6 +708,28 @@ namespace AnastasisVillage
 
 		/** Graine du flux de tirages du village (rumeurs). Defaut fixe ; l'hote la pose. */
 		void SetRngSeed(uint32 Seed) { VillageRng = FAnastasisRng(Seed); }
+
+		/**
+		 * Meteo (village-weather-001). `readSimWeather` lit `weatherAt(sim.seed, sim.day, dayFrac)` :
+		 * le village a besoin de la graine de la SIMULATION (pas celle de ses tirages), posee par
+		 * l'hote au Reset. Sans hote (les tests d'assemblage), PAS de meteo : un ciel d'ete sec,
+		 * ou chaque terme meteo vaut exactement 0 — le comportement d'avant, au bit pres.
+		 */
+		void SetWeatherSeed(uint32 Seed) { WeatherSeed = Seed; bWeatherSeeded = true; }
+		uint32 GetWeatherSeed() const { return WeatherSeed; }
+
+		/**
+		 * `sim.forceWeather` de la reference (« Hook verifies / debug ») : impose l'etat lu par les
+		 * habitants, a la fois a l'heure (decisions) et pour la journee (vitesse de marche).
+		 * Pour les tests et le debug ; la simulation normale n'y touche jamais.
+		 */
+		void SetForcedWeather(const AnastasisWeatherBehavior::FSimWeather& Weather) { bForcedWeather = true; ForcedWeather = Weather; }
+		void ClearForcedWeather() { bForcedWeather = false; }
+		bool HasForcedWeather() const { return bForcedWeather; }
+
+		/** La meteo que les habitants lisent maintenant (`readSimWeather`), et la pluie journaliere de la marche. */
+		AnastasisWeatherBehavior::FSimWeather CurrentWeather() const;
+		double DailyRain() const;
 
 		/** `relationOf(npc, otherId)`. */
 		static double RelationOf(const FNpc& Npc, const FString& OtherId);
@@ -799,6 +853,12 @@ namespace AnastasisVillage
 
 		bool TryEnterIndoorAction(FNpc& Npc);
 		const FBuilding* BuildingForIndoorAction(const FNpc& Npc, const FString& Goal) const;
+		/** `buildingForIndoorAction(actor, "shelterRain")` : batiment a portee qui abrite (`afford`). */
+		const FBuilding* ShelterBuildingNearActor(const FNpc& Npc) const;
+		/** `shelterRainAccess(sim, npc)` : foyer, poste, batiment couvert, sinon la place. */
+		bool ShelterRainTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
+		/** `performShelterRain(sim, npc)`. */
+		bool PerformShelterRain(FNpc& Npc);
 		const FBuilding* BuildingNearActor(const FNpc& Npc, double Radius) const;
 		bool EnterBuilding(FNpc& Npc, const FBuilding& Building, const FString& InActivity, double Duration);
 		void UpdateInside(FNpc& Npc);
@@ -884,6 +944,14 @@ namespace AnastasisVillage
 		int32 NextNpcId = 0;
 		/** `sim.time` du tick en cours (pose par UpdateActors). */
 		double Now = 0.0;
+
+		/** Meteo : graine de la simulation, forcage de test, et l'etat lu au debut du tick. */
+		uint32 WeatherSeed = 0;
+		bool bWeatherSeeded = false;
+		bool bForcedWeather = false;
+		AnastasisWeatherBehavior::FSimWeather ForcedWeather;
+		AnastasisWeatherBehavior::FSimWeather TickWeather;
+		double TickDailyRain = 0.0;
 		/** `sim.mealReservations` : ordre d'insertion = ordre de `Object.keys`. */
 		TArray<FMealReservation> MealReservations;
 		TArray<FFoodSource> FoodSources;

@@ -683,6 +683,18 @@ int32 UAnastasisSimulationDebugLibrary::CountInside(const UObject* WorldContextO
 	return Sim ? Sim->GetVillage().InsideOf(BuildingId).Num() : -1;
 }
 
+FString UAnastasisSimulationDebugLibrary::GetNpcState(const UObject* WorldContextObject, const FString& NpcId)
+{
+	const FAnastasisSimulation* Sim = DebugSimulation(WorldContextObject);
+	const AnastasisVillage::FNpc* N = Sim ? Sim->GetVillage().FindNpc(NpcId) : nullptr;
+	if (!N)
+	{
+		return FString();
+	}
+	return FString::Printf(TEXT("%s|%s|%s|%s|%d"), *N->Goal, *N->Activity,
+		N->Inside.bActive ? *N->Inside.BuildingId : TEXT("-"), N->Inside.bActive ? *N->Inside.Goal : TEXT("-"), N->SheltersTaken);
+}
+
 int32 UAnastasisSimulationDebugLibrary::GetFoodStock(const UObject* WorldContextObject, const FString& BuildingId)
 {
 	const FAnastasisSimulation* Sim = DebugSimulation(WorldContextObject);
@@ -880,6 +892,43 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVillageFirstFarmer(
 			const int32 Y = Args.IsValidIndex(2) ? FCString::Atoi(*Args[2]) : FMath::FloorToInt32(Settlement.Y);
 			Host->SeedFirstFarmer(Count, X, Y);
 		}
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVillageForceWeather(
+	TEXT("Anastasis.Village.ForceWeather"),
+	TEXT("Anastasis.Village.ForceWeather <rain 0..1> [snow] [wind] [spring|summer|autumn|winter] | off - imposes what the inhabitants read "
+		"(the reference's sim.forceWeather: a debug hook). Rain >= 0.48 is a storm: outdoor work is dropped for shelter. "
+		"The SKY is not forced: it keeps the simulation's own weather."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		UAnastasisSimulationSubsystem* Host = VillageHost(World);
+		if (!Host || !Args.IsValidIndex(0))
+		{
+			return;
+		}
+		AnastasisVillage::FVillage& Village = Host->GetSimulation().GetVillage();
+		if (Args[0].Equals(TEXT("off"), ESearchCase::IgnoreCase))
+		{
+			Village.ClearForcedWeather();
+			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE_WEATHER forced=0 (the simulation's weather again)"));
+			return;
+		}
+		AnastasisWeatherBehavior::FSimWeather Weather;
+		Weather.Rain = FMath::Clamp(FCString::Atod(*Args[0]), 0.0, 1.0);
+		Weather.Snow = Args.IsValidIndex(1) ? FMath::Clamp(FCString::Atod(*Args[1]), 0.0, 1.0) : 0.0;
+		Weather.Wind = Args.IsValidIndex(2) ? FMath::Clamp(FCString::Atod(*Args[2]), 0.0, 1.0) : 0.0;
+		if (Args.IsValidIndex(3))
+		{
+			const FString S = Args[3].ToLower();
+			Weather.Season = S == TEXT("spring") ? AnastasisWeather::ESeason::Spring
+				: S == TEXT("autumn") ? AnastasisWeather::ESeason::Autumn
+				: S == TEXT("winter") ? AnastasisWeather::ESeason::Winter
+				: AnastasisWeather::ESeason::Summer;
+		}
+		Village.SetForcedWeather(Weather);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE_WEATHER forced=1 rain=%.3f snow=%.3f wind=%.3f season=%s storm=%d"),
+			Weather.Rain, Weather.Snow, Weather.Wind, AnastasisWeather::SeasonId(Weather.Season),
+			Weather.Rain >= AnastasisWeatherBehavior::Shelter::RainHeavy ? 1 : 0);
 	}));
 
 FString UAnastasisSimulationDebugLibrary::GetGatherStatus(const UObject* WorldContextObject)
