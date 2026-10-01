@@ -111,15 +111,32 @@
 //     a chaque repas confirme et chaque livraison, les seules mutations ici.
 // 15. Socialiser (social-relax-001) : la cible est `socialPos` (le premier batiment
 //     acheve qui rassemble — `dailyMorale` > 0 : le puits), le gain social court
-//     tant que le but est `socialize`, et l'action est la branche SANS COMPAGNON de
-//     `socialize()` (`satisfySocial(14)`, moral +1). La branche avec compagnon
-//     (relations, affinite, paroles, rumeurs et gisements partages, rencontres,
-//     conseils, visites) n'est pas portee : c'est le module des liens. Sans puits,
-//     la reference vise la place (routes) puis le marche : ici, le point d'acces
-//     pres de l'origine. Les couches liens / memoire / age de la cible rendent la
-//     cible de base faute de relations : c'est la reference.
+//     tant que le but est `socialize`, et l'action est, sans personne a portee, la
+//     branche SANS COMPAGNON de `socialize()` (`satisfySocial(14)`, moral +1) ; la
+//     branche avec compagnon et les couches liens / memoire de la cible : n°16. Sans
+//     puits, la reference vise la place (routes) puis le marche : ici, le point
+//     d'acces pres de l'origine.
 //     Se detendre : complet — chez soi (foyer, sinon abri ouvert), dedans 4,8 s ;
 //     sans toit, dehors ; `hearthInviteScore` (scene de foyer) vaut 0.
+// 16. Liens et rumeurs (bonds-rumors-001) : la branche AVEC compagnon de
+//     `socialize()` — compagnon choisi dans la grille du tick (ordre de la reference),
+//     porte de conversation, relations et paliers (moodlet newFriend), fiches de
+//     personnes et theorie de l'esprit, porte de parole (hash FNV), session qui FIGE
+//     les deux habitants, rumeurs de GISEMENTS (on-dit), oubli quotidien a la place
+//     de la reference dans la file de minuit (`memory`). Non porte, et pourquoi :
+//       - le generateur de texte des repliques : le REFUS (seul effet de jeu) est
+//         evalue au premier tirage (`attempt` = 0) ; la boucle de re-tirage contre les
+//         redites depend du texte ;
+//       - `shareRumors` hors gisements (croyance de marche, puits, lits, dangers,
+//         acces bloques, savoir negatif, fiches colportees, episodes) : le portage
+//         n'a pas ces croyances, l'echange serait vide ou invente ;
+//       - les visites de voisinage, les conseils d'aine, les rencontres quotidiennes
+//         (`runSocialEncounters`), les frictions (`updateConflictsDaily`) ;
+//       - les tirages (`sim.rng`) des rumeurs viennent d'un flux propre au village,
+//         deterministe : la trajectoire JS n'est pas promise au tirage pres.
+//       - l'ancre du regard (`npc.target = partenaire`) est relachee a la fin de la
+//         session : la reference repense sa cible a chaque pensee, ce portage seulement
+//         sans cible (ecart n°2), et l'ancre deviendrait une destination durable.
 // 14. Cohabitation avec l'extension food-supply (non fidele, voir plus haut) : elle
 //     ne s'applique qu'aux habitants qui ne sont PAS le fermier d'un grenier ; une
 //     tuile ouverte par ActivateFoodSource n'a qu'une verite, son registre fini.
@@ -134,6 +151,9 @@
 
 #include "CoreMinimal.h"
 #include "Ai/AnastasisNous.h"
+#include "Core/AnastasisRng.h"
+#include "Core/AnastasisSpatialGrid.h"
+#include "Life/AnastasisBonds.h"
 #include "Life/AnastasisNeeds.h"
 #include "Life/AnastasisVillageRhythm.h"
 #include "Work/AnastasisGather.h"
@@ -316,6 +336,55 @@ namespace AnastasisVillage
 		int32 Amount = 0;
 		int32 Day = 0;
 		bool bHearsay = false;
+		/** On-dit : qui l'a dit, la source d'origine, combien de bouches, quand. */
+		FString SourceId;
+		FString OriginalSourceId;
+		int32 HopCount = 0;
+		int32 ReceivedDay = 0;
+		double ReceivedAt = 0.0;
+	};
+
+	/** `INFORM_RESOURCE_SPOT` — un gisement qu'un habitant raconte a un autre. */
+	struct FSpotAct
+	{
+		FString SourceId;
+		FString Key;
+		FString Resource;
+		double X = 0.0;
+		double Y = 0.0;
+		int32 Amount = 0;
+		int32 Day = 0;
+		int32 HopCount = 0;
+		FString OriginalSourceId;
+	};
+
+	/** `npc.lastTalk` — le dernier propos (le texte n'est pas porte). */
+	struct FLastTalk
+	{
+		bool bValid = false;
+		FString WithId;
+		double At = 0.0;
+		/** `detail === "refuse"`. */
+		bool bRefuse = false;
+	};
+
+	/** `npc.talkFatigue[otherId]`. */
+	struct FTalkFatigue
+	{
+		FString Id;
+		int32 Count = 0;
+		double At = 0.0;
+	};
+
+	/** Deux habitants vus par `bumpRelation` (tests de parite). */
+	struct FBondPair
+	{
+		double RelAB = 0.0;
+		double RelBA = 0.0;
+		double MoraleA = 50.0;
+		double MoraleB = 50.0;
+		TArray<AnastasisBonds::FMoodlet> MoodletsA;
+		TArray<AnastasisBonds::FMoodlet> MoodletsB;
 	};
 
 	/** `npc.workSession` — la session de coups de metier, ancree a une tuile. */
@@ -486,6 +555,31 @@ namespace AnastasisVillage
 		int32 MealsTaken = 0;
 		int32 SocialsTaken = 0;
 		int32 RelaxesTaken = 0;
+
+		/** `npc.relations` (ordre d'insertion), `mind.people`, `mind.tom`, `npc.moodlets`. */
+		TArray<TPair<FString, double>> Relations;
+		TArray<AnastasisBonds::FPersonRow> People;
+		TArray<AnastasisBonds::FTomEntry> Tom;
+		TArray<AnastasisBonds::FMoodlet> Moodlets;
+		/** Conversation : dernier propos, fatigue par interlocuteur, session en cours. */
+		FLastTalk LastTalk;
+		TArray<FTalkFatigue> TalkFatigue;
+		FString TalkWithId;
+		double TalkUntil = 0.0;
+		int32 TalkTurn = 0;
+		int32 TalkMaxTurns = 0;
+		FString TalkStarterId;
+		double TalkNextAt = 0.0;
+		/** `talkChainTopic || talkChainCue` : seule leur presence compte (porte de parole). */
+		bool bTalkChain = false;
+		/** La cible est l'ancre du regard posee par la conversation (relachee a la fin). */
+		bool bTalkAnchor = false;
+		/** `npc.socialSeekId` : la personne memorisee vers qui il marche. */
+		FString SocialSeekId;
+		/** Observation : conversations engagees (compagnon), gisements entendus / racontes. */
+		int32 TalksWithCompanion = 0;
+		int32 RumorsHeard = 0;
+		int32 RumorsShared = 0;
 		FDecisionTrace LastDecision;
 
 		/** `livingHome(npc)` = home || shelter. */
@@ -573,6 +667,21 @@ namespace AnastasisVillage
 		int32 RegrowFieldsDaily(int32 Day);
 		/** Observation : nourriture ajoutee aux champs par la repousse depuis Bind. */
 		int64 GetRegrownFood() const { return RegrownFood; }
+
+		/**
+		 * Travail `memory` de la file de minuit : `forgetStale` (gisements de plus de
+		 * 14 jours) et `forgetStalePeople` (fiches de plus de 26 jours), pour chacun.
+		 */
+		void ForgetStaleDaily(int32 Day);
+
+		/** Graine du flux de tirages du village (rumeurs). Defaut fixe ; l'hote la pose. */
+		void SetRngSeed(uint32 Seed) { VillageRng = FAnastasisRng(Seed); }
+
+		/** `relationOf(npc, otherId)`. */
+		static double RelationOf(const FNpc& Npc, const FString& OtherId);
+
+		/** `isTalking(npc, sim)`. */
+		bool IsTalking(const FNpc& Npc) const;
 
 		/** `countBuildings(type)` — acheves seulement. */
 		int32 CountBuildings(const FString& Type) const;
@@ -713,6 +822,26 @@ namespace AnastasisVillage
 
 		// Recolte et livraison (npc.js, craftWork.js, fieldWorkPosts.js, memory.js).
 		bool IsPortedGoalFor(const FNpc& Npc, const FString& Goal) const;
+		// Liens et paroles (bonds.js, talk.js, socialMemory.js).
+		FNpc* PickSocialCompanion(FNpc& Npc, double MaxDistance);
+		bool IsSociallyAvailable(const FNpc& Other) const;
+		bool CanStartTalk(const FNpc& A, const FNpc& B) const;
+		int32 TalkFatigueLevel(const FNpc& A, const FNpc& B) const;
+		int32 VillageEmitCount() const;
+		void SocializeWithCompanion(FNpc& Npc, FNpc& Other);
+		void BumpRelation(FNpc& A, FNpc& B, double DeltaA, double DeltaB);
+		void NoteMeeting(FNpc& A, FNpc& B);
+		void RecordTalk(FNpc& Speaker, FNpc& Listener, bool bContinue);
+		bool BeginTalkSession(FNpc& Speaker, FNpc& Listener, bool bContinue);
+		/** `holdTalkAct` : vrai si l'habitant est fige en conversation ce tick. */
+		bool HoldTalk(FNpc& Npc);
+		void AdvanceTalkTurn(FNpc& Driver, FNpc& Partner);
+		static void ClearTalkSession(FNpc& Npc);
+		bool BondSocialTarget(FNpc& Npc, FPoint& InOutTarget);
+		bool RememberedSocialTarget(FNpc& Npc, FPoint& InOutTarget);
+		FString PickRememberedSeekFor(const FNpc& Npc) const;
+		void ExchangeSpotRumors(FNpc& A, FNpc& B);
+
 		/** Lignes `socialize` / `relax` d'adultScores (Phase, rythme et pression morale compris). */
 		double SocialRowScore(const FNpc& Npc, const FString& Goal, double NeedScore, double PhaseBias) const;
 		/** `sim.socialPos(npc)` : le premier batiment acheve qui rassemble, sinon l'origine. */
@@ -743,6 +872,11 @@ namespace AnastasisVillage
 		/** Tuiles touchees par la recolte : index -> etat vivant. Ecrit seulement par TakeFromTile / DepleteTile. */
 		TMap<int32, AnastasisWorld::FTile> LiveTiles;
 		int64 RegrownFood = 0;
+		/** `sim.spatial` : reconstruite une fois par tick, au debut de la boucle des habitants. */
+		AnastasisSpatialGrid::FGrid Grid;
+		/** `sim.life.recentVillageEmits` : instants des paroles de rue. */
+		TArray<double> RecentVillageEmits;
+		FAnastasisRng VillageRng = FAnastasisRng(0x6a09e667u);
 		AnastasisNav::FNavGrid Nav;
 		int32 NavVersion = 0;
 		FPoint Settlement;
@@ -758,6 +892,20 @@ namespace AnastasisVillage
 		TAnastasisEntityTable<FBuilding> Buildings;
 		TAnastasisEntityTable<FNpc> Actors;
 	};
+
+	/** `canStartTalk` sur des champs (tests) : cooldown de paire puis fatigue. */
+	ANASTASISSIM_API bool CanStartTalkFor(double Now, bool bALast, double ALastAt, bool bBLast, double BLastAt,
+		int32 FatigueAB, double FatigueABAt, int32 FatigueBA, double FatigueBAAt);
+
+	/** `bumpRelation(sim, a, b, dA, dB)` + `noteBondStageCross` (moodlet newFriend). */
+	ANASTASISSIM_API void BumpRelationPair(FBondPair& Pair, double DeltaA, double DeltaB, double Now);
+
+	/** `createInformResourceSpotActs(sim, source, target, { limit })` ; R01 = le tirage `sim.rng()`. */
+	ANASTASISSIM_API TArray<FSpotAct> CreateInformSpotActs(const TArray<FResourceSpot>& Source, const TArray<FResourceSpot>& Target,
+		const FString& SourceId, double R01, int32 Limit);
+
+	/** `commitHearsayResourceSpot` puis `trimResourceSpotMemory`. Rend vrai si le gisement entre. */
+	ANASTASISSIM_API bool CommitHearsaySpot(TArray<FResourceSpot>& Target, const FSpotAct& Act, int32 Day, double Time);
 
 	/** `aiThinkStagger` — decalage FNV-1a de l'identifiant, dans [0, thinkEvery). */
 	ANASTASISSIM_API double AiThinkStagger(const FString& Id);

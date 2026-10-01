@@ -30,8 +30,17 @@ public:
 	/** Secondes de simulation par jour. Identique a export const DAY_LENGTH. */
 	static constexpr double DayLength = 90.0;
 
-	/** Soft cap jobs / tick. Identique a DAY_DEFERRED_JOBS_PER_TICK. Seul `landRegen` est porte. */
+	/** Soft cap jobs / tick. Identique a DAY_DEFERRED_JOBS_PER_TICK. */
 	static constexpr int32 DayDeferredJobsPerTick = 2;
+
+	/**
+	 * La file de minuit de la reference (`enqueueDayDeferred`), ses 17 travaux dans l'ordre.
+	 * Portes : `landRegen` (0) et `memory` (14, oubli quotidien). Les autres occupent leur
+	 * place et leur part du budget sans rien faire : NOT_IMPLEMENTED.
+	 */
+	static constexpr int32 DayDeferredJobCount = 17;
+	static constexpr int32 DayJobLandRegen = 0;
+	static constexpr int32 DayJobMemory = 14;
 
 	FAnastasisSimulation();
 
@@ -78,6 +87,7 @@ private:
 	void ProcessDayDeferred(int32 MaxJobs);
 	/** Tete de la file de minuit : `regrowFieldsDaily` (regrowForestDaily est sans effet dans la reference). */
 	void RunLandRegen();
+	void RunDayJob(int32 Job);
 
 	bool bBootDeferred = true;
 	uint32 Seed = 0;
@@ -85,7 +95,8 @@ private:
 	int32 Day = 0;
 	int32 NewDayCount = 0;
 	int32 DeferredRemaining = 0;
-	bool bLandRegenPending = false;
+	/** Travaux en attente, par numero dans la file de la reference. */
+	TArray<int32> DeferredJobs;
 	int32 LastRegrownFields = 0;
 	double Accumulator = 0.0;
 	AnastasisWorld::FWorld World;

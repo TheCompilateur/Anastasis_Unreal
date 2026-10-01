@@ -220,9 +220,21 @@ nourriture est conservée, personne n'a faim, et la limite de la table réduite 
 | `Work/AnastasisGather.*` (ajout) | `moralPressure(...).socialMul` | `Parite.Recolte`, cas Moral |
 | `Village/AnastasisVillage.*` (ajouts) | lignes socialize / relax d'adultScores, `socialPos`, `rhythmTarget` / `domesticTarget` relax, `socialize()` sans compagnon, entrée relax | `Village.Endurance` |
 
-La branche « compagnon » de `socialize()` (liens, paroles, rumeurs) n'est pas portée (écart n° 15).
+La branche « compagnon » de `socialize()` (liens, paroles, rumeurs) est venue ensuite (bonds-rumors-001).
 Avec ces deux remèdes, les fermiers de l'endurance livrent chaque jour sur 12 jours. Détail :
 `docs/unreal/SOCIAL_RELAX_001.md`.
+
+### Fait — les liens et les rumeurs (mission bonds-rumors-001)
+
+| Unreal | Source JS (`fee66ae`) | Preuve |
+| --- | --- | --- |
+| `Life/AnastasisBonds.h/.cpp` | `bonds.js` (affinité, gain, paliers), `talk.js` (hash, portes, durées, tours, refus), `socialMemory.js` (fiches, théorie de l'esprit, biais, recherche), `moodlets.js` (newFriend) | `Parite.Liens`, 2 834 vecteurs |
+| `Village/AnastasisVillage.*` (ajouts) | `socialize()` branche compagnon, `recordTalk`, `beginTalkSession`, `holdTalkAct`, `advanceTalkTurn`, `bondSocialTarget`, `rememberedSocialTarget`, `createInformResourceSpotActs`, `commitHearsayResourceSpot`, grille spatiale du tick | `Village.Liens.*` |
+| `Sim/AnastasisSimulation.*` (ajout) | `enqueueDayDeferred` : les 17 travaux, `memory` (n° 14) porté | `Village.Liens.Oubli`, `Tick.DayAdvance` |
+
+Deux habitants qui se croisent se parlent, se figent le temps de la session, se souviennent l'un de
+l'autre et se racontent les gisements qu'ils ont vus. Texte des répliques et rumeurs hors gisements :
+écart n° 16. Détail : `docs/unreal/BONDS_RUMORS_001.md`.
 
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 

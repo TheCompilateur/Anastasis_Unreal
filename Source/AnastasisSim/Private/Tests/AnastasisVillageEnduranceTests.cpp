@@ -281,7 +281,9 @@ bool FAnastasisRegrowHostTest::RunTest(const FString&)
 		{
 			++Midnights;
 			Grown += A.GetLastRegrownFields();
-			TestEqual(TEXT("file de minuit videe au meme tick"), A.GetDeferredRemaining(), 0);
+			// `landRegen` est le premier travail : il passe au tick du changement de jour.
+			TestEqual(TEXT("file de minuit entamee au meme tick"), A.GetDeferredRemaining(),
+				FAnastasisSimulation::DayDeferredJobCount - FAnastasisSimulation::DayDeferredJobsPerTick);
 		}
 	}
 	TestEqual(TEXT("trois minuits"), Midnights, 3);
@@ -465,6 +467,14 @@ bool FAnastasisVillageEnduranceTest::RunTest(const FString&)
 	TestTrue(TEXT("la solitude a un remede : on socialise"), Socials > 0);
 	TestTrue(TEXT("personne n'est en solitude critique durablement (social > 0)"), MinSocial > 0.0);
 	AddInfo(FString::Printf(TEXT("conversations %d, pauses %d, social min %.1f, loisir min %.1f"), Socials, Relaxes, MinSocial, MinLeisure));
+	int32 Talks = 0;
+	int32 Rumors = 0;
+	for (const FNpc& N : V.GetActors())
+	{
+		Talks += N.TalksWithCompanion;
+		Rumors += N.RumorsHeard;
+	}
+	AddInfo(FString::Printf(TEXT("liens : %d conversations avec compagnon, %d gisements appris par on-dit"), Talks, Rumors));
 	AddInfo(FString::Printf(TEXT("jours sans livraison : %d (le premier : %d), tous expliques par un besoin critique d'un fermier"),
 		DaysWithoutDelivery, FirstIdleDay));
 	return true;
