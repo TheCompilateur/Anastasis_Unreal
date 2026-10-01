@@ -377,10 +377,11 @@ def build_wall():
     x0 = -total * 0.5
     for p in range(planks):
         x_left = x0 + p * (plank_w + gap)
+        plank_h = height * (0.42 if p == 5 else 1.0)
         cup = 0.2 * math.sin(p * 1.7)
         for s in range(segs):
-            z0 = height * s / segs
-            z1 = height * (s + 1) / segs
+            z0 = plank_h * s / segs
+            z1 = plank_h * (s + 1) / segs
             warp0 = cup * math.sin(math.pi * s / segs)
             warp1 = cup * math.sin(math.pi * (s + 1) / segs)
             y_front = -thick * 0.5
@@ -411,17 +412,17 @@ def build_wall():
             edge = [
                 (x, thick * 0.5, 0),
                 (x, -thick * 0.5, 0),
-                (x, -thick * 0.5, height),
-                (x, thick * 0.5, height),
+                (x, -thick * 0.5, plank_h),
+                (x, thick * 0.5, plank_h),
             ]
             if side == 1:
                 edge = [edge[1], edge[0], edge[3], edge[2]]
             mesh.quad(edge, [col4(0.2, 0.0, 0.1)] * 4, [(0, 0), (0.08, 0), (0.08, 2.1), (0, 2.1)])
         top = [
-            (x_left, -thick * 0.5, height),
-            (x_left + plank_w, -thick * 0.5, height),
-            (x_left + plank_w, thick * 0.5, height),
-            (x_left, thick * 0.5, height),
+            (x_left, -thick * 0.5, plank_h),
+            (x_left + plank_w, -thick * 0.5, plank_h),
+            (x_left + plank_w, thick * 0.5, plank_h),
+            (x_left, thick * 0.5, plank_h),
         ]
         mesh.quad(top, [col4(0.22, 0.0, 0.04)] * 4, [
             (x_left / 100.0, 0.0), ((x_left + plank_w) / 100.0, 0.0),
@@ -999,6 +1000,38 @@ def build_level(instances, meshes):
         tag(actor, label, 'AAA_LAB/Current')
         actor.static_mesh_component.set_static_mesh(mesh)
         current.append(dict(label=label, path=path, placed=True, size_cm=size, location=[loc.x, loc.y, loc.z]))
+
+    def place_height(label, path, x, y, yaw, height_cm, folder, material=None):
+        mesh = unreal.EditorAssetLibrary.load_asset(path)
+        if mesh is None:
+            log('MISSING ' + path)
+            current.append(dict(label=label, path=path, placed=False))
+            return
+        bounds = mesh.get_bounding_box()
+        native = max(1.0, bounds.max.z - bounds.min.z)
+        scale = float(height_cm) / native
+        z = ground_z(x, y) - bounds.min.z * scale
+        actor = spawn(unreal.StaticMeshActor, unreal.Vector(x, y, z), unreal.Rotator(pitch=0, yaw=yaw, roll=0))
+        tag(actor, label, folder)
+        actor.set_actor_scale3d(unreal.Vector(scale, scale, scale))
+        comp = actor.static_mesh_component
+        comp.set_static_mesh(mesh)
+        if material is not None:
+            for slot in range(comp.get_num_materials()):
+                comp.set_material(slot, material)
+        log('HERO %s h=%.0f scale=%.2f (%.0f,%.0f,%.0f)' % (label, height_cm, scale, x, y, z))
+        current.append(dict(label=label, path=path, placed=True, height_cm=height_cm, scale=round(scale, 3), location=[x, y, round(z, 1)]))
+
+    # Anneau proche, dans le cone de cam_a (48 deg). L'arbre du fond reste a 1 m.
+    place_height('HERO_Tree', '/Game/Anastasis/Vegetation/SM_Tree_Broadleaf_Canopy_01', -310, -40, 15, 393.0, 'AAA_LAB/Hero')
+    # Touffe : les memes cartes, empilees, pour que le premier plan ne soit plus un plan.
+    grass = '/Game/Anastasis/GroundCover/SM_Grass_MeadowTall_01'
+    clump = [(0, 0, 0, 1.15), (22, 8, 40, 0.9), (-18, 12, 15, 1.05), (8, -20, 70, 0.85),
+             (-8, -16, 110, 1.2), (26, -6, 150, 0.75), (-24, -4, 200, 0.95), (4, 18, 250, 1.0)]
+    for i, (dx, dy, yaw, sc) in enumerate(clump):
+        place_height('HERO_Grass_%d' % i, grass, 160 + dx, -420 + dy, yaw, 97.0 * sc, 'AAA_LAB/Hero')
+    # Une maison, pas le village : le shader du mur du labo, l'asset de production intact.
+    place_height('HERO_House', '/Game/Anastasis/VillageBuildings/SM_House_Refuge_01', -600, 70, 30, 440.0, 'AAA_LAB/Hero', instances['MI_AAA_Wood'])
 
     sun = spawn(unreal.DirectionalLight, unreal.Vector(0, 0, 500), unreal.Rotator(pitch=-46, yaw=38, roll=0))
     tag(sun, 'AAA_Sun', 'AAA_LAB/Light')

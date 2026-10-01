@@ -169,6 +169,8 @@ Lumière locale au niveau : directionnelle 10 lux, soleil d'atmosphère, contact
 
 Captures du run 012 : `cam_a.png`, `cam_b.png`, `cam_c.png` dans `Saved/SliceEvidence/aaa-visual-lab-012/`. Les icônes de lumière et le cadre de sélection de l'éditeur sont encore dans l'image.
 
+La recette pose ensuite un anneau proche, non régénéré : arbre canopée à 393 cm, touffe de huit cartes d’herbe, une planche du mur à 42 % de la hauteur, maison du village dont le composant emprunte `MI_AAA_Wood`. La map sauvée reste celle du run 012.
+
 ## 9. Benchmark performance
 
 Non mesuré sur ce labo. Inventer un FPS serait faux.
