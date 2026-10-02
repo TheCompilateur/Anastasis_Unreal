@@ -78,10 +78,16 @@ static TAutoConsoleVariable<int32> CVarUnderstoryInAutomation(
     TEXT("anastasis.Understory.InAutomation"), 0,
     TEXT("0=pas de maquis ni de rochers pendant les tests d'automatisation (defaut, comme l'herbe), 1=aussi sous automatisation."), ECVF_Default);
 
-// Huit specimens a taille reelle, et une enveloppe de canopee au-dela de 70 m. 0 = la foret de production seule.
+// Huit specimens a taille reelle, et (anastasis.Dressing.CanopyShell) une enveloppe de canopee au-dela de 70 m. 0 = la foret de production seule.
 static TAutoConsoleVariable<int32> CVarHeroCanopy(
 	TEXT("anastasis.Dressing.HeroCanopy"), 1,
 	TEXT("0=meshes de production seuls, 1=huit heros (pin, cypres, chene, olivier) et enveloppe lointaine ; applique a l'incarnation."), ECVF_Default);
+// CANOPY_SHELL_FIX_001. L'enveloppe ne s'ajoute plus par defaut : les arbres de production ne
+// sont jamais coupes et forment deja la masse lointaine (A/B vue oblique : 2,09 % de pixels,
+// sous la variance de capture), et entre 70 et 200 m elle se lit comme une galette sans tronc.
+static TAutoConsoleVariable<int32> CVarCanopyShell(
+	TEXT("anastasis.Dressing.CanopyShell"), 0,
+	TEXT("1=enveloppe de canopee au-dela de 70 m sur chaque massif (avec anastasis.Dressing.HeroCanopy 1), 0=non (defaut) ; applique a l'incarnation."), ECVF_Default);
 static TAutoConsoleVariable<int32> CVarHeroCanopyInAutomation(
 	TEXT("anastasis.HeroCanopy.InAutomation"), 0,
 	TEXT("0=pas de heros ni d'enveloppe pendant les tests d'automatisation (defaut), 1=aussi sous automatisation."), ECVF_Default);
@@ -621,6 +627,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 double HeightM = 0.0;
                 double Crown = 1.0;
                 double GroundZ = 0.0;
+                double HeightCm = 0.0;
                 double Dryness = 0.0;
                 double Jitter = 0.0;
                 FVector2D Ground = FVector2D::ZeroVector;
@@ -703,12 +710,13 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 Tree.Jitter = TreeUnit(P.VisualSeed, T.X, T.Y, 0x34u) * 2.0 - 1.0;
                 Tree.Ground = FVector2D(P.Ground.X, P.Ground.Y);
                 Tree.MassBounds = MeshBounds;
+                Tree.HeightCm = (MeshBounds.Max.Z - MinZ) * Pose.GetScale3D().Z;
                 Held.Add(Tree);
                 ++SpeciesCounts[static_cast<uint8>(R.Species) & 7];
                 ++ForestLayerCounts[static_cast<uint8>(P.Layer)];
                 ++StatureCounts[static_cast<uint8>(Stature)];
                 ++FamilyCounts[static_cast<uint8>(Family)];
-                const double HeightUU = (MeshBounds.Max.Z - MinZ) * Pose.GetScale3D().Z;
+                const double HeightUU = Tree.HeightCm;
                 TallestUU = FMath::Max(TallestUU, HeightUU);
                 ShortestUU = FMath::Min(ShortestUU, HeightUU);
             }
@@ -730,6 +738,9 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                     Candidate.Ground = Held[Index].Ground;
                     Candidate.Species = static_cast<uint8>(Held[Index].Species);
                     Candidate.Score = Held[Index].HeightM;
+                    Candidate.GroundZ = Held[Index].GroundZ;
+                    Candidate.HeightCm = Held[Index].HeightCm;
+                    Candidate.Dryness = Held[Index].Dryness;
                     HeroCandidates.Add(Candidate);
                 }
                 TArray<AnastasisHeroCanopy::FHero> Heroes;
@@ -822,19 +833,21 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                         ++HeroPlaced;
                         ++DressingInstanceCount;
                     }
-                    UStaticMesh* ShellMesh = LoadObject<UStaticMesh>(nullptr,
-                        TEXT("/Game/Anastasis/Vegetation/Hero/SM_CanopyShell.SM_CanopyShell"));
+                    const bool bShells = CVarCanopyShell.GetValueOnGameThread() != 0;
+                    UStaticMesh* ShellMesh = bShells ? LoadObject<UStaticMesh>(nullptr,
+                        TEXT("/Game/Anastasis/Vegetation/Hero/SM_CanopyShell.SM_CanopyShell")) : nullptr;
                     if (ShellMesh)
                     {
                         const FBox ShellBounds = ShellMesh->GetBoundingBox();
                         const double ShellRadius = FMath::Max(FVector2D(ShellBounds.GetExtent().X, ShellBounds.GetExtent().Y).GetMax(), 1.0);
+                        const double ShellHeight = FMath::Max(ShellBounds.Max.Z - ShellBounds.Min.Z, 1.0);
                         TMap<uint64, UHierarchicalInstancedStaticMeshComponent*> Chunks;
                         for (const AnastasisHeroCanopy::FShell& Shell : Shells)
                         {
-                            double GroundZ = 0.0;
+                            double CenterZ = 0.0;
                             double WaterZ = 0.0;
-                            if (!AnastasisTerrainForge::SampleActive(Shell.Center.X, Shell.Center.Y, GroundZ)) continue;
-                            if (AnastasisTerrainForge::SampleActiveWater(Shell.Center.X, Shell.Center.Y, WaterZ) && WaterZ > GroundZ + 4.0) continue;
+                            if (!AnastasisTerrainForge::SampleActive(Shell.Center.X, Shell.Center.Y, CenterZ)) continue;
+                            if (AnastasisTerrainForge::SampleActiveWater(Shell.Center.X, Shell.Center.Y, WaterZ) && WaterZ > CenterZ + 4.0) continue;
                             const int32 CX = FMath::FloorToInt(Shell.Center.X / 6000.0);
                             const int32 CY = FMath::FloorToInt(Shell.Center.Y / 6000.0);
                             const uint64 Key = (static_cast<uint64>(static_cast<uint32>(CX)) << 32) | static_cast<uint32>(CY);
@@ -843,19 +856,27 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                             {
                                 Chunk = Ensure(*FString::Printf(TEXT("CanopyShell_%d_%d"), CX, CY), ShellMesh, false, false, 7000.0f, 120000.0f);
                             }
-                            const double Scale = Shell.RadiusCm / ShellRadius;
-                            const FVector Location(Shell.Center.X, Shell.Center.Y, GroundZ + Shell.RadiusCm * 0.22 - ShellBounds.Min.Z * Scale);
-                            Chunk->AddInstance(FTransform(FQuat::Identity, Location, FVector(Scale)), false);
+                            // Wide as the stand, tall as its crowns: the two scales are independent,
+                            // or a 30 m stand grows a 30 m dome over 10 m trees.
+                            const double Wide = Shell.RadiusCm / ShellRadius;
+                            const double Tall = FMath::Max(Shell.TopCm - Shell.BaseCm, 100.0) / ShellHeight;
+                            const FVector Location(Shell.Center.X, Shell.Center.Y,
+                                Shell.GroundZ + Shell.BaseCm - ShellBounds.Min.Z * Tall);
+                            const double Yaw = FMath::Frac(FMath::Sin(Shell.Center.X * 0.0123 + Shell.Center.Y * 0.0457) * 43758.5453) * 360.0;
+                            const int32 Instance = Chunk->AddInstance(FTransform(FRotator(0.0, Yaw, 0.0), Location, FVector(Wide, Wide, Tall)), false);
+                            // Custom data 0 is the crown's site dryness: left at zero, every shell
+                            // took the lushest green of the vegetation material, brighter than any tree under it.
+                            if (Instance != INDEX_NONE) Chunk->SetCustomDataValue(Instance, 0, static_cast<float>(Shell.Dryness), false);
                             ++ShellPlaced;
                         }
                     }
-                    else if (Shells.Num() > 0)
+                    else if (bShells && Shells.Num() > 0)
                     {
                         ++HeroMissing;
                     }
                     UE_LOG(LogAnastasis_UnrealV2, Display,
-                        TEXT("ANASTASIS_HERO_CANOPY enabled=1 heroes=%d shells=%d placed_heroes=%d placed_shells=%d missing=%d"),
-                        HeroReport.Heroes, HeroReport.Shells, HeroPlaced, ShellPlaced, HeroMissing);
+                        TEXT("ANASTASIS_HERO_CANOPY enabled=1 heroes=%d stands=%d shells=%d shell_cvar=%d placed_heroes=%d placed_shells=%d missing=%d"),
+                        HeroReport.Heroes, HeroReport.Stands, HeroReport.Shells, bShells ? 1 : 0, HeroPlaced, ShellPlaced, HeroMissing);
                 }
             }
             else

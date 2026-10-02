@@ -19,7 +19,8 @@ bool Build(const TArray<FCandidate>& Candidates, TArray<FHero>& Heroes, TArray<F
 	Report.Candidates = Candidates.Num();
 	for (const FCandidate& Candidate : Candidates)
 	{
-		if (!FMath::IsFinite(Candidate.Ground.X) || !FMath::IsFinite(Candidate.Ground.Y) || !FMath::IsFinite(Candidate.Score))
+		if (!FMath::IsFinite(Candidate.Ground.X) || !FMath::IsFinite(Candidate.Ground.Y) || !FMath::IsFinite(Candidate.Score)
+			|| !FMath::IsFinite(Candidate.GroundZ) || !FMath::IsFinite(Candidate.HeightCm) || !FMath::IsFinite(Candidate.Dryness))
 		{
 			Error = TEXT("HeroCanopy: non-finite candidate");
 			Report = FReport{};
@@ -61,10 +62,18 @@ bool Build(const TArray<FCandidate>& Candidates, TArray<FHero>& Heroes, TArray<F
 		Heroes.Add(Hero);
 		if (Heroes.Num() >= HeroCap) break;
 	}
-	// One shell per 60 m stand. Fewer than six trunks is a tree, not a mass.
-	constexpr double CellCm = 6000.0;
-	constexpr int32 MinTrees = 6;
-	constexpr int32 ShellCap = 240;
+	// One shell per 30 m stand. Under four trunks (about 45 a hectare) it is a few
+	// trees, not a mass. The shell fills crowns that are already there: a footprint
+	// wider than the trunks, or a top above them, reads as a green cloud over the
+	// forest instead of the forest itself.
+	constexpr double CellCm = 3000.0;
+	constexpr int32 MinTrees = 4;
+	constexpr int32 ShellCap = 600;
+	constexpr double CrownMarginCm = 250.0;
+	constexpr double MinRadiusCm = 600.0;
+	constexpr double MaxRadiusCm = 1800.0;
+	constexpr double CrownBase = 0.4;
+	constexpr double TopBelowMedian = 0.92;
 	TMap<uint64, TArray<int32>> Cells;
 	for (int32 Index = 0; Index < Candidates.Num(); ++Index)
 	{
@@ -75,20 +84,50 @@ bool Build(const TArray<FCandidate>& Candidates, TArray<FHero>& Heroes, TArray<F
 	}
 	TArray<uint64> Keys;
 	Keys.Reserve(Cells.Num());
-	for (const TPair<uint64, TArray<int32>>& Pair : Cells) Keys.Add(Pair.Key);
-	Keys.Sort();
+	for (const TPair<uint64, TArray<int32>>& Pair : Cells)
+	{
+		if (Pair.Value.Num() >= MinTrees) Keys.Add(Pair.Key);
+	}
+	Report.Stands = Keys.Num();
+	// Past the cap the densest stands keep their shell, wherever they are on the map.
+	Keys.Sort([&Cells](uint64 A, uint64 B)
+	{
+		const int32 NA = Cells[A].Num(), NB = Cells[B].Num();
+		if (NA != NB) return NA > NB;
+		return A < B;
+	});
 	for (uint64 Key : Keys)
 	{
 		const TArray<int32>& Ids = Cells[Key];
-		if (Ids.Num() < MinTrees) continue;
+		TArray<double> Heights;
 		FVector2D Sum = FVector2D::ZeroVector;
-		for (int32 Id : Ids) Sum += Candidates[Id].Ground;
+		double GroundSum = 0.0;
+		double DrySum = 0.0;
+		for (int32 Id : Ids)
+		{
+			Sum += Candidates[Id].Ground;
+			GroundSum += Candidates[Id].GroundZ;
+			DrySum += Candidates[Id].Dryness;
+			if (Candidates[Id].HeightCm > 0.0) Heights.Add(Candidates[Id].HeightCm);
+		}
+		if (Heights.Num() < MinTrees) continue;
 		const FVector2D Center = Sum / static_cast<double>(Ids.Num());
-		double MaxDistance = 0.0;
-		for (int32 Id : Ids) MaxDistance = FMath::Max(MaxDistance, FVector2D::Distance(Center, Candidates[Id].Ground));
+		// Half the trunks of a disc of radius R lie within R / sqrt(2). The median, not the
+		// farthest trunk: one stray tree at the cell's corner does not stretch the shell.
+		TArray<double> Distances;
+		Distances.Reserve(Ids.Num());
+		for (int32 Id : Ids) Distances.Add(FVector2D::Distance(Center, Candidates[Id].Ground));
+		Distances.Sort();
+		const double HalfRadius = Distances[Distances.Num() / 2];
+		Heights.Sort();
+		const double Median = Heights[Heights.Num() / 2];
 		FShell Shell;
 		Shell.Center = Center;
-		Shell.RadiusCm = FMath::Max(1200.0, MaxDistance * 1.35);
+		Shell.RadiusCm = FMath::Clamp(HalfRadius * UE_SQRT_2 + CrownMarginCm, MinRadiusCm, MaxRadiusCm);
+		Shell.GroundZ = GroundSum / static_cast<double>(Ids.Num());
+		Shell.TopCm = Median * TopBelowMedian;
+		Shell.BaseCm = Median * CrownBase;
+		Shell.Dryness = FMath::Clamp(DrySum / static_cast<double>(Ids.Num()), 0.0, 1.0);
 		Shell.Trees = Ids.Num();
 		Shells.Add(Shell);
 		if (Shells.Num() >= ShellCap) break;
