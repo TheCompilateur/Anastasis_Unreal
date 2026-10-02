@@ -47,8 +47,8 @@ voir `git log agent/forest-cost-001`
   eau, ciel, Lumen) coûte 7,9 à 8,4 ms.
 - Images regardées : `foret_eye_notrees` (la forêt disparaît, restent souches et bois mort de la
   micro-écologie), `vallee_b_eye_nograss` (sol nu, arbres présents) : le masquage retire la bonne strate.
-- Proposition de budget écrite dans `fiches/performance.md` (Ouvert) : 16,7 ms GPU par vue dans ce banc,
-  végétation ≤ 6,5 ms, tout ajout chiffré dans ce banc.
+- Budget approuvé par Alexandre le 2026-10-01, écrit en règle PERF-05 (`fiches/performance.md`) : 16,7 ms
+  GPU par vue dans ce banc, végétation ≤ 6,5 ms, tout ajout chiffré dans ce banc.
 
 ## PROOFS
 
@@ -79,4 +79,4 @@ PROOFS: (aucune)
 - Ce ne sont pas des ms de jeu : viewport d'éditeur dans une fenêtre 1280×720, pas un jeu packagé en
   1080p. Les ratios entre strates valent ; les valeurs absolues ne promettent aucune fréquence d'image.
 - Une seule heure (midi, sec) : l'aube, le contre-jour ou la pluie peuvent changer le coût des ombres.
-- Le budget n'est pas décidé : c'est une proposition à Alexandre.
+- Le budget a été approuvé par Alexandre le 2026-10-01 (PERF-05, `fiches/performance.md`) pour CE banc ; celui du jeu packagé reste à mesurer et à fixer.

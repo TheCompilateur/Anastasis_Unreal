@@ -29,7 +29,7 @@
 | Vues d'herbe | frame p50 environ 10–15 ms | `handoffs/ground-cover-001.md` |
 | Postes connus | Hit Lighting +0,5 à +3,4 ms ; herbe +1,5 à 2 ms ; eau environ 1,07 ms | fiches du domaine |
 | Végétation par strate (2026-10-01, viewport 1280×720) | image entière 10,3–14,2 ms ; arbres 0,3–3,75 ; herbe 0,1–3,75 ; sous-bois < 0,4 (bruit) ; scène sans végétation 7,9–8,4 ms ; témoin ≤ 0,34 ms | `handoffs/forest-cost-001.md` |
-| Budget écrit | **aucun** : proposition chiffrée en attente d'Alexandre (section Ouvert) | — |
+| Budget écrit | **PERF-05**, approuvé par Alexandre le 2026-10-01 : 16,7 ms GPU par vue, végétation ≤ 6,5 ms, dans le banc `vegetation-cost-capture.ps1` | `handoffs/forest-cost-001.md` |
 | Bruit de capture | ~3,6 % des pixels à plus de 16/255 entre deux runs du même état | `PIEGES_UNREAL.md` |
 
 ## Règles
@@ -43,6 +43,16 @@
   pas à promettre une fréquence d'image.
 - **PERF-04** — Une machine saturée (`EDITOR_GATE::WAIT`, `E_OUTOFMEMORY`) donne des mesures fausses :
   relancer dans une fenêtre calme, ne rien conclure.
+- **PERF-05** — Budget GPU, approuvé par Alexandre le 2026-10-01. Dans le banc de
+  `vegetation-cost-capture.ps1` (RTX 3060, viewport éditeur de la fenêtre 1280×720, midi sec, six vues) :
+  - **16,7 ms GPU par vue** au plus (60 images/s). Au 2026-10-01, la vue la plus chère est à 14,2 ms
+    (intérieur de forêt) : 2,5 ms de marge pour tout ce qui viendra ;
+  - **végétation ≤ 6,5 ms** dans toute vue (6,2 ms au plus le 2026-10-01) ;
+  - un ajout visuel donne son coût dans ce banc, vue par vue, contre un témoin (PERF-01, PERF-02). Il ne
+    passe que si chaque vue reste sous les deux plafonds, ou s'il retire ailleurs au moins ce qu'il ajoute.
+  Ce budget vaut pour ce banc, pas pour le jeu : un 1080p plein écran a 2,25 fois plus de pixels, et les
+  passes qui en dépendent (Lumen, ombres, post) grandiront d'autant. Promettre une fréquence d'image exige
+  de mesurer un jeu packagé (PERF-03).
 
 ## Vérifier
 
@@ -61,19 +71,11 @@ tools\unreal\vegetation-cost-capture.ps1 -Label <x>             # ms GPU par str
 
 ## Ouvert
 
-- **Budget GPU cible** : non écrit. Proposition chiffrée de `forest-cost-001` (2026-10-01), à valider par
-  Alexandre, dans le banc de `vegetation-cost-capture.ps1` (RTX 3060, viewport éditeur 1280×720, midi sec) :
-  - plafond **16,7 ms GPU par vue** (60 images/s) ; la vue la plus chère est aujourd'hui à 14,2 ms
-    (intérieur de forêt), soit 2,5 ms de marge ;
-  - **végétation ≤ 6,5 ms** dans toute vue (aujourd'hui 6,2 ms au plus) ;
-  - tout ajout donne son coût dans ce banc (PERF-01) et ne passe que si chaque vue reste sous le plafond,
-    ou s'il retire ailleurs ce qu'il ajoute.
-  Ce plafond vaut pour ce banc, pas pour le jeu : un 1080p plein écran a 2,25 fois plus de pixels, et les
-  passes qui en dépendent (Lumen, ombres, post) grandiront d'autant. Mesurer un jeu packagé avant de
-  promettre une fréquence d'image (PERF-03).
+- **Budget du jeu packagé** : PERF-05 fixe le budget du banc d'éditeur. Celui d'un jeu packagé en 1080p
+  plein écran reste à mesurer, puis à fixer par Alexandre.
 - Coût GPU de la forêt : mesuré par strate le 2026-10-01 (`handoffs/forest-cost-001.md`). Les 17–21 ms
   ci-dessus et les 10–14 ms de cette mesure ne sont pas comparables : autres vues, autre taille de viewport.
-- Le budget conditionne Lumen Lite (RU-002-01) : sans plafond écrit, rien ne justifie de céder de la
-  qualité de GI pour des ms.
+- Lumen Lite (RU-002-01) : avec PERF-05, toutes les vues sont sous le plafond ; rien ne justifie
+  aujourd'hui de céder de la qualité de GI pour des ms.
 - `stat unit` affiche en 5.8 la VRAM utilisée et son budget (RU-002-18) : à faire lire par les scripts de
   capture pour reconnaître une VRAM saturée (PERF-04).

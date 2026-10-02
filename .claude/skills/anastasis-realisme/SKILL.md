@@ -92,4 +92,6 @@ Un agent ne les tranche pas. Il peut les rappeler :
   méditerranéenne ». Les missions `forest-terrain-p1` à `p4` ont pourtant passé arbres, herbe et sol en
   méditerranéen (pin d'Alep, olivier, prairie olive-paille), alors que l'atmosphère reste « pontique
   humide ». Aucun document n'acte ce changement.
-- **Cible matérielle et budget GPU.** Aucun budget en ms n'est écrit. Seule la RTX 3060 est mesurée.
+- **Cible matérielle et budget du jeu packagé.** Le budget du banc d'éditeur est décidé (PERF-05,
+  `fiches/performance.md`, 2026-10-01) ; celui d'un jeu packagé en 1080p ne l'est pas. Seule la RTX 3060
+  est mesurée.
