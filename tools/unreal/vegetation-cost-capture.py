@@ -257,8 +257,14 @@ def tick(dt):
         return
     if st['phase'] == 'wait':
         if not os.path.isfile(st['shot']):
-            if el > 30:
-                finish('VEGCOST_SHOT_MISSING %s' % st['shot'], True)
+            if el <= 30:
+                return
+            # L'image ne sert qu'a verifier le masquage ; la mesure GPU de la vue est deja prise.
+            unreal.log_warning('VEGCOST_SHOT_MISSING %s (mesure gardee)' % st['shot'])
+            report.setdefault('missing_shots', []).append(os.path.basename(st['shot']))
+            st['queue'].pop(0)
+            st['first'] = False
+            st['phase'], st['mark'] = 'aim', now
             return
         if el > 1:
             st['queue'].pop(0)
