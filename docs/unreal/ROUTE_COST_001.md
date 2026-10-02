@@ -18,7 +18,7 @@ conserver exactement la nourriture.
 
 `anastasis.Village.RouteCost=0` reprend le temps uniforme de la référence JS.
 Le village C++ est désactivé par défaut ; l'hôte Unreal active la règle en PIE
-et lors des sauts de temps. L'écart est inscrit sous n° 25 dans `ECARTS.md`.
+et lors des sauts de temps. L'écart est inscrit sous n° 29 dans `ECARTS.md`.
 
 ## Preuve et limites
 

@@ -2482,7 +2482,7 @@ namespace AnastasisVillage
 			if (Len < 1e-4) break;
 			const double DirX = DX / Len;
 			const double DirY = DY / Len;
-			// ecart n°25 : l'A* paie deja le cout de la case visee ; en mode jeu,
+			// ecart n°29 : l'A* paie deja le cout de la case visee ; en mode jeu,
 			// chaque segment depense le meme multiplicateur en temps de marche.
 			// Le mode reference conserve exactement son ancien calcul.
 			const double TravelCost = bTerrainTravelCostEnabled
