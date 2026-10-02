@@ -106,7 +106,7 @@ pas la direction : `anastasis.Sky.WindHeading` est un choix de presentation expl
 `Atmosphere.Coupling 0` restitue la reponse anterieure des materiaux et des nuages ; 1 les couple.
 Le noeud moteur `Layout_WindControls` a ete inspecte en editeur : RGB = axes monde signes,
 alpha = multiplicateur. Les nuages lisent la meme direction/intensite que l'herbe et l'eau.
-Mie varie seulement de x0.85 a x1.15 avec l'humidite. Les brumes locales existantes restent gouvernees
+Mie reste exactement la valeur du profil (contrat Realism.Reversible). Les brumes locales existantes restent gouvernees
 par Wetness, le soleil et le vent. Aucun volume supplementaire.
 
 Autorite des materiaux : `tools/unreal/weather-materials.ps1`. Observation directe :

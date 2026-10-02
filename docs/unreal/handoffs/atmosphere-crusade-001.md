@@ -25,7 +25,7 @@ Commit portant cette fiche, puis rebase sur agent/natural-history-001 (43412cca4
 - Le simulateur ne fournit aucune direction : WindHeading est une direction de presentation explicite, 26.565 degres.
 - Nuages : Layout_WindControls inspecte dans l'editeur (RGB axes monde signes, A multiplicateur) ; direction/intensite communes.
 - Brumes locales : Wetness, dilution par vent et dissipation solaire deja presentes, conservees. Aucun nouveau volume.
-- Mie x lerp(.85,1.15,humidite). AirVisibility multiplie la densite existante par .4+.6*humidite^2 ; aucune modification d'exposition ni du profil authored.
+- Mie conserve la valeur du profil. AirVisibility multiplie la densite existante par .4+.6*humidite^2 ; aucune modification d'exposition ni du profil authored.
 - Herbe/couronnes : fronts communs en coordonnees monde, herbe plus rapide, branches limitees, troncs immobiles.
 - Eau : courant original conserve, petites perturbations alignees au vent, ripples des lacs attenues au calme.
 - Bois/roche : albedo -12% max, roughness x.86, plancher .48. Humidification visuelle, pas accumulation physique. Sol non modifie.
@@ -81,3 +81,12 @@ AUCUN pour cette mission : Source/AnastasisSim non modifie.
 ## STOP
 Pas de reconstruction, pas de simulateur climatique, pas d'integration ni push autonomes. Pas de troisieme correctif artistique.
 Retour authored : anastasis.Atmosphere.Coupling 0. Retour de la seule correction de densite : anastasis.Atmosphere.AirVisibility 0. Sky.Hour/Humidity/Wind/Cover a -1 suivent de nouveau le simulateur.
+
+## CORRECTIF APRES PREMIER LOT
+Le premier lot a compile, puis rapporte 264 PASS / 4 KNOWN_EXPECTED / 1 FAIL :
+Anastasis.Atmosphere.Realism.Reversible. Deux assertions exigeaient Mie=0.006500
+(valeur du profil), mais UpdateSky reecrivait 0.005597 selon l'humidite.
+La modulation Mie ajoutee par cette mission est retiree ; ApplyRealism reste son unique autorite.
+Aucun test ni registre assoupli. Vent, materiaux et AirVisibility inchanges.
+Les captures precedentes comprennent la modulation retiree : aspect final apres retrait NON reobserve.
+Build par finish ; confirmation du test et du lot attendue de l'integrateur, pas de capture supplementaire.

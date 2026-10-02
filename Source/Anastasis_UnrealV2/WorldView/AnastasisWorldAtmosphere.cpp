@@ -455,16 +455,8 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
         Parameters->SetVectorParameterValue(TEXT("WeatherAir"), FLinearColor(Humidity, Dampness, Cover, 0));
         Parameters->SetScalarParameterValue(TEXT("WeatherCoupling"), bCoupled ? 1.0f : 0.0f);
     }
-    // Aerosol variation is restrained; do not increase the global height-fog wall.
-    if (bRealismApplied && SkyAtmosphere)
-    {
-        if (USkyAtmosphereComponent* Air = SkyAtmosphere->FindComponentByClass<USkyAtmosphereComponent>())
-        {
-            const float Mie = Profile.SkyMieScatteringScale * (bCoupled ? FMath::Lerp(0.85f, 1.15f, Humidity) : 1.0f);
-            if (!FMath::IsNearlyEqual(Air->MieScatteringScale, Mie, 1.e-6f))
-                Air->SetMieScatteringScale(Mie);
-        }
-    }
+    // Mie scattering remains owned by ApplyRealism and its authored profile.
+    // Weather must not overwrite the reversible profile contract here.
     if (bForceLog)
         UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_WEATHER coupled=%d collection=%d wind=%.3f heading=%.2f humidity=%.3f cover=%.3f dampness=%.3f"),
             bCoupled ? 1 : 0, WeatherCollection ? 1 : 0, Wind, CVarWindHeading.GetValueOnAnyThread(), Humidity, Cover, Dampness);
