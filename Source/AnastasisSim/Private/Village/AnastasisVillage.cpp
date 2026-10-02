@@ -165,6 +165,7 @@ namespace AnastasisVillage
 		Nav = AnastasisNav::FNavGrid();
 		AnastasisNav::InitFromWorld(Nav, InWorld);
 		AnastasisNav::RebuildMoveCosts(Nav, InWorld);
+		bTerrainTravelCostEnabled = false;
 		NavVersion = 0;
 		Settlement = { InWorld.W * 0.5, InWorld.H * 0.5 };
 		NextBuildingId = 0;
@@ -2481,7 +2482,13 @@ namespace AnastasisVillage
 			if (Len < 1e-4) break;
 			const double DirX = DX / Len;
 			const double DirY = DY / Len;
-			const double Step = FMath::Min(Len, Budget);
+			// ecart n°25 : l'A* paie deja le cout de la case visee ; en mode jeu,
+			// chaque segment depense le meme multiplicateur en temps de marche.
+			// Le mode reference conserve exactement son ancien calcul.
+			const double TravelCost = bTerrainTravelCostEnabled
+				? AnastasisNav::MoveCostAt(Nav, FloorInt(Waypoint.X), FloorInt(Waypoint.Y)) : 1.0;
+			if (!FMath::IsFinite(TravelCost) || TravelCost <= 0.0) break;
+			const double Step = FMath::Min(Len, Budget / TravelCost);
 			const double NextX = Npc.X + DirX * Step;
 			const double NextY = Npc.Y + DirY * Step;
 			// Exception unique : sortir d'une case deja bloquee.
@@ -2498,7 +2505,7 @@ namespace AnastasisVillage
 			}
 			const double MovedSeg = JsHypot(Npc.X - X0, Npc.Y - Y0);
 			if (MovedSeg < 1e-5) break;
-			Budget -= MovedSeg;
+			Budget -= MovedSeg * TravelCost;
 			if (JsHypot(Npc.X - Waypoint.X, Npc.Y - Waypoint.Y) >= 0.45) break;
 		}
 

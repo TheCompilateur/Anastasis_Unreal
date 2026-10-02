@@ -429,6 +429,56 @@ bool FAnastasisVillageGatherDeliverTest::RunTest(const FString&)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAnastasisVillageRouteCostDeliveryTest,
+	"Anastasis.Sim.Village.Recolte.RouteCostDelivery",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAnastasisVillageRouteCostDeliveryTest::RunTest(const FString&)
+{
+	using namespace AnastasisVillageGatherTest;
+	auto FirstDelivery = [](AnastasisWorld::ETileType Ground, double Wetness, bool bCostEnabled) -> double
+	{
+		AnastasisWorld::FWorld World = MakeFlatWorld(40, 32);
+		for (AnastasisWorld::FTile& Tile : World.Tiles)
+		{
+			Tile.Type = Ground;
+			Tile.Wetness = Wetness;
+		}
+		SetField(World, 6, 10, 8, 12, 20);
+		FVillage Village;
+		Village.Bind(World);
+		Village.SetTerrainTravelCostEnabled(bCostEnabled);
+		const FString Granary = Village.AddBuilding(GranaryType, 16, 11);
+		const FString Farmer = Village.SpawnNpc(13.5, 11.5, Rested());
+		if (Granary.IsEmpty() || Farmer.IsEmpty() || !Village.AssignWorkplace(Farmer, G::JobFarmer, Granary)) return NAN;
+		const int32 InitialFood = FoodEverywhere(Village, World);
+		double Time = Morning;
+		const bool bSafe = Run(Village, World, InitialFood, Time, 50.0, [&]
+		{
+			return Village.FindNpc(Farmer)->Deliveries > 0;
+		});
+		const FNpc* Npc = Village.FindNpc(Farmer);
+		const FBuilding* Depot = Village.FindBuilding(Granary);
+		if (!bSafe || !Npc || !Depot || Npc->Deliveries != 1 || Npc->DeliveredFood <= 0
+			|| Depot->FoodPhysical != Npc->DeliveredFood) return NAN;
+		return Time - Morning;
+	};
+
+	const double Road = FirstDelivery(AnastasisWorld::ETileType::Road, 0.3, true);
+	const double Grass = FirstDelivery(AnastasisWorld::ETileType::Grass, 0.3, true);
+	const double Marsh = FirstDelivery(AnastasisWorld::ETileType::Grass, 0.9, true);
+	const double ReferenceGrass = FirstDelivery(AnastasisWorld::ETileType::Grass, 0.3, false);
+	AddInfo(FString::Printf(TEXT("first delivery simulated seconds: road=%.3f grass=%.3f wet-grass=%.3f reference-grass=%.3f"),
+		Road, Grass, Marsh, ReferenceGrass));
+	TestTrue(TEXT("four conserved deliveries"), FMath::IsFinite(Road) && FMath::IsFinite(Grass)
+		&& FMath::IsFinite(Marsh) && FMath::IsFinite(ReferenceGrass));
+	TestTrue(TEXT("road delivers first"), Road < Grass);
+	TestTrue(TEXT("wet grass delivers last"), Grass < Marsh);
+	TestTrue(TEXT("field traversal is not faster than reference uniform time"), Grass >= ReferenceGrass);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FAnastasisVillageGatherDepletionTest,
 	"Anastasis.Sim.Village.Recolte.Epuisement",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

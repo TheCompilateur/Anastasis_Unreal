@@ -920,6 +920,9 @@ namespace AnastasisVillage
 		/** `sim.settlement` : l'origine vers laquelle les portes s'ouvrent. Centre du monde par defaut. */
 		void SetSettlement(double InX, double InY) { Settlement = { InX, InY }; }
 		FPoint GetSettlement() const { return Settlement; }
+		/** RouteCost-001: optional Unreal gameplay extension. JS parity harness keeps the reference's uniform travel time. */
+		void SetTerrainTravelCostEnabled(bool bEnabled) { bTerrainTravelCostEnabled = bEnabled; }
+		bool IsTerrainTravelCostEnabled() const { return bTerrainTravelCostEnabled; }
 
 		/**
 		 * `addBuilding(type, x, y)` — identifiant `building-N`, case bloquee, cout
@@ -1557,6 +1560,7 @@ namespace AnastasisVillage
 		TArray<double> RecentVillageEmits;
 		FAnastasisRng VillageRng = FAnastasisRng(0x6a09e667u);
 		AnastasisNav::FNavGrid Nav;
+		bool bTerrainTravelCostEnabled = false;
 		int32 NavVersion = 0;
 		FPoint Settlement;
 		int32 NextBuildingId = 0;

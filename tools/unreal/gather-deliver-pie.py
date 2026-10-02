@@ -108,6 +108,8 @@ def tick(dt):
         # Preuve seulement : sans brouillard, a 20 m la tuile, le village se lit de haut.
         unreal.SystemLibrary.execute_console_command(world, 'showflag.Fog 0')
         unreal.SystemLibrary.execute_console_command(world, 'r.MotionBlurQuality 0')
+        unreal.SystemLibrary.execute_console_command(world, 'anastasis.Village.RouteCost 1')
+        log('ROUTE_COST 1')
         unreal.SystemLibrary.execute_console_command(world, 'Anastasis.Village.FirstFarmer 1')
         cameras = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.CameraActor)
         state['camera'] = next((c for c in cameras if c.get_actor_label() == 'GatherDeliverProofCamera'), None)

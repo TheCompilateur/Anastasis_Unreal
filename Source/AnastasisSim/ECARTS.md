@@ -532,3 +532,15 @@ mort effacées chez les autres (`forgetTheDead`) ; pas de veuvage, d'orphelins, 
 colonie, de journal, de mémorial ni de deuil. Appelé par le travail différé 10, après `AssignSheltersDaily`
 de minuit (la référence l'appelle après `agePopulation`, que le C++ n'a pas). `ensureNeeds` ne tire rien :
 les besoins d'un habitant C++ existent toujours.
+### n° 25 — Temps de trajet payé au coût du terrain dans le jeu Unreal
+
+- **classe** : EXTENSION
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : route-cost-001
+- **activation** : `anastasis.Village.RouteCost=1` dans l'hôte Unreal ; défaut 1. Le village C++ seul reste à 0 pour la parité JS.
+- **reference** : `src/sim/pathfinding.js` et `src/sim/simulation.js` — le chemin paie déjà les coûts de terrain, mais le budget de marche de la référence est uniforme.
+- **cpp** : `Village/AnastasisVillage.cpp` (`MoveActor`) et `Public/Village/AnastasisVillage.h` (commutateur) ; hôte `AnastasisSimulationSubsystem.cpp`
+- **harnais** : actors
+
+Le même multiplicateur de la grille de navigation que lit l'A* devient le temps dépensé par segment de marche : une route réduit le temps par distance, une herbe humide l'augmente. Aucun nouveau graphe, tirage ni changement de choix de chemin. Le harnais n'active pas cette extension : `FVillage` démarre à 0 et seuls les pas de l'hôte Unreal la mettent à 1. Ce multiplicateur est une règle de jeu, pas une mesure physique ou une pente du maillage rendu. À trancher : conserver cette divergence ou rapprocher la référence JS lors d'une décision de simulation commune.
