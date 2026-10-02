@@ -407,7 +407,7 @@ coderait un faux ordre. Suite : perception-explore-001 (`npc.mind.cells`, `perce
 Le bruit d'un but non porté est tiré mais pas ajouté au plancher 42 (écart n° 1) : ajouté à un score
 inventé, il faisait gagner `observer` au hasard (`Village.Endurance` le voyait). Pas branchés, déclarés :
 la reconsidération (l. 893, n° 2), le rate de coup (n° 11), l'intention du jour, l'ambition et les cibles
-de risque (n° 20). Relevé : `docs/migration/phase3/P3_RNG_RELEVE_JOUR.md`.
+de risque (n° 24). Relevé : `docs/migration/phase3/P3_RNG_RELEVE_JOUR.md`.
 
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 

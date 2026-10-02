@@ -189,7 +189,7 @@ bool FAnastasisDecisionDrawsTest::RunTest(const FString& Parameters)
 	{
 		const V::FDecisionDrawVector& D = V::DecisionDraws[I];
 		const FString Where = FString::Printf(TEXT("tick %d %s"), D.Tick, UTF8_TO_TCHAR(D.Npc));
-		// Une intention du jour « explore » ferait tirer intentExploreHint : non porte (ecart n°20).
+		// Une intention du jour « explore » ferait tirer intentExploreHint : non porte (ecart n°24).
 		if (D.Contiguous == 0 || FString(UTF8_TO_TCHAR(D.DayIntent)) == TEXT("explore"))
 		{
 			++Skipped;

@@ -26,7 +26,7 @@ est posée sur `agent/sim-rng-001` (3b14d27, rebasée sur `main` 2388bb1), qui n
   `AnastasisVillageBuildTests.cpp` (ligne build), `AnastasisVillageGatherTests.cpp` (ligne gatherFood)
 - `tools/migration/gen-explore-vectors.mjs` (nouveau), `tools/migration/rng-trace-lib.mjs` (photo de
   l'habitant à chaque décision ; le relevé est inchangé, vérifié ligne à ligne)
-- `Source/AnastasisSim/ECARTS.md` (n° 1, 2, 11 ; n° 20 nouveau), `PORTAGE.md`,
+- `Source/AnastasisSim/ECARTS.md` (n° 1, 2, 11 ; n° 24 nouveau, n° 20 à 23 pris par player-goals-001), `PORTAGE.md`,
   `tools/migration/ported-functions.mjs`, `docs/migration/phase2/P2_INVENTAIRE_JS.md` (régénéré)
 
 Non touchés : `Harness/*`, `AnastasisJsSave`, `AnastasisHarnessTrace`, le début d'`UpdateNpc` (cadence) et le
@@ -54,10 +54,10 @@ Ordre dans `chooseGoal` (adulte) d'après le relevé (`docs/migration/phase3/P3_
 
 | Étape (référence) | C++ |
 | --- | --- |
-| `ensureDayIntent` > `assignDayIntent` (+ cap si `explore`) | **non** : écart n° 20 (5 par jour, au changement de jour) |
-| `prepareAdultGoalContext` > `assignAmbition` si pas d'ambition | **non** : écart n° 20 |
-| `spatialRiskBiasMap` > `recallOrSearch` > `exploreTarget` | **non** : 0 tirage sur un jour, écart n° 20 |
-| `failureTargetBiasMap` > `failureCauseForGoal("explore")` > `intentExploreHint` \|\| `exploreTarget` | **oui** pour `exploreTarget` (`ExploreTargetFor`) ; `intentExploreHint` non porté (n° 20) |
+| `ensureDayIntent` > `assignDayIntent` (+ cap si `explore`) | **non** : écart n° 24 (5 par jour, au changement de jour) |
+| `prepareAdultGoalContext` > `assignAmbition` si pas d'ambition | **non** : écart n° 24 |
+| `spatialRiskBiasMap` > `recallOrSearch` > `exploreTarget` | **non** : 0 tirage sur un jour, écart n° 24 |
+| `failureTargetBiasMap` > `failureCauseForGoal("explore")` > `intentExploreHint` \|\| `exploreTarget` | **oui** pour `exploreTarget` (`ExploreTargetFor`) ; `intentExploreHint` non porté (n° 24) |
 | table : 14 `goalNoise` inconditionnels + 3 conditionnels (`helpFarm`, `craft`, `visitFamily`) | **oui** (`Ai/AnastasisGoalNoise.h`) ; famille : toujours faux, la famille n'est pas portée (n° 8) |
 | `assignTarget` > `recallOrSearch` / `exploreTarget` (gather, explore) | **non** : ne tire pas dans le scénario ; `GatherTarget` sans gisement vaque (n° 11) |
 
@@ -102,7 +102,7 @@ référence lui donne dans la somme.
   lifestyle-wiring-001 pour le tirage, goal-noise-001 pour le collant.
 - modifié : n° 11 — `exploreTarget` porté, pas encore appelé par `GatherTarget` ; `rollCraftMiss` non tiré
   (43 par jour).
-- ouvert : n° 20 — Intention du jour, ambition, cibles de risque : leurs tirages ne sont pas faits
+- ouvert : n° 24 — Intention du jour, ambition, cibles de risque : leurs tirages ne sont pas faits
   (A_FERMER, goals-day-intent, goals-resources-001).
 
 ## PROOFS
