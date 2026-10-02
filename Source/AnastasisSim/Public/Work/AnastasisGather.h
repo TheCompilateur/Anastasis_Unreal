@@ -69,6 +69,12 @@ namespace AnastasisGather
 	inline constexpr double FarmSkillPeriodFactor = 0.07;
 	/** `CRAFT_ARRIVE_BY_CRAFT.farm` : ancrage avant le premier coup. */
 	inline constexpr double FarmArriveSeconds = 0.36;
+	/** `CRAFT_PROFILES.tend` (soins de parcelle, help-farm-001) et `CRAFT_ARRIVE_BY_CRAFT.tend`. */
+	inline constexpr double TendBaseSwingPeriod = 0.68;
+	inline constexpr double TendMinSwingPeriod = 0.5;
+	inline constexpr double TendSkillPeriodFactor = 0.07;
+	inline constexpr int32 TendSwingsPerPlot = 4;
+	inline constexpr double TendArriveSeconds = 0.32;
 
 	/** `gainSkill` : par coup de recolte, par livraison. */
 	inline constexpr double GatherSkillGain = 0.008;
@@ -183,6 +189,12 @@ namespace AnastasisGather
 
 	/** `fieldSeasonGatherAmount(base, day)`. */
 	ANASTASISSIM_API int32 FieldSeasonGatherAmount(int32 Base, int32 Day);
+
+	/** `swingPeriodFor(npc, "tend")` — sans technique ni coup de main (help-farm-001). */
+	ANASTASISSIM_API double SwingPeriodTend(double Skill, int32 SwingsDone, double Energy);
+
+	/** `fieldSeasonTendAmount(base, day)` (help-farm-001). */
+	ANASTASISSIM_API int32 FieldSeasonTendAmount(int32 Base, int32 Day);
 
 	/** `preferredFieldPostIndex(npc, tile)`. */
 	ANASTASISSIM_API int32 PreferredFieldPostIndex(const FString& NpcId, int32 TileX, int32 TileY);

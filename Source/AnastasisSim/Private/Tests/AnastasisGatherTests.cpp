@@ -156,6 +156,18 @@ bool FAnastasisParityGatherTest::RunTest(const FString&)
 		CheckI(TEXT("Season"), I, TEXT("amount"), G::FieldSeasonGatherAmount(V.A0, V.A1), V.Attendu);
 	}
 
+	// help-farm-001 : le rythme et le soin saisonnier des parcelles (profil `tend`).
+	for (int32 I = 0; I < UE_ARRAY_COUNT(SwingTendVectors); ++I)
+	{
+		const FSwingTendVector& V = SwingTendVectors[I];
+		CheckD(TEXT("SwingTend"), I, TEXT("period"), G::SwingPeriodTend(GatherFromBits(V.A0Bits), V.A1, GatherFromBits(V.A2Bits)), V.AttenduBits);
+	}
+	for (int32 I = 0; I < UE_ARRAY_COUNT(SeasonTendVectors); ++I)
+	{
+		const FSeasonTendVector& V = SeasonTendVectors[I];
+		CheckI(TEXT("SeasonTend"), I, TEXT("amount"), G::FieldSeasonTendAmount(V.A0, V.A1), V.Attendu);
+	}
+
 	for (int32 I = 0; I < UE_ARRAY_COUNT(FieldPostVectors); ++I)
 	{
 		const FFieldPostVector& V = FieldPostVectors[I];

@@ -70,6 +70,10 @@ perception-explore-001 : branchés. Chaque décision tire `exploreTarget` (prép
 `Village.TiragesDecision` rejoue les décisions mesurées au tirage près. Restent le plancher 42 et
 `observer`. Le bruit d'une ligne non portée est TIRÉ (l'ordre du flux en dépend) mais PAS AJOUTÉ au
 plancher : ajouté à un score inventé, il faisait gagner `observer` au hasard (`Village.Endurance`).
+Depuis help-farm-001, la ligne `helpFarm` est calculée pour tous (`helpFarmScore * wf`, puis la chaîne des
+biais) : sans ferme, elle vaut 0 au lieu du plancher 42. Son but est porté (cible : la parcelle faible ;
+acte : la session `tend`). Sans parcelle, `farmPos` rendrait l'accès au marché prévu : il arrive avec
+build-decision-001 ; d'ici là, l'habitant vaque.
 
 ### n° 2 — Des cibles relâchées que la référence garderait
 
@@ -249,7 +253,9 @@ dit « pas de repousse » : c'est périmé**, la repousse est portée depuis (fi
 perception-explore-001 : `exploreTarget` est porté (`World/AnastasisExplore.h`) et tire dans la décision ;
 la récolte sans gisement connu ne l'appelle pas encore (`GatherTarget`, il vaque) — le branchement change
 le comportement du fermier et revient à goals-resources-001. `rollCraftMiss` reste non tiré : 43 tirages
-par jour dans le relevé, le premier au tick 257.
+par jour dans le relevé, le premier au tick 257. Le soin de parcelle (`progressTendWork`, help-farm-001)
+est porté sans son `rollCraftMiss(sim, npc, "tend")` : à brancher sur la fonction générique de
+chat-on-haul-001.
 
 ### n° 12 — Livraison à son dépôt seulement
 
@@ -472,4 +478,24 @@ lieu d'`exploreTarget`. `spatialRiskBiasMap` ne tire pas dans le scénario (0 su
 plus proche (1,9), sinon le poste pour un geste de travail. `workAtWorkplaceYard`, qui pose
 `workPresence` et note un second geste (`dt * 0,4`) quand le fermier livre ou travaille à son propre
 poste, n'est pas porté. Un geste fait au poste mais plus près d'un autre bâtiment est donc noté sur
-l'autre, et le `laborToday` du poste en manque une part.
+l'autre, et le `laborToday` du poste en manque une part. `helpFarm` (help-farm-001) passe aussi par
+`workAtWorkplaceYard` dans la référence : même manque.
+
+### n° 27 — Planificateur collectif non porté : biais, planchers et urgence vides
+
+- **classe** : REDUIT
+- **destin** : A_FERMER
+- **fermeture** : planner-module-001, puis build-decision-001
+- **statut** : OUVERT
+- **entree** : help-farm-001
+- **reference** : `src/sim/collectivePriorities.js` (`collectiveGoalBias`, `collectiveGoalFloor`, `isFoodRush`, `farmStaffingGap`, `isWoodBootstrapDraftee`), `src/sim/npc.js` (`collectiveUrgencyBiasMap`, fin d'`adultScores` l. 1205-1258)
+- **cpp** : `Village/AnastasisVillage.cpp`, `CollectiveDecisionOf` (vide) et `ApplyCollectivePass`
+- **harnais** : actors, rng
+- **detail** : `docs/migration/phase3/P3_PLANIFICATEUR.md` (sur agent/build-decision-001)
+
+La passe finale de la table (urgence collective, plancher après `workFactor`, corvée de bois, rush famine)
+est branchée à sa place, mais le planificateur qui l'alimente n'est pas porté : `FCollectiveDecision`
+est vide, la table garde ses bits. Sur `endurance`, la référence a pourtant des planchers `gatherFood` 40,
+`helpFarm` 28, `build` 24 et des biais `build` 20, `gatherFood` 14, `gatherWood` 14, `helpFarm` 10
+(constants sur la journée) : ce sont eux qui font choisir `helpFarm` sans ferme (tick 196) et `build`
+sans chantier (tick 32).

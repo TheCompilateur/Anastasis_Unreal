@@ -50,6 +50,8 @@ namespace AnastasisGather
 
 		// `FIELD_SEASON_YIELD[season].gather`, printemps -> hiver.
 		const double SeasonGather[4] = { 0.95, 1.1, 1.55, 0.85 };
+		// `FIELD_SEASON_YIELD[saison].tend` : printemps, ete, automne, hiver.
+		const double SeasonTend[4] = { 1.35, 1.5, 1.1, 0.55 };
 
 		bool StartsWithGather(const FString& Goal)
 		{
@@ -361,6 +363,21 @@ namespace AnastasisGather
 	int32 FieldSeasonGatherAmount(int32 Base, int32 Day)
 	{
 		const double Mul = SeasonGather[FieldSeasonFromDay(Day)];
+		return FMath::Max(1, static_cast<int32>(AnastasisJs::Round(static_cast<double>(Base) * Mul)));
+	}
+
+	double SwingPeriodTend(double Skill, int32 SwingsDone, double Energy)
+	{
+		const double S = AnastasisJs::NumberOr(Skill, 0.7);
+		double Period = FMath::Max(TendMinSwingPeriod, TendBaseSwingPeriod - S * TendSkillPeriodFactor);
+		Period *= CraftFatiguePeriodMul(SwingsDone, Energy);
+		// techniqueWorkPeriodMultiplier : 1 sans technique.
+		return Period;
+	}
+
+	int32 FieldSeasonTendAmount(int32 Base, int32 Day)
+	{
+		const double Mul = SeasonTend[FieldSeasonFromDay(Day)];
 		return FMath::Max(1, static_cast<int32>(AnastasisJs::Round(static_cast<double>(Base) * Mul)));
 	}
 

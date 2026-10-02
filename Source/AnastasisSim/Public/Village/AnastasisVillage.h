@@ -233,6 +233,8 @@ namespace AnastasisVillage
 
 	/** Buts portes. `observer` est l'etat initial de createNpc. */
 	inline const TCHAR* const GoalObserver = TEXT("observer");
+	/** Soigner une parcelle de champ (help-farm-001). */
+	inline const TCHAR* const GoalHelpFarm = TEXT("helpFarm");
 	inline const TCHAR* const GoalDrink = TEXT("drink");
 	inline const TCHAR* const GoalRest = TEXT("rest");
 	inline const TCHAR* const GoalEat = TEXT("eat");
@@ -654,6 +656,8 @@ namespace AnastasisVillage
 		bool bWoodBootstrapDraftee = false;
 		/** `isFoodRush(sim)`. */
 		bool bFoodRush = false;
+		/** `farmStaffingGap(sim).gap` : postes de ferme achevee sans fermier. */
+		int32 FarmStaffingGap = 0;
 
 		double BiasOf(const FString& Goal) const { const double* V = GoalBias.Find(Goal); return V ? *V : 0.0; }
 		double FloorOf(const FString& Goal) const { const double* V = GoalFloor.Find(Goal); return V ? *V : 0.0; }
@@ -781,6 +785,11 @@ namespace AnastasisVillage
 		int32 RelaxesTaken = 0;
 		/** `deeds.sheltered` : abris pris sous l'orage. */
 		int32 SheltersTaken = 0;
+		/**
+		 * `deeds.helped` (help-farm-001) : soins de parcelle donnes. Observation : le lecteur ne
+		 * projette pas `deeds` (ses autres compteurs non plus).
+		 */
+		int32 DeedsHelped = 0;
 
 		/** `npc.shelterResumeGoal` : le travail expose a reprendre apres l'abri ; vide = null. */
 		FString ShelterResumeGoal;
@@ -1404,9 +1413,30 @@ namespace AnastasisVillage
 		AnastasisWorld::FTile LiveTile(int32 Index) const;
 		/** `tile.amount -= taken` sur l'etat vivant (ou le registre food-supply). */
 		void TakeFromTile(int32 Index, int32 Taken);
-		void EnsureCraftSession(FNpc& Npc, int32 TileX, int32 TileY);
+		/**
+		 * `ensureCraftSession(sim, npc, craftId, tile)` : la session de coups ancree sur une tuile.
+		 * Changer de metier (`farm` <-> `tend`) coute `craftToolSwitchSeconds`, puis `craftArriveSeconds`.
+		 */
+		void EnsureCraftSession(FNpc& Npc, int32 TileX, int32 TileY, const TCHAR* CraftId = TEXT("farm"));
+		/**
+		 * `sim.findTendFieldNear(origin, 8)` (help-farm-001) : la parcelle la plus utile a soigner autour
+		 * d'un point ; `Actor` exclu du compte des travailleurs (nul quand l'origine est un batiment).
+		 * Rend l'index de la tuile, ou INDEX_NONE.
+		 */
+		int32 FindTendFieldNear(double OriginX, double OriginY, const FNpc* Actor) const;
+		/** `findTendFieldNear(npc) || findTendFieldNear(workplace acheve)`. */
+		int32 FindTendFieldFor(const FNpc& Npc) const;
+		/** `progressTendWork(sim, npc)` (help-farm-001) : 0 = echec, 1 = au travail, 2 = fini. */
+		int32 ProgressTendWork(FNpc& Npc);
+		/** La ligne `helpFarm` d'`adultScores` : `helpFarmScore * wf("helpFarm")`, puis la chaine des biais. */
+		double HelpFarmRowScore(const FNpc& Npc, double PhaseBias, const FWorkRowContext& Work, double Noise,
+			const FCollectiveDecision& Collective) const;
+		/** `assignTarget` pour `helpFarm` : la parcelle faible, sinon `farmPos`. */
+		bool HelpFarmTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
 		FPoint FieldWorkTarget(FNpc& Npc, const AnastasisWorld::FTile& Tile);
 		uint32 ClaimedFieldPosts(const FNpc& Npc, int32 TileX, int32 TileY) const;
+		/** `claimedFieldPosts(sim, ignoredNpc, tile)`, `Ignored` nul = personne n'est exclu. */
+		uint32 ClaimedFieldPostsExcept(const FNpc* Ignored, int32 TileX, int32 TileY) const;
 		void DepleteTile(int32 Index);
 		void BeginHaulToDepot(FNpc& Npc);
 		bool Deliver(FNpc& Npc);

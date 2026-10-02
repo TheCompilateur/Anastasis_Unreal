@@ -187,6 +187,27 @@ export default {
       call: (m, [base, jour]) => m.crops.fieldSeasonGatherAmount(base, jour),
     },
     {
+      name: "SwingTend",
+      comment: "swingPeriodFor(npc, tend) — soins de parcelle (help-farm-001)",
+      args: ["double", "int", "double"],
+      ret: "double",
+      inputs: croiser([0.7, 1, 1.34, 1.35, 2.6, 4], [0, 4, 5, 10, 14, 20], [100, 42, 30, 5]),
+      call: (m, [skill, coups, energie]) => {
+        const npc = habitant(m, "npc-0", 3, { skill });
+        npc.energy = energie;
+        npc.workSession = { craftId: "tend", tileX: 3, tileY: 4, swingsDone: coups };
+        return m.craft.swingPeriodFor(npc, "tend");
+      },
+    },
+    {
+      name: "SeasonTend",
+      comment: "fieldSeasonTendAmount(base, day) — soins de parcelle (help-farm-001)",
+      args: ["int", "int"],
+      ret: "int",
+      inputs: croiser([2, 3], [0, 1, 30, 31, 60, 61, 90, 91, 120, 121, 250]),
+      call: (m, [base, jour]) => m.crops.fieldSeasonTendAmount(base, jour),
+    },
+    {
       name: "FieldPost",
       comment: "fieldWorkTarget(sim, npc, tile) — seul, ou un voisin tient deja un poste",
       args: ["string", "int", "int", "int"],
