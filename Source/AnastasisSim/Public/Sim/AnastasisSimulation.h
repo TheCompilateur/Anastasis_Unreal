@@ -40,7 +40,7 @@ public:
 	 */
 	static constexpr int32 DayDeferredJobCount = 17;
 	static constexpr int32 DayJobLandRegen = 0;
-	/** `lifeDaily` (updateLifeDaily) : porte reduit a la mort certaine (ecart n°25). */
+	/** `lifeDaily` (updateLifeDaily) : porte reduit a la mort certaine (ecart n°28). */
 	static constexpr int32 DayJobLifeDaily = 10;
 	static constexpr int32 DayJobMemory = 14;
 

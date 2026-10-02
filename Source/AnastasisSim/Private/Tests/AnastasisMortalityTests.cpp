@@ -1,4 +1,4 @@
-// MORTALITY_001 -- `causeOfDeath` (branche sante epuisee) et `updateMortalityDaily` reduit (ecart n°25).
+// MORTALITY_001 -- `causeOfDeath` (branche sante epuisee) et `updateMortalityDaily` reduit (ecart n°28).
 // Les libelles attendus sont ceux de life/mortality.js lignes 70-76 (lus, pas executes :
 // `causeOfDeath` n'est pas exporte et `removeActor` tire dans une trentaine de modules).
 

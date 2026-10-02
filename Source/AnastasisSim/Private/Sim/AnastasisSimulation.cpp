@@ -162,7 +162,7 @@ void FAnastasisSimulation::RunDayJob(int32 Job)
 	}
 	else if (Job == DayJobLifeDaily)
 	{
-		// `updateLifeDaily` : ni `agePopulation` ni les tirages de mortalite ne sont portes (ecart n°25).
+		// `updateLifeDaily` : ni `agePopulation` ni les tirages de mortalite ne sont portes (ecart n°28).
 		Village.UpdateMortalityDaily();
 	}
 	else if (Job == DayJobMemory)

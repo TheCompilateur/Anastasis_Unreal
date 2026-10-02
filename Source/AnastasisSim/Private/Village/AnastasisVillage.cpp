@@ -1370,7 +1370,7 @@ namespace AnastasisVillage
 
 	FString FVillage::CauseOfDeath(const FNpc& Npc)
 	{
-		// ecart n°25 : seule la branche `(npc.health ?? 100) <= 0` de causeOfDeath. Le libelle « de faim »
+		// ecart n°28 : seule la branche `(npc.health ?? 100) <= 0` de causeOfDeath. Le libelle « de faim »
 		// ignore `starvingDays > 0` (compteur non porte) : la faim haute suffit.
 		if (Npc.Needs.Health > 0.0)
 		{

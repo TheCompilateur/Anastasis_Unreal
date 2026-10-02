@@ -1089,14 +1089,14 @@ namespace AnastasisVillage
 		};
 
 		/**
-		 * MORTALITY_001 -- `causeOfDeath`, branche « vitalite epuisee » seule (ecart n°25) : la cause
+		 * MORTALITY_001 -- `causeOfDeath`, branche « vitalite epuisee » seule (ecart n°28) : la cause
 		 * d'un habitant dont la sante est <= 0 (`de soif`, `de faim`, `d'epuisement`, `de faiblesse`,
 		 * seuils de la reference), vide tant qu'il vit. Aucun tirage.
 		 */
 		static FString CauseOfDeath(const FNpc& Npc);
 
 		/**
-		 * `updateMortalityDaily` reduit a la mort certaine (ecart n°25) : parcours a l'envers, tout
+		 * `updateMortalityDaily` reduit a la mort certaine (ecart n°28) : parcours a l'envers, tout
 		 * habitant de sante <= 0 est retire (`RemoveNpc` : maison liberee, repas rendu), puis oublie
 		 * de ses semblables (`forgetTheDead`). Appele a minuit par l'hote. Rend le nombre de morts.
 		 * Ne tire jamais dans le flux aleatoire.

@@ -17,14 +17,14 @@ aucune voie de production.
 - `Source/AnastasisSim/Public/Sim/AnastasisSimulation.h` (`DayJobLifeDaily = 10`)
 - `Source/AnastasisSim/Private/Sim/AnastasisSimulation.cpp` (`RunDayJob`)
 - `Source/AnastasisSim/Private/Tests/AnastasisMortalityTests.cpp`
-- `Source/AnastasisSim/ECARTS.md` (fiche n° 25)
+- `Source/AnastasisSim/ECARTS.md` (fiche n° 28)
 - cette fiche
 
 Empilée sur `agent/abandon-001` (puis `agent/iceberg-001`) : **intégrer iceberg-001 puis abandon-001 d'abord**.
 
 ## COMMIT
 
-`fd19ddf` — « feat(sim): la mortalite ne tue qu a sante epuisee, sans tirage (MORTALITY_001, ecart n°25) ».
+`fd19ddf` — « feat(sim): la mortalite ne tue qu a sante epuisee, sans tirage (MORTALITY_001, ecart n°28) ».
 
 ## MEC
 
@@ -61,7 +61,7 @@ UNKNOWN. Aucune partie représentative.
 
 ## ECARTS
 
-`n° 25` ouvert (REDUIT, A_TRANCHER) : mortalité réduite à la mort certaine par santé épuisée. Pas de mort par
+`n° 28` ouvert (REDUIT, A_TRANCHER) : mortalité réduite à la mort certaine par santé épuisée. Pas de mort par
 âge ni de très grand âge, pas de famine personnelle ni de crise de grenier (`starvingDays` non porté, libellé
 « de faim » sans `starvingDays > 0`), pas de vieillesse, pas de veuvage / orphelins / héritage / moral de
 colonie / journal / mémorial / deuil. Appelé par le travail différé 10, hors de l'ordre de la référence

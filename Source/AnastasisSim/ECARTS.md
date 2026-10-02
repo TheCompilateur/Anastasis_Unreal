@@ -512,7 +512,7 @@ est vide, la table garde ses bits. Sur `endurance`, la référence a pourtant de
 `helpFarm` 28, `build` 24 et des biais `build` 20, `gatherFood` 14, `gatherWood` 14, `helpFarm` 10
 (constants sur la journée) : ce sont eux qui font choisir `helpFarm` sans ferme (tick 196) et `build`
 sans chantier (tick 32).
-### n° 25 — Mortalité : seule la mort par santé épuisée est portée
+### n° 28 — Mortalité : seule la mort par santé épuisée est portée
 
 - **classe** : REDUIT
 - **destin** : A_TRANCHER
