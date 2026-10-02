@@ -9,6 +9,9 @@ intermediaire : son `quit_editor()` termine SON travail au lieu de fermer l'edit
 rappels de tick sont suivis pour etre retires s'il les oublie. Entre deux travaux : PIE arrete,
 rappels retires, variables du travail suivant posees. A la fin seulement, l'editeur se ferme.
 
+Avant chaque preuve, les CVars de rythme (TimeScale, Speed, Warp, WarpBudgetMs) reprennent leur valeur
+du demarrage : une preuve qui accelere le temps ne l'impose pas a la suivante.
+
 Lignes du log, lues par editor-batch.ps1 :
     EDITOR_BATCH_JOB_BEGIN <nom>
     EDITOR_BATCH_JOB_END <nom> reason=<quit|timeout|error> seconds=<s>
@@ -33,6 +36,22 @@ _real_quit = unreal.SystemLibrary.quit_editor
 
 state = {'i': -1, 'handles': [], 'done': None, 'deadline': 0.0, 'started': 0.0, 'ending': False}
 t0 = time.monotonic()
+
+# Les CVars de rythme qu'une preuve change (TimeScale 1, Speed 10, Warp 10...) persistent dans
+# l'editeur apres sa fin : sans remise a zero, la preuve suivante du lot heriterait de son rythme.
+# Valeurs relevees au demarrage du lot, reposees avant chaque preuve (pie-advance-001).
+RHYTHM_CVARS = ('anastasis.Sim.TimeScale', 'anastasis.Sim.Speed', 'anastasis.Sim.Warp', 'anastasis.Sim.WarpBudgetMs')
+_rhythm = {}
+for _name in RHYTHM_CVARS:
+    try:
+        _rhythm[_name] = unreal.SystemLibrary.get_console_variable_float_value(_name)
+    except Exception:
+        pass
+
+
+def _restore_rhythm():
+    for name, value in _rhythm.items():
+        unreal.SystemLibrary.execute_console_command(None, '%s %g' % (name, value))
 
 
 def _job_done(reason):
@@ -79,6 +98,7 @@ proxy.unregister_slate_post_tick_callback = _unregister
 
 def _start(i):
     job = JOBS[i]
+    _restore_rhythm()
     for key, value in (job.get('env') or {}).items():
         os.environ[key] = value
     state.update(i=i, handles=[], done=None, ending=False,

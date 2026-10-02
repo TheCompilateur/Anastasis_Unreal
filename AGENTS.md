@@ -304,7 +304,7 @@ Opérateur et portails :
 | `editor-launch.ps1` | `Start-AnastasisEditor` : lancement d'Unreal sans focus, avec gardien, derrière la porte mémoire, à dot-sourcer |
 | `editor-window-guard.ps1` | gardien lancé par `Start-AnastasisEditor` : fenêtres hors écran, focus rendu |
 | `report-tests.ps1` | suite `Anastasis`, classée PASS / KNOWN_EXPECTED_FAILURE / FAIL, refuse un run tronqué |
-| `editor-batch.ps1` + `editor-batch.py` | plusieurs preuves PIE du registre dans **un seul** éditeur (EDITOR_QUEUE_001) : `-Proofs a,b` ; le `quit_editor()` de chaque script passe au suivant, PIE arrêté entre deux ; verdict `PROOF::PASS/FAIL` par preuve → `Saved/EditorBatch/<horodatage>/` ; appelé par `integrate-batch` |
+| `editor-batch.ps1` + `editor-batch.py` | plusieurs preuves PIE du registre dans **un seul** éditeur (EDITOR_QUEUE_001) : `-Proofs a,b` ; le `quit_editor()` de chaque script passe au suivant, PIE arrêté et rythme (`TimeScale`, `Speed`, `Warp`) reposé entre deux ; verdict `PROOF::PASS/FAIL` par preuve → `Saved/EditorBatch/<horodatage>/` ; appelé par `integrate-batch` |
 | `proofs.txt` | registre des preuves PIE rejouables en lot : nom, script, motif de réussite, motif d'échec, délai, variables ; une fiche les déclare par `PROOFS:` |
 | `project-health.ps1` | rapport de santé des preuves (appelé par `health`) ; absent ou périmé ≠ PASS |
 | `automation-log.ps1` | lecture de log d'automation partagée par les deux précédents, pas un point d'entrée |
@@ -323,7 +323,7 @@ Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
 | `first-building-pie.py` | preuve PIE du premier bâtiment : pilote `Anastasis.Village.*` en console (puits, habitants, retraits), lecture par les lignes `ANASTASIS_VILLAGE` du log |
 | `house-rest-pie.py` | preuve PIE de la maison : `Anastasis.Village.FirstHouse`, une nuit de sommeil, retrait d'un dormeur puis de la maison occupée |
 | `granary-eat-pie.py` | preuve PIE du grenier (Noûs) : `Anastasis.Village.FirstGranary`, repas confirmés, stock qui baisse, démolition avec réservations en cours |
-| `village-weather-pie.py` | preuve PIE de la météo des habitants : `Anastasis.Village.FirstFarmer 1`, orage par `Anastasis.Village.ForceWeather 0.9`, le fermier entre à l'abri puis en ressort, `ForceWeather off` ; lecture par les lignes `VILLAGE_WEATHER_` et `ANASTASIS_VILLAGE` du log |
+| `village-weather-pie.py` | preuve PIE de la météo des habitants : `Anastasis.Village.FirstFarmer 1`, orage par `Anastasis.Village.ForceWeather 0.9`, le fermier entre à l'abri puis en ressort, `ForceWeather off` ; temps accéléré (`anastasis.Sim.Warp 10`), verdict `VILLAGE_WEATHER PASS/FAIL` ; lecture par les lignes `VILLAGE_WEATHER_` et `ANASTASIS_VILLAGE` du log ; au registre (`village-weather-pie`) |
 | `player-pie.ps1` + `player-pie.py` | preuve PIE du joueur minimal : `Anastasis.Player.Arrive`, attente (`idle`), marche par `Anastasis.Player.Move`, pawn pose sur le corps, `Anastasis.Sim.Advance 7d` puis `1d` (presence, jours oisifs, personne ne le voit, reputation), `Release` ; lecture par `get_player_status` → `Saved/PlayerEvidence/pie/` ; aucun asset sauve |
 | `gather-deliver-pie.ps1` + `gather-deliver-pie.py` | preuve PIE du fermier au grenier : `Anastasis.Village.FirstFarmer`, recolte, retour, livraisons, conservation a chaque echantillon, une capture par etape → `Saved/SliceEvidence/gather-deliver/` ; aucun asset sauve |
 | `build-site-pie.ps1` + `build-site-pie.py` | preuve PIE du chantier : `Anastasis.Village.FirstSite`, devis livre, batisseurs ; une capture a l'ouverture, aux fondations, aux murs, au toit et a l'achevement, devis et pieces controles a chaque echantillon → `Saved/SliceEvidence/build-site/` ; aucun asset sauve |
@@ -337,7 +337,7 @@ Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
 | `capture-sky.ps1` + `capture-sky.py` | ciel de `Lvl_AnastasisSlice` par états de CVars, mêmes caméras (oblique, fond de vallée, crête, contre-jour) : réalisme (`anastasis.Atmosphere.Realism`), heure et jour du ciel (`anastasis.Sky.Hour` / `Sky.Day`), météo (`anastasis.Sky.Weather`), humidité du ciel (`anastasis.Sky.Humidity`) ; `-Preset cycle` = 06 09 12 16 18 20 00 03 × sec / humide / saturé → `Saved/SkyEvidence/<Label>/` |
 | `eye-plane-capture.ps1` + `eye-plane-capture.py` | plan net à 1,7 m sur `Lvl_AnastasisSlice` : un premier plan qui coupe, un seul sujet au milieu, le lointain qui perd le contraste (`anastasis.Depth.EyePlane` 0 puis 1, même cadrage, heure 11) → `Saved/EyePlaneEvidence/<Label>/` |
 | `atmosphere-metrics.py` | **hors éditeur** (Python système, Pillow + numpy) : mesures par capture de ciel (médiane, surexposition, mur de brouillard, voile, profondeur par tiers, drapeaux `WALL` / `HAZE` / `CLIPPED` / `BLACK`) et planches heure × humidité par vue, dans le dossier lu (`ATMOSPHERE_COHERENCE_001`) |
-| `sky-clock-pie.py` | preuve PIE de l'horloge du ciel : PIE sur `Lvl_AnastasisSlice` plus d'un jour de simulation, lignes `ANASTASIS_SKY` à chaque phase du village et échantillons `SKY_PIE_SAMPLE` (temps et phase de la simulation) ; `ANASTASIS_SKY_PIE_SECONDS` |
+| `sky-clock-pie.py` | preuve PIE de l'horloge du ciel : PIE sur `Lvl_AnastasisSlice` plus d'un jour de simulation, lignes `ANASTASIS_SKY` à chaque phase du village et échantillons `SKY_PIE_SAMPLE` (temps et phase de la simulation, toutes les 5 s simulées) ; temps accéléré : un jour et quart simulé à `Warp 4` (~30 s), verdict `SKY_PIE PASS/FAIL` (durée et six phases vues) ; `ANASTASIS_SKY_PIE_SIM_SECONDS` / `_WARP` / `_SECONDS` (plafond réel) ; au registre (`sky-clock-pie`) |
 | `capture-places.ps1` + `places-capture.py` | lieux composés (`AnastasisPlaces`) : vue lointaine et vues à 1,7 m par lieu, lieux actifs puis coupés aux mêmes caméras (`-OnOnly`, `-All`) → `Saved/PlacesEvidence/<Label>/` |
 | `capture-human-geography.py` | comparaison du relief corrige et de Human_Geography_V2 : export des maillages et vues a 170 cm ; sortie via ANASTASIS_HUMAN_EVIDENCE ; ferme l'editeur dedie |
 | `capture-macro-forest.py` | A/B forestier sur Human_Geography_V2, ouverture par defaut, empreintes des instances et du terrain ; sortie via ANASTASIS_FOREST_OUT ; aucun asset sauve |
@@ -446,8 +446,15 @@ Par-dessus `TimeScale` et `Speed`, pour le joueur comme pour les agents. Detail 
 | lire l'etat | `Anastasis.Sim.TimeStatus`, ou `AnastasisSimulationDebugLibrary.get_time_warp_status` (JSON) |
 
 Le pas ne depasse jamais 10 x FixedDt (la reference) : c'est le nombre de pas par frame qui monte. `Warp 1` reprend
-exactement le chemin `PumpFrame`. Une preuve qui attendait sur l'horloge murale (`TimeScale 1` + `Speed 10` + 240 s)
-peut passer a `Advance` : meme simulation, quelques secondes.
+exactement le chemin `PumpFrame`.
+
+**Regle (Alexandre, 2026-10-01), pour tous les agents, Cursor comme Claude : une preuve n'attend pas le temps
+simule, elle l'avance.** Toute preuve qui attend une heure, la nuit ou des jours de simulation le fait par
+`Anastasis.Sim.Advance` (saut) ou `anastasis.Sim.Warp` (acceleration, delais gardes en temps simule) — jamais par
+`TimeScale 1` + attente murale. Seules exceptions : une preuve qui mesure le pas fin de 1/60 s, ou une comparaison
+bit a bit avec la reference JS (`PumpFrame`). Une preuve qui accelere remet `anastasis.Sim.Warp 1` en partant ;
+au lot, `editor-batch` repose de toute facon le rythme entre deux preuves. Exemples : `village-weather-pie.py`
+(Warp 10), `sky-clock-pie.py` (Warp 4, un jour et quart en ~30 s), `player-pie.py` (`Advance 7d`).
 
 Sans joueur incarne, accelerer ne coute rien. Avec un joueur (`Anastasis.Player.Arrive`), le temps accelere est du
 temps ou il ne fait rien aux yeux du village : sa presence s'efface, ses jours oisifs comptent dans sa reputation.

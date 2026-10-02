@@ -17,6 +17,11 @@ moment de l'orage, et la preuve l'avait compte comme un abri. Ici seul `shelterR
 Lignes VILLAGE_WEATHER_ et ANASTASIS_VILLAGE du log. Le CIEL n'est pas force : la commande n'impose
 que ce que les habitants lisent.
 
+Temps accelere (TIME_WARP_001, pie-advance-001) : `anastasis.Sim.Warp 10` -- le pas de la reference a x10
+(celui de `Sim.Speed 10`, deja pris par les autres preuves du village), plusieurs pas par frame ; les
+delais restent en temps SIMULE. Verdict : VILLAGE_WEATHER PASS si le fermier est entre a l'abri pour
+`shelterRain` PUIS en est ressorti, FAIL sinon (avec l'etape atteinte).
+
     UnrealEditor.exe <uproject> -nosplash -NoLiveCoding -abslog=<log> -ExecCmds="py tools/unreal/village-weather-pie.py"
 """
 import time
@@ -38,6 +43,12 @@ mark = 0.0
 storm_at = 0.0
 handle = None
 shelters_before = 0
+# Etape la plus loin atteinte : 5 = entre a l'abri pour shelterRain puis ressorti.
+reached = 0
+
+
+def verdict():
+    unreal.log('VILLAGE_WEATHER %s reached_step=%d' % ('PASS' if reached >= 5 else 'FAIL', reached))
 
 
 def finish(message):
@@ -62,9 +73,11 @@ def state(world):
 
 
 def tick(dt):
-    global phase, step, mark, storm_at, shelters_before
+    global phase, step, mark, storm_at, shelters_before, reached
     now = time.monotonic()
     if now - t0 > 900:
+        verdict()
+        unreal.SystemLibrary.execute_console_command(None, 'anastasis.Sim.Warp 1')
         finish('VILLAGE_WEATHER_TIMEOUT phase=%d step=%d' % (phase, step))
         return
     if phase == 0 and now - t0 > 3:
@@ -94,6 +107,8 @@ def tick(dt):
         # Temps simule = temps reel : l'echelle de jour (anastasis.Sim.TimeScale, branche
         # villager-png-001) ralentit la journee a ~40 min ; cette preuve attend sur le temps simule.
         cmd(world, 'anastasis.Sim.TimeScale 1')
+        # TIME_WARP_001 : x10, le pas de `Sim.Speed 10` ; les delais ci-dessous restent en temps simule.
+        cmd(world, 'anastasis.Sim.Warp 10')
         cmd(world, 'Anastasis.Village.FirstFarmer 1')
         cmd(world, 'Anastasis.Village.Status')
         mark = t
@@ -136,6 +151,7 @@ def tick(dt):
             cmd(world, 'Anastasis.Village.ForceWeather off')
             mark = t
             step = 5
+            reached = 5
         elif t - mark > 90.0:
             unreal.log_error('VILLAGE_WEATHER_NEVER_LEFT stayed=%.3f state=%s' % (t - mark, s['raw']))
             step = 6
@@ -144,6 +160,8 @@ def tick(dt):
         cmd(world, 'Anastasis.Village.Status')
         step = 6
     elif step == 6:
+        verdict()
+        cmd(world, 'anastasis.Sim.Warp 1')
         phase = 3
         les.editor_request_end_play()
 

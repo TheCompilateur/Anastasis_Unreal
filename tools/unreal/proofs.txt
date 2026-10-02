@@ -13,5 +13,14 @@
 # motif d'echec, ou mieux un verdict PASS/FAIL, avant de l'inscrire.
 
 player-pie | tools/unreal/player-pie.py | PLAYER_PIE PASS | PLAYER_PIE FAIL|PLAYER_PIE_TIMEOUT|PLAYER_PIE CHECK FAIL | 600 | ANASTASIS_PLAYER_PIE_OUT=@Saved/PlayerEvidence/pie
-village-weather-pie | tools/unreal/village-weather-pie.py | VILLAGE_WEATHER_COMPLETE | VILLAGE_WEATHER_(NO_SHELTER_GOAL|NEVER_INSIDE|NEVER_LEFT|TIMEOUT) | 900 | -
 villager-pie | tools/unreal/villager-pie.py | VILLAGER_PIE PASS | VILLAGER_PIE FAIL | 900 | ANASTASIS_VILLAGER_PIE_OUT=@Saved/VillagerEvidence/pie;ANASTASIS_VILLAGER_PIE_NPCS=12
+
+# pie-advance-001 : temps accelere (anastasis.Sim.Warp), delais en temps SIMULE.
+# village-weather : Warp 10 ; PASS = entre a l'abri pour shelterRain PUIS ressorti.
+village-weather-pie | tools/unreal/village-weather-pie.py | VILLAGE_WEATHER PASS | VILLAGE_WEATHER FAIL|VILLAGE_WEATHER_(NO_SHELTER_GOAL|NEVER_INSIDE|NEVER_LEFT|TIMEOUT) | 400 | -
+# sky-clock : un jour et quart simule a Warp 4 (~30 s) ; PASS = la duree ET les six phases du village vues.
+sky-clock-pie | tools/unreal/sky-clock-pie.py | SKY_PIE PASS | SKY_PIE FAIL|SKY_PIE_TIMEOUT | 300 | -
+# house-rest : deja a Speed 10. Son *_COMPLETE n'arrive qu'apres nuit + maison occupee + aube : c'est un verdict.
+house-rest-pie | tools/unreal/house-rest-pie.py | HOUSE_REST_COMPLETE | HOUSE_REST_TIMEOUT | 300 | -
+# granary-eat : deja a Speed 10. COMPLETE exige au moins un repas pris au grenier (verdict faible : pas trois).
+granary-eat-pie | tools/unreal/granary-eat-pie.py | GRANARY_EAT_COMPLETE | GRANARY_EAT_TIMEOUT | 300 | -
