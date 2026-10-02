@@ -28,6 +28,12 @@ import unreal
 # utf-8-sig : Set-Content -Encoding UTF8 de PowerShell 5.1 ecrit un BOM, que json refuse en utf-8.
 with open(os.environ['ANASTASIS_EDITOR_BATCH_JOBS'], encoding='utf-8-sig') as _f:
     JOBS = json.loads(_f.read())
+# Run scene captures after PIE proofs. Reloading the map after the large preview
+# capture hit a PythonScriptPlugin access violation in the visual integration.
+# Stable partition preserves order within both groups; checks and failure rules
+# remain unchanged. This does not claim to fix the separate shutdown crash.
+JOBS.sort(key=lambda job: 2 if job['name'].endswith('-capture') else (0 if job['name'].endswith('-pie') else 1))
+unreal.log('EDITOR_BATCH_ORDER ' + ','.join(job['name'] for job in JOBS))
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 
 _real_register = unreal.register_slate_post_tick_callback

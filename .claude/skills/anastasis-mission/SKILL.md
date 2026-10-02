@@ -128,3 +128,12 @@ tools\unreal\agent-worktree.ps1 prune -Mission <mission>
 
 Supprime worktree, branche et enregistrement MCP local. Refuse si un commit manque à `main`. Pas
 `git branch -d` : il compare à la branche extraite du canonique, pas à `main`.
+
+### Ordre des preuves et captures (visual-crusade-001)
+
+`editor-batch.py` conserve les preuves PIE avant les travaux dont le nom finit par
+`-capture`, en gardant leur ordre relatif. Le rechargement de carte apres la capture
+de vegetation du lot visuel a plante dans PythonScriptPlugin. Cette partition est
+un contournement borne de cette transition, pas une correction du crash de fermeture.
+Tous les criteres PASS/FAIL restent appliques ; le journal `EDITOR_BATCH_ORDER` donne
+l'ordre reel. Une capture COMPLETE ne prouve toujours pas une fermeture saine.
