@@ -49,3 +49,15 @@ while SoilHistory stays enabled. Missing requested views now fail explicitly.
 SlopeSurface defaults to1 in the saved master; set0 for rollback. SlopeSurfaceSize
 is900cm. No new textures or geometry. See soil-slope-002 handoff for bounded KEEP:
 one cliff has visible middle-distance fabric; pente_face is not discriminating.
+
+
+Contact pilot (soil-contact-003): ANASTASIS_SOIL_CONTACT=1 with
+capture.ps1 -Label contact-v1 captures five fixed cameras (three eye positions over
+6m, one lateral eye view, one elevated context). Before/after/control hide/show/hide
+only SoilContact_* HISM. They do not rebuild terrain or vegetation, or change soil
+materials. This is a sequence of editor viewpoints, not player movement proof.
+Pilot restricted to seed12345 scale5 near the existing cliff/water junction.
+Disable with anastasis.Dressing.SoilContact 0 then re-embody. No collision/navigation.
+Existing RockSplit/Boulder/Low meshes, <=162 proposed instances over <=33m diameter,
+rejected when unsupported or deeply submerged; small detail culls by60m, source180m.
+Validation pending: neither compilation nor instance count establishes visual quality.

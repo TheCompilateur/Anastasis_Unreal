@@ -48,6 +48,7 @@ for _state in ('soil_before', 'soil_after', 'soil_control'):
     STATE_CMDS[_state] = STATE_CMDS['on']
 NO_TEXTURE = ('on_notex', 'bare_notex')
 GROUND_MI = '/Game/Anastasis/Materials/MI_AnastasisGround'
+CONTACT = os.environ.get('ANASTASIS_SOIL_CONTACT') == '1'
 SOIL_PARAMETER = os.environ.get('ANASTASIS_SOIL_PARAMETER', 'SoilHistory')
 states = [x.strip() for x in os.environ.get('ANASTASIS_GROUND_STATES', 'on,off').split(',') if x.strip()]
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
@@ -87,10 +88,24 @@ try:
     cls = unreal.load_class(None, '/Script/Anastasis_UnrealV2.AnastasisWorldEmbodiment')
     found = unreal.GameplayStatics.get_all_actors_of_class(world, cls)
     actor = found[0] if len(found) > 0 else eas.spawn_actor_from_class(cls, V(0, 0, 0), unreal.Rotator(0, 0, 0))
+    if CONTACT:
+        cmd('anastasis.Dressing.SoilContact 1')
     actor.call_method('EmbodyCanonical', args=(SEED,))
 
+    contact_components = [c for c in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent)
+                          if c.get_name().startswith('SoilContact_') and c.get_instance_count()]
+    if CONTACT and not contact_components:
+        raise RuntimeError('SoilContact pilot missing')
     soil_mids = []
     def texture_state(state):
+        if CONTACT:
+            visible = state == 'soil_after'
+            for comp in contact_components:
+                comp.set_visibility(visible, True)
+                comp.set_hidden_in_game(not visible, True)
+            unreal.log('SOIL_CONTACT_STATE %s visible=%s instances=%d' %
+                       (state, visible, sum(c.get_instance_count() for c in contact_components)))
+            return
         # Material-only A/B: retain the same geometry and MIDs across all soil states.
         if state.startswith('soil_') and soil_mids:
             value = 1.0 if state == 'soil_after' else 0.0
@@ -279,6 +294,38 @@ try:
         keep = {'prairie_eye', 'riviere_eye', 'lisiere_eye', 'sousbois_eye', 'pente_eye', 'oblique'}
         keep.update(x.strip() for x in os.environ.get('ANASTASIS_SOIL_VIEWS', '').split(',') if x.strip())
         plan = [v for v in plan if v[0] in keep]
+
+    if CONTACT:
+        def positions(kind):
+            out = []
+            for c in contact_components:
+                if not c.get_name().startswith('SoilContact_%d_' % kind):
+                    continue
+                for i in range(c.get_instance_count()):
+                    got = c.get_instance_transform(i, True)
+                    xf = got[1] if isinstance(got, tuple) else got
+                    out.append(xf.translation)
+            return out
+        coarse, fine = positions(0), positions(2)
+        if not coarse or not fine:
+            raise RuntimeError('Both source and deposit needed for contact pilot')
+        cx, cy = sum(p.x for p in coarse)/len(coarse), sum(p.y for p in coarse)/len(coarse)
+        fx, fy = sum(p.x for p in fine)/len(fine), sum(p.y for p in fine)/len(fine)
+        ux, uy = cx-fx, cy-fy
+        length = math.hypot(ux,uy)
+        ux,uy = ux/length,uy/length
+        sx,sy = -uy,ux
+        plan = []
+        # Three successive eye positions across 6 m; fixed target, then lateral and context views.
+        for i, side in enumerate((-300,0,300)):
+            ex,ey = cx-ux*1700+sx*side, cy-uy*1700+sy*side
+            plan.append(('contact_walk%02d'%i,(ex/T,ey/T),170,(cx/T,cy/T),80))
+        plan.append(('contact_side',((cx+sx*1700-ux*500)/T,(cy+sy*1700-uy*500)/T),170,(cx/T,cy/T),60))
+        plan.append(('contact_context',((cx-ux*3400)/T,(cy-uy*3400)/T),750,(cx/T,cy/T),150))
+        with open(os.path.join(OUT,'contact-site.json'),'w') as f:
+            json.dump({'coarse_center':[cx,cy],'fine_center':[fx,fy],
+                       'counts':{c.get_name():c.get_instance_count() for c in contact_components},
+                       'ground_samples':[[p.x,p.y,ground(p.x,p.y)] for p in coarse+fine]},f,indent=1)
 
     only = {x.strip() for x in os.environ.get('ANASTASIS_SOIL_VIEWS', '').split(',') if x.strip()}
     if only:

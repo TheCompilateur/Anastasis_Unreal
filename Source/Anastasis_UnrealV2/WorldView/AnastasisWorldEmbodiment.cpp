@@ -15,6 +15,7 @@
 #include "WorldView/AnastasisTrunkContact.h"
 #include "WorldView/AnastasisMicroEcology.h"
 #include "WorldView/AnastasisRiverbank.h"
+#include "WorldView/AnastasisSoilContact.h"
 
 #include "Anastasis_UnrealV2.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
@@ -998,6 +999,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	PlaceGroundCover(CanonicalSource, Places, Canopy, bEcology);
 	PlaceMicroEcology(CanonicalSource, Places, Canopy, Trunks, bEcology);
 	PlaceRiverbank(CanonicalSource, true);
+	AnastasisSoilContact::Apply(*this, CanonicalSource.Seed, CanonicalSource.SpatialScale);
 	EmbodyPlaces(PlaceInputs, Places, bPlaces, CanonicalSource, SupersededRuins);
 }
 
