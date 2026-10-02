@@ -176,6 +176,13 @@ function Write-RetestSkip([string]$proved, [string]$mode, [string]$who) {
   Write-Output "BUILD::SKIP  TESTS::SKIP  -- preuve reprise du commit $($proved.Substring(0, 7)) ($mode), rien n a ete rejoue : ce n est pas un nouveau PASS"
 }
 
+# Dossier du worktree d'integration : _integration par defaut. ANASTASIS_INTEGRATION_DIR le deplace
+# quand ce chemin devient inscriptible (2026-10-02 : la machine refusait d'y recreer
+# tools/unreal/editor-window-guard.ps1, meme dans un dossier neuf, sans processus ni regle identifies).
+function Integration-Path {
+  if ($env:ANASTASIS_INTEGRATION_DIR) { return [IO.Path]::GetFullPath($env:ANASTASIS_INTEGRATION_DIR).TrimEnd('\') }
+  return (Join-Path $WorktreeRoot '_integration')
+}
 # Le worktree d'integration persistant, remis sur main (integrate-batch, et integrate quand il
 # faut rebaser). Ses Binaries/ et Intermediate/ (ignores) survivent : build incremental.
 # Appele sous le verrou de main seulement : un seul utilisateur a la fois.
@@ -553,7 +560,7 @@ switch ($Command) {
         exit 1
       }
       Write-Output 'NOTE: main a avance : la branche est rejouee sur main (worktree d integration)'
-      $integ = Join-Path $WorktreeRoot '_integration'
+      $integ = Integration-Path
       Reset-IntegrationTree $integ 'integration/batch'
       $integBase = (Invoke-Git -C $integ rev-parse HEAD).Out[0]
       $commits = @((Invoke-Git -C $integ cherry HEAD $branch).Out | Where-Object { $_ -like '+ *' } | ForEach-Object { $_.Substring(2).Trim() })
@@ -663,7 +670,7 @@ switch ($Command) {
 
     # 2. Empilement, dans le worktree d'integration (persistant : ses Binaries survivent,
     #    le build y est incremental d'un lot a l'autre).
-    $integ = Join-Path $WorktreeRoot '_integration'
+    $integ = Integration-Path
     $ib = 'integration/batch'
     if ($ready.Count -gt 0) { Reset-IntegrationTree $integ $ib }
     $applied = @()
