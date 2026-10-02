@@ -97,6 +97,36 @@ namespace
 			}
 		}
 	};
+
+	struct FScopedEyePlaneCVar
+	{
+		IConsoleVariable* CVar = nullptr;
+		int32 Before = 1;
+
+		explicit FScopedEyePlaneCVar(const int32 Value)
+		{
+			CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Depth.EyePlane"));
+			if (CVar)
+			{
+				Before = CVar->GetInt();
+				CVar->Set(Value, ECVF_SetByCode);
+			}
+		}
+		void Set(const int32 Value) const
+		{
+			if (CVar)
+			{
+				CVar->Set(Value, ECVF_SetByCode);
+			}
+		}
+		~FScopedEyePlaneCVar()
+		{
+			if (CVar)
+			{
+				CVar->Set(Before, ECVF_SetByCode);
+			}
+		}
+	};
 }
 
 /**
@@ -473,6 +503,9 @@ bool FAnastasisAtmosphereRealismReversible::RunTest(const FString&)
 	}
 
 	FScopedRealismCVar Realism(1);
+	// The eye plane is on by default. This test locks the profile itself, so hold the plane off
+	// until the block that is about the plane.
+	FScopedEyePlaneCVar EyePlane(0);
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	Params.ObjectFlags |= RF_Transient;
@@ -546,6 +579,40 @@ bool FAnastasisAtmosphereRealismReversible::RunTest(const FString&)
 		TestEqual(TEXT("on again: mie from the profile"), S->MieScatteringScale, Profile.SkyMieScatteringScale);
 	}
 	TestTrue(TEXT("on again: the layer reports itself on"), Atmosphere->WasRealismApplied());
+	if (const USkyAtmosphereComponent* S = Sky())
+	{
+		TestEqual(TEXT("on again, plane off: aerial perspective from the profile"), S->AerialPespectiveViewDistanceScale, Profile.SkyAerialPerspectiveDistanceScale);
+	}
+
+	// EYE_PLANE_001. Same session, one CVar: the near field stays clear and colour contrast
+	// falls sooner than the profile's kilometre-scale aerial perspective.
+	EyePlane.Set(1);
+	TestTrue(TEXT("apply (eye plane)"), Atmosphere->Apply());
+	if (const USkyAtmosphereComponent* S = Sky())
+	{
+		const float ExpectAerial = FMath::Min(
+			AAnastasisWorldAtmosphere::EyePlaneAerialCap,
+			Profile.SkyAerialPerspectiveDistanceScale * AAnastasisWorldAtmosphere::EyePlaneAerialGain);
+		TestEqual(TEXT("eye plane: aerial perspective comes forward"), S->AerialPespectiveViewDistanceScale, ExpectAerial);
+		TestTrue(TEXT("eye plane: nearer than the profile"), ExpectAerial > Profile.SkyAerialPerspectiveDistanceScale);
+	}
+	if (const UExponentialHeightFogComponent* F = FogC())
+	{
+		TestEqual(TEXT("eye plane: the first 7 m stay clear"), F->StartDistance, AAnastasisWorldAtmosphere::EyePlaneStartUU);
+		TestEqual(TEXT("eye plane: volumetric fog starts after the same 7 m"), F->VolumetricFogStartDistance, AAnastasisWorldAtmosphere::EyePlaneStartUU);
+		TestEqual(TEXT("eye plane: the volume reaches the ridge, not only the near forest"), F->VolumetricFogDistance, AAnastasisWorldAtmosphere::EyePlaneVolumetricDistanceUU);
+		TestEqual(TEXT("eye plane: the wash is capped so a ridge stays a shape"), F->FogMaxOpacity, AAnastasisWorldAtmosphere::EyePlaneMaxOpacity);
+		TestEqual(TEXT("eye plane: volumetric extinction rises"), F->VolumetricFogExtinctionScale,
+			Profile.VolumetricFogExtinctionScale * AAnastasisWorldAtmosphere::EyePlaneExtinctionGain);
+	}
+	EyePlane.Set(0);
+	TestTrue(TEXT("apply (eye plane off)"), Atmosphere->Apply());
+	if (const UExponentialHeightFogComponent* F = FogC())
+	{
+		TestEqual(TEXT("plane off: fog start back to the profile"), F->StartDistance, Profile.FogStartDistance);
+		TestEqual(TEXT("plane off: volumetric distance back to the profile"), F->VolumetricFogDistance, Profile.VolumetricFogDistanceUU);
+		TestEqual(TEXT("plane off: volumetric start back to the engine default"), F->VolumetricFogStartDistance, FogDefault->VolumetricFogStartDistance);
+	}
 
 	Atmosphere->DestroySpawnedActors();
 	Atmosphere->Destroy();

@@ -131,6 +131,22 @@ public:
 	/** Whether the last Apply() ran the realism layer (profile switch AND CVar). */
 	bool WasRealismApplied() const { return bRealismApplied; }
 
+	/**
+	 * EYE_PLANE_001. The first 7 m stay outside the volumetric volume (a trunk, a reed).
+	 * The volume then reaches about 120 m, so a shore near 40 m sits in air that has a cost
+	 * and a ridge keeps its shape. Extinction 3.5 is the step that moved the water and the
+	 * far trees in the A/B without turning the sky into a flat sheet (8 did that).
+	 * The exponential fog's own start, max opacity and cutoff do not reach the volume.
+	 */
+	static constexpr float EyePlaneStartUU = 700.0f;
+	static constexpr float EyePlaneNearFadeUU = 1800.0f;
+	static constexpr float EyePlaneVolumetricDistanceUU = 12000.0f;
+	static constexpr float EyePlaneMaxOpacity = 0.48f;
+	static constexpr float EyePlaneCutoffUU = 0.0f;
+	static constexpr float EyePlaneAerialGain = 1.15f;
+	static constexpr float EyePlaneAerialCap = 12.0f;
+	static constexpr float EyePlaneExtinctionGain = 3.5f;
+
 	/** True when the last Apply()/Tick handed forward shading to the moon (ATMOSPHERE_COHERENCE_001). */
 	bool IsMoonLeadingForward() const { return bMoonLeadsForward; }
 
@@ -178,6 +194,15 @@ protected:
 	 * it created, so that switching it off in a live session returns the exact pre-realism image.
 	 */
 	void ApplyRealism(const UAnastasisAtmosphereProfile& Profile, bool bOn, const FRotator& SunRotation, const FRotator& MoonRotation);
+
+	/**
+	 * EYE_PLANE_001. The realism aerial scale is tuned for a ridge a kilometre away, so at 40 m
+	 * an olive, a pebble and a wall still arrive at the same contrast. With anastasis.Depth.EyePlane
+	 * on, the first 7 m stay clear (a trunk or a reed in the near frame) and colour contrast falls
+	 * toward the air after that. FogMaxOpacity and the cutoff keep a ridge a shape, not a white-out.
+	 * Volumetric fog ignores start, max opacity and cutoff: the extinction scale is what reaches it.
+	 */
+	void ApplyEyePlane(const UAnastasisAtmosphereProfile& Profile, bool bRealismOn);
 
 	bool bRealismApplied = false;
 

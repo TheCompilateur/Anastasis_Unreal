@@ -74,6 +74,12 @@ static TAutoConsoleVariable<int32> CVarRealism(
 	TEXT("ENV_REALISM_001 layer: tuned sky, clouds, moon, valley fog, volumetric fog. 0=engine defaults for every property it owns (the pre-realism image), 1=profile values; read on every Apply()."),
 	ECVF_Default);
 
+static TAutoConsoleVariable<int32> CVarEyePlane(
+	TEXT("anastasis.Depth.EyePlane"),
+	1,
+	TEXT("EYE_PLANE_001. 1=at eye height the first 7 m stay outside the volumetric fog, then local colour (olive, pebble, wall) falls toward the air out to about 160 m. 0=the profile's own aerial scale, fog and extinction. Read on every Apply()."),
+	ECVF_Default);
+
 const FName AAnastasisWorldAtmosphere::MoonTag(TEXT("AnastasisMoon"));
 const FName AAnastasisWorldAtmosphere::RealismCloudTag(TEXT("AnastasisRealismCloud"));
 
@@ -620,6 +626,50 @@ void AAnastasisWorldAtmosphere::ApplyRealism(const UAnastasisAtmosphereProfile& 
 	}
 }
 
+void AAnastasisWorldAtmosphere::ApplyEyePlane(const UAnastasisAtmosphereProfile& Profile, const bool bRealismOn)
+{
+	const bool bOn = bRealismOn && CVarEyePlane.GetValueOnGameThread() != 0;
+	USkyAtmosphereComponent* SkyComponent = SkyAtmosphere ? SkyAtmosphere->GetComponent() : nullptr;
+	UExponentialHeightFogComponent* FogComponent = Fog ? Fog->GetComponent() : nullptr;
+	if (!bRealismOn)
+	{
+		return;
+	}
+
+	const UExponentialHeightFogComponent* FogDefault = GetDefault<UExponentialHeightFogComponent>();
+	const float Aerial = bOn
+		? FMath::Min(EyePlaneAerialCap, Profile.SkyAerialPerspectiveDistanceScale * EyePlaneAerialGain)
+		: Profile.SkyAerialPerspectiveDistanceScale;
+	const float Start = bOn ? EyePlaneStartUU : Profile.FogStartDistance;
+	const float MaxOpacity = bOn ? EyePlaneMaxOpacity : Profile.FogMaxOpacity;
+	const float Cutoff = bOn ? EyePlaneCutoffUU : FogDefault->FogCutoffDistance;
+	const float Extinction = bOn
+		? Profile.VolumetricFogExtinctionScale * EyePlaneExtinctionGain
+		: Profile.VolumetricFogExtinctionScale;
+	// Volumetric fog ignores the exponential start. Its own start is what keeps a reed sharp.
+	const float VolumetricStart = bOn ? EyePlaneStartUU : FogDefault->VolumetricFogStartDistance;
+	const float NearFade = bOn ? EyePlaneNearFadeUU : FogDefault->VolumetricFogNearFadeInDistance;
+	const float VolumetricDistance = bOn ? EyePlaneVolumetricDistanceUU : Profile.VolumetricFogDistanceUU;
+
+	if (SkyComponent)
+	{
+		SkyComponent->SetAerialPespectiveViewDistanceScale(Aerial);
+	}
+	if (FogComponent)
+	{
+		FogComponent->SetStartDistance(Start);
+		FogComponent->SetFogMaxOpacity(MaxOpacity);
+		FogComponent->SetFogCutoffDistance(Cutoff);
+		FogComponent->SetVolumetricFogExtinctionScale(Extinction);
+		FogComponent->SetVolumetricFogStartDistance(VolumetricStart);
+		FogComponent->SetVolumetricFogNearFadeInDistance(NearFade);
+		FogComponent->SetVolumetricFogDistance(VolumetricDistance);
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_EYE_PLANE on=%d start_cm=%.0f vol_start_cm=%.0f vol_dist_cm=%.0f max_opacity=%.2f aerial=%.2f extinction=%.2f"),
+		bOn ? 1 : 0, Start, VolumetricStart, VolumetricDistance, MaxOpacity, Aerial, Extinction);
+}
+
 void AAnastasisWorldAtmosphere::BeginPlay()
 {
 	Super::BeginPlay();
@@ -766,7 +816,9 @@ bool AAnastasisWorldAtmosphere::Apply()
 	// --- Realism (ENV_REALISM_001) -----------------------------------------------------
 	// After the five rig actors, because it writes into them. Run in both states: "off" is an
 	// active restore, not a skip.
-	ApplyRealism(Profile, Profile.bRealismEnabled && IsRealismEnabledByCVar(), SunRotation, MoonRotation);
+	const bool bRealismOn = Profile.bRealismEnabled && IsRealismEnabledByCVar();
+	ApplyRealism(Profile, bRealismOn, SunRotation, MoonRotation);
+	ApplyEyePlane(Profile, bRealismOn);
 
 	// --- Directional lights: exactly one leads (ATMOSPHERE_COHERENCE_001) -------------
 	// After the realism layer, which creates or removes the moon. The clock re-decides it every
@@ -819,7 +871,7 @@ bool AAnastasisWorldAtmosphere::Apply()
 	LastSummary = FString::Printf(
 		TEXT("ANASTASIS_ATMOSPHERE applied=1 profile=%s sun_source=%s sun_pitch=%.3f sun_yaw=%.3f lux=%.1f ")
 		TEXT("fog=%d fog_density=%.4f ev100=%.2f adopted=%d spawned=%d realism=%d moon=%d clouds=%d volumetric_fog=%d ")
-		TEXT("forward_light=%s extra_directional_lights=%d"),
+		TEXT("forward_light=%s extra_directional_lights=%d eye_plane=%d"),
 		Source,
 		Profile.bDeriveSunFromTimeOfDay ? TEXT("time_of_day") : TEXT("explicit"),
 		SunRotation.Pitch, SunRotation.Yaw, Profile.SunIntensityLux,
@@ -827,7 +879,8 @@ bool AAnastasisWorldAtmosphere::Apply()
 		AdoptedCount, SpawnedCount,
 		bRealismApplied ? 1 : 0, Moon ? 1 : 0, Cloud ? 1 : 0,
 		(Fog && Fog->GetComponent() && Fog->GetComponent()->bEnableVolumetricFog) ? 1 : 0,
-		bMoonLeadsForward ? TEXT("moon") : TEXT("sun"), ExtraDirectionalLights);
+		bMoonLeadsForward ? TEXT("moon") : TEXT("sun"), ExtraDirectionalLights,
+		(bRealismOn && CVarEyePlane.GetValueOnGameThread() != 0) ? 1 : 0);
 	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("%s"), *LastSummary);
 
 	return true;

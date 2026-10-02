@@ -50,6 +50,7 @@ Ou dans la console Python de cet editeur. Le commandlet Python est refuse
 avant toute ecriture. Fermer l'editeur apres la generation si lance en batch.
 """
 import math
+import os
 import random
 import unreal
 
@@ -1087,6 +1088,26 @@ def enum_member(owner_name, *names):
     raise RuntimeError('unreal.%s: aucun de %s' % (owner_name, names))
 
 
+def open_material(name, path):
+    """Reecrit le graphe SANS supprimer l'asset : les meshes gardent leur reference."""
+    mel = unreal.MaterialEditingLibrary
+    if unreal.EditorAssetLibrary.does_asset_exist(path):
+        mat = unreal.EditorAssetLibrary.load_asset(path)
+        before = mel.get_num_material_expressions(mat)
+        mel.delete_all_material_expressions(mat)
+        left = mel.get_num_material_expressions(mat)
+        if left:
+            for expr in list(mel.get_material_expressions(mat) or []):
+                mel.delete_material_expression(mat, expr)
+            left = mel.get_num_material_expressions(mat)
+        log('%s clear expressions %d -> %d' % (name, before, left))
+        if left:
+            raise RuntimeError('%s: le graphe n est pas vide (%d)' % (name, left))
+        return mat
+    return unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+        name, MATERIAL_DIR, unreal.Material, unreal.MaterialFactoryNew())
+
+
 def ensure_material():
     """VertexColor -> BaseColor, et surtout : feuillage deux faces.
 
@@ -1099,11 +1120,9 @@ def ensure_material():
     ce masque, les troncs deviendraient translucides eux aussi -- et la teinte par
     arbre peindrait aussi l'ecorce.
     """
-    if unreal.EditorAssetLibrary.does_asset_exist(MATERIAL_PATH):
-        unreal.EditorAssetLibrary.delete_asset(MATERIAL_PATH)
-
-    mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
-        MATERIAL_NAME, MATERIAL_DIR, unreal.Material, unreal.MaterialFactoryNew())
+    if unreal.get_editor_subsystem(unreal.AssetEditorSubsystem) is None:
+        raise RuntimeError('Tree generation requires a live editor; no assets were modified')
+    mat = open_material(MATERIAL_NAME, MATERIAL_PATH)
     mel = unreal.MaterialEditingLibrary
 
     def const(value, x, y):
@@ -1156,11 +1175,59 @@ def ensure_material():
     except Exception as exc:  # noqa: BLE001
         log('WARN teinte par instance non construite, couleur de sommet seule: %s' % exc)
 
-    wired = mel.connect_material_property(base, base_output, unreal.MaterialProperty.MP_BASE_COLOR)
+    # POLY_REALISM. Une couronne de spheres lisses est un primitif. Une masse large
+    # (quelques metres) casse ce degradé a toute distance ; le grain fin et la
+    # normale ne vivent qu'entre 8 et 40 m, puis la couronne redevient une masse.
+    depth = mel.create_material_expression(mat, unreal.MaterialExpressionPixelDepth, -900, 400)
+    pos = mel.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -900, 480)
+    nrm = mel.create_material_expression(mat, unreal.MaterialExpressionVertexNormalWS, -900, 560)
+    foliage_h = '''
+float fade = 1.0 - smoothstep(800.0, 4000.0, Depth);
+float3 p = Position * 0.012;
+float broad = sin(p.x * 1.7 + sin(p.y * 1.3)) * sin(p.y * 1.5 + sin(p.z * 1.1));
+float3 q = Position * 0.055;
+float fine = sin(q.x * 2.1 + sin(q.y * 1.7)) * sin(q.y * 1.9 + sin(q.z * 2.2)) * sin(q.z * 1.6 + q.x);
+float h = broad * 0.55 + fine * fade;
+'''
 
-    # Transmission = couleur de base x chaleur x masque de feuillage.
-    tinted = op(unreal.MaterialExpressionMultiply, base, const3(TRANSMISSION_WARMTH, -650, 220),
-                -450, 140, a_out=base_output)
+    color_node = mel.create_material_expression(mat, unreal.MaterialExpressionCustom, -400, 0)
+    color_node.set_editor_property('description', 'FoliageBreak')
+    color_node.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    color_node.set_editor_property('code', foliage_h + '''
+float3 n = normalize(Normal);
+float3 a = cross(ddy(Position), n);
+float3 b = cross(n, ddx(Position));
+float det = dot(ddx(Position), a);
+float3 g = sign(det) * (ddx(h) * a + ddy(h) * b);
+FoliageNormal = normalize(max(abs(det), 0.000001) * n - g * (0.35 + 1.6 * fade) * saturate(Mask));
+return Colour * (1.0 + (broad * 0.28 + fine * 0.12 * fade) * saturate(Mask));
+''')
+    extra = unreal.CustomOutput()
+    extra.set_editor_property('output_name', 'FoliageNormal')
+    extra.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    color_node.set_editor_property('additional_outputs', [extra])
+    inputs = []
+    for name in ('Colour', 'Mask', 'Position', 'Normal', 'Depth'):
+        entry = unreal.CustomInput()
+        entry.set_editor_property('input_name', name)
+        inputs.append(entry)
+    color_node.set_editor_property('inputs', inputs)
+    if not mel.connect_material_expressions(base, base_output, color_node, 'Colour'):
+        raise RuntimeError('foliage Colour not connected')
+    if not mel.connect_material_expressions(vc, 'A', color_node, 'Mask'):
+        raise RuntimeError('foliage Mask not connected')
+    for source, name in ((pos, 'Position'), (nrm, 'Normal'), (depth, 'Depth')):
+        if not mel.connect_material_expressions(source, '', color_node, name):
+            raise RuntimeError('foliage input not connected: ' + name)
+    mat.set_editor_property('tangent_space_normal', False)
+    if not mel.connect_material_property(color_node, 'FoliageNormal', unreal.MaterialProperty.MP_NORMAL):
+        raise RuntimeError('foliage normal not connected')
+
+    wired = mel.connect_material_property(color_node, '', unreal.MaterialProperty.MP_BASE_COLOR)
+
+    # Transmission = couleur cassee x chaleur x masque de feuillage.
+    tinted = op(unreal.MaterialExpressionMultiply, color_node, const3(TRANSMISSION_WARMTH, -650, 220),
+                -450, 140)
     masked = op(unreal.MaterialExpressionMultiply, tinted, vc, -300, 140, b_out='A')
     r_sss = mel.connect_material_property(masked, '', unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
     r_rough = mel.connect_material_property(const(0.82, -350, 260), '', unreal.MaterialProperty.MP_ROUGHNESS)
@@ -1242,7 +1309,11 @@ def ensure_material():
         % (wired, tint_state, r_sss, r_rough, r_spec, shading, r_wpo, wind_state))
     if not wired:
         raise RuntimeError('MATERIAL base colour not connected')
-    mel.recompile_material(mat)
+    errors = list(mel.recompile_material(mat) or [])
+    if errors:
+        for e in errors:
+            unreal.log_error('VEGETATION_COMPILE ' + str(e))
+        raise RuntimeError('M_AnastasisVegetation ne compile pas')
     unreal.EditorAssetLibrary.save_asset(MATERIAL_PATH)
     log("MATERIAL saved " + MATERIAL_PATH)
     return mat
@@ -1255,55 +1326,67 @@ def ensure_bark_material():
     modele d'ombrage de feuillage. Meme langage que le reste du projet : la
     couleur de sommet EST la semantique, aucune texture.
     """
-    if unreal.EditorAssetLibrary.does_asset_exist(BARK_MATERIAL_PATH):
-        unreal.EditorAssetLibrary.delete_asset(BARK_MATERIAL_PATH)
-
-    mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
-        BARK_MATERIAL_NAME, MATERIAL_DIR, unreal.Material, unreal.MaterialFactoryNew())
+    if unreal.get_editor_subsystem(unreal.AssetEditorSubsystem) is None:
+        raise RuntimeError('Tree generation requires a live editor; no assets were modified')
+    mat = open_material(BARK_MATERIAL_NAME, BARK_MATERIAL_PATH)
     mel = unreal.MaterialEditingLibrary
 
     vc = mel.create_material_expression(mat, unreal.MaterialExpressionVertexColor, -600, 0)
-    wired = False
-    for out_name in ('', 'RGB', 'Color'):
-        if mel.connect_material_property(vc, out_name, unreal.MaterialProperty.MP_BASE_COLOR):
-            wired = 'output=' + repr(out_name)
-            break
-
-    # Broad vertical fissures plus fine grain. UVs come from the recipe primitives;
-    # palette still comes from vertex colours. Derivatives give a world-space normal
-    # without a new texture dependency or geometry on distant trunks.
     uv = mel.create_material_expression(mat, unreal.MaterialExpressionTextureCoordinate, -1100, -120)
     position = mel.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -1100, 100)
     normal = mel.create_material_expression(mat, unreal.MaterialExpressionVertexNormalWS, -1100, 260)
-    genome = '''
+    depth = mel.create_material_expression(mat, unreal.MaterialExpressionPixelDepth, -1100, 400)
+    local = mel.create_material_expression(mat, unreal.MaterialExpressionLocalPosition, -1100, 500)
+    local_z = mel.create_material_expression(mat, unreal.MaterialExpressionComponentMask, -900, 500)
+    for channel, keep in (('r', False), ('g', False), ('b', True), ('a', False)):
+        local_z.set_editor_property(channel, keep)
+    if not mel.connect_material_expressions(local, '', local_z, ''):
+        raise RuntimeError('Bark LocalPosition not connected')
+    # Un seul noeud : deux Custom qui partagent les memes entrees perdent un lien
+    # au second (le normal compilait sans Colour). Fissures pleines pres du tronc,
+    # eteintes a 40 m. Le pied (Z local -50) entre dans la terre sur 8 uu.
+    node = mel.create_material_expression(mat, unreal.MaterialExpressionCustom, -450, 0)
+    node.set_editor_property('description', 'BarkBreak')
+    node.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    node.set_editor_property('code', '''
+        float fade = 1.0 - smoothstep(700.0, 4000.0, Depth);
+        float foot = saturate((LocalZ + 50.0) / 8.0);
         float2 q = UV * float2(42.0, 7.0);
         float bend = sin(q.y*1.7)*0.16 + sin(q.y*4.1+q.x*0.19)*0.09;
         float ridge = pow(saturate(0.5+0.5*sin((q.x+bend)*6.283185)), 5.0);
         float grain = sin(q.x*31.0+sin(q.y*7.0))*sin(q.y*18.0+q.x);
-        float h = ridge*0.65 + grain*0.055;
-    '''
-    for description,code,prop in (
-        ('Bark fissure colour',genome+'return Colour*(0.72+ridge*0.42+grain*0.06);',unreal.MaterialProperty.MP_BASE_COLOR),
-        ('Bark fissure normal',genome+'''
-            float3 n=normalize(Normal);
-            float3 a=cross(ddy(Position),n), b=cross(n,ddx(Position));
-            float det=dot(ddx(Position),a);
-            float3 g=sign(det)*(ddx(h)*a+ddy(h)*b);
-            return normalize(max(abs(det),0.000001)*n-g*1.5);
-        ''',unreal.MaterialProperty.MP_NORMAL)):
-        node=mel.create_material_expression(mat,unreal.MaterialExpressionCustom,-450,-100 if prop==unreal.MaterialProperty.MP_BASE_COLOR else 100)
-        node.set_editor_property('description',description)
-        node.set_editor_property('code',code)
-        node.set_editor_property('output_type',unreal.CustomMaterialOutputType.CMOT_FLOAT3)
-        inputs=[]
-        for name in ('UV','Colour','Position','Normal'):
-            entry=unreal.CustomInput();entry.set_editor_property('input_name',name);inputs.append(entry)
-        node.set_editor_property('inputs',inputs)
-        for source,out_name,name in ((uv,'','UV'),(vc,'','Colour'),(position,'','Position'),(normal,'','Normal')):
-            if not mel.connect_material_expressions(source,out_name,node,name):
-                raise RuntimeError('Bark input not connected: '+name)
-        if not mel.connect_material_property(node,'',prop):raise RuntimeError('Bark property not connected')
-    mat.set_editor_property('tangent_space_normal',False)
+        float h = (ridge*0.65 + grain*0.055) * fade;
+        float3 n = normalize(Normal);
+        float3 a = cross(ddy(Position), n), b = cross(n, ddx(Position));
+        float det = dot(ddx(Position), a);
+        float3 g = sign(det) * (ddx(h) * a + ddy(h) * b);
+        BarkNormal = normalize(max(abs(det), 0.000001) * n - g * 1.5);
+        return Colour * (0.72 + ridge * 0.42 * fade + grain * 0.06 * fade) * lerp(0.66, 1.0, foot);
+    ''')
+    extra = unreal.CustomOutput()
+    extra.set_editor_property('output_name', 'BarkNormal')
+    extra.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    node.set_editor_property('additional_outputs', [extra])
+    inputs = []
+    for name in ('UV', 'Colour', 'Position', 'Normal', 'Depth', 'LocalZ'):
+        entry = unreal.CustomInput()
+        entry.set_editor_property('input_name', name)
+        inputs.append(entry)
+    node.set_editor_property('inputs', inputs)
+    wired_colour = None
+    for out_name in ('', 'RGB', 'Color'):
+        if mel.connect_material_expressions(vc, out_name, node, 'Colour'):
+            wired_colour = out_name
+            break
+    if wired_colour is None:
+        raise RuntimeError('Bark Colour not connected')
+    for source, name in ((uv, 'UV'), (position, 'Position'), (normal, 'Normal'), (depth, 'Depth'), (local_z, 'LocalZ')):
+        if not mel.connect_material_expressions(source, '', node, name):
+            raise RuntimeError('Bark input not connected: ' + name)
+    wired = mel.connect_material_property(node, '', unreal.MaterialProperty.MP_BASE_COLOR)
+    if not mel.connect_material_property(node, 'BarkNormal', unreal.MaterialProperty.MP_NORMAL):
+        raise RuntimeError('Bark normal output not connected')
+    mat.set_editor_property('tangent_space_normal', False)
 
     # Plus rugueux et moins speculaire que le feuillage : une ecorce humide
     # n'accroche pas la lumiere comme une feuille cireuse.
@@ -1327,7 +1410,11 @@ def ensure_bark_material():
 
     log("BARK_MATERIAL wiring base_color=%s roughness=%s specular=%s shading=%s"
         % (wired, r_rough, r_spec, shading))
-    mel.recompile_material(mat)
+    errors = list(mel.recompile_material(mat) or [])
+    if errors:
+        for e in errors:
+            unreal.log_error('BARK_COMPILE ' + str(e))
+        raise RuntimeError('M_AnastasisBark ne compile pas')
     unreal.EditorAssetLibrary.save_asset(BARK_MATERIAL_PATH)
     log("BARK_MATERIAL saved " + BARK_MATERIAL_PATH)
     return mat
@@ -1343,51 +1430,52 @@ ROCK_MATERIAL_PATH = MATERIAL_DIR + "/" + ROCK_MATERIAL_NAME
 
 
 def ensure_rock_material():
-    if unreal.EditorAssetLibrary.does_asset_exist(ROCK_MATERIAL_PATH):
-        unreal.EditorAssetLibrary.delete_asset(ROCK_MATERIAL_PATH)
-    mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
-        ROCK_MATERIAL_NAME, MATERIAL_DIR, unreal.Material, unreal.MaterialFactoryNew())
+    mat = open_material(ROCK_MATERIAL_NAME, ROCK_MATERIAL_PATH)
     mel = unreal.MaterialEditingLibrary
     position = mel.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -1100, 100)
     normal = mel.create_material_expression(mat, unreal.MaterialExpressionVertexNormalWS, -1100, 260)
-    genome = """
+    depth = mel.create_material_expression(mat, unreal.MaterialExpressionPixelDepth, -1100, 400)
+    node = mel.create_material_expression(mat, unreal.MaterialExpressionCustom, -450, 0)
+    node.set_editor_property('description', 'RockBreak')
+    node.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    node.set_editor_property('code', '''
+        float fade = 1.0 - smoothstep(700.0, 4000.0, Depth);
         float3 p = Position * 0.012;
         float3 w = abs(normalize(Normal)); w = w / (w.x + w.y + w.z);
         float n1 = sin(p.x*1.7+sin(p.y*2.3))*sin(p.y*1.9+sin(p.z*2.9))*sin(p.z*1.3+p.x*0.7);
         float n2 = sin(p.x*7.1+p.z*3.7)*sin(p.y*6.3+p.x*2.1)*sin(p.z*8.3+p.y*1.7);
         float n3 = sin(p.x*23.0+n2*3.0)*sin(p.y*29.0+p.z*7.0);
-        float crack = pow(saturate(1.0 - abs(n2) * 5.0), 6.0);
+        float crack = pow(saturate(1.0 - abs(n2) * 5.0), 6.0) * fade;
         float lichen = saturate((n1 * 0.5 + 0.5 - 0.62) * 6.0) * saturate(w.z * 1.6);
-        float h = n2 * 0.5 + n3 * 0.12 - crack * 0.8;
-    """
-    base = """
-        float3 stone = float3(0.20, 0.185, 0.160) * (0.82 + n1 * 0.10 + n3 * 0.05);
-        stone = lerp(stone, stone * 0.45, crack);
-        float3 lichenCol = lerp(float3(0.30, 0.27, 0.12), float3(0.22, 0.22, 0.20), saturate(n2 * 0.5 + 0.5));
-        return lerp(stone, lichenCol, lichen * 0.8);
-    """
-    bump = """
-        float3 n = normalize(Normal);
-        float3 a = cross(ddy(Position), n), b = cross(n, ddx(Position));
+        float h = n2 * 0.35 * fade + n3 * 0.12 * fade - crack * 0.8;
+        float3 nn = normalize(Normal);
+        float3 a = cross(ddy(Position), nn), b = cross(nn, ddx(Position));
         float det = dot(ddx(Position), a);
         float3 g = sign(det) * (ddx(h) * a + ddy(h) * b);
-        return normalize(max(abs(det), 0.000001) * n - g * 0.8);
-    """
-    for description, code, prop, y in (('Rock colour', genome + base, unreal.MaterialProperty.MP_BASE_COLOR, -100),
-                                        ('Rock normal', genome + bump, unreal.MaterialProperty.MP_NORMAL, 100)):
-        node = mel.create_material_expression(mat, unreal.MaterialExpressionCustom, -450, y)
-        node.set_editor_property('description', description)
-        node.set_editor_property('code', code)
-        node.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT3)
-        inputs = []
-        for name in ('Position', 'Normal'):
-            entry = unreal.CustomInput(); entry.set_editor_property('input_name', name); inputs.append(entry)
-        node.set_editor_property('inputs', inputs)
-        for source, name in ((position, 'Position'), (normal, 'Normal')):
-            if not mel.connect_material_expressions(source, '', node, name):
-                raise RuntimeError('Rock input not connected: ' + name)
-        if not mel.connect_material_property(node, '', prop):
-            raise RuntimeError('Rock property not connected')
+        RockNormal = normalize(max(abs(det), 0.000001) * nn - g * 0.8);
+        float3 stone = float3(0.20, 0.185, 0.160) * (0.82 + n1 * 0.10 + n3 * 0.05 * fade);
+        stone = lerp(stone, stone * 0.45, crack);
+        float3 lichenCol = lerp(float3(0.30, 0.27, 0.12), float3(0.22, 0.22, 0.20), saturate(n2 * 0.5 + 0.5));
+        float sit = lerp(0.74, 1.0, saturate(Normal.z * 0.45 + 0.78));
+        return lerp(stone, lichenCol, lichen * 0.8) * sit;
+    ''')
+    extra = unreal.CustomOutput()
+    extra.set_editor_property('output_name', 'RockNormal')
+    extra.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+    node.set_editor_property('additional_outputs', [extra])
+    inputs = []
+    for name in ('Position', 'Normal', 'Depth'):
+        entry = unreal.CustomInput()
+        entry.set_editor_property('input_name', name)
+        inputs.append(entry)
+    node.set_editor_property('inputs', inputs)
+    for source, name in ((position, 'Position'), (normal, 'Normal'), (depth, 'Depth')):
+        if not mel.connect_material_expressions(source, '', node, name):
+            raise RuntimeError('Rock input not connected: ' + name)
+    if not mel.connect_material_property(node, '', unreal.MaterialProperty.MP_BASE_COLOR):
+        raise RuntimeError('Rock colour not connected')
+    if not mel.connect_material_property(node, 'RockNormal', unreal.MaterialProperty.MP_NORMAL):
+        raise RuntimeError('Rock normal not connected')
     mat.set_editor_property('tangent_space_normal', False)
     rough = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -350, 260)
     rough.set_editor_property('r', 0.88)
@@ -1396,7 +1484,11 @@ def ensure_rock_material():
     spec.set_editor_property('r', 0.25)
     mel.connect_material_property(spec, '', unreal.MaterialProperty.MP_SPECULAR)
     mat.set_editor_property('two_sided', False)
-    mel.recompile_material(mat)
+    errors = list(mel.recompile_material(mat) or [])
+    if errors:
+        for e in errors:
+            unreal.log_error('ROCK_COMPILE ' + str(e))
+        raise RuntimeError('M_AnastasisRock ne compile pas')
     unreal.EditorAssetLibrary.save_asset(ROCK_MATERIAL_PATH)
     log("ROCK_MATERIAL saved " + ROCK_MATERIAL_PATH)
     return mat
@@ -1406,6 +1498,14 @@ def main():
     log("start")
     if unreal.get_editor_subsystem(unreal.AssetEditorSubsystem) is None:
         raise RuntimeError('Tree generation requires a live editor; no assets were modified')
+    if os.environ.get('ANASTASIS_TREE_MATERIALS_ONLY') == '1':
+        ensure_material()
+        ensure_bark_material()
+        ensure_rock_material()
+        log('RESULT::PASS materials_only=1')
+        unreal.SystemLibrary.quit_editor()
+        return True
+
     ensure_material()
     ensure_bark_material()
 

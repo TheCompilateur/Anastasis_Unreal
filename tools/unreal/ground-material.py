@@ -612,7 +612,9 @@ def build_master(textures):
     p_damp_dark = g.scalar('DampDarken', 0.88, P + 'Wet', -1900, 580)
     p_soil_rough = g.scalar('SoilRoughness', 0.94, P + 'Roughness', -1900, 640)
     p_rock_rough = g.scalar('RockRoughness', 0.70, P + 'Roughness', -1900, 700)
-    p_damp_rough = g.scalar('DampRoughness', 0.38, P + 'Roughness', -1900, 760)
+    # 0.22, pas 0.38 : a 1,7 m le trait de cote doit accrocher le ciel. 0.38 restait
+    # un sol mat, et le contact eau/terre ne se lisait pas.
+    p_damp_rough = g.scalar('DampRoughness', 0.22, P + 'Roughness', -1900, 760)
     p_rough_grain = g.scalar('RoughnessGrain', 0.14, P + 'Roughness', -1900, 820)
     # Ces deux amplitudes ne valent que PRES du sol : DetailFade les eteint au loin.
     # BumpStrength n'est lisible que parce que le gradient est borne plus bas -- sans ce
@@ -644,11 +646,14 @@ def build_master(textures):
     # La roche tire son caractere de son albedo et de sa rugosite. Le relief micro, lui,
     # se lit sur le plat, ou il ne risque pas de franchir le terminateur.
     p_rock_bump = g.scalar('RockBumpScale', 0.55, P + 'Relief', -1900, 940)
-    # 15 m : encore du relief sous les pieds. 70 m : plus rien, bien avant que la
-    # structure n'atteigne la taille d'un motif a l'ecran.
-    p_fade_near = g.scalar('DetailFadeStart', 1500.0, P + 'Detail', -1900, 1060)
-    p_fade_far = g.scalar('DetailFadeEnd', 7000.0, P + 'Detail', -1900, 1120)
+    # Le talus vu a 1,7 m tient dans les quinze premiers metres. Un fondu qui ne
+    # commence qu'a 15 m laisse ce plan entier au meme grain. 2,5 m : encore net
+    # sous les pieds. 16 m : le grain est parti, il reste la couleur.
+    p_fade_near = g.scalar('DetailFadeStart', 250.0, P + 'Detail', -1900, 1060)
+    p_fade_far = g.scalar('DetailFadeEnd', 1600.0, P + 'Detail', -1900, 1120)
     p_soil_spec = g.scalar('SoilSpecular', 0.22, P + 'Roughness', -1900, 1000)
+    # Le lustre du dernier metre, pas un miroir : le sec reste a 0.22.
+    p_damp_spec = g.scalar('DampSpecular', 0.55, P + 'Roughness', -1900, 1040)
 
     # ------------------------------------------------------------------ fondu de detail
     # PixelDepth plutot qu'une distance a la camera calculee : c'est la profondeur deja
@@ -696,12 +701,10 @@ def build_master(textures):
     }
     for i, (family, size) in enumerate(TEX_FAMILIES):
         tex_params['TexSize' + family] = g.scalar('TexSize' + family, size, T, -1900, 1720 + 60 * i)
-    # Fondu lointain. Les mips ramenent deja le detail a sa moyenne -- neutre, par
-    # construction de ground-textures.py -- mais la REPETITION d'une photo de 2 m se lit
-    # en grille entre 30 et 100 m bien avant que les mips ne l'effacent. Au-dela de la fin
-    # du fondu le noeud ne lit plus aucune texture : le lointain ne paie rien.
-    p_tex_near = g.scalar('TexFadeStart', 3000.0, T, -1900, 1960)
-    p_tex_far = g.scalar('TexFadeEnd', 12000.0, T, -1900, 2020)
+    # Pleine a 4 m, absente a 20 m. Le talus du cadrage a 1,7 m perd sa photo
+    # avant l'eau ; au-dela le noeud ne lit plus aucune texture.
+    p_tex_near = g.scalar('TexFadeStart', 400.0, T, -1900, 1960)
+    p_tex_far = g.scalar('TexFadeEnd', 2000.0, T, -1900, 2020)
     tex_fade = g.one_minus(
         g.smoothstep(p_tex_near, '', p_tex_far, '', depth, '', -1540, 1960), '', -1380, 1960)
 
@@ -780,7 +783,8 @@ def build_master(textures):
     r = g.add(r, '', tex, 'TexRough', 440, 400)
     r = g.sat(r, '', 520, 400)
     g.prop(r, '', unreal.MaterialProperty.MP_ROUGHNESS)
-    g.prop(p_soil_spec, '', unreal.MaterialProperty.MP_SPECULAR)
+    spec = g.lerp(p_soil_spec, '', p_damp_spec, '', damp_mask, '', 520, 520)
+    g.prop(spec, '', unreal.MaterialProperty.MP_SPECULAR)
 
     # ------------------------------------------------------------------------ normale
     # Relief micro analytique. Le gradient du bruit est une direction dans l'espace
