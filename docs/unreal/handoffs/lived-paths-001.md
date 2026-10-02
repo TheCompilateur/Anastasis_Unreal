@@ -58,3 +58,7 @@ AUCUN — Source/AnastasisSim intact ; lecture de Wetness et positions uniquemen
 ## STOP
 
 HANDOFF_READY uniquement ; integration par session designee. Pas de revendication de sentier finalise, de preuve joueur, de gain GPU ou de retour causal vers la navigation.
+
+## INTEGRATION (integrateur, 2026-10-02)
+
+Rebase sur main (ba327ba) apres anthropic-paths-002 : la CVar `anastasis.Anthropic.Display` est fusionnee dans `anastasis.Anthropic.Draw` de main (meme role, memoire conservee) ; `StrengthAt` garde le melange des cellules voisines de main, applique a `Wear` ; le rapport garde tous les champs de main (`drawn`, `focus_*`) et ajoute `display`, `peak*`, `people`, `view_*` ; les deux tests coexistent (`ObservedContinuity`, `WetnessAxisAndAbandonment`). Preuve `lived-paths-capture` passee a `Draw`.
