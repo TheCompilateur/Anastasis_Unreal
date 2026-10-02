@@ -10,7 +10,7 @@ Commandée par « Simulateur IV Kingdoms migration phase 3 », découpage approu
   conditionnels.
 
 Ce qui n'est pas branché (l. 893, rate de coup, intention du jour) est déclaré dans les écarts. La branche
-part de `agent/sim-rng-001` (cfbbfc5), qui n'est pas encore dans `main`.
+est posée sur `agent/sim-rng-001` (3b14d27, rebasée sur `main` 2388bb1), qui n'est pas encore dans `main`.
 
 ## FILES_OWNED
 
@@ -79,8 +79,8 @@ référence lui donne dans la somme.
 - Vecteurs : `node tools/migration/gen-explore-vectors.mjs -ref <clone anastasis-ref-p3>` : 188 cas
   `exploreTarget` (64 en promenade, 4 au centre du village), 48 `randomWalkTarget`, 104 décisions mesurées
   (toutes contiguës ; 5 contiennent aussi `assignDayIntent` ou `refreshColonyStockReport`, avant le bloc porté).
-- TESTS (`report-tests.ps1 -Filter Anastasis.Sim`) : **PASS 114, KNOWN_EXPECTED_FAILURE 2**
-  (`Parite.Fbm`, `Parite.SemantiqueJs`), **FAIL 0**, 116/116.
+- TESTS (`report-tests.ps1 -Filter Anastasis.Sim`), après rebase sur `main` 2388bb1 (needs-wiring-001 compris) :
+  **PASS 115, KNOWN_EXPECTED_FAILURE 2** (`Parite.Fbm`, `Parite.SemantiqueJs`), **FAIL 0**, 117/117.
   - `Anastasis.Sim.Parite.Exploration` : 1 185 valeurs, 0 écart.
   - `Anastasis.Sim.Village.TiragesDecision` : les 104 décisions mesurées sont reprises sur le village du
     harnais (scénario `endurance` relu, photo de l'habitant posée, flux posé) et rejouées par la décision
@@ -121,7 +121,7 @@ Sans objet.
 
 ## INTEGRATION_RISK
 
-- Dépend de `agent/sim-rng-001` (cfbbfc5) : à verser après elle, ou dans le même lot.
+- Dépend de `agent/sim-rng-001` (3b14d27) : à verser après elle, ou dans le même lot.
 - `AnastasisVillage.h/.cpp` : `ChooseGoal`, `Perceive`, les lignes de score et `FNpc` (deux champs après
   `LastScan`). Fusion probable avec lifestyle-wiring et needs-wiring (autres endroits de `UpdateNpc` et de
   `FNpc`).
