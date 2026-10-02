@@ -371,7 +371,8 @@ static uint64 CellKey(double X, double Y, double Cell)
 	return (static_cast<uint64>(HX) << 32) | static_cast<uint64>(HY);
 }
 
-static void AddForest(const FInputs& In, const FSettings& C, const FMicroCanopyIndex& Crowns, FRow& Row)
+static void AddForest(const FInputs& In, const FSettings& C, const FMicroCanopyIndex& Crowns,
+	const FMicroCanopyIndex& Obstacles, FRow& Row)
 {
 	TSet<uint64> Seen;
 	auto Try = [&](double X, double Y, bool bEdge, double RingT) -> bool
@@ -395,11 +396,13 @@ static void AddForest(const FInputs& In, const FSettings& C, const FMicroCanopyI
 		if (bEdge)
 		{
 			if (Crown < 1.02 || Crown > 2.45) return false;
+			if (C.bTreeCanopyEcotone && Obstacles.Nearest(X, Y) < 1.02) return false;
 			if (MicroCluster(In.Seed ^ 0xE6u, X / C.EdgePocketSpanUU, Y / C.EdgePocketSpanUU, 81u) < 0.64) return false;
 		}
 		else
 		{
 			if (Crown < 0.22 || Crown > 0.92) return false;
+			if (C.bTreeCanopyEcotone && Obstacles.Nearest(X, Y) < 0.22) return false;
 			const double N = MicroCluster(In.Seed ^ 0x0Du, X / C.UnderPocketSpanUU, Y / C.UnderPocketSpanUU, 83u);
 			if (N < 0.38 || N >= 0.74) return false;
 		}
@@ -439,7 +442,8 @@ static void AddForest(const FInputs& In, const FSettings& C, const FMicroCanopyI
 		return true;
 	};
 
-	for (const FVector& Crown : In.Canopy)
+	const TArray<FVector>& ForestCanopy = C.bTreeCanopyEcotone ? In.TreeCanopy : In.Canopy;
+	for (const FVector& Crown : ForestCanopy)
 	{
 		if (Crown.Z < 80.0) continue;
 		const double Spin = MicroUnit(MicroMix(In.Seed, FMath::FloorToInt(Crown.X), FMath::FloorToInt(Crown.Y), 3u));
@@ -652,12 +656,24 @@ bool Build(const FInputs& In, const FSettings& Settings, FPlan& Out, FString& Ou
 		}
 	}
 
-	Detail::FMicroCanopyIndex Crowns;
+	if (Settings.bTreeCanopyEcotone)
+	{
+		for (const FVector& Crown : In.TreeCanopy)
+		{
+			if (!FMath::IsFinite(Crown.X) || !FMath::IsFinite(Crown.Y) || !FMath::IsFinite(Crown.Z) || Crown.Z < 0.0)
+			{
+				OutError = TEXT("micro ecology: non-finite tree crown");
+				return false;
+			}
+		}
+	}
+	Detail::FMicroCanopyIndex Crowns, TreeCrowns;
 	Crowns.Init(In.Canopy);
+	if (Settings.bTreeCanopyEcotone) TreeCrowns.Init(In.TreeCanopy);
 	Detail::FRow Bank, Meadow, Forest;
 	Detail::ScanGrid(In, Settings, Crowns, Settings.BankCellUU, true, Bank);
 	Detail::ScanGrid(In, Settings, Crowns, Settings.MeadowCellUU, false, Meadow);
-	Detail::AddForest(In, Settings, Crowns, Forest);
+	Detail::AddForest(In, Settings, Settings.bTreeCanopyEcotone ? TreeCrowns : Crowns, Crowns, Forest);
 
 	Out.Instances.Reserve(Bank.Items.Num() + Meadow.Items.Num() + Forest.Items.Num());
 	Out.Instances.Append(Bank.Items);

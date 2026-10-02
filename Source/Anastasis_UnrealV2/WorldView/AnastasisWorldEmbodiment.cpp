@@ -38,6 +38,10 @@ static TAutoConsoleVariable<int32> CVarEcologicalDressing(
     TEXT("0=legacy tile dressing, 1=forest grammar on continuous terrain; applied on embodiment."), ECVF_Default);
 
 // WORLD_DRESSING_01. Coupable pour les captures A/B : meme monde, meme dressing, sans les lieux.
+static TAutoConsoleVariable<int32> CVarTreeCanopyEcotone(
+	TEXT("anastasis.Dressing.TreeCanopyEcotone"), 1,
+	TEXT("1=forest communities anchored to tree crowns only; 0=mixed obstacle reference. Applied on embodiment."), ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarNaturalHistory(
 	TEXT("anastasis.Dressing.NaturalHistory"), 1,
 	TEXT("1=habitat-conditioned patches, wet meadow gradient and forest regeneration; 0=reference distribution. Applied on embodiment."), ECVF_Default);
@@ -982,7 +986,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	PlaceUnderstory(CanonicalSource, Canopy, bEcology);
 	PlaceTrunkContact(CanonicalSource, Trunks, bEcology);
 	PlaceGroundCover(CanonicalSource, Places, Canopy, bEcology);
-	PlaceMicroEcology(CanonicalSource, Places, Canopy, bEcology);
+	PlaceMicroEcology(CanonicalSource, Places, Canopy, Trunks, bEcology);
 	PlaceRiverbank(CanonicalSource, true);
 	EmbodyPlaces(PlaceInputs, Places, bPlaces, CanonicalSource, SupersededRuins);
 }
@@ -1527,7 +1531,7 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 }
 
 void AAnastasisWorldEmbodiment::PlaceMicroEcology(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,
-	const AnastasisPlaces::FPlan& Places, const TArray<FVector>& Canopy, bool bEnabled)
+	const AnastasisPlaces::FPlan& Places, const TArray<FVector>& Canopy, const TArray<FVector>& TreeCanopy, bool bEnabled)
 {
 	for (UHierarchicalInstancedStaticMeshComponent* M : MicroEcologyMeshes)
 	{
@@ -1554,6 +1558,7 @@ void AAnastasisWorldEmbodiment::PlaceMicroEcology(const AnastasisWorldView::FWor
 	In.Bounds = FBox2D(FVector2D(CanonicalSource.OriginX * T, CanonicalSource.OriginY * T),
 		FVector2D((CanonicalSource.OriginX + CanonicalSource.W) * T, (CanonicalSource.OriginY + CanonicalSource.H) * T));
 	In.Canopy = Canopy;
+	In.TreeCanopy = TreeCanopy;
 	In.Seed = CanonicalSource.Seed;
 	for (const AnastasisPlaces::FPlace& P : Places.Places)
 	{
@@ -1563,6 +1568,9 @@ void AAnastasisWorldEmbodiment::PlaceMicroEcology(const AnastasisWorldView::FWor
 	FString Error;
 	AnastasisMicroEcology::FSettings EcoSettings;
 	EcoSettings.bNaturalHistory = CVarNaturalHistory.GetValueOnGameThread() != 0;
+	EcoSettings.bTreeCanopyEcotone = CVarTreeCanopyEcotone.GetValueOnGameThread() != 0;
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_ECOTONE trees_only=%d trees=%d obstacles=%d"),
+		EcoSettings.bTreeCanopyEcotone, TreeCanopy.Num(), Canopy.Num());
 	if (!AnastasisMicroEcology::Build(In, EcoSettings, Eco, Error))
 	{
 		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_MICRO_ECOLOGY rejected=%s"), *Error);

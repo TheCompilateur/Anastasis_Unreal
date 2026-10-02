@@ -365,4 +365,38 @@ bool FAnastasisNaturalHistoryPockets::RunTest(const FString&)
  return true;
 }
 
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisEcotoneTreeIdentity, "Anastasis.MicroEcology.EcotoneTreeIdentity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisEcotoneTreeIdentity::RunTest(const FString&)
+{
+	using namespace AnastasisMicroEcology;
+	FInputs In;
+	In.SampleHeight = [](double, double, double& Z) { Z = 1000.0; return true; };
+	In.SampleWaterHeight = [](double, double, double& Z) { Z = 0.0; return true; };
+	In.Mask = [](double, double) { return 0.0; };
+	In.Bounds = FBox2D(FVector2D(0, 0), FVector2D(16000, 16000));
+	In.Seed = 12345;
+	for (int32 Y=1; Y<7; ++Y) for (int32 X=1; X<7; ++X)
+		In.Canopy.Add(FVector(X*2200.0, Y*2200.0, 450.0)); // Non-tree exclusions only.
+	FSettings Legacy, Typed;
+	Typed.bTreeCanopyEcotone = true;
+	FPlan Old, NoTrees, Trees, Repeat;
+	FString Error;
+	TestTrue(TEXT("reference builds"), Build(In, Legacy, Old, Error));
+	TestTrue(TEXT("reference generated forest from untyped obstacles"), Old.Instances.Num() > 0);
+	TestTrue(TEXT("typed empty forest builds"), Build(In, Typed, NoTrees, Error));
+	TestEqual(TEXT("rocks and bushes alone cannot create a forest community"), NoTrees.Instances.Num(), 0);
+	In.TreeCanopy = In.Canopy; // Only the identity changes; positions and terrain remain identical.
+	TestTrue(TEXT("actual trees build"), Build(In, Typed, Trees, Error));
+	TestTrue(TEXT("tree identity restores forest community"), Trees.Instances.Num() > 0);
+	TestTrue(TEXT("repeat builds"), Build(In, Typed, Repeat, Error));
+	bool Same = Trees.Instances.Num() == Repeat.Instances.Num();
+	for (int32 I=0; Same && I<Trees.Instances.Num(); ++I)
+		Same = Trees.Instances[I].Ground.Equals(Repeat.Instances[I].Ground, 0.0)
+			&& Trees.Instances[I].Role == Repeat.Instances[I].Role;
+	TestTrue(TEXT("typed forest is deterministic"), Same);
+	return true;
+}
+
 #endif

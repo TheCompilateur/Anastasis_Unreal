@@ -69,3 +69,15 @@ inchangees et les inventaires (mesh, compte, positions echantillonnees) identiqu
 Les noms UObject ne sont pas des identites stables apres reincarnation. Il ne juge ni
 la qualite ecologique, ni la botanique historique, ni la marche en PIE. Regarder les six
 triplets, mesurer leur ecart contre reference/reference2, lire le GPU par vue.
+
+## Lisiere proche (ecotone-002)
+
+La pose historique lisiere_eye regarde a environ 180 m ; les strates MicroEco edge
+cessent a 75/78 m. Ne pas conclure a leur absence a partir de cette seule silhouette.
+ground-cover-capture.py avec etats ecotone_reference,ecotone,ecotone_reference2
+choisit une couronne reelle au bord d'un peuplement et fige un transect a 1,7 m
+(ecotone_open, ecotone_edge, ecotone_inside) plus ecotone_oblique ; ecotone-site.json
+explique le choix. Prairie temoin inchangee. Seule TreeCanopyEcotone bascule ;
+NaturalHistory reste a 1. Preuve ecotone-capture au registre. PASS instrumental :
+hauteurs identiques, retour spatial temoin, inventaire non-MicroEco echantillonne
+identique. Ces echantillons ne couvrent pas chaque instance ni la marche joueur.

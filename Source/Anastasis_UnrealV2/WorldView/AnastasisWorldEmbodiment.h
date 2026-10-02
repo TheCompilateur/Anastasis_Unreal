@@ -132,7 +132,7 @@ protected:
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> TrunkContactMeshes;
 	/** MICRO_ECOLOGY_001 : poches de berge, prairie, lisiere et sous-bois, apres l'herbe. */
 	void PlaceMicroEcology(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,
-		const AnastasisPlaces::FPlan& Places, const TArray<FVector>& Canopy, bool bEnabled);
+		const AnastasisPlaces::FPlan& Places, const TArray<FVector>& Canopy, const TArray<FVector>& TreeCanopy, bool bEnabled);
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> MicroEcologyMeshes;
 	/** RIVERBANK_LIFE_001 : un HISM par famille de rive et tuile, vides puis reremplis a chaque incarnation. */

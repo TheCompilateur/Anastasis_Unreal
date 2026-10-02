@@ -13,6 +13,9 @@ sans ombres sortait plus lente qu'avec) ; le GPU mesure la scene.
 La vue hors_vallee est choisie parmi les touffes REELLEMENT posees (HISM GroundCover_*) loin
 des ellipses de la vallee ecrite : elle prouve que la carte entiere est couverte.
 
+Etats ecotone_reference,ecotone,ecotone_reference2 : couronnes arbres vs obstacles,
+poses ecotone_open/edge/inside/oblique proches, prairie temoin.
+
 ANASTASIS_GROUND_VIEWS   optional comma-separated existing view names; missing view fails
 ANASTASIS_GROUND_OUT     dossier de sortie (obligatoire)
 ANASTASIS_GROUND_STATES  etats captures, dans l'ordre, le premier doit poser l'herbe
@@ -30,6 +33,9 @@ import os, time, math, json, hashlib, unreal
 
 OUT = os.environ.get('ANASTASIS_GROUND_OUT')
 STATE_CMDS = {
+    'ecotone_reference': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 0'),
+    'ecotone': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 1'),
+    'ecotone_reference2': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 0'),
     'natural': ('anastasis.Dressing.NaturalHistory 1',),
     'reference': ('anastasis.Dressing.NaturalHistory 0',),
     'reference2': ('anastasis.Dressing.NaturalHistory 0',),
@@ -60,7 +66,9 @@ les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 handle = None
-natural_run = any(s in ('natural', 'reference', 'reference2') for s in states)
+ecotone_run = any(s.startswith('ecotone') for s in states)
+natural_run = ecotone_run or any(s in ('natural', 'reference', 'reference2') for s in states)
+original_ecotone = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.TreeCanopyEcotone')
 original_hour = unreal.SystemLibrary.get_console_variable_float_value('anastasis.Sky.Hour')
 original_natural = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.NaturalHistory')
 habitat = {}
@@ -71,6 +79,8 @@ def finish(msg, error=False):
     if natural_run:
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Sky.Hour %s' % original_hour)
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.NaturalHistory %s' % original_natural)
+    if ecotone_run:
+        unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.TreeCanopyEcotone %s' % original_ecotone)
     (unreal.log_error if error else unreal.log)(msg)
     if handle is not None:
         unreal.unregister_slate_post_tick_callback(handle)
@@ -143,11 +153,13 @@ try:
     def record_habitat(state):
         if not natural_run:
             return
-        actual = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.NaturalHistory')
-        if actual != (1 if state == 'natural' else 0):
+        actual = unreal.SystemLibrary.get_console_variable_int_value(
+            'anastasis.Dressing.TreeCanopyEcotone' if ecotone_run else 'anastasis.Dressing.NaturalHistory')
+        if actual != (1 if state in ('natural', 'ecotone') else 0):
             raise RuntimeError('NaturalHistory switch not applied')
         counts = {}
         spatial = []
+        non_micro = []
         for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
             count = comp.get_instance_count()
             if count:
@@ -161,13 +173,16 @@ try:
                     got = comp.get_instance_transform(i, True)
                     xf = got[1] if isinstance(got, tuple) else got
                     samples.append([round(xf.translation.x, 4), round(xf.translation.y, 4), round(xf.translation.z, 4)])
-                spatial.append([mesh.get_path_name(), count, samples])
+                item = [mesh.get_path_name(), count, samples]
+                spatial.append(item)
+                if not comp.get_name().startswith('MicroEco_'):
+                    non_micro.append(item)
         if not any(n.startswith('GroundCover_') for n in counts):
             raise RuntimeError('no ground cover to compare')
         heights = [ground(x*T, y*T) for y in range(4, 93, 4) for x in range(4, 93, 4)]
         if any(z is None for z in heights):
             raise RuntimeError('sampled terrain missing')
-        habitat[state] = {'switch': actual, 'instances': counts, 'spatial_inventory': sorted(spatial),
+        habitat[state] = {'switch': actual, 'instances': counts, 'spatial_inventory': sorted(spatial), 'non_micro_inventory': sorted(non_micro),
                           'sampled_ground_sha256': hashlib.sha256(json.dumps(heights).encode()).hexdigest()}
         unreal.log('NATURAL_HISTORY_SAMPLE state=%s instances=%d ground=%s' % (
             state, sum(counts.values()), habitat[state]['sampled_ground_sha256']))
@@ -272,6 +287,57 @@ try:
         plan.append(('sousbois_eye', (fern[0] - dx / d * 0.4, fern[1] - dy / d * 0.4), 170, (fern[0] + dx / d * 0.6, fern[1] + dy / d * 0.6), 40))
     unreal.log('GROUND_CAPTURE_SOUSBOIS %s' % (('tile=%.1f,%.1f' % fern) if fern else 'NONE'))
 
+    if ecotone_run:
+        # Actual tree on the open side of a stand; all poses chosen once from the reference.
+        trees = {}
+        for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
+            mesh = comp.get_editor_property('static_mesh')
+            if mesh is None or not mesh.get_name().startswith('SM_Tree_'):
+                continue
+            for i in range(comp.get_instance_count()):
+                got = comp.get_instance_transform(i, True)
+                xf = got[1] if isinstance(got, tuple) else got
+                x, y = xf.translation.x, xf.translation.y
+                trees[(round(x), round(y))] = (x, y)
+        points = list(trees.values())
+        target = (28*T, 58*T)
+        candidates = sorted(points, key=lambda p: (p[0]-target[0])**2+(p[1]-target[1])**2)[:250]
+        chosen = None
+        def nearby(x, y):
+            return sum((px-x)**2+(py-y)**2 < 2200**2 for px, py in points)
+        for x, y in candidates:
+            dx, dy = 48*T-x, 58*T-y
+            length = math.hypot(dx, dy)
+            if length < 1:
+                continue
+            dx, dy = dx/length, dy/length
+            outer = (x+dx*1800, y+dy*1800)
+            inner = (x-dx*1800, y-dy*1800)
+            front, back = nearby(*outer), nearby(*inner)
+            if back < 3 or front >= back:
+                continue
+            heights = [ground(x+dx*d, y+dy*d) for d in (-1800, -800, 0, 800, 1800, 3500)]
+            if any(z is None for z in heights):
+                continue
+            if max(heights)-min(heights) > 1700:
+                continue
+            chosen = (x, y, dx, dy, front, back)
+            break
+        if chosen is None:
+            raise RuntimeError('no observable near forest edge found')
+        x, y, dx, dy, front, back = chosen
+        for name, offset, lift in [('ecotone_open', 1800, 170),
+                                   ('ecotone_edge', 800, 170),
+                                   ('ecotone_inside', -800, 170),
+                                   ('ecotone_oblique', 3500, 1400)]:
+            plan.append((name, ((x+dx*offset)/T, (y+dy*offset)/T), lift,
+                         ((x-dx*2200)/T, (y-dy*2200)/T), 170))
+        with open(os.path.join(OUT, 'ecotone-site.json'), 'w') as f:
+            json.dump({'tree_xy': [x,y], 'outward_xy': [dx,dy],
+                       'front_tree_count_22m': front, 'back_tree_count_22m': back,
+                       'reference_tree_instances': len(points), 'human_eye_cm':170}, f, indent=1)
+        unreal.log('ECOTONE_SITE tree=%.1f,%.1f front=%d back=%d' % (x,y,front,back))
+
     selected = os.environ.get('ANASTASIS_GROUND_VIEWS', '')
     if selected:
         wanted = set(selected.split(','))
@@ -339,9 +405,13 @@ def tick(dt):
                         hashes = {v['sampled_ground_sha256'] for v in habitat.values()}
                         if len(hashes) != 1:
                             raise RuntimeError('terrain samples changed between states')
-                        if 'reference2' in habitat and habitat['reference']['spatial_inventory'] != habitat['reference2']['spatial_inventory']:
+                        ref = 'ecotone_reference' if ecotone_run else 'reference'
+                        if ref+'2' in habitat and habitat[ref]['spatial_inventory'] != habitat[ref+'2']['spatial_inventory']:
                             raise RuntimeError('reference spatial inventory not reproducible')
-                        unreal.log('NATURAL_HISTORY_CAPTURE PASS sampled_ground_unchanged=1 views=%d' % len(views))
+                        if ecotone_run and any(v['non_micro_inventory'] != habitat[ref]['non_micro_inventory'] for v in habitat.values()):
+                            raise RuntimeError('ecotone changed sampled non-micro vegetation')
+                        marker = 'ECOTONE_CAPTURE' if ecotone_run else 'NATURAL_HISTORY_CAPTURE'
+                        unreal.log(marker + ' PASS sampled_ground_unchanged=1 views=%d' % len(views))
                     finish('GROUND_CAPTURE_COMPLETE views=%d states=%d' % (len(views), len(states)))
                     return
                 for c in STATE_CMDS[states[state_i]]:
