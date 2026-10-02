@@ -377,6 +377,25 @@ branchés : l'`ensureLifestyle` de tête (aucun habitant C++ n'a de mode de vie,
 et les autres lectures (décision, marche, intérieur, destination, `placeMemory`). Preuve :
 `Anastasis.Sim.Village.ModeDeVie` ; au forage du tick 1, `lifestyle` est égal à la référence.
 
+### Fait — le flux `sim.rng` et le bruit de décision (mission sim-rng-001), sans branchement
+
+| Unreal | Source JS (`anastasis-ref-p3`) | Preuve |
+| --- | --- | --- |
+| `FVillage::GetSimRngState` / `SetSimRngState` | `sim.rng.state()` / `setState()` — `VillageRng` est le flux `makeRng(seed)` de `simulation.js` l. 1022 ; `save.rng` (save.js l. 66, l. 168) | `Village.FluxSimRng` |
+| `Ai/AnastasisGoalNoise.h/.cpp` | `npc.js` : `goalNoise` (fonction pure), et la table de ses tirages dans `adultScores` (14 inconditionnels, 3 conditionnels), ordre et lignes de source | `Parite.BruitDeBut` : la fonction exécutée telle qu'écrite dans la source, les amplitudes lues dans la source, et 104 décisions MESURÉES rejouées depuis leur état |
+
+**Le relevé** (`tools/migration/trace-sim-rng.mjs`, mesure partagée dans `rng-trace-lib.mjs`) :
+`docs/migration/phase3/P3_RNG_RELEVE.md` (600 ticks) et `P3_RNG_RELEVE_JOUR.md` (5 400 ticks, un jour),
+avec leurs CSV — chaque tirage du scénario `endurance` : tick, habitant, site, appelant, chemin. Sur
+le jour : 1 854 tirages, 104 décisions, chacune = 2 à 8 tirages d'`exploreTarget` (ligne `explore`
+de `failureTargetBiasMap`) PUIS les 14 bruits de la table ; hors décision : `npc.js` l. 893,
+`rollCraftMiss`, rumeurs, `tellPerson`, `assignDayIntent`, `maybeChatOnHaul`.
+
+**Pas branché**, et c'est voulu : les 14 bruits viennent APRÈS un nombre variable de tirages
+d'`exploreTarget`, qui dépend de la mémoire des cases (`npc.mind.cells`). Brancher la table seule
+coderait un faux ordre. Suite : perception-explore-001 (`npc.mind.cells`, `perceive`,
+`exploreTarget`, `randomWalkTarget`, `recallOrSearch`).
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

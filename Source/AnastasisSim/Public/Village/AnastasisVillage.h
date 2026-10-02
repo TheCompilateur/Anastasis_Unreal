@@ -62,6 +62,13 @@
 //     `statusBias` (misere = or <= 2 et sans toit : l'or n'existe pas encore),
 //     sans mode de vie, district, age, memoire, prevision de survie. La meteo
 //     (`weatherGoalBias`) est portee : ecart n°17.
+//     Bruit (sim-rng-001) : `goalNoise` est porte en fonction pure et la table de ses
+//     dix-sept tirages (`Ai/AnastasisGoalNoise.h`), prouves contre les decisions
+//     MESUREES de la reference (`Parite.BruitDeBut`) — mais PAS BRANCHE. Le releve
+//     (`docs/migration/phase3/P3_RNG_RELEVE.md`) montre qu'avant ses quatorze bruits,
+//     chaque decision adulte tire deja `exploreTarget` (2 a 8 tirages selon la memoire
+//     des cases) : brancher la table seule coderait un faux ordre. Suite :
+//     perception-explore-001.
 //  2. Pas de reconsideration aleatoire (`sim.rng() < chance`) ni de collant de
 //     but (`goalStickinessBonus`) : un habitant qui a une cible la garde jusqu'a
 //     l'arrivee, l'echec ou la disparition ; il redecide des qu'il n'en a plus.
@@ -140,8 +147,12 @@
 //         n'a pas ces croyances, l'echange serait vide ou invente ;
 //       - les visites de voisinage, les conseils d'aine, les rencontres quotidiennes
 //         (`runSocialEncounters`), les frictions (`updateConflictsDaily`) ;
-//       - les tirages (`sim.rng`) des rumeurs viennent d'un flux propre au village,
-//         deterministe : la trajectoire JS n'est pas promise au tirage pres.
+//       - les tirages (`sim.rng`) des rumeurs viennent de `VillageRng`. Depuis sim-rng-001
+//         c'est le flux PARTAGE de la reference (`makeRng(seed)`), etat lisible et posable
+//         (`GetSimRngState` / `SetSimRngState`, pour `save.rng`). La trajectoire JS n'est
+//         pourtant pas promise au tirage pres : la reference tire bien plus sur ce flux
+//         (decision, `exploreTarget`, rate de coup, `npc.js` l. 893 ; releve
+//         `P3_RNG_RELEVE.md`), et le C++ pas encore — la position dans le flux diverge.
 //       - l'ancre du regard (`npc.target = partenaire`) est relachee a la fin de la
 //         session : la reference repense sa cible a chaque pensee, ce portage seulement
 //         sans cible (ecart n°2), et l'ancre deviendrait une destination durable.
@@ -963,6 +974,23 @@ namespace AnastasisVillage
 
 		/** Graine du flux de tirages du village (rumeurs). Defaut fixe ; l'hote la pose. */
 		void SetRngSeed(uint32 Seed) { VillageRng = FAnastasisRng(Seed); }
+
+		/**
+		 * `sim.rng` (sim-rng-001) : `VillageRng` EST le flux partage de la reference,
+		 * `this.rng = makeRng(this.seed)` (simulation.js l. 1022) — l'hote le seme avec
+		 * la graine de la simulation (`SetRngSeed`), comme la reference.
+		 *
+		 * Ce qui tire dessus cote C++ aujourd'hui : les actes de parole sur les gisements
+		 * (`createInformResourceSpotActs`, speechActs.js l. 62), dans `ExchangeSpotRumors`
+		 * et `SocializeWithCompanion` — et rien d'autre. La table de decision ne tire pas
+		 * (ecart n°1) ; ce que la reference y tire est releve dans
+		 * `docs/migration/phase3/P3_RNG_RELEVE.md`.
+		 *
+		 * L'etat est celui de `sim.rng.state()` / `setState()` : ce que la sauvegarde JS
+		 * range dans `save.rng` (save.js l. 66) et que `deserialize` restaure (l. 168).
+		 */
+		uint32 GetSimRngState() const { return VillageRng.GetState(); }
+		void SetSimRngState(uint32 State) { VillageRng.SetState(State); }
 
 		/**
 		 * Meteo (village-weather-001). `readSimWeather` lit `weatherAt(sim.seed, sim.day, dayFrac)` :

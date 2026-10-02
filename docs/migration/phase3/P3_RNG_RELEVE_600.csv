@@ -1,0 +1,372 @@
+tick;etape;habitant;decision;etat_avant;site;appelant;chemin
+32;updateNpc;npc-2;1;2576143622;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+32;updateNpc;npc-2;1;112742139;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+32;updateNpc;npc-2;1;1944307952;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+32;updateNpc;npc-2;1;3775873765;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+32;updateNpc;npc-2;1;1312472282;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+32;updateNpc;npc-2;1;3144038095;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+32;updateNpc;npc-2;1;680636612;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+32;updateNpc;npc-2;1;2512202425;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+32;updateNpc;npc-2;1;48800942;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+32;updateNpc;npc-2;1;1880366755;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+32;updateNpc;npc-2;1;3711932568;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+32;updateNpc;npc-2;1;1248531085;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+32;updateNpc;npc-2;1;3080096898;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+32;updateNpc;npc-2;1;616695415;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+32;updateNpc;npc-2;1;2448261228;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+32;updateNpc;npc-2;1;4279827041;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+63;updateNpc;npc-0;1;1816425558;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+63;updateNpc;npc-0;1;3647991371;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+63;updateNpc;npc-0;1;1184589888;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+63;updateNpc;npc-0;1;3016155701;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+63;updateNpc;npc-0;1;552754218;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+63;updateNpc;npc-0;1;2384320031;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+63;updateNpc;npc-0;1;4215885844;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+63;updateNpc;npc-0;1;1752484361;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+63;updateNpc;npc-0;1;3584050174;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+63;updateNpc;npc-0;1;1120648691;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+63;updateNpc;npc-0;1;2952214504;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+63;updateNpc;npc-0;1;488813021;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+63;updateNpc;npc-0;1;2320378834;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+63;updateNpc;npc-0;1;4151944647;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+63;updateNpc;npc-0;1;1688543164;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+63;updateNpc;npc-0;1;3520108977;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+82;updateNpc;npc-3;1;1056707494;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+82;updateNpc;npc-3;1;2888273307;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+82;updateNpc;npc-3;1;424871824;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+82;updateNpc;npc-3;1;2256437637;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+82;updateNpc;npc-3;1;4088003450;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+82;updateNpc;npc-3;1;1624601967;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+82;updateNpc;npc-3;1;3456167780;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+82;updateNpc;npc-3;1;992766297;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+82;updateNpc;npc-3;1;2824332110;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+82;updateNpc;npc-3;1;360930627;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+82;updateNpc;npc-3;1;2192496440;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+82;updateNpc;npc-3;1;4024062253;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+82;updateNpc;npc-3;1;1560660770;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+82;updateNpc;npc-3;1;3392226583;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+82;updateNpc;npc-3;1;928825100;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+82;updateNpc;npc-3;1;2760390913;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+114;updateNpc;npc-1;1;296989430;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+114;updateNpc;npc-1;1;2128555243;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+114;updateNpc;npc-1;1;3960121056;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+114;updateNpc;npc-1;1;1496719573;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+114;updateNpc;npc-1;1;3328285386;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+114;updateNpc;npc-1;1;864883903;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+114;updateNpc;npc-1;1;2696449716;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+114;updateNpc;npc-1;1;233048233;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+114;updateNpc;npc-1;1;2064614046;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+114;updateNpc;npc-1;1;3896179859;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+114;updateNpc;npc-1;1;1432778376;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+114;updateNpc;npc-1;1;3264344189;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+114;updateNpc;npc-1;1;800942706;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+114;updateNpc;npc-1;1;2632508519;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+114;updateNpc;npc-1;1;169107036;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+114;updateNpc;npc-1;1;2000672849;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+125;updateNpc;npc-0;0;3832238662;maybeChatOnHaul src/sim/npc.js:5505;deliver src/sim/npc.js:5417;updateNpc > measure > measure > (anonyme) > act > perform > deliver > maybeChatOnHaul
+133;updateNpc;npc-4;1;1368837179;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+133;updateNpc;npc-4;1;3200402992;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+133;updateNpc;npc-4;1;737001509;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+133;updateNpc;npc-4;1;2568567322;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+133;updateNpc;npc-4;1;105165839;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+133;updateNpc;npc-4;1;1936731652;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+133;updateNpc;npc-4;1;3768297465;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+133;updateNpc;npc-4;1;1304895982;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+133;updateNpc;npc-4;1;3136461795;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+133;updateNpc;npc-4;1;673060312;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+133;updateNpc;npc-4;1;2504626125;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+133;updateNpc;npc-4;1;41224642;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+133;updateNpc;npc-4;1;1872790455;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+133;updateNpc;npc-4;1;3704356268;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+133;updateNpc;npc-4;1;1240954785;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+133;updateNpc;npc-4;1;3072520598;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+141;updateNpc;npc-1;0;609119115;maybeChatOnHaul src/sim/npc.js:5505;deliver src/sim/npc.js:5417;updateNpc > measure > measure > (anonyme) > act > perform > deliver > maybeChatOnHaul
+165;updateNpc;npc-2;0;2440684928;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+196;updateNpc;npc-0;1;4272250741;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+196;updateNpc;npc-0;1;1808849258;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+196;updateNpc;npc-0;1;3640415071;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+196;updateNpc;npc-0;1;1177013588;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+196;updateNpc;npc-0;1;3008579401;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+196;updateNpc;npc-0;1;545177918;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+196;updateNpc;npc-0;1;2376743731;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+196;updateNpc;npc-0;1;4208309544;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+196;updateNpc;npc-0;1;1744908061;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+196;updateNpc;npc-0;1;3576473874;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+196;updateNpc;npc-0;1;1113072391;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+196;updateNpc;npc-0;1;2944638204;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+196;updateNpc;npc-0;1;481236721;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+196;updateNpc;npc-0;1;2312802534;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+196;updateNpc;npc-0;1;4144368347;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+196;updateNpc;npc-0;1;1680966864;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+215;updateNpc;npc-3;0;3512532677;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+247;updateNpc;npc-1;1;1049131194;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+247;updateNpc;npc-1;1;2880697007;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+247;updateNpc;npc-1;1;417295524;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+247;updateNpc;npc-1;1;2248861337;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+247;updateNpc;npc-1;1;4080427150;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+247;updateNpc;npc-1;1;1617025667;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+247;updateNpc;npc-1;1;3448591480;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+247;updateNpc;npc-1;1;985189997;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+247;updateNpc;npc-1;1;2816755810;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+247;updateNpc;npc-1;1;353354327;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+247;updateNpc;npc-1;1;2184920140;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+247;updateNpc;npc-1;1;4016485953;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+247;updateNpc;npc-1;1;1553084470;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+247;updateNpc;npc-1;1;3384650283;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+247;updateNpc;npc-1;1;921248800;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+247;updateNpc;npc-1;1;2752814613;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+257;updateNpc;npc-0;0;289413130;rollCraftMiss src/sim/craftMiss.js:79;progressTendWork src/sim/npc.js:4711;updateNpc > measure > measure > (anonyme) > act > progressTendWork > rollCraftMiss
+266;updateNpc;npc-4;0;2120978943;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+266;updateNpc;npc-4;1;3952544756;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+266;updateNpc;npc-4;1;1489143273;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+266;updateNpc;npc-4;1;3320709086;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+266;updateNpc;npc-4;1;857307603;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+266;updateNpc;npc-4;1;2688873416;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+266;updateNpc;npc-4;1;225471933;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+266;updateNpc;npc-4;1;2057037746;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+266;updateNpc;npc-4;1;3888603559;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+266;updateNpc;npc-4;1;1425202076;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+266;updateNpc;npc-4;1;3256767889;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+266;updateNpc;npc-4;1;793366406;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+266;updateNpc;npc-4;1;2624932219;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+266;updateNpc;npc-4;1;161530736;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+266;updateNpc;npc-4;1;1993096549;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+266;updateNpc;npc-4;1;3824662362;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+266;updateNpc;npc-4;1;1361260879;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+293;updateNpc;npc-0;0;3192826692;rollCraftMiss src/sim/craftMiss.js:79;progressTendWork src/sim/npc.js:4711;updateNpc > measure > measure > (anonyme) > act > progressTendWork > rollCraftMiss
+298;updateNpc;npc-2;0;729425209;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+298;updateNpc;npc-2;1;2560991022;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+298;updateNpc;npc-2;1;97589539;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+298;updateNpc;npc-2;1;1929155352;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+298;updateNpc;npc-2;1;3760721165;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+298;updateNpc;npc-2;1;1297319682;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+298;updateNpc;npc-2;1;3128885495;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+298;updateNpc;npc-2;1;665484012;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+298;updateNpc;npc-2;1;2497049825;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+298;updateNpc;npc-2;1;33648342;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+298;updateNpc;npc-2;1;1865214155;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+298;updateNpc;npc-2;1;3696779968;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+298;updateNpc;npc-2;1;1233378485;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+298;updateNpc;npc-2;1;3064944298;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+298;updateNpc;npc-2;1;601542815;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+298;updateNpc;npc-2;1;2433108628;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+298;updateNpc;npc-2;1;4264674441;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-0;0;1801272958;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+320;updateNpc;npc-0;1;3632838771;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+320;updateNpc;npc-0;1;1169437288;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+320;updateNpc;npc-0;1;3001003101;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+320;updateNpc;npc-0;1;537601618;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+320;updateNpc;npc-0;1;2369167431;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-0;1;4200733244;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-0;1;1737331761;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-0;1;3568897574;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+320;updateNpc;npc-0;1;1105496091;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-0;1;2937061904;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-0;1;473660421;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-0;1;2305226234;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+320;updateNpc;npc-0;1;4136792047;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-0;1;1673390564;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+320;updateNpc;npc-0;1;3504956377;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-0;1;1041554894;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-0;1;2873120707;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-0;1;409719224;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-1;1;2241285037;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+320;updateNpc;npc-1;1;4072850850;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+320;updateNpc;npc-1;1;1609449367;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-1;1;3441015180;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-1;1;977613697;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-1;1;2809179510;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+320;updateNpc;npc-1;1;345778027;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-1;1;2177343840;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-1;1;4008909653;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-1;1;1545508170;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+320;updateNpc;npc-1;1;3377073983;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-1;1;913672500;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+320;updateNpc;npc-1;1;2745238313;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-1;1;281836830;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-1;1;2113402643;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-1;1;3944968456;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-3;0;1481566973;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+320;updateNpc;npc-3;1;3313132786;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+320;updateNpc;npc-3;1;849731303;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+320;updateNpc;npc-3;1;2681297116;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+320;updateNpc;npc-3;1;217895633;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+320;updateNpc;npc-3;1;2049461446;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-3;1;3881027259;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-3;1;1417625776;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-3;1;3249191589;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+320;updateNpc;npc-3;1;785790106;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-3;1;2617355919;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-3;1;153954436;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-3;1;1985520249;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+320;updateNpc;npc-3;1;3817086062;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-3;1;1353684579;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+320;updateNpc;npc-3;1;3185250392;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-3;1;721848909;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-3;1;2553414722;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-3;1;90013239;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-4;0;1921579052;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+320;updateNpc;npc-4;1;3753144865;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+320;updateNpc;npc-4;1;1289743382;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+320;updateNpc;npc-4;1;3121309195;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-4;1;657907712;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-4;1;2489473525;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-4;1;26072042;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+320;updateNpc;npc-4;1;1857637855;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-4;1;3689203668;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-4;1;1225802185;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-4;1;3057367998;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+320;updateNpc;npc-4;1;593966515;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-4;1;2425532328;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+320;updateNpc;npc-4;1;4257098141;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-4;1;1793696658;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-4;1;3625262471;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+320;updateNpc;npc-4;1;1161860988;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+321;updateNpc;npc-1;0;2993426801;exploreTarget src/ai/memory.js:669;redirectAfterFailure src/sim/npc.js:3923;updateNpc > measure > measure > (anonyme) > act > redirectAfterFailure > exploreTarget
+321;updateNpc;npc-1;0;530025318;exploreTarget src/ai/memory.js:670;redirectAfterFailure src/sim/npc.js:3923;updateNpc > measure > measure > (anonyme) > act > redirectAfterFailure > exploreTarget
+329;updateNpc;npc-0;0;2361591131;rollCraftMiss src/sim/craftMiss.js:79;progressTendWork src/sim/npc.js:4711;updateNpc > measure > measure > (anonyme) > act > progressTendWork > rollCraftMiss
+365;updateNpc;npc-0;0;4193156944;rollCraftMiss src/sim/craftMiss.js:79;progressTendWork src/sim/npc.js:4711;updateNpc > measure > measure > (anonyme) > act > progressTendWork > rollCraftMiss
+386;updateNpc;npc-0;0;1729755461;rollCraftMiss src/sim/craftMiss.js:79;progressTendWork src/sim/npc.js:4711;updateNpc > measure > measure > (anonyme) > act > progressTendWork > rollCraftMiss
+422;updateNpc;npc-0;0;3561321274;rollCraftMiss src/sim/craftMiss.js:79;progressTendWork src/sim/npc.js:4711;updateNpc > measure > measure > (anonyme) > act > progressTendWork > rollCraftMiss
+431;updateNpc;npc-2;0;1097919791;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+453;updateNpc;npc-0;0;2929485604;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+453;updateNpc;npc-0;1;466084121;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-0;1;2297649934;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-0;1;4129215747;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-0;1;1665814264;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-0;1;3497380077;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-0;1;1033978594;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-0;1;2865544407;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-0;1;402142924;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+453;updateNpc;npc-0;1;2233708737;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-0;1;4065274550;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-0;1;1601873067;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-0;1;3433438880;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+453;updateNpc;npc-0;1;970037397;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-0;1;2801603210;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+453;updateNpc;npc-0;1;338201727;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-0;1;2169767540;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-0;1;4001333353;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-0;1;1537931870;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-1;0;3369497683;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+453;updateNpc;npc-1;1;906096200;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-1;1;2737662013;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-1;1;274260530;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-1;1;2105826343;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-1;1;3937392156;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-1;1;1473990673;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+453;updateNpc;npc-1;1;3305556486;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-1;1;842155003;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-1;1;2673720816;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-1;1;210319333;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+453;updateNpc;npc-1;1;2041885146;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-1;1;3873450959;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+453;updateNpc;npc-1;1;1410049476;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-1;1;3241615289;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-1;1;778213806;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-1;1;2609779619;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-3;0;146378136;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+453;updateNpc;npc-3;1;1977943949;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-3;1;3809509762;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-3;1;1346108279;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-3;1;3177674092;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-3;1;714272609;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-3;1;2545838422;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-3;1;82436939;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-3;1;1914002752;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-3;1;3745568565;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-3;1;1282167082;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-3;1;3113732895;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-3;1;650331412;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+453;updateNpc;npc-3;1;2481897225;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-3;1;18495742;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-3;1;1850061555;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-3;1;3681627368;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+453;updateNpc;npc-3;1;1218225885;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-3;1;3049791698;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+453;updateNpc;npc-3;1;586390215;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-3;1;2417956028;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-3;1;4249521841;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-3;1;1786120358;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-4;0;3617686171;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+453;updateNpc;npc-4;1;1154284688;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-4;1;2985850501;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+453;updateNpc;npc-4;1;522449018;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-4;1;2354014831;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-4;1;4185580644;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-4;1;1722179161;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+453;updateNpc;npc-4;1;3553744974;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-4;1;1090343491;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-4;1;2921909304;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-4;1;458507821;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+453;updateNpc;npc-4;1;2290073634;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-4;1;4121639447;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+453;updateNpc;npc-4;1;1658237964;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-4;1;3489803777;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-4;1;1026402294;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+453;updateNpc;npc-4;1;2857968107;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+487;updateNpc;npc-3;0;394566624;rollCraftMiss src/sim/craftMiss.js:79;progressCraftGather src/sim/npc.js:4579;updateNpc > measure > measure > (anonyme) > act > progressCraftGather > rollCraftMiss
+511;updateNpc;npc-1;0;2226132437;rollCraftMiss src/sim/craftMiss.js:79;progressTendWork src/sim/npc.js:4711;updateNpc > measure > measure > (anonyme) > act > progressTendWork > rollCraftMiss
+516;updateNpc;npc-3;0;4057698250;rollCraftMiss src/sim/craftMiss.js:79;progressCraftGather src/sim/npc.js:4579;updateNpc > measure > measure > (anonyme) > act > progressCraftGather > rollCraftMiss
+519;updateNpc;npc-4;0;1594296767;rollCraftMiss src/sim/craftMiss.js:79;progressCraftGather src/sim/npc.js:4579;updateNpc > measure > measure > (anonyme) > act > progressCraftGather > rollCraftMiss
+531;updateNpc;npc-2;0;3425862580;rollCraftMiss src/sim/craftMiss.js:79;progressCraftGather src/sim/npc.js:4579;updateNpc > measure > measure > (anonyme) > act > progressCraftGather > rollCraftMiss
+536;updateNpc;npc-2;0;962461097;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+536;updateNpc;npc-2;1;2794026910;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+536;updateNpc;npc-2;1;330625427;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+536;updateNpc;npc-2;1;2162191240;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+536;updateNpc;npc-2;1;3993757053;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+536;updateNpc;npc-2;1;1530355570;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+536;updateNpc;npc-2;1;3361921383;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+536;updateNpc;npc-2;1;898519900;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+536;updateNpc;npc-2;1;2730085713;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+536;updateNpc;npc-2;1;266684230;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+536;updateNpc;npc-2;1;2098250043;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+536;updateNpc;npc-2;1;3929815856;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+536;updateNpc;npc-2;1;1466414373;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+536;updateNpc;npc-2;1;3297980186;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+536;updateNpc;npc-2;1;834578703;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+536;updateNpc;npc-2;1;2666144516;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+536;updateNpc;npc-2;1;202743033;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+548;updateNpc;npc-4;0;2034308846;rollCraftMiss src/sim/craftMiss.js:79;progressCraftGather src/sim/npc.js:4579;updateNpc > measure > measure > (anonyme) > act > progressCraftGather > rollCraftMiss
+549;updateNpc;npc-1;0;3865874659;rollCraftMiss src/sim/craftMiss.js:79;progressTendWork src/sim/npc.js:4711;updateNpc > measure > measure > (anonyme) > act > progressTendWork > rollCraftMiss
+552;updateNpc;npc-0;0;1402473176;createInformResourceSpotActs src/life/speechActs.js:62;socialize src/sim/npc.js:3974;updateNpc > measure > measure > (anonyme) > act > perform > socialize > createInformResourceSpotActs
+552;updateNpc;npc-0;0;3234038989;createInformResourceSpotActs src/life/speechActs.js:62;socialize src/sim/npc.js:3975;updateNpc > measure > measure > (anonyme) > act > perform > socialize > createInformResourceSpotActs
+562;updateNpc;npc-2;0;770637506;rollCraftMiss src/sim/craftMiss.js:79;progressCraftGather src/sim/npc.js:4579;updateNpc > measure > measure > (anonyme) > act > progressCraftGather > rollCraftMiss
+586;updateNpc;npc-0;1;2602203319;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+586;updateNpc;npc-0;1;138801836;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+586;updateNpc;npc-0;1;1970367649;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-0;1;3801933462;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-0;1;1338531979;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-0;1;3170097792;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+586;updateNpc;npc-0;1;706696309;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-0;1;2538262122;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-0;1;74860639;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-0;1;1906426452;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+586;updateNpc;npc-0;1;3737992265;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-0;1;1274590782;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+586;updateNpc;npc-0;1;3106156595;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-0;1;642755112;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-0;1;2474320925;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-0;1;10919442;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-1;0;1842485255;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+586;updateNpc;npc-1;1;3674051068;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+586;updateNpc;npc-1;1;1210649585;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+586;updateNpc;npc-1;1;3042215398;exploreTarget src/ai/memory.js:669;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+586;updateNpc;npc-1;1;578813915;exploreTarget src/ai/memory.js:670;failureCauseForGoal src/sim/npc.js:1696;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > failureTargetBiasMap > failureCauseForGoal > exploreTarget
+586;updateNpc;npc-1;1;2410379728;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1114;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-1;1;4241945541;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1116;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-1;1;1778544058;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1118;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-1;1;3610109871;goalNoise src/sim/npc.js:491;gatherWoodScoreForDecision src/sim/npc.js:1072;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > gatherWoodScoreForDecision > goalNoise
+586;updateNpc;npc-1;1;1146708388;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1120;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-1;1;2978274201;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1121;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-1;1;514872718;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1125;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-1;1;2346438531;goalNoise src/sim/npc.js:491;maintainScore src/sim/npc.js:2813;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > maintainScore > goalNoise
+586;updateNpc;npc-1;1;4178004344;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1135;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-1;1;1714602861;goalNoise src/sim/npc.js:491;exploreScore src/sim/npc.js:2355;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > exploreScore > goalNoise
+586;updateNpc;npc-1;1;3546168674;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1138;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-1;1;1082767191;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1139;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-1;1;2914333004;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1140;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-1;1;450931521;goalNoise src/sim/npc.js:491;adultScores src/sim/npc.js:1141;updateNpc > measure > measure > (anonyme) > chooseGoal > scoreGoals > adultScores > goalNoise
+586;updateNpc;npc-3;0;2282497334;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+586;updateNpc;npc-4;0;4114063147;(anonyme) src/sim/npc.js:893;measure src/debug/profilerCore.js:297;updateNpc > measure > measure > (anonyme)
+598;updateNpc;npc-1;0;1650661664;rollCraftMiss src/sim/craftMiss.js:79;progressTendWork src/sim/npc.js:4711;updateNpc > measure > measure > (anonyme) > act > progressTendWork > rollCraftMiss

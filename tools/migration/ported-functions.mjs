@@ -123,10 +123,11 @@ export const PORTAGE_DECLARE = [
     reduites: ["tick", "moveActor", "nextWaypoint", "enqueueDayDeferred", "assignHomeToHousehold", "movementSpeedFactor"],
   },
   {
-    module: "src/sim/npc.js", cpp: "Village/AnastasisVillage, Work/AnastasisGather, Life/AnastasisWeatherBehavior",
-    source: "puits ; maison ; grenier ; gather-deliver ; social-relax ; bonds-rumors ; village-weather ; build-001",
+    module: "src/sim/npc.js", cpp: "Village/AnastasisVillage, Work/AnastasisGather, Life/AnastasisWeatherBehavior, Ai/AnastasisGoalNoise",
+    source: "puits ; maison ; grenier ; gather-deliver ; social-relax ; bonds-rumors ; village-weather ; build-001 ; sim-rng-001 (goalNoise, fonction pure non branchee)",
     citation: false,
     fonctions: [
+      "goalNoise",
       "reachedMoveTarget", "updateInside", "tryEnterIndoorAction", "redirectDomesticDoorFailure",
       "completionBias", "traitGoalBias", "jobPriority", "mealPathBlocked", "survivalWorkFactor",
       "shouldHaulGatherLoad", "progressCraftGather", "beginHaulToDepot", "applyGoalEligibility",
