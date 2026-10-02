@@ -170,6 +170,11 @@ namespace AnastasisVillage
 		bTerrainTravelCostEnabled = false;
 		MaterialCourierId.Reset();
 		NavVersion = 0;
+		NavSourceShared.Reset();
+		NavService = AnastasisNavService::FNavService();
+		NavAgents.Reset();
+		Traffic.Reset();
+		Traffic.SetNumZeroed(InWorld.W * InWorld.H);
 		Settlement = { InWorld.W * 0.5, InWorld.H * 0.5 };
 		NextBuildingId = 0;
 		NextNpcId = 0;
@@ -238,6 +243,7 @@ namespace AnastasisVillage
 		Nav.MoveCost[Index] = std::numeric_limits<float>::infinity();
 		// `bumpNavVersion` + `clearNavCache` : les chemins qui traversaient la case sont perimes.
 		++NavVersion;
+		NavService.ClearNavCache(*this);
 
 		Building.AccessPoints = ComputeBuildingAccessPoints(Building);
 		const FString Id = Building.Id;
@@ -1163,8 +1169,12 @@ namespace AnastasisVillage
 		Npc.Inside.Until = Now + FMath::Max(0.45, Duration);
 		Npc.Inside.ExitX = Entrance.X;
 		Npc.Inside.ExitY = Entrance.Y;
+		// `actor.target = null ; path = null ; pathStep = 0 ; pathGoal = null ; stuckTimer = 0` (nav-service-001).
 		Npc.bHasTarget = false;
-		ClearNavigation(Npc);
+		Npc.Path.Reset();
+		Npc.PathStep = 0;
+		Npc.bHasPathGoal = false;
+		Npc.StuckTimer = 0.0;
 		// `enterBuilding` : l'entree compte au lieu (`notePlaceUse(actor, activity, 0.8)`).
 		NotePlaceUse(Npc, InActivity, 0.8);
 		return true;
@@ -1528,10 +1538,14 @@ namespace AnastasisVillage
 		Points.Reserve(Items.Num());
 		for (const FNpc& Npc : Items) Points.Add(FVector2D(Npc.X, Npc.Y));
 		Grid.Rebuild(Points);
+		// Pathfinding (nav-service-001) : budget A* du tick (file + cache), avant et apres les habitants.
+		NavService.BeginNavTick(*this, 1.0);
+		ProcessNavQueue();
 		for (int32 Index = 0; Index < Items.Num(); ++Index)
 		{
 			UpdateNpc(Items[Index], Dt);
 		}
+		ProcessNavQueue();
 	}
 
 	bool FVillage::IsNight() const
@@ -2631,7 +2645,10 @@ namespace AnastasisVillage
 		{
 			ExploreTargetFor(Npc);
 		}
-		ClearNavigation(Npc);
+		// `pathFailStreak = 0 ; pathFailed = false ; stuckTimer = 0` : le chemin n'est pas jete ici.
+		Npc.PathFailStreak = 0;
+		Npc.bPathFailed = false;
+		Npc.StuckTimer = 0.0;
 		Npc.bHasTarget = false;
 		Npc.DestBuildingId.Reset();
 		Npc.Goal = GoalObserver;
@@ -2648,8 +2665,11 @@ namespace AnastasisVillage
 		// Porte inaccessible : le besoin se fait dehors, puis `explore` (non porte : observer).
 		Npc.DoorStuckAt = 0.0;
 		Npc.DoorApproachAt = 0.0;
-		ClearNavigation(Npc);
-		Npc.PathCooldown = 0.6;
+		// `pathFailStreak = 0 ; pathFailed = false ; path = null ; pathCooldown = 0.6 ; stuckTimer = 0`.
+		Npc.PathFailStreak = 0;
+		Npc.bPathFailed = false;
+		DropPath(Npc, 0.6);
+		Npc.StuckTimer = 0.0;
 		if (Npc.Goal == GoalRest || Npc.Goal == GoalDrink || Npc.Goal == GoalEat || Npc.Goal == GoalRelax)
 		{
 			if (Perform(Npc))
@@ -2717,6 +2737,16 @@ namespace AnastasisVillage
 			// `setActivity(sim, npc, travelActivity(npc.goal))` (planner-wiring-001 : le C++ ecrivait « marche » pour tous).
 			SetActivity(Npc, JsTravelActivity(Npc.Goal));
 			MoveActor(Npc, Npc.Target, Dt);
+			// A* qui echoue en boucle (`NPC_UNSTICK.pathFailStreakMax`, nav-service-001) : abandonner la cible
+			// plutot que buter contre un mur.
+			if (Npc.PathFailStreak >= PathFailStreakMax)
+			{
+				Npc.PathFailStreak = 0;
+				Npc.bPathFailed = false;
+				Npc.Path.Reset();
+				if (IsDomesticGoal(Npc.Goal) && !Npc.LivingHomeId().IsEmpty()) RedirectDomesticDoorFailure(Npc);
+				else RedirectAfterFailure(Npc);
+			}
 			return;
 		}
 
@@ -2753,7 +2783,15 @@ namespace AnastasisVillage
 				if (!bAccess || !bAtDoor)
 				{
 					Npc.DoorApproachAt += Dt;
-					if (!bAtDoor && bAccess) MoveActor(Npc, Access, Dt);
+					if (!bAtDoor && bAccess)
+					{
+						MoveActor(Npc, Access, Dt);
+						if (Npc.PathFailStreak >= PathFailStreakMax)
+						{
+							RedirectDomesticDoorFailure(Npc);
+							return;
+						}
+					}
 					if (Npc.DoorApproachAt >= DoorApproachSeconds) RedirectDomesticDoorFailure(Npc);
 					return;
 				}
@@ -2988,163 +3026,62 @@ namespace AnastasisVillage
 		Npc.StuckTimer = 0.0;
 	}
 
-	FPoint FVillage::NextWaypoint(FNpc& Npc, const FPoint& Target, double Dt)
-	{
-		Npc.PathCooldown = FMath::Max(0.0, Npc.PathCooldown - Dt);
-		const FString GoalKey = TargetKey(Target);
-		const bool bHasStep = Npc.Path.IsValidIndex(Npc.PathStep);
-		const bool bStepBlocked = bHasStep && IsFootBlocked(Npc.Path[Npc.PathStep].X, Npc.Path[Npc.PathStep].Y);
-		const bool bNeedsPath =
-			Npc.Path.Num() == 0
-			|| Npc.PathStep >= Npc.Path.Num()
-			|| !Npc.bHasPathGoal
-			|| Dist(Npc.PathGoal.X, Npc.PathGoal.Y, Target.X, Target.Y) > 1.2
-			|| Npc.NavVersion != NavVersion
-			|| Npc.NavTargetKey != GoalKey
-			|| bStepBlocked;
-
-		if (bNeedsPath && Npc.PathCooldown <= 0.0)
-		{
-			AnastasisPath::FOptions Options;
-			Options.bAllowBlockedTarget = IsFootBlocked(Target.X, Target.Y);
-			const AnastasisPath::FWorldNavSource Source(Nav, *World);
-			TArray<FPoint> NewPath;
-			const bool bOk = AnastasisPath::FindPath(Source, { Npc.X, Npc.Y }, Target, Options, NewPath);
-			Npc.NavTargetKey = GoalKey;
-			Npc.NavVersion = NavVersion;
-			Npc.bHasPathGoal = true;
-			Npc.PathGoal = Target;
-			Npc.PathStep = 0;
-			if (bOk)
-			{
-				Npc.Path = MoveTemp(NewPath);
-				Npc.bPathFailed = false;
-			}
-			else
-			{
-				// Pas de chemin : on ne relance pas l'A* a chaque tick.
-				Npc.Path.Reset();
-				Npc.bPathFailed = true;
-				Npc.PathCooldown = FMath::Max(0.12, Dt * 2.0);
-			}
-		}
-
-		const FPoint Here = { Npc.X, Npc.Y };
-		if (!Npc.Path.IsValidIndex(Npc.PathStep))
-		{
-			// Chemin en echec : la reference contourne localement (`steerAroundBlock`,
-			// non porte). On reste sur place ; le compteur de blocage prend la suite.
-			if (Npc.bPathFailed) return Here;
-			if (IsFootBlocked(Target.X, Target.Y) && !IsFootBlocked(Npc.X, Npc.Y)) return Here;
-			return Target;
-		}
-		const FPoint Point = Npc.Path[Npc.PathStep];
-		if (IsFootBlocked(Point.X, Point.Y) && !IsFootBlocked(Npc.X, Npc.Y))
-		{
-			Npc.PathStep = Npc.Path.Num();
-			return Here;
-		}
-		if (Dist(Npc.X, Npc.Y, Point.X, Point.Y) < 0.5)
-		{
-			++Npc.PathStep;
-			const FPoint Next = Npc.Path.IsValidIndex(Npc.PathStep) ? Npc.Path[Npc.PathStep] : Target;
-			if (IsFootBlocked(Next.X, Next.Y) && !IsFootBlocked(Npc.X, Npc.Y))
-			{
-				Npc.PathStep = Npc.Path.Num();
-				return Here;
-			}
-			return Next;
-		}
-		return Point;
-	}
-
-	void FVillage::MoveActor(FNpc& Npc, const FPoint& Target, double Dt)
-	{
-		const double BeforeX = Npc.X;
-		const double BeforeY = Npc.Y;
-		FPoint Waypoint = NextWaypoint(Npc, Target, Dt);
-
-		// Pas de marche de la reference : budget de distance, enchaine jusqu'a 8 noeuds.
-		// `speed * movementSpeedFactor(...)` : seul le bloc pluie de ce facteur est porte (ecarts n°4, n°17).
-		double Budget = Npc.Speed * AnastasisWeatherBehavior::RainSpeedFactor(TickDailyRain, Npc.Goal, Npc.JobId) * FMath::Max(0.0, Dt);
-		for (int32 Guard = 0; Guard < 8 && Budget > 1e-4; ++Guard)
-		{
-			if (Guard > 0)
-			{
-				Waypoint = NextWaypoint(Npc, Target, 0.0);
-			}
-			const double DX = Waypoint.X - Npc.X;
-			const double DY = Waypoint.Y - Npc.Y;
-			const double Len = JsHypot(DX, DY);
-			if (Len < 1e-4) break;
-			const double DirX = DX / Len;
-			const double DirY = DY / Len;
-			// ecart n°29 : l'A* paie deja le cout de la case visee ; en mode jeu,
-			// chaque segment depense le meme multiplicateur en temps de marche.
-			// Le mode reference conserve exactement son ancien calcul.
-			const double TravelCost = bTerrainTravelCostEnabled
-				? AnastasisNav::MoveCostAt(Nav, FloorInt(Waypoint.X), FloorInt(Waypoint.Y)) : 1.0;
-			if (!FMath::IsFinite(TravelCost) || TravelCost <= 0.0) break;
-			const double Step = FMath::Min(Len, Budget / TravelCost);
-			const double NextX = Npc.X + DirX * Step;
-			const double NextY = Npc.Y + DirY * Step;
-			// Exception unique : sortir d'une case deja bloquee.
-			const bool bCellStuck = IsFootBlocked(Npc.X, Npc.Y);
-			const double X0 = Npc.X;
-			const double Y0 = Npc.Y;
-			if (bCellStuck || !IsFootBlocked(NextX, Npc.Y))
-			{
-				Npc.X = Clamp(NextX, 1.0, Nav.W - 2);
-			}
-			if (bCellStuck || !IsFootBlocked(Npc.X, NextY))
-			{
-				Npc.Y = Clamp(NextY, 1.0, Nav.H - 2);
-			}
-			const double MovedSeg = JsHypot(Npc.X - X0, Npc.Y - Y0);
-			if (MovedSeg < 1e-5) break;
-			Budget -= MovedSeg * TravelCost;
-			if (JsHypot(Npc.X - Waypoint.X, Npc.Y - Waypoint.Y) >= 0.45) break;
-		}
-
-		const double Moved = JsHypot(Npc.X - BeforeX, Npc.Y - BeforeY);
-		if (Dist(Npc.X, Npc.Y, Target.X, Target.Y) > 1.2 && Moved < 0.05)
-		{
-			Npc.StuckTimer += Dt;
-			if (Npc.StuckTimer > 0.75)
-			{
-				ResolveStuckActor(Npc, Target);
-			}
-		}
-		else
-		{
-			Npc.StuckTimer = 0.0;
-			if (Moved >= 0.05) Npc.StuckStage = 0;
-		}
-	}
-
 	void FVillage::ResolveStuckActor(FNpc& Npc, const FPoint& Target)
 	{
-		// Escalade reduite (ecart n°4) : 1) recalcul, 2) autre seuil du meme batiment, 3) abandon.
+		// Escalade anti-blocage (nav-service-001) : 1) recalcul depuis la position, 2) autre seuil du
+		// batiment, 3) abandon temporaire du but.
+		Npc.Path.Reset();
+		Npc.PathCooldown = 0.0;
 		Npc.StuckTimer = 0.0;
+		Npc.NavPath.Reset();
+		Npc.NavPathIndex = 0;
+		Npc.StuckTicks = 0;
+		Npc.bAwaitingPath = false;
 		++Npc.StuckStage;
 		if (Npc.StuckStage == 1)
 		{
-			ClearNavigation(Npc);
 			return;
 		}
-		if (Npc.StuckStage == 2 && !Npc.DestBuildingId.IsEmpty())
+		if (Npc.StuckStage == 2)
 		{
-			if (FBuilding* Building = Buildings.FindById(Npc.DestBuildingId))
+			// `nav.destBuildingId`, sinon `buildingForAccessTarget(sim, target)` : le batiment, un de ses
+			// seuils, sinon l'anneau 1.
+			FBuilding* Building = Npc.DestBuildingId.IsEmpty() ? nullptr : Buildings.FindById(Npc.DestBuildingId);
+			const int32 TX = FloorInt(Target.X);
+			const int32 TY = FloorInt(Target.Y);
+			if (!Building)
 			{
-				FPoint Other;
-				if (PickBuildingAccessPoint(*Building, &Npc, Other, &Target))
+				for (FBuilding& B : Buildings.GetItemsMutable())
 				{
-					ClearNavigation(Npc);
-					Npc.Target = Other;
+					const bool bOn = B.X == TX && B.Y == TY;
+					const bool bAccess = B.AccessPoints.ContainsByPredicate(
+						[&](const FPoint& P) { return FloorInt(P.X) == TX && FloorInt(P.Y) == TY; });
+					if (bOn || bAccess) { Building = &B; break; }
+				}
+			}
+			if (!Building)
+			{
+				for (FBuilding& B : Buildings.GetItemsMutable())
+				{
+					if (FMath::Max(FMath::Abs(B.X - TX), FMath::Abs(B.Y - TY)) == 1.0) { Building = &B; break; }
+				}
+			}
+			if (Building)
+			{
+				FPoint Alt;
+				if (BuildingAccessPoint(*Building, &Npc, Alt, &Target)
+					&& (FloorInt(Alt.X) != TX || FloorInt(Alt.Y) != TY))
+				{
+					Npc.bHasTarget = true;
+					Npc.Target = Alt;
+					Npc.DestBuildingId = Building->Id;
+					Npc.NavTargetKey.Reset();
 					return;
 				}
 			}
+			Npc.StuckStage = 3;
 		}
+		Npc.StuckStage = 0;
 		// `_navAbandon` -> redirectDomesticDoorFailure (foyer) ou redirectAfterFailure.
 		++Npc.FailedActions;
 		if (IsDomesticGoal(Npc.Goal) && !Npc.LivingHomeId().IsEmpty())
@@ -5033,14 +4970,14 @@ namespace AnastasisVillage
 			Npc.Goal = GoalDeliver;
 			Npc.bHasTarget = BuildingAccessPoint(*Workplace, &Npc, Access);
 			Npc.Target = Access;
-			ClearNavigation(Npc);
+			DropPath(Npc, 0.0);
 			return;
 		}
 		// Sans depot : livrer au hub ou vendre au marche — non portes (ecart n°12).
 		Npc.Goal = GoalObserver;
 		Npc.bHasTarget = false;
 		Npc.DestBuildingId.Reset();
-		ClearNavigation(Npc);
+		DropPath(Npc, 0.0);
 	}
 
 	bool FVillage::Deliver(FNpc& Npc)

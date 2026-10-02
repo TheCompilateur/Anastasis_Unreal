@@ -482,6 +482,28 @@ namespace AnastasisJsSave
 			if (bNew || Obj.Find(Key)) Obj.Set(Key, Value);
 		}
 
+		/** Un chemin : `[{x, y}, ...]` (nav-service-001). */
+		FValue PointsValue(const TArray<AnastasisVillage::FPoint>& Points)
+		{
+			FValue Arr = FValue::MakeArray();
+			for (const AnastasisVillage::FPoint& P : Points)
+			{
+				FValue Obj = FValue::MakeObject();
+				Obj.Set(TEXT("x"), Num(P.X));
+				Obj.Set(TEXT("y"), Num(P.Y));
+				Arr.Items.Add(Obj);
+			}
+			return Arr;
+		}
+
+		FValue PointValue(const AnastasisVillage::FPoint& P)
+		{
+			FValue Obj = FValue::MakeObject();
+			Obj.Set(TEXT("x"), Num(P.X));
+			Obj.Set(TEXT("y"), Num(P.Y));
+			return Obj;
+		}
+
 		FValue ProjectBuilding(const AnastasisVillage::FBuilding& B, const FValue* Base)
 		{
 			const bool bNew = Base == nullptr;
@@ -778,6 +800,60 @@ namespace AnastasisJsSave
 			}
 			if (!R.OptInt(A, TEXT("pathStep"), Where, Out.PathStep) || !R.OptDouble(A, TEXT("pathCooldown"), Where, Out.PathCooldown)) return false;
 			if (!R.OptBool(A, TEXT("pathFailed"), Where, Out.bPathFailed) || !R.OptDouble(A, TEXT("stuckTimer"), Where, Out.StuckTimer)) return false;
+			// Le chemin et `actor.navigation` (nav-service-001).
+			auto ReadPoints = [&R](const FValue& V, const FString& W, TArray<AnastasisVillage::FPoint>& OutPoints) -> bool
+			{
+				if (!V.IsArray()) return R.Fail(W, TEXT("tableau de points attendu"));
+				for (int32 I = 0; I < V.Items.Num(); ++I)
+				{
+					AnastasisVillage::FPoint P;
+					if (!R.Point(V.Items[I], FString::Printf(TEXT("%s[%d]"), *W, I), P)) return false;
+					OutPoints.Add(P);
+				}
+				return true;
+			};
+			if (const FValue* Path = A.Find(TEXT("path")); Path && !Path->IsNull())
+			{
+				if (!ReadPoints(*Path, FReader::At(Where, TEXT("path")), Out.Path)) return false;
+			}
+			if (const FValue* PathGoal = A.Find(TEXT("pathGoal")); PathGoal && !PathGoal->IsNull())
+			{
+				if (!R.Point(*PathGoal, FReader::At(Where, TEXT("pathGoal")), Out.PathGoal)) return false;
+				Out.bHasPathGoal = true;
+			}
+			if (!R.OptInt(A, TEXT("pathFailStreak"), Where, Out.PathFailStreak) || !R.OptDouble(A, TEXT("trafficTimer"), Where, Out.TrafficTimer)) return false;
+			if (const FValue* Dir = A.Find(TEXT("lastMoveDir")); Dir && !Dir->IsNull())
+			{
+				if (!R.Point(*Dir, FReader::At(Where, TEXT("lastMoveDir")), Out.LastMoveDir)) return false;
+				Out.bHasLastMoveDir = true;
+			}
+			if (A.Find(TEXT("hesitationTimer")) || A.Find(TEXT("hesitationCooldown")))
+			{
+				Out.bHasHesitation = true;
+				if (!R.OptDouble(A, TEXT("hesitationTimer"), Where, Out.HesitationTimer)) return false;
+				if (!R.OptDouble(A, TEXT("hesitationCooldown"), Where, Out.HesitationCooldown)) return false;
+			}
+			if (const FValue* Nav = A.Find(TEXT("navigation")); Nav && Nav->IsObject())
+			{
+				const FString W = FReader::At(Where, TEXT("navigation"));
+				if (const FValue* NavPath = Nav->Find(TEXT("path")); NavPath && !NavPath->IsNull())
+				{
+					if (!ReadPoints(*NavPath, FReader::At(W, TEXT("path")), Out.NavPath)) return false;
+				}
+				if (!R.OptInt(*Nav, TEXT("pathIndex"), W, Out.NavPathIndex)) return false;
+				if (const FValue* Key = Nav->Find(TEXT("targetKey")); Key && !Key->IsNull())
+				{
+					if (!Key->IsString()) return R.Fail(FReader::At(W, TEXT("targetKey")), TEXT("chaine ou null attendue"));
+					Out.NavTargetKey = Key->String;
+				}
+				if (!R.OptDouble(*Nav, TEXT("requestedAt"), W, Out.NavRequestedAt)) return false;
+				if (!R.OptInt(*Nav, TEXT("stuckTicks"), W, Out.StuckTicks) || !R.OptInt(*Nav, TEXT("stuckStage"), W, Out.StuckStage)) return false;
+				if (!R.OptId(*Nav, TEXT("destBuildingId"), W, Out.DestBuildingId)) return false;
+				if (!R.OptBool(*Nav, TEXT("awaitingPath"), W, Out.bAwaitingPath)) return false;
+				if (!R.OptId(*Nav, TEXT("doorQueueRole"), W, Out.DoorQueueRole)) return false;
+				if (!R.OptInt(*Nav, TEXT("doorQueueRank"), W, Out.DoorQueueRank)) return false;
+				if (!R.OptInt(*Nav, TEXT("navVersion"), W, Out.NavVersion)) return false;
+			}
 			if (!R.OptDouble(A, TEXT("doorStuckAt"), Where, Out.DoorStuckAt) || !R.OptDouble(A, TEXT("doorApproachAt"), Where, Out.DoorApproachAt)) return false;
 			if (!R.OptId(A, TEXT("talkWithId"), Where, Out.TalkWithId) || !R.OptDouble(A, TEXT("talkUntil"), Where, Out.TalkUntil)) return false;
 			// `actor.activitySince = saved.activitySince ?? 0`.
@@ -1036,6 +1112,31 @@ namespace AnastasisJsSave
 			Put(Out, TEXT("pathCooldown"), Num(N.PathCooldown), bNew);
 			Put(Out, TEXT("pathFailed"), FValue::MakeBool(N.bPathFailed), bNew);
 			Put(Out, TEXT("stuckTimer"), Num(N.StuckTimer), bNew);
+			// Le chemin et `actor.navigation` (nav-service-001).
+			Put(Out, TEXT("path"), N.Path.Num() > 0 ? PointsValue(N.Path) : FValue(), bNew);
+			Put(Out, TEXT("pathGoal"), N.bHasPathGoal ? PointValue(N.PathGoal) : FValue(), bNew);
+			Put(Out, TEXT("pathFailStreak"), Num(N.PathFailStreak), bNew);
+			Put(Out, TEXT("trafficTimer"), Num(N.TrafficTimer), bNew);
+			if (N.bHasLastMoveDir) Out.Set(TEXT("lastMoveDir"), PointValue(N.LastMoveDir));
+			if (N.bHasHesitation)
+			{
+				Out.Set(TEXT("hesitationTimer"), Num(N.HesitationTimer));
+				Out.Set(TEXT("hesitationCooldown"), Num(N.HesitationCooldown));
+			}
+			if (FValue* Nav = Out.Find(TEXT("navigation")); Nav && Nav->IsObject())
+			{
+				Nav->Set(TEXT("path"), PointsValue(N.NavPath));
+				Nav->Set(TEXT("pathIndex"), Num(N.NavPathIndex));
+				Nav->Set(TEXT("targetKey"), N.NavTargetKey.IsEmpty() ? FValue() : Str(N.NavTargetKey));
+				Nav->Set(TEXT("requestedAt"), Num(N.NavRequestedAt));
+				Nav->Set(TEXT("stuckTicks"), Num(N.StuckTicks));
+				Nav->Set(TEXT("stuckStage"), Num(N.StuckStage));
+				Nav->Set(TEXT("destBuildingId"), IdOrNull(N.DestBuildingId));
+				Nav->Set(TEXT("awaitingPath"), FValue::MakeBool(N.bAwaitingPath));
+				Nav->Set(TEXT("doorQueueRole"), IdOrNull(N.DoorQueueRole));
+				Nav->Set(TEXT("doorQueueRank"), Num(N.DoorQueueRank));
+				Nav->Set(TEXT("navVersion"), Num(N.NavVersion));
+			}
 			Put(Out, TEXT("doorStuckAt"), Num(N.DoorStuckAt), bNew);
 			Put(Out, TEXT("doorApproachAt"), Num(N.DoorApproachAt), bNew);
 			Put(Out, TEXT("talkWithId"), IdOrNull(N.TalkWithId), bNew);

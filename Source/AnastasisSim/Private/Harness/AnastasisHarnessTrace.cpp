@@ -289,6 +289,35 @@ namespace AnastasisHarnessTrace
 			if (const FValue* T = Colony->Find(TEXT("treasury")); T && T->IsNumber()) Treasury = T->Number;
 			Village.RestoreColonyForHarness(State, MarketStock, ClearRadius, Treasury);
 		}
+		// `sim.navVersion = data.navVersion | 0`, puis `navCache` filtre sur cette version (nav-service-001) :
+		// les chemins deja calcules, servis tels quels par le cache exact ou de zone.
+		{
+			int32 SavedNavVersion = Village.GetNavVersion();
+			if (const FValue* V = Read.Source.Find(TEXT("navVersion")); V && V->IsNumber()) SavedNavVersion = static_cast<int32>(V->Number);
+			TArray<TPair<FString, AnastasisNavService::FNavCacheEntry>> Cache;
+			if (const FValue* Saved = Read.Source.Find(TEXT("navCache")); Saved && Saved->IsArray())
+			{
+				for (const FValue& Pair : Saved->Items)
+				{
+					if (!Pair.IsArray() || Pair.Items.Num() < 2 || !Pair.Items[0].IsString() || !Pair.Items[1].IsObject()) continue;
+					const FValue& Entry = Pair.Items[1];
+					AnastasisNavService::FNavCacheEntry Out;
+					if (const FValue* NV = Entry.Find(TEXT("navVersion")); NV && NV->IsNumber()) Out.NavVersion = static_cast<int32>(NV->Number);
+					if (const FValue* At = Entry.Find(TEXT("storedAt")); At && At->IsNumber()) Out.StoredAt = At->Number;
+					if (const FValue* Path = Entry.Find(TEXT("path")); Path && Path->IsArray())
+					{
+						for (const FValue& P : Path->Items)
+						{
+							const FValue* X = P.Find(TEXT("x"));
+							const FValue* Y = P.Find(TEXT("y"));
+							if (X && Y && X->IsNumber() && Y->IsNumber()) Out.Path.Add({ X->Number, Y->Number });
+						}
+					}
+					Cache.Add(TPair<FString, AnastasisNavService::FNavCacheEntry>(Pair.Items[0].String, Out));
+				}
+			}
+			Village.RestoreNavigationForHarness(SavedNavVersion, Cache);
+		}
 		// `sim.rng` reprend la ou la sauvegarde l'a laisse (`save.rng`) : apres `ResetFromWorld`, qui
 		// l'a seme sur la graine (`makeRng(seed)`), comme `deserialize` (reader-rng-001).
 		Village.SetSimRngState(Read.RngState);

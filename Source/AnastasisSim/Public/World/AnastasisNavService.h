@@ -203,6 +203,12 @@ namespace AnastasisNavService
 		FString NavTargetKey;
 		double NavRequestedAt = 0.0;
 		int32 NavVersion = -1;
+
+		/**
+		 * Compte les `applyPathToActor` (nav-service-001) : l'hote sait ainsi qu'un chemin a ete pose,
+		 * donc que `syncNavigationFromActor` a recopie `navigation.path` / `pathIndex`.
+		 */
+		int32 ApplyCount = 0;
 	};
 
 	/**

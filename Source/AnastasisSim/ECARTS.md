@@ -125,17 +125,27 @@ ses quartiers, score chaque bâtiment (`districtDestinationScore`) : le bâtimen
 
 - **classe** : REDUIT
 - **destin** : A_FERMER
-- **fermeture** : nav-service-001
+- **fermeture** : failure-target-001 (`navigation.destBuildingId` : `failureTargetBiasMap`, remise à zéro au commit) ; à attribuer : `separateCrowdedActors`, verrou de seuil domestique en route
 - **statut** : OUVERT
 - **entree** : tranches puits → grenier (first-building-001, house-rest-001, granary-eat-001)
-- **reference** : `src/sim/crowdNav.js`, `moveActor`, `separateCrowdedActors`, `movementSpeedFactor` hors pluie
-- **cpp** : `Village/AnastasisVillage.cpp`, pilotage et anti-blocage en trois paliers
+- **reference** : `src/sim/crowdNav.js` (`applyCrowdSeparation`), `simulation.js` (`separateCrowdedActors`), `npc.js` (`act`, verrou du seuil domestique avant `moveActor`), `failureTargetBiasMap`
+- **cpp** : `Village/AnastasisVillageNav.cpp` (la marche) ; `Village/AnastasisVillage.cpp` (`Act`, `CommitGoal`)
 - **harnais** : actors
 - **masques** : separationFoule
-- **detail** : `Public/Village/AnastasisVillage.h`, n° 4
+- **detail** : `docs/migration/phase3/P3_NAV_RELEVE.md`
 
-Pas de file de porte, pas d'hésitation, pas de facteur de vitesse (sauf le bloc pluie, n° 17), pas de
-contournement local, pas de verrou de seuil domestique en route.
+Depuis nav-service-001, la marche passe par le service de navigation (`requestPath` : cache exact et de
+zone, A* sous budget, file vidée avant et après la boucle des habitants), avec la file de porte, l'hésitation,
+le facteur de vitesse de l'état porté (mode de vie compris), le contournement local, l'escalade anti-blocage et
+les passages (`recordPassage`). Le harnais projette `navigation`, le chemin, `lastMoveDir`, `trafficTimer`,
+`hesitation*` : au tick 32 d'endurance, ils sont identiques à la référence. Reste :
+- `navigation.destBuildingId` : son dernier écrivain dans la référence est `failureTargetBiasMap` (`deliveryPos`),
+  non porté, et `CommitGoal` l'efface à chaque décision, ce que la référence ne fait pas ;
+- `separateCrowdedActors`, masqué (`separationFoule`) ;
+- le verrou du seuil domestique en route (`isStableAccessTarget`, `doorApproachAt` avant `moveActor`) ;
+- dans `movementSpeedFactor` : famille (n° 7), routes (aucune), quartiers (n° 3) valent 1 ;
+- la file de porte calcule son point d'attente par `atan2` / `cos` / `sin` de la bibliothèque C++, et non par
+  ceux de V8 : un écart au dernier bit reste possible.
 
 ### n° 5 — Pas de cadence de simulation par bande sans vue posée
 
@@ -601,7 +611,7 @@ les besoins d'un habitant C++ existent toujours.
 - **entree** : route-cost-001
 - **activation** : `anastasis.Village.RouteCost=1` dans l'hôte Unreal ; défaut 1. Le village C++ seul reste à 0 pour la parité JS.
 - **reference** : `src/sim/pathfinding.js` et `src/sim/simulation.js` — le chemin paie déjà les coûts de terrain, mais le budget de marche de la référence est uniforme.
-- **cpp** : `Village/AnastasisVillage.cpp` (`MoveActor`) et `Public/Village/AnastasisVillage.h` (commutateur) ; hôte `AnastasisSimulationSubsystem.cpp`
+- **cpp** : `Village/AnastasisVillageNav.cpp` (`MoveActor`, depuis nav-wiring-001) et `Public/Village/AnastasisVillage.h` (commutateur) ; hôte `AnastasisSimulationSubsystem.cpp`
 - **harnais** : actors
 
 Le même multiplicateur de la grille de navigation que lit l'A* devient le temps dépensé par segment de marche : une route réduit le temps par distance, une herbe humide l'augmente. Aucun nouveau graphe, tirage ni changement de choix de chemin. Le harnais n'active pas cette extension : `FVillage` démarre à 0 et seuls les pas de l'hôte Unreal la mettent à 1. Ce multiplicateur est une règle de jeu, pas une mesure physique ou une pente du maillage rendu. À trancher : conserver cette divergence ou rapprocher la référence JS lors d'une décision de simulation commune.

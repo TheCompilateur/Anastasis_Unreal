@@ -559,6 +559,7 @@ namespace AnastasisNavService
 		Actor.NavTargetKey = NavigationTargetKey(Target);
 		Actor.NavRequestedAt = TimeOf(Host);
 		Actor.NavVersion = WorldNav;
+		Actor.ApplyCount += 1;
 		FNavMetrics* Metrics = Host.GetMetrics();
 		if (bHasPath)
 		{

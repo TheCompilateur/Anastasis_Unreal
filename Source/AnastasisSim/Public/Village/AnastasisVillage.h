@@ -222,6 +222,7 @@
 #include "Work/AnastasisGather.h"
 #include "World/AnastasisEntityTable.h"
 #include "World/AnastasisNavGrid.h"
+#include "World/AnastasisNavService.h"
 #include "World/AnastasisPathfinding.h"
 #include "World/AnastasisWorld.h"
 
@@ -369,6 +370,8 @@ namespace AnastasisVillage
 	/** `NPC_UNSTICK` de npc.js — la porte du foyer. */
 	inline constexpr double DoorWaitSeconds = 2.8;
 	inline constexpr double DoorApproachSeconds = 5.5;
+	/** `NPC_UNSTICK.pathFailStreakMax` (nav-service-001) : trois A* en echec de suite, la cible est abandonnee. */
+	inline constexpr int32 PathFailStreakMax = 3;
 	inline constexpr double DoorAccessRadius = 1.05;
 
 	/** `buildingNearActor(actor, 3.2)` dans buildingForIndoorAction. */
@@ -787,6 +790,35 @@ namespace AnastasisVillage
 		double StuckTimer = 0.0;
 		int32 StuckStage = 0;
 
+		// Service de navigation et pas de marche (nav-service-001).
+		/** `actor.pathFailStreak`. */
+		int32 PathFailStreak = 0;
+		/** `navigation.requestedAt`. */
+		double NavRequestedAt = 0.0;
+		/** `navigation.awaitingPath`. */
+		bool bAwaitingPath = false;
+		/**
+		 * `navigation.path` / `navigation.pathIndex` : des COPIES de `actor.path` / `actor.pathStep`, recopiees
+		 * seulement par `syncNavigationFromActor`. Entre deux synchronisations, la reference les laisse
+		 * en retard (un `npc.path = null` ne les touche pas) : la projection les montre tels quels.
+		 */
+		TArray<FPoint> NavPath;
+		int32 NavPathIndex = 0;
+		/** `navigation.doorQueueRole` (vide = null) et `doorQueueRank`. */
+		FString DoorQueueRole;
+		int32 DoorQueueRank = 0;
+		/** `navigation.stuckTicks`. */
+		int32 StuckTicks = 0;
+		/** `actor.lastMoveDir`, pose au premier segment marche. */
+		bool bHasLastMoveDir = false;
+		FPoint LastMoveDir;
+		/** `actor.hesitationTimer` / `hesitationCooldown` : absents tant que `moveActor` n'a pas tourne. */
+		bool bHasHesitation = false;
+		double HesitationTimer = 0.0;
+		double HesitationCooldown = 0.0;
+		/** `actor.trafficTimer`. */
+		double TrafficTimer = 0.0;
+
 		/** `npc.inventory.food`. */
 		int32 InventoryFood = 0;
 		/** Extension opt-in de portage materiel : charge conservee entre source et chantier. ecart n°18. */
@@ -1011,9 +1043,20 @@ namespace AnastasisVillage
 	 * L'etat du village et ses regles. Lie a un monde genere, qu'il ne possede
 	 * pas : l'hote de simulation garde le monde et le village cote a cote.
 	 */
-	class ANASTASISSIM_API FVillage
+	class ANASTASISSIM_API FVillage : public AnastasisNavService::INavServiceHost
 	{
 	public:
+		// --- Hote du service de navigation (nav-service-001) ---------------------
+		double GetTime() const override { return Now; }
+		/** `sim.speedScale` : le harnais tourne a 1. */
+		double GetSpeedScale() const override { return 1.0; }
+		int32 GetNavVersion() const override { return NavVersion; }
+		const AnastasisPath::INavSource& GetNavSource() const override;
+		AnastasisNavService::FNavAgent* FindLiveAgent(const FString& Id) override;
+		/** `data.navVersion` (harnais) : la version de navigation sauvee, et le cache `navCache`. */
+		void RestoreNavigationForHarness(int32 InNavVersion,
+			const TArray<TPair<FString, AnastasisNavService::FNavCacheEntry>>& InCache);
+
 		/** Lie le village a un monde et reconstruit la grille de navigation. Vide les tables. */
 		void Bind(const AnastasisWorld::FWorld& InWorld);
 		bool IsBound() const { return World != nullptr; }
@@ -1407,7 +1450,6 @@ namespace AnastasisVillage
 		FNpc* FindNpcMutable(const FString& Id) { return Actors.FindById(Id); }
 
 		const AnastasisNav::FNavGrid& GetNavGrid() const { return Nav; }
-		int32 GetNavVersion() const { return NavVersion; }
 
 		/** `footBlockedAt(floor(x), floor(y))` — eau, bati, arbres debout. */
 		bool IsFootBlocked(double InX, double InY) const;
@@ -1565,6 +1607,26 @@ namespace AnastasisVillage
 		FPoint NextWaypoint(FNpc& Npc, const FPoint& Target, double Dt);
 		void ResolveStuckActor(FNpc& Npc, const FPoint& Target);
 		void ClearNavigation(FNpc& Npc);
+		/** `npc.path = null ; npc.pathCooldown = Cooldown` — ce que la reference ecrit a la plupart de ses sites. */
+		static void DropPath(FNpc& Npc, double Cooldown);
+		/** `syncNavigationFromActor(actor)`. */
+		static void SyncNavigationFromActor(FNpc& Npc);
+		/** `requestPath(sim, actor, target, options)` par le service ; rend vrai la ou le JS rend un chemin. */
+		bool RequestPathFor(FNpc& Npc, const FPoint& Target, bool bAllowBlockedTarget);
+		/** `processNavQueue(sim)`. */
+		void ProcessNavQueue();
+		/** `steerAroundBlock(actor, target)`. */
+		FPoint SteerAroundBlock(const FNpc& Npc, const FPoint& Target) const;
+		/** `doorQueueWaypoint(sim, actor, target, waypoint)` (crowdNav.js) : pose le role et le rang. */
+		FPoint DoorQueueWaypoint(FNpc& Npc, const FPoint& Target, const FPoint& Waypoint);
+		/** `movementSpeedFactor(sim, actor, target)`. */
+		double MovementSpeedFactor(FNpc& Npc, const FPoint* Target);
+		/** `recordPassage(actor)`. */
+		void RecordPassage(const FNpc& Npc);
+		/** Copie l'habitant dans sa vue du service, et l'inverse. */
+		static void FillNavAgent(const FNpc& Npc, AnastasisNavService::FNavAgent& Agent);
+		static void WriteBackNavAgent(const AnastasisNavService::FNavAgent& Agent, FNpc& Npc);
+		void FlushNavAgents();
 
 		// Recolte et livraison (npc.js, craftWork.js, fieldWorkPosts.js, memory.js).
 		bool IsPortedGoalFor(const FNpc& Npc, const FString& Goal) const;
@@ -1771,6 +1833,14 @@ namespace AnastasisVillage
 		bool bTerrainTravelCostEnabled = false;
 		FString MaterialCourierId;
 		int32 NavVersion = 0;
+		/** `sim.navService` (nav-service-001). */
+		AnastasisNavService::FNavService NavService;
+		/** Vues des habitants prises par le service pendant un appel, recopiees a la sortie (`FlushNavAgents`). */
+		TMap<FString, AnastasisNavService::FNavAgent> NavAgents;
+		/** `sim.traffic` : passages par tuile, plafonnes a 180. */
+		TArray<int32> Traffic;
+		/** Ce que `findPath(sim, ...)` interroge, construit a la demande (references sur `Nav` et `World`). */
+		mutable TSharedPtr<AnastasisPath::FWorldNavSource> NavSourceShared;
 		FPoint Settlement;
 		TOptional<double> MarketDx;
 		TOptional<double> MarketDy;
