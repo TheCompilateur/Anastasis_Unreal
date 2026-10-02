@@ -37,9 +37,11 @@ Le commit qui porte cette fiche sur `agent/lifestyle-001`.
   `lifestyleTravelFactor` (1 920), `lifestyleIndoorDuration` (288), `lifestyleTarget` (480 : 4 mondes de
   tavernes, maison, lieu favori), `lifestyleNotePlaceUse` (20 suites de 12 usages, ordre des cles compris),
   `lifestyleDailyUpdate` (72 suites de 60 pas sur plusieurs jours, memes jours compris).
-- TESTS : TESTS_CIBLES
-- MUTATION : MUTATION_RESULTAT
-- Suite complete : par `agent-worktree.ps1 finish`.
+- TESTS cibles : `tools\unreal\report-tests.ps1 -Filter Anastasis.Sim.Parite.ModeDeVie` (sur main 22db051)
+  → PASS 1, KNOWN_EXPECTED_FAILURE 0, FAIL 0 ; 11 056 valeurs comparees, 0 ecart.
+- MUTATION (posee, testee, retiree) : penchant du travailleur acharne `Min(8, skill * 2)` ecrit
+  `Min(8, skill) * 2` → **detectee** (`Bias[1306]` : attendu 20, obtenu 22, competence 5).
+- Suite complete : au lot (`finish` ne fait plus que le build, EDITOR_QUEUE_001).
 
 ## npc.lifestyle — CHAMPS ET ORDRE D'APPEL (liste de lecture du lecteur)
 
@@ -66,6 +68,14 @@ l. 1150, x0,55 l. 2217, x0,8 l. 2266) ; `lifestyleIndoorDuration` (`npc.js` l. 3
 `notePlaceUse`) ; `lifestyleTarget` (`destination.js` l. 60). `ensureLifestyle(npc, rng)` aussi a la
 creation (`npc.js` l. 722), dans `normalizeNpcStory` (`simulation.js` l. 1462) et au chargement
 (`save.js` l. 752, avec `sim.rng`).
+
+## PROOFS
+
+Preuves PIE que le lot rejoue pour cette mission, noms de `tools/unreal/proofs.txt` (EDITOR_QUEUE_001) :
+
+PROOFS: (aucune)
+
+La preuve est un test d'automation (`Anastasis.Sim.Parite.ModeDeVie`), rejoue par la suite du lot.
 
 ## SCN
 
