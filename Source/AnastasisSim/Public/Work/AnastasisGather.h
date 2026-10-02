@@ -175,6 +175,9 @@ namespace AnastasisGather
 	/** `shouldHaulGatherLoad` — sans rush, sans hub, pour la nourriture. */
 	ANASTASISSIM_API bool ShouldHaulGatherLoad(int32 Load);
 
+	/** `craftFatigueOf(npc).t` : la fatigue de session, 0..1 (coups de la session, energie). */
+	ANASTASISSIM_API double CraftFatigueT(int32 SwingsDone, double Energy);
+
 	/** `craftFatigueOf(npc).periodMul`. */
 	ANASTASISSIM_API double CraftFatiguePeriodMul(int32 SwingsDone, double Energy);
 

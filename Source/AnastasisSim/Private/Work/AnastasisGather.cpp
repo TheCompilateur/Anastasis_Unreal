@@ -317,7 +317,7 @@ namespace AnastasisGather
 		return Load > HaulLoadAbove;
 	}
 
-	double CraftFatiguePeriodMul(int32 SwingsDone, double Energy)
+	double CraftFatigueT(int32 SwingsDone, double Energy)
 	{
 		constexpr int32 Onset = 4;
 		constexpr int32 FullAt = 14;
@@ -334,8 +334,12 @@ namespace AnastasisGather
 		{
 			FromEnergy = FMath::Min(0.45, (EnergySoft - E) / EnergySoft);
 		}
-		const double T = FMath::Max(0.0, FMath::Min(1.0, FromSwings * 0.82 + FromEnergy * 0.55 + FromSwings * FromEnergy * 0.25));
-		return 1.0 + T * (1.28 - 1.0);
+		return FMath::Max(0.0, FMath::Min(1.0, FromSwings * 0.82 + FromEnergy * 0.55 + FromSwings * FromEnergy * 0.25));
+	}
+
+	double CraftFatiguePeriodMul(int32 SwingsDone, double Energy)
+	{
+		return 1.0 + CraftFatigueT(SwingsDone, Energy) * (1.28 - 1.0);
 	}
 
 	double SwingPeriodFarm(double Skill, int32 SwingsDone, double Energy)

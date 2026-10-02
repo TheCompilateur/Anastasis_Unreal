@@ -190,7 +190,8 @@
 //       - la memoire d'echec et de danger d'un chantier bloque, le relais de pieces
 //         (rendu), les episodes, la reputation, l'annonce, les postes ouverts par le
 //         batiment acheve, la restitution du reliquat (aucun depot de bois ni de pierre) ;
-//       - le rate de coup (ecart n°11) et le bruit de but (ecart n°1), comme ailleurs.
+//       - le bruit de but (ecart n°1), comme ailleurs. Le rate de coup est tire depuis
+//         chat-on-haul-001 (`RollCraftMiss`, profil `build`).
 // 13. Reference : `fee66ae`, commitee. Sa copie de travail porte, NON commitee,
 //     `load > 11` au lieu de `load > 9` pour rentrer livrer : non suivi.
 //
@@ -744,6 +745,14 @@ namespace AnastasisVillage
 		double ScanX = -999.0;
 		double ScanY = -999.0;
 		FWorkSession WorkSession;
+		/**
+		 * Le dernier coup rate (chat-on-haul-001, `craftMiss.js`) : `npc.craftMissAt` et
+		 * `npc.craftMiss = { kind, craftId, at }`. Absents = 0 et vide (la reference lit `|| 0`).
+		 */
+		double CraftMissAt = 0.0;
+		FString CraftMissKind;
+		FString CraftMissCraftId;
+		double CraftMissStampAt = 0.0;
 		/** Observation : nombre de livraisons faites (les quantites : GatheredFood, DeliveredFood). */
 		int32 Deliveries = 0;
 		FHungerAction HungerAction;
@@ -1181,6 +1190,20 @@ namespace AnastasisVillage
 		 */
 		double ReconsiderChanceNow(const FString& NpcId, double ThinkDt) const;
 
+		/**
+		 * `rollCraftMiss(sim, npc, craftId)` (craftMiss.js l. 75, chat-on-haul-001) : si la porte
+		 * l'ouvre et que la chance est positive, UN tirage du flux partage ; rate si tirage < chance,
+		 * et le rate est estampille sur l'habitant (`stampCraftMiss`). Generique : `CraftId` est le
+		 * profil (`farm`, `build`, `chop`, `quarry`, `tend`…). Maitrise des techniques : 0 (ecart n°10).
+		 */
+		bool RollCraftMiss(FNpc& Npc, const FString& CraftId);
+
+		/**
+		 * `applyCraftMissRecovery(npc, sim, craftId, swingPeriodFor)` : `Period` est
+		 * `swingPeriodFor(npc, craftId)` calcule AVANT d'incrementer les coups de la session.
+		 */
+		void ApplyCraftMissRecovery(FNpc& Npc, double Period);
+
 		/** La meme chance a l'instant `At` (tests de rejeu : l'instant mesure, pas l'horloge du village). */
 		double ReconsiderChanceAt(const FNpc& Npc, double At, double ThinkDt) const;
 
@@ -1353,7 +1376,19 @@ namespace AnastasisVillage
 		void SocializeWithCompanion(FNpc& Npc, FNpc& Other);
 		void BumpRelation(FNpc& A, FNpc& B, double DeltaA, double DeltaB);
 		void NoteMeeting(FNpc& A, FNpc& B);
-		void RecordTalk(FNpc& Speaker, FNpc& Listener, bool bContinue);
+		/**
+		 * `recordTalk(sim, speaker, listener, options)`. `KindOverride` = `options.kind` (sinon le lien),
+		 * `AmbientChance` = `options.ambientChance` de la porte d'impulsion (`shouldSpeakNow`).
+		 */
+		void RecordTalk(FNpc& Speaker, FNpc& Listener, bool bContinue,
+			TOptional<AnastasisBonds::EBondKind> KindOverride = {}, double AmbientChance = AnastasisBonds::SpeakWorthAmbientChance);
+		/** `maybeChatOnHaul(sim, npc)` (npc.js l. 5503) : la causette au depot, apres une livraison. */
+		void MaybeChatOnHaul(FNpc& Npc);
+		/**
+		 * `tellSpots(sim, from, to)` (memory.js l. 722) : un sens de `shareRumors`, actes crees PUIS
+		 * deposes avant l'autre sens. Rend le nombre de gisements appris.
+		 */
+		int32 TellSpots(FNpc& From, FNpc& To);
 		bool BeginTalkSession(FNpc& Speaker, FNpc& Listener, bool bContinue);
 		/** `holdTalkAct` : vrai si l'habitant est fige en conversation ce tick. */
 		bool HoldTalk(FNpc& Npc);

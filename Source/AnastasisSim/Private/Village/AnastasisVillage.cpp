@@ -1,4 +1,5 @@
 #include "Village/AnastasisVillage.h"
+#include "Work/AnastasisCraftMiss.h"
 
 #include "Core/AnastasisJsNumeric.h"
 #include "Core/AnastasisSimMath.h"
@@ -4236,7 +4237,12 @@ namespace AnastasisVillage
 		Npc.Activity = TEXT("recolte");
 		if (Now < Npc.WorkSession.NextSwingAt) return 1;
 
-		// `rollCraftMiss` tire `sim.rng` : pas de rate (ecart n°11).
+		// Micro-echec rare : geste sans rendement, reprise un peu plus lente (chat-on-haul-001).
+		if (RollCraftMiss(Npc, TEXT("farm")))
+		{
+			ApplyCraftMissRecovery(Npc, G::SwingPeriodFarm(Npc.Skill, Npc.WorkSession.SwingsDone, Npc.Needs.Energy));
+			return 1;
+		}
 		int32 Taken = G::YieldPerSwingFarm(Npc.Skill);
 		if (Tile.Type == AnastasisWorld::ETileType::Field)
 		{
@@ -4320,6 +4326,9 @@ namespace AnastasisVillage
 		Npc.Needs.Morale = Clamp(Npc.Needs.Morale + 1.0, 0.0, 100.0);
 		// `gainSkill(npc, 0.002)` : domaine du but, le marche.
 		AnastasisGather::GainDomainSkill(Npc.Skill, Npc.SkillTrade, AnastasisGather::DeliverSkillGain);
+		// `if (depot) { workPresence ; maybeChatOnHaul }` : le depot est toujours son poste ici.
+		// `workPresence` n'est pas porte (ecart n°26).
+		MaybeChatOnHaul(Npc);
 		return true;
 	}
 
@@ -4730,16 +4739,18 @@ namespace AnastasisVillage
 		return true;
 	}
 
-	void FVillage::RecordTalk(FNpc& Speaker, FNpc& Listener, bool bContinue)
+	void FVillage::RecordTalk(FNpc& Speaker, FNpc& Listener, bool bContinue, TOptional<BD::EBondKind> KindOverride, double AmbientChance)
 	{
-		const BD::EBondKind Kind = BD::BondKindBetween(RelationOf(Speaker, Listener.Id), RelationOf(Listener, Speaker.Id), Speaker.JobId, Listener.JobId);
+		// `options.kind || bondKindBetween(speaker, listener)`.
+		const BD::EBondKind Kind = KindOverride.IsSet() ? KindOverride.GetValue()
+			: BD::BondKindBetween(RelationOf(Speaker, Listener.Id), RelationOf(Listener, Speaker.Id), Speaker.JobId, Listener.JobId);
 		if (!bContinue)
 		{
 			if (!CanStartTalk(Speaker, Listener)) return;
 			if (Speaker.LastTalk.bValid && Speaker.LastTalk.WithId == Listener.Id && Now - Speaker.LastTalk.At < BD::PairCooldownSeconds) return;
 			// Porte d'impulsion : `shouldSpeakNow`.
 			const double Worth = BD::SpeakWorth(Speaker.Needs, Listener.Needs, Speaker.bTalkChain, Kind);
-			if (!BD::ShouldSpeakNow(Worth, VillageEmitCount(), Speaker.Id, Listener.Id, Now)) return;
+			if (!BD::ShouldSpeakNow(Worth, VillageEmitCount(), Speaker.Id, Listener.Id, Now, AmbientChance)) return;
 		}
 		const bool bAllowReply = bContinue || !Listener.LastTalk.bValid || Now - Listener.LastTalk.At > BD::ReplyQuietSeconds;
 		const int32 Fatigue = FMath::Max(TalkFatigueLevel(Listener, Speaker), TalkFatigueLevel(Speaker, Listener));
@@ -4883,6 +4894,75 @@ namespace AnastasisVillage
 				++A.RumorsHeard;
 			}
 		}
+	}
+
+	int32 FVillage::TellSpots(FNpc& From, FNpc& To)
+	{
+		// `createInformResourceSpotActs(sim, from, to, { limit: PERCEPTION.rumorSpots })` : sans gisement,
+		// aucun tirage. Puis `commitSpeechActs` : deposes tout de suite, avant l'autre sens.
+		if (From.Spots.Num() == 0) return 0;
+		const double R = VillageRng.Next();
+		const TArray<FSpotAct> Acts = CreateInformSpotActs(From.Spots, To.Spots, From.Id, R, 2);
+		const int32 Today = Day();
+		int32 Applied = 0;
+		for (const FSpotAct& Act : Acts)
+		{
+			if (CommitHearsaySpot(To.Spots, Act, Today, Now))
+			{
+				++From.RumorsShared;
+				++To.RumorsHeard;
+				++Applied;
+			}
+		}
+		return Applied;
+	}
+
+	void FVillage::MaybeChatOnHaul(FNpc& Npc)
+	{
+		// « Soft : pas a chaque depot. » Le tirage est inconditionnel : il se consomme toujours.
+		if (VillageRng.Next() > 0.42) return;
+		FNpc* Other = PickSocialCompanion(Npc, 3.4);
+		if (!Other) return;
+		if (!CanStartTalk(Npc, *Other)) return;
+		const bool bSameJob = !Npc.JobId.IsEmpty() && !Other->JobId.IsEmpty() && Npc.JobId == Other->JobId;
+		// `recordTalk(sim, npc, other, sameJob ? { kind: "coworker", ambientChance: 0.1 } : { ambientChance: 0.1 })`.
+		RecordTalk(Npc, *Other, /*bContinue=*/false,
+			bSameJob ? TOptional<BD::EBondKind>(BD::EBondKind::Coworker) : TOptional<BD::EBondKind>(), 0.1);
+		// `sim.shareRumors(npc, other)` : les gisements, dans les deux sens, l'un apres l'autre. Ni acces
+		// bloques, ni savoir negatif, ni croyance de marche, ni croyances (eau, lits, dangers), ni
+		// `spreadRumorExchange` (personnes, episodes, chronique) : ecart n°16.
+		TellSpots(Npc, *Other);
+		TellSpots(*Other, Npc);
+		// `maybeCounselPair` : aucun aine dans ce portage (ecart n°8).
+		// `gain = max(2, floor(bondTalkGain(npc, other) * 0.5))`, sans `bumpRelation` : pas de palier note.
+		const int32 Gain = FMath::Max(2, static_cast<int32>(AnastasisJs::Floor(BD::BondTalkGain(RelationOf(Npc, Other->Id) >= BD::FriendAt) * 0.5)));
+		double& AB = RelationRef(Npc.Relations, Other->Id);
+		AB = Clamp(AB + Gain, -100.0, 100.0);
+		double& BA = RelationRef(Other->Relations, Npc.Id);
+		BA = Clamp(BA + FMath::Max(1, Gain - 1), -100.0, 100.0);
+	}
+
+	bool FVillage::RollCraftMiss(FNpc& Npc, const FString& CraftId)
+	{
+		namespace CM = AnastasisCraftMiss;
+		if (!CM::CanRoll(CraftId, Now, Npc.CraftMissAt, Npc.CraftMissStampAt)) return false;
+		const double Chance = CM::MissChance(CraftId, Npc.Skill, /*Mastery=*/0.0, Npc.WorkSession.SwingsDone, Npc.Needs.Energy);
+		if (Chance <= 0.0) return false;
+		if (VillageRng.Next() >= Chance) return false;
+		// `stampCraftMiss`.
+		Npc.CraftMissKind = CM::MissKindFor(CraftId);
+		Npc.CraftMissCraftId = CraftId;
+		Npc.CraftMissStampAt = Now;
+		Npc.CraftMissAt = Now;
+		return true;
+	}
+
+	void FVillage::ApplyCraftMissRecovery(FNpc& Npc, double Period)
+	{
+		if (!Npc.WorkSession.bActive) return;
+		Npc.WorkSession.LastSwingAt = Now;
+		Npc.WorkSession.NextSwingAt = Now + Period * AnastasisCraftMiss::RecoveryMul;
+		Npc.WorkSession.SwingsDone += 1;
 	}
 
 	void FVillage::SocializeWithCompanion(FNpc& Npc, FNpc& Other)
@@ -5248,7 +5328,13 @@ namespace AnastasisVillage
 		Npc.Activity = TEXT("chantier");
 		if (Now < Npc.WorkSession.NextSwingAt) return 1;
 
-		// `rollCraftMiss` tire `sim.rng` : pas de rate (ecart n°11). `markCraftSwing` :
+		// Piece mal calee : swing visible, pas de pose, reprise (`rollCraftMiss(sim, npc, "build")`).
+		if (RollCraftMiss(Npc, TEXT("build")))
+		{
+			ApplyCraftMissRecovery(Npc, B::SwingPeriod(Npc.Skill, Npc.WorkSession.SwingsDone, Npc.Needs.Energy));
+			return 1;
+		}
+		// `markCraftSwing` :
 		FWorkSession& S = Npc.WorkSession;
 		S.SwingsDone += 1;
 		S.ActionAcc += 1;

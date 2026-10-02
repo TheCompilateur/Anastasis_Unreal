@@ -130,11 +130,12 @@ namespace AnastasisBonds
 		return FMath::Min(1.0, Worth);
 	}
 
-	bool ShouldSpeakNow(double Worth, int32 RecentEmits, const FString& SpeakerId, const FString& ListenerId, double Now)
+	bool ShouldSpeakNow(double Worth, int32 RecentEmits, const FString& SpeakerId, const FString& ListenerId, double Now, double AmbientChance)
 	{
 		if (Worth >= SpeakWorthThreshold) return true;
 		if (RecentEmits >= VillageEmitLimit) return false;
-		const double Rate = FMath::Min(0.5, FMath::Max(0.0, SpeakWorthAmbientChance + Worth * 0.4));
+		// `options.ambientChance` (0,1 pour la causette en livrant), sinon `TALK.speakWorthAmbientChance`.
+		const double Rate = FMath::Min(0.5, FMath::Max(0.0, AmbientChance + Worth * 0.4));
 		const int64 Salt = static_cast<int64>(AnastasisJs::Floor(Now * 10.0)) + 41;
 		return Chance(HashTalk(SpeakerId, ListenerId, Salt), 71, Rate);
 	}

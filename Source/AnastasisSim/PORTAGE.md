@@ -423,6 +423,17 @@ référence. `ReconsiderChanceAt` lit sans écrire. Relevé : `docs/migration/ph
 (`tools/migration/trace-reconsider.mjs`). Reste du n° 2 : le collant de but. `UpdatePlayer` lit encore la
 phase du village (habitant incarné, mission player-goals).
 
+### Fait — le coup raté et la causette au dépôt (mission chat-on-haul-001)
+
+| Unreal | Source JS (`anastasis-ref-p3`) | Preuve |
+| --- | --- | --- |
+| `Work/AnastasisCraftMiss.h/.cpp` | `craftMiss.js` : `craftMissKindFor`, `craftMissChance`, `canRollCraftMiss` ; `craftFatigue.js` : `missMul` | `Parite.CoupRate` : 4 050 chances (profils, compétence, coups, énergie, maîtrise), 135 portes, et les 43 tirages `rollCraftMiss` mesurés sur endurance (tend, chop, quarry ; 1 raté) |
+| `FVillage::RollCraftMiss`, `ApplyCraftMissRecovery` ; `ProgressCraftGather` (farm), `ProgressBuildWork` (build) | `rollCraftMiss`, `stampCraftMiss`, `applyCraftMissRecovery`, leurs appels dans `progressCraftGather` et `progressBuildWork` | `Village.Recolte.CoupRate` : un tirage, pas de rendement, estampille `whiff`, reprise × 1,38 au bit, refroidissement de 9,5 s sans tirage |
+| `FVillage::MaybeChatOnHaul`, `TellSpots`, options de `RecordTalk` ; `AnastasisBonds::ShouldSpeakNow` (ambiance) | `maybeChatOnHaul` (npc.js l. 5503), `shareRumors` > `tellSpots`, `recordTalk(…, { kind, ambientChance })` | `Village.Recolte.CausetteDepot` : tirage consommé au-dessus de 0,42 ; dessous, gisements dans les deux sens et liens +3 / +2 ; `Parite.CoupRate` : 324 portes de parole à 0,1 |
+
+`rollCraftMiss` est générique : `tend` (help-farm-001), `chop` et `quarry` n'ont plus qu'à l'appeler. Le
+`shareRumors` de la causette ne fait que les gisements (n° 16) ; `maybeCounselPair` n'a pas d'aîné (n° 8).
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

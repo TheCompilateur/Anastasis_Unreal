@@ -202,6 +202,7 @@ vie (`lifestyleBias` dans la table, `lifestyleTravelFactor`, `lifestyleIndoorDur
 attendent la décision (n° 1). Depuis act-gate-001, `notePlaceUse` appelle `lifestyleNotePlaceUse` pour
 un habitant qui a un mode de vie ; pour un habitant sans, la référence en tirerait un dans le flux de
 secours : ce tirage est sauté, l'habitant reste sans mode de vie.
+chat-on-haul-001 : sans aîné, `maybeCounselPair` de la causette au dépôt ne conseille jamais.
 
 ### n° 9 — Noûs partiel
 
@@ -233,12 +234,15 @@ toit va manger chez lui « à vide », même si sa réservation est au grenier.
 `settler` et `farmer` ; `gatherFood` et `deliver` ne sont calculées que pour le fermier d'un grenier
 achevé. Nature moyenne, trait « gardien », compétences à 1 : des options légales de `createNpc`, pas
 des tirages.
+chat-on-haul-001 : aucune technique (`npc.techniques` vide) ; la chance de raté lit une maîtrise de 0
+(`bestCraftMastery`), comme la référence pour un habitant sans livre de techniques — vrai des cinq
+habitants d'endurance.
 
-### n° 11 — Récolte sans aléa ni exploration ; monde généré immuable
+### n° 11 — Récolte sans exploration ; ratés seulement dans les boucles portées ; monde généré immuable
 
 - **classe** : REDUIT
 - **destin** : A_FERMER
-- **fermeture** : goals-resources-001 (`rollCraftMiss`, `exploreTarget`)
+- **fermeture** : goals-resources-001 (`exploreTarget` dans la récolte), help-farm-001 (`rollCraftMiss` tend), build-materials-001 (`rollCraftMiss` chop, quarry)
 - **statut** : OUVERT
 - **entree** : gather-deliver-001 (9e2057c)
 - **reference** : `src/sim/npc.js`, `craftWork.js` (`rollCraftMiss`, `exploreTarget`), écriture dans `sim.tiles`
@@ -252,10 +256,14 @@ dit « pas de repousse » : c'est périmé**, la repousse est portée depuis (fi
 `RegrowFieldsDaily`).
 perception-explore-001 : `exploreTarget` est porté (`World/AnastasisExplore.h`) et tire dans la décision ;
 la récolte sans gisement connu ne l'appelle pas encore (`GatherTarget`, il vaque) — le branchement change
-le comportement du fermier et revient à goals-resources-001. `rollCraftMiss` reste non tiré : 43 tirages
-par jour dans le relevé, le premier au tick 257. Le soin de parcelle (`progressTendWork`, help-farm-001)
-est porté sans son `rollCraftMiss(sim, npc, "tend")` : à brancher sur la fonction générique de
-chat-on-haul-001.
+le comportement du fermier et revient à goals-resources-001.
+chat-on-haul-001 : `rollCraftMiss` est porté, générique (`FVillage::RollCraftMiss(Npc, CraftId)`,
+`Work/AnastasisCraftMiss.h`), et tiré dans les deux boucles portées qui le sautaient : la cueillette du
+fermier (`farm`) et le chantier (`build`), avec la reprise allongée de 1,38. Reste : les profils dont la
+boucle n'est pas portée (`tend` de `helpFarm`, `chop`, `quarry` : les 43 tirages du relevé endurance, le
+premier au tick 257 par `helpFarm`), qui n'auront qu'à l'appeler. Maîtrise des techniques à 0 (n° 10).
+Le soin de parcelle (`progressTendWork`, help-farm-001) est porté sans son `rollCraftMiss(sim, npc, "tend")` :
+à brancher sur la fonction générique ci-dessus.
 
 ### n° 12 — Livraison à son dépôt seulement
 
@@ -332,8 +340,13 @@ l'origine. La scène de foyer vaut 0.
 `VillageRng` est bien `sim.rng` (`makeRng(seed)`, sim-rng-001), et depuis reader-rng-001 le harnais le
 reprend à l'état sauvé (`save.rng`) et projette son état VIVANT : sur `endurance`, la section `rng` est
 identique à la référence jusqu'au tick 125. Ce qui reste : la position dans le flux décale dès qu'un site
-de tirage de la référence n'est pas porté (au tick 125, `maybeChatOnHaul` dans `deliver`). Rumeurs de
-gisements seulement ; texte des répliques non porté (le refus est évalué au premier tirage).
+de tirage de la référence n'est pas porté. Rumeurs de gisements seulement ; texte des répliques non porté
+(le refus est évalué au premier tirage).
+chat-on-haul-001 : `maybeChatOnHaul` est porté (tirage, compagnon à 3,4, `recordTalk` coworker / ambiance 0,1,
+gisements dans les deux sens, gain de lien). Comme pour `socialize`, `shareRumors` n'y fait que les gisements :
+ni accès bloqués, ni savoir négatif, ni croyance de marché, ni croyances (eau, lits, dangers), ni
+`spreadRumorExchange` (personnes : `tellPerson` tire dans `sim.rng`, épisodes, chronique). `bondTalkGain`
+sans partenaire, famille, aîné ni nature (« ami » seulement, comme `socialize`).
 
 ### n° 17 — Météo des habitants : ce qui n'est pas porté
 

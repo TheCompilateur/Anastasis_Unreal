@@ -140,7 +140,7 @@ export const PORTAGE_DECLARE = [
   },
   {
     module: "src/sim/npc.js", cpp: "Village/AnastasisVillage, Work/AnastasisGather, Life/AnastasisWeatherBehavior, Ai/AnastasisGoalNoise",
-    source: "puits ; maison ; grenier ; gather-deliver ; social-relax ; bonds-rumors ; village-weather ; build-001 ; sim-rng-001 (goalNoise, fonction pure non branchee) ; reconsider-001",
+    source: "puits ; maison ; grenier ; gather-deliver ; social-relax ; bonds-rumors ; village-weather ; build-001 ; sim-rng-001 (goalNoise, fonction pure non branchee) ; reconsider-001 ; chat-on-haul-001",
     citation: false,
     fonctions: [
       "goalNoise", "committedReconsiderChance",
@@ -151,7 +151,8 @@ export const PORTAGE_DECLARE = [
       "shelterRainDuration", "applyRainExposure", "shelterRainAccess", "performShelterRain",
       "progressBuildWork", "pickBuildSite",
     ],
-    reduites: ["updateNpc", "act", "perform", "adultScores", "assignTarget", "resourceScore", "deliveryScore", "workplaceGoalBias", "deliver", "commitGoalChoice"],
+    reduites: ["updateNpc", "act", "perform", "adultScores", "assignTarget", "resourceScore", "deliveryScore", "workplaceGoalBias", "deliver", "commitGoalChoice",
+      "maybeChatOnHaul"],
   },
   { module: "src/ai/algorithmic/hungerUtility.js", cpp: "Ai/AnastasisNous", source: "grenier", entier: true },
   { module: "src/ai/algorithmic/inertia.js", cpp: "Ai/AnastasisNous", source: "grenier", entier: true },
@@ -168,14 +169,20 @@ export const PORTAGE_DECLARE = [
   {
     module: "src/ai/memory.js", cpp: "Village/AnastasisVillage, Work/AnastasisGather, World/AnastasisExplore", source: "grenier ; gather-deliver ; bonds-rumors (n° 14) ; perception-explore-001",
     fonctions: ["believedStock", "presumedNoise", "perceive", "rememberSpot", "trimMemory", "forgetEmptied", "recallResource", "forgetStale",
-      "markCell", "cellIndex", "exploreTarget"],
+      "markCell", "cellIndex", "exploreTarget", "tellSpots"],
   },
   { module: "src/ai/moralPressure.js", cpp: "Work/AnastasisGather", source: "gather-deliver ; social-relax", entier: true },
   {
     module: "src/sim/craftWork.js", cpp: "Work/AnastasisGather, Work/AnastasisBuild", source: "gather-deliver ; build-001 (profil build)",
     fonctions: ["swingPeriodFor", "yieldPerSwing", "ensureCraftSession"],
   },
-  { module: "src/sim/craftFatigue.js", cpp: "Work/AnastasisGather", source: "gather-deliver", entier: true },
+  { module: "src/sim/craftFatigue.js", cpp: "Work/AnastasisGather", source: "gather-deliver ; chat-on-haul-001 (missMul)", entier: true },
+  {
+    module: "src/sim/craftMiss.js", cpp: "Work/AnastasisCraftMiss, Village/AnastasisVillage", source: "chat-on-haul-001",
+    fonctions: ["craftMissChance", "craftMissKindFor", "canRollCraftMiss", "rollCraftMiss", "stampCraftMiss", "applyCraftMissRecovery"],
+    alias: { craftMissKindFor: "MissKindFor", canRollCraftMiss: "CanRoll", craftMissChance: "MissChance", stampCraftMiss: "RollCraftMiss" },
+    hors: { isCraftMissFresh: "fenetre du geste et des eclats (rendu), aucune lecture par la simulation" },
+  },
   { module: "src/sim/fieldWorkPosts.js", cpp: "Work/AnastasisGather, Village/AnastasisVillage", source: "gather-deliver", entier: true, fonctions: ["fieldWorkTarget", "claimedFieldPosts"] },
   { module: "src/life/skills.js", cpp: "Work/AnastasisGather", source: "gather-deliver", entier: true },
   { module: "src/life/bonds.js", cpp: "Life/AnastasisBonds", source: "bonds-rumors", entier: true, fonctions: ["bondSocialTarget"] },

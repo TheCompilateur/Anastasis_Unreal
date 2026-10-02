@@ -140,7 +140,8 @@ namespace AnastasisBonds
 	ANASTASISSIM_API double SpeakWorth(const AnastasisNeeds::FNeeds& Speaker, const AnastasisNeeds::FNeeds& Listener, bool bSpeakerChain, EBondKind Kind);
 
 	/** `shouldSpeakNow` : RecentEmits = paroles de rue dans les 22 dernieres secondes. */
-	ANASTASISSIM_API bool ShouldSpeakNow(double Worth, int32 RecentEmits, const FString& SpeakerId, const FString& ListenerId, double Now);
+	ANASTASISSIM_API bool ShouldSpeakNow(double Worth, int32 RecentEmits, const FString& SpeakerId, const FString& ListenerId, double Now,
+		double AmbientChance = SpeakWorthAmbientChance);
 
 	/** `talkHoldDurationFor`. */
 	ANASTASISSIM_API double TalkHoldDuration(bool bUrgent, bool bWorkBusy);

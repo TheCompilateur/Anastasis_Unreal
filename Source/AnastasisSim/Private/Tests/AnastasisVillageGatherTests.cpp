@@ -6,6 +6,8 @@
 #include "Sim/AnastasisSimulation.h"
 #include "Village/AnastasisVillage.h"
 #include "Work/AnastasisGather.h"
+#include "Work/AnastasisCraftMiss.h"
+#include "Core/AnastasisRng.h"
 #include "World/AnastasisWorld.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -681,6 +683,197 @@ bool FAnastasisVillageGatherHostTest::RunTest(const FString&)
 	TestEqual(TEXT("ce qui est livre est ce qu'il a porte"), Village.FindBuilding(Granary)->FoodPhysical, N->DeliveredFood);
 	AddInfo(FString::Printf(TEXT("champ (%d,%d), grenier %s, t=%.3f : cueilli %d, livre %d"),
 		FX, FY, *Granary, Sim.GetTime(), N->GatheredFood, N->DeliveredFood));
+	return true;
+}
+
+namespace AnastasisVillageGatherTest
+{
+	/** Un etat du flux dont le PREMIER tirage tombe sous `Below` (ou au-dessus de `Above`). */
+	uint32 StateWhoseNextIs(double Below, double Above)
+	{
+		for (uint32 S = 1u; S < 1000000u; ++S)
+		{
+			FAnastasisRng R(S);
+			const double V = R.Next();
+			if (V < Below && V > Above) return S;
+		}
+		return 0u;
+	}
+
+	/** Un pas, l'habitant sans pensee (aucune decision, donc aucun tirage de decision). */
+	void StepQuiet(FVillage& Village, double& Time, const TArray<FString>& Quiet)
+	{
+		for (const FString& Id : Quiet) Village.FindNpcMutable(Id)->AiThinkAt = Time + 1000.0;
+		Time += Dt;
+		Village.UpdateActors(Time, Dt);
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAnastasisVillageGatherMissTest,
+	"Anastasis.Sim.Village.Recolte.CoupRate",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAnastasisVillageGatherMissTest::RunTest(const FString&)
+{
+	using namespace AnastasisVillageGatherTest;
+	// `rollCraftMiss(sim, npc, "farm")` (chat-on-haul-001) dans la cueillette du fermier : la porte, UN
+	// tirage du flux partage, le rate (pas de rendement, estampille `whiff`), la reprise allongee de 1,38,
+	// et le refroidissement de 9,5 s pendant lequel il ne tire plus.
+	AnastasisWorld::FWorld World = MakeFlatWorld(40, 32);
+	SetField(World, 6, 10, 8, 12, 200);
+	FVillage Village;
+	Village.Bind(World);
+	const FString Granary = Village.AddBuilding(GranaryType, 16, 11);
+	const FString Id = Village.SpawnNpc(13.5, 11.5, Rested());
+	Village.AssignWorkplace(Id, G::JobFarmer, Granary);
+	const int32 Total = FoodEverywhere(Village, World);
+	const TArray<FString> Quiet = { Id };
+	const uint32 Low = StateWhoseNextIs(0.01, -1.0);
+	const uint32 High = StateWhoseNextIs(2.0, 0.9);
+	constexpr uint32 Step = 0x6d2b79f5u;
+
+	double Time = Morning;
+	TestTrue(TEXT("sain jusqu'au premier coup"), Run(Village, World, Total, Time, 20.0, [&] { return Village.FindNpc(Id)->GatheredFood > 0; }));
+	const FNpc* N = Village.FindNpc(Id);
+	if (!TestTrue(TEXT("session ouverte"), N->WorkSession.bActive)) return false;
+
+	// Amorce : sans pensee, flux tenu HAUT a chaque pas (aucun rate), sac vide au grenier sans rien
+	// perdre (le retour force ne coupe pas la session), jusqu'a ce que le pas suivant soit un coup ET
+	// qu'au moins `Need` secondes separent ce coup du dernier rate.
+	auto Prime = [&](double Need)
+	{
+		int32 Guard = 0;
+		while (++Guard < 5000)
+		{
+			FNpc* M = Village.FindNpcMutable(Id);
+			if (M->InventoryFood >= 6)
+			{
+				M->InventoryFood -= Village.CreditFood(Granary, M->InventoryFood);
+			}
+			const double Next = Time + Dt;
+			const bool bSwing = Next >= M->WorkSession.NextSwingAt;
+			const bool bCool = Next - M->CraftMissAt >= Need && Next - M->CraftMissStampAt >= Need;
+			if (M->WorkSession.bActive && bSwing && bCool) return true;
+			Village.SetSimRngState(High);
+			StepQuiet(Village, Time, Quiet);
+		}
+		const FNpc* M = Village.FindNpc(Id);
+		AddInfo(FString::Printf(TEXT("amorce epuisee : t=%.3f but=%s session=%d sac=%d prochain coup=%.3f dernier rate=%.3f"),
+			Time, *M->Goal, M->WorkSession.bActive ? 1 : 0, M->InventoryFood, M->WorkSession.NextSwingAt, M->CraftMissAt));
+		return false;
+	};
+
+	// 1. La porte ouverte, un tirage sous la chance : rate.
+	if (!TestTrue(TEXT("amorce : coup suivant, porte ouverte"), Prime(AnastasisCraftMiss::Cooldown))) return false;
+	N = Village.FindNpc(Id);
+	const int32 FoodBefore = N->InventoryFood;
+	const int32 SwingsBefore = N->WorkSession.SwingsDone;
+	const double SkillBefore = N->Skill;
+	Village.SetSimRngState(Low);
+	StepQuiet(Village, Time, Quiet);
+	N = Village.FindNpc(Id);
+	TestEqual(TEXT("rate : un seul tirage"), Village.GetSimRngState(), Low + Step);
+	TestEqual(TEXT("rate : pas de rendement"), N->InventoryFood, FoodBefore);
+	TestEqual(TEXT("rate : estampille whiff"), N->CraftMissKind, FString(TEXT("whiff")));
+	TestEqual(TEXT("rate : profil farm"), N->CraftMissCraftId, FString(TEXT("farm")));
+	TestEqual(TEXT("rate : craftMissAt = maintenant"), N->CraftMissAt, Time);
+	TestEqual(TEXT("rate : craftMiss.at = maintenant"), N->CraftMissStampAt, Time);
+	TestEqual(TEXT("rate : un coup de plus"), N->WorkSession.SwingsDone, SwingsBefore + 1);
+	TestEqual(TEXT("rate : coup a maintenant"), N->WorkSession.LastSwingAt, Time);
+	// `swingPeriodFor` AVANT l'increment, puis x 1,38 ; meme competence, energie de ce tick.
+	const double Expected = Time + G::SwingPeriodFarm(SkillBefore, SwingsBefore, N->Needs.Energy) * AnastasisCraftMiss::RecoveryMul;
+	TestTrue(TEXT("rate : reprise allongee (memes bits)"), N->WorkSession.NextSwingAt == Expected);
+
+	// 2. Coup suivant, moins de 9,5 s apres : la porte est fermee, aucun tirage, le coup rend.
+	if (!TestTrue(TEXT("amorce : coup suivant, sous le refroidissement"), Prime(0.0))) return false;
+	const int32 FoodMid = Village.FindNpc(Id)->InventoryFood;
+	Village.SetSimRngState(Low);
+	StepQuiet(Village, Time, Quiet);
+	N = Village.FindNpc(Id);
+	TestTrue(TEXT("refroidissement : moins de 9,5 s apres le rate"), Time - N->CraftMissAt < AnastasisCraftMiss::Cooldown);
+	TestEqual(TEXT("refroidissement : aucun tirage"), Village.GetSimRngState(), Low);
+	TestTrue(TEXT("refroidissement : le coup rend"), N->InventoryFood > FoodMid);
+
+	// 3. Apres le refroidissement : un tirage au-dessus de la chance, le coup rend.
+	if (!TestTrue(TEXT("amorce : coup suivant, porte rouverte"), Prime(AnastasisCraftMiss::Cooldown))) return false;
+	const int32 FoodLate = Village.FindNpc(Id)->InventoryFood;
+	Village.SetSimRngState(High);
+	StepQuiet(Village, Time, Quiet);
+	N = Village.FindNpc(Id);
+	TestEqual(TEXT("porte rouverte : un tirage"), Village.GetSimRngState(), High + Step);
+	TestTrue(TEXT("porte rouverte, tirage haut : le coup rend"), N->InventoryFood > FoodLate);
+	TestEqual(TEXT("rien ne se perd"), FoodEverywhere(Village, World), Total);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAnastasisVillageChatOnHaulTest,
+	"Anastasis.Sim.Village.Recolte.CausetteDepot",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAnastasisVillageChatOnHaulTest::RunTest(const FString&)
+{
+	using namespace AnastasisVillageGatherTest;
+	// `maybeChatOnHaul(sim, npc)` (npc.js l. 5503) apres une livraison a son depot : le tirage est
+	// toujours consomme ; au-dessus de 0,42 rien d'autre ; dessous, un compagnon a 3,4 cases, les
+	// gisements dans les deux sens (un tirage chacun) et le gain de lien max(2, floor(6 * 0,5)) = 3 / 2.
+	constexpr uint32 Step = 0x6d2b79f5u;
+	for (const bool bChat : { false, true })
+	{
+		AnastasisWorld::FWorld World = MakeFlatWorld(40, 32);
+		SetField(World, 6, 10, 8, 12, 20);
+		FVillage Village;
+		Village.Bind(World);
+		const FString Granary = Village.AddBuilding(GranaryType, 16, 11);
+		const FString Farmer = Village.SpawnNpc(13.5, 11.5, Rested());
+		Village.AssignWorkplace(Farmer, G::JobFarmer, Granary);
+		const FString Friend = Village.SpawnNpc(14.5, 12.5, Rested());
+		Village.FindNpcMutable(Farmer)->InventoryFood = 4;
+		const int32 Total = FoodEverywhere(Village, World);
+		const uint32 Seed = bChat ? StateWhoseNextIs(0.1, -1.0) : StateWhoseNextIs(2.0, 0.9);
+		const FString Label = bChat ? TEXT("causette") : TEXT("pas de causette");
+
+		double Time = Morning;
+		// Le fermier decide de livrer ; le compagnon ne pense pas et reste ou il est.
+		TestTrue(Label + TEXT(" : sain jusqu'a la decision"), Run(Village, World, Total, Time, 40.0, [&]
+		{
+			Village.FindNpcMutable(Friend)->AiThinkAt = Time + 1000.0;
+			return Village.FindNpc(Farmer)->Goal == GoalDeliver;
+		}));
+		if (!TestEqual(Label + TEXT(" : but deliver"), Village.FindNpc(Farmer)->Goal, FString(GoalDeliver))) return false;
+		const bool bFarmerSpots = Village.FindNpc(Farmer)->Spots.Num() > 0;
+		const bool bFriendSpots = Village.FindNpc(Friend)->Spots.Num() > 0;
+		uint32 Before = 0u;
+		int32 Guard = 0;
+		while (Village.FindNpc(Farmer)->Deliveries == 0 && ++Guard < 3000)
+		{
+			Village.SetSimRngState(Seed);
+			Before = Seed;
+			StepQuiet(Village, Time, { Farmer, Friend });
+		}
+		const FNpc* F = Village.FindNpc(Farmer);
+		if (!TestEqual(Label + TEXT(" : une livraison"), F->Deliveries, 1)) return false;
+		const FNpc* C = Village.FindNpc(Friend);
+		const double D = FMath::Sqrt(FMath::Square(F->X - C->X) + FMath::Square(F->Y - C->Y));
+		if (!bChat)
+		{
+			TestEqual(TEXT("pas de causette : un seul tirage"), Village.GetSimRngState(), Before + Step);
+			TestEqual(TEXT("pas de causette : aucun lien"), FVillage::RelationOf(*F, Friend), 0.0);
+			TestEqual(TEXT("pas de causette : aucun lien en retour"), FVillage::RelationOf(*C, Farmer), 0.0);
+		}
+		else
+		{
+			if (!TestTrue(FString::Printf(TEXT("causette : le compagnon est a %.2f cases (<= 3,4)"), D), D <= 3.4)) return false;
+			const uint32 Draws = 1u + (bFarmerSpots ? 1u : 0u) + (bFriendSpots ? 1u : 0u);
+			TestEqual(TEXT("causette : tirage + un par sens avec gisements"), Village.GetSimRngState(), Before + Draws * Step);
+			TestEqual(TEXT("causette : lien du livreur +3"), FVillage::RelationOf(*F, Friend), 3.0);
+			TestEqual(TEXT("causette : lien du compagnon +2"), FVillage::RelationOf(*C, Farmer), 2.0);
+			AddInfo(FString::Printf(TEXT("compagnon a %.2f ; gisements %d / %d ; parole %s"), D, F->Spots.Num(), C->Spots.Num(),
+				F->LastTalk.bValid ? *F->LastTalk.WithId : TEXT("(porte d'impulsion fermee)")));
+		}
+		TestEqual(Label + TEXT(" : rien ne se perd"), FoodEverywhere(Village, World), Total);
+	}
 	return true;
 }
 
