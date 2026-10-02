@@ -49,7 +49,13 @@ CVar anastasis.Village.SiteSelection = 1 par dÃ©faut. 0 conserve l'ancien choix 
 
 ## SCN
 
-PENDING. Rapport JSON lu via AnastasisSimulationDebugLibrary.get_settlement_site_status(world) : ancien site, meilleur, top cinq, pentes, surfaces et distances. Le script exige le puits vraiment posÃ© aux coordonnÃ©es retenues, douze PNJ, progression temporelle et dÃ©placement rÃ©el ; produit selected_eye.png (1,7 m au sol Ã©chantillonnÃ©), selected_oblique.png et legacy_terrain_oblique.png dans Saved/SettlementSiteEvidence/. Le troisiÃ¨me cadre montre l'ancien TERRAIN, pas un faux village avant/aprÃ¨s.
+OBSERVÉ sur c790e8a, run 20261002-022202. Rapport JSON lu via AnastasisSimulationDebugLibrary.get_settlement_site_status(world) : ancien site, meilleur, top cinq, pentes, surfaces et distances. Le script exige le puits vraiment posÃ© aux coordonnÃ©es retenues, douze PNJ, progression temporelle et dÃ©placement rÃ©el ; produit selected_eye.png (1,7 m au sol Ã©chantillonnÃ©), selected_oblique.png et legacy_terrain_oblique.png dans Saved/SettlementSiteEvidence/. Le troisiÃ¨me cadre montre l'ancien TERRAIN, pas un faux village avant/aprÃ¨s.
+
+Résultat : SETTLEMENT_SITE_PIE PASS, 52.3 s, douze PNJ présents et au moins un déplacement observé après dix secondes simulées. Relevé 69.428 ms, 8836 cellules sondées, 59 sites éligibles. Site retenu (74,36) : pente 6.077 degrés, surface contiguë 9600 m², accès eau 60 m, champ 120 m, accès bois adjacent (0 m jusqu’à la cellule de prélèvement). Ancien site (47,47) : non éligible, accès eau 660 m sur le sous-graphe. Le zéro de surface de l’ancien site signifie que le calcul a été écarté par les préconditions, pas une absence mesurée de terrain disponible.
+
+Les trois images ont été regardées : puits posé dans une ouverture en lisière, sol lisible à hauteur humaine, forêt proche. Des repères de debug PNJ restent visibles ; ces images sont fonctionnelles et ne constituent pas une validation artistique finale. La vue de l’ancien site montre son terrain ouvert et la rivière ; la distance calculée est un parcours filtré vers une eau à la fois sémantique et rendue, pas sa distance visuelle à toute eau du décor.
+
+Preuves locales non versionnées : Saved/EditorBatch/20261002-022202/editor-batch.log et Saved/SettlementSiteEvidence/comparison.json + trois PNG. Le log termine la preuve à 06:23:40, puis relève un crash de fermeture à 06:23:47 (RequestExitWithStatus 3). Le lanceur affiche EDITOR_BATCH::PASS car il juge les motifs du travail ; cela NE prouve PAS une fermeture propre. PID 4892 absent après le run, créneau rendu. Stabilité générale : UNKNOWN.
 
 ## PLY
 
