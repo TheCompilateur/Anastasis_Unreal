@@ -512,6 +512,8 @@ est vide, la table garde ses bits. Sur `endurance`, la référence a pourtant de
 `helpFarm` 28, `build` 24 et des biais `build` 20, `gatherFood` 14, `gatherWood` 14, `helpFarm` 10
 (constants sur la journée) : ce sont eux qui font choisir `helpFarm` sans ferme (tick 196) et `build`
 sans chantier (tick 32).
+Depuis planner-module-001, le planificateur est porté en module seul (`Village/AnastasisPlanner`, prouvé au
+bit par `Anastasis.Sim.Parite.Planificateur`) : il reste à remplir `CollectiveDecisionOf` depuis sa vue.
 
 ### n° 28 — Mortalité : seule la mort par santé épuisée est portée
 
@@ -546,3 +548,20 @@ les besoins d'un habitant C++ existent toujours.
 - **harnais** : actors
 
 Le même multiplicateur de la grille de navigation que lit l'A* devient le temps dépensé par segment de marche : une route réduit le temps par distance, une herbe humide l'augmente. Aucun nouveau graphe, tirage ni changement de choix de chemin. Le harnais n'active pas cette extension : `FVillage` démarre à 0 et seuls les pas de l'hôte Unreal la mettent à 1. Ce multiplicateur est une règle de jeu, pas une mesure physique ou une pente du maillage rendu. À trancher : conserver cette divergence ou rapprocher la référence JS lors d'une décision de simulation commune.
+
+### n° 32 — Planificateur : la corvée de bois départage les égalités en ordre ordinal
+
+- **classe** : SUBSTITUT
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : planner-module-001
+- **reference** : `src/sim/collectivePriorities.js` `woodBootstrapDraft` (`String(a.id).localeCompare(String(b.id))`)
+- **cpp** : `Village/AnastasisPlanner.cpp`, `WoodBootstrapDraft`
+- **harnais** : aucune
+
+À aptitude égale, la référence classe les habitants par `localeCompare` (collation ICU de la locale) ; le C++
+les classe par ordre ordinal des identifiants. Les deux ordres coïncident pour des identifiants de même forme
+(`npc-0`, `npc-12`, `npc-3` : chiffres comparés caractère par caractère), qui sont ceux de tous les scénarios ;
+ils divergent pour des identifiants mêlant casses ou ponctuation. Module seul aujourd'hui : une fois branché, la
+divergence toucherait `actors`. Porter la collation ICU ou restreindre la forme
+des identifiants : à trancher.

@@ -1059,7 +1059,7 @@ namespace AnastasisPlanner
 				R.Fit = (A.JobId == TEXT("woodcutter") ? 2.0 : 0.0) + A.TraitGather * JobTraitBiasGather(A.JobId);
 				Ranked.Add(R);
 			}
-			// `(b.fit - a.fit) || String(a.id).localeCompare(String(b.id))` : ordre ordinal ici (ecart n° 28).
+			// `(b.fit - a.fit) || String(a.id).localeCompare(String(b.id))` : ordre ordinal ici (ecart n°32).
 			Ranked.StableSort([](const FRanked& A, const FRanked& B)
 			{
 				if (A.Fit != B.Fit) return A.Fit > B.Fit;

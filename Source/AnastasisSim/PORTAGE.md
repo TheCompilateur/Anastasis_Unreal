@@ -434,6 +434,19 @@ phase du village (habitant incarné, mission player-goals).
 `rollCraftMiss` est générique : `tend` (help-farm-001), `chop` et `quarry` n'ont plus qu'à l'appeler. Le
 `shareRumors` de la causette ne fait que les gisements (n° 16) ; `maybeCounselPair` n'a pas d'aîné (n° 8).
 
+### Fait — le planificateur collectif, module seul (mission planner-module-001)
+
+| Unreal | Source JS (`anastasis-ref-p3`) | Preuve |
+| --- | --- | --- |
+| `Village/AnastasisPlanner.h/.cpp` | `collectivePriorities.js` : besoins de métier, scores des chantiers (bruts et boostés), besoin de chantier, effets du jour (`computeEffects`, focus, `liveEffects` et son cache), biais et planchers des buts, rush famine, cinq paliers « pending », corvée de bois, dette de service, logement, urgence | `Parite.Planificateur` : 20 variantes d'endurance, 100 décisions d'habitant, 6 362 valeurs au bit |
+| idem | `colonyStockReport.js` : rapport, rafraîchissement paresseux et ses tirages `sim.rng`, angles morts, consolidation | 7 variantes où le flux tire (rumeur tirée, rumeur vivante), état du flux comparé |
+| idem | `founderCharter.js` (effets, expiration), `forestSustain.js` / `colonizationDoctrine.js` (frein forestier), `stockLedger.js` (stock des bâtiments), méthodes de `Simulation`, `npc.js` (`collectiveUrgencyBiasMap`) | idem |
+| `Village/AnastasisPlannerCatalog.inl` | `BUILDINGS`, `DEPOT_PROFILES`, `CONSUME_ORDER`, `MARKET.cap`, `CHARTER_THEMES`, `JOBS[*].traitBias.gather`, constantes | généré par `tools/migration/gen-planner-catalog.mjs` |
+
+Le module travaille sur une VUE (`FPlannerVillage`) et ne touche pas `FVillage` : la passe collective de la
+décision le branchera (colony-state-001). Au tick 196 d'endurance : `build` 20, `gatherFood` 14, plancher
+`helpFarm` 28, `buildingNeedScore` 220. Écart n° 32 : départage ordinal de la corvée de bois.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules
