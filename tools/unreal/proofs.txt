@@ -14,6 +14,8 @@ sky-passage-pie | tools/unreal/sky-passage-pie.py | SKY_PASSAGE PASS | SKY_PASSA
 # Un script qui ne logue qu'un *_COMPLETE prouve seulement qu'il est alle au bout : lui donner un
 # motif d'echec, ou mieux un verdict PASS/FAIL, avant de l'inscrire.
 
+# river-use-001: actual autonomous journey + drink + thirst relief near one rendered river; UNKNOWN blocks PASS.
+river-use-pie | tools/unreal/river-use-pie.py | RIVER_USE PASS | RIVER_USE FAIL|Traceback | 420 | -
 # Default-off soil pilot: completion is technical, not an artistic verdict.
 
 player-pie | tools/unreal/player-pie.py | PLAYER_PIE PASS | PLAYER_PIE FAIL|PLAYER_PIE_TIMEOUT|PLAYER_PIE CHECK FAIL | 600 | ANASTASIS_PLAYER_PIE_OUT=@Saved/PlayerEvidence/pie
@@ -55,5 +57,3 @@ anthropic-paths-capture | tools/unreal/anthropic-paths-capture.py | ANTHROPIC_PA
 anthropic-routine-capture | tools/unreal/anthropic-paths-capture.py | ANTHROPIC_PATHS PASS | ANTHROPIC_PATHS FAIL|ANTHROPIC_PATH_CHECK FAIL | 660 | ANASTASIS_PATHS_SCENARIO=farmer
 # Default-off pilot: technical completion only; images require a separate artistic verdict.
 soil-contact-capture | tools/soil-crusade/capture.py | SOIL_CONTACT_CAPTURE COMPLETE | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING|Traceback | 600 | ANASTASIS_GROUND_OUT=@Saved/SoilEvidence/contact-batch;ANASTASIS_GROUND_STATES=soil_before,soil_after,soil_control;ANASTASIS_SOIL_CONTACT=1;ANASTASIS_SOIL_VIEWS=contact_walk00,contact_walk01,contact_walk02,contact_side,contact_context
-# river-use-001: actual autonomous journey + drink + thirst relief near one rendered river; UNKNOWN blocks PASS.
-river-use-pie | tools/unreal/river-use-pie.py | RIVER_USE PASS | RIVER_USE FAIL|Traceback | 420 | -
