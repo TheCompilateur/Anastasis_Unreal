@@ -88,3 +88,15 @@ sortie propre, GPU apres11.379..15.973ms; deltas dans la derive du temoin.
 `-Label deployed -Deploy` sauvegarde la couverture et controle deux vues hors pilote.
 Limites : grain proche parfois trop regulier; pas de preuve PLY ni d'histoire alluviale.
 Details et preuves dans `docs/unreal/handoffs/soil-crusade-001.md`.
+
+## Pentes soil-slope-002 (2026-10-02, KEEP borne)
+
+`SlopeSurface=1` ajoute la famille Rock existante a9m, entre10 et350m
+(pleine22..180m), selon pente20..41deg et attenuation litiere/humidite.
+`SlopeSurface=0` rend le materiau precedent; SoilHistory et le proche restent.
+Aucune texture/geometrie ajoutee. 1175 instructions pixel,10samplers.
+A/B0/1/0 propre,12images observees : paroi hors_vallee amelioree, prairie/oblique
+preservees; pente_face non discriminante. GPUapres13.406..15.489ms, deltas dans
+la derive du temoin. Le seuil global16/255 est insuffisant ici : voir les rectangles
+explicites de matiere et limites dans `docs/unreal/handoffs/soil-slope-002.md`.
+Cette couche ne corrige ni les contours abrupts ni les cassures du maillage.

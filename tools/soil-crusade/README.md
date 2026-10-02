@@ -40,3 +40,12 @@ Deployment: six images inspected in Saved/SoilEvidence/deployed-v3. Reloaded mas
 parameters verified; global radius read back and instance saved. GPU after12.968/14.197ms.
 Complete images followed by exit3 shutdown crash: EDITOR_EXIT::FAIL, not a clean PASS.
 Large steep faces remain smooth. Integration must inspect the combined result.
+
+
+Slope follow-up (soil-slope-002): set ANASTASIS_SOIL_PARAMETER=SlopeSurface and
+ANASTASIS_SOIL_VIEWS=prairie_eye,pente_face,hors_vallee_eye,oblique, then run
+capture.ps1 -Label slope-v1 -Rebuild. Same states toggle SlopeSurface0/1/0
+while SoilHistory stays enabled. Missing requested views now fail explicitly.
+SlopeSurface defaults to1 in the saved master; set0 for rollback. SlopeSurfaceSize
+is900cm. No new textures or geometry. See soil-slope-002 handoff for bounded KEEP:
+one cliff has visible middle-distance fabric; pente_face is not discriminating.

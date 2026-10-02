@@ -316,7 +316,7 @@ def import_textures():
     """Importe les huit textures si elles manquent (ou sur REIMPORT), puis les rend.
 
     AH : sRGB, la couleur de detail est perceptuelle et 8 bits lineaires la
-    postériseraient dans les sombres. NR : LINEAIRE -- c'est une normale, une rugosite
+    postÃƒÂ©riseraient dans les sombres. NR : LINEAIRE -- c'est une normale, une rugosite
     et une occlusion, pas une couleur ; decodee en sRGB, la normale serait tordue.
     Les deux en BC7 : BC1 n'a pas d'alpha, BC3 abime la normale ; BC7 garde les quatre
     canaux propres pour 1 octet par texel.
@@ -457,6 +457,33 @@ TexNormal = normalize(lerp(Nn, nw, Fade));
 TexRough = (nr.b - 0.5) * 2.0 * RoughnessStrength * Fade;
 return lerp(float3(1.0, 1.0, 1.0), detail, Fade);
 ''' % (body, 1.0 / TEX_DETAIL_MEAN)
+
+
+
+def slope_surface_hlsl():
+    """Existing rock fabric at metre scale on exposed middle-distance slopes."""
+    lines = ["SlopeNormal = normalize(N); float3 Nn = SlopeNormal;",
+        "float weight = saturate(Enabled) * smoothstep(0.06,0.25,1.0-Nn.z);",
+        "weight *= (1.0-0.80*saturate(Litter))*(1.0-0.30*saturate(Wet));",
+        "weight *= smoothstep(1000.0,2200.0,Depth)*(1.0-smoothstep(18000.0,35000.0,Depth));",
+        "float3 dPx=ddx(P),dPy=ddy(P);",
+        "[branch] if(weight < 0.001) return float3(1,1,1);",
+        "float3 sg=float3(Nn.x>=0?1:-1,Nn.y>=0?1:-1,Nn.z>=0?1:-1);",
+        "float3 tw=pow(abs(Nn),8.0); tw/=max(dot(tw,1.0),1e-5);",
+        "float t=1.0/max(Size,100.0);",
+        "float4 A=0; float3 Nm=0;"]
+    for w, sign, uv, grad, tn, swizzle in _AXES:
+        lines += ['[branch] if (%s > 0.01) {' % w,
+            'float2 uv=%s*t,gx=%s*t,gy=%s*t;' % (uv,grad.format(d='dPx'),grad.format(d='dPy')),
+            'float4 a=Texture2DSampleGrad(RockAH,RockAHSampler,uv,gx,gy);',
+            'float4 n=Texture2DSampleGrad(RockNR,RockNRSampler,uv,gx,gy);',
+            'float2 xy=(n.xy*2.0-1.0)*0.16; xy.x *= %s;' % sign,
+            'float z=sqrt(saturate(1.0-dot(xy,xy)));',
+            'A += a*%s; Nm += (%s).%s * %s;' % (w,tn,swizzle,w), '}']
+    lines += ['SlopeNormal=normalize(lerp(Nn,normalize(Nm),weight));',
+        'float3 contrast=clamp(A.rgb*%.6f,0.55,1.45);' % (1.0/TEX_DETAIL_MEAN),
+        'return lerp(float3(1,1,1),contrast,weight*0.80);']
+    return '\n'.join(lines)
 
 
 def build_master(textures):
@@ -771,6 +798,16 @@ return float3(lerp(Rock, rock, enabled), saturate(thin * 0.65) * enabled, fines 
     for name, src in tex_objects.items():
         g.link(src, '', tex, name)
 
+    # SOIL_SLOPE_002: existing rock fabric, own distance band, no new geometry/assets.
+    slope_surface = g.custom(slope_surface_hlsl(), 'SlopeSurface', CMOT_FLOAT3,
+        ('P','N','Depth','Litter','Wet','Enabled','Size','RockAH','RockNR'),
+        (('SlopeNormal', CMOT_FLOAT3),), -500, 3100)
+    for name, src in (('P',wp),('N',nws),('Depth',depth),('Litter',w_litter),('Wet',wetness),
+                      ('RockAH',tex_objects['RockAH']),('RockNR',tex_objects['RockNR'])):
+        g.link(src, '', slope_surface, name)
+    g.link(g.scalar('SlopeSurface',1.0,P+'SoilHistory',-1700,3100),'',slope_surface,'Enabled')
+    g.link(g.scalar('SlopeSurfaceSize',900.0,P+'SoilHistory',-1700,3160),'',slope_surface,'Size')
+
     # ------------------------------------------------------------------------- albedo
     base = g.mask(vc, '', True, True, True, -1240, -240)
     base = g.lerp(base, '', g.mul(base, '', p_litter_tint, '', -1080, -200), '', w_litter, '', -920, -240)
@@ -837,6 +874,7 @@ return float3(lerp(Rock, rock, enabled), saturate(thin * 0.65) * enabled, fines 
     damp_lerp = g.lerp(base, '', dark, '', damp_mask, '', 520, -120)
     base_final = g.mul(damp_lerp, '', p_albedo, '', 680, -160)
 
+    base_final = g.mul(base_final, '', slope_surface, '', 900, 3100)
     g.prop(base_final, '', unreal.MaterialProperty.MP_BASE_COLOR)
 
     # ---------------------------------------------------------------------- rugosite
@@ -889,7 +927,10 @@ return float3(lerp(Rock, rock, enabled), saturate(thin * 0.65) * enabled, fines 
     # deja posee sur la normale de sommet : les deux echelles se cumulent (1,6 m et
     # sous le metre) au lieu de se remplacer.
     g.link(g.sub(tex, 'TexNormal', perturb, '', -740, 1000), '', out_normal, '')
-    g.prop(out_normal, '', unreal.MaterialProperty.MP_NORMAL)
+    slope_delta = g.sub(slope_surface, 'SlopeNormal', nws, '', 400, 3200)
+    normal_combined = g.node(unreal.MaterialExpressionNormalize, 720, 3200)
+    g.link(g.add(out_normal, '', slope_delta, '', 560, 3200), '', normal_combined, '')
+    g.prop(normal_combined, '', unreal.MaterialProperty.MP_NORMAL)
 
     # LE garde-fou qui manquait au premier jet. recompile_material RETOURNE les erreurs
     # du compilateur ; les ignorer produit un asset qui s'enregistre tres bien et que le

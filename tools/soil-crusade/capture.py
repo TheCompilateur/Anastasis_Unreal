@@ -48,6 +48,7 @@ for _state in ('soil_before', 'soil_after', 'soil_control'):
     STATE_CMDS[_state] = STATE_CMDS['on']
 NO_TEXTURE = ('on_notex', 'bare_notex')
 GROUND_MI = '/Game/Anastasis/Materials/MI_AnastasisGround'
+SOIL_PARAMETER = os.environ.get('ANASTASIS_SOIL_PARAMETER', 'SoilHistory')
 states = [x.strip() for x in os.environ.get('ANASTASIS_GROUND_STATES', 'on,off').split(',') if x.strip()]
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
 SEED = 12345
@@ -94,9 +95,9 @@ try:
         if state.startswith('soil_') and soil_mids:
             value = 1.0 if state == 'soil_after' else 0.0
             for mid in soil_mids:
-                mid.set_scalar_parameter_value('SoilHistory', value)
+                mid.set_scalar_parameter_value(SOIL_PARAMETER, value)
                 get = getattr(mid, 'k2_get_scalar_parameter_value', None) or mid.get_scalar_parameter_value
-                if abs(get('SoilHistory') - value) > 1e-4:
+                if abs(get(SOIL_PARAMETER) - value) > 1e-4:
                     raise RuntimeError('SoilHistory readback failed')
             unreal.log('SOIL_STATE state=%s sections=%d geometry_unchanged=1' % (state, len(soil_mids)))
             return
@@ -113,10 +114,10 @@ try:
                 mid = comp.create_dynamic_material_instance(i, m)
                 if state.startswith('soil_'):
                     value = 1.0 if state == 'soil_after' else 0.0
-                    mid.set_scalar_parameter_value('SoilHistory', value)
+                    mid.set_scalar_parameter_value(SOIL_PARAMETER, value)
                     soil_mids.append(mid)
                     get = getattr(mid, 'k2_get_scalar_parameter_value', None) or mid.get_scalar_parameter_value
-                    if abs(get('SoilHistory') - value) > 1e-4:
+                    if abs(get(SOIL_PARAMETER) - value) > 1e-4:
                         raise RuntimeError('SoilHistory parameter missing')
                     n += 1
                     continue
@@ -131,6 +132,7 @@ try:
             raise RuntimeError('aucune section ne porte MI_AnastasisGround')
         unreal.log('GROUND_CAPTURE_NOTEX state=%s sections=%d' % (state, n))
 
+    unreal.log('SOIL_PARAMETER ' + SOIL_PARAMETER)
     texture_state(states[0])
     report = [r.split('|') for r in actor.call_method('GetPlaceReport')]
 
@@ -272,6 +274,7 @@ try:
             length = math.hypot(normal.x, normal.y) or 1.0
             plan.append(('pente_eye', (tx, ty), 170,
                          (tx-normal.y/length, ty+normal.x/length), 50))
+            plan.append(('pente_face', (tx+normal.x/length*2, ty+normal.y/length*2), 170, (tx,ty), 100))
             unreal.log('SOIL_SLOPE slope_1_minus_nz=%f tile=%d,%d' % (steepness, tx, ty))
         keep = {'prairie_eye', 'riviere_eye', 'lisiere_eye', 'sousbois_eye', 'pente_eye', 'oblique'}
         keep.update(x.strip() for x in os.environ.get('ANASTASIS_SOIL_VIEWS', '').split(',') if x.strip())
@@ -280,6 +283,8 @@ try:
     only = {x.strip() for x in os.environ.get('ANASTASIS_SOIL_VIEWS', '').split(',') if x.strip()}
     if only:
         plan = [v for v in plan if v[0] in only]
+    if only - {v[0] for v in plan}:
+        raise RuntimeError('Requested soil cameras missing: ' + str(only - {v[0] for v in plan}))
     if not plan:
         raise RuntimeError('No requested soil camera available')
     views = []
