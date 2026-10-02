@@ -58,7 +58,7 @@ Porté :
 
 ## COMMIT
 
-Les commits de `agent/nav-wiring-001`, posés sur `agent/spatial-risk-test-001` (87d623f).
+Les commits de `agent/nav-wiring-001`, posés sur `agent/spatial-risk-test-001` (1873279, chaîne rebasée sur main da7c771).
 
 ## MEC
 
@@ -99,7 +99,10 @@ Sans objet.
   - `separateCrowdedActors` (masqué) et le verrou du seuil domestique en route ;
   - famille, routes et quartiers valent 1 dans le facteur de vitesse ;
   - risque d'un écart au dernier bit sur `atan2` / `cos` / `sin` dans la file de porte.
-- hérités de la base, non modifiés ici : n° 32, n° 33.
+- modifié : n° 29 — `MoveActor` vit désormais dans `Village/AnastasisVillageNav.cpp` ; le coût de terrain du mode jeu
+  (route-cost-001) y est reporté à l'identique, le mode référence inchangé.
+- hérités de la base (`agent/spatial-risk-test-001`, posée sur lifestyle-decision-001 et premiere-pensee-001),
+  non modifiés ici : n° 32, n° 33, n° 34, n° 35, n° 36.
 
 ## INTEGRATION_RISK
 
