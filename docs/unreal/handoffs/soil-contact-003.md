@@ -45,6 +45,8 @@ UNKNOWN. Couche decorative sans collision, aucune marche joueur prouvee.
 AUCUN : aucun fichier Source/AnastasisSim modifie.
 
 ## INTEGRATION_RISK
+Rebase main47bcb3e; conflit du lot identifie uniquement sur proofs.txt (ajouts en fin).
+Entree sol placee en tete du registre, sans modifier les entrees concurrentes.
 WorldEmbodiment partage : conserver les appels concurrents, hunk limite include + Apply.
 HISM transitoires reutilises apres ClearInstances, pas de destruction pendant rebuild async.
 Pilote uniquement seed12345 scale5; repli vide si aucun site satisfait pente + eau reelles.

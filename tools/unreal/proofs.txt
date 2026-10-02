@@ -14,6 +14,9 @@ sky-passage-pie | tools/unreal/sky-passage-pie.py | SKY_PASSAGE PASS | SKY_PASSA
 # Un script qui ne logue qu'un *_COMPLETE prouve seulement qu'il est alle au bout : lui donner un
 # motif d'echec, ou mieux un verdict PASS/FAIL, avant de l'inscrire.
 
+# Default-off soil pilot: completion is technical, not an artistic verdict.
+soil-contact-capture | tools/soil-crusade/capture.py | SOIL_CONTACT_CAPTURE COMPLETE | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING|Traceback | 600 | ANASTASIS_GROUND_OUT=@Saved/SoilEvidence/contact-batch;ANASTASIS_GROUND_STATES=soil_before,soil_after,soil_control;ANASTASIS_SOIL_CONTACT=1;ANASTASIS_SOIL_VIEWS=contact_walk00,contact_walk01,contact_walk02,contact_side,contact_context
+
 player-pie | tools/unreal/player-pie.py | PLAYER_PIE PASS | PLAYER_PIE FAIL|PLAYER_PIE_TIMEOUT|PLAYER_PIE CHECK FAIL | 600 | ANASTASIS_PLAYER_PIE_OUT=@Saved/PlayerEvidence/pie
 villager-pie | tools/unreal/villager-pie.py | VILLAGER_PIE PASS | VILLAGER_PIE FAIL | 900 | ANASTASIS_VILLAGER_PIE_OUT=@Saved/VillagerEvidence/pie;ANASTASIS_VILLAGER_PIE_NPCS=12
 # geography-concordance-001: acquisition and partition integrity, not geographic agreement or NPC travel.
