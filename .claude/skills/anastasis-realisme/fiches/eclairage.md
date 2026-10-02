@@ -37,6 +37,7 @@
 | Ombres | VSM, `r.Shadow.Virtual.Enable=1` | idem |
 | Shading | Substrate, `r.Substrate=True` | idem |
 | Soleil | `Movable`, 75 000 lux, 5 900 K | `AnastasisAtmosphereProfile.h` (`SunIntensityLux`, `SunTemperatureKelvin`) |
+| Taille apparente du soleil et de la lune | 0,5357° (`LightSourceAngle`, défaut du moteur, non posé par le projet) : le disque solaire réel ; pénombre tracée par les VSM (SMRT, 7 rayons × 8 échantillons par défaut) | moteur ; `handoffs/sun-angle-001.md` |
 | Ombre des nuages au sol | 0,6 | idem (`SunCloudShadowStrength`) |
 | Lune | 0,3 lux, 4 100 K | idem |
 | SkyLight | `Movable`, capture temps réel, intensité 1,0 | idem (`SkyLightIntensity`) |
@@ -60,8 +61,10 @@ Tout l'éclairage est posé par `AAnastasisWorldAtmosphere` à partir de `DA_Ana
   lune passe par `AAnastasisWorldAtmosphere`, qui arbitre déjà les deux.
 - **ECL-05** — Les VSM restent actives. On n'ajuste pas les ombres par les cascades (CSM), qui ne servent
   plus.
-- **ECL-06** — Une ombre trop dure se corrige par la taille apparente de la source (`Source Angle`), pas
-  par un flou de post-traitement.
+- **ECL-06** — La taille apparente du soleil reste **0,5357°** : le disque solaire réel, défaut du moteur,
+  vérifié en A/B le 2026-10-02 (`handoffs/sun-angle-001.md`). Une ombre qui paraît trop dure ou trop
+  floue ne se corrige ni en changeant cet angle ni par un flou de post-traitement : chercher la cause
+  ailleurs (lumière du ciel, GI, résolution des VSM).
 - **ECL-07** — Changer de méthode de GI (Lumen Lite, logiciel, cache) est un A/B **image et ms**, aux
   mêmes caméras, en forêt, en berge et en vue haute : ce sont là que le Hit Lighting a été mesuré.
 
@@ -69,6 +72,7 @@ Tout l'éclairage est posé par `AAnastasisWorldAtmosphere` à partir de `DA_Ana
 
 | Quoi | Comment |
 |---|---|
+| Pénombre, taille du soleil | `capture-sky.ps1` avec un état `py <racine>/tools/unreal/sun-angle.py <degrés>` ; regarder un recadrage d'ombres de feuillage à 16 h (`ridge_long`) : le vent change les formes, la pénombre se juge aux bords. Contrôle : 10° doit flouter franchement |
 | Ce que Lumen voit | console : `r.Lumen.Visualize 3`, puis `r.Lumen.Visualize 5` ; noir = absent du cache |
 | Effet d'un réglage Lumen | `capture-slice.ps1 -PreCmds '<cvar> <valeur>'` en A/B, puis `compare.py` (skill `anastasis-capture`) |
 | Coût | `riverbank-capture.ps1 -Profile` (un `ProfileGPU` par vue) ; `stat GPU` dans l'éditeur |
@@ -80,11 +84,12 @@ Tout l'éclairage est posé par `AAnastasisWorldAtmosphere` à partir de `DA_Ana
 - Revenir au cache de surface sans cartes Lumen : le sous-bois s'assombrit (17,6 contre 20,9 sans GI).
 - Compenser par l'auto-exposition, le bloom ou une LUT (loi 1 et loi 2 du skill).
 - Recopier les intensités d'un tutoriel : elles supposent souvent une auto-exposition active.
+- Monter `LightSourceAngle` pour « adoucir » les ombres (ECL-06). Mesuré le 2026-10-02 : à 0° les bords
+  d'ombre de feuillage sont tranchants et polygonaux, à 0,5357° ils ont une vraie pénombre, à 1° ils sont
+  flous, au-delà du soleil réel. Aucun coût GPU mesurable entre ces valeurs.
 
 ## Ouvert
 
 - **Lumen Lite** : candidat si le budget GPU l'exige, et seulement alors (RU-002-01). Non mesuré. A/B :
   `capture-slice.ps1 -PreCmds 'r.Lumen.FinalGatherMethod 0'`, image **et** ms (ECL-07).
 - **Arbres noirs pour Lumen** : la cause n'est pas établie (`lumen-hit-lighting-001.md`).
-- Le `Source Angle` du soleil n'est pas posé par le projet (valeur par défaut du moteur) et n'a jamais été
-  mesuré en A/B.

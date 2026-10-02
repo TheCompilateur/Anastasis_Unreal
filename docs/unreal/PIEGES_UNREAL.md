@@ -152,6 +152,15 @@ l'asset, pas le log.
 ### Un chemin passé à `-script` perd ses `\t`, `\n`…
 **Cause** : lu comme séquence d'échappement. **Parade** : chemins en `/` (`measure-tree-cost.ps1`).
 
+### `set <Classe> <Propriété> <valeur>` ne change rien aux acteurs posés
+
+Signature : un A/B qui pose une propriété par la commande console `set` (par exemple
+`set DirectionalLightComponent LightSourceAngle 10`) sort des images que seul le bruit distingue. Vérifié
+le 2026-10-02 (`sun-angle-001`) : 10° demandés, ombres aussi nettes qu'à 0,5357°. La commande n'atteint pas
+les composants des lumières posées (ou ne rafraîchit pas leur rendu). Passer par le setter du composant en
+Python (`tools/unreal/sun-angle.py`), relire la valeur au log, et toujours faire un contrôle à valeur
+extrême avant de croire un « aucun effet ».
+
 ### Un acteur de capture se retrouve dans le niveau
 **Cause** : `save_current_level()` fige tout ce qui a été posé. Les scripts de capture ne sauvent **jamais** le
 niveau (`capture-tree-lineup.py`) ; l'embodiment remplit des composants `RF_Transient`.
