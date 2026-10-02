@@ -57,3 +57,4 @@ anthropic-paths-capture | tools/unreal/anthropic-paths-capture.py | ANTHROPIC_PA
 anthropic-routine-capture | tools/unreal/anthropic-paths-capture.py | ANTHROPIC_PATHS PASS | ANTHROPIC_PATHS FAIL|ANTHROPIC_PATH_CHECK FAIL | 660 | ANASTASIS_PATHS_SCENARIO=farmer
 # Default-off pilot: technical completion only; images require a separate artistic verdict.
 soil-contact-capture | tools/soil-crusade/capture.py | SOIL_CONTACT_CAPTURE COMPLETE | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING|Traceback | 600 | ANASTASIS_GROUND_OUT=@Saved/SoilEvidence/contact-batch;ANASTASIS_GROUND_STATES=soil_before,soil_after,soil_control;ANASTASIS_SOIL_CONTACT=1;ANASTASIS_SOIL_VIEWS=contact_walk00,contact_walk01,contact_walk02,contact_side,contact_context
+terrain-access-pie | tools/unreal/terrain-access-pie.py | TERRAIN_ACCESS INSTRUMENT_PASS | TERRAIN_ACCESS FAIL|TERRAIN_ACCESS_OUTPUT_ERROR | 540 | -
