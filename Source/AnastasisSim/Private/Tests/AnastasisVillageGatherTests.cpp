@@ -334,6 +334,31 @@ bool FAnastasisVillageGatherHarvestTest::RunTest(const FString&)
 	TestEqual(TEXT("le grenier n'a encore rien"), Village.FindBuilding(Granary)->FoodPhysical, 0);
 	AddInfo(FString::Printf(TEXT("sac %d en %.2f s ; champ %d,%d : %d"), N->InventoryFood, Time - Session.ArrivedAt,
 		Session.TileX, Session.TileY, Village.LiveTileAt(Session.TileX, Session.TileY).Amount));
+
+	// Le retour force, isole : le meme fermier, mais sans pensee (`AiThinkAt` repousse a chaque
+	// tick), donc sans reconsideration possible. Seul `shouldHaulGatherLoad` peut le ramener : a la
+	// prise qui fait passer le sac au-dela de 9, soit 5 coups de 2.
+	{
+		AnastasisWorld::FWorld Quiet = MakeFlatWorld(40, 32);
+		SetField(Quiet, 6, 10, 8, 12, 20);
+		FVillage Still;
+		Still.Bind(Quiet);
+		const FString StillGranary = Still.AddBuilding(GranaryType, 16, 11);
+		const FString Farmer = Still.SpawnNpc(13.5, 11.5, Rested());
+		Still.AssignWorkplace(Farmer, G::JobFarmer, StillGranary);
+		const int32 StillTotal = FoodEverywhere(Still, Quiet);
+		double StillTime = Morning;
+		TestTrue(TEXT("sans pensee : sain jusqu'a l'ancrage"),
+			Run(Still, Quiet, StillTotal, StillTime, 15.0, [&] { return Still.FindNpc(Farmer)->WorkSession.bActive; }));
+		TestTrue(TEXT("sans pensee : sain jusqu'au retour"), Run(Still, Quiet, StillTotal, StillTime, 30.0, [&]
+		{
+			Still.FindNpcMutable(Farmer)->AiThinkAt = StillTime + 1000.0;
+			return Still.FindNpc(Farmer)->Goal == GoalDeliver;
+		}));
+		const FNpc* F = Still.FindNpc(Farmer);
+		TestEqual(TEXT("sans pensee : il rentre livrer"), F->Goal, FString(GoalDeliver));
+		TestEqual(TEXT("sans pensee : retour force a sac 10 (5 coups)"), F->InventoryFood, 10);
+	}
 	return true;
 }
 

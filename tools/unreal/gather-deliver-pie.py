@@ -10,8 +10,11 @@ temps de la prise, puis relancee) :
 
   01-depart     le fermier vient d'etre pose au seuil du grenier
   02-recolte    session de coups ouverte, sac qui se remplit
-  03-retour     sac > 9 : but `deliver`, en route vers le grenier
-  04-livre      premiere livraison faite : le stock du grenier a monte
+  03-retour     but `deliver`, en route vers le grenier, sac entre 1 et 10 : plein (retour force
+                a > 9) ou moins, quand une reconsideration (`npc.js` l. 893, reconsider-001) fait
+                gagner la ligne `deliver` — la reference livre ainsi 5 vivres dans le scenario
+                endurance
+  04-livre      premiere livraison faite : le sac du retour est passe au grenier, en entier
   05-large      vue large apres la deuxieme livraison
 
 A chaque echantillon : champs + sacs + grenier + repas == total initial.
@@ -159,13 +162,31 @@ def tick(dt):
     checks = {
         '01-depart': True,
         '02-recolte': s['session'] and s['bag'] > 0,
-        '03-retour': s['goal'] == 'deliver' and s['bag'] > 9,
+        '03-retour': s['goal'] == 'deliver' and s['bag'] > 0,
         '04-livre': s['deliveries'] >= 1,
         '05-large': s['deliveries'] >= 2,
     }
     for name in STAGES:
         if name in state['seen'] or not checks[name]:
             continue
+        if name == '03-retour':
+            # Au plus un sac plein : le retour est force des que le sac depasse 9.
+            if s['bag'] > 10:
+                finish(False, 'retour avec %d au sac : le retour force a > 9 n\'a pas joue' % s['bag'])
+                return
+            state['retour'] = s
+        if name == '04-livre':
+            # Livraison = le sac du retour, en entier (grenier loin d'etre plein). Ce qui est entre
+            # au grenier depuis le retour, repas compris, est exactement ce qui a quitte le sac.
+            r = state.get('retour')
+            if r is None:
+                finish(False, 'livraison sans retour observe')
+                return
+            moved = (s['stock'] + s['meals']) - (r['stock'] + r['meals'])
+            if s['bag'] != 0 or moved != r['bag']:
+                finish(False, 'livraison partielle : sac du retour %d, entre au grenier %d, reste au sac %d'
+                       % (r['bag'], moved, s['bag']))
+                return
         state['seen'].append(name)
         state['samples'].append(dict(s, stage=name))
         log('STAGE ' + name + ' ' + json.dumps(s))

@@ -75,8 +75,25 @@ Le commit qui porte cette fiche sur `agent/reconsider-001`.
   MeteoHabitants.Orage) : livraison = sac au moment du retour, sac = cueilli, sac + grenier conservés ; orage selon
   l'ordre de `commitGoalChoice` (npc.js l. 1855 `applyGoalStickiness`, porte d'orage l. 2055-2071). Référence :
   dans `endurance`, les deux livraisons du jour font 5 vivres (npc-0 t=125, npc-1 t=141), pas 10.
-- MUTATIONS : **À FAIRE** — une par test réécrit (retour forcé > 9 supprimé, livrer sac − 1, porte d'orage ignorée,
-  `shelterResumeGoal` oublié), plus une sur le tirage (échelle 0,42 retirée) et une sur le collant.
+- MUTATIONS : faites dans reconsider-mutations-001 (une à la fois, suite `Anastasis.Sim` entière) :
+
+| Test réécrit | Ancienne assertion | Nouvel invariant | Mutation | Détectée par (message) |
+|---|---|---|---|---|
+| `Recolte.Cueillette` | `5 coups : sac 10` | sac = cueilli, 2 ≤ sac ≤ 10 ; **renforcé** : sans pensée (aucune reconsidération possible), retour forcé à sac 10 | M1 — retour forcé à sac > 9 supprimé | `Recolte.Cueillette` : `sans pensee : retour force a sac 10 (5 coups)` to be 10, but it was 44 ; aussi `Village.Endurance` (solitude critique) |
+| `Recolte.Livraison` | `grenier 0 -> 10`, `livre` 10, marché 10, `grenier 20` | grenier = livré = sac du retour ; marché = sac ; grenier = tout ce qui a été livré, deuxième voyage > sac | M2 — livrer sac − 1 | `Recolte.Livraison` : `grenier 0 -> le sac` to be 4, but it was 3 ; `sac vide` 0 / 1 ; `livre` 4 / 3 |
+| `Recolte.Epuisement` | `sac 5 : sous le seuil`, `grenier 5` | 5 cueillis ; sac + grenier = 5 ; le grenier finit à 5 | M2 — livrer sac − 1 | `Recolte.Epuisement` : `champ vide` to be 0, but it was 1 |
+| `Recolte.Plein` | une livraison, `5 livres`, `5 au sac` | grenier plein à 300 ; 5 livrés ; reste au sac = cueilli − 5 | M2 — livrer sac − 1 | `Recolte.Plein` : `plein a 300` 300 / 299 ; `5 livres` 5 / 4 ; `le reste au sac` 5 / 1 |
+| `Recolte.Destruction` | `le sac reste plein` = 10 | le sac reste celui d'avant la démolition | M7 — sac vidé à la démolition | `Recolte.Destruction` : `le sac reste plein` to be 4, but it was 0 |
+| `MeteoHabitants.Orage` | `shelterRain` gagne la table, pas de porte, pas de but repris ; reprise : observer | deux chemins selon la table (ligne ou porte + `shelterResumeGoal` = gatherFood) ; **renforcé** : la PREMIÈRE décision sous l'orage l'envoie à l'abri ; reprise = but retenu par la porte | M3 — porte d'orage ignorée | `Orage` : `storm: his first decision under the storm drops the harvest for shelter` (goal=gatherFood) |
+| `MeteoHabitants.Orage` | (idem) | (idem) | M4 — `shelterResumeGoal` oublié | `Orage` : `and keeps the harvest to resume` to be "gatherFood", but it was "" ; aussi `TempsSec` (`every storm-gate decision keeps an exposed goal to resume`) |
+| — (reconsidération) | — | — | M5 — échelle 0,42 du tirage retirée (`CommitReconsiderScale` = 1) | `Village.Reconsideration` : `tick 165 npc-2 (build) : chance 0.396000 / 0.166320` (puis 74 autres) |
+| — (collant) | — | — | M6 — collant de but retiré de la table (`Row.Value += Bonus` supprimé) | `Orage` : première décision sous l'orage = `deliver` (goal=deliver), que la porte d'orage exclut ; avec le collant, la cueillette garde la table et la porte l'envoie à l'abri |
+
+Sans mutation (tests renforcés) : `Anastasis.Sim` PASS 120, KNOWN_EXPECTED_FAILURE 2, FAIL 0. Chaque mutation est
+posée seule, build, suite `Anastasis.Sim` entière, puis retirée. Deux invariants ne détectaient rien et ont été
+renforcés, pas les mutations : `Recolte.Cueillette` (M1 passait : le fermier rentre à sac 4 sur reconsidération
+avant que le retour forcé ne joue) et `MeteoHabitants.Orage` (M3 passait : sans porte, il finissait à l'abri plus
+tard par la ligne de la table).
 
 ## ECARTS
 
@@ -93,7 +110,7 @@ PROOFS: village-weather-pie
 
 Preuve par tests d'automation (`Parite.Reconsideration`, `Village.Reconsideration`), rejoués par la suite du lot.
 
-`gather-deliver-pie` (hors registre) exige `bag > 9` à l'étape `03-retour` : elle peut maintenant échouer, script non modifié, signalé à migration phase 3.
+`gather-deliver-pie` exigeait `bag > 9` à l'étape `03-retour` : corrigée et inscrite au registre dans reconsider-mutations-001.
 
 ## SCN
 

@@ -70,8 +70,8 @@
 //     des cases) : brancher la table seule coderait un faux ordre. Suite :
 //     perception-explore-001.
 //  2. Reconsideration aleatoire PORTEE (reconsider-001 : `sim.rng() < chance` a chaque
-//     pensee avec cible, phase personnelle, quart de travail). Pas de collant de but
-//     (`goalStickinessBonus`), et deux fins d'action relachent la cible que la
+//     pensee avec cible, phase personnelle, quart de travail) et collant de but
+//     (`goalStickinessBonus`) porte. Reste : deux fins d'action relachent la cible que la
 //     reference garderait (chantier fini, ancre sociale).
 //  3. Points d'acces sans intention urbaine (sim/urban/intent.js, vague 5) :
 //     l'anneau 1 oriente vers le camp, qui est exactement le repli de la reference.

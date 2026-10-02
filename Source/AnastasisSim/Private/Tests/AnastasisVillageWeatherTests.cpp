@@ -125,12 +125,16 @@ bool FAnastasisVillageWeatherStormTest::RunTest(const FString&)
 		return false;
 	}
 
-	// L'orage eclate. A sa prochaine decision il lache la cueillette.
+	// L'orage eclate. A sa PREMIERE decision sous l'orage il lache la cueillette : par la ligne
+	// `shelterRain` si elle gagne la table, sinon par la porte d'orage de `commitGoalChoice`.
+	// Pas plus tard, par hasard : c'est la porte qui le garantit (npc.js l. 2055-2071).
 	constexpr double Rain = 0.9;
+	const double DecidedBefore = Village.FindNpc(Farmer)->LastDecision.Time;
 	Village.SetForcedWeather(Storm(Rain));
-	const bool bSheltering = RunUntil(Village, Time, 90.0, [&] { return Village.FindNpc(Farmer)->Goal == GoalShelterRain; });
+	RunUntil(Village, Time, 90.0, [&] { return Village.FindNpc(Farmer)->LastDecision.Time > DecidedBefore; });
+	const bool bSheltering = Village.FindNpc(Farmer)->Goal == GoalShelterRain;
 	const FNpc* N = Village.FindNpc(Farmer);
-	if (!TestTrue(TEXT("storm: the farmer drops the harvest for shelter"), bSheltering))
+	if (!TestTrue(TEXT("storm: his first decision under the storm drops the harvest for shelter"), bSheltering))
 	{
 		AddInfo(FString::Printf(TEXT("goal=%s winner=%s rain=%.3f shelterRow=%.3f"), *N->Goal, *N->LastDecision.TableWinner,
 			N->LastDecision.WeatherRain, N->LastDecision.ShelterRowScore));

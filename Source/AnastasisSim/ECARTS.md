@@ -71,24 +71,25 @@ perception-explore-001 : branchés. Chaque décision tire `exploreTarget` (prép
 `observer`. Le bruit d'une ligne non portée est TIRÉ (l'ordre du flux en dépend) mais PAS AJOUTÉ au
 plancher : ajouté à un score inventé, il faisait gagner `observer` au hasard (`Village.Endurance`).
 
-### n° 2 — Pas de collant de but ; des cibles relâchées que la référence garderait
+### n° 2 — Des cibles relâchées que la référence garderait
 
 - **classe** : REDUIT
 - **destin** : A_FERMER
-- **fermeture** : goal-noise-001 suite (`goalStickinessBonus` dans la table, avec le branchement des bruits, n° 1)
+- **fermeture** : à attribuer (fin de chantier : suite de build-001 ; ancre sociale : suite de bonds-rumors-001)
 - **statut** : OUVERT
 - **entree** : tranches puits → grenier (first-building-001, house-rest-001, granary-eat-001)
-- **reference** : `src/sim/npc.js` `goalStickinessBonus` (l. 1756, ajouté au score l. 1850)
-- **cpp** : `Village/AnastasisVillage.cpp`, `ChooseGoal` (pas de collant) ; fin de chantier et fin de session sociale (`bHasTarget = false`)
+- **reference** : `src/sim/npc.js` `progressBuildWork` (la cible reste posée), `holdTalkAct` ; reconsidération l. 893
+- **cpp** : `Village/AnastasisVillage.cpp`, fin de chantier et fin de session sociale (`bHasTarget = false`)
 - **harnais** : actors
 - **detail** : `Public/Village/AnastasisVillage.h`, n° 2 ; `docs/migration/phase3/P3_RECONSIDERATION.md`
 
 Depuis reconsider-001, le tirage l. 893 est fait : `if (!npc.target || sim.rng() < chance) chooseGoal`,
 chance = `committedReconsiderChance(phaseReconsiderChance(needsReconsiderChance(npc, thinkDt)))`, phase
 PERSONNELLE et quart de travail compris (75 tirages mesurés sur un jour rejoués au bit,
-`Anastasis.Sim.Village.Reconsideration`). Reste : le collant de but (`goalStickinessBonus`) n'entre pas
-dans la table, et deux fins d'action du C++ relâchent la cible (chantier fini ou à sec, ancre du regard
-d'une session sociale) là où la référence la garde et laisse la reconsidération trancher.
+`Anastasis.Sim.Village.Reconsideration`). Le collant de but (`goalStickinessBonus`, `criticalReliefGoals`) est
+porté aussi et entre dans la table avant Noûs (1 944 vecteurs `ReconsiderStickiness`, nature sans qualité ni
+défaut : écart n° 10). Reste : deux fins d'action du C++ relâchent la cible (chantier fini ou à sec, ancre du
+regard d'une session sociale) là où la référence la garde et laisse la reconsidération trancher.
 
 ### n° 3 — Points d'accès sans intention urbaine
 
