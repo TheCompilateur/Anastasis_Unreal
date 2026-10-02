@@ -58,7 +58,7 @@ Porté :
 
 ## COMMIT
 
-Les commits de `agent/nav-wiring-001`, posés sur `agent/spatial-risk-test-001` (1873279, chaîne rebasée sur main da7c771).
+Les commits de `agent/nav-wiring-001`, posés sur `agent/spatial-risk-test-001` (22e679e, chaîne rebasée sur main da7c771).
 
 ## MEC
 
