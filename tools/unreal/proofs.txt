@@ -39,3 +39,5 @@ settlement-site-pie | tools/unreal/settlement-site-pie.py | SETTLEMENT_SITE_PIE 
 ecotone-capture | tools/unreal/ground-cover-capture.py | ECOTONE_CAPTURE PASS | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/EcotoneEvidence;ANASTASIS_GROUND_STATES=ecotone_reference,ecotone,ecotone_reference2;ANASTASIS_GROUND_VIEWS=ecotone_open,ecotone_edge,ecotone_inside,ecotone_oblique,prairie_eye
 
 anthropic-paths-capture | tools/unreal/anthropic-paths-capture.py | ANTHROPIC_PATHS PASS | ANTHROPIC_PATHS FAIL|ANTHROPIC_PATH_CHECK FAIL | 480 | -
+
+anthropic-routine-capture | tools/unreal/anthropic-paths-capture.py | ANTHROPIC_PATHS PASS | ANTHROPIC_PATHS FAIL|ANTHROPIC_PATH_CHECK FAIL | 660 | ANASTASIS_PATHS_SCENARIO=farmer

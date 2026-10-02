@@ -3,7 +3,9 @@ import json, os, re, time, statistics
 from pathlib import Path
 import unreal
 ROOT=Path(unreal.Paths.project_dir()).resolve()
+ROUTINE=os.environ.get('ANASTASIS_PATHS_SCENARIO')=='farmer'
 OUT=ROOT/'Saved'/'AnthropicPathsEvidence'
+if ROUTINE: OUT=OUT/'farmer'
 OUT.mkdir(parents=True,exist_ok=True)
 les=unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues=unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
@@ -56,7 +58,7 @@ def tick(dt):
     except Exception as e: check('no_exception',False); finish(repr(e))
 def run(dt):
     now=time.monotonic(); phase=s['phase']
-    if now-start>360: check('timeout',False); finish('timeout'); return
+    if now-start>(540 if ROUTINE else 360): check('timeout',False); finish('timeout'); return
     if phase=='tests_start' and now-start>3:
         cmd('Automation RunTests Anastasis.Anthropic'); s['phase']='tests'
     elif phase=='tests':
@@ -75,6 +77,11 @@ def run(dt):
         check('geographic_village',data.get('status')=='selected')
         if not s['checks'][-1][1]: finish('village unavailable'); return
         s['site']=data; s['at']=now; s['phase']='observe'; s['sample_at']=0
+        if ROUTINE:
+            cmd('Anastasis.Village.FirstFarmer 1')
+            cmd('anastasis.Sim.TimeScale 0.3')
+            s['routine_samples']=[]
+        s['sim_start']=DBG.get_simulation_time(w)
         s['camera']=next(c for c in unreal.GameplayStatics.get_all_actors_of_class(w,unreal.CameraActor) if c.get_actor_label()=='AnthropicPathsProofCamera')
         s['actor']=unreal.GameplayStatics.get_all_actors_of_class(w,unreal.AnastasisWorldEmbodiment)[0]
         unreal.GameplayStatics.get_player_controller(w,0).set_view_target_with_blend(s['camera'],0)
@@ -85,8 +92,20 @@ def run(dt):
     elif phase=='observe':
         if now-s['sample_at']>5:
             r=report(); s['samples'].append(r); s['sample_at']=now
+            if ROUTINE:
+                g=json.loads(DBG.get_gather_status(ues.get_game_world()))
+                s['routine_samples'].append(g)
+                total=g['field']+g['bag']+g['stock']+g['meals']
+                if 'food_initial' not in s: s['food_initial']=total
+                if total!=s['food_initial']: check('food_conservation',False); finish('food conservation failed'); return
+                unreal.log('ANTHROPIC_ROUTINE_SAMPLE '+json.dumps(g))
             unreal.log('ANTHROPIC_PATH_SAMPLE '+json.dumps(r))
-        if now-s['at']<110: return
+        if now-s['at']<(260 if ROUTINE else 110): return
+        s['sim_elapsed']=DBG.get_simulation_time(ues.get_game_world())-s['sim_start']
+        if ROUTINE:
+            g=json.loads(DBG.get_gather_status(ues.get_game_world())); s['routine_final']=g
+            check('three_actual_deliveries',g.get('deliveries',0)>=3)
+            if not s['checks'][-1][1]: finish('insufficient repeated routine; do not infer mature paths'); return
         r=report(); s['focus']=r
         check('real_traffic_visible',r.get('grass',0)>0 and r.get('focus_strength',0)>.15)
         check('no_capacity_loss',r.get('dropped')==0 and r.get('grass_cap')==0)

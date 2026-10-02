@@ -58,3 +58,11 @@ Shared AGENTS.md and proofs registry must preserve other entries. Anthropic laye
 ## STOP
 
 No independent integration or push. No farming, grazing, logging or historical reconstruction implemented in this slice. Full cultural-landscape feedback loop remains incomplete. Do not enable the experimental layer globally on a technical test alone. Follow the single-editor queue; never close another session. Prior shutdown crash is known but not presumed fixed.
+
+## OPENING OBSERVATION - 20261002-095802
+
+Four targeted tests Success; geographic village and frozen-memory restoration checks PASS. Six images viewed. 1559 cells, 29 affected grass instances, maximum reported grass response 0.206, no gap/jump/drop or restore errors. Technical proof 208.8 s; subsequent shutdown crash Exit3. No global artistic activation accepted: no legible path in the opening scene.
+
+compare.py, 1166x856: eye off/on 1.47% pixels above16, off/off2 1.28%; oblique1.34% vs reference1.19%. Marginal difference does not establish a legible path. Default remains OFF. A new external water-look NullRHI commandlet was seen at process-release check; frozen-frame GPU numbers are not accepted as a controlled performance comparison until overlap is excluded.
+
+One bounded follow-up is prepared using EXISTING FirstFarmer1, not injected traffic: 260wall seconds at TimeScale0.3, actual delivery counter and food-conservation samples recorded. Requires at least three completed deliveries; no forced routes, resource refill or altered behaviour. Separate farmer output folder preserves opening evidence. Registered anthropic-routine-capture. Queue rank after soil-contact-003 then woodland-sequence-003; no launch until their actual release. This is a scenario proof, not normal-village traffic evidence.
