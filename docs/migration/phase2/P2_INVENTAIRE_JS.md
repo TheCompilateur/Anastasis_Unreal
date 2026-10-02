@@ -39,7 +39,7 @@ pas l'interet du gameplay. Un module partiellement porte compte pour ce qui lui 
 | Vague | fichiers | dont partiels | lignes de code a porter |
 | --- | ---: | ---: | ---: |
 | 0 — socle deterministe | 1 | 1 | 24 |
-| 1 — generation du monde | 2 | 2 | 663 |
+| 1 — generation du monde | 2 | 2 | 658 |
 | 2 — navigation | 8 | 2 | 639 |
 | 3 — budget et LOD logique | 1 | 0 | 228 |
 | 4 — etat du monde et sauvegarde | 3 | 2 | 701 |
@@ -52,7 +52,7 @@ elles deux. Elles se decoupent en chantiers, et c'est a ce grain qu'un module se
 | Vague | Chantier | fichiers | lignes de code a porter | plus gros reste |
 | --- | --- | ---: | ---: | --- |
 | 0 | socle | 1 | 24 | `sim/spatialGrid.js` (24, partiel) |
-| 1 | generation du monde | 2 | 663 | `sim/worldArchetypes.js` (595, partiel) |
+| 1 | generation du monde | 2 | 658 | `sim/worldArchetypes.js` (595, partiel) |
 | 2 | navigation | 8 | 639 | `sim/crowdNav.js` (228) |
 | 3 | budget et LOD | 1 | 228 | `sim/logicalLod.js` (228) |
 | 4 | etat et sauvegarde | 3 | 701 | `sim/save.js` (609, partiel) |
@@ -99,7 +99,7 @@ reparti entre `porte` et `reste` au prorata du code de fonctions.
 | `life/villageRhythm.js` | Life/AnastasisVillageRhythm, Village/AnastasisVillage | 12 / 20 | 0 | 343 | 263 | 0 | **80** | maison ; puits ; grenier ; social-relax ; reconsider-001 |
 | `life/skills.js` | Work/AnastasisGather | 3 / 8 | 0 | 122 | 44 | 0 | **78** | gather-deliver |
 | `sim/navGrid.js` | World/AnastasisNavGrid, World/AnastasisNavService | 13 / 19 | 2 | 364 | 289 | 0 | **75** | couche 2 (couche terrain) ; puits (seuils) ; nav-service-001 (metriques, anneau de trace, cle de cible) |
-| `sim/fieldCrops.js` | World/AnastasisWorld, Work/AnastasisFields, Work/AnastasisGather | 8 / 14 | 0 | 120 | 52 | 0 | **68** | couche 1 ; gather-deliver-001 ; field-regrow-001 ; village-weather-001 |
+| `sim/fieldCrops.js` | World/AnastasisWorld, Work/AnastasisFields, Work/AnastasisGather | 9 / 14 | 0 | 120 | 57 | 0 | **63** | couche 1 ; gather-deliver-001 ; field-regrow-001 ; village-weather-001 |
 | `sim/craftToolSwitch.js` | Work/AnastasisBuild, Village/AnastasisVillage | 1 / 6 | 0 | 65 | 10 | 0 | **55** | build-001 |
 | `sim/colonyStockReport.js` | Village/AnastasisPlanner | 9 / 11 | 0 | 254 | 207 | 0 | **47** | planner-module-001 |
 | `ai/moralPressure.js` | Work/AnastasisGather | 1 / 4 | 0 | 116 | 70 | 0 | **46** | gather-deliver ; social-relax |
@@ -222,15 +222,10 @@ reparti entre `porte` et `reste` au prorata du code de fonctions.
 - portees (4) : `clearWorkSession`, `swingPeriodFor`, `yieldPerSwing`, `ensureCraftSession`
 - restent (47 fonctions) : `applyWorkshopBatch` (78), `craftSwingPhase` (38), `workshopCanRun` (33), `creditDepotYard` (28), `applySawBatch` (24), `craftSwingProgress` (20), `craftIdForNpc` (19), `packWorkSession` (15), … et 39 autres
 
-**`sim/fieldCrops.js`** — World/AnastasisWorld, Work/AnastasisFields, Work/AnastasisGather. Reste 68 lignes de code sur 120 (dont 10 des 17 lignes hors fonction, au prorata).
+**`sim/fieldCrops.js`** — World/AnastasisWorld, Work/AnastasisFields, Work/AnastasisGather. Reste 63 lignes de code sur 120 (dont 9 des 17 lignes hors fonction, au prorata).
 
-- portees (8) : `hash2d`, `fieldSeasonFromDay`, `fieldSeasonRegenAmount`, `fieldSeasonGatherAmount`, `pickFieldCropId`, `rotateFieldCropId`, `ensureFieldFallow`, `ensureFieldCropReady`
-- restent (6 fonctions) : `majorityFieldCropId` (22), `fieldSeasonReadOf` (20), `fieldSeasonYieldOf` (6), `fieldSeasonTendAmount` (4), `isFieldCropId` (3), `isFieldFoodCropId` (3)
-
-**`sim/fieldWorkPosts.js`** — Work/AnastasisGather, Village/AnastasisVillage. Reste 3 lignes de code sur 104.
-
-- portees (6) : `hashText`, `preferredFieldPostIndex`, `fieldPostWorld`, `nearestFieldPostIndex`, `claimedFieldPosts`, `fieldWorkTarget`
-- restent (1 fonctions) : `countFieldWorkers` (3)
+- portees (9) : `hash2d`, `fieldSeasonFromDay`, `fieldSeasonRegenAmount`, `fieldSeasonTendAmount`, `fieldSeasonGatherAmount`, `pickFieldCropId`, `rotateFieldCropId`, `ensureFieldFallow`, `ensureFieldCropReady`
+- restent (5 fonctions) : `majorityFieldCropId` (22), `fieldSeasonReadOf` (20), `fieldSeasonYieldOf` (6), `isFieldCropId` (3), `isFieldFoodCropId` (3)
 
 **`sim/forestSustain.js`** — Village/AnastasisPlanner. Reste 123 lignes de code sur 182 (dont 27 des 40 lignes hors fonction, au prorata).
 
@@ -541,7 +536,7 @@ importent celui-ci.
 | porter | `ai/algorithmic/flags.js` | 19 | 10 | 10 | 0 | 3 | 6 | cognition |  |
 | partiel | `sim/spatialGrid.js` | 142 | 100 | 24 | 0 | 8 | 0 | socle | Core/AnastasisSpatialGrid — 6/12 fonctions portees |
 | partiel | `sim/worldArchetypes.js` | 866 | 752 | 595 | 7 | 4 | 1 | generation du monde | World/AnastasisWorldArchetype — 2/4 fonctions portees |
-| partiel | `sim/fieldCrops.js` | 155 | 120 | 68 | 0 | 11 | 1 | generation du monde | World/AnastasisWorld, Work/AnastasisFields, Work/AnastasisGather — 8/14 fonctions portees |
+| partiel | `sim/fieldCrops.js` | 155 | 120 | 63 | 0 | 11 | 1 | generation du monde | World/AnastasisWorld, Work/AnastasisFields, Work/AnastasisGather — 9/14 fonctions portees |
 | partiel | `sim/navGrid.js` | 435 | 364 | 75 | 2 | 6 | 2 | navigation | World/AnastasisNavGrid, World/AnastasisNavService — 13/19 fonctions portees |
 | partiel | `sim/pathfinding.js` | 212 | 179 | 7 | 0 | 3 | 2 | navigation | World/AnastasisPathfinding — 13/15 fonctions portees |
 | partiel | `sim/save.js` | 829 | 656 | 609 | 2 | 0 | 4 | etat et sauvegarde | Harness/AnastasisJsSave — 1/11 fonctions portees |

@@ -118,6 +118,8 @@ l'hôte doit le vider au changement de jour (là où la référence fait `update
 
 ## ECARTS
 
+- modifié : n° 27 — le planificateur est porté en module seul (`Village/AnastasisPlanner`) ; la fiche reste
+  ouverte : `CollectiveDecisionOf` (help-farm-001) n'est pas encore rempli depuis la vue.
 - ouvert : n° 32 — Planificateur : la corvée de bois départage les égalités en ordre ordinal (A_TRANCHER) ;
   la référence trie par `localeCompare`, identique pour les identifiants `npc-N` de tous les scénarios.
 
