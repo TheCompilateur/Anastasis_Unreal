@@ -344,6 +344,22 @@ l'habitant, jamais sur `sim.rng`.
 `AreNeedsCritical` et non `NeedsCritical` : `AnastasisVillage` porte déjà une fonction de ce nom sur
 `FNeeds`, même formule. La recherche dépendante des arguments rendait ses appels ambigus.
 
+### Fait — le mode de vie (mission lifestyle-001), module seul
+
+| Unreal | Source JS (`anastasis-ref-p3`) | Preuve |
+| --- | --- | --- |
+| `Life/AnastasisLifestyle.h/.cpp` | `sim/lifestyle.js` : `dayPhase`, `lifestyleForId` (table `LIFESTYLES`), `assignLifestyle`, `ensureLifestyle`, `lifestyleBias`, `lifestyleTravelFactor`, `lifestyleIndoorDuration`, `lifestyleTarget` (`LifestyleTargetBuilding`), `lifestyleNotePlaceUse`, `lifestyleDailyUpdate` | `Parite.ModeDeVie`, 7 465 vecteurs (`tools/migration/parity/lifestyle.mjs`) |
+
+Hors portage : `lifestyleLabel` et `lifestyleColor`, du texte et une couleur d'affichage ; leur table
+(`LIFESTYLES`) est portée, leur formatage non.
+
+**Pas branché** : `FNpc` ne porte pas de `FLifestyle`. Ce que le branchement doit savoir :
+`ensureLifestyle` TIRE dans `sim.rng` (un tirage) quand le mode de vie manque, et `updateNpc` l'appelle
+en première ligne, AVANT la cadence. `lifestyleIndoorDuration` et `lifestyleNotePlaceUse` appellent
+`ensureLifestyle` sans flux : un habitant sans mode de vie tirerait alors dans `fallbackRng`
+(`GetAnastasisFallbackRng`), un flux global. `lifestyleTarget` rend un bâtiment ; l'appelant calcule le
+point d'accès, une fois, comme la référence.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

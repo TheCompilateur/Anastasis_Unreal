@@ -18,17 +18,17 @@ Unreal, il ne se traduit pas. Ce document dit, fichier par fichier, dans quel se
 
 | | fichiers | lignes | dont code | dont code a porter |
 | --- | ---: | ---: | ---: | ---: |
-| **A porter** | 161 | 51104 | 40035 | 40035 |
+| **A porter** | 160 | 50855 | 39819 | 39819 |
 | **Partiellement porte** | 34 | 28454 | 23539 | 17904 |
 | **A generer** (donnees) | 4 | 2101 | 1278 | 0 |
 | **A jeter** | 23 | 4968 | 3847 | 0 |
-| Deja porte | 11 | 2438 | 1723 | 0 |
-| **Total** | 233 | 89065 | 70422 | 57939 |
+| Deja porte | 12 | 2687 | 1939 | 0 |
+| **Total** | 233 | 89065 | 70422 | 57723 |
 
-Sur les 51104 lignes des modules a porter, 5564 sont du commentaire et
-3774 des lignes vides : **40035 lignes de code**. Les 34 modules
+Sur les 50855 lignes des modules a porter, 5559 sont du commentaire et
+3755 des lignes vides : **39819 lignes de code**. Les 34 modules
 partiellement portes ajoutent **17904 lignes de code** qui restent (sur 23539 ;
-5635 portees, 0 hors perimetre). Total a porter : **57939 lignes de code**.
+5635 portees, 0 hors perimetre). Total a porter : **57723 lignes de code**.
 12 modules a porter melangent logique et table de contenu : la table s'extrait, le selecteur se porte.
 
 ## Reste a porter, par vague
@@ -43,10 +43,10 @@ pas l'interet du gameplay. Un module partiellement porte compte pour ce qui lui 
 | 2 — navigation | 8 | 2 | 639 |
 | 3 — budget et LOD logique | 1 | 0 | 228 |
 | 4 — etat du monde et sauvegarde | 3 | 2 | 701 |
-| 5 — boucle de simulation | 80 | 9 | 33410 |
+| 5 — boucle de simulation | 79 | 9 | 33194 |
 | 6 — vie, IA, langue | 100 | 18 | 22274 |
 
-Les vagues 5 et 6 ne sont pas des vagues, ce sont des marecages : 180 modules a
+Les vagues 5 et 6 ne sont pas des vagues, ce sont des marecages : 179 modules a
 elles deux. Elles se decoupent en chantiers, et c'est a ce grain qu'un module se confie.
 
 | Vague | Chantier | fichiers | lignes de code a porter | plus gros reste |
@@ -56,7 +56,7 @@ elles deux. Elles se decoupent en chantiers, et c'est a ce grain qu'un module se
 | 2 | navigation | 8 | 639 | `sim/crowdNav.js` (228) |
 | 3 | budget et LOD | 1 | 228 | `sim/logicalLod.js` (228) |
 | 4 | etat et sauvegarde | 3 | 701 | `sim/save.js` (609, partiel) |
-| 5 | noyau de boucle | 9 | 12630 | `sim/simulation.js` (6647, partiel) |
+| 5 | noyau de boucle | 8 | 12414 | `sim/simulation.js` (6647, partiel) |
 | 5 | societe et institutions | 8 | 6629 | `sim/collectivePriorities.js` (3035) |
 | 5 | urbanisme | 14 | 3954 | `sim/urban/intent.js` (489) |
 | 5 | economie et travail | 18 | 3373 | `sim/craftWork.js` (854, partiel) |
@@ -304,6 +304,7 @@ C++ — ou ecartee par PORTAGE.md :
 | `life/conditioning.js` | Life/AnastasisConditioning | 4 | — | needs-factors-001 |
 | `runtime/simClock.js` | Core/AnastasisSimClock | 4 | `simSpeedRenderGate3d`, `applySimSpeedRenderGate3d` | couche 0 |
 | `sim/hydrology.js` | World/AnastasisHydrology | 13 | — | couche 1 |
+| `sim/lifestyle.js` | Life/AnastasisLifestyle | 10 | `lifestyleLabel`, `lifestyleColor` | lifestyle-001 (module seul) |
 | `sim/navService.js` | World/AnastasisNavService | 22 | — | couche 2 (nav-service-001, module seul) |
 | `sim/rng.js` | Core/AnastasisRng | 4 | — | couche 0 |
 | `sim/simulationBudget.js` | Core/AnastasisSimBudget | 9 | `ema`, `resetSimulationBudgetStats`, `noteSimulationBudgetFrame`, `formatSimulationBudgetHud` | couche 3 (noyau causal) |
@@ -422,7 +423,6 @@ importent celui-ci.
 | porter | `sim/eraClimateBridge.js` | 287 | 226 | 226 | 9 | 4 | 5 | chronique et memoire collective |  |
 | porter | `sim/collectivePulse.js` | 293 | 219 | 219 | 26 | 1 | 5 | societe et institutions |  |
 | porter | `sim/playerGenesis.js` | 254 | 218 | 218 | 11 | 0 | 5 | noyau de boucle |  |
-| porter | `sim/lifestyle.js` | 249 | 216 | 216 | 9 | 4 | 5 | noyau de boucle |  |
 | porter | `sim/transport/haulThroughput.js` | 266 | 202 | 202 | 0 | 4 | 5 | transport et logistique |  |
 | porter | `sim/forestSustain.js` | 257 | 182 | 182 | 0 | 5 | 5 | economie et travail |  |
 | porter | `sim/animaux/livestockEconomy.js` | 213 | 177 | 177 | 0 | 1 | 5 | regne animal |  |
@@ -605,6 +605,7 @@ importent celui-ci.
 | porte | `sim/world.js` | 427 | 320 | 0 | 0 | 3 | 1 | — | World/AnastasisWorld (+ WorldNoise) |
 | porte | `sim/navService.js` | 511 | 391 | 0 | 3 | 2 | 2 | — | World/AnastasisNavService |
 | porte | `sim/simulationBudget.js` | 275 | 166 | 0 | 0 | 2 | 3 | — | Core/AnastasisSimBudget |
+| porte | `sim/lifestyle.js` | 249 | 216 | 0 | 9 | 4 | 5 | — | Life/AnastasisLifestyle |
 | porte | `ai/algorithmic/hungerUtility.js` | 245 | 204 | 0 | 2 | 4 | 6 | — | Ai/AnastasisNous |
 | porte | `life/conditioning.js` | 109 | 48 | 0 | 0 | 3 | 6 | — | Life/AnastasisConditioning |
 | porte | `ai/algorithmic/inertia.js` | 55 | 41 | 0 | 0 | 4 | 6 | — | Ai/AnastasisNous |

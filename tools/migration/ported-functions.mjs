@@ -163,6 +163,14 @@ export const PORTAGE_DECLARE = [
   { module: "src/life/bonds.js", cpp: "Life/AnastasisBonds", source: "bonds-rumors", entier: true, fonctions: ["bondSocialTarget"] },
   { module: "src/life/talk.js", cpp: "Life/AnastasisBonds, Village/AnastasisVillage", source: "bonds-rumors (hash, portes, durees, tours, refus)", fonctions: ["recordTalk", "beginTalkSession", "advanceTalkTurn"] },
   { module: "src/ai/socialMemory.js", cpp: "Life/AnastasisBonds", source: "bonds-rumors", entier: true, fonctions: ["rememberedSocialTarget"] },
+  {
+    module: "src/sim/lifestyle.js", cpp: "Life/AnastasisLifestyle", source: "lifestyle-001 (module seul)", entier: true,
+    alias: { lifestyleTarget: "LifestyleTargetBuilding" },
+    hors: {
+      lifestyleLabel: "presentation : `${life.label}: ${life.short}`, texte affiche (PORTAGE.md, lifestyle-001)",
+      lifestyleColor: "presentation : couleur du marqueur 3D (PORTAGE.md, lifestyle-001)",
+    },
+  },
   { module: "src/life/moodlets.js", cpp: "Life/AnastasisBonds", source: "bonds-rumors (newFriend)" },
   { module: "src/life/speechActs.js", cpp: "Village/AnastasisVillage", source: "bonds-rumors", fonctions: ["createInformResourceSpotActs", "commitHearsayResourceSpot"] },
   {
