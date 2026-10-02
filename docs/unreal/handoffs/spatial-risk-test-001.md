@@ -59,7 +59,7 @@ Sans objet.
   `speechActId`, ni `confidence`, ni `viaPlayerId` : elle diffère de la référence dans `actors` dès qu'une rumeur
   de gisement passe ; `recallResource` ne lit aucun des trois. (Le coordinateur avait cité le n° 14 ; il porte en
   fait la cohabitation food-supply et ne parle pas des rumeurs.)
-- hérités de la base, non modifiés ici : n° 32, n° 33.
+- hérités de la base, non modifiés ici : n° 32, n° 33 ; et n° 34, n° 35, n° 36 (premiere-pensee-001, sous cette mission depuis le rebase de la pile sur main).
 
 ## INTEGRATION_RISK
 
