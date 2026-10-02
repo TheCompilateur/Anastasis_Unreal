@@ -90,4 +90,33 @@ bool FAnthropicContinuityTest::RunTest(const FString&)
     TestTrue(TEXT("wear remains bounded"),M.StrengthAt(FVector2D(55,50))<=1.0);
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnthropicLivedPathsTest, "Anastasis.Anthropic.WetnessAxisAndAbandonment",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnthropicLivedPathsTest::RunTest(const FString&)
+{
+    AnastasisAnthropic::FMemory Dry, Wet;
+    for (int32 I = 0; I <= 6; ++I)
+    {
+        const FVector2D P(I % 2 ? 90 : 10, 50);
+        Dry.Observe(I / 60.0, {{TEXT("walker"), P, true, 0}});
+        Wet.Observe(I / 60.0, {{TEXT("walker"), P, true, 1}});
+    }
+    const FVector2D Center(50, 50);
+    const double Used = Wet.StrengthAt(Center);
+    TestTrue(TEXT("same route is more marked on wet tile"), Used > Dry.StrengthAt(Center));
+    double Coherence;
+    const FVector2D Axis = Wet.AxisAt(Center, Coherence);
+    TestTrue(TEXT("return trips reinforce east-west axis"), FMath::Abs(Axis.X) > .99 && Coherence > .99);
+    TestEqual(TEXT("unvisited ground unchanged"), Wet.StrengthAt(FVector2D(500, 500)), 0.0);
+    Wet.Observe(.1 + 8 * 90, {});
+    TestTrue(TEXT("abandoned route recovers"), Wet.StrengthAt(Center) < Used);
+    TestTrue(TEXT("route persists beyond departure"), Wet.GetCells().Num() > 0);
+    Wet.Observe(.1 + 160 * 90, {});
+    TestEqual(TEXT("long abandoned route disappears"), Wet.StrengthAt(Center), 0.0);
+    AnastasisAnthropic::FMemory Single;
+    Single.Observe(0, {{TEXT("a"), FVector2D(1, 1), true, 1}});
+    Single.Observe(1.0 / 60, {{TEXT("a"), FVector2D(99, 99), true, 1}});
+    TestEqual(TEXT("single wet diagonal stays invisible"), Single.StrengthAt(Center), 0.0);
+    return true;
+}
 #endif

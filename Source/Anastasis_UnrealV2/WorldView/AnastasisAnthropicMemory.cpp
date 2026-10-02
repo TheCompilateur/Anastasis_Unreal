@@ -16,6 +16,7 @@ void AnastasisAnthropic::FMemory::Observe(double Time, const TArray<FObservation
     for (auto It = Cells.CreateIterator(); It; ++It)
     {
         It.Value().Metres *= Decay;
+        It.Value().Wear *= Decay;
         if (It.Value().Metres < 0.005) It.RemoveCurrent();
     }
     // Only adjacent observations separated by at most one normal 1/60 simulation step.
@@ -64,6 +65,12 @@ void AnastasisAnthropic::FMemory::Observe(double Time, const TArray<FObservation
                     }
                     const double Sum = Cell->Metres + Metres;
                     Cell->Position = (Cell->Position * Cell->Metres + P * Metres) / Sum;
+                    const FVector2D Unit = Delta / Length;
+                    const FVector2D Moment(Unit.X * Unit.X - Unit.Y * Unit.Y, 2.0 * Unit.X * Unit.Y);
+                    Cell->AxisMoment = (Cell->AxisMoment * Cell->Metres + Moment * Metres) / Sum;
+                    const double Wetness = FMath::IsFinite(Person.Wetness) ? FMath::Clamp(Person.Wetness, 0.0, 1.0) : 0.0;
+                    // Presentation tuning, not a calibrated soil-compaction law. One traverse stays subthreshold.
+                    Cell->Wear = FMath::Min(16.0, Cell->Wear + Metres * (1.0 + 0.5 * Wetness));
                     Cell->Metres = FMath::Min(16.0, Sum);
                 }
             }
@@ -82,11 +89,31 @@ double AnastasisAnthropic::FMemory::StrengthAt(const FVector2D& Point) const
     {
         if (const FCell* C = Cells.Find(Key + FIntPoint(X, Y)))
         {
+            if (C->Metres <= 2.0) continue;
             const double Edge = FMath::Clamp(1.0 - FVector2D::Distance(Point, C->Position) / 75.0, 0.0, 1.0);
             // A single traverse is invisible; repeated observed distance opens a soft, narrow tread.
             // Blend adjoining observed cells so grid boundaries do not create a dotted trail.
-            Strength += FMath::Clamp((C->Metres - 2.0) / 6.0, 0.0, 1.0) * Edge;
+            Strength += FMath::Clamp((C->Wear - 2.0) / 6.0, 0.0, 1.0) * Edge;
         }
     }
     return FMath::Clamp(Strength, 0.0, 1.0);
+}
+
+FVector2D AnastasisAnthropic::FMemory::AxisAt(const FVector2D& Point, double& Coherence) const
+{
+    FVector2D Moment = FVector2D::ZeroVector;
+    double Weight = 0.0;
+    const FIntPoint Key(FMath::FloorToInt32(Point.X / CellUU), FMath::FloorToInt32(Point.Y / CellUU));
+    for (int32 Y = -1; Y <= 1; ++Y) for (int32 X = -1; X <= 1; ++X)
+        if (const FCell* C = Cells.Find(Key + FIntPoint(X, Y)))
+        {
+            if (C->Metres <= 2.0) continue;
+            const double W = FMath::Clamp(1.0 - FVector2D::Distance(Point, C->Position) / 75.0, 0.0, 1.0)
+                * FMath::Clamp((C->Wear - 2.0) / 6.0, 0.0, 1.0);
+            Moment += C->AxisMoment * W;
+            Weight += W;
+        }
+    Coherence = Weight > 0.0 ? FMath::Clamp(Moment.Size() / Weight, 0.0, 1.0) : 0.0;
+    const double Angle = 0.5 * FMath::Atan2(Moment.Y, Moment.X);
+    return FVector2D(FMath::Cos(Angle), FMath::Sin(Angle));
 }

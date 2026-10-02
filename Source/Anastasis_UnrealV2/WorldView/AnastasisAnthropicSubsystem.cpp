@@ -89,7 +89,7 @@ void UAnastasisAnthropicSubsystem::Tick(float DeltaTime)
         const bool bLand = X >= 0 && Y >= 0 && X < W.W && Y < W.H
             && W.Tiles.IsValidIndex(Y * W.W + X) && W.Tiles[Y * W.W + X].Type != AnastasisWorld::ETileType::Water;
         People.Add({N.Id, FVector2D(N.X, N.Y) * AnastasisWorldView::TileWorldSize * Scale,
-            bLand && !N.Inside.bActive});
+            bLand && !N.Inside.bActive, bLand ? W.Tiles[Y * W.W + X].Wetness : 0.0});
     }
     Memory.Observe(Sim.GetTime(), People);
     LastTime = Sim.GetTime();
@@ -114,10 +114,10 @@ void UAnastasisAnthropicSubsystem::ApplyGrass()
     FocusStrength = 0.0;
     TArray<AnastasisAnthropic::FCell> Visible;
     for (const auto& Pair : Memory.GetCells())
-        if (Pair.Value.Metres > 2.0) Visible.Add(Pair.Value);
+        if (Pair.Value.Metres > 2.0 && Pair.Value.Wear > 2.0) Visible.Add(Pair.Value);
     Visible.Sort([](const auto& A, const auto& B)
     {
-        if (A.Metres != B.Metres) return A.Metres > B.Metres;
+        if (A.Wear != B.Wear) return A.Wear > B.Wear;
         if (A.Position.X != B.Position.X) return A.Position.X < B.Position.X;
         return A.Position.Y < B.Position.Y;
     });
@@ -152,11 +152,17 @@ void UAnastasisAnthropicSubsystem::ApplyGrass()
                 if (Strength > FocusStrength) { FocusStrength = Strength; Focus = P; }
                 FTransform Applied = Original;
                 FVector Size = Original.GetScale3D();
-                Size.Z *= FMath::Lerp(1.0, 0.08, Strength);
+                Size.Z *= FMath::Lerp(1.0, 0.35, Strength);
                 // At high repeated use some ground becomes visible; no soil is repainted.
                 Size.X *= FMath::Lerp(1.0, 0.45, Strength);
                 Size.Y *= FMath::Lerp(1.0, 0.45, Strength);
                 Applied.SetScale3D(Size);
+                double Coherence;
+                const FVector2D Axis = Memory.AxisAt(FVector2D(P.X, P.Y), Coherence);
+                // Tilt around the observed travel axis's perpendicular, preserving the rooted location.
+                // Opposing trips reinforce; crossing flows reduce the directional lean.
+                const FQuat Lean(FVector(-Axis.Y, Axis.X, 0), FMath::DegreesToRadians(60.0) * Strength * Coherence);
+                Applied.SetRotation(Lean * Original.GetRotation());
                 if (M->UpdateInstanceTransform(Index, Applied, true, false, true))
                 { Grass.Add({M, Index, M->GetInstanceCount(), Original, Applied}); bDirty = true; }
             }
@@ -167,9 +173,40 @@ void UAnastasisAnthropicSubsystem::ApplyGrass()
 }
 FString UAnastasisAnthropicSubsystem::GetReport() const
 {
-    return FString::Printf(TEXT("active=%d cells=%d grass=%d gaps=%d jumps=%d dropped=%d grass_cap=%d apply_ms=%.3f restored=%d restore_errors=%d drawn=%d focus_x=%.3f focus_y=%.3f focus_z=%.3f focus_strength=%.3f"),
+    FVector Peak = FVector::ZeroVector;
+    int32 People = -1;
+    FVector View = FVector::ZeroVector;
+    double ViewStrength = -1;
+    for (const FGrass& G : Grass)
+    {
+        const FVector P = G.Original.GetLocation();
+        const double Strength = Memory.StrengthAt(FVector2D(P.X, P.Y));
+        if (Strength > ViewStrength) { ViewStrength = Strength; View = P; }
+    }
+    double PeakStrength = 0.0;
+    for (const auto& Pair : Memory.GetCells())
+    {
+        const double Strength = Memory.StrengthAt(Pair.Value.Position);
+        if (Strength > PeakStrength)
+        {
+            PeakStrength = Strength;
+            Peak = FVector(Pair.Value.Position.X, Pair.Value.Position.Y, 0);
+        }
+    }
+    if (const auto* Host = GetWorld()->GetSubsystem<UAnastasisSimulationSubsystem>())
+    {
+        People = Host->GetSimulation().GetVillage().GetActors().Num();
+        for (TActorIterator<AAnastasisWorldEmbodiment> It(GetWorld()); It; ++It)
+        {
+            const double UU = AnastasisWorldView::TileWorldSize * It->GetSnapshot().SpatialScale;
+            if (UU > 0) Peak = FAnastasisVillagePresentation::SimToUnreal(Host->GetSimulation().GetWorld(), Peak.X / UU, Peak.Y / UU, GetWorld());
+            break;
+        }
+    }
+    return FString::Printf(TEXT("active=%d cells=%d grass=%d gaps=%d jumps=%d dropped=%d grass_cap=%d apply_ms=%.3f restored=%d restore_errors=%d drawn=%d focus_x=%.3f focus_y=%.3f focus_z=%.3f focus_strength=%.3f display=%d peak=%.6f peak_x=%.3f peak_y=%.3f peak_z=%.3f people=%d view_x=%.3f view_y=%.3f view_z=%.3f"),
         bActive, Memory.GetCells().Num(), Grass.Num(), Memory.RejectedGaps, Memory.RejectedJumps,
-        Memory.DroppedCells, bTruncatedGrass, ApplyMs, Restored, RestoreErrors, bDrawn, Focus.X, Focus.Y, Focus.Z, FocusStrength);
+        Memory.DroppedCells, bTruncatedGrass, ApplyMs, Restored, RestoreErrors, bDrawn, Focus.X, Focus.Y, Focus.Z, FocusStrength,
+        CVarAnthropicDraw.GetValueOnGameThread(), PeakStrength, Peak.X, Peak.Y, Peak.Z, People, View.X, View.Y, View.Z);
 }
 
 

@@ -42,6 +42,7 @@ granary-eat-pie | tools/unreal/granary-eat-pie.py | GRANARY_EAT_COMPLETE | GRANA
 metabolism-pie | tools/unreal/metabolism-pie.py | METABOLISM_PIE PASS | METABOLISM_PIE FAIL | 420 | -
 abandon-pie | tools/unreal/abandon-pie.py | ABANDON_PIE PASS | ABANDON_PIE FAIL | 420 | -
 anthropic-memory-pie | tools/unreal/anthropic-memory-pie.py | ANTHROPIC_PIE PASS | ANTHROPIC_PIE FAIL | 360 | -
+lived-paths-capture | tools/unreal/lived-paths-capture.py | LIVED_PATHS_CAPTURE PASS | LIVED_PATHS_CAPTURE FAIL|Traceback | 480 | ANASTASIS_PATHS_OUT=@Saved/LivedPathsEvidence
 # gather-deliver : Speed 10, delais en temps simule. PASS = recolte, retour (au plus un sac plein), le sac du
 # retour livre en entier, deuxieme voyage ; conservation champs + sacs + grenier + repas a chaque echantillon.
 # Woodland sequence: exact bank/meadow positions and bounded instance budget.
