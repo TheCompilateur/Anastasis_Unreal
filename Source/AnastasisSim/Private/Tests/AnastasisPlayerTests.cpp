@@ -260,13 +260,148 @@ bool FAnastasisPlayerReputationTest::RunTest(const FString&)
 	TestEqual(TEXT("the others are not judged"), Village.FindNpc(TEXT("npc-0"))->Reputation, Standing::Base);
 
 	// Ce que le village en fait : moins envie de lui parler.
-	TestEqual(TEXT("affinity at the base: 0"), FVillage::ReputationAffinity(*Village.FindNpc(TEXT("npc-0"))), 0.0);
-	TestTrue(TEXT("affinity of the idler: negative"), FVillage::ReputationAffinity(*Village.FindNpc(Id)) < -10.0);
+	TestEqual(TEXT("affinity at the base: 0"), Village.ReputationAffinity(*Village.FindNpc(TEXT("npc-0"))), 0.0);
+	TestTrue(TEXT("affinity of the idler: negative"), Village.ReputationAffinity(*Village.FindNpc(Id)) < -10.0);
 
 	// Un mois oisif de plus : la cible touche le plancher, pas en dessous.
 	Village.ObservePlayer(0.0, 30.0 * AnastasisRhythm::DayLength);
 	for (int32 Night = 0; Night < 60; ++Night) Village.UpdateReputationDaily();
 	TestEqual(TEXT("floor 0"), Village.FindNpc(Id)->Reputation, 0.0, 1e-6);
+
+	// `deeds.built x buildGain` (player-goals-001) : un batisseur gagne en reputation. Entre habitants,
+	// elle ne change pas l'envie de se parler (le portage reste au bit pres).
+	FNpc* Builder = Village.FindNpcMutable(TEXT("npc-1"));
+	Builder->BuildingsCompleted = 2;
+	Village.UpdateReputationDaily();
+	TestEqual(TEXT("two buildings: 50 + (56 - 50) x 0.4"), Builder->Reputation, 50.0 + 6.0 * 0.4, 1e-9);
+	TestEqual(TEXT("a builder who is not the player: no affinity effect"), Village.ReputationAffinity(*Builder), 0.0);
+	return true;
+}
+
+// --- La main du joueur (player-goals-001) ------------------------------------------------------
+
+namespace AnastasisPlayerTest
+{
+	/** Un puits a (20,20), le joueur arrive a l'est, assoiffe a `Thirst`. */
+	FString ArriveNearWell(FVillage& Village, double Thirst)
+	{
+		Village.AddBuilding(WellType, 20, 20);
+		const FString Id = Village.ArriveAsPlayer(25.5, 20.5);
+		if (FNpc* Me = Village.FindNpcMutable(Id)) Me->Needs.Thirst = Thirst;
+		return Id;
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAnastasisPlayerGoalHoldsTest,
+	"Anastasis.Sim.Joueur.Choix.Tient",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAnastasisPlayerGoalHoldsTest::RunTest(const FString&)
+{
+	using namespace AnastasisPlayerTest;
+	const AnastasisWorld::FWorld World = MakeFlatWorld(40, 40);
+	FVillage Village;
+	Village.Bind(World);
+	const FString Id = ArriveNearWell(Village, 50.0);
+	TestFalse(TEXT("no choice before the player asks"), Village.GetPlayerGoalChoice() != nullptr);
+
+	double Time = 0.0;
+	Run(Village, Time, 2.0);
+	bool bDrinkOffered = false;
+	for (const FPlayerGoalOption& O : Village.GetPlayerGoalOptions()) bDrinkOffered |= O.Goal == GoalDrink;
+	TestTrue(TEXT("options: drink is in the table the player reads"), bDrinkOffered);
+	TestEqual(TEXT("still waiting"), Village.FindNpc(Id)->Goal, FString(GoalIdle));
+
+	TestTrue(TEXT("choose drink"), Village.ChoosePlayerGoal(GoalDrink));
+	Run(Village, Time, 20.0);
+	const FNpc* Me = Village.FindNpc(Id);
+	TestTrue(TEXT("he walked to the well and drank"), Me->DrinksTaken >= 1);
+	TestTrue(TEXT("thirst went down"), Me->Needs.Thirst < 50.0);
+	const FPlayerGoalChoice* Choice = Village.GetPlayerGoalChoice();
+	if (!TestNotNull(TEXT("the intention lasts"), Choice)) return false;
+	TestTrue(TEXT("held at least one decision"), Choice->Holds >= 1);
+	TestEqual(TEXT("still drink"), Choice->Goal, FString(GoalDrink));
+	TestTrue(TEXT("no refusal"), Village.GetPlayerRefusal() == nullptr);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAnastasisPlayerGoalRefusedTest,
+	"Anastasis.Sim.Joueur.Choix.Refus",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAnastasisPlayerGoalRefusedTest::RunTest(const FString&)
+{
+	using namespace AnastasisPlayerTest;
+	const AnastasisWorld::FWorld World = MakeFlatWorld(40, 40);
+
+	// Hors table : batir sans chantier ouvert, ou un but que ce portage ne sait pas faire.
+	{
+		FVillage Village;
+		Village.Bind(World);
+		const FString Id = ArriveNearWell(Village, 10.0);
+		double Time = 0.0;
+		Village.ChoosePlayerGoal(AnastasisBuild::GoalBuild);
+		Run(Village, Time, 3.0);
+		const FPlayerRefusal* R = Village.GetPlayerRefusal();
+		if (TestNotNull(TEXT("build without a site: refused"), R))
+		{
+			TestEqual(TEXT("reason: hors-table"), R->Reason, FString(PlayerDecision::RefusalNotInTable));
+			TestEqual(TEXT("wanted build"), R->Wanted, FString(AnastasisBuild::GoalBuild));
+		}
+		TestEqual(TEXT("he waits instead (Nous does not pick for him)"), Village.FindNpc(Id)->Goal, FString(GoalIdle));
+		const FPlayerGoalChoice* C = Village.GetPlayerGoalChoice();
+		TestTrue(TEXT("the intention is NOT withdrawn"), C && C->Goal == AnastasisBuild::GoalBuild && C->Yields >= 1);
+
+		Village.ChoosePlayerGoal(TEXT("craft"));
+		Run(Village, Time, 3.0);
+		TestTrue(TEXT("an unported goal: hors-table"), Village.GetPlayerRefusal() && Village.GetPlayerRefusal()->Reason == PlayerDecision::RefusalNotInTable);
+	}
+
+	// Le corps parle : assoiffe a 95, il ne va pas se detendre ; il attend que le joueur choisisse le remede.
+	{
+		FVillage Village;
+		Village.Bind(World);
+		const FString Id = ArriveNearWell(Village, 95.0);
+		double Time = 0.0;
+		Village.ChoosePlayerGoal(GoalRelax);
+		Run(Village, Time, 3.0);
+		const FPlayerRefusal* R = Village.GetPlayerRefusal();
+		TestTrue(TEXT("thirst 95: le-corps-parle"), R && R->Reason == PlayerDecision::RefusalBody);
+		TestEqual(TEXT("waits, does not drink by himself"), Village.FindNpc(Id)->Goal, FString(GoalIdle));
+		TestEqual(TEXT("no drink without the player"), Village.FindNpc(Id)->DrinksTaken, 0);
+		// Le remede, lui, passe (EXTENSION : la reference le refuserait aussi, et le joueur mourrait de soif).
+		Village.ChoosePlayerGoal(GoalDrink);
+		Run(Village, Time, 20.0);
+		TestTrue(TEXT("the remedy passes: he drinks"), Village.FindNpc(Id)->DrinksTaken >= 1);
+		TestTrue(TEXT("the remedy passes: no refusal"), Village.GetPlayerRefusal() == nullptr);
+	}
+
+	// Retirer l'intention : il attend, sans refus.
+	{
+		FVillage Village;
+		Village.Bind(World);
+		const FString Id = ArriveNearWell(Village, 50.0);
+		double Time = 0.0;
+		Village.ChoosePlayerGoal(GoalDrink);
+		Run(Village, Time, 1.0);
+		Village.ChoosePlayerGoal(FString());
+		Run(Village, Time, 2.0);
+		TestTrue(TEXT("withdrawn: no choice"), Village.GetPlayerGoalChoice() == nullptr);
+		TestTrue(TEXT("withdrawn: no refusal"), Village.GetPlayerRefusal() == nullptr);
+		TestEqual(TEXT("withdrawn: idle"), Village.FindNpc(Id)->Goal, FString(GoalIdle));
+	}
+
+	// Conduire le corps a la main retire l'intention (`setPlayerMovementInput`).
+	{
+		FVillage Village;
+		Village.Bind(World);
+		ArriveNearWell(Village, 50.0);
+		Village.ChoosePlayerGoal(GoalDrink);
+		Village.SetPlayerMovementInput(0.0, 1.0);
+		TestTrue(TEXT("driving withdraws the intention"), Village.GetPlayerGoalChoice() == nullptr);
+	}
 	return true;
 }
 

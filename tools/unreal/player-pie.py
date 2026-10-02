@@ -6,6 +6,8 @@ attendant le temps SIMULE (jamais l'horloge murale) :
     1. anastasis.Sim.TimeScale 1 ; Anastasis.Player.Arrive      un habitant arrive et est incarne
     2. 3 s simulees : il attend (but idle), immobile ; le pawn est pose sur lui
     3. Anastasis.Player.Move 1 0, 2 s simulees : il marche vers +X, le pawn le suit ; Move 0 0
+    3b. Anastasis.Player.Goal build (pas de chantier) : refuse `hors-table`, il attend, l'intention reste
+    3c. Anastasis.Player.Goal drink : il marche au puits et boit (<= 60 s simulees) ; Goal none
     4. Anastasis.Sim.Advance 7d : une semaine sautee -> presence ~3 %, 7 jours oisifs, plus personne ne le voit
     5. Anastasis.Sim.Advance 1d : un minuit de plus -> reputation sous 50
     6. Anastasis.Player.Release : observateur, le pawn retrouve sa marche
@@ -152,8 +154,30 @@ def _tick():
         gap = pawn_gap(world, s)
         check('pawn follows the body', gap < 5.0, 'gap=%.1f uu' % gap)
         cmd(world, 'Anastasis.Player.Move 0 0')
-        cmd(world, 'Anastasis.Sim.Advance 7d')
-        step = 4
+        # player-goals-001 : la main du joueur. Batir sans chantier ouvert : refuse, et il attend.
+        cmd(world, 'Anastasis.Player.Goal build')
+        mark = t
+        step = 31
+    elif step == 31 and t - mark > 2.0:
+        s = status(world, 'goal_refused')
+        check('build without a site: refused hors-table', s.get('refusal') == 'hors-table', s.get('refusal'))
+        check('refused: he waits, Nous does not pick', s.get('goal') == 'idle', s.get('goal'))
+        check('refused: the intention is kept', s.get('choice') == 'build' and s.get('yields', 0) >= 1, '%s yields=%s' % (s.get('choice'), s.get('yields')))
+        check('the player reads a table of goals', 'drink' in s.get('options', []), ','.join(s.get('options', [])))
+        samples['drinks_before'] = s.get('drinks', 0)
+        cmd(world, 'Anastasis.Player.Goal drink')
+        mark = t
+        step = 32
+    elif step == 32:
+        s = json.loads(DBG.get_player_status(world) or '{}')
+        if s.get('drinks', 0) > samples['drinks_before'] or t - mark > 60.0:
+            s = status(world, 'goal_drink')
+            check('drink chosen: he walks to the well and drinks', s.get('drinks', 0) > samples['drinks_before'],
+                  'drinks %s -> %s in %.1f s sim' % (samples['drinks_before'], s.get('drinks'), t - mark))
+            check('drink chosen: the intention held', s.get('choice') == 'drink' and s.get('holds', 0) >= 1, 'holds=%s' % s.get('holds'))
+            cmd(world, 'Anastasis.Player.Goal none')
+            cmd(world, 'Anastasis.Sim.Advance 7d')
+            step = 4
     elif step == 4:
         s = status(world, 'week_skipped')
         check('a skipped week: presence below 5 %', s.get('presence', 1) < 0.05, 'presence=%.4f' % s.get('presence', -1))

@@ -147,11 +147,37 @@ namespace
 		}
 		return Seers;
 	}
+
+	/** Le nom d'un but tel que le joueur le lit. */
+	FString GoalLabel(const FString& Goal)
+	{
+		if (Goal == TEXT("drink")) return TEXT("boire");
+		if (Goal == TEXT("eat")) return TEXT("manger");
+		if (Goal == TEXT("rest")) return TEXT("dormir");
+		if (Goal == TEXT("socialize")) return TEXT("parler");
+		if (Goal == TEXT("relax")) return TEXT("se detendre");
+		if (Goal == TEXT("gatherFood")) return TEXT("recolter");
+		if (Goal == TEXT("deliver")) return TEXT("livrer");
+		if (Goal == TEXT("build")) return TEXT("batir");
+		if (Goal == TEXT("shelterRain")) return TEXT("s'abriter");
+		if (Goal == TEXT("idle")) return TEXT("attendre");
+		return Goal;
+	}
+
+	/** Pourquoi une intention cede, en clair. */
+	FString RefusalLabel(const FString& Reason)
+	{
+		if (Reason == AnastasisVillage::PlayerDecision::RefusalNotInTable) return TEXT("impossible ici et maintenant");
+		if (Reason == AnastasisVillage::PlayerDecision::RefusalLocked) return TEXT("un verrou tient (orage, charge)");
+		if (Reason == AnastasisVillage::PlayerDecision::RefusalBody) return TEXT("le corps passe devant");
+		return Reason;
+	}
 }
 
 void UAnastasisSimulationSubsystem::DrawPlayerOverlay() const
 {
-	const AnastasisVillage::FNpc* Player = Simulation.GetVillage().PlayerActor();
+	const AnastasisVillage::FVillage& Village = Simulation.GetVillage();
+	const AnastasisVillage::FNpc* Player = Village.PlayerActor();
 	if (!Player || !GEngine)
 	{
 		return;
@@ -167,7 +193,27 @@ void UAnastasisSimulationSubsystem::DrawPlayerOverlay() const
 			Player->Presence * 100.0,
 			Player->Reputation,
 			Player->IdleSeconds / FAnastasisSimulation::DayLength,
-			CountSeers(Simulation.GetVillage(), *Player)));
+			CountSeers(Village, *Player)));
+
+	// player-goals-001 : la table du joueur, numerotee comme les touches 1 a 5, puis l'intention et le refus.
+	FString Options;
+	const TArray<AnastasisVillage::FPlayerGoalOption>& Table = Village.GetPlayerGoalOptions();
+	for (int32 I = 0; I < FMath::Min(5, Table.Num()); ++I)
+	{
+		Options += FString::Printf(TEXT("  %d %s"), I + 1, *GoalLabel(Table[I].Goal));
+	}
+	const AnastasisVillage::FPlayerGoalChoice* Choice = Village.GetPlayerGoalChoice();
+	const AnastasisVillage::FPlayerRefusal* Refusal = Village.GetPlayerRefusal();
+	FString Intent = Choice ? FString::Printf(TEXT("   but: %s"), *GoalLabel(Choice->Goal)) : FString(TEXT("   but: aucun"));
+	if (Refusal)
+	{
+		Intent += FString::Printf(TEXT("  -- refuse : %s"), *RefusalLabel(Refusal->Reason));
+	}
+	GEngine->AddOnScreenDebugMessage(
+		0xA51A54,
+		0.0f,
+		Refusal ? FColor::Orange : FColor::Cyan,
+		TEXT("BUTS") + Options + TEXT("  0 rien") + Intent);
 }
 
 namespace
@@ -249,6 +295,47 @@ static FAutoConsoleCommandWithWorld CmdAnastasisPlayerStatus(
 		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER status %s"), *UAnastasisSimulationDebugLibrary::GetPlayerStatus(World));
 	}));
 
+// --- La main du joueur (player-goals-001) ----------------------------------------------------------
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisPlayerGoal(
+	TEXT("Anastasis.Player.Goal"),
+	TEXT("Anastasis.Player.Goal <goal|none> - pose an intention for the incarnated inhabitant (drink, eat, rest, socialize, relax, "
+		"gatherFood, deliver, build, shelterRain), held until withdrawn ('none'). It is decided at his next thought, in the table "
+		"Nous would read, under the same locks: a goal that cannot pass now yields, and says why (Anastasis.Player.Status)."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		UAnastasisSimulationSubsystem* Host = PlayerHost(World);
+		if (!Host) return;
+		const FString Goal = (!Args.IsValidIndex(0) || Args[0].Equals(TEXT("none"), ESearchCase::IgnoreCase)) ? FString() : Args[0];
+		const bool bOk = Host->GetSimulation().GetVillage().ChoosePlayerGoal(Goal);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER goal %s -> %s"), Goal.IsEmpty() ? TEXT("(withdrawn)") : *Goal,
+			bOk ? TEXT("posed") : TEXT("no incarnated inhabitant"));
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisPlayerChoose(
+	TEXT("Anastasis.Player.Choose"),
+	TEXT("Anastasis.Player.Choose <n> - pose the n-th goal of the player's table as shown on the BUTS line (keys 1 to 5 in PIE)."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		UAnastasisSimulationSubsystem* Host = PlayerHost(World);
+		if (!Host || !Args.IsValidIndex(0)) return;
+		AnastasisVillage::FVillage& Village = Host->GetSimulation().GetVillage();
+		const TArray<AnastasisVillage::FPlayerGoalOption>& Table = Village.GetPlayerGoalOptions();
+		const int32 Index = FCString::Atoi(*Args[0]) - 1;
+		if (!Village.PlayerActor())
+		{
+			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER choose %s -> no incarnated inhabitant (Anastasis.Player.Arrive)"), *Args[0]);
+			return;
+		}
+		if (!Table.IsValidIndex(Index))
+		{
+			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER choose %s -> no such line (%d goals in the table)"), *Args[0], Table.Num());
+			return;
+		}
+		Village.ChoosePlayerGoal(Table[Index].Goal);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER choose %d -> %s"), Index + 1, *Table[Index].Goal);
+	}));
+
 FString UAnastasisSimulationDebugLibrary::GetPlayerStatus(const UObject* WorldContextObject)
 {
 	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
@@ -261,11 +348,23 @@ FString UAnastasisSimulationDebugLibrary::GetPlayerStatus(const UObject* WorldCo
 		return FString::Printf(TEXT("{\"player\":\"\",\"npcs\":%d}"), Village.GetActors().Num());
 	}
 	const FVector Body = FAnastasisVillagePresentation::SimToUnreal(Host->GetSimulation().GetWorld(), Player->X, Player->Y, const_cast<UWorld*>(World));
+	// player-goals-001 : l'intention, le dernier refus et la table du joueur.
+	const AnastasisVillage::FPlayerGoalChoice* Choice = Village.GetPlayerGoalChoice();
+	const AnastasisVillage::FPlayerRefusal* Refusal = Village.GetPlayerRefusal();
+	TArray<FString> Options;
+	for (const AnastasisVillage::FPlayerGoalOption& O : Village.GetPlayerGoalOptions())
+	{
+		Options.Add(FString::Printf(TEXT("\"%s\""), *O.Goal));
+	}
 	return FString::Printf(
 		TEXT("{\"player\":\"%s\",\"x\":%.4f,\"y\":%.4f,\"goal\":\"%s\",\"activity\":\"%s\",\"presence\":%.4f,\"reputation\":%.4f,")
-		TEXT("\"idleDays\":%.4f,\"thirst\":%.2f,\"pawn\":%s,\"seenBy\":%d,\"npcs\":%d,\"ux\":%.1f,\"uy\":%.1f,\"uz\":%.1f}"),
+		TEXT("\"idleDays\":%.4f,\"thirst\":%.2f,\"drinks\":%d,\"meals\":%d,\"pawn\":%s,\"seenBy\":%d,\"npcs\":%d,")
+		TEXT("\"choice\":\"%s\",\"holds\":%d,\"yields\":%d,\"refusal\":\"%s\",\"options\":[%s],")
+		TEXT("\"ux\":%.1f,\"uy\":%.1f,\"uz\":%.1f}"),
 		*Player->Id, Player->X, Player->Y, *Player->Goal, *Player->Activity, Player->Presence, Player->Reputation,
-		Player->IdleSeconds / FAnastasisSimulation::DayLength, Player->Needs.Thirst,
+		Player->IdleSeconds / FAnastasisSimulation::DayLength, Player->Needs.Thirst, Player->DrinksTaken, Player->MealsTaken,
 		Host->IsPawnBound() ? TEXT("true") : TEXT("false"), CountSeers(Village, *Player), Village.GetActors().Num(),
+		Choice ? *Choice->Goal : TEXT(""), Choice ? Choice->Holds : 0, Choice ? Choice->Yields : 0,
+		Refusal ? *Refusal->Reason : TEXT(""), *FString::Join(Options, TEXT(",")),
 		Body.X, Body.Y, Body.Z);
 }

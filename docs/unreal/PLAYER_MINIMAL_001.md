@@ -66,11 +66,38 @@ Repères (tests et preuve PIE) :
 - Overlay PIE : `JOUEUR npc-N  attend  présence …%  réputation …  oisif … j  vu par N`, en orange sous 50 %.
 - `AnastasisSimulationDebugLibrary.get_player_status` (JSON) pour les preuves.
 
+## La main du joueur (player-goals-001)
+
+Port de `choosePlayerGoal` / `decideAsPlayer` (decisionProvider.js). Le joueur pose une **intention**
+qui dure jusqu'à ce qu'il la retire ; elle est décidée au même point que celle d'un habitant
+(`ChooseGoal`, après le tri, l'éligibilité et les verrous), dans la table que Noûs aurait lue :
+
+| Ce qui arrive | Résultat | Refus affiché |
+|---|---|---|
+| le but est dans la table et rien ne s'y oppose | il le commet, comme n'importe qui (mêmes cibles, portes, effets) | — |
+| le but n'est pas dans la table, ou pas porté (`build` sans chantier, `craft`) | il attend | `hors-table` : impossible ici et maintenant |
+| un verrou impose autre chose (orage → `shelterRain`, livraison en cours) | il attend | `verrou` |
+| faim ≥ 92, soif ≥ 88 ou énergie ≤ 12 | il attend, **sauf si le but est le remède** | `le-corps-parle` |
+| le joueur reprend la direction à la main | l'intention est retirée | — |
+
+L'intention n'est jamais remplacée par un choix de Noûs : un refus fait **attendre**. Noûs ne pense pas pour
+l'habitant incarné (ni biais, ni porte de commit). Écart assumé (EXTENSION) : la référence refuse aussi le
+remède quand le corps parle, donc un joueur à soif 88 ne pourrait plus jamais boire. Son propre commentaire
+dit « le joueur doit choisir le remède » : ici, le remède passe.
+
+En PIE : touches **1 à 5** = les buts de la ligne `BUTS` à l'écran (dans l'ordre de la table), **0** =
+retirer l'intention ; console `Anastasis.Player.Goal <but|none>`, `Anastasis.Player.Choose <n>`.
+`get_player_status` donne `choice`, `holds`, `yields`, `refusal`, `options`, `drinks`, `meals`.
+
+Réputation : le mérite des bâtiments achevés (`deeds.built × 3`, `STANDING.buildGain`) est porté pour tous.
+Entre habitants, la réputation ne change pas l'envie de se parler (le portage reste au bit près) ; seule celle
+du joueur compte.
+
 ## STOP — ce qui n'est pas fait
 
-- **Le choix de but par le joueur** (`choosePlayerGoal`, touches 1–5, refus motivés) et **la parole
-  dirigée** (`T`) : sans eux, l'habitant incarné ne peut que marcher et attendre. Il ne boit pas tout
-  seul : le corps parle (la soif monte), personne ne décide pour lui.
+- **La parole dirigée** (`T`, `requestPlayerTellResourceSpot`) : non portée.
+- Les options affichées sont celles de la dernière décision du joueur (rafraîchies à chaque pensée) :
+  aucune lecture d'interface ne recalcule la table, à dessein (piège payé deux fois par la référence).
 - La réputation des autres habitants (actes, envie, rivalité, jalousie, vols) : non portée.
 - Le mode visuel `PLAYER` du GameMode, et un pawn propre au jeu : le pawn est celui du template.
 - Le témoin vit dans l'hôte ; la présence et l'oisiveté sont sur la personne, pas dans l'empreinte

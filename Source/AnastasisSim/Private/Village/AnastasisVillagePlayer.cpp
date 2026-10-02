@@ -1,11 +1,12 @@
-// player-minimal-001 -- le joueur est un habitant.
+// player-minimal-001, player-goals-001 -- le joueur est un habitant.
 //
 // Port de la reference : `simulation.js` (incarnate, release, arriveAsPlayer, setPlayerMovementInput,
-// drivePlayerActor), `decisionProvider.js` (sans commande, l'habitant incarne attend : `idle`) et
-// `updateNpc` de npc.js (branche `playerControlled`). Porte : l'incarnation, l'attente, la marche
-// directe, la reputation (`standing.js`, structure seule). PAS porte : le choix de but par le joueur
-// (`choosePlayerGoal`, refus motives), la parole dirigee (`requestPlayerTellResourceSpot`), le flux
-// aleatoire joueur (`spawnNpc` n'en tire aucun ici).
+// drivePlayerActor, choosePlayerGoal, playerGoalOptions, playerRefusal), `decisionProvider.js`
+// (decideAsPlayer : sans commande l'habitant incarne attend, avec une intention il la tient tant
+// qu'elle passe, et cede en disant pourquoi) et `updateNpc` de npc.js (branche `playerControlled`).
+// Porte aussi : la reputation (`standing.js`, merite des batiments acheves).
+// PAS porte : la parole dirigee (`requestPlayerTellResourceSpot`), le flux aleatoire joueur
+// (`spawnNpc` n'en tire aucun ici).
 //
 // EXTENSION (TIME_WARP_001, demande d'Alexandre) : presence et oisivete. Un joueur qui accelere le
 // temps ne fait rien aux yeux du village ; il s'efface de leur vue et sa reputation baisse.
@@ -29,6 +30,17 @@ namespace AnastasisVillage
 		return PlayerPersonId.IsEmpty() ? nullptr : Actors.FindById(PlayerPersonId);
 	}
 
+	void FVillage::ResetPlayerHand()
+	{
+		PlayerDrive = FPoint();
+		bHasPlayerChoice = false;
+		PlayerChoice = FPlayerGoalChoice();
+		bPlayerChoiceDirty = false;
+		bHasPlayerRefusal = false;
+		PlayerRefusal = FPlayerRefusal();
+		PlayerOptions.Reset();
+	}
+
 	bool FVillage::Incarnate(const FString& NpcId)
 	{
 		FNpc* Npc = Actors.FindById(NpcId);
@@ -37,9 +49,11 @@ namespace AnastasisVillage
 			return false;
 		}
 		PlayerPersonId = Npc->Id;
-		PlayerDrive = FPoint();
+		ResetPlayerHand();
 		// `npc.aiThinkAt = this.time` : il pense des le prochain tick, et attend.
 		Npc->AiThinkAt = Now;
+		// Une decision de Nous prise avant l'incarnation ne pese plus : Nous ne pense pas pour lui.
+		Npc->bHasAlgoDecision = false;
 		return true;
 	}
 
@@ -47,7 +61,7 @@ namespace AnastasisVillage
 	{
 		const FString Previous = PlayerPersonId;
 		PlayerPersonId.Reset();
-		PlayerDrive = FPoint();
+		ResetPlayerHand();
 		// Rendu a Nous : sa prochaine pensee redecide (le but `idle` n'est pas porte pour un PNJ).
 		if (FNpc* Npc = Actors.FindById(Previous))
 		{
@@ -108,8 +122,106 @@ namespace AnastasisVillage
 			return false;
 		}
 		PlayerDrive = { RawX / Length, RawY / Length };
+		// `this.playerGoalChoice = null` : conduire le corps a la main retire l'intention posee.
+		if (bHasPlayerChoice)
+		{
+			bHasPlayerChoice = false;
+			PlayerChoice = FPlayerGoalChoice();
+			bPlayerChoiceDirty = true;
+		}
 		if (!bWasMoving) Actor->AiThinkAt = Now;
 		return true;
+	}
+
+	bool FVillage::ChoosePlayerGoal(const FString& Goal)
+	{
+		FNpc* Actor = PlayerActor();
+		if (!Actor)
+		{
+			return false;
+		}
+		const FString Clean = Goal.TrimStartAndEnd();
+		// Retirer l'intention, ou en poser une neuve (compteurs a zero). La decision reste au point
+		// de decision : on demande seulement qu'il y repense tout de suite.
+		bHasPlayerChoice = !Clean.IsEmpty();
+		PlayerChoice = FPlayerGoalChoice();
+		PlayerChoice.Goal = Clean;
+		bPlayerChoiceDirty = true;
+		bHasPlayerRefusal = false;
+		PlayerDrive = FPoint();
+		Actor->AiThinkAt = Now;
+		return true;
+	}
+
+	bool FVillage::BodyOverrides(const FNpc& Npc)
+	{
+		// `needsCritical` ne convient pas (vrai a ~100 % des decisions dans la reference) : les seuils
+		// du verrou de chantier, qui repondent deja a « quand un but tenu doit-il ceder ? ».
+		return Npc.Needs.Hunger >= PlayerDecision::HungerRelease
+			|| Npc.Needs.Thirst >= PlayerDecision::ThirstRelease
+			|| Npc.Needs.Energy <= PlayerDecision::EnergyRelease;
+	}
+
+	bool FVillage::IsRemedyFor(const FNpc& Npc, const FString& Goal)
+	{
+		return (Goal == GoalDrink && Npc.Needs.Thirst >= PlayerDecision::ThirstRelease)
+			|| (Goal == GoalEat && Npc.Needs.Hunger >= PlayerDecision::HungerRelease)
+			|| (Goal == GoalRest && Npc.Needs.Energy <= PlayerDecision::EnergyRelease);
+	}
+
+	FString FVillage::CedePlayerGoal(const FString& Reason)
+	{
+		++PlayerChoice.Yields;
+		PlayerChoice.CedingFor = Reason;
+		bHasPlayerRefusal = true;
+		PlayerRefusal.Wanted = PlayerChoice.Goal;
+		PlayerRefusal.Reason = Reason;
+		PlayerRefusal.Applied = GoalIdle;
+		PlayerRefusal.Day = Day();
+		// Le corps parle, la table ou un verrou dit non : l'humain attend, Nous ne choisit pas a sa place.
+		return GoalIdle;
+	}
+
+	FString FVillage::DecideAsPlayer(FNpc& Npc, const TArray<TPair<FString, double>>& Rows, const FString& Next, bool bLocked)
+	{
+		if (!bHasPlayerChoice)
+		{
+			bHasPlayerRefusal = false;
+			return GoalIdle;
+		}
+		const FString& Wanted = PlayerChoice.Goal;
+		// 1. Le corps passe devant. L'intention n'est pas retiree : le joueur choisit le remede.
+		//    EXTENSION (ecart assume) : la reference teste `bodyOverrides` avant tout et refuse donc AUSSI
+		//    le remede -- un joueur a soif 88 ne pourrait plus jamais boire. Son propre commentaire dit
+		//    « le joueur doit choisir le remede » : le remede du besoin qui parle passe.
+		if (BodyOverrides(Npc) && !IsRemedyFor(Npc, Wanted)) return CedePlayerGoal(PlayerDecision::RefusalBody);
+		// 2. SYM-1 : la table fait foi. Un but absent (ou non porte ici) est impossible maintenant.
+		const bool bInTable = IsPortedGoalFor(Npc, Wanted)
+			&& Rows.ContainsByPredicate([&](const TPair<FString, double>& Row) { return Row.Key == Wanted; });
+		if (!bInTable) return CedePlayerGoal(PlayerDecision::RefusalNotInTable);
+		// 3. SYM-3 : les verrous ne connaissent pas le joueur.
+		if (bLocked && Wanted != Next) return CedePlayerGoal(PlayerDecision::RefusalLocked);
+		++PlayerChoice.Holds;
+		PlayerChoice.CedingFor.Reset();
+		bHasPlayerRefusal = false;
+		return Wanted;
+	}
+
+	void FVillage::CommitPlayerIdle(FNpc& Npc)
+	{
+		if (Npc.Goal == GoalEat)
+		{
+			ReleaseMeal(Npc, TEXT("player_idle"));
+		}
+		if (Npc.Goal != GoalIdle)
+		{
+			Npc.GoalSince = Now;
+		}
+		Npc.Goal = GoalIdle;
+		Npc.bHasTarget = false;
+		Npc.WorkTimer = 0.0;
+		Npc.DestBuildingId.Reset();
+		ClearNavigation(Npc);
 	}
 
 	void FVillage::ObservePlayer(double InPresence, double IdleSecondsDelta)
@@ -125,10 +237,11 @@ namespace AnastasisVillage
 	{
 		for (FNpc& Npc : Actors.GetItemsMutable())
 		{
-			// Merite de la reference : constructions, ambitions, jalons, conseils, vols -- non portes.
-			// Seule l'oisivete compte, et elle ne s'efface pas (un acte reste un acte).
+			// Merite de la reference : `deeds.built x buildGain` (porte) ; ambitions, jalons, conseils,
+			// vols : non portes. EXTENSION : l'oisivete du joueur, qui ne s'efface pas (un acte reste un acte).
 			const double IdleDays = Npc.IdleSeconds / AnastasisRhythm::DayLength;
-			const double Target = Clamp(Standing::Base - IdleDays * Standing::IdleMeritPerDay, 0.0, 100.0);
+			const double Merit = Npc.BuildingsCompleted * Standing::BuildGain - IdleDays * Standing::IdleMeritPerDay;
+			const double Target = Clamp(Standing::Base + Merit, 0.0, 100.0);
 			Npc.Reputation = Clamp(Npc.Reputation + (Target - Npc.Reputation) * Standing::DriftToBase, 0.0, 100.0);
 		}
 	}
@@ -142,38 +255,53 @@ namespace AnastasisVillage
 		return Other.Presence >= Standing::MinPresenceSeen && D <= Range * Other.Presence;
 	}
 
-	double FVillage::ReputationAffinity(const FNpc& Other)
+	double FVillage::ReputationAffinity(const FNpc& Other) const
 	{
-		return Other.Reputation == Standing::Base ? 0.0 : (Other.Reputation - Standing::Base) * Standing::AffinityWeight;
+		if (!IsPlayer(Other) || Other.Reputation == Standing::Base)
+		{
+			return 0.0;
+		}
+		return (Other.Reputation - Standing::Base) * Standing::AffinityWeight;
 	}
 
 	void FVillage::UpdatePlayer(FNpc& Npc, double Dt)
 	{
 		// `syncVillagePhase` : tenu a jour pour le jour ou il sera rendu a Nous.
 		Npc.VillagePhase = AnastasisRhythm::PhaseId(AnastasisRhythm::VillagePhase(AnastasisRhythm::DayFracOf(Now)));
+		const bool bDrive = JsHypot(PlayerDrive.X, PlayerDrive.Y) > 1e-5;
 
-		// Branche `playerControlled` de updateNpc : a l'heure de penser, sortir, percevoir, decider.
+		// Branche `playerControlled` de updateNpc : a l'heure de penser, percevoir, decider. Une
+		// intention qui a sa cible et que rien ne remet en cause n'est pas redecidee a chaque pensee :
+		// le chemin ne serait recalcule que pour rien.
 		if (Npc.AiThinkAt < 0.0 || Now >= Npc.AiThinkAt)
 		{
-			if (Npc.Inside.bActive) ExitBuilding(Npc);
-			Perceive(Npc, false);
-			// `decideAsPlayer` sans `playerGoalChoice` : PLAYER_IDLE_GOAL. Nous ne choisit pas.
-			if (Npc.Goal != GoalIdle)
-			{
-				Npc.GoalSince = Now;
-			}
-			Npc.Goal = GoalIdle;
-			Npc.bHasTarget = false;
-			Npc.WorkTimer = 0.0;
-			ClearNavigation(Npc);
-			Npc.LastDecision = FDecisionTrace();
-			Npc.LastDecision.Time = Now;
-			Npc.LastDecision.Winner = GoalIdle;
-			Npc.LastDecision.CommitGate = TEXT("player");
 			Npc.AiThinkAt = Now + AnastasisNous::DecisionIntervalSeconds(NeedsCritical(Npc.Needs));
+			const bool bReconsider = bDrive || bPlayerChoiceDirty || !bHasPlayerChoice
+				|| Npc.Goal == GoalIdle || !Npc.bHasTarget || BodyOverrides(Npc);
+			if (bReconsider)
+			{
+				// Dedans pour ce qu'il a lui-meme choisi : il y reste. Sinon (il conduit, a change d'avis,
+				// ou n'a plus d'intention), il sort, comme la reference a chaque pensee du joueur.
+				const bool bStayInside = Npc.Inside.bActive && !bDrive && !bPlayerChoiceDirty && bHasPlayerChoice
+					&& Npc.Inside.Goal == PlayerChoice.Goal && !BodyOverrides(Npc);
+				if (Npc.Inside.bActive && !bStayInside) ExitBuilding(Npc);
+				if (!Npc.Inside.bActive)
+				{
+					Perceive(Npc, false);
+					if (bDrive)
+					{
+						CommitPlayerIdle(Npc);
+					}
+					else
+					{
+						ChooseGoal(Npc);
+					}
+				}
+				bPlayerChoiceDirty = false;
+			}
 		}
 
-		if (JsHypot(PlayerDrive.X, PlayerDrive.Y) > 1e-5)
+		if (bDrive)
 		{
 			DrivePlayer(Npc, Dt);
 			Npc.Activity = TEXT("marche");
@@ -184,10 +312,25 @@ namespace AnastasisVillage
 			UpdateInside(Npc);
 			return;
 		}
-		// `act` pour PLAYER_IDLE_GOAL : pas de cible, pas de travail, il attend.
-		Npc.bHasTarget = false;
-		Npc.WorkTimer = 0.0;
-		Npc.Activity = TEXT("attend");
+		if (Npc.Goal == GoalIdle)
+		{
+			// `act` pour PLAYER_IDLE_GOAL : pas de cible, pas de travail, il attend.
+			Npc.bHasTarget = false;
+			Npc.WorkTimer = 0.0;
+			Npc.Activity = TEXT("attend");
+			return;
+		}
+		if (Npc.FailedActions >= 3)
+		{
+			// Comme RedirectAfterFailure, mais vers l'attente : `observer` n'est pas un but humain.
+			Npc.FailedActions = 0;
+			Npc.StuckStage = 0;
+			CommitPlayerIdle(Npc);
+			Npc.Activity = TEXT("attend");
+			return;
+		}
+		// Le but humain s'execute comme celui de n'importe qui : memes cibles, memes portes, memes effets.
+		Act(Npc, Dt);
 	}
 
 	void FVillage::DrivePlayer(FNpc& Npc, double Dt)

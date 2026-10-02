@@ -347,7 +347,7 @@ Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
 | `house-rest-pie.py` | preuve PIE de la maison : `Anastasis.Village.FirstHouse`, une nuit de sommeil, retrait d'un dormeur puis de la maison occupée |
 | `granary-eat-pie.py` | preuve PIE du grenier (Noûs) : `Anastasis.Village.FirstGranary`, repas confirmés, stock qui baisse, démolition avec réservations en cours |
 | `village-weather-pie.py` | preuve PIE de la météo des habitants : `Anastasis.Village.FirstFarmer 1`, orage par `Anastasis.Village.ForceWeather 0.9`, le fermier entre à l'abri puis en ressort, `ForceWeather off` ; temps accéléré (`anastasis.Sim.Warp 10`), verdict `VILLAGE_WEATHER PASS/FAIL` ; lecture par les lignes `VILLAGE_WEATHER_` et `ANASTASIS_VILLAGE` du log ; au registre (`village-weather-pie`) |
-| `player-pie.ps1` + `player-pie.py` | preuve PIE du joueur minimal : `Anastasis.Player.Arrive`, attente (`idle`), marche par `Anastasis.Player.Move`, pawn pose sur le corps, `Anastasis.Sim.Advance 7d` puis `1d` (presence, jours oisifs, personne ne le voit, reputation), `Release` ; lecture par `get_player_status` → `Saved/PlayerEvidence/pie/` ; aucun asset sauve |
+| `player-pie.ps1` + `player-pie.py` | preuve PIE du joueur minimal : `Anastasis.Player.Arrive`, attente (`idle`), marche par `Anastasis.Player.Move`, pawn pose sur le corps, `Anastasis.Player.Goal build` refuse (`hors-table`) puis `drink` (il va boire au puits), `Anastasis.Sim.Advance 7d` puis `1d` (presence, jours oisifs, personne ne le voit, reputation), `Release` ; lecture par `get_player_status` → `Saved/PlayerEvidence/pie/` ; aucun asset sauve |
 | `gather-deliver-pie.ps1` + `gather-deliver-pie.py` | preuve PIE du fermier au grenier : `Anastasis.Village.FirstFarmer`, recolte, retour, livraisons, conservation a chaque echantillon, une capture par etape → `Saved/SliceEvidence/gather-deliver/` ; aucun asset sauve |
 | `build-site-pie.ps1` + `build-site-pie.py` | preuve PIE du chantier : `Anastasis.Village.FirstSite`, devis livre, batisseurs ; une capture a l'ouverture, aux fondations, aux murs, au toit et a l'achevement, devis et pieces controles a chaque echantillon → `Saved/SliceEvidence/build-site/` ; aucun asset sauve |
 | `food-supply-pie.py` | preuve PIE du circuit vivrier fini : prise, depot, repas, epuisement et conservation ; sortie via ANASTASIS_FOOD_OUT ; aucun asset sauvegarde |
@@ -538,8 +538,9 @@ build vert en non-unity : chaque piège y est rangé par sa signature dans le lo
 
 `PLAYER` est **minimal** (player-minimal-001, mandat d'Alexandre du 2026-10-01, `docs/unreal/PLAYER_MINIMAL_001.md`) :
 le joueur est un habitant de la simulation (`FVillage::PlayerPersonId`, comme la reference), qui attend sans
-commande, marche a la main, et que le village voit ou oublie selon l'usage du temps accelere. Le choix de but par
-le joueur, la parole dirigee et le mode visuel `PLAYER` du GameMode restent **NOT_IMPLEMENTED** : ne pas les
-etendre sans mandat explicite d'Alexandre.
+commande, marche a la main, et que le village voit ou oublie selon l'usage du temps accelere. Depuis
+player-goals-001 (mandat d'Alexandre, 2026-10-01), il **choisit son but** dans la table de Nous (touches 1 a 5,
+`Anastasis.Player.Goal`), sous les memes verrous, avec un refus motive. La parole dirigee et le mode visuel
+`PLAYER` du GameMode restent **NOT_IMPLEMENTED** : ne pas les etendre sans mandat explicite d'Alexandre.
 
 Voir `ANASTASIS_CANONICAL_PROJECT.md` et `docs/unreal/UNREAL_CANONICAL_STATE.md`.

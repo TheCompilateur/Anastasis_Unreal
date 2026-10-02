@@ -258,7 +258,54 @@ namespace AnastasisVillage
 		inline constexpr double RememberPresenceMin = 0.25;
 		/** EXTENSION : poids de l'ecart de reputation dans l'envie de lui parler. */
 		inline constexpr double AffinityWeight = 0.4;
+		/** `STANDING.buildGain` : merite par batiment acheve (`deeds.built`). */
+		inline constexpr double BuildGain = 3.0;
 	}
+
+	/**
+	 * player-goals-001 -- la main du joueur (decisionProvider.js, `decideAsPlayer`). Le joueur ne choisit
+	 * pas « ce qu'il veut » : il choisit dans la table que Nous aurait lue, sous les memes verrous.
+	 * L'intention DURE jusqu'a ce qu'il la retire ; elle CEDE pour une decision, sans disparaitre, et
+	 * dit pourquoi.
+	 */
+	namespace PlayerDecision
+	{
+		/** `BUILD_SITE_LOCK` (npc.js) : au-dela, le corps passe devant l'intention. */
+		inline constexpr double HungerRelease = 92.0;
+		inline constexpr double ThirstRelease = 88.0;
+		inline constexpr double EnergyRelease = 12.0;
+		/** `REFUSAL` de decisionProvider.js. */
+		inline const TCHAR* const RefusalNotInTable = TEXT("hors-table");
+		inline const TCHAR* const RefusalLocked = TEXT("verrou");
+		inline const TCHAR* const RefusalBody = TEXT("le-corps-parle");
+		/** Lignes gardees pour l'affichage des buts possibles (`playerGoalOptions(limit)`). */
+		inline constexpr int32 OptionsKept = 8;
+	}
+
+	/** `sim.playerGoalChoice` : le but pose, combien de decisions il a tenu, combien il a cede, et pourquoi. */
+	struct FPlayerGoalChoice
+	{
+		FString Goal;
+		int32 Holds = 0;
+		int32 Yields = 0;
+		FString CedingFor;
+	};
+
+	/** `npc.playerRefusal` : le dernier refus oppose (« tu voulais batir, tu bois d'abord »). */
+	struct FPlayerRefusal
+	{
+		FString Wanted;
+		FString Reason;
+		FString Applied;
+		int32 Day = 0;
+	};
+
+	/** Une ligne de la table du joueur a sa derniere decision : un but porte et son score. */
+	struct FPlayerGoalOption
+	{
+		FString Goal;
+		double Score = 0.0;
+	};
 
 	/** `NPC_AI` de npc.js (chemin classique) — conserve pour `aiThinkStagger`. */
 	inline constexpr double ThinkEvery = 0.12;
@@ -814,15 +861,37 @@ namespace AnastasisVillage
 		 * Standing::MinPresenceSeen.
 		 */
 		static bool Sees(const FNpc& Other, double D, double Range);
-		/** EXTENSION : ce que la reputation de `Other` ajoute a l'envie de lui parler ; 0 a la base. */
-		static double ReputationAffinity(const FNpc& Other);
+		/**
+		 * EXTENSION : ce que la reputation de `Other` ajoute a l'envie de lui parler. Seulement pour le
+		 * joueur : entre habitants, la reference ne s'en sert pas ici, et le portage reste au bit pres.
+		 */
+		double ReputationAffinity(const FNpc& Other) const;
 
 		/**
 		 * `updateReputationDaily`, appele a minuit : `reputation += (cible - reputation) x 0,4`,
-		 * cible = `base + merite`. Le seul merite porte est l'oisivete (EXTENSION) : un habitant
-		 * jamais oisif a pour cible 50 et y reste.
+		 * cible = `base + merite`. Merites portes : batiments acheves (`deeds.built x buildGain`) et,
+		 * EXTENSION, l'oisivete du joueur (negative). Un habitant sans acte a pour cible 50 et y reste.
 		 */
 		void UpdateReputationDaily();
+
+		// --- La main du joueur (player-goals-001, simulation.js « La main du joueur ») ------------
+
+		/**
+		 * `choosePlayerGoal(goal)` : pose une intention qui dure jusqu'a ce que le joueur la retire
+		 * (`Goal` vide). Ne mute rien d'autre : la decision reste prise au point de decision, a la
+		 * prochaine pensee, ou un verrou peut encore la refuser. Faux sans joueur incarne.
+		 */
+		bool ChoosePlayerGoal(const FString& Goal);
+		/** `playerGoalStanding()` : l'intention posee, ou nullptr. */
+		const FPlayerGoalChoice* GetPlayerGoalChoice() const { return bHasPlayerChoice ? &PlayerChoice : nullptr; }
+		/** `playerRefusal()` : le dernier refus, ou nullptr. */
+		const FPlayerRefusal* GetPlayerRefusal() const { return bHasPlayerRefusal ? &PlayerRefusal : nullptr; }
+		/**
+		 * `playerGoalOptions` : les buts portes que le joueur pourrait commettre, tries, tels que la
+		 * table les donnait a sa DERNIERE decision. Lecture pure : rien n'est recalcule ici (la reference
+		 * a paye deux fois une lecture d'interface qui mutait l'habitant).
+		 */
+		const TArray<FPlayerGoalOption>& GetPlayerGoalOptions() const { return PlayerOptions; }
 
 		/**
 		 * `assignHomeToHousehold`, branche sans famille : la maison appartient a
@@ -1173,9 +1242,32 @@ namespace AnastasisVillage
 		void UpdatePlayer(FNpc& Npc, double Dt);
 		/** `drivePlayerActor` : un pas dans la direction humaine, memes collisions que MoveActor. */
 		void DrivePlayer(FNpc& Npc, double Dt);
+		/**
+		 * `decideAsPlayer` : le point de decision unique, appele par ChooseGoal APRES le tri, l'eligibilite
+		 * et les verrous. Rend le but a commettre, `idle` quand l'humain attend. `bLocked` : un verrou a
+		 * impose `Next` (orage, livraison en cours).
+		 */
+		FString DecideAsPlayer(FNpc& Npc, const TArray<TPair<FString, double>>& Rows, const FString& Next, bool bLocked);
+		/** `cede` : l'intention cede pour CETTE decision, sans disparaitre ; le refus dit pourquoi. */
+		FString CedePlayerGoal(const FString& Reason);
+		/** `bodyOverrides` : faim, soif ou fatigue au-dela des seuils du verrou de chantier. */
+		static bool BodyOverrides(const FNpc& Npc);
+		/** EXTENSION : `Goal` soigne-t-il le besoin qui parle (boire / soif, manger / faim, dormir / fatigue) ? */
+		static bool IsRemedyFor(const FNpc& Npc, const FString& Goal);
+		/** L'humain attend : `idle`, sans cible, sans travail, sans repas reserve. */
+		void CommitPlayerIdle(FNpc& Npc);
+		/** Direction, intention, refus et options oublies (incarnation, liberation, retrait). */
+		void ResetPlayerHand();
 
 		FString PlayerPersonId;
 		FPoint PlayerDrive;
+		bool bHasPlayerChoice = false;
+		FPlayerGoalChoice PlayerChoice;
+		/** Le choix a change depuis la derniere decision : la prochaine pensee le relit. */
+		bool bPlayerChoiceDirty = false;
+		bool bHasPlayerRefusal = false;
+		FPlayerRefusal PlayerRefusal;
+		TArray<FPlayerGoalOption> PlayerOptions;
 
 		const AnastasisWorld::FWorld* World = nullptr;
 		/** Tuiles touchees par la recolte : index -> etat vivant. Ecrit seulement par TakeFromTile / DepleteTile. */

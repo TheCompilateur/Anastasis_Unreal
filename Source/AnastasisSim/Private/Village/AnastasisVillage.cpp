@@ -178,7 +178,7 @@ namespace AnastasisVillage
 		Buildings = TAnastasisEntityTable<FBuilding>();
 		Actors = TAnastasisEntityTable<FNpc>();
 		PlayerPersonId.Reset();
-		PlayerDrive = FPoint();
+		ResetPlayerHand();
 	}
 
 	bool FVillage::IsFootBlocked(double InX, double InY) const
@@ -1224,7 +1224,7 @@ namespace AnastasisVillage
 		if (Id == PlayerPersonId)
 		{
 			PlayerPersonId.Reset();
-			PlayerDrive = FPoint();
+			ResetPlayerHand();
 		}
 		return Actors.RemoveById(Id);
 	}
@@ -1560,8 +1560,13 @@ namespace AnastasisVillage
 			Row.Value += AnastasisWeatherBehavior::WeatherGoalBias(TickWeather, Npc.JobId, Row.Key);
 		}
 
-		// commitGoalChoice : (collant non porte) Noûs biaise la table avant le tri.
-		ApplyAlgorithmicScoreBias(Npc, Rows);
+		// commitGoalChoice : (collant non porte) Noûs biaise la table avant le tri. Pas pour l'habitant
+		// incarne : `algoOn = !playerControlled` (npc.js), Noûs ne pense pas pour lui.
+		const bool bPlayer = IsPlayer(Npc);
+		if (!bPlayer)
+		{
+			ApplyAlgorithmicScoreBias(Npc, Rows);
+		}
 		// `applyGoalEligibility` : `deliver` n'est candidat qu'avec une charge.
 		if (Npc.InventoryFood <= 0)
 		{
@@ -1596,7 +1601,9 @@ namespace AnastasisVillage
 			Trace.NousScore = Npc.AlgoDecision.Score;
 			Trace.NousUrgency = Npc.AlgoDecision.Urgency;
 		}
-		FString Next = ApplyAlgorithmicCommitGate(Npc, Rows[0].Key, Npc.Goal, Trace.CommitGate);
+		FString Next = bPlayer ? Rows[0].Key : ApplyAlgorithmicCommitGate(Npc, Rows[0].Key, Npc.Goal, Trace.CommitGate);
+		// Ce que la table donnait avant les verrous : s'ils changent `Next`, le joueur est verrouille.
+		const FString Gated = Next;
 		// Finish a physical delivery before resuming gathering; urgent needs retain priority.
 		// (Extension food-supply seulement : le fermier du grenier suit la reference.)
 		if (!bWorker && FoodSources.Num() > 0 && Npc.InventoryFood > 0 && KnownFoodDepot(Npc) && !NeedsCritical(Npc.Needs))
@@ -1619,6 +1626,27 @@ namespace AnastasisVillage
 				Next = GoalShelterRain;
 				Trace.bStormGate = true;
 			}
+		}
+		// `decideGoal(sim, npc, scores, ctx)` (player-goals-001) : le seam unique, APRES le tri,
+		// l'eligibilite et les verrous. Pour tout autre habitant, la fonction identite.
+		if (bPlayer)
+		{
+			PlayerOptions.Reset();
+			for (const TPair<FString, double>& Row : Rows)
+			{
+				if (PlayerOptions.Num() >= PlayerDecision::OptionsKept) break;
+				if (IsPortedGoalFor(Npc, Row.Key)) PlayerOptions.Add({ Row.Key, Row.Value });
+			}
+			Next = DecideAsPlayer(Npc, Rows, Next, Next != Gated);
+			if (Next == GoalIdle)
+			{
+				CommitPlayerIdle(Npc);
+				Trace.Winner = GoalIdle;
+				Trace.CommitGate = TEXT("player");
+				Npc.LastDecision = MoveTemp(Trace);
+				return;
+			}
+			Trace.CommitGate = TEXT("player");
 		}
 		CommitGoal(Npc, Next, Trace);
 	}
