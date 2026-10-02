@@ -1622,6 +1622,58 @@ namespace AnastasisVillage
 		Act(Npc, Dt);
 	}
 
+	FCollectiveDecision FVillage::CollectiveDecisionOf(const FNpc& Npc) const
+	{
+		if (CollectiveDecisionOverride) return CollectiveDecisionOverride(Npc);
+		// Le planificateur collectif n'est pas encore branche (planner-module-001) : rien a dire.
+		return FCollectiveDecision();
+	}
+
+	void FVillage::ApplyCollectivePass(const FNpc& Npc, const FCollectiveDecision& Collective,
+		TArray<TPair<FString, double>>& Rows, FDecisionTrace& Trace) const
+	{
+		const bool bCritical = NeedsCritical(Npc.Needs);
+		for (TPair<FString, double>& Row : Rows)
+		{
+			const double Before = Row.Value;
+			// `addScore(score, "score.collective_urgency", ..., collectiveUrgency[score.goal] || 0)`.
+			Row.Value += Collective.UrgencyOf(Row.Key);
+			// La pression morale sur les buts sociaux (`(pressure.socialMul - 1) * 18`) vient ici dans la
+			// reference, entre l'urgence et le plancher. Le C++ l'ajoute plus tot, dans `SocialRowScore` :
+			// meme valeur, autre ordre d'addition, donc un arrondi qui peut differer d'un ULP quand
+			// l'urgence de `socialize` / `relax` n'est pas nulle.
+			// Plancher collectif : un PLANCHER, pas un appoint ; un besoin vital reel le recoit en appoint.
+			double Floor = Collective.FloorOf(Row.Key);
+			if (Row.Key == TEXT("gatherWood") && Collective.bWoodBootstrapDraftee)
+			{
+				// `COLLECTIVE_PRIORITIES.bootstrapWoodFloor ?? 165`.
+				Floor = FMath::Max(Floor, 165.0);
+			}
+			if (Floor > 0.0)
+			{
+				Row.Value = bCritical ? Row.Value + Floor : FMath::Max(Row.Value, Floor);
+			}
+			if (Row.Value != Before) Trace.CollectiveDelta.Add(Row.Key, Row.Value - Before);
+		}
+		// « Rush famine : sac food -> depot avant autre but de travail. »
+		if (Collective.bFoodRush && Npc.InventoryFood > 0)
+		{
+			for (TPair<FString, double>& Row : Rows)
+			{
+				const double Before = Row.Value;
+				if (Row.Key == GoalDeliver) Row.Value += 28.0;
+				else if (Row.Key == TEXT("sell")) Row.Value += 16.0;
+				else if (Row.Key == GoalGatherFood) Row.Value += 6.0;
+				else if (Row.Key == TEXT("gatherWood") || Row.Key == TEXT("gatherStone") || Row.Key == AnastasisBuild::GoalBuild
+					|| Row.Key == TEXT("craft") || Row.Key == TEXT("explore"))
+				{
+					Row.Value -= 10.0;
+				}
+				if (Row.Value != Before) Trace.CollectiveDelta.FindOrAdd(Row.Key) += Row.Value - Before;
+			}
+		}
+	}
+
 	void FVillage::ChooseGoal(FNpc& Npc)
 	{
 		// `phaseBias` / `phaseWorkFactor` lisent `villagePhaseFor(sim, npc)` : la phase PERSONNELLE
@@ -1732,6 +1784,8 @@ namespace AnastasisVillage
 		{
 			Row.Value += AnastasisWeatherBehavior::WeatherGoalBias(TickWeather, Npc.JobId, Row.Key);
 		}
+		// La fin de la chaine d'`adultScores` : urgence collective, plancher collectif, rush famine.
+		ApplyCollectivePass(Npc, CollectiveDecisionOf(Npc), Rows, Trace);
 
 		// commitGoalChoice : `applyGoalStickiness` (reconsider-001) — le but en cours garde sa ligne, pour
 		// tout habitant, joueur compris. Nature sans qualite ni defaut (ecart n°10) : `natureStickBonus` = 0.

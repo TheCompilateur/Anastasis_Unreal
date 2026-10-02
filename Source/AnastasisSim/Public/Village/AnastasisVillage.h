@@ -633,6 +633,31 @@ namespace AnastasisVillage
 		bool bShiftLock = false;
 		/** `goalStickinessBonus` ajoute a la ligne du but en cours (0 si aucun). */
 		double Stickiness = 0.0;
+		/** Passe collective (collective-pass-001) : urgence, plancher et rush appliques, par ligne. */
+		TMap<FString, double> CollectiveDelta;
+	};
+
+	/**
+	 * Ce que le planificateur collectif (`collectivePriorities.js`) dit a la decision d'UN habitant
+	 * (collective-pass-001). Rempli par le module du planificateur ; vide (tout a 0, faux) tant
+	 * qu'il n'est pas branche : la table garde alors ses bits.
+	 */
+	struct FCollectiveDecision
+	{
+		/** `collectiveGoalBias(sim, goal)` : additif DANS la formule de certaines lignes. */
+		TMap<FString, double> GoalBias;
+		/** `collectiveGoalFloor(sim, goal)` : plancher apres `workFactor`. */
+		TMap<FString, double> GoalFloor;
+		/** `collectiveUrgencyBiasMap(sim, npc)` : additif sur chaque ligne, propre a l'habitant. */
+		TMap<FString, double> UrgencyBias;
+		/** `isWoodBootstrapDraftee(sim, npc)` : plancher `bootstrapWoodFloor` (165) sur `gatherWood`. */
+		bool bWoodBootstrapDraftee = false;
+		/** `isFoodRush(sim)`. */
+		bool bFoodRush = false;
+
+		double BiasOf(const FString& Goal) const { const double* V = GoalBias.Find(Goal); return V ? *V : 0.0; }
+		double FloorOf(const FString& Goal) const { const double* V = GoalFloor.Find(Goal); return V ? *V : 0.0; }
+		double UrgencyOf(const FString& Goal) const { const double* V = UrgencyBias.Find(Goal); return V ? *V : 0.0; }
 	};
 
 	/** Ce que les lignes de travail d'un fermier partagent a une decision. */
@@ -1204,6 +1229,20 @@ namespace AnastasisVillage
 	private:
 		void UpdateNpc(FNpc& Npc, double Dt);
 		void ChooseGoal(FNpc& Npc);
+		/**
+		 * La passe collective de fin d'`adultScores` (npc.js l. 1205-1258) : urgence collective, plancher
+		 * collectif apres `workFactor` (corvee de bois comprise), puis rush famine.
+		 */
+		void ApplyCollectivePass(const FNpc& Npc, const FCollectiveDecision& Collective,
+			TArray<TPair<FString, double>>& Rows, FDecisionTrace& Trace) const;
+	public:
+		/**
+		 * Ce que le planificateur dit pour cet habitant. Sans planificateur branche : vide. Un test
+		 * peut le remplacer (`CollectiveDecisionOverride`).
+		 */
+		FCollectiveDecision CollectiveDecisionOf(const FNpc& Npc) const;
+		TFunction<FCollectiveDecision(const FNpc&)> CollectiveDecisionOverride;
+	private:
 		bool FoodSupplyTarget(FNpc& Npc, FPoint& Out, FString& Source);
 		bool PerformFoodSupply(FNpc& Npc);
 		bool HasKnownFoodSource(const FNpc& Npc) const;
