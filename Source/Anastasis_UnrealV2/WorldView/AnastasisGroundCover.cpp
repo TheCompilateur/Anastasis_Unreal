@@ -460,6 +460,15 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 					// Famille. Lande : la callune tient le haut des versants, loin du fond de vallee,
 					// la touffe d'eboulis le reste. Prairie : humidite d'abord (laiches), puis la pente
 					// decide haute ou basse ; une seconde tache melange les hauteurs sur le plat.
+					// Riparian is a geometric proximity proxy, not measured soil moisture.
+					// Low-gradient banks support contiguous colonies; steep banks drain out.
+					// Existing clearings retain their lower vegetation. Positions/budget stay fixed.
+					const double WetHabitat = Wet * (1.0 - Smooth((Slope - 6.0) / 12.0));
+					const double Colony = C.bRiparianTransition && WetHabitat > 0.0 && !bLande
+						? Patch(In.Seed, X, Y, 1200.0, 83) : 0.0;
+					const double SedgeChance = C.bRiparianTransition
+						? Smooth((WetHabitat - (0.18 + 0.38 * Colony)) / 0.22) * Trampled
+						: Smooth((Wet - 0.10) / 0.55);
 					EFamily Family;
 					const double WetDraw = C.SedgeWetness + 0.12 * (Unit(Hash(In.Seed, GX, GY, 14)) - 0.5);
 					if (bLande)
@@ -470,8 +479,8 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 							* FMath::Lerp(0.25, 1.0, Smooth((Patch(In.Seed, X, Y, C.PatchSpanUU * 0.8, 51) - 0.2) / 0.5));
 						Family = Unit(Hash(In.Seed, GX, GY, 20)) < HeatherChance ? EFamily::Heather : EFamily::HeathTussock;
 					}
-					else if (C.bNaturalHistory
-						? Unit(Hash(In.Seed, GX, GY, 14)) < Smooth((Wet - 0.10) / 0.55)
+					else if (C.bNaturalHistory || C.bRiparianTransition
+						? Unit(Hash(In.Seed, GX, GY, 14)) < SedgeChance
 						: Wet >= WetDraw)
 					{
 						Family = EFamily::Sedge;

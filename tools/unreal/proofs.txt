@@ -81,3 +81,5 @@ world-theatre-read | tools/unreal/world-theatre-read.py | WORLD_THEATRE_READ_PIE
 # WORLD_THEATRE_001 : vistas canoniques en PIE, anastasis.Theatre 0 / 1 / 0 (temoin) aux memes cameras, ciel a 11 h, simulation gelee ; COMPLETE = images ecrites, pas un verdict artistique.
 world-theatre-capture | tools/unreal/world-theatre-capture.py | WORLD_THEATRE_CAPTURE COMPLETE | WORLD_THEATRE_CAPTURE FAIL|Traceback | 900 | ANASTASIS_THEATRE_OUT=@Saved/WorldTheatreEvidence/capture
 places-lifecycle | tools/unreal/places-lifecycle.py | PLACES_LIFECYCLE COMPLETE | PLACES_LIFECYCLE FAIL|Traceback | 420 | ANASTASIS_PLACES_LIFECYCLE_OUT=@Saved/PlacesLifecycleEvidence
+
+riparian-transition-capture | tools/unreal/ground-cover-capture.py | RIPARIAN_CAPTURE PASS | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/RiparianTransitionEvidence;ANASTASIS_GROUND_STATES=riparian_reference,riparian,riparian_reference2;ANASTASIS_GROUND_VIEWS=prairie_eye,riviere_eye,aerien

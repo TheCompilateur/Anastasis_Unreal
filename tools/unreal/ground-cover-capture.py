@@ -40,6 +40,9 @@ STATE_CMDS = {
     'woodland_reference': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 1', 'anastasis.Dressing.WoodlandSequence 0'),
     'woodland': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 1', 'anastasis.Dressing.WoodlandSequence 1'),
     'woodland_reference2': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 1', 'anastasis.Dressing.WoodlandSequence 0'),
+    'riparian_reference': ('anastasis.Dressing.RiparianTransition 0',),
+    'riparian': ('anastasis.Dressing.RiparianTransition 1',),
+    'riparian_reference2': ('anastasis.Dressing.RiparianTransition 0',),
     'ecotone_reference': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 0'),
     'ecotone': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 1'),
     'ecotone_reference2': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 0'),
@@ -88,8 +91,10 @@ ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 handle = None
 woodland_run = any(s.startswith('woodland') for s in states)
+riparian_run = any(s.startswith('riparian') for s in states)
+original_riparian = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.RiparianTransition')
 ecotone_run = woodland_run or any(s.startswith('ecotone') for s in states)
-natural_run = ecotone_run or any(s in ('natural', 'reference', 'reference2') for s in states)
+natural_run = riparian_run or ecotone_run or any(s in ('natural', 'reference', 'reference2') for s in states)
 original_woodland = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.WoodlandSequence')
 flower_run = any(s in ('noflowers', 'flowers', 'noflowers2') for s in states)
 cards_run = any(s in ('nocards', 'cards', 'nocards2') for s in states)
@@ -101,6 +106,8 @@ habitat = {}
 
 
 def finish(msg, error=False):
+    if riparian_run:
+        unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.RiparianTransition %s' % original_riparian)
     if natural_run:
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Sky.Hour %s' % original_hour)
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.NaturalHistory %s' % original_natural)
@@ -183,8 +190,10 @@ try:
         if not natural_run:
             return
         actual = unreal.SystemLibrary.get_console_variable_int_value(
-            'anastasis.Dressing.WoodlandSequence' if woodland_run else 'anastasis.Dressing.TreeCanopyEcotone' if ecotone_run else 'anastasis.Dressing.NaturalHistory')
-        if actual != (1 if state in ('natural', 'ecotone', 'woodland') else 0):
+            'anastasis.Dressing.WoodlandSequence' if woodland_run else
+            'anastasis.Dressing.RiparianTransition' if riparian_run else
+            'anastasis.Dressing.TreeCanopyEcotone' if ecotone_run else 'anastasis.Dressing.NaturalHistory')
+        if actual != (1 if state in ('natural', 'ecotone', 'woodland', 'riparian') else 0):
             raise RuntimeError('NaturalHistory switch not applied')
         counts = {}
         spatial = []
@@ -458,7 +467,7 @@ def tick(dt):
                         hashes = {v['sampled_ground_sha256'] for v in habitat.values()}
                         if len(hashes) != 1:
                             raise RuntimeError('terrain samples changed between states')
-                        ref = 'woodland_reference' if woodland_run else 'ecotone_reference' if ecotone_run else 'reference'
+                        ref = 'woodland_reference' if woodland_run else 'riparian_reference' if riparian_run else 'ecotone_reference' if ecotone_run else 'reference'
                         if ref+'2' in habitat and habitat[ref]['spatial_inventory'] != habitat[ref+'2']['spatial_inventory']:
                             raise RuntimeError('reference spatial inventory not reproducible')
                         if ecotone_run and any(v['non_micro_inventory'] != habitat[ref]['non_micro_inventory'] for v in habitat.values()):
@@ -468,7 +477,14 @@ def tick(dt):
                                 raise RuntimeError('woodland changed bank/meadow positions')
                             if any(sum(v['instances'].values()) > sum(habitat[ref]['instances'].values()) for v in habitat.values()):
                                 raise RuntimeError('woodland increased instance budget')
-                        marker = 'WOODLAND_CAPTURE' if woodland_run else 'ECOTONE_CAPTURE' if ecotone_run else 'NATURAL_HISTORY_CAPTURE'
+                        if riparian_run:
+                            base = habitat[ref]
+                            for entry in habitat.values():
+                                if sum(entry['instances'].values()) != sum(base['instances'].values()):
+                                    raise RuntimeError('riparian transition changed instance budget')
+                            if habitat['riparian']['spatial_inventory'] == base['spatial_inventory']:
+                                raise RuntimeError('riparian transition had no observable placement effect')
+                        marker = 'WOODLAND_CAPTURE' if woodland_run else 'RIPARIAN_CAPTURE' if riparian_run else 'ECOTONE_CAPTURE' if ecotone_run else 'NATURAL_HISTORY_CAPTURE'
                         unreal.log(marker + ' PASS sampled_ground_unchanged=1 views=%d' % len(views))
                     finish('GROUND_CAPTURE_COMPLETE views=%d states=%d' % (len(views), len(states)))
                     return

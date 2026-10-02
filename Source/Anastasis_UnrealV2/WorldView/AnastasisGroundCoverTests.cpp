@@ -482,4 +482,46 @@ bool FAnastasisGroundCoverWildflowers::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisRiparianTransition, "Anastasis.GroundCover.RiparianTransition",
+ EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisRiparianTransition::RunTest(const FString&)
+{
+ namespace GC = AnastasisGroundCover;
+ GC::FSettings Reference, Colonies;
+ Reference.bNaturalHistory = true;
+ Colonies = Reference; Colonies.bRiparianTransition = true;
+ FString Error;
+ for (double Slope : { 3.0, 17.0 })
+ {
+  auto In = AnastasisGroundCoverTestFixture::OpenPlane(Slope);
+  In.SampleWetness = [](double X, double, double& W) { W = X < 3000 ? 0.0 : 0.5; return true; };
+  GC::FPlan A, B, Repeat;
+  if (!TestTrue(TEXT("reference build"), GC::Build(In, Reference, A, Error)) ||
+      !TestTrue(TEXT("colonies build"), GC::Build(In, Colonies, B, Error)) ||
+      !TestTrue(TEXT("repeat build"), GC::Build(In, Colonies, Repeat, Error))) return false;
+  TestEqual(TEXT("unchanged instance budget"), A.Instances.Num(), B.Instances.Num());
+  TestEqual(TEXT("repeat count"), B.Instances.Num(), Repeat.Instances.Num());
+  bool Fixed = A.Instances.Num() == B.Instances.Num();
+  bool DryUnchanged = true, Deterministic = B.Instances.Num() == Repeat.Instances.Num();
+  for (int32 I=0; Fixed && I<A.Instances.Num(); ++I)
+  {
+   const auto& P=A.Instances[I]; const auto& Q=B.Instances[I];
+   Fixed &= P.Ground.Equals(Q.Ground,0.0) && P.Yaw==Q.Yaw && P.Thin==Q.Thin;
+   if (P.Ground.X<3000) DryUnchanged &= P.Family==Q.Family && P.Scale==Q.Scale;
+  }
+  for (int32 I=0; Deterministic && I<B.Instances.Num(); ++I)
+   Deterministic &= B.Instances[I].Family==Repeat.Instances[I].Family && B.Instances[I].Ground.Equals(Repeat.Instances[I].Ground,0.0);
+  TestTrue(TEXT("positions preserved"), Fixed);
+  TestTrue(TEXT("dry meadow unchanged"), DryUnchanged);
+  TestTrue(TEXT("colonies deterministic"), Deterministic);
+  TestTrue(TEXT("wet habitat responds to slope"), Slope<6 ? (B.Counts[2]>0 && B.Counts[2]!=A.Counts[2]) : B.Counts[2]<A.Counts[2]);
+  AddInfo(FString::Printf(TEXT("RIPARIAN slope=%.0f instances=%d sedge_before=%d after=%d"),Slope,B.Instances.Num(),A.Counts[2],B.Counts[2]));
+  In.SampleWaterHeight = [](double,double,double& W) { W=100000;return true; };
+  GC::FPlan Flooded;
+  TestTrue(TEXT("flooded build"), GC::Build(In,Colonies,Flooded,Error));
+  TestEqual(TEXT("no terrestrial plants underwater"), Flooded.Instances.Num(),0);
+ }
+ return true;
+}
+
 #endif

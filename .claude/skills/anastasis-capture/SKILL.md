@@ -85,3 +85,11 @@ identique. Ces echantillons ne couvrent pas chaque instance ni la marche joueur.
 ## Woodland sequence 003
 
 Etats woodland_reference,woodland,woodland_reference2 : groupes de regeneration, adultes et herbe inchanges. Choix du bord plus dense (au moins six arbres derriere, moins de la moitie devant), quatre poses humaines dont une ouverture locale et une vue oblique. Controle des positions de TOUS les microelements de berge/prairie, du plafond total et des inventaires echantillonnes habituels. Le plan de reference ecotone determine le budget forestier ; aucune redistribution des berges autorisee.
+
+## Transition rive-prairie (riparian-transition-004)
+
+Preuve `riparian-transition-capture` : etats riparian_reference,riparian,riparian_reference2,
+seule CVar Dressing.RiparianTransition change. Trois vues prairie/riviere/aerien a soleil fixe.
+Controle technique : budget d'instances constant, retour au temoin reproductible,
+hauteurs echantillonnees fixes, changement effectif des familles. PASS ne juge pas l'image.
+Regarder et comparer les triplets, relever le GPU ; aucun gain visuel revendique avant cela.

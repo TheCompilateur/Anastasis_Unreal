@@ -47,6 +47,10 @@ static TAutoConsoleVariable<int32> CVarTreeCanopyEcotone(
 	TEXT("anastasis.Dressing.TreeCanopyEcotone"), 1,
 	TEXT("1=forest communities anchored to tree crowns only; 0=mixed obstacle reference. Applied on embodiment."), ECVF_Default);
 
+static TAutoConsoleVariable<int32> CVarRiparianTransition(
+	TEXT("anastasis.Dressing.RiparianTransition"), 1,
+	TEXT("1=wet meadow colonies on gentle banks; 0=reference. Applied on embodiment."), ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarNaturalHistory(
 	TEXT("anastasis.Dressing.NaturalHistory"), 1,
 	TEXT("1=habitat-conditioned patches, wet meadow gradient and forest regeneration; 0=reference distribution. Applied on embodiment."), ECVF_Default);
@@ -1382,6 +1386,7 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 	GC::FSettings CoverSettings;
 	CoverSettings.bNaturalHistory = CVarNaturalHistory.GetValueOnGameThread() != 0;
 	CoverSettings.FlowerShare = CVarWildflowers.GetValueOnGameThread() != 0 ? 0.24 : 0.0;
+	CoverSettings.bRiparianTransition = CVarRiparianTransition.GetValueOnGameThread() != 0;
 	if (!GC::Build(In, CoverSettings, Cover, Error))
 	{
 		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_GROUND_COVER rejected=%s"), *Error);

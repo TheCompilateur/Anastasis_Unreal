@@ -48,6 +48,8 @@ struct FSettings
 	 * porte lui-meme quelques lames, la prairie ne se troue pas.
 	 */
 	double FlowerShare = 0.0;
+	/** Spatial wet-meadow colonies; family replacement only, no additional instances. */
+	bool bRiparianTransition = false;
 	/** Une candidate par cellule, jittee dans la cellule. */
 	double CellUU = 120.0;
 	/** Rayon des sondes de pente : celui de la foret macro, pour que les deux lisent le meme sol. */
