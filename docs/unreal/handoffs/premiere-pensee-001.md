@@ -36,7 +36,25 @@ Voir `git log agent/premiere-pensee-001`. Posée sur `agent/resource-targets-001
 
 ## MEC
 
-@@MEC@@
+- BUILD : `BUILD::PASS`.
+- TESTS (`finish -Prove`) : PASS 281, KNOWN_EXPECTED_FAILURE 4, FAIL 0, 285/285 annoncés.
+  - `Anastasis.Sim.Village.PremierePensee` (nouveau) : avant toute pensée, aucune clé ; après une décision,
+    `goalExplain` (heure, gagnant de la table, trois lignes triées, scores au dixième, une cause chacune, phrase
+    `parce que …` ou trois buts courts), `streetDecision` (gagnant, depuis `observer`, bascule, cause de
+    l'explication, fenêtre 3 / 4,5 / 6,5 s, marge ≥ 0), `buildBinding` nul hors `build`, `socialSeekId`,
+    `mind.failures`, `nocturnalIntent` posés.
+  - `Harnais.Lecture` : la sauvegarde porte `mind.failures = {}` (forme ancienne) ; elle n'est pas marquée à la
+    lecture (la référence la convertit à la première pensée), le tick 0 se relit au bit près.
+- HARNAIS (`endurance`, 16 200 ticks, forage au tick 32 ; base resource-targets-001) :
+  - premier tick divergent toujours **32**, désormais `actors` seul (`buildings` au tick 125, comme `rng`) ;
+  - au tick 32, npc-2 : **33 → 29 champs**. Concordent désormais : `activitySince`, `workShift`, `hungerAction`,
+    `nocturnalIntent`, `socialSeekId`, `buildBinding`, `mind.failures`, la forme de `goalExplain` et de
+    `streetDecision` (`at`, `goal`, `top[0].goal`, `cause` « habitude », `line`, `until`, `from`, `changed`, `tight`) ;
+  - restent : les **valeurs** de `goalExplain` / `streetDecision` (la ligne `build` vaut 288,7 en C++ contre 223,8 :
+    npc-2 est noctambule et le C++ ignore le mode de vie dans la décision, n° 8 ; deuxième et troisième lignes
+    `deliver` 164,1 (micro-plan) et `gatherStone` 155,9 (ambition), non portées, n° 1 / 24 ; collant 18 contre 19,4) ;
+    `_algoDebug` (n° 35) ; `workTimer` 0 contre 0,5167 (n° 36) ; navigation et pas (n° 4, nav-service-001).
+- Relevé : `node tools/migration/trace-first-writes.mjs -ref <clone> -scenario tools/migration/scenarios/endurance.json -ticks 32 -npc npc-2`.
 
 ## PROOFS
 
