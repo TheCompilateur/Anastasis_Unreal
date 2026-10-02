@@ -1,12 +1,25 @@
 #include "Village/AnastasisVillageBuilding.h"
 
 #include "Anastasis_UnrealV2.h"
+#include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "HAL/IConsoleManager.h"
 #include "Engine/StaticMesh.h"
 #include "SmartObjectComponent.h"
 
 namespace
 {
+	// Candelas a pleine puissance (Hearth = 1). Le ciel de nuit est expose tres bas : la valeur
+	// se regle a l'oeil sur une capture de nuit, sans recompiler.
+	TAutoConsoleVariable<float> CVarHearthCandela(
+		TEXT("anastasis.Village.HearthCandela"),
+		400.f,
+		TEXT("ICEBERG_001 : intensite (cd) du foyer d'une maison habitee, a pleine nuit."),
+		ECVF_Default);
+
+	/** Dans le volume de la maison : la lumiere sort par la porte (+Y d'auteur) et la fenetre, pas par les murs. */
+	const FVector HearthLocal(0.0, 0.0, 120.0);
+
 	const TCHAR* BodyMeshPath(EAnastasisVillageBuildingKind Kind)
 	{
 		switch (Kind)
@@ -35,6 +48,36 @@ AAnastasisVillageBuilding::AAnastasisVillageBuilding()
 	Body->SetCastShadow(true);
 	Body->SetCanEverAffectNavigation(false);
 	Body->SetMobility(EComponentMobility::Movable);
+
+	Hearth = CreateDefaultSubobject<UPointLightComponent>(TEXT("Hearth"));
+	Hearth->SetupAttachment(SmartObject);
+	Hearth->SetRelativeLocation(HearthLocal);
+	Hearth->SetMobility(EComponentMobility::Movable);
+	Hearth->SetIntensityUnits(ELightUnits::Candelas);
+	Hearth->SetLightColor(FLinearColor(1.0f, 0.52f, 0.20f));
+	Hearth->SetAttenuationRadius(900.f);
+	Hearth->SetSourceRadius(14.f);
+	Hearth->SetCastShadows(true);
+	Hearth->SetVolumetricScatteringIntensity(0.f);
+	Hearth->SetIntensity(0.f);
+	Hearth->SetVisibility(false);
+}
+
+void AAnastasisVillageBuilding::SetHearth(const double Level)
+{
+	if (!Hearth || Kind != EAnastasisVillageBuildingKind::House)
+	{
+		return;
+	}
+	const double Clamped = FMath::Clamp(Level, 0.0, 1.0);
+	if (FMath::IsNearlyEqual(Clamped, HearthLevel, 0.005))
+	{
+		return;
+	}
+	HearthLevel = Clamped;
+	const bool bLit = Clamped > 0.01;
+	Hearth->SetIntensity(static_cast<float>(Clamped * CVarHearthCandela.GetValueOnGameThread()));
+	Hearth->SetVisibility(bLit);
 }
 
 bool AAnastasisVillageBuilding::HasBody() const

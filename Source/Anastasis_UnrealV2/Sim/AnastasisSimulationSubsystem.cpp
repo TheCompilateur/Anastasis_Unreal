@@ -14,6 +14,9 @@
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisWorldView.h"
 #include "WorldView/AnastasisAnthropicSubsystem.h"
+#include "WorldView/AnastasisWorldAtmosphere.h"
+#include "Village/AnastasisBuildingMetabolism.h"
+#include "EngineUtils.h"
 #include "WorldView/AnastasisSettlementSurvey.h"
 #include "HAL/PlatformTime.h"
 
@@ -51,6 +54,14 @@ static TAutoConsoleVariable<int32> CVarVillageDebug(
 	TEXT("anastasis.Village.Debug"),
 	1,
 	TEXT("1 = draw the simulated village (buildings, access points, inhabitants, targets) in PIE."),
+	ECVF_Default);
+
+// ICEBERG_001 : ce que la maison montre de ses habitants. 0 = ancien rendu, 1 = projection de la
+// simulation (defaut), 2 = TEMOIN FAUX (toutes les maisons allumees), pour comparer, jamais un reglage.
+static TAutoConsoleVariable<int32> CVarVillageMetabolism(
+	TEXT("anastasis.Village.Metabolism"),
+	1,
+	TEXT("ICEBERG_001: 0 = buildings show nothing of their occupants, 1 = hearth light from the simulation's occupancy (default), 2 = WRONG WITNESS control: every house lit regardless."),
 	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarVillagePortraits(
@@ -279,7 +290,24 @@ int32 UAnastasisSimulationSubsystem::SyncVillagePresentation()
 	{
 		return 0;
 	}
-	return VillagePresentation.Sync(Simulation.GetVillage(), Simulation.GetWorld(), *Rooms);
+	// La lumiere du jour que le joueur voit : celle du ciel, pas une seconde horloge. Sans ciel pilote
+	// par l'horloge de simulation (editeur, test) : plein jour, aucun foyer allume.
+	static TWeakObjectPtr<AAnastasisWorldAtmosphere> Atmosphere;
+	if (!Atmosphere.IsValid() || Atmosphere->GetWorld() != World)
+	{
+		Atmosphere.Reset();
+		for (TActorIterator<AAnastasisWorldAtmosphere> It(World); It; ++It)
+		{
+			Atmosphere = *It;
+			break;
+		}
+	}
+	const double Daylight = (Atmosphere.IsValid() && Atmosphere->IsSkyClockActive())
+		? Atmosphere->GetLastSkyState().Daylight
+		: 1.0;
+	return VillagePresentation.Sync(
+		Simulation.GetVillage(), Simulation.GetWorld(), *Rooms, Daylight,
+		AnastasisMetabolism::ModeFromInt(CVarVillageMetabolism.GetValueOnGameThread()));
 }
 
 FString UAnastasisSimulationSubsystem::SeedFirstWell(int32 NpcCount, int32 TileX, int32 TileY)

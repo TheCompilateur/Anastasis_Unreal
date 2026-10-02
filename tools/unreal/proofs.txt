@@ -28,6 +28,7 @@ sky-clock-pie | tools/unreal/sky-clock-pie.py | SKY_PIE PASS | SKY_PIE FAIL|SKY_
 house-rest-pie | tools/unreal/house-rest-pie.py | HOUSE_REST_COMPLETE | HOUSE_REST_TIMEOUT | 300 | -
 # granary-eat : deja a Speed 10. COMPLETE exige au moins un repas pris au grenier (verdict faible : pas trois).
 granary-eat-pie | tools/unreal/granary-eat-pie.py | GRANARY_EAT_COMPLETE | GRANARY_EAT_TIMEOUT | 300 | -
+metabolism-pie | tools/unreal/metabolism-pie.py | METABOLISM_PIE PASS | METABOLISM_PIE FAIL | 420 | -
 anthropic-memory-pie | tools/unreal/anthropic-memory-pie.py | ANTHROPIC_PIE PASS | ANTHROPIC_PIE FAIL | 360 | -
 # gather-deliver : Speed 10, delais en temps simule. PASS = recolte, retour (au plus un sac plein), le sac du
 # retour livre en entier, deuxieme voyage ; conservation champs + sacs + grenier + repas a chaque echantillon.

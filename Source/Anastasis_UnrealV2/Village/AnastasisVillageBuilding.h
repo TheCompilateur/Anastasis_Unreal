@@ -7,6 +7,7 @@
 
 class USmartObjectComponent;
 class USmartObjectDefinition;
+class UPointLightComponent;
 class UStaticMeshComponent;
 
 UENUM()
@@ -44,12 +45,26 @@ public:
 	 */
 	void SetConstructionProgress(double Progress);
 
+	/**
+	 * ICEBERG_001 : le foyer. 0..1 = part de la lumiere de l'atre qui sort par la porte et la
+	 * fenetre (AnastasisMetabolism::FState::Hearth). 0 = eteint, composant invisible. Un
+	 * batiment sans foyer (puits, grenier) ignore l'appel. N'ecrit rien dans la simulation.
+	 */
+	void SetHearth(double Level);
+	double GetHearth() const { return HearthLevel; }
+
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis")
 	TObjectPtr<USmartObjectComponent> SmartObject;
 
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis")
 	TObjectPtr<UStaticMeshComponent> Body;
+
+	/** Cree pour tout batiment, mais allume seulement pour une maison (SetHearth). */
+	UPROPERTY(VisibleAnywhere, Category = "Anastasis")
+	TObjectPtr<UPointLightComponent> Hearth;
+
+	double HearthLevel = 0.0;
 
 	UPROPERTY()
 	FName SimId;

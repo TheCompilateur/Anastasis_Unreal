@@ -110,9 +110,26 @@ FVector FAnastasisVillagePresentation::SimToUnreal(const AnastasisWorld::FWorld&
 int32 FAnastasisVillagePresentation::Sync(
 	const AnastasisVillage::FVillage& Village,
 	const AnastasisWorld::FWorld& World,
-	UAnastasisVillageInteractionSubsystem& Rooms)
+	UAnastasisVillageInteractionSubsystem& Rooms,
+	const double Daylight,
+	const AnastasisMetabolism::EMode Mode)
 {
 	int32 Changes = 0;
+
+	// ICEBERG_001 : ce que la simulation sait d'une maison, traduit en foyer. Rien n'est ecrit en retour.
+	const auto ApplyMetabolism = [&](AAnastasisVillageBuilding& Actor, const AnastasisVillage::FBuilding& Building)
+	{
+		AnastasisMetabolism::FInput In;
+		In.bDwelling = Building.Type == AnastasisVillage::HouseType;
+		In.bCompleted = Building.IsCompleted();
+		In.Daylight = Daylight;
+		if (In.bDwelling && In.bCompleted)
+		{
+			In.Residents = Village.CountShelterOccupants(Building.Id);
+			In.Inside = Village.InsideOf(Building.Id).Num();
+		}
+		Actor.SetHearth(AnastasisMetabolism::Derive(In, Mode).Hearth);
+	};
 
 	// Retirer d'abord : un acteur dont l'enregistrement a disparu, ou qui a ete
 	// detruit par ailleurs (fin de PIE, GC), ne doit pas survivre dans la table.
@@ -145,6 +162,7 @@ int32 FAnastasisVillagePresentation::Sync(
 			if (AAnastasisVillageBuilding* Actor = Existing->Get())
 			{
 				Actor->SetConstructionProgress(Building.Progress);
+				ApplyMetabolism(*Actor, Building);
 			}
 			continue;
 		}
@@ -179,6 +197,7 @@ int32 FAnastasisVillagePresentation::Sync(
 		Actor->SetActorLabel(FString::Printf(TEXT("SimBuilding_%s_%s"), *Building.Type, *Building.Id));
 #endif
 		Actor->SetConstructionProgress(Building.Progress);
+		ApplyMetabolism(*Actor, Building);
 		Actors.Add(Building.Id, Actor);
 		++Changes;
 		UE_LOG(

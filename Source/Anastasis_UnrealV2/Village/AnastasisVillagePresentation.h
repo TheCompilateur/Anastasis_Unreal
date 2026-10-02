@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/WeakObjectPtrTemplates.h"
+#include "Village/AnastasisBuildingMetabolism.h"
 
 class AAnastasisVillageBuilding;
 class AAnastasisVillagerVisual;
@@ -30,8 +31,18 @@ public:
 	/** Simulation (tuiles, continu) -> Unreal (cm). Z = surface rendue si PresentationWorld est fourni, altitude semantique sinon. */
 	static FVector SimToUnreal(const AnastasisWorld::FWorld& World, double SimX, double SimY, UWorld* PresentationWorld = nullptr);
 
-	/** Aligne les acteurs sur les enregistrements. Rend le nombre d'acteurs crees + detruits. */
-	int32 Sync(const AnastasisVillage::FVillage& Village, const AnastasisWorld::FWorld& World, UAnastasisVillageInteractionSubsystem& Rooms);
+	/**
+	 * Aligne les acteurs sur les enregistrements. Rend le nombre d'acteurs crees + detruits.
+	 * ICEBERG_001 : `Daylight` (0 nuit, 1 plein jour : celui du ciel que le joueur voit) et `Mode`
+	 * donnent a chaque maison le foyer que la simulation lui prete (AnastasisMetabolism). Le defaut
+	 * (plein jour) n'allume rien : les appelants qui ne connaissent pas le ciel gardent l'ancien rendu.
+	 */
+	int32 Sync(
+		const AnastasisVillage::FVillage& Village,
+		const AnastasisWorld::FWorld& World,
+		UAnastasisVillageInteractionSubsystem& Rooms,
+		double Daylight = 1.0,
+		AnastasisMetabolism::EMode Mode = AnastasisMetabolism::EMode::Truth);
 
 	/** Detruit tous les acteurs refletes. */
 	void Clear(UAnastasisVillageInteractionSubsystem* Rooms);
