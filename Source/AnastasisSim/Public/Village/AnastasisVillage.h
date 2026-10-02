@@ -607,6 +607,9 @@ namespace AnastasisVillage
 		FString Phase;
 		/** Tirages `sim.rng` de la decision (perception-explore-001) : `exploreTarget`, puis les bruits. */
 		int32 ExploreDraws = 0;
+		/** `survivalForecastBias` et `spatialRiskBiasMap` (resource-targets-001), but -> biais, cles a 0 comprises. */
+		TMap<FString, double> ForecastBias;
+		TMap<FString, double> SpatialRiskBias;
 		int32 NoiseDraws = 0;
 		/** Le bruit tire pour chaque ligne qui en a tire un (but -> valeur). */
 		TMap<FString, double> RowNoise;
@@ -1553,6 +1556,42 @@ namespace AnastasisVillage
 		/** `assignTarget` pour `helpFarm` : la parcelle faible, sinon `farmPos`. */
 		bool HelpFarmTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
 		FPoint FieldWorkTarget(FNpc& Npc, const AnastasisWorld::FTile& Tile);
+
+		// --- Prevision de survie et risque spatial d'adultScores (resource-targets-001,
+		// AnastasisVillageSpatialRisk.cpp). Ordre des appels = celui de la reference : leurs
+		// `buildingAccessPoint` filtrent les seuils (paresseux) et posent `DestBuildingId`.
+
+		/** `survivalForecastBias(sim, npc)` : replis manger, boire, dormir, puis la carte. */
+		TArray<TPair<FString, double>> SurvivalForecastBiasFor(FNpc& Npc, bool bMealBlocked);
+		/** `spatialRiskBiasMap(sim, npc)` : replis dormir, manger, boire, s'abriter, puis une cible par but. */
+		TArray<TPair<FString, double>> SpatialRiskBiasMapFor(FNpc& Npc);
+		/** `forecastEatTarget` : le foyer si le sac a des vivres, sinon le marche (prevu). */
+		bool ForecastEatTarget(FNpc& Npc, FPoint& Out);
+		/** `forecastDrinkTarget` = `drinkTarget` : croyance (ecart n°33), puits / berge, le camp. */
+		bool ForecastDrinkTarget(FNpc& Npc, FPoint& Out);
+		/** `forecastRestTarget` : lit connu (ecart n°33), le camp, le marche. */
+		bool ForecastRestTarget(FNpc& Npc, FPoint& Out);
+		/** `shelterRainAccess(sim, npc)`, sans les ecritures de l'acte d'abri. */
+		bool ShelterRainAccess(FNpc& Npc, FPoint& Out);
+		/** `bestKnownBed` reduit au lit du foyer seme par `seedHomeBedBelief` (ecart n°33). */
+		bool KnownBedOf(const FNpc& Npc, FPoint& Out) const;
+		/** `stableBuildingAccess(sim, npc, building)` : la cible en cours si elle reste un seuil libre. */
+		bool StableBuildingAccess(FNpc& Npc, FBuilding& Building, FPoint& Out);
+		/** `spatialRiskTargetForGoal(sim, npc, goal)`. */
+		bool SpatialRiskTargetForGoal(FNpc& Npc, const FString& Goal, FPoint& Out);
+		/** `recallOrSearch(sim, npc, resource)` : le gisement dont il se souvient, sinon `exploreTarget` (tire). */
+		bool RecallOrSearch(FNpc& Npc, const FString& Resource, FPoint& Out);
+		/** `recallResource(sim, npc, resource)` (memory.js) : le meilleur gisement connu. */
+		bool RecallResource(const FNpc& Npc, const FString& Resource, FPoint& Out) const;
+		/** `workCommutePos(actor, goal)`, pour les buts que le risque spatial lit. */
+		bool WorkCommutePos(FNpc& Npc, const FString& Goal, FPoint& Out);
+		/** `maintenancePos(actor)`. */
+		bool MaintenancePos(FNpc& Npc, FPoint& Out);
+		/** `farmPos(actor)`. */
+		bool FarmPos(FNpc& Npc, FPoint& Out);
+		/** `householdAidTarget(sim, npc)`, sans plan d'aide (ecart n°7). */
+		bool HouseholdAidTarget(FNpc& Npc, FPoint& Out);
+
 		uint32 ClaimedFieldPosts(const FNpc& Npc, int32 TileX, int32 TileY) const;
 		/** `claimedFieldPosts(sim, ignoredNpc, tile)`, `Ignored` nul = personne n'est exclu. */
 		uint32 ClaimedFieldPostsExcept(const FNpc* Ignored, int32 TileX, int32 TileY) const;

@@ -707,6 +707,32 @@ namespace AnastasisJsSave
 					}
 				}
 				if (!R.OptInt(*Mind, TEXT("cellCount"), W, Out.CellCount)) return false;
+				// `mind.spots` (resource-targets-001) : `{ "<x>,<y>": { x, y, resource, amount, day, hearsay, ... } }`,
+				// les gisements dont il se souvient, dans l'ordre des cles : `recallResource` garde le premier
+				// meilleur score. L'on-dit porte qui l'a dit, la source d'origine, combien de bouches, quand.
+				if (const FValue* Spots = Mind->Find(TEXT("spots")); Spots && !Spots->IsNull())
+				{
+					const FString WS = FReader::At(W, TEXT("spots"));
+					if (!Spots->IsObject()) return R.Fail(WS, TEXT("objet attendu"));
+					for (const FString& Key : Spots->Keys)
+					{
+						const FValue* S = Spots->Find(Key);
+						const FString WK = WS + TEXT(".") + Key;
+						if (!S || !S->IsObject()) return R.Fail(WK, TEXT("objet attendu"));
+						AnastasisVillage::FResourceSpot Spot;
+						Spot.Key = Key;
+						if (!R.Double(*S, TEXT("x"), WK, Spot.X) || !R.Double(*S, TEXT("y"), WK, Spot.Y)) return false;
+						if (!R.String(*S, TEXT("resource"), WK, Spot.Resource)) return false;
+						if (!R.Int(*S, TEXT("amount"), WK, Spot.Amount) || !R.Int(*S, TEXT("day"), WK, Spot.Day)) return false;
+						if (!R.OptBool(*S, TEXT("hearsay"), WK, Spot.bHearsay)) return false;
+						if (!R.OptId(*S, TEXT("sourceId"), WK, Spot.SourceId)) return false;
+						if (!R.OptId(*S, TEXT("originalSourceId"), WK, Spot.OriginalSourceId)) return false;
+						if (!R.OptInt(*S, TEXT("hopCount"), WK, Spot.HopCount)) return false;
+						if (!R.OptInt(*S, TEXT("receivedDay"), WK, Spot.ReceivedDay)) return false;
+						if (!R.OptDouble(*S, TEXT("receivedAt"), WK, Spot.ReceivedAt)) return false;
+						Out.Spots.Add(MoveTemp(Spot));
+					}
+				}
 			}
 			// `placeMemory` (act-gate-001) : `{ buildings: { <id>: entree }, favoriteBuildingId }`.
 			if (const FValue* Places = A.Find(TEXT("placeMemory")); Places && Places->IsObject())
@@ -857,6 +883,34 @@ namespace AnastasisJsSave
 				// Absentes au depart et toujours vides : rien a ecrire (la reference ne les cree qu'au marquage).
 				if (Mind->Find(TEXT("cells")) || Sorted.Num() > 0) Mind->Set(TEXT("cells"), Cells);
 				if (Mind->Find(TEXT("cellCount")) || N.CellCount != 0) Mind->Set(TEXT("cellCount"), Num(N.CellCount));
+				// Les gisements retenus (resource-targets-001), dans l'ordre du C++ (celui des cles). Une entree
+				// deja lue garde ses champs non portes (`speechActId`, `confidence`...), les autres sont reecrits.
+				if (Mind->Find(TEXT("spots")) || N.Spots.Num() > 0)
+				{
+					const FValue* OldSpots = Mind->Find(TEXT("spots"));
+					FValue Spots = FValue::MakeObject();
+					for (const AnastasisVillage::FResourceSpot& Spot : N.Spots)
+					{
+						const FValue* Old = (OldSpots && OldSpots->IsObject()) ? OldSpots->Find(Spot.Key) : nullptr;
+						FValue Obj = (Old && Old->IsObject()) ? *Old : FValue::MakeObject();
+						Obj.Set(TEXT("x"), Num(Spot.X));
+						Obj.Set(TEXT("y"), Num(Spot.Y));
+						Obj.Set(TEXT("resource"), Str(Spot.Resource));
+						Obj.Set(TEXT("amount"), Num(Spot.Amount));
+						Obj.Set(TEXT("day"), Num(Spot.Day));
+						Obj.Set(TEXT("hearsay"), FValue::MakeBool(Spot.bHearsay));
+						if (Spot.bHearsay)
+						{
+							Obj.Set(TEXT("sourceId"), Spot.SourceId.IsEmpty() ? FValue() : Str(Spot.SourceId));
+							Obj.Set(TEXT("originalSourceId"), Spot.OriginalSourceId.IsEmpty() ? FValue() : Str(Spot.OriginalSourceId));
+							Obj.Set(TEXT("hopCount"), Num(Spot.HopCount));
+							Obj.Set(TEXT("receivedDay"), Num(Spot.ReceivedDay));
+							Obj.Set(TEXT("receivedAt"), Num(Spot.ReceivedAt));
+						}
+						Spots.Set(Spot.Key, Obj);
+					}
+					Mind->Set(TEXT("spots"), Spots);
+				}
 			}
 			// La memoire des lieux : une entree par batiment, dans l'ordre de premiere visite.
 			if (Out.Find(TEXT("placeMemory")) || N.PlaceEntries.Num() > 0)

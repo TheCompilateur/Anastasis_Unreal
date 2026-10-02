@@ -531,7 +531,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FAnastasisVillageGatherMultiTest::RunTest(const FString&)
 {
 	using namespace AnastasisVillageGatherTest;
-	// Une seule parcelle, trois fermiers : trois postes distincts dans la tuile.
+	// Une seule parcelle, trois fermiers : deux fermiers sur la tuile en meme temps n'y ont jamais le meme poste.
+	// (Les trois a la fois depend des horaires de livraison, que les tirages de la decision decalent :
+	// resource-targets-001.)
 	AnastasisWorld::FWorld World = MakeFlatWorld(40, 32);
 	SetField(World, 8, 11, 8, 11, 37);
 	FVillage Village;
@@ -546,29 +548,47 @@ bool FAnastasisVillageGatherMultiTest::RunTest(const FString&)
 	const int32 Total = FoodEverywhere(Village, World);
 
 	double Time = Morning;
-	bool bThreeTogether = false;
+	int32 MostTogether = 0;
 	bool bDistinct = true;
+	TMap<FString, FString> Goals;
+	TMap<FString, FString> LastGoal;
 	TestTrue(TEXT("sain, rien ne se perd"), Run(Village, World, Total, Time, 60.0, [&]
 	{
 		TArray<int32> Posts;
 		for (const FString& Id : Ids)
 		{
+			const FString& G = Village.FindNpc(Id)->Goal;
+			FString& Seq = Goals.FindOrAdd(Id);
+			FString& Last = LastGoal.FindOrAdd(Id);
+			if (Last != G) { Last = G; Seq += FString::Printf(TEXT(" %s@%.1f"), *G, Time); }
 			const FWorkSession& S = Village.FindNpc(Id)->WorkSession;
 			if (S.bActive && S.TileX == 8 && S.TileY == 11 && S.PostIndex >= 0) Posts.Add(S.PostIndex);
 		}
-		if (Posts.Num() == 3)
+		MostTogether = FMath::Max(MostTogether, Posts.Num());
+		for (int32 A = 0; A < Posts.Num(); ++A)
 		{
-			bThreeTogether = true;
-			bDistinct &= Posts[0] != Posts[1] && Posts[0] != Posts[2] && Posts[1] != Posts[2];
+			for (int32 B = A + 1; B < Posts.Num(); ++B) bDistinct &= Posts[A] != Posts[B];
 		}
 		return Village.LiveTileAt(8, 11).Amount == 0 && Village.FindBuilding(Granary)->FoodPhysical > 0;
 	}));
-	TestTrue(TEXT("les trois a la meme parcelle"), bThreeTogether);
+	if (!TestTrue(TEXT("au moins deux a la meme parcelle en meme temps"), MostTogether >= 2))
+	{
+		for (const FString& Id : Ids)
+		{
+			const FNpc* N = Village.FindNpc(Id);
+			const FDecisionTrace& T = N->LastDecision;
+			AddInfo(FString::Printf(TEXT("%s goal=%s winner=%s gatherRow=%.3f prevision=%.3f risque=%.3f session=%d (%d,%d)"), *Id, *N->Goal,
+				*T.TableWinner, T.GatherRowScore, T.ForecastBias.FindRef(GoalGatherFood), T.SpatialRiskBias.FindRef(GoalGatherFood),
+				N->WorkSession.bActive, N->WorkSession.TileX, N->WorkSession.TileY));
+			AddInfo(FString::Printf(TEXT("%s buts :%s ; cueilli %d"), *Id, *Goals.FindRef(Id), N->GatheredFood));
+		}
+	}
 	TestTrue(TEXT("chacun son poste"), bDistinct);
 	TestEqual(TEXT("parcelle videe"), Village.LiveTileAt(8, 11).Amount, 0);
 	int32 Gathered = 0;
 	for (const FString& Id : Ids) Gathered += Village.FindNpc(Id)->GatheredFood;
 	TestEqual(TEXT("37 cueillis en tout"), Gathered, 37);
+	for (const FString& Id : Ids) TestTrue(TEXT("chacun a cueilli"), Village.FindNpc(Id)->GatheredFood > 0);
 	TestTrue(TEXT("le grenier a recu"), Village.FindBuilding(Granary)->FoodPhysical > 0);
 	return true;
 }

@@ -200,10 +200,13 @@ bool FAnastasisVillageWellSelectionTest::RunTest(const FString&)
 	TestEqual(TEXT("trace : vainqueur"), Why.Winner, FString(GoalDrink));
 	TestEqual(TEXT("trace : source"), Why.TargetSource, FString(TEXT("well")));
 	TestEqual(TEXT("trace : batiment"), Why.BuildingId, Near);
-	// `needs.drink + 6 + goalNoise(sim, 6)`, puis le rythme (perception-explore-001 : le bruit est tire).
-	TestTrue(TEXT("trace : ligne drink = needGoalScores.drink + 6 + bruit + phaseBias (exact)"),
+	// `needs.drink + 6 + goalNoise(sim, 6)`, puis le rythme (perception-explore-001 : le bruit est tire), puis la
+	// prevision de survie (`score.survival_forecast`, resource-targets-001) ; le risque spatial n'a pas de cle `drink`.
+	TestTrue(TEXT("trace : ligne drink = needGoalScores.drink + 6 + bruit + phaseBias + prevision (exact)"),
 		Why.DrinkRowScore == Why.NeedScores.Drink + 6.0 + Why.RowNoise.FindRef(GoalDrink)
-			+ AnastasisRhythm::PhaseBias(AnastasisRhythm::EPhase::Night, AnastasisRhythm::FPhaseSubject(), GoalDrink));
+			+ AnastasisRhythm::PhaseBias(AnastasisRhythm::EPhase::Night, AnastasisRhythm::FPhaseSubject(), GoalDrink)
+			+ Why.ForecastBias.FindRef(GoalDrink));
+	TestFalse(TEXT("trace : pas de risque spatial sur drink"), Why.SpatialRiskBias.Contains(GoalDrink));
 	TestTrue(TEXT("trace : au-dessus du plancher des buts non portes"), Why.DrinkRowScore > Why.FloorScore);
 	TestTrue(TEXT("trace : au-dessus de la ligne rest"), Why.DrinkRowScore > Why.RestRowScore);
 	TestEqual(TEXT("trace : l'horloge commence la nuit"), Why.Phase, FString(TEXT("night")));

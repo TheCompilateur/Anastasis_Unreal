@@ -74,6 +74,9 @@ Depuis help-farm-001, la ligne `helpFarm` est calculée pour tous (`helpFarmScor
 biais) : sans ferme, elle vaut 0 au lieu du plancher 42. Son but est porté (cible : la parcelle faible ;
 acte : la session `tend`). Sans parcelle, `farmPos` rendrait l'accès au marché prévu : il arrive avec
 build-decision-001 ; d'ici là, l'habitant vaque.
+resource-targets-001 : la prévision de survie (`survivalForecastBias`) et le risque spatial
+(`spatialRiskBiasMap`) sont portés. Ils s'ajoutent à chaque ligne, plancher compris, à leur place dans la
+chaîne, comme la météo et la passe collective. Leurs replis réduits sont l'écart n° 33.
 
 ### n° 2 — Des cibles relâchées que la référence garderait
 
@@ -110,6 +113,9 @@ regard d'une session sociale) là où la référence la garde et laisse la recon
 
 L'anneau 1 oriente vers le camp, qui est exactement le repli de la référence quand l'intention
 urbaine ne propose rien.
+resource-targets-001 : `pickDailyBuilding` (`pickDistrictAwareBuilding`, cible `maintain` du risque spatial)
+prend sans quartiers son repli : le hachage FNV du jour, de l'habitant, du but et du sel. La référence, qui a
+ses quartiers, score chaque bâtiment (`districtDestinationScore`) : le bâtiment entretenu peut différer.
 
 ### n° 4 — Pilotage réduit
 
@@ -177,6 +183,8 @@ vue, (0, 0) sans caméra.
 
 Foyer sans famille (le propriétaire seul), capacité 3, ni achat, ni agrandissement, ni hospitalité,
 ni dortoir. `redirectDomesticDoorFailure` bascule sur `explore`, non porté : ici `observer`.
+resource-targets-001 : sans plan d'aide (`householdPlan` absent), la cible `aidHousehold` du risque spatial
+est toujours celle du foyer, ou `socialPos`. La référence vise le parent à aider quand un plan existe.
 
 ### n° 8 — Adultes sans métier de garde, sans famille, sans mode de vie
 
@@ -352,7 +360,7 @@ sans partenaire, famille, aîné ni nature (« ami » seulement, comme `socializ
 
 - **classe** : REDUIT
 - **destin** : A_FERMER
-- **fermeture** : goals-work-001 (`craft` après l'abri) ; à attribuer : `bestKnownBed`, la taverne, le biais de la prévision de survie
+- **fermeture** : goals-work-001 (`craft` après l'abri) ; beliefs-001 (`bestKnownBed`, écart n° 33) ; à attribuer : la taverne
 - **statut** : OUVERT
 - **entree** : village-weather-001 (932d1cc)
 - **reference** : `weatherGoalBias.js`, `npc.js` (`shelterRain`, `bestKnownBed`), taverne
@@ -362,6 +370,7 @@ sans partenaire, famille, aîné ni nature (« ami » seulement, comme `socializ
 
 Les formules sont en parité (`Parite.MeteoHabitants`). Le foyer tient lieu de `bestKnownBed` ; après
 l'abri, un but repris non exposé devient `craft` dans la référence, `observer` ici.
+resource-targets-001 : le biais de la prévision de survie est porté, y compris `shelterRain` (−soif × 0,08).
 
 ### n° 18 — Chantier ouvert par l'hôte, sans livraisons
 
@@ -461,20 +470,24 @@ pèse sur aucune décision (n° 22 : seul le joueur).
 
 - **classe** : REDUIT
 - **destin** : A_FERMER
-- **fermeture** : goals-day-intent (`assignDayIntent`, `intentExploreHint`, `assignAmbition`), goals-resources-001 (`spatialRiskBiasMap` > `recallOrSearch`)
+- **fermeture** : goals-day-intent (`assignDayIntent`, `intentExploreHint`, `assignAmbition`)
 - **statut** : OUVERT
 - **entree** : perception-explore-001
 - **reference** : `src/ai/dayIntent.js` (`ensureDayIntent`, `assignDayIntent`, `intentExploreHint`), `src/ai/ambitions.js` (`assignAmbition`), `src/sim/npc.js` (`spatialRiskBiasMap`, `spatialRiskTargetForGoal`)
-- **cpp** : `Village/AnastasisVillage.cpp`, `ChooseGoal` (préparation d'adultScores)
-- **harnais** : actors, rng
-- **detail** : `docs/migration/phase3/P3_RNG_RELEVE_JOUR.md`
+- **cpp** : `Village/AnastasisVillage.cpp`, `ChooseGoal` (préparation d'adultScores) ; `Village/AnastasisVillageSpatialRisk.cpp` (`SpatialRiskTargetForGoal`, but `explore`)
+- **harnais** : actors, rng, buildings
+- **detail** : `docs/migration/phase3/P3_RNG_RELEVE_JOUR.md`, `docs/migration/phase3/P3_RISQUE_SPATIAL_RELEVE.md`
 
 Avant `exploreTarget`, `chooseGoal` tire l'intention du jour quand elle est périmée (1 tirage, plus le
 cap si elle vaut `explore` : 5 par jour dans le relevé, au changement de jour) et l'ambition d'un
 habitant qui n'en a pas. Le C++ ne les tire pas : le flux se décale au premier changement de jour.
 `intentExploreHint` n'est pas porté : avec une intention `explore`, la référence tirerait 1 ou 3 fois au
-lieu d'`exploreTarget`. `spatialRiskBiasMap` ne tire pas dans le scénario (0 sur un jour) et n'est pas
-évalué.
+lieu d'`exploreTarget`.
+resource-targets-001 : `spatialRiskBiasMap` est porté, avec `spatialRiskTargetForGoal` et `recallOrSearch`
+(`Ai/AnastasisSpatialRisk`, `Village/AnastasisVillageSpatialRisk.cpp`). Sa cible `explore` lit encore
+`intentExploreHint` : sans intention du jour, c'est `npc.target`. Dans le relevé sur 16 200 ticks, c'est là
+que tombent ses 57 tirages : ils restent à cet écart. Ses écritures (seuils filtrés au premier appel,
+`buildings`) sont faites.
 
 ### n° 26 — Mémoire des lieux sans présence au poste
 
@@ -579,3 +592,24 @@ les classe par ordre ordinal des identifiants. Les deux ordres coïncident pour 
 ils divergent pour des identifiants mêlant casses ou ponctuation. Branché depuis planner-wiring-001 : la
 divergence toucherait `actors`. Porter la collation ICU ou restreindre la forme
 des identifiants : à trancher.
+
+### n° 33 — Prévision de survie et risque spatial : croyances des lieux sûrs et doctrine de lisière absentes
+
+- **classe** : REDUIT
+- **destin** : A_FERMER
+- **fermeture** : beliefs-001 (`bestKnownWater`, `bestKnownBed`, `seedHomeBedBelief`) ; à attribuer : doctrine de lisière (`wantsColonizationClear`)
+- **statut** : OUVERT
+- **entree** : resource-targets-001
+- **reference** : `src/ai/memory.js` (`bestKnownWater`, `bestKnownBed`, `seedHomeBedBelief`, `bestKnownBelief`), `src/sim/npc.js` (`forecastDrinkTarget`, `forecastRestTarget`, `shelterRainAccess`, `gatherWoodTarget`), `src/sim/colonizationDoctrine.js` (`wantsColonizationClear`)
+- **cpp** : `Village/AnastasisVillageSpatialRisk.cpp` (`ForecastDrinkTarget`, `KnownBedOf`, `RecallOrSearch`)
+- **harnais** : actors, buildings
+- **detail** : `docs/migration/phase3/P3_RISQUE_SPATIAL_RELEVE.md`
+
+Les replis de la prévision de survie et du risque spatial passent dans la référence par les croyances
+`mind.beliefs` (puits et berges vus, lits vus ou entendus). Le C++ ne les a pas. Il boit donc au puits le
+plus proche (`drinkAccessPoint`), sinon à la berge. Il dort au lit de son foyer s'il est achevé (ce que
+sème `seedHomeBedBelief`, dont l'écriture dans `mind.beliefs` n'est pas faite), sinon au camp. Dans le
+relevé, les deux croyances répondent toujours (381 décisions sur 381) : les distances, donc les biais, en
+diffèrent dès que la croyance n'est pas le repli du C++. Ce repli appelle aussi `buildingAccessPoint`, ce
+que la croyance ne fait pas : seuils filtrés et destination posée en plus. La doctrine de lisière est
+lue comme fausse ; elle ne l'est jamais devenue dans le relevé.

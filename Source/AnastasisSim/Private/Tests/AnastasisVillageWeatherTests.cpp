@@ -111,7 +111,12 @@ bool FAnastasisVillageWeatherStormTest::RunTest(const FString&)
 	FVillage Village;
 	Village.Bind(World);
 	const FString Granary = Village.AddBuilding(GranaryType, 16, 11);
-	const FString Farmer = Village.SpawnNpc(13.5, 11.5, Rested());
+	// Frais (energie 100) : l'averse vide l'energie dehors (2,4 / s) ; parti de 70, il est a 45,7 a sa premiere
+	// decision sous l'orage, sa fatigue est critique, la porte d'orage ne joue plus et la prevision de survie
+	// (resource-targets-001) fait gagner `rest`, comme dans la reference. Ce test prouve le chemin de l'abri.
+	AnastasisNeeds::FNeeds Fresh = Rested();
+	Fresh.Energy = 100.0;
+	const FString Farmer = Village.SpawnNpc(13.5, 11.5, Fresh);
 	if (!TestTrue(TEXT("farmer hired at the granary"), Village.AssignWorkplace(Farmer, G::JobFarmer, Granary)))
 	{
 		return false;
@@ -136,8 +141,13 @@ bool FAnastasisVillageWeatherStormTest::RunTest(const FString&)
 	const FNpc* N = Village.FindNpc(Farmer);
 	if (!TestTrue(TEXT("storm: his first decision under the storm drops the harvest for shelter"), bSheltering))
 	{
-		AddInfo(FString::Printf(TEXT("goal=%s winner=%s rain=%.3f shelterRow=%.3f"), *N->Goal, *N->LastDecision.TableWinner,
-			N->LastDecision.WeatherRain, N->LastDecision.ShelterRowScore));
+		AddInfo(FString::Printf(TEXT("goal=%s winner=%s rain=%.3f shelterRow=%.3f restRow=%.3f gatherRow=%.3f gate=%d shift=%d"),
+			*N->Goal, *N->LastDecision.TableWinner, N->LastDecision.WeatherRain, N->LastDecision.ShelterRowScore,
+			N->LastDecision.RestRowScore, N->LastDecision.GatherRowScore, N->LastDecision.bStormGate, N->LastDecision.bShiftLock));
+		AddInfo(FString::Printf(TEXT("energy=%.3f hunger=%.3f thirst=%.3f decidedAt=%.3f stormFrom=%.3f"), N->Needs.Energy, N->Needs.Hunger,
+			N->Needs.Thirst, N->LastDecision.Time, DecidedBefore));
+		for (const TPair<FString, double>& E : N->LastDecision.ForecastBias) AddInfo(FString::Printf(TEXT("prevision %s=%.4f"), *E.Key, E.Value));
+		for (const TPair<FString, double>& E : N->LastDecision.SpatialRiskBias) AddInfo(FString::Printf(TEXT("risque %s=%.4f"), *E.Key, E.Value));
 		return false;
 	}
 	const FDecisionTrace& Why = N->LastDecision;

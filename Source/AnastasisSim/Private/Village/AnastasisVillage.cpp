@@ -1,6 +1,7 @@
 #include "Village/AnastasisVillage.h"
 #include "Work/AnastasisCraftMiss.h"
 
+#include "Ai/AnastasisSpatialRisk.h"
 #include "Core/AnastasisJsNumeric.h"
 #include "Core/AnastasisSimMath.h"
 #include "Core/AnastasisStateDigest.h"
@@ -2043,14 +2044,22 @@ namespace AnastasisVillage
 		}
 		// Ce que le planificateur collectif dit pour cet habitant : lu une fois, pour les lignes et la passe finale.
 		const FCollectiveDecision Collective = CollectiveDecisionOf(Npc);
+		// --- resource-targets-001 : `survivalForecastBias` puis `spatialRiskBiasMap` (adultScores, npc.js
+		// l. 1103-1104), apres la lecture du planificateur, AVANT `failureTargetBiasMap`. Leurs replis et leurs cibles ecrivent (seuils filtres,
+		// destination posee), dans l'ordre de la reference ; `recallOrSearch` tire s'il ne connait aucun
+		// gisement. Les deux cartes s'ajoutent aux lignes apres la meteo (plus bas).
+		const TArray<TPair<FString, double>> ForecastBias = SurvivalForecastBiasFor(Npc, Work.bMealBlocked);
+		const TArray<TPair<FString, double>> SpatialRiskBias = SpatialRiskBiasMapFor(Npc);
+		for (const TPair<FString, double>& Entry : ForecastBias) Trace.ForecastBias.Add(Entry.Key, Entry.Value);
+		for (const TPair<FString, double>& Entry : SpatialRiskBias) Trace.SpatialRiskBias.Add(Entry.Key, Entry.Value);
+		// --- fin resource-targets-001
 
 		// Preparation d'adultScores (perception-explore-001) : `failureTargetBiasMap` evalue
 		// `failureCauseForGoal(sim, npc, "explore")` = `intentExploreHint(sim, npc) ||
 		// exploreTarget(sim, npc)`. Sans intention du jour portee (ecart n°24), c'est
 		// `exploreTarget` : 2 a 8 tirages dans le releve, AVANT les bruits de la table. La
 		// cible ne sert qu'au biais d'echec de la ligne `explore`, non portee (ecart n°1) : seuls ses
-		// tirages comptent ici. `spatialRiskBiasMap` (recallOrSearch) ne tire pas dans le
-		// scenario du harnais et n'est pas porte (ecart n°24).
+		// tirages comptent ici. `spatialRiskBiasMap` est calcule plus haut (resource-targets-001).
 		Trace.ExploreDraws = ExploreTargetFor(Npc).Draws;
 
 		// adultScores : les 25 lignes, dans l'ordre de la reference, puis
@@ -2128,6 +2137,15 @@ namespace AnastasisVillage
 		{
 			Row.Value += AnastasisWeatherBehavior::WeatherGoalBias(TickWeather, Npc.JobId, Row.Key);
 		}
+		// --- resource-targets-001 : `score.survival_forecast` puis `score.spatial_risk`, `map[score.goal] || 0`,
+		// a leur place dans la chaine (apres la meteo et les biais non portes, avant l'urgence collective).
+		// Comme la meteo et la passe collective, sur chaque ligne, plancher compris.
+		for (TPair<FString, double>& Row : Rows)
+		{
+			Row.Value += AnastasisSpatialRisk::BiasOf(ForecastBias, Row.Key);
+			Row.Value += AnastasisSpatialRisk::BiasOf(SpatialRiskBias, Row.Key);
+		}
+		// --- fin resource-targets-001
 		// La fin de la chaine d'`adultScores` : urgence collective, plancher collectif, rush famine.
 		ApplyCollectivePass(Npc, Collective, Rows, Trace);
 
