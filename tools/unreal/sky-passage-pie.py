@@ -150,7 +150,16 @@ def tick(dt):
         return
     elapsed = now - s['mark']
     ev, target = s['atmos'].get_applied_exposure_ev(), s['atmos'].get_target_exposure_ev()
-    settings = s['atmos'].get_editor_property('exposure_volume').get_editor_property('settings')
+    # ExposureVolume est un UPROPERTY() sans specificateur : invisible en Python. Le volume est le
+    # PostProcessVolume non borne que l'atmosphere adopte ou cree (AdoptOrSpawn), retrouve dans le monde.
+    if s.get('exposure') is None:
+        volumes = [v for v in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.PostProcessVolume)
+                   if v.get_editor_property('unbound')]
+        owned = [v for v in volumes if v.get_owner() == s['atmos']]
+        s['exposure'] = (owned or volumes or [None])[0]
+        if s['exposure'] is None:
+            raise RuntimeError('exposure volume not found')
+    settings = s['exposure'].get_editor_property('settings')
     volume_ev = settings.get_editor_property('auto_exposure_min_brightness')
     sun, moon = s['sun'].get_component_by_class(unreal.DirectionalLightComponent), s['moon'].get_component_by_class(unreal.DirectionalLightComponent)
     elev = -s['sun'].get_actor_rotation().pitch
