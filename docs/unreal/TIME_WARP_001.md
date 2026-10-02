@@ -36,8 +36,8 @@ Joueur, en PIE (liaisons de debug du moteur dans `Config/DefaultInput.ini`, aucu
 
 | Touche | Commande | Effet |
 |---|---|---|
-| pavé num. `+` | `Anastasis.Sim.Faster` | palier suivant : ×0.25 ×0.5 ×1 ×2 ×4 ×8 ×16 ×32 ×64 ×128 |
-| pavé num. `-` | `Anastasis.Sim.Slower` | palier précédent |
+| **`8`** (rangée des chiffres ou pavé), ou pavé `+` | `Anastasis.Sim.Faster` | palier suivant : ×0.25 ×0.5 ×1 ×2 ×4 ×8 ×16 ×32 ×64 ×128 |
+| **`9`** (rangée des chiffres ou pavé), ou pavé `-` | `Anastasis.Sim.Slower` | palier précédent |
 | `Pause` | `Anastasis.Sim.Pause` | pause, puis retour à la vitesse d'avant |
 
 Ces liaisons n'existent pas dans un build Shipping : quand PLAYER sera écrit, la vitesse passera

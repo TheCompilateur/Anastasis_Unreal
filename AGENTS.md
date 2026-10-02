@@ -464,7 +464,7 @@ Par-dessus `TimeScale` et `Speed`, pour le joueur comme pour les agents. Detail 
 | Pour | Comment |
 |---|---|
 | attendre la nuit, un jour, une semaine dans une preuve | `Anastasis.Sim.Advance @22` / `6h` / `3d` / `45` : la simulation saute dans la frame, ligne `ANASTASIS_SIM advance` au log |
-| regarder le village vivre plus vite | `anastasis.Sim.Warp 8` (0 = pause, jusqu'a 1000) ; en PIE pave num. `+` / `-` et `Pause` |
+| regarder le village vivre plus vite | `anastasis.Sim.Warp 8` (0 = pause, jusqu'a 1000) ; en PIE **`8` accelere, `9` ralentit** (rangee des chiffres ou pave numerique ; aussi pave `+` / `-`), `Pause` |
 | un editeur batch deja accelere | `-dpcvars=anastasis.Sim.Warp=64` ; `anastasis.Sim.WarpBudgetMs 0` si le debit prime sur les images |
 | lire l'etat | `Anastasis.Sim.TimeStatus`, ou `AnastasisSimulationDebugLibrary.get_time_warp_status` (JSON) |
 

@@ -35,7 +35,7 @@ static TAutoConsoleVariable<float> CVarSimTimeScale(
 static TAutoConsoleVariable<float> CVarSimWarp(
 	TEXT("anastasis.Sim.Warp"),
 	1.0f,
-	TEXT("Time warp for the player and for agents (TIME_WARP_001): multiplies simulated time after anastasis.Sim.TimeScale and anastasis.Sim.Speed. 1 = unchanged (the JS PumpFrame path), 0 = pause, up to 1000. Steps never exceed the reference's 10 x FixedDt; more steps run per frame, under anastasis.Sim.WarpBudgetMs. PIE keys: numpad +/- and Pause. Batch editors: -dpcvars=anastasis.Sim.Warp=64."),
+	TEXT("Time warp for the player and for agents (TIME_WARP_001): multiplies simulated time after anastasis.Sim.TimeScale and anastasis.Sim.Speed. 1 = unchanged (the JS PumpFrame path), 0 = pause, up to 1000. Steps never exceed the reference's 10 x FixedDt; more steps run per frame, under anastasis.Sim.WarpBudgetMs. PIE keys: 8 faster, 9 slower (digit row or numpad), numpad +/-, Pause. Batch editors: -dpcvars=anastasis.Sim.Warp=64."),
 	ECVF_Default);
 
 static TAutoConsoleVariable<float> CVarSimWarpBudgetMs(
@@ -494,7 +494,7 @@ namespace
 
 static FAutoConsoleCommand CmdAnastasisSimFaster(
 	TEXT("Anastasis.Sim.Faster"),
-	TEXT("Next time warp preset (x0.25 .. x128). From pause, resumes at x1. PIE: numpad +."),
+	TEXT("Next time warp preset (x0.25 .. x128). From pause, resumes at x1. PIE: 8 (or numpad +)."),
 	FConsoleCommandDelegate::CreateLambda([]()
 	{
 		SetWarp(AnastasisTimeWarp::StepPreset(CVarSimWarp.GetValueOnGameThread(), +1), TEXT("Faster"));
@@ -502,7 +502,7 @@ static FAutoConsoleCommand CmdAnastasisSimFaster(
 
 static FAutoConsoleCommand CmdAnastasisSimSlower(
 	TEXT("Anastasis.Sim.Slower"),
-	TEXT("Previous time warp preset (x128 .. x0.25). PIE: numpad -."),
+	TEXT("Previous time warp preset (x128 .. x0.25). PIE: 9 (or numpad -)."),
 	FConsoleCommandDelegate::CreateLambda([]()
 	{
 		SetWarp(AnastasisTimeWarp::StepPreset(CVarSimWarp.GetValueOnGameThread(), -1), TEXT("Slower"));
