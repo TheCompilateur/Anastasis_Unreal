@@ -131,3 +131,15 @@ REJECT : FogMaxOpacity .48 -> .30. Deux A/B dans une session : ROI arbres lointa
 .352/.364% de pixels >16, contre .368% entre temoins. Aucun gain reproductible ; conserver .48.
 Ne pas recommencer ce seul changement sans fait nouveau. Scripts `valley-air.ps1/.py`,
 mode diagnostic puis candidate ; fiche `docs/unreal/handoffs/valley-air-001.md`.
+
+
+## Allegement direct du volume (air-relief-002)
+
+Sur demande explicite d'Alexandre : production directe, sans test ni capture.
+`EyePlaneExtinctionGain` passe de 3.5 a 1.5 dans `AnastasisWorldAtmosphere.h`.
+`ApplyEyePlane` le multiplie par `Profile.VolumetricFogExtinctionScale` et ecrit
+`SetVolumetricFogExtinctionScale`. Le volume reste actif de 7 a 120 m ; les brumes
+locales, la perspective aerienne et les valeurs exponentielles sont conservees.
+C'est un choix de rendu NON OBSERVE, pas un gain mesure. Contrairement au plafond
+exponentiel .48/.30 rejete par valley-air-001, ce multiplicateur agit sur le volume.
+Retour cible : remettre EyePlaneExtinctionGain a 3.5. Voir passation air-relief-002.

@@ -141,8 +141,9 @@ public:
 	/**
 	 * EYE_PLANE_001. The first 7 m stay outside the volumetric volume (a trunk, a reed).
 	 * The volume then reaches about 120 m, so a shore near 40 m sits in air that has a cost
-	 * and a ridge keeps its shape. Extinction 3.5 is the step that moved the water and the
-	 * far trees in the A/B without turning the sky into a flat sheet (8 did that).
+	 * and a ridge keeps its shape. AIR_RELIEF_002 reduces the previous 3.5 amplification
+	 * to 1.5 to lighten the shared volumetric veil while retaining local wetness mist.
+	 * Direct art adjustment requested by Alexandre; this value has not been visually observed.
 	 * The exponential fog's own start, max opacity and cutoff do not reach the volume.
 	 */
 	static constexpr float EyePlaneStartUU = 700.0f;
@@ -152,7 +153,7 @@ public:
 	static constexpr float EyePlaneCutoffUU = 0.0f;
 	static constexpr float EyePlaneAerialGain = 1.15f;
 	static constexpr float EyePlaneAerialCap = 12.0f;
-	static constexpr float EyePlaneExtinctionGain = 3.5f;
+	static constexpr float EyePlaneExtinctionGain = 1.5f;
 
 	/** True when the last Apply()/Tick handed forward shading to the moon (ATMOSPHERE_COHERENCE_001). */
 	bool IsMoonLeadingForward() const { return bMoonLeadsForward; }
