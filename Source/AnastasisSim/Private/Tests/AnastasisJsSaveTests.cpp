@@ -259,6 +259,20 @@ bool FAnastasisHarnessReadTest::RunTest(const FString& Parameters)
 		TestNotEqual(TEXT("un ulp sur actors[1].x change `actors`"), ProjectedDigest(*this, Mutated, TEXT("actors")), FindSection(TEXT("actors"))->Digest);
 	}
 	{
+		// reader-rng-001 : la memoire des regions est lue puis projetee depuis le C++.
+		AnastasisJsSave::FState Mutated = State;
+		TestTrue(TEXT("mind.cells lue : la region 104 de actors[2]"), Mutated.Actors[2].KnownCells.Contains(104) && Mutated.Actors[2].CellCount == 1);
+		Mutated.Actors[2].KnownCells.Add(105);
+		Mutated.Actors[2].CellCount += 1;
+		TestNotEqual(TEXT("une region de plus pour actors[2] change `actors`"), ProjectedDigest(*this, Mutated, TEXT("actors")), FindSection(TEXT("actors"))->Digest);
+	}
+	{
+		// reader-rng-001 : la section `rng` projette l'etat tenu par le C++.
+		AnastasisJsSave::FState Mutated = State;
+		Mutated.RngState += 1u;
+		TestNotEqual(TEXT("un etat de flux different change `rng`"), ProjectedDigest(*this, Mutated, TEXT("rng")), FindSection(TEXT("rng"))->Digest);
+	}
+	{
 		AnastasisJsSave::FState Mutated = State;
 		Mutated.Buildings[0].FoodPhysical += 1;
 		TestNotEqual(TEXT("une portion de plus au grenier change `buildings`"), ProjectedDigest(*this, Mutated, TEXT("buildings")), FindSection(TEXT("buildings"))->Digest);

@@ -136,8 +136,15 @@ namespace AnastasisHarnessTrace
 		if (const FValue* V = Read.Source.Find(TEXT("nextBuildingId")); V && V->IsNumber()) NextBuildingId = static_cast<int32>(V->Number);
 		if (const FValue* V = Read.Source.Find(TEXT("nextId")); V && V->IsNumber()) NextNpcId = static_cast<int32>(V->Number);
 
-		return Village.RestoreForHarness(Read.Buildings.GetItems(), Read.Actors.GetItems(),
-			Read.Meals.Reservations, Read.Meals.Seq, NextBuildingId, NextNpcId, OutError);
+		if (!Village.RestoreForHarness(Read.Buildings.GetItems(), Read.Actors.GetItems(),
+			Read.Meals.Reservations, Read.Meals.Seq, NextBuildingId, NextNpcId, OutError))
+		{
+			return false;
+		}
+		// `sim.rng` reprend la ou la sauvegarde l'a laisse (`save.rng`) : apres `ResetFromWorld`, qui
+		// l'a seme sur la graine (`makeRng(seed)`), comme `deserialize` (reader-rng-001).
+		Village.SetSimRngState(Read.RngState);
+		return true;
 	}
 
 	void Snapshot(const FAnastasisSimulation& Sim, AnastasisJsSave::FState& InOut)
@@ -174,6 +181,8 @@ namespace AnastasisHarnessTrace
 		}
 		InOut.Meals.Seq = Village.GetMealSeq();
 		InOut.Meals.Reservations = Village.GetMealReservations();
+		// La section `rng` : l'etat VIVANT du flux partage, plus celui de la lecture (reader-rng-001).
+		InOut.RngState = Village.GetSimRngState();
 	}
 
 	bool DigestSections(const AnastasisJsSave::FState& State, const TArray<FString>& Sections,

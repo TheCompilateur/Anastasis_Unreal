@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+#include "Algo/AllOf.h"
+
 #include "Core/AnastasisJsNumeric.h"
 
 // Reference: src/sim/save.js de `anastasis-ref-p3` (fee66ae) — serialize,
@@ -644,6 +646,24 @@ namespace AnastasisJsSave
 				return R.Fail(FReader::At(Where, TEXT("lifestyle")), TEXT("absent : deserialize le tirerait dans sim.rng, non reproduit"));
 			}
 			if (!ReadLifestyle(R, *Lifestyle, FReader::At(Where, TEXT("lifestyle")), Out.Lifestyle.Emplace())) return false;
+			// `mind.cells` : `{ "<index>": 1 }`, les regions 8 x 8 deja vues ; `mind.cellCount` (reader-rng-001).
+			if (const FValue* Mind = A.Find(TEXT("mind")); Mind && Mind->IsObject())
+			{
+				const FString W = FReader::At(Where, TEXT("mind"));
+				if (const FValue* Cells = Mind->Find(TEXT("cells")); Cells && !Cells->IsNull())
+				{
+					if (!Cells->IsObject()) return R.Fail(FReader::At(W, TEXT("cells")), TEXT("objet attendu"));
+					for (const FString& Key : Cells->Keys)
+					{
+						const bool bDigits = !Key.IsEmpty() && Key.Len() <= 9
+							&& Algo::AllOf(Key, [](TCHAR C) { return C >= TEXT('0') && C <= TEXT('9'); })
+							&& (Key.Len() == 1 || Key[0] != TEXT('0'));
+						if (!bDigits) return R.Fail(FReader::At(W, TEXT("cells")), FString::Printf(TEXT("cle d'index entiere attendue, lu '%s'"), *Key));
+						Out.KnownCells.Add(FCString::Atoi(*Key));
+					}
+				}
+				if (!R.OptInt(*Mind, TEXT("cellCount"), W, Out.CellCount)) return false;
+			}
 			if (const FValue* Inside = A.Find(TEXT("inside")); Inside && !Inside->IsNull())
 			{
 				return R.Fail(FReader::At(Where, TEXT("inside")), TEXT("habitant a l'interieur : non lu par ce lecteur (inside non nul)"));
@@ -743,6 +763,21 @@ namespace AnastasisJsSave
 				Obj.Set(TEXT("rhythmScore"), Num(L.RhythmScore));
 				Obj.Set(TEXT("lastNotedDay"), Num(L.LastNotedDay));
 				Out.Set(TEXT("lifestyle"), Obj);
+			}
+			// La memoire des regions grandit a chaque balayage de `perceive`, sans oubli. Un objet JS a
+			// cles entieres s'itere dans l'ordre numerique : les index sont projetes tries.
+			if (FValue* Mind = Out.Find(TEXT("mind")); Mind && Mind->IsObject())
+			{
+				TArray<int32> Sorted = N.KnownCells.Array();
+				Sorted.Sort();
+				FValue Cells = FValue::MakeObject();
+				for (const int32 Index : Sorted)
+				{
+					Cells.Set(FString::FromInt(Index), Num(1.0));
+				}
+				// Absentes au depart et toujours vides : rien a ecrire (la reference ne les cree qu'au marquage).
+				if (Mind->Find(TEXT("cells")) || Sorted.Num() > 0) Mind->Set(TEXT("cells"), Cells);
+				if (Mind->Find(TEXT("cellCount")) || N.CellCount != 0) Mind->Set(TEXT("cellCount"), Num(N.CellCount));
 			}
 			// `inside` non nul n'est pas lu (ReadActor refuse) : un habitant lu est dehors.
 			Put(Out, TEXT("inside"), FValue(), bNew);

@@ -319,9 +319,11 @@ l'origine. La scène de foyer vaut 0.
 - **detail** : `Public/Village/AnastasisVillage.h`, n° 16 ; `docs/unreal/BONDS_RUMORS_001.md`
 - **jugement** : `docs/migration/ecarts/n16.md` (2026-10-01, labo-ecarts-001), substitution de flux seule — au bit `DIVERGE` au premier tirage détourné ; statistique `INDETERMINE`, même profil que la calibration A/A : chaotique (`INF`), `NEUTRE` non démontrable à N=40
 
-Les tirages des rumeurs viennent de `VillageRng`, pas de `sim.rng` : la trajectoire JS n'est pas
-promise au tirage près. Rumeurs de gisements seulement ; texte des répliques non porté (le refus est
-évalué au premier tirage). Dans le harnais, la section `rng` rend l'état lu, figé.
+`VillageRng` est bien `sim.rng` (`makeRng(seed)`, sim-rng-001), et depuis reader-rng-001 le harnais le
+reprend à l'état sauvé (`save.rng`) et projette son état VIVANT : sur `endurance`, la section `rng` est
+identique à la référence jusqu'au tick 125. Ce qui reste : la position dans le flux décale dès qu'un site
+de tirage de la référence n'est pas porté (au tick 125, `maybeChatOnHaul` dans `deliver`). Rumeurs de
+gisements seulement ; texte des répliques non porté (le refus est évalué au premier tirage).
 
 ### n° 17 — Météo des habitants : ce qui n'est pas porté
 
