@@ -233,3 +233,70 @@ Inchangés depuis le rapport 2. Le premier est en cours : `needs-factors-001` (g
 facteurs des besoins ; module seul, au lot 2), puis son branchement dans `FNpc`, le lecteur et
 `UpdateNpc`. `lifestyle-001` (`sim/lifestyle.js`) suit, pour `lifestyle.lastNotedDay` et le tirage `rng`
 d'`ensureLifestyle`.
+
+---
+
+## Rapport 4 — sur `main` 4fef72d, après les besoins, le mode de vie, le flux partagé et la reconsidération (sim-report-004)
+
+Versés depuis le rapport 3 : `needs-factors-001`, `needs-wiring-001`, `lifestyle-001`, `lifestyle-wiring-001`,
+`sim-rng-001`, `perception-explore-001`, `reader-rng-001`, `reconsider-001`. Production : comme en tête, référence
+= clone du tag `anastasis-ref-p3`, scénario `endurance` (vue `settlement`), 16 200 ticks.
+`Anastasis.Sim` : 120 PASS / 2 KNOWN_EXPECTED_FAILURE (`Parite.Fbm`, `Parite.SemantiqueJs`) / 0 FAIL, 122/122.
+
+### Le rapport `EVD`
+
+```
+PREMIER TICK DIVERGENT : 1  (jour 1, temps 37.81666666666666)
+Sections divergentes a ce tick (1) :
+  actors                 A=4cc03c8b776700c0  B=143261ff92332a01
+Premiere divergence par section :
+  tick        1  actors
+  tick       32  buildings
+  tick      125  rng
+  tick      133  mealReservations
+  tick      257  tileDiff
+Sections jugees restees identiques sur toute la trace (5) : day, h, seed, time, w
+```
+
+### Ce qui a avancé depuis le rapport 2 `EVD`
+
+| Mesure | Rapport 2 | Rapport 4 |
+|---|---|---|
+| champs différents au forage du tick 1 | 45 | 15 |
+| première divergence de `rng` | tick 32 | tick 125 |
+
+Au tick 1, les huit mètres, le conditionnement, le mode de vie, `aiThinkAt`, `villagePhase` et la mémoire des
+régions sont égaux à la référence pour les cinq habitants. Restent, par habitant : `placeMemory`
+(`favoriteBuildingId`, `buildings.building-0`, écrits par `notePlaceUse` de `simulation.js`, non porté) et
+`workTimer` (chemin d'acte du but `observer`, non porté).
+
+`rng` tient jusqu'au tick 125 : la référence y tire dans `maybeChatOnHaul` (`npc.js:5505`, depuis `deliver`,
+npc-0) ; le C++ livre sans tirer (mission `chat-on-haul-001`). Les tirages de reconsidération
+(`reconsider-001`, premier au tick 165) sont donc au-delà du premier tirage décalé : ce rapport ne les juge pas
+encore.
+
+### Forage du tick 32 : les points d'accès du puits `EVD`
+
+Hors `actors`, une seule différence au tick 32 : `buildings[building-1]` (le puits, en (48, 57)).
+
+| | points d'accès |
+|---|---|
+| sauvegarde (tick 0, les deux côtés) | (49.5, 57.5), (50.5, 57.5), (49.5, 58.5), (49.5, 56.5) |
+| référence au tick 32 | (50.5, 57.5), (49.5, 58.5), (49.5, 56.5) |
+| C++ au tick 32 | inchangés |
+
+La référence a retiré le premier point, (49.5, 57.5), la case qui fait face au camp. `INF` : c'est le filtre
+d'`ensureBuildingAccessPoints` (`navGrid.js` l. 362 : un seuil dont la case n'est plus libre est retiré) ou un
+recalcul. La case (49, 57) est de l'herbe au tick 32, des deux côtés (`tileDiff` identique jusqu'au tick 257),
+et aucun des sites qui réécrivent `accessPoints` (`save.js` l. 411, `simulation.js` l. 1362, 2161, 5710, 5720)
+n'est désigné par la seule lecture. **Ordre de travail `DEC`** : instrumenter la référence (outil des relevés
+`rng-trace-lib.mjs`) sur `building.accessPoints` et `sim.blockedAt(49, 57)` entre les ticks 0 et 32, et
+nommer le site. Écarts suspects : n° 3 (points d'accès sans intention urbaine), dont le champ `harnais` ne
+cite pas `buildings`.
+
+### Ordres de travail, dans l'ordre
+
+1. `chat-on-haul-001` : le tirage de `maybeChatOnHaul` et sa conversation (renfort).
+2. Le site qui retire le point d'accès du puits au tick 32.
+3. `placeMemory` (`notePlaceUse`, `lifestyleNotePlaceUse` déjà porté) et `workTimer`.
+4. Puis juger les tirages de reconsidération, une fois le flux aligné au-delà du tick 165.
