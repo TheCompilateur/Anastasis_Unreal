@@ -371,6 +371,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisEcotoneTreeIdentity, "Anastasis.Micro
 bool FAnastasisEcotoneTreeIdentity::RunTest(const FString&)
 {
 	using namespace AnastasisMicroEcology;
+	using AnastasisMicroEcology::FPlan; // unity : un using namespace AnastasisWorldView voisin rendrait FPlan ambigu
 	FInputs In;
 	In.SampleHeight = [](double, double, double& Z) { Z = 1000.0; return true; };
 	In.SampleWaterHeight = [](double, double, double& Z) { Z = 0.0; return true; };
@@ -405,6 +406,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisWoodlandIsolation, "Anastasis.MicroEc
 bool FAnastasisWoodlandIsolation::RunTest(const FString&)
 {
     using namespace AnastasisMicroEcology;
+    using AnastasisMicroEcology::FPlan; // unity : un using namespace AnastasisWorldView voisin rendrait FPlan ambigu
     FInputs In=AnastasisMicroEcologyTest::Channel();
     for (int32 Y=2000;Y<23000;Y+=1500) for(int32 X=3500;X<7500;X+=1500)
         In.TreeCanopy.Add(FVector(X,Y,500));
