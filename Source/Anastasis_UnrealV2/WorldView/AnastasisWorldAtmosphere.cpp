@@ -3,6 +3,7 @@
 #include "Anastasis_UnrealV2.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/LocalFogVolumeComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
@@ -12,6 +13,7 @@
 #include "Engine/PostProcessVolume.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "Engine/SkyLight.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
@@ -22,6 +24,7 @@
 #include "WorldView/AnastasisAtmosphereProfile.h"
 #include "WorldView/AnastasisAtmosphereResolver.h"
 #include "WorldView/AnastasisMistField.h"
+#include "WorldView/AnastasisRain.h"
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisTerrainForge.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
@@ -90,6 +93,18 @@ static TAutoConsoleVariable<float> CVarFogScatteringSceneColor(
 	TEXT("anastasis.Atmosphere.FogScattering.SceneColor"),
 	-1.0f,
 	TEXT("FOG_FSSS_001 capture override of the profile's FogScatteringSceneColorScale (share of scene colour fed into the scattering); -1 = the profile. Read on every Apply()."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarWeatherRain(
+	TEXT("anastasis.Weather.Rain"),
+	1,
+	TEXT("RAIN_001. 1=the simulation's rain falls as streaks around the camera, 0=no rain drawn (the image before). Read on every Apply() and Tick."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<float> CVarSkyRain(
+	TEXT("anastasis.Sky.Rain"),
+	-1.0f,
+	TEXT("RAIN_001. Pins the rain the SKY shows [0,1] for captures; -1 follows the simulation's weather. Never moves the simulation."),
 	ECVF_Default);
 
 const FName AAnastasisWorldAtmosphere::MoonTag(TEXT("AnastasisMoon"));
@@ -453,6 +468,8 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 		}
 	}
 
+	UpdateRain(LastSky, bWeather);
+
 	const FString Phase = LastSky.VillagePhase;
 	if (bForceLog || Phase != LastLoggedPhase)
 	{
@@ -469,6 +486,91 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 			LastSky.SkyHumidity, LastSky.SkyWind, LastSky.SkyCover,
 			bMoonLeadsForward ? TEXT("moon") : TEXT("sun"), LastSky.SunFogScattering);
 	}
+}
+
+void AAnastasisWorldAtmosphere::UpdateRain(const AnastasisSkyClock::FSkyState& Sky, const bool bWeatherDrivesSky)
+{
+	const bool bEnabled = CVarWeatherRain.GetValueOnGameThread() != 0;
+	const AnastasisRain::FRainVisual Rain = AnastasisRain::VisualFor(
+		Sky.Weather, bWeatherDrivesSky, static_cast<double>(CVarSkyRain.GetValueOnGameThread()));
+	const double Amount = bEnabled ? Rain.Amount : 0.0;
+
+	if (Amount > 0.0 && !RainStreaks)
+	{
+		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, AnastasisRain::MeshPath);
+		UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, AnastasisRain::MaterialPath);
+		if (!Mesh || !Material)
+		{
+			if (!bRainAssetsMissingLogged)
+			{
+				UE_LOG(LogAnastasis_UnrealV2, Warning,
+					TEXT("ANASTASIS_RAIN assets missing (mesh=%d material=%d): run tools/unreal/rain-material.ps1"),
+					Mesh ? 1 : 0, Material ? 1 : 0);
+				bRainAssetsMissingLogged = true;
+			}
+			LastRainAmount = 0.0;
+			return;
+		}
+		RainStreaks = NewObject<UInstancedStaticMeshComponent>(this, TEXT("AnastasisRainStreaks"), RF_Transient);
+		RainStreaks->SetupAttachment(GetRootComponent());
+		RainStreaks->SetMobility(EComponentMobility::Movable);
+		RainStreaks->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		RainStreaks->SetGenerateOverlapEvents(false);
+		RainStreaks->SetCanEverAffectNavigation(false);
+		RainStreaks->SetCastShadow(false);
+		RainStreaks->bAffectDistanceFieldLighting = false;
+		RainStreaks->bVisibleInRayTracing = false;
+		RainStreaks->bVisibleInReflectionCaptures = false;
+		RainStreaks->bVisibleInRealTimeSkyCaptures = false;
+		RainStreaks->SetStaticMesh(Mesh);
+		RainMaterialInstance = UMaterialInstanceDynamic::Create(Material, this);
+		RainStreaks->SetMaterial(0, RainMaterialInstance);
+		RainStreaks->NumCustomDataFloats = 3;
+		RainStreaks->RegisterComponent();
+
+		// Every streak sits on the actor; the material places it. The start positions in the
+		// unit box are seeded: the same rain, streak for streak, in every session and capture.
+		FRandomStream Stream(12345);
+		TArray<FTransform> Transforms;
+		Transforms.Init(FTransform::Identity, AnastasisRain::StreakCount);
+		RainStreaks->AddInstances(Transforms, /*bShouldReturnIndices*/ false, /*bWorldSpace*/ false);
+		for (int32 I = 0; I < AnastasisRain::StreakCount; ++I)
+		{
+			const float Data[3] = { Stream.FRand(), Stream.FRand(), Stream.FRand() };
+			RainStreaks->SetCustomData(I, MakeArrayView(Data, 3), /*bMarkRenderStateDirty*/ false);
+		}
+		RainStreaks->MarkRenderStateDirty();
+		RainMaterialInstance->SetVectorParameterValue(TEXT("Box"), FLinearColor(
+			AnastasisRain::BoxUU.X, AnastasisRain::BoxUU.Y, AnastasisRain::BoxUU.Z, 0.0f));
+		RainMaterialInstance->SetScalarParameterValue(TEXT("Len"), static_cast<float>(AnastasisRain::StreakLengthUU));
+		RainMaterialInstance->SetScalarParameterValue(TEXT("Width"), static_cast<float>(AnastasisRain::StreakWidthUU));
+		RainMaterialInstance->SetScalarParameterValue(TEXT("Opacity"), static_cast<float>(AnastasisRain::StreakOpacity));
+	}
+
+	if (RainStreaks)
+	{
+		const bool bVisible = Amount > 0.0;
+		if (RainStreaks->IsVisible() != bVisible)
+		{
+			RainStreaks->SetVisibility(bVisible);
+		}
+		if (RainMaterialInstance && bVisible)
+		{
+			RainMaterialInstance->SetScalarParameterValue(TEXT("RainAmount"), static_cast<float>(Amount));
+			RainMaterialInstance->SetScalarParameterValue(TEXT("Fall"), static_cast<float>(Rain.FallUUPerSecond));
+			RainMaterialInstance->SetVectorParameterValue(TEXT("Wind"), FLinearColor(
+				static_cast<float>(Rain.WindUUPerSecond.X), static_cast<float>(Rain.WindUUPerSecond.Y), 0.0f, 0.0f));
+		}
+	}
+
+	// One line when the rain starts, stops or moves by a twentieth: not one per tick.
+	if (FMath::Abs(Amount - LastRainAmount) >= 0.05 || ((Amount > 0.0) != (LastRainAmount > 0.0)))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_RAIN amount=%.3f sim_rain=%.3f wind_uu=(%.0f,%.0f) enabled=%d pinned=%d"),
+			Amount, Sky.Weather.Rain, Rain.WindUUPerSecond.X, Rain.WindUUPerSecond.Y, bEnabled ? 1 : 0,
+			CVarSkyRain.GetValueOnGameThread() >= 0.0f ? 1 : 0);
+	}
+	LastRainAmount = Amount;
 }
 
 void AAnastasisWorldAtmosphere::ApplyRealism(const UAnastasisAtmosphereProfile& Profile, const bool bOn, const FRotator& SunRotation, const FRotator& MoonRotation)

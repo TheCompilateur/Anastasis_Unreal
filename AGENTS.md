@@ -388,6 +388,7 @@ manque puis se contentent de le vérifier ; `*_REBUILD=1` le régénère et écr
 | `ground-textures.py` | **Python systeme, hors Unreal**, a lancer avant `ground-material.ps1` : telecharge les quatre textures CC0 Poly Haven du sol et les empaquette (detail neutre en moyenne) dans `Saved/GroundTextures/packed` ; n'ecrit pas dans `Content/` |
 | `shore-water.ps1` + `.py` | `M_AnastasisShoreWater` |
 | `water-look.ps1` + `.py` | `M_AnastasisWater` (Single Layer Water, WATER_LOOK_001) |
+| `rain-material.ps1` + `.py` | `M_AnastasisRain` et `SM_AnastasisRainStreak` (`/Game/Anastasis/Weather`, RAIN_001) : stries de pluie placées en HLSL autour de la caméra, translucide éclairé ; `-Rebuild` régénère |
 | `presentation-registry.py` | `DA_AnastasisPresentation` |
 | `atmosphere-profile.py` | `DA_AnastasisAtmosphere` |
 | `create_tree_asset.py` | `SM_Tree_*` (grille pontique + 7 essences x 3 formes : pin d'Alep, cypres, chene vert, olivier, platane, pin noir, sapin de Cephalonie), `SM_Shrub_*` (lentisque, chene kermes, genet, ronce x 3), `M_AnastasisVegetation`, `M_AnastasisBark`, `M_AnastasisRock` — régénérés à **chaque** run ; `ANASTASIS_TREE_MATERIALS_ONLY=1` ne réécrit que les trois matériaux |

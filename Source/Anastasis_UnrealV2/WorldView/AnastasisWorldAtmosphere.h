@@ -11,6 +11,7 @@ class APostProcessVolume;
 class ASkyAtmosphere;
 class ASkyLight;
 class AVolumetricCloud;
+class UInstancedStaticMeshComponent;
 class UAnastasisAtmosphereProfile;
 
 /**
@@ -128,6 +129,12 @@ public:
 	ADirectionalLight* GetMoon() const { return Moon; }
 	AVolumetricCloud* GetCloud() const { return Cloud; }
 
+	/** RAIN_001. The streaks, once rain has been shown (null before); hidden when it stops. */
+	UInstancedStaticMeshComponent* GetRainStreaks() const { return RainStreaks; }
+
+	/** RAIN_001. The share of streaks lit at the last UpdateSky (0 = none drawn). */
+	double GetRainAmount() const { return LastRainAmount; }
+
 	/** Whether the last Apply() ran the realism layer (profile switch AND CVar). */
 	bool WasRealismApplied() const { return bRealismApplied; }
 
@@ -227,6 +234,23 @@ protected:
 	 * rate (Tick); 0 snaps to it (Apply, captures).
 	 */
 	void UpdateSky(const UAnastasisAtmosphereProfile& Profile, bool bForceLog, float AdaptSeconds = 0.0f);
+
+	/**
+	 * RAIN_001. Shows the simulation's rain (or anastasis.Sky.Rain when pinned) as streaks around
+	 * the camera: creates the instanced component the first time rain is visible, hides it when
+	 * the rain stops, and writes amount and wind on its dynamic material. Called by UpdateSky.
+	 * Missing assets (tools/unreal/rain-material.ps1 not run) are logged once and leave no rain.
+	 */
+	void UpdateRain(const AnastasisSkyClock::FSkyState& Sky, bool bWeatherDrivesSky);
+
+	UPROPERTY()
+	TObjectPtr<UInstancedStaticMeshComponent> RainStreaks;
+
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> RainMaterialInstance;
+
+	double LastRainAmount = 0.0;
+	bool bRainAssetsMissingLogged = false;
 
 	/** The exposure actually on screen, which lags the hour's target while the eye adapts. */
 	double AppliedExposureEV = 0.0;

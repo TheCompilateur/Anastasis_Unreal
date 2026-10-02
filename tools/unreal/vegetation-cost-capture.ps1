@@ -1,8 +1,9 @@
-param([string]$Label = 'latest', [string]$States = '', [int]$TimeoutSec = 2400)
+param([string]$Label = 'latest', [string]$States = '', [string]$PreCmds = '', [int]$TimeoutSec = 2400)
 # FOREST_COST_001 : cout GPU de la vegetation, strate par strate, aux memes cameras.
 # Pilote vegetation-cost-capture.py (strates masquees a l'execution, rien de sauve).
 # Sortie : Saved\VegetationCostEvidence\<Label>\vegetation-cost.json + <vue>_<etat>.png
 #   -States 'all,notrees,all2' : sous-ensemble ordonne (defaut : all,notrees,nounder,nograss,bare,all2)
+#   -PreCmds 'anastasis.Sky.Rain 1' : CVars posees avant le script, pour chiffrer un ajout dans ce banc (PERF-05)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
@@ -20,7 +21,7 @@ $launchArgs = @(
   # Hors premier plan, l'editeur coupe le rendu des viewports (cf. capture-sky.ps1).
   '-ini:EditorSettings:[/Script/UnrealEd.EditorPerformanceSettings]:bThrottleCPUWhenNotForeground=False',
   ('-abslog="' + $log + '"'),
-  ('-ExecCmds="py ' + $py + '"')
+  ('-ExecCmds="' + $(if ($PreCmds) { $PreCmds + ',' } else { '' }) + 'py ' + $py + '"')
 )
 $p = Start-AnastasisEditor $Editor $launchArgs
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
