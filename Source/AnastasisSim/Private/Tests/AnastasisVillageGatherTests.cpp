@@ -244,7 +244,9 @@ bool FAnastasisVillageGatherSelectionTest::RunTest(const FString&)
 	Subject.bHasHomeOrShelter = false;
 	Subject.Energy = Needs.Energy;
 	Subject.Hunger = Needs.Hunger;
-	double Expected = (G::ResourceScoreFood(2, Believed, G::JobFarmer, 1.0, 0, Needs.Hunger) + Needs.Hunger * 0.15)
+	// `(resourceScore + npc.hunger * 0.15 + goalNoise(sim, 14)) * wf` (perception-explore-001 : le bruit est tire).
+	double Expected = (G::ResourceScoreFood(2, Believed, G::JobFarmer, 1.0, 0, Needs.Hunger) + Needs.Hunger * 0.15
+		+ Why.RowNoise.FindRef(GoalGatherFood))
 		* G::SurvivalWorkFactor(GoalGatherFood, Wf, bBlocked);
 	Expected += AnastasisRhythm::PhaseBias(AnastasisRhythm::EPhase::Morning, Subject, GoalGatherFood);
 	Expected += 22.0;

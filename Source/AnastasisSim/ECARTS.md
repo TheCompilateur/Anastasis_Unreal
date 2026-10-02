@@ -65,12 +65,16 @@ que cet écart reste, la trajectoire JS est interdite.
 sim-rng-001 : `goalNoise` et la table de ses 17 tirages sont portés (`Ai/AnastasisGoalNoise.h`,
 `Parite.BruitDeBut`), NON branchés — chaque décision tire d'abord `exploreTarget` (2 à 8 fois, relevé
 `docs/migration/phase3/P3_RNG_RELEVE.md`) : brancher la table seule coderait un faux ordre.
+perception-explore-001 : branchés. Chaque décision tire `exploreTarget` (préparation, ligne `explore` de
+`failureTargetBiasMap`) puis les 14 bruits et leurs 3 conditionnels, à leur place dans les sommes ;
+`Village.TiragesDecision` rejoue les décisions mesurées au tirage près. Restent le plancher 42 et
+`observer`.
 
 ### n° 2 — Ni reconsidération aléatoire, ni collant de but
 
 - **classe** : REDUIT
 - **destin** : A_FERMER
-- **fermeture** : goal-noise-001
+- **fermeture** : lifestyle-wiring-001 (le tirage l. 893 : phase personnelle, quarts, `committedReconsiderChance`), goal-noise-001 (`goalStickinessBonus`)
 - **statut** : OUVERT
 - **entree** : tranches puits → grenier (first-building-001, house-rest-001, granary-eat-001)
 - **reference** : `src/sim/npc.js` reconsidération (`sim.rng() < chance`), `goalStickinessBonus`
@@ -80,6 +84,9 @@ sim-rng-001 : `goalNoise` et la table de ses 17 tirages sont portés (`Ai/Anasta
 
 Un habitant qui a une cible la garde jusqu'à l'arrivée, l'échec ou la disparition ; il redécide dès
 qu'il n'en a plus. La référence tire au sort une reconsidération à chaque pensée.
+Ce tirage (`npc.js` l. 893, seulement si l'habitant a une cible) n'est pas fait : 75 par jour dans le
+relevé (`P3_RNG_RELEVE_JOUR.md`), le premier au tick 165. Une chance approchée ferait tirer quand la
+référence ne tire pas : il attend la phase personnelle (mode de vie) et les quarts de travail.
 
 ### n° 3 — Points d'accès sans intention urbaine
 
@@ -234,6 +241,10 @@ Pas de raté de coup, pas d'exploration sans gisement connu (il vaque). Le villa
 des tuiles touchées au lieu d'écrire dans le monde : mêmes lectures, mêmes valeurs. **Le bloc d'en-tête
 dit « pas de repousse » : c'est périmé**, la repousse est portée depuis (field-regrow-001,
 `RegrowFieldsDaily`).
+perception-explore-001 : `exploreTarget` est porté (`World/AnastasisExplore.h`) et tire dans la décision ;
+la récolte sans gisement connu ne l'appelle pas encore (`GatherTarget`, il vaque) — le branchement change
+le comportement du fermier et revient à goals-resources-001. `rollCraftMiss` reste non tiré : 43 tirages
+par jour dans le relevé, le premier au tick 257.
 
 ### n° 12 — Livraison à son dépôt seulement
 
@@ -419,3 +430,22 @@ réputation, qui pèse sur l'envie de lui parler (le joueur seulement).
 La réputation n'est pas dans l'empreinte C++. `reputation += (cible − reputation) × 0,4` à minuit, cible = 50 + `BuildingsCompleted × 3`. Ambitions,
 jalons, conseils, vols et le plancher des aînés ne sont pas portés. Entre habitants, la réputation ne
 pèse sur aucune décision (n° 22 : seul le joueur).
+
+### n° 24 — Intention du jour, ambition, cibles de risque : leurs tirages ne sont pas faits
+
+- **classe** : REDUIT
+- **destin** : A_FERMER
+- **fermeture** : goals-day-intent (`assignDayIntent`, `intentExploreHint`, `assignAmbition`), goals-resources-001 (`spatialRiskBiasMap` > `recallOrSearch`)
+- **statut** : OUVERT
+- **entree** : perception-explore-001
+- **reference** : `src/ai/dayIntent.js` (`ensureDayIntent`, `assignDayIntent`, `intentExploreHint`), `src/ai/ambitions.js` (`assignAmbition`), `src/sim/npc.js` (`spatialRiskBiasMap`, `spatialRiskTargetForGoal`)
+- **cpp** : `Village/AnastasisVillage.cpp`, `ChooseGoal` (préparation d'adultScores)
+- **harnais** : actors, rng
+- **detail** : `docs/migration/phase3/P3_RNG_RELEVE_JOUR.md`
+
+Avant `exploreTarget`, `chooseGoal` tire l'intention du jour quand elle est périmée (1 tirage, plus le
+cap si elle vaut `explore` : 5 par jour dans le relevé, au changement de jour) et l'ambition d'un
+habitant qui n'en a pas. Le C++ ne les tire pas : le flux se décale au premier changement de jour.
+`intentExploreHint` n'est pas porté : avec une intention `explore`, la référence tirerait 1 ou 3 fois au
+lieu d'`exploreTarget`. `spatialRiskBiasMap` ne tire pas dans le scénario (0 sur un jour) et n'est pas
+évalué.

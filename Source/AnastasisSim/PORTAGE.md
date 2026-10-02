@@ -396,6 +396,19 @@ d'`exploreTarget`, qui dépend de la mémoire des cases (`npc.mind.cells`). Bran
 coderait un faux ordre. Suite : perception-explore-001 (`npc.mind.cells`, `perceive`,
 `exploreTarget`, `randomWalkTarget`, `recallOrSearch`).
 
+### Fait — la mémoire des régions, l'exploration, et les tirages de la décision (mission perception-explore-001)
+
+| Unreal | Source JS (`anastasis-ref-p3`) | Preuve |
+| --- | --- | --- |
+| `World/AnastasisExplore.h/.cpp` | `memory.js` : `cellIndex`, `markCell`, `exploreTarget` ; `simulation.js` : `randomWalkTarget` | `Parite.Exploration` : 188 cas `exploreTarget` (régions connues ou non, bâti, promenade, centre) et 48 `randomWalkTarget` |
+| `FNpc::KnownCells` / `CellCount`, `FVillage::Perceive` | `npc.mind.cells` / `mind.cellCount`, écrits par `perceive` (`markCell` à la case arrondie) | idem |
+| `FVillage::ChooseGoal` | la préparation d'`adultScores` (`failureTargetBiasMap` > `exploreTarget`) puis les 14 `goalNoise` et leurs 3 conditionnels, sur le flux partagé, dans les sommes de la référence | `Village.TiragesDecision` : les 104 décisions mesurées du scénario `endurance` (un jour), reprises sur le village du harnais, tirent exactement ce que la référence a tiré |
+
+Le bruit d'un but non porté est tiré mais pas ajouté au plancher 42 (écart n° 1) : ajouté à un score
+inventé, il faisait gagner `observer` au hasard (`Village.Endurance` le voyait). Pas branchés, déclarés :
+la reconsidération (l. 893, n° 2), le rate de coup (n° 11), l'intention du jour, l'ambition et les cibles
+de risque (n° 20). Relevé : `docs/migration/phase3/P3_RNG_RELEVE_JOUR.md`.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

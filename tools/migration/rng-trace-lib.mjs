@@ -53,10 +53,30 @@ export async function releverTirages(REF_DIR, scenario, ticks) {
 
   const tirages = [];
   const original = sim.rng;
+  let derniereDecision = null;
   const enveloppe = () => {
     const etat = original.state();
+    const cadresAvant = cadresReference();
+    // Premier tirage d'une decision : la photo de l'habitant (position, regions connues,
+    // intention du jour), AVANT le tirage. Ni la position ni la memoire ne bougent
+    // pendant chooseGoal.
+    const enDecision = cadresAvant.some((c) => c.nom === "chooseGoal");
+    const cle = `${tickCourant}:${habitant}`;
+    let photo = null;
+    if (enDecision && cle !== derniereDecision) {
+      const npc = sim.actors.find((a) => a.id === habitant);
+      if (npc) {
+        photo = {
+          x: npc.x,
+          y: npc.y,
+          cells: Object.keys(npc.mind?.cells || {}).map(Number).sort((u, v) => u - v),
+          intent: npc.dayIntent ? { id: npc.dayIntent.id ?? null, bearing: npc.dayIntent.bearing ?? null } : null,
+        };
+      }
+    }
+    derniereDecision = enDecision ? cle : null;
     const valeur = original();
-    const cadres = cadresReference();
+    const cadres = cadresAvant;
     const site = cadres[0] ?? { nom: "?", lieu: "?" };
     const appelant = cadres[1] ?? { nom: "?", lieu: "?" };
     const fin = cadres.findIndex((c) => c.nom === "updateNpc");
@@ -71,6 +91,7 @@ export async function releverTirages(REF_DIR, scenario, ticks) {
       decision: chemin.includes("chooseGoal"),
       etat,
       valeur,
+      photo,
     });
     return valeur;
   };
@@ -83,7 +104,7 @@ export async function releverTirages(REF_DIR, scenario, ticks) {
     tickCourant = t;
     tick(scenario.dt);
   }
-  return { ref, tirages, etatDepart, etatFin: original.state() };
+  return { ref, sim, tirages, etatDepart, etatFin: original.state() };
 }
 
 /** Les decisions : tirages consecutifs d'un meme habitant, au meme tick, sous chooseGoal. */

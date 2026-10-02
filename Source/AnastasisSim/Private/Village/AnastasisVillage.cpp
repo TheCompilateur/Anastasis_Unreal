@@ -1511,39 +1511,70 @@ namespace AnastasisVillage
 			Trace.WorkFactor = Work.WorkFactor;
 		}
 
+		// Preparation d'adultScores (perception-explore-001) : `failureTargetBiasMap` evalue
+		// `failureCauseForGoal(sim, npc, "explore")` = `intentExploreHint(sim, npc) ||
+		// exploreTarget(sim, npc)`. Sans intention du jour portee (ecart n°20), c'est
+		// `exploreTarget` : 2 a 8 tirages dans le releve, AVANT les bruits de la table. La
+		// cible ne sert qu'au biais d'echec de la ligne `explore`, non portee : seuls ses
+		// tirages comptent ici. `spatialRiskBiasMap` (recallOrSearch) ne tire pas dans le
+		// scenario du harnais et n'est pas porte (ecart n°20).
+		Trace.ExploreDraws = ExploreTargetFor(Npc).Draws;
+
 		// adultScores : les 25 lignes, dans l'ordre de la reference, puis
 		// `rhythmBias` (= phaseBias). Les buts non portes valent 42 avant rythme.
+		// Chaque ligne tire son `goalNoise` a sa place dans la table (`Ai/AnastasisGoalNoise.h`),
+		// et le bruit entre dans la somme la ou la reference l'ecrit.
+		const TConstArrayView<AnastasisGoalNoise::FTableNoise> Noises = AnastasisGoalNoise::AdultTableNoises();
+		auto DrawNoise = [this, &Npc, &Noises, &Trace](const FString& G) -> double
+		{
+			for (const AnastasisGoalNoise::FTableNoise& N : Noises)
+			{
+				if (G != N.Goal) continue;
+				if (!NoiseConditionHolds(Npc, N.Condition)) return 0.0;
+				Trace.NoiseDraws += 1;
+				const double Value = AnastasisGoalNoise::GoalNoise(VillageRng, N.Amp);
+				Trace.RowNoise.Add(G, Value);
+				return Value;
+			}
+			return 0.0;
+		};
 		TArray<TPair<FString, double>> Rows;
 		for (const TCHAR* Goal : AdultTable)
 		{
 			const FString G = Goal;
+			const double Noise = DrawNoise(G);
+			// Un but non porte vaut le plancher (ecart n°1) : son bruit est TIRE (la reference le
+			// tire, et l'ordre du flux en depend) mais pas ajoute, le plancher n'etant pas un score
+			// de la reference. Ajoute a 42, il ferait gagner `observer` au hasard.
 			double Score = UnportedGoalsFloor;
 			if (G == GoalEat) Score = Trace.NeedScores.Eat + EatJobPriorityBias;
 			else if (G == GoalRest) Score = Trace.NeedScores.Rest + RestJobPriorityBias;
-			else if (G == GoalDrink) Score = Trace.NeedScores.Drink + (Wells > 0 ? 6.0 : 0.0);
-			// `{ goal: "shelterRain", score: shelterRainScore(sim, npc) + goalNoise(sim, 6) }` (sans bruit, ecart n°1).
+			// `needs.drink + (sim.countBuildings?.("well") > 0 ? 6 : 0) + goalNoise(sim, 6)`.
+			else if (G == GoalDrink) Score = Trace.NeedScores.Drink + (Wells > 0 ? 6.0 : 0.0) + Noise;
+			// `{ goal: "shelterRain", score: shelterRainScore(sim, npc) + goalNoise(sim, 6) }`.
 			else if (G == GoalShelterRain) Score = AnastasisWeatherBehavior::ShelterRainScore(
-				TickWeather.Rain, Npc.Inside.bActive, Npc.Goal, Npc.JobId, Now, Npc.ShelterCooldownUntil);
+				TickWeather.Rain, Npc.Inside.bActive, Npc.Goal, Npc.JobId, Now, Npc.ShelterCooldownUntil) + Noise;
 			else if (G == GoalSocialize || G == GoalRelax)
 			{
 				const double Need = G == GoalSocialize ? Trace.NeedScores.Socialize : Trace.NeedScores.Relax;
-				Rows.Add(TPair<FString, double>(G, SocialRowScore(Npc, G, Need, AnastasisRhythm::PhaseBias(Phase, Subject, G))));
+				Rows.Add(TPair<FString, double>(G, SocialRowScore(Npc, G, Need, AnastasisRhythm::PhaseBias(Phase, Subject, G), Noise)));
 				continue;
 			}
 			else if (bSite && G == AnastasisBuild::GoalBuild)
 			{
-				Rows.Add(TPair<FString, double>(G, BuildRowScore(Npc, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work)));
+				Rows.Add(TPair<FString, double>(G, BuildRowScore(Npc, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work, Noise)));
 				continue;
 			}
 			else if (bWorker && (G == GoalGatherFood || G == GoalDeliver))
 			{
-				const double Row = WorkRowScore(Npc, G, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work);
+				const double Row = WorkRowScore(Npc, G, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work, Noise);
 				(G == GoalGatherFood ? Trace.GatherRowTable : Trace.DeliverRowTable) = Row;
 				Rows.Add(TPair<FString, double>(G, Row));
 				continue;
 			}
 			// Bounded food-supply extension: known finite source + known depot.
 			// Existing Noûs urgency and phase biases still arbitrate needs.
+			// (Le bruit de la ligne est tire quand meme : la reference le tire.)
 			if (FoodSources.Num() > 0 && G == TEXT("gatherFood"))
 				Score = Npc.InventoryFood == 0 && HasKnownFoodSource(Npc) && KnownFoodDepot(Npc) ? 85.0 : -1000.0;
 			if (FoodSources.Num() > 0 && G == TEXT("deliver"))
@@ -1726,6 +1757,13 @@ namespace AnastasisVillage
 
 	void FVillage::RedirectAfterFailure(FNpc& Npc)
 	{
+		// `failureCauseForGoal(sim, npc, failedGoal)` : seul `explore` tire (exploreTarget).
+		// Le C++ ne porte pas le but `explore` (il donne `observer`) : la branche est la pour
+		// la fidelite, elle ne tire jamais aujourd'hui.
+		if (Npc.Goal == TEXT("explore"))
+		{
+			ExploreTargetFor(Npc);
+		}
 		ClearNavigation(Npc);
 		Npc.bHasTarget = false;
 		Npc.DestBuildingId.Reset();
@@ -2383,10 +2421,71 @@ namespace AnastasisVillage
 		}
 	}
 
+	void FVillage::ChooseGoalNow(const FString& NpcId)
+	{
+		if (FNpc* Npc = Actors.FindById(NpcId))
+		{
+			ChooseGoal(*Npc);
+		}
+	}
+
+	AnastasisExplore::FExploreWorld FVillage::ExploreWorld() const
+	{
+		AnastasisExplore::FExploreWorld Out;
+		Out.W = World ? World->W : 0;
+		Out.H = World ? World->H : 0;
+		Out.IsBlocked = [this](double X, double Y) { return IsBlocked(X, Y); };
+		Out.IsFootBlocked = [this](double X, double Y) { return IsFootBlocked(X, Y); };
+		Out.Settlement = Settlement;
+		return Out;
+	}
+
+	AnastasisExplore::FExploreResult FVillage::ExploreTargetFor(const FNpc& Npc)
+	{
+		return AnastasisExplore::ExploreTarget(ExploreWorld(), VillageRng, Npc.X, Npc.Y, Npc.KnownCells);
+	}
+
+	bool FVillage::NoiseConditionHolds(const FNpc& Npc, AnastasisGoalNoise::ENoiseCondition Condition) const
+	{
+		using C = AnastasisGoalNoise::ENoiseCondition;
+		auto AnyCompleted = [this](std::initializer_list<const TCHAR*> Types)
+		{
+			for (const TCHAR* Type : Types)
+			{
+				if (CountBuildings(Type) > 0) return true;
+			}
+			return false;
+		};
+		switch (Condition)
+		{
+		case C::Always:
+			return true;
+		case C::HasFarm:
+			// `countBuildings("farm") > 0 || countBuildingsWith(d => d.function === "nourrir") > 0`
+			// : les types `nourrir` du catalogue (sim/batiments/catalog.js).
+			return AnyCompleted({ TEXT("farm"), TEXT("fishery"), TEXT("mill"), TEXT("sheepfold"), TEXT("stable"),
+				TEXT("piggery"), TEXT("chickencoop"), TEXT("bakery"), TEXT("dairy"), TEXT("butcher") });
+		case C::HasCraftBuilding:
+			// `countBuildingsWith(d => d.function === "fabriquer" || d.produces?.tools) > 0`.
+			return AnyCompleted({ TEXT("lodge"), TEXT("workshop"), TEXT("forge"), TEXT("tannery"), TEXT("weaver") });
+		case C::HasFamilyToVisit:
+			// `if (!npc.home || !npc.familyId) return 0;` : la famille n'est pas portee
+			// (ecart n°8), aucun habitant C++ n'a de `familyId`.
+			return false;
+		default:
+			return false;
+		}
+	}
+
 	void FVillage::Perceive(FNpc& Npc, bool bForce)
 	{
 		if (!bForce && Now - Npc.LastScan < PerceptionScanInterval) return;
 		Npc.LastScan = Now;
+		// `markCell(sim, mind, Math.floor(npc.x), Math.floor(npc.y))` (perception-explore-001).
+		if (World)
+		{
+			AnastasisExplore::MarkCell(Npc.KnownCells, Npc.CellCount, World->W, World->H, FloorInt(Npc.X), FloorInt(Npc.Y));
+		}
 		for (const FFoodSource& S : FoodSources)
 		{
 			if (Dist(Npc.X, Npc.Y, S.Position.X, S.Position.Y) <= PerceptionRadius)
@@ -3296,7 +3395,7 @@ namespace AnastasisVillage
 		}
 	}
 
-	double FVillage::WorkRowScore(const FNpc& Npc, const FString& Goal, double PhaseBias, const FWorkRowContext& Work) const
+	double FVillage::WorkRowScore(const FNpc& Npc, const FString& Goal, double PhaseBias, const FWorkRowContext& Work, double Noise) const
 	{
 		namespace G = AnastasisGather;
 		const G::FTrait& Trait = G::TraitAt(Npc.TraitIndex);
@@ -3308,9 +3407,9 @@ namespace AnastasisVillage
 		double DomainSkill = 1.0;
 		if (Goal == GoalGatherFood)
 		{
-			// `(resourceScore + npc.hunger * 0.15 + goalNoise(sim, 14)) * wf("gatherFood")` — sans bruit (ecart n°1).
+			// `(resourceScore + npc.hunger * 0.15 + goalNoise(sim, 14)) * wf("gatherFood")` : le bruit est tire par ChooseGoal, a sa place dans la table.
 			const double Base = G::ResourceScoreFood(Actors.Num(), Work.Believed, Npc.JobId, Trait.Gather, Npc.InventoryFood, Npc.Needs.Hunger)
-				+ Npc.Needs.Hunger * 0.15;
+				+ Npc.Needs.Hunger * 0.15 + Noise;
 			Score = Base * G::SurvivalWorkFactor(Goal, Work.WorkFactor, Work.bMealBlocked);
 			DomainSkill = Npc.SkillGather;
 		}
@@ -3728,12 +3827,14 @@ namespace AnastasisVillage
 
 	// --- Socialiser, souffler (npc.js, villageRhythm.js, domestic.js) ---------------
 
-	double FVillage::SocialRowScore(const FNpc& Npc, const FString& Goal, double NeedScore, double PhaseBias) const
+	double FVillage::SocialRowScore(const FNpc& Npc, const FString& Goal, double NeedScore, double PhaseBias, double Noise) const
 	{
 		namespace G = AnastasisGather;
 		// `socialize` : needs.socialize + jobPriority + planBias + goalNoise ;
 		// `relax` : needs.relax + goalNoise + hearthInviteScore * 0,45. Ni plan, ni bruit, ni scene.
 		double Score = Goal == GoalSocialize ? NeedScore + G::JobPriority(Npc.JobId, Goal) : NeedScore;
+		// Le bruit ferme la somme de la ligne, avant les biais (`planBias` et la scene de foyer valent 0).
+		Score += Noise;
 		Score += PhaseBias;
 		// workplaceGoalBias : 0 (aubergiste, pretre seulement) ; completionBias pour tous.
 		const int32 DepotLoad = IsGranaryWorker(Npc) ? Npc.InventoryFood : 0;
@@ -4660,13 +4761,13 @@ namespace AnastasisVillage
 		return 1;
 	}
 
-	double FVillage::BuildRowScore(const FNpc& Npc, double PhaseBias, const FWorkRowContext& Work) const
+	double FVillage::BuildRowScore(const FNpc& Npc, double PhaseBias, const FWorkRowContext& Work, double Noise) const
 	{
 		namespace B = AnastasisBuild;
 		namespace G = AnastasisGather;
 		const G::FTrait& Trait = G::TraitAt(Npc.TraitIndex);
-		// `(buildScore + goalNoise(sim, 14)) * wf("build")` — sans bruit (ecart n°1).
-		double Score = B::BuildScoreActiveSite(Trait.Build, Npc.JobId) * G::SurvivalWorkFactor(B::GoalBuild, Work.WorkFactor, Work.bMealBlocked);
+		// `(buildScore + goalNoise(sim, 14)) * wf("build")` : le bruit est tire par ChooseGoal, a sa place dans la table.
+		double Score = (B::BuildScoreActiveSite(Trait.Build, Npc.JobId) + Noise) * G::SurvivalWorkFactor(B::GoalBuild, Work.WorkFactor, Work.bMealBlocked);
 		// Les biais, dans l'ordre d'adultScores. Le poste (grenier) ne pese pas sur `build` ;
 		// statut, age, district, foyer, episodes, scenes, humeur, plans, meteo, nature
 		// (moyenne), memoire sociale et d'echec, ordres, prevision, risque, urgence : nuls.

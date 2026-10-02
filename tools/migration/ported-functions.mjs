@@ -113,7 +113,7 @@ export const PORTAGE_DECLARE = [
     source: "couche 2 ; puits ; maison ; gather-deliver ; field-regrow ; social-relax ; bonds-rumors ; village-weather ; build-001",
     citation: false,
     fonctions: [
-      "blockedAt", "footBlockedAt", "tileTraversalCost",
+      "blockedAt", "footBlockedAt", "tileTraversalCost", "randomWalkTarget",
       "addBuilding", "countBuildings", "localOccupancy", "accessPointNear", "drinkAccessPoint",
       "enterBuilding", "exitBuilding", "buildingForIndoorAction", "buildingNearActor",
       "resourceTileNear", "depleteTile", "regrowFieldsDaily", "regrowFieldTile", "socialPos",
@@ -150,8 +150,9 @@ export const PORTAGE_DECLARE = [
     fonctions: ["reserveStock", "releaseStock", "takeReserved"],
   },
   {
-    module: "src/ai/memory.js", cpp: "Village/AnastasisVillage, Work/AnastasisGather", source: "grenier ; gather-deliver ; bonds-rumors (n° 14)",
-    fonctions: ["believedStock", "presumedNoise", "perceive", "rememberSpot", "trimMemory", "forgetEmptied", "recallResource", "forgetStale"],
+    module: "src/ai/memory.js", cpp: "Village/AnastasisVillage, Work/AnastasisGather, World/AnastasisExplore", source: "grenier ; gather-deliver ; bonds-rumors (n° 14) ; perception-explore-001",
+    fonctions: ["believedStock", "presumedNoise", "perceive", "rememberSpot", "trimMemory", "forgetEmptied", "recallResource", "forgetStale",
+      "markCell", "cellIndex", "exploreTarget"],
   },
   { module: "src/ai/moralPressure.js", cpp: "Work/AnastasisGather", source: "gather-deliver ; social-relax", entier: true },
   {

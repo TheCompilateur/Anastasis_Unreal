@@ -326,8 +326,9 @@ bool FAnastasisVillageBuildScoreTest::RunTest(const FString&)
 	Subject.Hunger = N->Needs.Hunger;
 	const double Phase = AnastasisRhythm::PhaseBias(AnastasisRhythm::VillagePhase(AnastasisRhythm::DayFracOf(T.Time)), Subject, B::GoalBuild);
 	// Ni sac, ni session au moment de la decision : la fin de tache ne pese pas.
-	const double Expected = Base * T.WorkFactor + Phase + 0.0 + 0.0 + (N->SkillCraft - 1.0) * 8.0;
-	TestTrue(TEXT("la ligne build = buildScore x wf + rythme + trait + competence"), FMath::Abs(T.BuildRowScore - Expected) < 1e-9);
+	// `(buildScore + goalNoise(sim, 14)) * wf` (perception-explore-001 : le bruit est tire).
+	const double Expected = (Base + T.RowNoise.FindRef(B::GoalBuild)) * T.WorkFactor + Phase + 0.0 + 0.0 + (N->SkillCraft - 1.0) * 8.0;
+	TestTrue(TEXT("la ligne build = (buildScore + bruit) x wf + rythme + trait + competence"), FMath::Abs(T.BuildRowScore - Expected) < 1e-9);
 	TestEqual(TEXT("elle gagne"), T.Winner, FString(B::GoalBuild));
 	TestEqual(TEXT("cible : le chantier"), T.TargetSource, FString(TEXT("site")));
 	AddInfo(FString::Printf(TEXT("ligne build %.4f (base %.2f x wf %.4f + rythme %.2f)"), T.BuildRowScore, Base, T.WorkFactor, Phase));

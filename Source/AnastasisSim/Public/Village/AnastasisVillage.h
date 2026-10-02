@@ -200,7 +200,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Ai/AnastasisGoalNoise.h"
 #include "Ai/AnastasisNous.h"
+#include "World/AnastasisExplore.h"
 #include "Core/AnastasisRng.h"
 #include "Core/AnastasisSimBudget.h"
 #include "Core/AnastasisSpatialGrid.h"
@@ -572,6 +574,11 @@ namespace AnastasisVillage
 	{
 		double Time = -1.0;
 		FString Phase;
+		/** Tirages `sim.rng` de la decision (perception-explore-001) : `exploreTarget`, puis les bruits. */
+		int32 ExploreDraws = 0;
+		int32 NoiseDraws = 0;
+		/** Le bruit tire pour chaque ligne qui en a tire un (but -> valeur). */
+		TMap<FString, double> RowNoise;
 		AnastasisNeeds::FNeedGoalScores NeedScores;
 		/** Ligne `rest` : needs.rest + jobPriority + phaseBias. */
 		double RestRowScore = 0.0;
@@ -700,6 +707,14 @@ namespace AnastasisVillage
 		/** `mind.beliefs.knownStocks`, dans l'ordre d'insertion (celui d'un objet JS). */
 		TArray<FStockBelief> KnownStocks;
 		double LastScan = -999.0;
+		/**
+		 * `mind.cells` (perception-explore-001) : les regions 8x8 ou l'habitant s'est
+		 * tenu lors d'une perception (`markCell`), par index `floor(y/8) * cols + floor(x/8)`.
+		 * Jamais oubliees. `exploreTarget` saute une region connue.
+		 */
+		TSet<int32> KnownCells;
+		/** `mind.cellCount` — tenu par `markCell`, egal a `KnownCells.Num()` hors reprise. */
+		int32 CellCount = 0;
 		/** `npc.villagePhase` — la bascule force une pensee. */
 		FString VillagePhase;
 		double GoalSince = 0.0;
@@ -1071,6 +1086,12 @@ namespace AnastasisVillage
 		void PerceiveNow(const FString& NpcId);
 
 		/**
+		 * `chooseGoal(sim, npc)` tout de suite (perception-explore-001) : pour les tests qui
+		 * rejouent une decision mesuree de la reference et comptent ses tirages `sim.rng`.
+		 */
+		void ChooseGoalNow(const FString& NpcId);
+
+		/**
 		 * Harnais (sim-digest-emitter-001) : reprend un etat lu d'une sauvegarde JS
 		 * (Harness/AnastasisJsSave.h) sur un village lie au monde lu, comme
 		 * `deserialize` le fait cote JS. Les batiments gardent leur identifiant,
@@ -1226,13 +1247,13 @@ namespace AnastasisVillage
 		void ExchangeSpotRumors(FNpc& A, FNpc& B);
 
 		/** Lignes `socialize` / `relax` d'adultScores (Phase, rythme et pression morale compris). */
-		double SocialRowScore(const FNpc& Npc, const FString& Goal, double NeedScore, double PhaseBias) const;
+		double SocialRowScore(const FNpc& Npc, const FString& Goal, double NeedScore, double PhaseBias, double Noise = 0.0) const;
 		/** `sim.socialPos(npc)` : le premier batiment acheve qui rassemble, sinon l'origine. */
 		bool SocialPos(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
 		bool SocializeTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
 		bool RelaxTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
 		/** Ligne `gatherFood` ou `deliver` d'adultScores pour un fermier, rythme compris. */
-		double WorkRowScore(const FNpc& Npc, const FString& Goal, double PhaseBias, const FWorkRowContext& Work) const;
+		double WorkRowScore(const FNpc& Npc, const FString& Goal, double PhaseBias, const FWorkRowContext& Work, double Noise = 0.0) const;
 		void ScanTiles(FNpc& Npc, int32 CX, int32 CY, bool bForce);
 		bool GatherTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
 		bool DeliverTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
@@ -1250,7 +1271,23 @@ namespace AnastasisVillage
 		/** `constructionAccessPoint(npc)` : le seuil du premier chantier ouvert. */
 		bool ConstructionAccessPoint(FNpc& Npc, FPoint& OutTarget);
 		/** La ligne `build` d'adultScores quand un chantier est ouvert. */
-		double BuildRowScore(const FNpc& Npc, double PhaseBias, const FWorkRowContext& Work) const;
+		double BuildRowScore(const FNpc& Npc, double PhaseBias, const FWorkRowContext& Work, double Noise = 0.0) const;
+
+		/**
+		 * `exploreTarget(sim, npc)` sur le flux partage (perception-explore-001) : la cible,
+		 * et combien de tirages elle a coute. Voir `World/AnastasisExplore.h`.
+		 */
+		AnastasisExplore::FExploreResult ExploreTargetFor(const FNpc& Npc);
+
+		/** Le monde de l'exploration : `IsBlocked`, `IsFootBlocked`, le centre du village. */
+		AnastasisExplore::FExploreWorld ExploreWorld() const;
+
+		/**
+		 * Les conditions des trois bruits conditionnels de la table (`Ai/AnastasisGoalNoise.h`) :
+		 * une ferme ou un batiment `nourrir` acheve ; un batiment `fabriquer` ou qui produit des
+		 * outils acheve ; une famille a visiter.
+		 */
+		bool NoiseConditionHolds(const FNpc& Npc, AnastasisGoalNoise::ENoiseCondition Condition) const;
 		/** `goalForWorkSession(npc)` : le but du metier de la session en cours. */
 		static FString SessionGoalOf(const FNpc& Npc);
 		/** Index de la premiere tuile de la ressource dans le 3 x 3 de l'habitant, -1 sinon. */
