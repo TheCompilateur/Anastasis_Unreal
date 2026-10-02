@@ -28,16 +28,16 @@ No shared material, soil mesh, tree asset, simulation, navigation or NPC behavio
 ## MEC
 
 BUILD: PASS, 294.72 seconds.
-TESTS: PENDING. Existing observation/gaps/jumps, repetition/recovery/capacity and distance-conservation tests, plus ObservedContinuity (boundary coverage and untouched parallel strip).
+TESTS: four targeted tests PASS in 20261002-095802 on abf93dd; C++ unchanged since. Full suite remains queued. Coverage: observation/gaps/jumps, repetition/recovery/capacity, distance conservation and ObservedContinuity.
 PYTHON_AST: PASS.
 
 ## PROOFS
 
-PROOFS: anthropic-paths-capture
+PROOFS: anthropic-paths-capture, anthropic-routine-capture
 
 ## SCN
 
-PENDING: canonical interactive editor PID42172 and external capture PID22784 occupied the machine at preflight. No editor launched for this worktree; user asked to free the session or choose a queued delivery. The registered script runs four tests, observes the ordinary twelve opening NPCs for 110 wall seconds at TimeScale0.15, requires actual affected grass and no capacity loss, then freezes simulation. Six screenshots: human-height and oblique, Draw0/1/0. Focus is selected from actual affected grass; no synthetic path or injected observations. Memory cell count must remain unchanged across visibility toggles, and original grass transforms must restore. Same camera, clock and scene; reference repeat estimates render/wind noise. Captures are functional until reviewed and measured against the repeated reference.
+Opening observation executed; artistic activation REJECTED (results below). Routine follow-up remains queued. The registered script runs four tests, observes the ordinary twelve opening NPCs for 110 wall seconds at TimeScale0.15, requires actual affected grass and no capacity loss, then freezes simulation. Six screenshots: human-height and oblique, Draw0/1/0. Focus is selected from actual affected grass; no synthetic path or injected observations. Memory cell count must remain unchanged across visibility toggles, and original grass transforms must restore. Same camera, clock and scene; reference repeat estimates render/wind noise. Captures are functional until reviewed and measured against the repeated reference.
 
 GPU/game/render p50 from the existing GetFrameTimingsMs API during each frozen capture; not a live simulation CPU benchmark. apply_ms separately measures the periodic grass update. No GPU claim with concurrent editors.
 
