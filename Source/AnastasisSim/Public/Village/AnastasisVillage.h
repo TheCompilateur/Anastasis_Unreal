@@ -69,9 +69,10 @@
 //     chaque decision adulte tire deja `exploreTarget` (2 a 8 tirages selon la memoire
 //     des cases) : brancher la table seule coderait un faux ordre. Suite :
 //     perception-explore-001.
-//  2. Pas de reconsideration aleatoire (`sim.rng() < chance`) ni de collant de
-//     but (`goalStickinessBonus`) : un habitant qui a une cible la garde jusqu'a
-//     l'arrivee, l'echec ou la disparition ; il redecide des qu'il n'en a plus.
+//  2. Reconsideration aleatoire PORTEE (reconsider-001 : `sim.rng() < chance` a chaque
+//     pensee avec cible, phase personnelle, quart de travail). Pas de collant de but
+//     (`goalStickinessBonus`), et deux fins d'action relachent la cible que la
+//     reference garderait (chantier fini, ancre sociale).
 //  3. Points d'acces sans intention urbaine (sim/urban/intent.js, vague 5) :
 //     l'anneau 1 oriente vers le camp, qui est exactement le repli de la reference.
 //  4. Pilotage reduit : pas de file de porte (crowdNav), pas d'hesitation, pas
@@ -201,6 +202,8 @@
 
 #include "CoreMinimal.h"
 #include "Ai/AnastasisGoalNoise.h"
+#include "Life/AnastasisReconsider.h"
+#include "Life/AnastasisWorkShift.h"
 #include "Ai/AnastasisNous.h"
 #include "World/AnastasisExplore.h"
 #include "Core/AnastasisRng.h"
@@ -619,6 +622,10 @@ namespace AnastasisVillage
 		double ShelterRowScore = 0.0;
 		/** La porte d'orage de commitGoalChoice a-t-elle remplace le gagnant ? */
 		bool bStormGate = false;
+		/** Le verrou de quart a tenu le but precedent (reconsider-001). */
+		bool bShiftLock = false;
+		/** `goalStickinessBonus` ajoute a la ligne du but en cours (0 si aucun). */
+		double Stickiness = 0.0;
 	};
 
 	/** Ce que les lignes de travail d'un fermier partagent a une decision. */
@@ -718,6 +725,14 @@ namespace AnastasisVillage
 		/** `npc.villagePhase` — la bascule force une pensee. */
 		FString VillagePhase;
 		double GoalSince = 0.0;
+		/**
+		 * `npc.phaseChangedAt` (reconsider-001) : l'instant de la derniere bascule de la phase
+		 * PERSONNELLE (`syncVillagePhase`). Vide = `null` (jamais bascule) : c'est la valeur
+		 * « absent » que le lecteur pose quand la sauvegarde n'a pas le champ.
+		 */
+		TOptional<double> PhaseChangedAt;
+		/** `npc.workShift` (reconsider-001) — NON sauvegarde par la reference : absent au chargement. */
+		AnastasisWorkShift::FWorkShift WorkShift;
 		/** `npc._algoDebug` : la decision Noûs courante et son contexte. */
 		bool bHasAlgoDecision = false;
 		AnastasisNous::FDecision AlgoDecision;
@@ -1090,6 +1105,20 @@ namespace AnastasisVillage
 		 * rejouent une decision mesuree de la reference et comptent ses tirages `sim.rng`.
 		 */
 		void ChooseGoalNow(const FString& NpcId);
+
+		/**
+		 * La chance de reconsideration de `updateNpc` (reconsider-001) pour cet habitant, a cet
+		 * instant, avec ce `thinkDt` : `committedReconsiderChance(phaseReconsiderChance(
+		 * needsReconsiderChance(npc, dt)))`. Lecture pure : ne tire pas, ne synchronise pas la phase.
+		 * Pour les tests qui rejouent les tirages mesures de la reference.
+		 */
+		double ReconsiderChanceNow(const FString& NpcId, double ThinkDt) const;
+
+		/** La meme chance a l'instant `At` (tests de rejeu : l'instant mesure, pas l'horloge du village). */
+		double ReconsiderChanceAt(const FNpc& Npc, double At, double ThinkDt) const;
+
+		/** La phase PERSONNELLE de l'habitant maintenant (`villagePhaseFor(sim, npc)`). */
+		AnastasisRhythm::EPhase PersonalPhaseOf(const FNpc& Npc) const;
 
 		/**
 		 * Harnais (sim-digest-emitter-001) : reprend un etat lu d'une sauvegarde JS

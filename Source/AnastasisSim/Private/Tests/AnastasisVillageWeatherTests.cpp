@@ -138,13 +138,26 @@ bool FAnastasisVillageWeatherStormTest::RunTest(const FString&)
 	}
 	const FDecisionTrace& Why = N->LastDecision;
 	TestEqual(TEXT("the decision read the storm"), Why.WeatherRain, Rain);
-	// Sous un vrai orage la ligne `shelterRain` GAGNE la table (shelterRainScore + biais meteo
-	// 16t + 22) : la porte d'orage n'a pas a intervenir. La reference ne retient alors AUCUN but
-	// a reprendre (`shelterResumeGoal` n'est pose que par la porte) — fidele, pas un oubli.
-	TestEqual(TEXT("in a real storm the shelter row wins the table itself"), Why.TableWinner, FString(GoalShelterRain));
-	TestTrue(TEXT("its row beats the harvest row"), Why.ShelterRowScore > Why.GatherRowScore);
-	TestFalse(TEXT("no storm gate needed"), Why.bStormGate);
-	TestTrue(TEXT("so no resume goal (the reference sets it only through the gate)"), N->ShelterResumeGoal.IsEmpty());
+	// Deux chemins, dans l'ordre de `commitGoalChoice` (npc.js l. 1855 `applyGoalStickiness`, puis la porte d'orage l. 2055-2071) : si
+	// la ligne `shelterRain` (shelterRainScore + biais meteo 16t + 22) bat la cueillette, elle gagne
+	// la table et aucun but n'est retenu (`shelterResumeGoal` n'est pose que par la porte). Si la
+	// cueillette en cours garde la table grace au collant (`goalStickinessBonus`, reconsider-001),
+	// la porte d'orage l'envoie a l'abri et retient `gatherFood`.
+	const bool bRowWins = Why.ShelterRowScore > Why.GatherRowScore;
+	if (bRowWins)
+	{
+		TestEqual(TEXT("the shelter row wins the table itself"), Why.TableWinner, FString(GoalShelterRain));
+		TestFalse(TEXT("no storm gate needed"), Why.bStormGate);
+		TestTrue(TEXT("so no resume goal (the reference sets it only through the gate)"), N->ShelterResumeGoal.IsEmpty());
+	}
+	else
+	{
+		TestTrue(TEXT("the harvest kept the table with its stickiness"), Why.Stickiness > 0.0);
+		TestEqual(TEXT("the harvest wins the table"), Why.TableWinner, FString(GoalGatherFood));
+		TestTrue(TEXT("the storm gate sends him to shelter"), Why.bStormGate);
+		TestEqual(TEXT("and keeps the harvest to resume"), N->ShelterResumeGoal, FString(GoalGatherFood));
+	}
+	const FString Resume = N->ShelterResumeGoal;
 	TestEqual(TEXT("shelter: his workplace (no home)"), Why.TargetSource, FString(TEXT("workplace")));
 	TestEqual(TEXT("shelter: the granary"), Why.BuildingId, Granary);
 
@@ -175,8 +188,9 @@ bool FAnastasisVillageWeatherStormTest::RunTest(const FString&)
 	TestFalse(TEXT("outside again"), N->Inside.bActive);
 	TestTrue(TEXT("energy recovered (+14 and the slow recovery under the roof)"), N->Needs.Energy >= FMath::Min(100.0, EnergyIn + B::Shelter::EnergyRecover));
 	TestEqual(TEXT("grace delay of 18 s"), N->ShelterCooldownUntil, Time + B::Shelter::CooldownSeconds, Dt * 1.5);
-	// Sans but a reprendre, la reference passe a `craft` (non porte ici : observer).
-	TestEqual(TEXT("no resume goal: craft in the reference, observer here"), N->Goal, FString(GoalObserver));
+	// Il reprend le but retenu par la porte ; sans but a reprendre, la reference passe a `craft`
+	// (non porte ici : observer).
+	TestEqual(TEXT("resume goal, or craft in the reference (observer here)"), N->Goal, Resume.IsEmpty() ? FString(GoalObserver) : Resume);
 
 	// Pendant le delai de grace, l'orage ne le renvoie pas a l'abri.
 	TestFalse(TEXT("no shelter call during the grace delay"),

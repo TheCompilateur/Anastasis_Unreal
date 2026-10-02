@@ -409,6 +409,20 @@ inventé, il faisait gagner `observer` au hasard (`Village.Endurance` le voyait)
 la reconsidération (l. 893, n° 2), le rate de coup (n° 11), l'intention du jour, l'ambition et les cibles
 de risque (n° 24). Relevé : `docs/migration/phase3/P3_RNG_RELEVE_JOUR.md`.
 
+### Fait — la reconsidération, la phase personnelle et le quart de travail (mission reconsider-001)
+
+| Unreal | Source JS (`anastasis-ref-p3`) | Preuve |
+| --- | --- | --- |
+| `Life/AnastasisReconsider.h/.cpp` | `needs.js` : `needsReconsiderChance` ; `villageRhythm.js` : `personalFrac`, `villagePhaseFor`, `phaseReconsiderChance` ; `npc.js` : `committedReconsiderChance` (`GOAL_AI` : 2,5 s / 7 s / 0,42) | `Parite.Reconsideration` : 128 cas `needsReconsiderChance`, 104 phases personnelles |
+| `Life/AnastasisWorkShift.h/.cpp` | `workShift.js` : `noteShiftGoalCommit`, `noteShiftArrival`, `shiftShields`, `shiftEntryCommitted` ; `extractionPost.js` : `opensExtractionShift` (et `extractionPostFor`, `withinCourt`, `extractionResourceOfBuilding`, en ligne) | `Parite.Reconsideration` : 255 commits de quart (état, but, plancher, bouclier), 5 arrivées |
+| `FNpc::PhaseChangedAt` / `FNpc::WorkShift`, `FVillage::UpdateNpc` / `ChooseGoal` / `CommitGoal` | `syncVillagePhase` à la phase personnelle, le tirage l. 893 (`!npc.target \|\| sim.rng() < chance`), le verrou de quart de `commitGoalChoice`, `noteShiftArrival` à la création des sessions de travail | `Village.Reconsideration` : les 75 tirages l. 893 mesurés sur un jour du scénario `endurance`, rejoués sur le village du harnais : chance au bit, même résultat (38 reconsidérations) |
+
+La branche 0,92 de `phaseReconsiderChance` n'est jamais prise sur ce chemin : `updateNpc` synchronise la
+phase en tête de chaque tick (npc.js l. 874), avant la pensée ; elle est portée mais morte, comme dans la
+référence. `ReconsiderChanceAt` lit sans écrire. Relevé : `docs/migration/phase3/P3_RECONSIDERATION.md`
+(`tools/migration/trace-reconsider.mjs`). Reste du n° 2 : le collant de but. `UpdatePlayer` lit encore la
+phase du village (habitant incarné, mission player-goals).
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

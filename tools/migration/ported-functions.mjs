@@ -85,8 +85,8 @@ export const PORTAGE_DECLARE = [
   // --- Tranches verticales -----------------------------------------------------
   {
     module: "src/life/needs.js", cpp: "Life/AnastasisNeeds (+ Work/AnastasisGather)",
-    source: "puits ; maison ; grenier ; gather-deliver ; social-relax ; needs-factors-001",
-    fonctions: ["urgeScore", "needGoalScores", "tickNeeds", "tickVitality", "satisfyDrink", "satisfyRest", "satisfyEat", "satisfySocial", "satisfyRelax", "workWillFactor",
+    source: "puits ; maison ; grenier ; gather-deliver ; social-relax ; needs-factors-001 ; reconsider-001",
+    fonctions: ["needsReconsiderChance", "urgeScore", "needGoalScores", "tickNeeds", "tickVitality", "satisfyDrink", "satisfyRest", "satisfyEat", "satisfySocial", "satisfyRelax", "workWillFactor",
       "hydrationLossFactor", "metabolicDemandFactor", "fatigueRecoveryFactor", "fatigueAdaptationFactor", "recoveryConditioningFactor", "needsCritical"],
     alias: { needsCritical: "AreNeedsCritical" },
   },
@@ -101,8 +101,24 @@ export const PORTAGE_DECLARE = [
   { module: "src/life/conditioning.js", cpp: "Life/AnastasisConditioning", source: "needs-factors-001", entier: true },
   {
     module: "src/life/villageRhythm.js", cpp: "Life/AnastasisVillageRhythm, Village/AnastasisVillage",
-    source: "maison ; puits ; grenier ; social-relax",
-    fonctions: ["villagePhase", "isNightPhase", "phaseBias", "nearestWell", "nearestHousing", "mealPlace", "rhythmTarget"],
+    source: "maison ; puits ; grenier ; social-relax ; reconsider-001",
+    fonctions: ["villagePhase", "isNightPhase", "phaseBias", "nearestWell", "nearestHousing", "mealPlace", "rhythmTarget",
+      "personalFrac", "villagePhaseFor", "phaseReconsiderChance", "syncVillagePhase"],
+  },
+  {
+    module: "src/life/workShift.js", cpp: "Life/AnastasisWorkShift, Village/AnastasisVillage", source: "reconsider-001",
+    fonctions: ["noteShiftGoalCommit", "noteShiftArrival", "shiftShields", "shiftEntryCommitted"],
+    alias: { shiftEntryCommitted: "IsShiftEntryGoal" },
+    hors: {
+      __setWorkShiftModeForBench: "bascule de banc A/B, aucun code runtime ne l'appelle",
+      shiftOf: "accesseur nul-sur : FNpc::WorkShift existe toujours (etat None)",
+    },
+  },
+  {
+    module: "src/sim/metiers/extractionPost.js", cpp: "Life/AnastasisWorkShift", source: "reconsider-001",
+    fonctions: ["opensExtractionShift", "extractionPostFor", "withinCourt", "extractionResourceOfBuilding"],
+    alias: { extractionPostFor: "OpensExtractionShift", withinCourt: "OpensExtractionShift", extractionResourceOfBuilding: "OpensExtractionShift" },
+    hors: { __setExtractionPostModeForBench: "bascule de banc A/B, aucun code runtime ne l'appelle" },
   },
   {
     module: "src/life/domestic.js", cpp: "Life/AnastasisNeeds, Village/AnastasisVillage", source: "maison ; social-relax",
@@ -124,10 +140,10 @@ export const PORTAGE_DECLARE = [
   },
   {
     module: "src/sim/npc.js", cpp: "Village/AnastasisVillage, Work/AnastasisGather, Life/AnastasisWeatherBehavior, Ai/AnastasisGoalNoise",
-    source: "puits ; maison ; grenier ; gather-deliver ; social-relax ; bonds-rumors ; village-weather ; build-001 ; sim-rng-001 (goalNoise, fonction pure non branchee)",
+    source: "puits ; maison ; grenier ; gather-deliver ; social-relax ; bonds-rumors ; village-weather ; build-001 ; sim-rng-001 (goalNoise, fonction pure non branchee) ; reconsider-001",
     citation: false,
     fonctions: [
-      "goalNoise",
+      "goalNoise", "committedReconsiderChance",
       "reachedMoveTarget", "updateInside", "tryEnterIndoorAction", "redirectDomesticDoorFailure",
       "completionBias", "traitGoalBias", "jobPriority", "mealPathBlocked", "survivalWorkFactor",
       "shouldHaulGatherLoad", "progressCraftGather", "beginHaulToDepot", "applyGoalEligibility",

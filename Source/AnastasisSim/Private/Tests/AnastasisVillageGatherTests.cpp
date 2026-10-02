@@ -317,19 +317,22 @@ bool FAnastasisVillageGatherHarvestTest::RunTest(const FString&)
 		Bits(N->WorkSession.NextSwingAt - N->WorkSession.LastSwingAt),
 		Bits((N->WorkSession.LastSwingAt + G::SwingPeriodFarm(N->Skill, 1, N->Needs.Energy)) - N->WorkSession.LastSwingAt));
 
-	// Sac > 9 : il rentre livrer a SON grenier.
+	// Il rentre livrer a SON grenier : sac > 9 (retour force), ou plus tot si une reconsideration
+	// (`npc.js` l. 893, reconsider-001) fait gagner la ligne `deliver` — elle talonne la cueillette
+	// des que le sac porte quelque chose, collant compris. Le sac est ce qu'il a cueilli.
 	TestTrue(TEXT("sain jusqu'au retour"), Run(Village, World, Total, Time, 20.0, [&] { return Village.FindNpc(Id)->Goal == GoalDeliver; }));
 	N = Village.FindNpc(Id);
 	if (!TestEqual(TEXT("but deliver"), N->Goal, FString(GoalDeliver)))
 	{
 		return false;
 	}
-	TestEqual(TEXT("5 coups : sac 10"), N->InventoryFood, 10);
+	TestEqual(TEXT("sac = cueilli"), N->InventoryFood, N->GatheredFood);
+	TestTrue(TEXT("au plus un sac plein (retour force a > 9)"), N->InventoryFood >= 2 && N->InventoryFood <= 10);
 	TestFalse(TEXT("session close"), N->WorkSession.bActive);
 	TestTrue(TEXT("cible : un seuil du grenier"), N->bHasTarget && IsAccessPointOf(*Village.FindBuilding(Granary), N->Target));
 	TestEqual(TEXT("par identifiant"), N->DestBuildingId, Granary);
 	TestEqual(TEXT("le grenier n'a encore rien"), Village.FindBuilding(Granary)->FoodPhysical, 0);
-	AddInfo(FString::Printf(TEXT("5 coups en %.2f s ; champ %d,%d : %d"), Time - Session.ArrivedAt,
+	AddInfo(FString::Printf(TEXT("sac %d en %.2f s ; champ %d,%d : %d"), N->InventoryFood, Time - Session.ArrivedAt,
 		Session.TileX, Session.TileY, Village.LiveTileAt(Session.TileX, Session.TileY).Amount));
 	return true;
 }
@@ -353,6 +356,9 @@ bool FAnastasisVillageGatherDeliverTest::RunTest(const FString&)
 
 	double Time = Morning;
 	TestTrue(TEXT("sain jusqu'au retour"), Run(Village, World, Total, Time, 40.0, [&] { return Village.FindNpc(Id)->Goal == GoalDeliver; }));
+	// Ce qu'il rapporte : un sac plein, ou moins apres une reconsideration (reconsider-001).
+	const int32 Sac = Village.FindNpc(Id)->InventoryFood;
+	TestTrue(TEXT("il rentre avec une charge"), Sac > 0);
 	const double TradeBefore = Village.FindNpc(Id)->SkillTrade;
 	const double SkillBefore = Village.FindNpc(Id)->Skill;
 	bool bEntered = false;
@@ -372,9 +378,9 @@ bool FAnastasisVillageGatherDeliverTest::RunTest(const FString&)
 		return false;
 	}
 	TestFalse(TEXT("depot de son poste : DEHORS, au seuil"), bEntered);
-	TestEqual(TEXT("grenier 0 -> 10"), Village.FindBuilding(Granary)->FoodPhysical, 10);
+	TestEqual(TEXT("grenier 0 -> le sac"), Village.FindBuilding(Granary)->FoodPhysical, Sac);
 	TestEqual(TEXT("sac vide"), N->InventoryFood, 0);
-	TestEqual(TEXT("livre"), N->DeliveredFood, 10);
+	TestEqual(TEXT("livre"), N->DeliveredFood, Sac);
 	// Le moral monte de 1 au tick de la livraison (plus la derive d'un tick de besoins).
 	TestTrue(TEXT("moral +1"), FMath::Abs(MoraleJump - 1.0) < 0.05);
 	double Skill = SkillBefore;
@@ -382,13 +388,14 @@ bool FAnastasisVillageGatherDeliverTest::RunTest(const FString&)
 	G::GainDomainSkill(Skill, Trade, G::DeliverSkillGain);
 	TestEqual(TEXT("competence de marche : memes bits"), Bits(N->SkillTrade), Bits(Trade));
 	TestEqual(TEXT("competence plate : memes bits"), Bits(N->Skill), Bits(Skill));
-	TestEqual(TEXT("le marche compte le grenier"), Village.MarketFood(), 10);
+	TestEqual(TEXT("le marche compte le grenier"), Village.MarketFood(), Sac);
 
 	// Et il y retourne : deuxieme voyage, sans rien perdre en route.
 	TestTrue(TEXT("sain jusqu'au deuxieme voyage"), Run(Village, World, Total, Time, 60.0, [&] { return Village.FindNpc(Id)->Deliveries >= 2; }));
 	N = Village.FindNpc(Id);
 	TestEqual(TEXT("deux livraisons"), N->Deliveries, 2);
-	TestEqual(TEXT("grenier 20"), Village.FindBuilding(Granary)->FoodPhysical, 20);
+	TestEqual(TEXT("le grenier a tout ce qui a ete livre"), Village.FindBuilding(Granary)->FoodPhysical, N->DeliveredFood);
+	TestTrue(TEXT("le deuxieme voyage a rapporte"), N->DeliveredFood > Sac);
 	AddInfo(FString::Printf(TEXT("t=%.2f : champs %d, sac %d, grenier %d, repas %d"),
 		Time, FieldFood(Village, World), N->InventoryFood, Village.FindBuilding(Granary)->FoodPhysical, N->MealsTaken));
 	return true;
@@ -423,10 +430,13 @@ bool FAnastasisVillageGatherDepletionTest::RunTest(const FString&)
 	TestTrue(TEXT("reste un champ"), Tile.Type == AnastasisWorld::ETileType::Field);
 	TestTrue(TEXT("en jachere"), Tile.CropId == AnastasisWorld::ECropId::Fallow);
 	TestEqual(TEXT("le monde genere reste immuable"), World.Tiles[11 * World.W + 8].Amount, 5);
-	TestEqual(TEXT("sac 5 : sous le seuil, pas de retour force"), Village.FindNpc(Id)->InventoryFood, 5);
+	// Sous le seuil, pas de retour force ; une reconsideration (reconsider-001) peut l'avoir deja
+	// envoye livrer une partie. Rien ne se perd : sac + grenier = 5.
+	TestEqual(TEXT("5 cueillis"), Village.FindNpc(Id)->GatheredFood, 5);
+	TestEqual(TEXT("sac + grenier = 5"), Village.FindNpc(Id)->InventoryFood + Village.FindBuilding(Granary)->FoodPhysical, 5);
 
-	// Plus rien a cueillir : le sac de 5 part au grenier (deliver, eligible avec une charge).
-	TestTrue(TEXT("sain jusqu'a la livraison"), Run(Village, World, Total, Time, 40.0, [&] { return Village.FindNpc(Id)->Deliveries > 0; }));
+	// Plus rien a cueillir : le sac part au grenier (deliver, eligible avec une charge).
+	TestTrue(TEXT("sain jusqu'a la livraison"), Run(Village, World, Total, Time, 40.0, [&] { return Village.FindBuilding(Granary)->FoodPhysical == 5; }));
 	TestEqual(TEXT("grenier 5"), Village.FindBuilding(Granary)->FoodPhysical, 5);
 	Village.PerceiveNow(Id);
 	TestEqual(TEXT("le champ vide est oublie"), Village.FindNpc(Id)->Spots.Num(), 0);
@@ -510,6 +520,8 @@ bool FAnastasisVillageGatherDestructionTest::RunTest(const FString&)
 		{
 			return false;
 		}
+		const int32 Sac = Village.FindNpc(Id)->InventoryFood;
+		TestTrue(TEXT("il porte une charge"), Sac > 0);
 		TestTrue(TEXT("demoli"), Village.RemoveBuilding(Granary));
 		const FNpc* N = Village.FindNpc(Id);
 		TestTrue(TEXT("plus de poste"), N->WorkplaceId.IsEmpty());
@@ -517,7 +529,7 @@ bool FAnastasisVillageGatherDestructionTest::RunTest(const FString&)
 		TestEqual(TEXT("but perdu"), N->Goal, FString(GoalObserver));
 		TestFalse(TEXT("plus de cible"), N->bHasTarget);
 		TestTrue(TEXT("aucune reference"), N->DestBuildingId.IsEmpty());
-		TestEqual(TEXT("le sac reste plein"), N->InventoryFood, 10);
+		TestEqual(TEXT("le sac reste plein"), N->InventoryFood, Sac);
 		TestTrue(TEXT("plus un travailleur du grenier"), !Village.IsGranaryWorker(*N));
 		TestTrue(TEXT("sain ensuite, sans livrer ni cueillir"), Run(Village, World, Total, Time, 15.0, [&]
 		{
@@ -556,7 +568,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FAnastasisVillageGatherFullTest::RunTest(const FString&)
 {
 	using namespace AnastasisVillageGatherTest;
-	// Grenier a 295 / 300 : 10 livres, 5 entrent, 5 restent au sac.
+	// Grenier a 295 / 300 : 5 entrent, le reste du sac y reste. Le fermier peut livrer en
+	// plusieurs voyages (reconsideration, reconsider-001) : on attend le grenier plein.
 	AnastasisWorld::FWorld World = MakeFlatWorld(40, 32);
 	SetField(World, 6, 10, 8, 12, 20);
 	FVillage Village;
@@ -567,15 +580,11 @@ bool FAnastasisVillageGatherFullTest::RunTest(const FString&)
 	Village.AssignWorkplace(Id, G::JobFarmer, Granary);
 	const int32 Total = FoodEverywhere(Village, World);
 	double Time = Morning;
-	TestTrue(TEXT("sain"), Run(Village, World, Total, Time, 60.0, [&] { return Village.FindNpc(Id)->Deliveries > 0; }));
+	TestTrue(TEXT("sain"), Run(Village, World, Total, Time, 90.0, [&] { return Village.FindBuilding(Granary)->FoodPhysical >= GranaryFoodCap; }));
 	const FNpc* N = Village.FindNpc(Id);
-	if (!TestEqual(TEXT("une livraison"), N->Deliveries, 1))
-	{
-		return false;
-	}
 	TestEqual(TEXT("plein a 300"), Village.FindBuilding(Granary)->FoodPhysical, GranaryFoodCap);
 	TestEqual(TEXT("5 livres"), N->DeliveredFood, 5);
-	TestEqual(TEXT("5 au sac"), N->InventoryFood, 5);
+	TestEqual(TEXT("le reste au sac"), N->InventoryFood, N->GatheredFood - 5);
 	// Plus de place : deliver echoue, rien ne deborde, rien ne se perd.
 	TestTrue(TEXT("sain, jamais au-dela de 300"), Run(Village, World, Total, Time, 15.0, [] { return false; }));
 	TestEqual(TEXT("toujours 300"), Village.FindBuilding(Granary)->FoodPhysical, GranaryFoodCap);

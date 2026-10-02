@@ -71,23 +71,24 @@ perception-explore-001 : branchés. Chaque décision tire `exploreTarget` (prép
 `observer`. Le bruit d'une ligne non portée est TIRÉ (l'ordre du flux en dépend) mais PAS AJOUTÉ au
 plancher : ajouté à un score inventé, il faisait gagner `observer` au hasard (`Village.Endurance`).
 
-### n° 2 — Ni reconsidération aléatoire, ni collant de but
+### n° 2 — Pas de collant de but ; des cibles relâchées que la référence garderait
 
 - **classe** : REDUIT
 - **destin** : A_FERMER
-- **fermeture** : lifestyle-wiring-001 (le tirage l. 893 : phase personnelle, quarts, `committedReconsiderChance`), goal-noise-001 (`goalStickinessBonus`)
+- **fermeture** : goal-noise-001 suite (`goalStickinessBonus` dans la table, avec le branchement des bruits, n° 1)
 - **statut** : OUVERT
 - **entree** : tranches puits → grenier (first-building-001, house-rest-001, granary-eat-001)
-- **reference** : `src/sim/npc.js` reconsidération (`sim.rng() < chance`), `goalStickinessBonus`
-- **cpp** : `Village/AnastasisVillage.cpp`, reconsidération seulement sans cible
-- **harnais** : actors, rng
-- **detail** : `Public/Village/AnastasisVillage.h`, n° 2
+- **reference** : `src/sim/npc.js` `goalStickinessBonus` (l. 1756, ajouté au score l. 1850)
+- **cpp** : `Village/AnastasisVillage.cpp`, `ChooseGoal` (pas de collant) ; fin de chantier et fin de session sociale (`bHasTarget = false`)
+- **harnais** : actors
+- **detail** : `Public/Village/AnastasisVillage.h`, n° 2 ; `docs/migration/phase3/P3_RECONSIDERATION.md`
 
-Un habitant qui a une cible la garde jusqu'à l'arrivée, l'échec ou la disparition ; il redécide dès
-qu'il n'en a plus. La référence tire au sort une reconsidération à chaque pensée.
-Ce tirage (`npc.js` l. 893, seulement si l'habitant a une cible) n'est pas fait : 75 par jour dans le
-relevé (`P3_RNG_RELEVE_JOUR.md`), le premier au tick 165. Une chance approchée ferait tirer quand la
-référence ne tire pas : il attend la phase personnelle (mode de vie) et les quarts de travail.
+Depuis reconsider-001, le tirage l. 893 est fait : `if (!npc.target || sim.rng() < chance) chooseGoal`,
+chance = `committedReconsiderChance(phaseReconsiderChance(needsReconsiderChance(npc, thinkDt)))`, phase
+PERSONNELLE et quart de travail compris (75 tirages mesurés sur un jour rejoués au bit,
+`Anastasis.Sim.Village.Reconsideration`). Reste : le collant de but (`goalStickinessBonus`) n'entre pas
+dans la table, et deux fins d'action du C++ relâchent la cible (chantier fini ou à sec, ancre du regard
+d'une session sociale) là où la référence la garde et laisse la reconsidération trancher.
 
 ### n° 3 — Points d'accès sans intention urbaine
 

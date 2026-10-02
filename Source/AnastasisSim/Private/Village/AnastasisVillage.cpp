@@ -1445,10 +1445,16 @@ namespace AnastasisVillage
 			return;
 		}
 
-		// `syncVillagePhase` : la bascule de phase force une pensee.
-		const FString PhaseNow = AnastasisRhythm::PhaseId(AnastasisRhythm::VillagePhase(AnastasisRhythm::DayFracOf(Now)));
+		// `syncVillagePhase` : la bascule de phase force une pensee. La phase est PERSONNELLE
+		// (`villagePhaseFor`, reconsider-001) : le mode de vie decale l'horloge ; sans mode de vie
+		// (habitant C++, ecart n°8), c'est la phase du village, comme avant.
+		const FString PhaseNow = AnastasisRhythm::PhaseId(PersonalPhaseOf(Npc));
 		const bool bPhaseFlip = !Npc.VillagePhase.IsEmpty() && Npc.VillagePhase != PhaseNow;
 		Npc.VillagePhase = PhaseNow;
+		if (bPhaseFlip)
+		{
+			Npc.PhaseChangedAt = Now;
+		}
 
 		const bool bCritical = NeedsCritical(Npc.Needs);
 		// Noûs actif : `tickAlgorithmicNpc` a chaque mise a jour d'habitant, comme la reference.
@@ -1464,11 +1470,13 @@ namespace AnastasisVillage
 		}
 		if (Now >= Npc.AiThinkAt)
 		{
-			Npc.AiThinkAt = Now + AnastasisNous::DecisionIntervalSeconds(bCritical);
+			const double ThinkDt = AnastasisNous::DecisionIntervalSeconds(bCritical);
+			Npc.AiThinkAt = Now + ThinkDt;
 			Perceive(Npc, false);
 			ComputeAlgorithmicDecision(Npc);
-			// Reconsideration seulement sans cible (ecart n°2).
-			if (!Npc.bHasTarget)
+			// `if (!npc.target || sim.rng() < chance) chooseGoal(sim, npc);` (reconsider-001) :
+			// UN tirage du flux partage, seulement avec une cible, AVANT la decision.
+			if (!Npc.bHasTarget || VillageRng.Next() < ReconsiderChanceNow(Npc.Id, ThinkDt))
 			{
 				ChooseGoal(Npc);
 			}
@@ -1484,7 +1492,9 @@ namespace AnastasisVillage
 
 	void FVillage::ChooseGoal(FNpc& Npc)
 	{
-		const AnastasisRhythm::EPhase Phase = AnastasisRhythm::VillagePhase(AnastasisRhythm::DayFracOf(Now));
+		// `phaseBias` / `phaseWorkFactor` lisent `villagePhaseFor(sim, npc)` : la phase PERSONNELLE
+		// (reconsider-001). Sans mode de vie, la phase du village.
+		const AnastasisRhythm::EPhase Phase = PersonalPhaseOf(Npc);
 		const AnastasisRhythm::FPhaseSubject Subject = PhaseSubjectOf(Npc);
 		const int32 Wells = CountBuildings(WellType);
 
@@ -1591,8 +1601,30 @@ namespace AnastasisVillage
 			Row.Value += AnastasisWeatherBehavior::WeatherGoalBias(TickWeather, Npc.JobId, Row.Key);
 		}
 
-		// commitGoalChoice : (collant non porte, ecart n°2) Noûs biaise la table avant le tri. Pas pour l'habitant
-		// incarne : `algoOn = !playerControlled` (npc.js), Noûs ne pense pas pour lui.
+		// commitGoalChoice : `applyGoalStickiness` (reconsider-001) — le but en cours garde sa ligne, pour
+		// tout habitant, joueur compris. Nature sans qualite ni defaut (ecart n°10) : `natureStickBonus` = 0.
+		{
+			const AnastasisGather::FTrait& T = AnastasisGather::TraitAt(Npc.TraitIndex);
+			AnastasisReconsider::FStickSubject Stick;
+			Stick.CurrentGoal = Npc.Goal;
+			Stick.bCritical = NeedsCritical(Npc.Needs);
+			Stick.bCurrentRelievesCritical = AnastasisReconsider::IsCriticalReliefGoal(Npc.Needs, Npc.InventoryFood, Npc.Goal);
+			Stick.PhaseChangedAt = Npc.PhaseChangedAt;
+			Stick.TraitBuild = T.Build;
+			Stick.TraitTrade = T.Trade;
+			Stick.TraitGather = T.Gather;
+			Stick.TraitExplore = T.Explore;
+			Stick.bWorkSession = Npc.WorkSession.bActive;
+			Stick.InventoryLoad = Npc.InventoryFood;
+			for (TPair<FString, double>& Row : Rows)
+			{
+				const double Bonus = AnastasisReconsider::GoalStickinessBonus(Stick, Now, Row.Key);
+				Row.Value += Bonus;
+				if (Bonus != 0.0) Trace.Stickiness = Bonus;
+			}
+		}
+		// Noûs biaise la table avant le tri. Pas pour l'habitant incarne : `algoOn = !playerControlled`
+		// (npc.js), Noûs ne pense pas pour lui.
 		const bool bPlayer = IsPlayer(Npc);
 		if (!bPlayer)
 		{
@@ -1635,6 +1667,16 @@ namespace AnastasisVillage
 		FString Next = bPlayer ? Rows[0].Key : ApplyAlgorithmicCommitGate(Npc, Rows[0].Key, Npc.Goal, Trace.CommitGate);
 		// Ce que la table donnait avant les verrous : s'ils changent `Next`, le joueur est verrouille.
 		const FString Gated = Next;
+		// LOT C — VERROU DE QUART (commitGoalChoice, reconsider-001) : un but engage sous plancher
+		// ne bascule pas vers un but hors famille travail ; seul le palier critique (deja teste
+		// dans `shiftShields`) force la sortie. Apres la porte Noûs, avant l'orage.
+		if (!AnastasisWorkShift::IsShiftWorkFamily(Next)
+			&& AnastasisWorkShift::IsShiftWorkFamily(Npc.Goal)
+			&& AnastasisWorkShift::ShiftShields(Npc.WorkShift, Npc.Goal, Now, NeedsCritical(Npc.Needs)))
+		{
+			Next = Npc.Goal;
+			Trace.bShiftLock = true;
+		}
 		// Finish a physical delivery before resuming gathering; urgent needs retain priority.
 		// (Extension food-supply seulement : le fermier du grenier suit la reference.)
 		if (!bWorker && FoodSources.Num() > 0 && Npc.InventoryFood > 0 && KnownFoodDepot(Npc) && !NeedsCritical(Npc.Needs))
@@ -1706,6 +1748,15 @@ namespace AnastasisVillage
 			Npc.WorkTimer = 0.0;
 		}
 		AssignTarget(Npc, Trace);
+		// `noteShiftGoalCommit(sim, npc)` (reconsider-001) : le point de decision ouvre, continue ou
+		// ferme le quart. Apres la cible : `opensExtractionShift` lit `npc.target`.
+		{
+			const FBuilding* Workplace = Npc.WorkplaceId.IsEmpty() ? nullptr : Buildings.FindById(Npc.WorkplaceId);
+			const bool bEntry = AnastasisWorkShift::IsShiftEntryGoal(Npc.Goal)
+				|| (Workplace && AnastasisWorkShift::OpensExtractionShift(Npc.Goal, Workplace->Type, Workplace->Progress,
+					Workplace->X, Workplace->Y, Npc.bHasTarget, Npc.Target.X, Npc.Target.Y));
+			AnastasisWorkShift::NoteShiftGoalCommit(Npc.WorkShift, Npc.Goal, Now, NeedsCritical(Npc.Needs), bEntry);
+		}
 		Trace.Winner = Npc.Goal;
 		Trace.BuildingId = Npc.DestBuildingId;
 		Npc.LastDecision = MoveTemp(Trace);
@@ -2419,6 +2470,33 @@ namespace AnastasisVillage
 		{
 			Perceive(*Npc, true);
 		}
+	}
+
+	AnastasisRhythm::EPhase FVillage::PersonalPhaseOf(const FNpc& Npc) const
+	{
+		return AnastasisReconsider::PersonalPhase(AnastasisRhythm::DayFracOf(Now), Npc.Lifestyle);
+	}
+
+	double FVillage::ReconsiderChanceNow(const FString& NpcId, double ThinkDt) const
+	{
+		const FNpc* Npc = Actors.FindById(NpcId);
+		return Npc ? ReconsiderChanceAt(*Npc, Now, ThinkDt) : 0.0;
+	}
+
+	double FVillage::ReconsiderChanceAt(const FNpc& Npc, double At, double ThinkDt) const
+	{
+		const bool bCritical = NeedsCritical(Npc.Needs);
+		const double Base = AnastasisReconsider::NeedsReconsiderChance(bCritical, Npc.Goal, ThinkDt);
+		const AnastasisRhythm::EPhase Personal = AnastasisReconsider::PersonalPhase(AnastasisRhythm::DayFracOf(At), Npc.Lifestyle);
+		const double Reconsider = AnastasisReconsider::PhaseReconsiderChance(Personal, ThinkDt, Base);
+		AnastasisReconsider::FCommitSubject Subject;
+		Subject.bCritical = bCritical;
+		Subject.bHasTarget = Npc.bHasTarget;
+		Subject.Goal = Npc.Goal;
+		Subject.PhaseChangedAt = Npc.PhaseChangedAt;
+		Subject.GoalSince = Npc.GoalSince;
+		Subject.bShiftShields = AnastasisWorkShift::ShiftShields(Npc.WorkShift, Npc.Goal, At, bCritical);
+		return AnastasisReconsider::CommittedReconsiderChance(Subject, At, Reconsider);
 	}
 
 	void FVillage::ChooseGoalNow(const FString& NpcId)
@@ -3595,6 +3673,8 @@ namespace AnastasisVillage
 		Session.ArrivedAt = Now;
 		Session.NextSwingAt = SwitchUntil + AnastasisGather::FarmArriveSeconds;
 		Npc.WorkSession = Session;
+		// `noteShiftArrival(sim, npc)` : arrivee physique au travail, COMMUTING -> ON_SHIFT.
+		AnastasisWorkShift::NoteShiftArrival(Npc.WorkShift);
 	}
 
 	uint32 FVillage::ClaimedFieldPosts(const FNpc& Npc, int32 TileX, int32 TileY) const
@@ -3902,8 +3982,9 @@ namespace AnastasisVillage
 	bool FVillage::RelaxTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource)
 	{
 		// Couche rythme (recouvre toujours la base) : soir avec un foyer -> le foyer ;
-		// midi -> le puits (ou socialPos) ; sinon foyer, sinon socialPos.
-		const AnastasisRhythm::EPhase Phase = AnastasisRhythm::VillagePhase(AnastasisRhythm::DayFracOf(Now));
+		// midi -> le puits (ou socialPos) ; sinon foyer, sinon socialPos. `rhythmTarget` lit la phase
+		// PERSONNELLE (`villagePhaseFor`, reconsider-001).
+		const AnastasisRhythm::EPhase Phase = PersonalPhaseOf(Npc);
 		bool bHave = false;
 		if (Phase != AnastasisRhythm::EPhase::Midday && !Npc.HomeId.IsEmpty() && BuildingAccessPointById(Npc.HomeId, &Npc, OutTarget))
 		{
@@ -4669,6 +4750,8 @@ namespace AnastasisVillage
 		Session.ArrivedAt = Now;
 		Session.NextSwingAt = SwitchUntil + B::ArriveSeconds;
 		Npc.WorkSession = Session;
+		// `noteShiftArrival(sim, npc)` : arrivee physique au travail, COMMUTING -> ON_SHIFT.
+		AnastasisWorkShift::NoteShiftArrival(Npc.WorkShift);
 	}
 
 	bool FVillage::WorkConstruction(FBuilding& Site, FNpc& Npc)

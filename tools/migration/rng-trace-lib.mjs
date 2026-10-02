@@ -32,7 +32,7 @@ function cadresReference() {
  * `appelant` = le cadre de la reference juste au-dessus du site (pour un bruit de
  * but, la ligne de la table qui a appele `goalNoise`).
  */
-export async function releverTirages(REF_DIR, scenario, ticks) {
+export async function releverTirages(REF_DIR, scenario, ticks, { photographier = null } = {}) {
   Error.stackTraceLimit = 64;
   const ref = await chargerReference(REF_DIR);
   const sim = new ref.Simulation({ deferred: true, seed: scenario.seed });
@@ -92,6 +92,7 @@ export async function releverTirages(REF_DIR, scenario, ticks) {
       etat,
       valeur,
       photo,
+      extra: photographier ? photographier({ cadres, sim, habitant, site }) : null,
     });
     return valeur;
   };
