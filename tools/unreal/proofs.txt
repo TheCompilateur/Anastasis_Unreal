@@ -52,6 +52,7 @@ lived-paths-capture | tools/unreal/lived-paths-capture.py | LIVED_PATHS_CAPTURE 
 woodland-sequence-capture | tools/unreal/ground-cover-capture.py | WOODLAND_CAPTURE PASS | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/WoodlandEvidence;ANASTASIS_GROUND_STATES=woodland_reference,woodland,woodland_reference2;ANASTASIS_GROUND_VIEWS=ecotone_open,ecotone_edge,ecotone_inside,woodland_gap,ecotone_oblique,prairie_eye
 
 # Capture editor (SCN seulement), cinq habitats et aerien, terrain echantillonne stable.
+riparian-transition-capture | tools/unreal/ground-cover-capture.py | RIPARIAN_CAPTURE PASS | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/RiparianTransitionEvidence;ANASTASIS_GROUND_STATES=riparian_reference,riparian,riparian_reference2;ANASTASIS_GROUND_VIEWS=prairie_eye,riviere_eye,aerien
 natural-history-capture | tools/unreal/ground-cover-capture.py | NATURAL_HISTORY_CAPTURE PASS | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/NaturalHistoryEvidence;ANASTASIS_GROUND_STATES=reference,natural,reference2;ANASTASIS_GROUND_VIEWS=prairie_eye,lisiere_eye,sousbois_eye,riviere_eye,lande_eye,aerien
 
 weather-contract | tools/unreal/weather-contract.py | WEATHER_CONTRACT PASS | WEATHER_CONTRACT FAIL|Traceback | 180 | -
@@ -82,4 +83,3 @@ world-theatre-read | tools/unreal/world-theatre-read.py | WORLD_THEATRE_READ_PIE
 world-theatre-capture | tools/unreal/world-theatre-capture.py | WORLD_THEATRE_CAPTURE COMPLETE | WORLD_THEATRE_CAPTURE FAIL|Traceback | 900 | ANASTASIS_THEATRE_OUT=@Saved/WorldTheatreEvidence/capture
 places-lifecycle | tools/unreal/places-lifecycle.py | PLACES_LIFECYCLE COMPLETE | PLACES_LIFECYCLE FAIL|Traceback | 420 | ANASTASIS_PLACES_LIFECYCLE_OUT=@Saved/PlacesLifecycleEvidence
 
-riparian-transition-capture | tools/unreal/ground-cover-capture.py | RIPARIAN_CAPTURE PASS | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/RiparianTransitionEvidence;ANASTASIS_GROUND_STATES=riparian_reference,riparian,riparian_reference2;ANASTASIS_GROUND_VIEWS=prairie_eye,riviere_eye,aerien
