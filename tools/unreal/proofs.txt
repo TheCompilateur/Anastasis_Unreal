@@ -53,6 +53,7 @@ settlement-site-pie | tools/unreal/settlement-site-pie.py | SETTLEMENT_SITE_PIE 
 gather-deliver-pie | tools/unreal/gather-deliver-pie.py | GATHER_DELIVER PASS | GATHER_DELIVER FAIL|Traceback | 600 | ANASTASIS_GATHER_OUT=@Saved/SliceEvidence/gather-deliver-route-cost
 
 # Ecotone-002 : tree identity, near-edge transect, fixed reference cameras.
+soundscape-pie | tools/unreal/soundscape-pie.py | SOUNDSCAPE_PIE PASS | SOUNDSCAPE_PIE FAIL|Traceback | 240 | -
 ecotone-capture | tools/unreal/ground-cover-capture.py | ECOTONE_CAPTURE PASS | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/EcotoneEvidence;ANASTASIS_GROUND_STATES=ecotone_reference,ecotone,ecotone_reference2;ANASTASIS_GROUND_VIEWS=ecotone_open,ecotone_edge,ecotone_inside,ecotone_oblique,prairie_eye
 terrain-access-pie | tools/unreal/terrain-access-pie.py | TERRAIN_ACCESS INSTRUMENT_PASS | TERRAIN_ACCESS FAIL|TERRAIN_ACCESS_OUTPUT_ERROR | 540 | -
 
