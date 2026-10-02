@@ -86,6 +86,20 @@ goalNoise x14.
 - MUTATION (posée, testée, retirée) : `relax` et `drink` interverties dans la table C++ → **détectée**
   (`decision tick 32 npc-2 : la table tire drink (l. 1118) en position 1, la référence tirait la ligne 1116`).
 
+## ECARTS
+
+- modifié : n° 1 — `goalNoise` et la table de ses 17 tirages portés et prouvés (`Parite.BruitDeBut`, 104
+  décisions mesurées rejouées, 0 écart), NON branchés : reste OUVERT, `A_FERMER` ; fermeture complétée
+  par perception-explore-001 (`exploreTarget` tire avant la table).
+- modifié : n° 16 — texte de `AnastasisVillage.h` complété : `VillageRng` EST le `makeRng(seed)` de la
+  référence, état exposé (`GetSimRngState` / `SetSimRngState`) ; reste OUVERT : le lecteur ne pose pas
+  encore `save.rng`, et le C++ ne tire pas encore ce que la référence tire ailleurs (décision,
+  `exploreTarget`, l. 893, rate de coup). La fiche de `ECARTS.md` n'est PAS modifiée ici
+  (labo-ecarts-001 y travaille) : sa phrase « les tirages viennent de `VillageRng`, pas de `sim.rng` »
+  est à reprendre par lui ou à l'intégration.
+- Aucun nouvel écart : `goalNoise` est une copie fidèle ; aucun nouveau `FAnastasisRng` de flux (le
+  `FAnastasisRng` des tests est local au test).
+
 ## PROOFS
 
 PROOFS: (aucune)

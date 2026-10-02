@@ -51,7 +51,7 @@ une marque vers un numéro sans fiche, ou vers une fiche `FERME`.
 
 - **classe** : SUBSTITUT
 - **destin** : A_FERMER
-- **fermeture** : jalon B — goal-noise-001, goals-body-001, goals-resources-001, economy-gold-001, goals-work-001, goals-haul-001, goals-family-001
+- **fermeture** : jalon B — goal-noise-001, perception-explore-001, goals-body-001, goals-resources-001, economy-gold-001, goals-work-001, goals-haul-001, goals-family-001
 - **statut** : OUVERT
 - **entree** : tranches puits → grenier (first-building-001, house-rest-001, granary-eat-001)
 - **reference** : `src/sim/npc.js` `adultScores`, `goalNoise`, `statusBias`, mode de vie, prévision de survie
@@ -62,6 +62,9 @@ une marque vers un numéro sans fiche, ou vers une fiche `FERME`.
 16 des 25 lignes d'`adultScores` valent `UnportedGoalsFloor` (42) + leur vrai `phaseBias` ; un but
 non porté qui gagne donne `observer`. Sans `goalNoise`, la décision ne consomme pas `sim.rng` : tant
 que cet écart reste, la trajectoire JS est interdite.
+sim-rng-001 : `goalNoise` et la table de ses 17 tirages sont portés (`Ai/AnastasisGoalNoise.h`,
+`Parite.BruitDeBut`), NON branchés — chaque décision tire d'abord `exploreTarget` (2 à 8 fois, relevé
+`docs/migration/phase3/P3_RNG_RELEVE.md`) : brancher la table seule coderait un faux ordre.
 
 ### n° 2 — Ni reconsidération aléatoire, ni collant de but
 
