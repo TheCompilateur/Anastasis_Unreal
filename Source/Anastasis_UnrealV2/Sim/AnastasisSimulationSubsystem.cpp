@@ -14,6 +14,8 @@
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisWorldView.h"
 #include "WorldView/AnastasisAnthropicSubsystem.h"
+#include "WorldView/AnastasisSettlementSurvey.h"
+#include "HAL/PlatformTime.h"
 
 // Default 1 since SKY_TRANSITIONS_001 (2026-09-30), the JS reference's realtime: one day = 90 s.
 // At the former default of 10, now that the sky follows the simulation, a day lasted ~12 real
@@ -63,6 +65,10 @@ static TAutoConsoleVariable<int32> CVarVillageStartVillagers(
 	TEXT("Inhabitants placed around the first well when play begins (VILLAGER_PNG_001), so the game does not open on an empty world. 0 = empty village. The first explicit scenario command (FirstWell, FirstHouse, FirstGranary, FirstFarmer, FoodSupply) replaces this village."),
 	ECVF_Default);
 
+static TAutoConsoleVariable<int32> CVarVillageSiteSelection(
+    TEXT("anastasis.Village.SiteSelection"), 1,
+    TEXT("1 selects the opening village from this world rendered terrain and navigable resource access. 0 retains legacy centre placement for comparison. Explicit scenarios and saves are not relocated."), ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarSimOverlay(
 	TEXT("anastasis.Sim.Overlay"),
 	1,
@@ -93,21 +99,69 @@ void UAnastasisSimulationSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	ResetCanonical(SeedFromCVar());
 	bPumpFromEngineTick = true;
 
-	const int32 StartVillagers = CVarVillageStartVillagers.GetValueOnGameThread();
-	if (StartVillagers > 0)
-	{
-		// Le chemin existant des scenarios, rien de neuf dans la simulation.
-		const AnastasisVillage::FPoint Settlement = Simulation.GetVillage().GetSettlement();
-		const FString WellId = SeedFirstWell(StartVillagers, FMath::FloorToInt32(Settlement.X), FMath::FloorToInt32(Settlement.Y));
-		bStartVillage = !WellId.IsEmpty();
-		UE_LOG(LogAnastasis_UnrealV2, Display,
-			TEXT("ANASTASIS_VILLAGE start village: %s + %d inhabitants (anastasis.Village.StartVillagers; replaced by the first scenario command)"),
-			WellId.IsEmpty() ? TEXT("no well") : *WellId, Simulation.GetVillage().GetActors().Num());
-	}
+    // Subsystem begin play precedes actor terrain construction. Survey on the first ready tick.
+    bPendingStartVillage = CVarVillageStartVillagers.GetValueOnGameThread() > 0;
+    StartVillageWait = 0.0;
+    SettlementSiteReport = bPendingStartVillage ? TEXT("{\"status\":\"pending\"}") : TEXT("{\"status\":\"disabled\"}");
+}
+
+void UAnastasisSimulationSubsystem::TryStartVillage(float DeltaTime)
+{
+    if (!bPendingStartVillage) return;
+    auto& Village = Simulation.GetVillage();
+    // Explicit scenario/load takes ownership before automatic opening: never relocate existing people.
+    if (!Village.GetBuildings().IsEmpty() || !Village.GetActors().IsEmpty())
+    {
+        bPendingStartVillage = false;
+        SettlementSiteReport = TEXT("{\"status\":\"existing_village_preserved\"}");
+        return;
+    }
+    int32 X = FMath::FloorToInt32(Village.GetSettlement().X), Y = FMath::FloorToInt32(Village.GetSettlement().Y);
+    if (CVarVillageSiteSelection.GetValueOnGameThread() != 0)
+    {
+        AnastasisSettlementSite::FInputs In;
+        FString Error;
+        const double Began = FPlatformTime::Seconds();
+        if (!AnastasisSettlementSurvey::Read(GetWorld(), Simulation.GetSeed(), Simulation.GetWorld(), Village, In, Error))
+        {
+            StartVillageWait += DeltaTime;
+            if (StartVillageWait < 10.0 && Error == TEXT("terrain_not_ready")) return;
+            bPendingStartVillage = false;
+            SettlementSiteReport = FString::Printf(TEXT("{\"status\":\"unavailable\",\"error\":\"%s\"}"), *Error);
+            UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("SETTLEMENT_SITE %s"), *SettlementSiteReport);
+            return;
+        }
+        const auto Report = AnastasisSettlementSite::Choose(In);
+        SettlementSiteReport = AnastasisSettlementSite::ToJson(Report, In);
+        UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("SETTLEMENT_SITE survey_ms=%.3f %s"),
+            (FPlatformTime::Seconds()-Began)*1000.0, *SettlementSiteReport);
+        bPendingStartVillage = false;
+        if (!Report.Best.bEligible) return; // No disguised fallback to the arbitrary centre.
+        X = Report.Best.Index % In.W; Y = Report.Best.Index / In.W;
+        Village.SetSettlement(X + 0.5, Y + 0.5);
+    }
+    else
+    {
+        bPendingStartVillage = false;
+        SettlementSiteReport = TEXT("{\"status\":\"legacy\"}");
+    }
+    const int32 Count = CVarVillageStartVillagers.GetValueOnGameThread();
+    if (Count <= 0) return;
+    const FString WellId = SeedFirstWell(Count, X, Y);
+    bStartVillage = !WellId.IsEmpty();
+    const auto* Well = Village.FindBuilding(WellId);
+    if (!Well || (CVarVillageSiteSelection.GetValueOnGameThread()!=0 && (Well->X!=X || Well->Y!=Y)))
+    {
+        SettlementSiteReport = TEXT("{\"status\":\"spawn_mismatch\"}");
+        UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("SETTLEMENT_SITE spawn_mismatch"));
+    }
+    UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE start village: %s + %d inhabitants site=(%d,%d)"),
+        *WellId, Village.GetActors().Num(), X, Y);
 }
 
 void UAnastasisSimulationSubsystem::ReplaceStartVillage()
 {
+	bPendingStartVillage = false;
 	if (!bStartVillage)
 	{
 		return;
@@ -129,6 +183,9 @@ void UAnastasisSimulationSubsystem::Deinitialize()
 void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 {
 	if (auto* Anthropic = GetWorld()->GetSubsystem<UAnastasisAnthropicSubsystem>()) Anthropic->ResetPresentation();
+	bPendingStartVillage = false;
+	StartVillageWait = 0.0;
+	SettlementSiteReport = TEXT("{\"status\":\"reset\"}");
 	Simulation.Reset(Seed, AnastasisWorldView::ReferenceWidth, AnastasisWorldView::ReferenceHeight);
 	LoggedDay = Simulation.GetDay();
 	UE_LOG(
@@ -144,6 +201,7 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 
 void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 {
+	TryStartVillage(DeltaTime);
 	if (!Simulation.IsRunning())
 	{
 		return;
@@ -1332,4 +1390,18 @@ FString UAnastasisSimulationDebugLibrary::GetTimeWarpStatus(const UObject* World
 		CVarSimWarp.GetValueOnGameThread(), CVarSimSpeed.GetValueOnGameThread(), CVarSimTimeScale.GetValueOnGameThread(),
 		Host->GetEffectiveRate(), Host->WasWarpBudgetCut() ? TEXT("true") : TEXT("false"),
 		W.Presence, W.IdleDays(FAnastasisSimulation::DayLength));
+}
+
+FString UAnastasisSimulationDebugLibrary::GetSettlementSiteStatus(const UObject* WorldContextObject)
+{
+    const UWorld* W = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+    const auto* Host = W ? W->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+    return Host ? Host->GetSettlementSiteReport() : TEXT("{}");
+}
+
+FVector UAnastasisSimulationDebugLibrary::GetSettlementGroundPoint(const UObject* WorldContextObject, double SimX, double SimY)
+{
+    UWorld* W = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+    const auto* Host = W ? W->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+    return Host ? FAnastasisVillagePresentation::SimToUnreal(Host->GetSimulation().GetWorld(), SimX, SimY, W) : FVector::ZeroVector;
 }

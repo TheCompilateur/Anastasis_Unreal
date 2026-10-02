@@ -29,6 +29,7 @@ public:
 	virtual bool IsTickableInEditor() const override { return false; }
 
 	void ResetCanonical(uint32 Seed);
+	const FString& GetSettlementSiteReport() const { return SettlementSiteReport; }
 	void LogStatus() const;
 
 	/**
@@ -137,6 +138,10 @@ private:
 	 * village de lancement intact, ne fait rien : deux scenarios s'empilent comme avant.
 	 */
 	void ReplaceStartVillage();
+	void TryStartVillage(float DeltaTime);
+	bool bPendingStartVillage = false;
+	double StartVillageWait = 0.0;
+	FString SettlementSiteReport = TEXT("{\"status\":\"not_started\"}");
 
 	FAnastasisSimulation Simulation;
 	FAnastasisVillagePresentation VillagePresentation;
@@ -176,6 +181,12 @@ public:
 	/** Temps de simulation (s) de l'hote de ce monde, -1 sans hote. */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static double GetSimulationTime(const UObject* WorldContextObject);
+
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetSettlementSiteStatus(const UObject* WorldContextObject);
+
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FVector GetSettlementGroundPoint(const UObject* WorldContextObject, double SimX, double SimY);
 
 	/** Phase commune du village ("night", "dawn"...), vide sans hote. */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
