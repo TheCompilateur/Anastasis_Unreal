@@ -232,6 +232,9 @@ namespace AnastasisVillage
 	inline const TCHAR* const HouseType = TEXT("house");
 	inline const TCHAR* const GranaryType = TEXT("granary");
 
+	/** `MORTALITY.famineHunger` (life/mortality.js). */
+	inline constexpr double MortalityFamineHunger = 88.0;
+
 	/** Buts portes. `observer` est l'etat initial de createNpc. */
 	inline const TCHAR* const GoalObserver = TEXT("observer");
 	/** Soigner une parcelle de champ (help-farm-001). */
@@ -1076,6 +1079,30 @@ namespace AnastasisVillage
 		 * Rend le nombre de tuiles qui ont repousse.
 		 */
 		int32 RegrowFieldsDaily(int32 Day);
+
+		/** Une mort, telle que le village la retient (hors empreinte). */
+		struct FDeath
+		{
+			FString NpcId;
+			FString Cause;
+			int32 Day = 0;
+		};
+
+		/**
+		 * MORTALITY_001 -- `causeOfDeath`, branche « vitalite epuisee » seule (ecart n°25) : la cause
+		 * d'un habitant dont la sante est <= 0 (`de soif`, `de faim`, `d'epuisement`, `de faiblesse`,
+		 * seuils de la reference), vide tant qu'il vit. Aucun tirage.
+		 */
+		static FString CauseOfDeath(const FNpc& Npc);
+
+		/**
+		 * `updateMortalityDaily` reduit a la mort certaine (ecart n°25) : parcours a l'envers, tout
+		 * habitant de sante <= 0 est retire (`RemoveNpc` : maison liberee, repas rendu), puis oublie
+		 * de ses semblables (`forgetTheDead`). Appele a minuit par l'hote. Rend le nombre de morts.
+		 * Ne tire jamais dans le flux aleatoire.
+		 */
+		int32 UpdateMortalityDaily();
+		const TArray<FDeath>& GetDeaths() const { return DeathLog; }
 		/** Observation : nourriture ajoutee aux champs par la repousse depuis Bind. */
 		int64 GetRegrownFood() const { return RegrownFood; }
 
@@ -1533,6 +1560,7 @@ namespace AnastasisVillage
 		int32 NavVersion = 0;
 		FPoint Settlement;
 		int32 NextBuildingId = 0;
+		TArray<FDeath> DeathLog;
 		int32 NextNpcId = 0;
 		/** `sim.time` du tick en cours (pose par UpdateActors). */
 		double Now = 0.0;

@@ -512,3 +512,23 @@ est vide, la table garde ses bits. Sur `endurance`, la référence a pourtant de
 `helpFarm` 28, `build` 24 et des biais `build` 20, `gatherFood` 14, `gatherWood` 14, `helpFarm` 10
 (constants sur la journée) : ce sont eux qui font choisir `helpFarm` sans ferme (tick 196) et `build`
 sans chantier (tick 32).
+### n° 25 — Mortalité : seule la mort par santé épuisée est portée
+
+- **classe** : REDUIT
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : mortality-001
+- **reference** : `src/life/mortality.js` (`updateMortalityDaily`, `causeOfDeath`, `removeActor`, `scrubDeparted`, `settleEstate`), `src/life/life.js` (`updateLifeDaily`, `agePopulation`)
+- **cpp** : `Village/AnastasisVillage.cpp` (`CauseOfDeath`, `UpdateMortalityDaily`) ; `Sim/AnastasisSimulation.cpp` (`RunDayJob`, travail 10 `lifeDaily`)
+- **harnais** : actors, buildings
+- **fermeture** : à attribuer (portage de l'âge — `agePopulation`, `age`, `lifeStage` — puis des tirages de famine et de vieillesse, du veuvage et de l'héritage)
+
+Décision d'Alexandre du 2026-10-02 (conversation mortality-001) : la mortalité ne tue qu'à santé 0. Le C++
+exécute la règle 1 de `causeOfDeath` (`health <= 0`) et rien d'autre : pas de mort au-delà de 92 ans, pas de
+famine personnelle (`starvingDays` non porté), pas de crise de grenier, pas de risque de vieillesse (aucun
+tirage, donc le flux aléatoire n'est jamais touché). Libellé « de faim » sans `starvingDays > 0`.
+`removeActor` est réduit à ce que l'état de simulation porte : maison libérée (`RemoveNpc`), relations du
+mort effacées chez les autres (`forgetTheDead`) ; pas de veuvage, d'orphelins, d'héritage, de moral de
+colonie, de journal, de mémorial ni de deuil. Appelé par le travail différé 10, après `AssignSheltersDaily`
+de minuit (la référence l'appelle après `agePopulation`, que le C++ n'a pas). `ensureNeeds` ne tire rien :
+les besoins d'un habitant C++ existent toujours.

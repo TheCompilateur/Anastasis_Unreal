@@ -1368,6 +1368,59 @@ namespace AnastasisVillage
 		return Actors.RemoveById(Id);
 	}
 
+	FString FVillage::CauseOfDeath(const FNpc& Npc)
+	{
+		// ecart n°25 : seule la branche `(npc.health ?? 100) <= 0` de causeOfDeath. Le libelle « de faim »
+		// ignore `starvingDays > 0` (compteur non porte) : la faim haute suffit.
+		if (Npc.Needs.Health > 0.0)
+		{
+			return FString();
+		}
+		if (Npc.Needs.Thirst >= AnastasisNeeds::Constants::ParchedAt) return TEXT("de soif");
+		if (Npc.Needs.Hunger >= MortalityFamineHunger) return TEXT("de faim");
+		if (Npc.Needs.Energy <= AnastasisNeeds::Constants::ExhaustedAt + 8.0) return TEXT("d'epuisement");
+		return TEXT("de faiblesse");
+	}
+
+	int32 FVillage::UpdateMortalityDaily()
+	{
+		// Parcours a l'envers comme la reference : on retire en cours de route.
+		TArray<FString> Ids;
+		for (const FNpc& Npc : Actors.GetItems())
+		{
+			Ids.Add(Npc.Id);
+		}
+		const int32 Today = Day();
+		int32 Died = 0;
+		for (int32 I = Ids.Num() - 1; I >= 0; --I)
+		{
+			const FNpc* Npc = Actors.FindById(Ids[I]);
+			if (!Npc)
+			{
+				continue;
+			}
+			const FString Cause = CauseOfDeath(*Npc);
+			if (Cause.IsEmpty())
+			{
+				continue;
+			}
+			const FString Id = Ids[I];
+			RemoveNpc(Id);
+			// `forgetTheDead` : plus de relation avec un disparu. La lignee et les memoires restent.
+			for (FNpc& Other : Actors.GetItemsMutable())
+			{
+				Other.Relations.RemoveAll([&Id](const TPair<FString, double>& Row) { return Row.Key == Id; });
+			}
+			FDeath Death;
+			Death.NpcId = Id;
+			Death.Cause = Cause;
+			Death.Day = Today;
+			DeathLog.Add(MoveTemp(Death));
+			++Died;
+		}
+		return Died;
+	}
+
 	bool FVillage::AssignWorkplace(const FString& NpcId, const FString& JobId, const FString& BuildingId)
 	{
 		FNpc* Npc = Actors.FindById(NpcId);

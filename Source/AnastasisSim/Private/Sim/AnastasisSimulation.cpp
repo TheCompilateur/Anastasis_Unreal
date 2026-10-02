@@ -160,6 +160,11 @@ void FAnastasisSimulation::RunDayJob(int32 Job)
 	{
 		RunLandRegen();
 	}
+	else if (Job == DayJobLifeDaily)
+	{
+		// `updateLifeDaily` : ni `agePopulation` ni les tirages de mortalite ne sont portes (ecart n°25).
+		Village.UpdateMortalityDaily();
+	}
 	else if (Job == DayJobMemory)
 	{
 		// `memory` : forgetStale + forgetStalePeople pour chacun (fadeEpisodes : non porte).

@@ -35,11 +35,13 @@ public:
 
 	/**
 	 * La file de minuit de la reference (`enqueueDayDeferred`), ses 17 travaux dans l'ordre.
-	 * Portes : `landRegen` (0) et `memory` (14, oubli quotidien). Les autres occupent leur
+	 * Portes : `landRegen` (0), `lifeDaily` (10, mortalite reduite) et `memory` (14, oubli quotidien). Les autres occupent leur
 	 * place et leur part du budget sans rien faire : NOT_IMPLEMENTED.
 	 */
 	static constexpr int32 DayDeferredJobCount = 17;
 	static constexpr int32 DayJobLandRegen = 0;
+	/** `lifeDaily` (updateLifeDaily) : porte reduit a la mort certaine (ecart n°25). */
+	static constexpr int32 DayJobLifeDaily = 10;
 	static constexpr int32 DayJobMemory = 14;
 
 	FAnastasisSimulation();
