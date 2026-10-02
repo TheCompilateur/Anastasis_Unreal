@@ -180,3 +180,56 @@ vérifiée, `8b3a4d5cb53808f9`). 45 champs diffèrent, en deux familles :
    lisent (génome, mode de vie, conditionnement) — par le lecteur d'abord, le portage ensuite.
 2. Le lecteur : projeter `aiThinkAt` et `villagePhase` (le C++ les tient déjà), suivre `workTimer`.
 3. `placeMemory` et `lifestyleDailyUpdate` : petits, mais à chaque tick.
+
+---
+
+## Rapport 3 — sur `main` 5a607c9, après le lot 1 (sim-report-003)
+
+Le lot 1 a versé `player-minimal-001`, `nav-service-001`, `budget-cadence-001` et `realisme-ru-002`.
+Question posée : la simulation C++ de `main` rend-elle encore le rapport 2 ? `player-minimal-001`
+touche la boucle du village : `UpdateReputationDaily` à minuit, `ReputationAffinity` dans les choix
+sociaux, `Sees` dans la perception.
+
+Production : comme en tête, sur `main` 5a607c9 (worktree `sim-report-003`, `BUILD::PASS`). Référence :
+clone du tag `anastasis-ref-p3`, scénario `endurance` (empreinte `52f66b01c0766137`, vue `settlement`),
+16 200 ticks. `Anastasis.Sim.Harnais` : 3 PASS / 0 KNOWN_EXPECTED_FAILURE / 0 FAIL.
+
+### Le rapport `EVD`
+
+```
+PREMIER TICK DIVERGENT : 1  (jour 1, temps 37.81666666666666)
+Sections divergentes a ce tick (1) :
+  actors                 A=4cc03c8b776700c0  B=8b3a4d5cb53808f9
+Premiere divergence par section :
+  tick        1  actors
+  tick       32  buildings
+  tick       32  rng
+  tick      133  mealReservations
+  tick      257  tileDiff
+Sections jugees restees identiques sur toute la trace (5) : day, h, seed, time, w
+```
+
+**Identique au rapport 2**, section par section, jusqu'à l'empreinte C++ du tick 1 (`8b3a4d5cb53808f9`).
+La trace longue redonne au bit près les 601 premières lignes de la trace courte du portail du lot 1
+(`_integration`, même code) `EVD`.
+
+### Le joueur dans le harnais `INF`
+
+`player-minimal-001` est **neutre ici**, par construction et non par chance :
+
+- `IdleSeconds` n'augmente que par `FVillage::ObservePlayer`, que l'hôte appelle quand un joueur est
+  incarné. Le harnais n'en a pas : la valeur reste 0, la cible de `UpdateReputationDaily` reste
+  `Standing::Base` (50), et la réputation ne bouge pas ;
+- `ReputationAffinity` rend 0 quand la réputation vaut 50 ;
+- `Sees` à présence 1 revient exactement à `D > Range`.
+
+Pour plus tard : le lecteur ne lit ni `reputation` ni `idleSeconds`, et le C++ ne porte que l'oisiveté de
+`updateReputationDaily`, sans le mérite (constructions, ambitions, jalons, conseils, vols). Dès qu'un
+scénario fera bouger la réputation côté référence, il y aura divergence : à lire, puis à porter.
+
+### Ordres de travail
+
+Inchangés depuis le rapport 2. Le premier est en cours : `needs-factors-001` (génome, conditionnement,
+facteurs des besoins ; module seul, au lot 2), puis son branchement dans `FNpc`, le lecteur et
+`UpdateNpc`. `lifestyle-001` (`sim/lifestyle.js`) suit, pour `lifestyle.lastNotedDay` et le tirage `rng`
+d'`ensureLifestyle`.
