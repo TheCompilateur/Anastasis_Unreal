@@ -93,6 +93,9 @@ def seed(asset):
     # Exposition figee : deux captures doivent rester comparables.
     set_prop(asset, ('fixed_exposure', 'b_fixed_exposure'), True)
     asset.set_editor_property('exposure_ev100', 14.0)
+    # SKY_CONTINUITY_002: surface relay, independent of atmospheric radiance.
+    asset.set_editor_property('passage_sun_full_elevation', 4.0)
+    asset.set_editor_property('passage_moon_full_elevation', 6.0)
 
 
 if os.environ.get('ANASTASIS_ATMOSPHERE_REBUILD', '0') == '1' and unreal.EditorAssetLibrary.does_asset_exist(ASSET_PATH):

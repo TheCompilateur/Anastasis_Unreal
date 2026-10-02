@@ -327,6 +327,7 @@ Opérateur et portails :
 
 | Script | Rôle |
 |---|---|
+| `sky-passage-pie.py` | relais crepusculaire : aube/coucher continus en PIE, A/B/A `anastasis.Sky.Passage`, exposition et contributions directes echantillonnees, images `Shot` et JSON dans `Saved/SkyPassageEvidence/` ; PASS instrumental, verdict visuel separe ; registre `sky-passage-pie` |
 | `anastasis-unreal.ps1` | `status` / `build` / `build-game` / `verify` / `health` / `editor` |
 | `agent-worktree.ps1` | cycle de vie multi-agent : `create` / `status` / `finish` / `integrate` / `integrate-batch` / `prune` / `preflight` / `postflight` / `mcp` |
 | `test-agent-worktree.ps1` | banc d'essai de `finish` (saut sans changement Unreal, preuves déclarées), `integrate`, `integrate-batch`, verrou de `main`, règle de retest (arbres identiques / un `Source/` changé) et `prune` sur un dépôt jetable ; à relancer après toute modification de `agent-worktree.ps1` |

@@ -180,3 +180,15 @@ a été lue dans le code du moteur installé ; le moteur fait foi contre les not
 | RU-002-18 | `stat unit` affiche la VRAM utilisée et son budget | `OUVERT` | utile pour reconnaître une VRAM saturée (PERF-04) ; pas encore lu par les scripts de capture | PERF-04 |
 | RU-002-19 | Modeling Tools et Geometry Script : weight maps, bruit de Perlin | `OUVERT` | Geometry Script est déjà la base des assets ; le bruit de Perlin pourrait servir aux écorces et roches | VEG-02 |
 | RU-002-20 | Recoupement de RU-001-52 (Chaos Cloth pour plantes) et RU-001-53 (« Chaos Terrain de Trajectoire ») | `FAUX` | Chaos Cloth est prêt pour les vêtements, pas les plantes ; le second plugin n'existe ni dans les notes ni dans le moteur | — |
+# SKY_CONTINUITY_002 : contrat moteur verifie, application visuelle candidate
+
+- SkyAtmosphere emploie `GetOuterSpaceIlluminance()` des deux lumieres dans
+  `Engine/Source/Runtime/Renderer/Private/SkyAtmosphereRendering.cpp` (UE 5.8.2).
+  Les setters `SetDiffuseScale`, `SetSpecularScale`, `SetIndirectLightingIntensity` existent
+  dans `Components/LightComponent.h`. Statut : API VERIFIEE, effet visuel A PROUVER.
+- Documentation officielle : https://dev.epicgames.com/documentation/en-us/unreal-engine/directional-lights-in-unreal-engine
+  et https://dev.epicgames.com/documentation/unreal-engine/auto-exposure-in-unreal-engine .
+  Le rendu utilise une pre-exposition temporelle : un contrat CPU seul ne prouve pas l'absence de flash.
+- Decision locale : enveloppe de contribution aux surfaces dans le proprietaire existant,
+  sans toucher aux lux atmospheriques, au bloom, a la LUT ni a la duree du jour.
+  Statut artistique : CANDIDAT, voir handoffs/sky-continuity-002.md.

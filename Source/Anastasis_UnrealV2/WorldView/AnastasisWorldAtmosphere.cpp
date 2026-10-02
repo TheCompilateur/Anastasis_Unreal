@@ -27,6 +27,7 @@
 #include "WorldView/AnastasisAtmosphereResolver.h"
 #include "WorldView/AnastasisMistField.h"
 #include "WorldView/AnastasisRain.h"
+#include "WorldView/AnastasisSkyPassage.h"
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisTerrainForge.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
@@ -47,6 +48,11 @@ static TAutoConsoleVariable<int32> CVarSkyClock(
 	TEXT("anastasis.Sky.Clock"),
 	1,
 	TEXT("DAY_NIGHT_WEATHER_001. 1=the sky follows the simulation's hour, season and weather; 0=the profile's fixed sun (the observation rig). Read on every Apply() and Tick."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarSkyPassage(
+	TEXT("anastasis.Sky.Passage"), 1,
+	TEXT("SKY_CONTINUITY_002. Surface sun -> atmospheric twilight -> surface moon; exposure protection at dawn. 0 restores the previous transition for A/B. No simulation clock changes."),
 	ECVF_Default);
 
 static TAutoConsoleVariable<float> CVarSkyHour(
@@ -232,6 +238,7 @@ ActorType* AAnastasisWorldAtmosphere::AdoptOrSpawn(const FVector& Location, cons
 
 void AAnastasisWorldAtmosphere::DestroySpawnedActors()
 {
+	RestorePassage();
 	for (const TObjectPtr<AActor>& Actor : SpawnedActors)
 	{
 		if (IsValid(Actor))
@@ -307,6 +314,7 @@ void AAnastasisWorldAtmosphere::Tick(const float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	if (!bSkyClockActive)
 	{
+		RestorePassage();
 		return;
 	}
 	const UAnastasisAtmosphereProfile& Profile = AnastasisAtmosphere::GetProfile();
@@ -314,6 +322,7 @@ void AAnastasisWorldAtmosphere::Tick(const float DeltaSeconds)
 	// sky where it is until the next Apply() restores the fixed rig.
 	if (!Profile.bEnabled || !Profile.bSkyFollowsSimulation || !IsSkyClockEnabledByCVar())
 	{
+		RestorePassage();
 		return;
 	}
 	uint32 Seed = 0;
@@ -352,14 +361,73 @@ void AAnastasisWorldAtmosphere::ArbitrateDirectionalLights(const bool bMoonLeads
 	bMoonLeadsForward = bMoonLeadsNow;
 }
 
+void AAnastasisWorldAtmosphere::FPassageLight::Restore()
+{
+	if (ULightComponent* Light = Component.Get())
+	{
+		Light->SetDiffuseScale(Diffuse);
+		Light->SetSpecularScale(Specular);
+		Light->SetIndirectLightingIntensity(Indirect);
+		if (bScaledFog) Light->SetVolumetricScatteringIntensity(Fog);
+	}
+	Component.Reset();
+}
+
+void AAnastasisWorldAtmosphere::FPassageLight::Write(ULightComponent* Light, const float Weight, const bool bScaleFog)
+{
+	if (Component.Get() != Light)
+	{
+		Restore();
+		if (!Light) return;
+		Component = Light;
+		Diffuse = Light->DiffuseScale;
+		Specular = Light->SpecularScale;
+		Indirect = Light->IndirectLightingIntensity;
+		Fog = Light->VolumetricScatteringIntensity;
+		bScaledFog = bScaleFog;
+	}
+	if (!Light) return;
+	const float W = FMath::Clamp(Weight, 0.0f, 1.0f);
+	// Only attenuate authored surface energy; never multiply atmospheric lux.
+	if (!FMath::IsNearlyEqual(Light->DiffuseScale, Diffuse * W, 1e-6f)) Light->SetDiffuseScale(Diffuse * W);
+	if (!FMath::IsNearlyEqual(Light->SpecularScale, Specular * W, 1e-6f)) Light->SetSpecularScale(Specular * W);
+	if (!FMath::IsNearlyEqual(Light->IndirectLightingIntensity, Indirect * W, 1e-6f)) Light->SetIndirectLightingIntensity(Indirect * W);
+	if (bScaledFog && !FMath::IsNearlyEqual(Light->VolumetricScatteringIntensity, Fog * W, 1e-6f))
+		Light->SetVolumetricScatteringIntensity(Fog * W);
+}
+
+void AAnastasisWorldAtmosphere::RestorePassage()
+{
+	PassageSun.Restore();
+	PassageMoon.Restore();
+}
+
+void AAnastasisWorldAtmosphere::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	RestorePassage();
+	Super::EndPlay(EndPlayReason);
+}
+
 void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Profile, const bool bForceLog, const float AdaptSeconds)
 {
-	// Eye adaptation: the screen's exposure follows the hour's target at a bounded rate, so a
-	// dusk compressed into seconds by anastasis.Sim.Speed fades instead of flashing.
+	const bool bPassage = CVarSkyPassage.GetValueOnGameThread() != 0;
+	// The legacy symmetric lag could retain night sensitivity after the sun had risen.
+	// Passage permits slow dark adaptation, but never that positive exposure mismatch.
 	AppliedExposureEV = (AdaptSeconds > 0.0f && bHasAppliedExposure)
-		? AnastasisSkyClock::AdaptExposure(AppliedExposureEV, LastSky.ExposureEV100, AdaptSeconds, Profile.MaxExposureChangePerSecond)
+		? (bPassage
+			? AnastasisSkyPassage::Exposure(AppliedExposureEV, LastSky.ExposureEV100, AdaptSeconds, Profile.MaxExposureChangePerSecond)
+			: AnastasisSkyClock::AdaptExposure(AppliedExposureEV, LastSky.ExposureEV100, AdaptSeconds, Profile.MaxExposureChangePerSecond))
 		: LastSky.ExposureEV100;
 	bHasAppliedExposure = true;
+
+	const AnastasisSkyPassage::FRelay Relay = AnastasisSkyPassage::Resolve(LastSky.SunElevationDegrees,
+		AnastasisSkyClock::ElevationOf(LastSky.MoonRotation), Profile.PassageSunFullElevation, Profile.PassageMoonFullElevation);
+	if (bPassage)
+	{
+		PassageSun.Write(DirectionalComponentOf(Sun), static_cast<float>(Relay.Sun), false);
+		PassageMoon.Write(DirectionalComponentOf(Moon), static_cast<float>(Relay.Moon), true);
+	}
+	else RestorePassage();
 
 	const bool bSunUp = !AnastasisAtmosphere::IsBelowHorizon(LastSky.SunRotation);
 
@@ -410,6 +478,10 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 			{
 				CachedLightingPreExposure->Set(EV, ECVF_SetByCode);
 			}
+			LastExposureWritten = EV;
+		}
+		{
+			// These follow celestial state even while EV is on a plateau.
 			// Night vision on the same curve: colour fades and the white point follows the moon.
 			const float Sat = static_cast<float>(LastSky.ColorSaturation);
 			ExposureVolume->Settings.bOverride_ColorSaturation = true;
@@ -426,7 +498,6 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 				ExposureVolume->Settings.LocalExposureHighlightContrastScale = static_cast<float>(
 					AnastasisSkyClock::HighlightContrastFor(Profile, LastSky.Daylight, DayHighlight->GetFloat()));
 			}
-			LastExposureWritten = EV;
 		}
 	}
 
@@ -477,7 +548,8 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 
 			// The authored inscattering is an absolute luminance tuned for the day's EV: it has
 			// to dim with the light, or the night fog glows (see FogInscatteringScaleFor).
-			const float Inscatter = static_cast<float>(AnastasisSkyClock::FogInscatteringScaleFor(AppliedExposureEV, Profile.ExposureEV100));
+			const double FogEV = bPassage ? LastSky.ExposureEV100 : AppliedExposureEV;
+			const float Inscatter = static_cast<float>(AnastasisSkyClock::FogInscatteringScaleFor(FogEV, Profile.ExposureEV100));
 			const FLinearColor Scattered = Profile.FogInscatteringColor * Inscatter;
 			if (!FogComponent->FogInscatteringLuminance.Equals(Scattered, 1e-7f))
 			{
@@ -545,14 +617,17 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 		UE_LOG(LogAnastasis_UnrealV2, Display,
 			TEXT("ANASTASIS_SKY day=%.0f hour=%.2f phase=%s season=%s decl=%.2f sun_elev=%.2f moon_elev=%.2f ev100=%.2f ")
 			TEXT("cover=%.3f rain=%.3f snow=%.3f humidity=%.3f wind=%.3f weather=%d mist_factor=%.3f ")
-			TEXT("sky_humidity=%.3f sky_wind=%.3f sky_cover=%.3f forward_light=%s sun_fog_scatter=%.3f"),
+			TEXT("sky_humidity=%.3f sky_wind=%.3f sky_cover=%.3f forward_light=%s sun_fog_scatter=%.3f ")
+			TEXT("passage=%d applied_ev=%.3f exposure_lag=%.3f surface_sun=%.5f surface_moon=%.5f twilight=%.5f"),
 			LastSky.Day, LastSky.Hours, *Phase, AnastasisWeather::SeasonId(LastSky.Weather.Season),
 			LastSky.DeclinationDegrees, LastSky.SunElevationDegrees,
 			AnastasisSkyClock::ElevationOf(LastSky.MoonRotation), LastSky.ExposureEV100,
 			LastSky.Weather.Cover, LastSky.Weather.Rain, LastSky.Weather.Snow, LastSky.Humidity,
 			LastSky.Weather.Wind, bWeather ? 1 : 0, MistFactor,
 			LastSky.SkyHumidity, LastSky.SkyWind, LastSky.SkyCover,
-			bMoonLeadsForward ? TEXT("moon") : TEXT("sun"), LastSky.SunFogScattering);
+			bMoonLeadsForward ? TEXT("moon") : TEXT("sun"), LastSky.SunFogScattering,
+			bPassage ? 1 : 0, AppliedExposureEV, AppliedExposureEV - LastSky.ExposureEV100,
+			bPassage ? Relay.Sun : 1.0, bPassage ? Relay.Moon : 1.0, bPassage ? Relay.Twilight : 0.0);
 	}
 }
 
@@ -881,6 +956,7 @@ void AAnastasisWorldAtmosphere::BeginPlay()
 
 bool AAnastasisWorldAtmosphere::Apply()
 {
+	RestorePassage();
 	UWorld* World = GetWorld();
 	if (!World)
 	{

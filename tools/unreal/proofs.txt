@@ -1,4 +1,6 @@
 # Registre des preuves PIE rejouables en lot (EDITOR_QUEUE_001).
+# SKY_CONTINUITY_002: PASS = sampled live contracts, NOT absence of every visual flash.
+sky-passage-pie | tools/unreal/sky-passage-pie.py | SKY_PASSAGE PASS | SKY_PASSAGE FAIL|Traceback | 540 | -
 #
 # Une mission declare les preuves de son chantier dans sa fiche de passation :
 #     PROOFS: player-pie, village-weather-pie

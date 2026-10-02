@@ -1,5 +1,16 @@
 # Ciel, atmosphère, brouillard, nuages
 
+## Passage crepusculaire (sky-continuity-002, candidat a valider)
+
+`anastasis.Sky.Passage` commande le relais des contributions aux surfaces : soleil 0..4 deg,
+lune 0..6 deg avec extinction lorsque le soleil est leve. A l'horizon, les deux enveloppes
+sont nulles ; SkyAtmosphere conserve les lux des deux astres et porte l'intervalle.
+L'exposition appliquee ne descend jamais sous la cible de l'heure : l'aube ne conserve plus
+la sensibilite de nuit. Seule l'adaptation vers l'obscurite reste lente (3 EV/s, dt <= 0,1 s).
+Le brouillard exponentiel suit la cible, non ce retard d'adaptation. La simulation reste a l'heure.
+Les seuils sont des choix de presentation : aucun verdict artistique sans A/B/A continu.
+Preuve : `editor-batch.ps1 -Proofs sky-passage-pie`; limites et statut dans la passation.
+
 ## Unreal
 
 - **SkyAtmosphere** simule la diffusion de la lumière par l'air (Rayleigh, qui donne le bleu) et par les

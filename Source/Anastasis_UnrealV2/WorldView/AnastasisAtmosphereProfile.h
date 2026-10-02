@@ -436,12 +436,19 @@ public:
 	};
 
 	/**
-	 * Eye adaptation: the most the pinned exposure may move per REAL second while the clock
-	 * runs. Captures (Apply) snap to the hour's value; a running sky never jumps, whatever
-	 * anastasis.Sim.Speed does to the length of a dusk.
+	 * Eye adaptation rate in EV per second. Passage limits dark adaptation only (dt capped
+	 * at 0.1 s); exposure toward brighter light must immediately reach the current target.
+	 * Passage 0 retains the legacy symmetric rate. Apply/captures snap to the hour's value.
 	 */
 	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock", meta = (ClampMin = "0.1", ClampMax = "100.0"))
 	float MaxExposureChangePerSecond = 3.0f;
+
+	/** SKY_CONTINUITY_002: surface-light envelopes. The sky itself keeps physical sun/moon lux. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock|Passage", meta = (ClampMin = "0.1", ClampMax = "12.0"))
+	float PassageSunFullElevation = 4.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|SkyClock|Passage", meta = (ClampMin = "0.1", ClampMax = "12.0"))
+	float PassageMoonFullElevation = 6.0f;
 
 	/**
 	 * Night vision, not night grading. Under moonlight the eye is scotopic: colour fades and

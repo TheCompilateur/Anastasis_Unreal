@@ -13,6 +13,7 @@ class ASkyLight;
 class AVolumetricCloud;
 class UInstancedStaticMeshComponent;
 class UAnastasisAtmosphereProfile;
+class ULightComponent;
 
 /**
  * ATMOSPHERE OWNER.
@@ -46,6 +47,14 @@ public:
 	AAnastasisWorldAtmosphere();
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	/** Actual applied exposure, for temporal proofs (the sky state contains the target). */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Atmosphere")
+	double GetAppliedExposureEV() const { return AppliedExposureEV; }
+
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Atmosphere")
+	double GetTargetExposureEV() const { return LastSky.ExposureEV100; }
 
 	/** Follows the simulation clock while the sky clock is active (DAY_NIGHT_WEATHER_001). */
 	virtual void Tick(float DeltaSeconds) override;
@@ -231,8 +240,8 @@ protected:
 	 * Writes one sky instant: sun and moon orientation and shadows, pinned exposure, cloud
 	 * coverage and fog density from the weather. Called by Apply() and, while the clock is
 	 * active, every Tick. Logs a line when the village phase changes (or when bForceLog).
-	 * AdaptSeconds > 0 moves the exposure toward the hour's value at the profile's eye-adaptation
-	 * rate (Tick); 0 snaps to it (Apply, captures).
+	 * AdaptSeconds > 0 applies the exposure policy (Passage: slow dark adaptation, immediate
+	 * bright-light protection; legacy: symmetric rate); 0 snaps to the hour (Apply, captures).
 	 */
 	void UpdateSky(const UAnastasisAtmosphereProfile& Profile, bool bForceLog, float AdaptSeconds = 0.0f);
 
@@ -256,6 +265,22 @@ protected:
 	/** The exposure actually on screen, which lags the hour's target while the eye adapts. */
 	double AppliedExposureEV = 0.0;
 	bool bHasAppliedExposure = false;
+
+	/** Remember adopted-light settings so disabling the passage is reversible. */
+	struct FPassageLight
+	{
+		TWeakObjectPtr<ULightComponent> Component;
+		float Diffuse = 1.0f;
+		float Specular = 1.0f;
+		float Indirect = 1.0f;
+		float Fog = 1.0f;
+		bool bScaledFog = false;
+		void Restore();
+		void Write(ULightComponent* Light, float Weight, bool bScaleFog);
+	};
+	FPassageLight PassageSun;
+	FPassageLight PassageMoon;
+	void RestorePassage();
 
     /** Shared material weather contract. Serialized soft reference retains it in cooked builds. */
     UPROPERTY(EditDefaultsOnly, Category="Atmosphere")
