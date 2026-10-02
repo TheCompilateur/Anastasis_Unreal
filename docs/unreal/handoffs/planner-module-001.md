@@ -113,8 +113,12 @@ l'hôte doit le vider au changement de jour (là où la référence fait `update
 - Tick 196 d'endurance, référence et C++ : `build` 20, `gatherFood` 14, `gatherWood` 14, `helpFarm` 10 ;
   planchers `gatherFood` 40, `helpFarm` 28, `build` 24 ; `buildingNeedScore` 220.
 - TESTS : `Anastasis.Sim.Parite.Planificateur` : 20 variantes, 100 décisions, 7 variantes où le flux tire,
-  6 362 valeurs comparées, 0 écart. Suite `Anastasis.Sim` : À COMPLÉTER.
-- MUTATIONS : À COMPLÉTER.
+  6 362 valeurs comparées, 0 écart. Suite `Anastasis` entière (`finish -Prove`, après rebase sur help-farm-001) :
+  **PASS 278, KNOWN_EXPECTED_FAILURE 4** (`Parite.Fbm`, `Parite.SemantiqueJs`, et les deux `AI.Toolsets` marqués),
+  **FAIL 0**.
+- MUTATIONS (posée, build, `Parite.Planificateur`, retirée) :
+  - plancher `helpFarm` du creux mortel 28 → 27 : `endurance-t0 npc-0 goalFloor.helpFarm : 27, attendu 28` ;
+  - doute du rapport de stock retiré : `rapport-perime-et-depot-lointain npc-0 goalBias.build : 20, attendu 30`.
 
 ## ECARTS
 
