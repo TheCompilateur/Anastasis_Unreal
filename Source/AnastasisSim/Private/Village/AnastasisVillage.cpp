@@ -1515,7 +1515,7 @@ namespace AnastasisVillage
 		// `failureCauseForGoal(sim, npc, "explore")` = `intentExploreHint(sim, npc) ||
 		// exploreTarget(sim, npc)`. Sans intention du jour portee (ecart n°24), c'est
 		// `exploreTarget` : 2 a 8 tirages dans le releve, AVANT les bruits de la table. La
-		// cible ne sert qu'au biais d'echec de la ligne `explore`, non portee : seuls ses
+		// cible ne sert qu'au biais d'echec de la ligne `explore`, non portee (ecart n°1) : seuls ses
 		// tirages comptent ici. `spatialRiskBiasMap` (recallOrSearch) ne tire pas dans le
 		// scenario du harnais et n'est pas porte (ecart n°24).
 		Trace.ExploreDraws = ExploreTargetFor(Npc).Draws;
