@@ -32,7 +32,9 @@ PROOFS: (aucune)
 ## MEC
 
 - BUILD: sans objet (aucun fichier Unreal).
-- TESTS: `tools\unreal\test-agent-worktree.ps1` (2026-10-01, sur cette branche seule) : 35 PASS, 1 FAIL attendu —
+- TESTS: `tools\unreal\test-agent-worktree.ps1` après rebase sur `main` 5a607c9 (player-minimal-001 versée) :
+  **36 PASS, 0 FAIL**, S18 compris. Index `tools/unreal/` : aucun MISSING ni STALE.
+- Avant le rebase (2026-10-01, sur cette branche seule) : 35 PASS, 1 FAIL attendu —
   S18 `registre lisible, scripts presents` : `player-pie.py` ABSENT tant que player-minimal-001 n'est pas dans
   la base. Versée APRÈS player-minimal-001 (même lot, dans cet ordre), S18 doit passer : à relancer sur `main`
   après versement.
