@@ -215,6 +215,7 @@
 #include "Life/AnastasisNeeds.h"
 #include "Life/AnastasisVillageRhythm.h"
 #include "Life/AnastasisWeatherBehavior.h"
+#include "Village/AnastasisPlanner.h"
 #include "Work/AnastasisBuild.h"
 #include "Work/AnastasisGather.h"
 #include "World/AnastasisEntityTable.h"
@@ -404,6 +405,13 @@ namespace AnastasisVillage
 		int32 HousePhase = 1;
 		/** Seuils persistes : le PNJ vise une porte, jamais le centre bloque. */
 		TArray<FPoint> AccessPoints;
+		/**
+		 * `building.stock` tel que la reference le tient (planner-wiring-001) : toutes les cases, dans
+		 * l'ordre des cles. La case `food` est aussi tenue par `FoodPhysical` / `FoodReserved`, et celles
+		 * d'un chantier par `Materials.Stock*` : la vue du planificateur les reprend, sa recopie les y rend.
+		 */
+		bool bHasPlannerStock = false;
+		TArray<TPair<FString, AnastasisPlanner::FStockSlot>> PlannerStock;
 		/** `building.stock.food` — `{physical, reserved}`, reserved <= physical. Grenier seulement. */
 		int32 FoodPhysical = 0;
 		int32 FoodReserved = 0;
@@ -428,8 +436,8 @@ namespace AnastasisVillage
 
 		/**
 		 * `building.vacantSinceDay` (collectivePriorities.js, `stampHouseVacant`) : jour ou la maison
-		 * est devenue libre, -1 = `null` (occupee). HORS DIGEST : la projection canonique ne l'ecrit
-		 * pas (la reference non plus ne la compare pas). Pose par AddBuilding, RemoveNpc, AssignHome.
+		 * est devenue libre, -1 = `null` (occupee). Pose par AddBuilding, RemoveNpc, AssignHome, et par le
+		 * planificateur (`housingVacancySnapshot`, planner-wiring-001, via sa vue) ; lu et projete par le harnais.
 		 */
 		int32 VacantSinceDay = -1;
 
@@ -669,6 +677,16 @@ namespace AnastasisVillage
 		bool bFoodRush = false;
 		/** `farmStaffingGap(sim).gap` : postes de ferme achevee sans fermier. */
 		int32 FarmStaffingGap = 0;
+		/** `sim.buildingNeedScore()` : la pression a batir du planificateur (le `need` de `buildScore`). */
+		double BuildingNeedScore = 0.0;
+		/**
+		 * Ce que `buildScore` lit de la colonie (planner-wiring-001) : vrai quand le village a une
+		 * colonie ; `bBuildIdle` = le retour 0 (ni besoin, ni lisiere, ni manque en attente) ;
+		 * sinon `needFloor x liquidity`.
+		 */
+		bool bHasColony = false;
+		bool bBuildIdle = false;
+		double BuildNeedTerm = 0.0;
 
 		double BiasOf(const FString& Goal) const { const double* V = GoalBias.Find(Goal); return V ? *V : 0.0; }
 		double FloorOf(const FString& Goal) const { const double* V = GoalFloor.Find(Goal); return V ? *V : 0.0; }
@@ -1322,7 +1340,22 @@ namespace AnastasisVillage
 		 * Ce que le planificateur dit pour cet habitant. Sans planificateur branche : vide. Un test
 		 * peut le remplacer (`CollectiveDecisionOverride`).
 		 */
-		FCollectiveDecision CollectiveDecisionOf(const FNpc& Npc) const;
+		FCollectiveDecision CollectiveDecisionOf(const FNpc& Npc);
+		/**
+		 * La colonie d'une sauvegarde reprise par le harnais (planner-wiring-001) : tresor et moral,
+		 * priorites collectives, rapport de stock, charte, doctrine, stock du marche, rayon degage du camp.
+		 * Un village cree par le C++ n'en a pas : il ne consulte pas le planificateur (ecart n°27).
+		 */
+		void RestoreColonyForHarness(const AnastasisPlanner::FColonyState& InColony, const AnastasisPlanner::FOrderedMap& InMarketStock,
+			const TOptional<double>& InSettlementClearRadius, const TOptional<double>& InTreasury);
+		/** `colony.treasury` (le `liquidity` de `buildScore`) ; vide sans colonie. */
+		TOptional<double> GetColonyTreasury() const { return ColonyTreasury; }
+		bool HasColony() const { return bHasColony; }
+		const AnastasisPlanner::FColonyState& GetColony() const { return Colony; }
+		/** La vue du village que lit le planificateur (`sim` vu par `collectivePriorities.js`). */
+		AnastasisPlanner::FPlannerVillage BuildPlannerView();
+		/** Ce que le planificateur a ecrit dans la vue, rendu au village, dans l'ordre de sa fiche. */
+		void WritePlannerView(const AnastasisPlanner::FPlannerVillage& View);
 		TFunction<FCollectiveDecision(const FNpc&)> CollectiveDecisionOverride;
 	private:
 		bool FoodSupplyTarget(FNpc& Npc, FPoint& Out, FString& Source);
@@ -1474,7 +1507,8 @@ namespace AnastasisVillage
 		/** `constructionAccessPoint(npc)` : le seuil du premier chantier ouvert. */
 		bool ConstructionAccessPoint(FNpc& Npc, FPoint& OutTarget);
 		/** La ligne `build` d'adultScores quand un chantier est ouvert. */
-		double BuildRowScore(const FNpc& Npc, double PhaseBias, const FWorkRowContext& Work, double Noise = 0.0) const;
+		double BuildRowScore(const FNpc& Npc, double PhaseBias, const FWorkRowContext& Work, double Noise = 0.0,
+			const FCollectiveDecision& Collective = FCollectiveDecision()) const;
 
 		/**
 		 * `exploreTarget(sim, npc)` sur le flux partage (perception-explore-001) : la cible,
@@ -1578,6 +1612,15 @@ namespace AnastasisVillage
 		FPoint Settlement;
 		TOptional<double> MarketDx;
 		TOptional<double> MarketDy;
+		/** La colonie (planner-wiring-001) ; absente d'un village cree par le C++. */
+		bool bHasColony = false;
+		AnastasisPlanner::FColonyState Colony;
+		AnastasisPlanner::FOrderedMap MarketStock;
+		TOptional<double> SettlementClearRadius;
+		TOptional<double> ColonyTreasury;
+		/** `sim._npcCollectiveUrgency` : le cache d'urgence du planificateur, par seconde de jeu. */
+		FString UrgencyBucket;
+		TOptional<AnastasisPlanner::FUrgencySnapshot> UrgencyCache;
 		int32 NextBuildingId = 0;
 		TArray<FDeath> DeathLog;
 		int32 NextNpcId = 0;

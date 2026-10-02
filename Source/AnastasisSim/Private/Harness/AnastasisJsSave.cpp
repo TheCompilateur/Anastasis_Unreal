@@ -412,7 +412,8 @@ namespace AnastasisJsSave
 
 		// --- Batiments ----------------------------------------------------------
 		// Lus: id, type, x, y, progress, createdDay, owner, builderId, housePhase,
-		// piecesPlaced, accessPoints, stock.food.{physical, reserved}.
+		// piecesPlaced, accessPoints, stock (toutes les cases, dont food.{physical, reserved}),
+		// vacantSinceDay.
 
 		bool ReadBuilding(FReader& R, const FValue& B, const FString& Where, AnastasisVillage::FBuilding& Out)
 		{
@@ -445,6 +446,26 @@ namespace AnastasisJsSave
 					const FString W = Where + TEXT(".stock.food");
 					if (!R.Int(*Food, TEXT("physical"), W, Out.FoodPhysical) || !R.Int(*Food, TEXT("reserved"), W, Out.FoodReserved)) return false;
 				}
+				// Toutes les cases, dans l'ordre (planner-wiring-001) : le planificateur les lit et les ecrit.
+				if (Stock->IsObject())
+				{
+					Out.bHasPlannerStock = true;
+					for (int32 K = 0; K < Stock->Keys.Num(); ++K)
+					{
+						const FString W = FString::Printf(TEXT("%s.stock.%s"), *Where, *Stock->Keys[K]);
+						AnastasisPlanner::FStockSlot Slot;
+						const FValue& V = Stock->Items[K];
+						if (V.IsObject())
+						{
+							if (!R.OptInt(V, TEXT("physical"), W, Slot.Physical) || !R.OptInt(V, TEXT("reserved"), W, Slot.Reserved)) return false;
+						}
+						Out.PlannerStock.Emplace(Stock->Keys[K], Slot);
+					}
+				}
+			}
+			if (const FValue* Vacant = B.Find(TEXT("vacantSinceDay")); Vacant && !Vacant->IsNull())
+			{
+				if (!R.Int(B, TEXT("vacantSinceDay"), Where, Out.VacantSinceDay)) return false;
 			}
 			// `laborToday` (act-gate-001) : absent tant qu'aucun geste de travail n'a ete note.
 			if (B.Find(TEXT("laborToday")))
@@ -488,7 +509,21 @@ namespace AnastasisJsSave
 				}
 				Out.Set(TEXT("accessPoints"), Access);
 			}
-			if (FValue* Stock = Out.Find(TEXT("stock")))
+			if (B.bHasPlannerStock)
+			{
+				// Le stock tel que le planificateur l'a laisse ; la nourriture, telle que le village la tient.
+				FValue Stock = FValue::MakeObject();
+				for (const TPair<FString, AnastasisPlanner::FStockSlot>& Slot : B.PlannerStock)
+				{
+					const bool bFood = Slot.Key == TEXT("food");
+					FValue S = FValue::MakeObject();
+					S.Set(TEXT("physical"), Num(bFood ? B.FoodPhysical : Slot.Value.Physical));
+					S.Set(TEXT("reserved"), Num(bFood ? B.FoodReserved : Slot.Value.Reserved));
+					Stock.Set(Slot.Key, S);
+				}
+				Out.Set(TEXT("stock"), Stock);
+			}
+			else if (FValue* Stock = Out.Find(TEXT("stock")))
 			{
 				if (FValue* Food = Stock->Find(TEXT("food")))
 				{
@@ -496,6 +531,8 @@ namespace AnastasisJsSave
 					Food->Set(TEXT("reserved"), Num(B.FoodReserved));
 				}
 			}
+			if (B.VacantSinceDay >= 0) Out.Set(TEXT("vacantSinceDay"), Num(static_cast<double>(B.VacantSinceDay)));
+			else if (Out.Find(TEXT("vacantSinceDay"))) Out.Set(TEXT("vacantSinceDay"), FValue());
 			if (B.bHasLaborToday) Out.Set(TEXT("laborToday"), Num(B.LaborToday));
 			return Out;
 		}

@@ -65,14 +65,19 @@ namespace AnastasisBuild
 		return 1.0;
 	}
 
+	double BuildScoreFromNeed(double NeedTimesLiquidity, double TraitBuild, const FString& JobId)
+	{
+		const double BuilderFit = JobId == JobBuilder ? 18.0
+			: (JobId == TEXT("artisan") || JobId == TEXT("blacksmith")) ? 6.0 : 0.0;
+		return NeedTimesLiquidity * TraitBuild * JobTraitBiasBuild(JobId)
+			+ BuilderFit
+			+ AnastasisGather::JobPriority(JobId, GoalBuild);
+	}
+
 	double BuildScoreActiveSite(double TraitBuild, const FString& JobId)
 	{
 		// needFloor = max(85, 0, 0) ; liquidite 1 (chantier actif).
-		const double BuilderFit = JobId == JobBuilder ? 18.0
-			: (JobId == TEXT("artisan") || JobId == TEXT("blacksmith")) ? 6.0 : 0.0;
-		return NeedWithActiveSite * 1.0 * TraitBuild * JobTraitBiasBuild(JobId)
-			+ BuilderFit
-			+ AnastasisGather::JobPriority(JobId, GoalBuild)
+		return BuildScoreFromNeed(NeedWithActiveSite * 1.0, TraitBuild, JobId)
 			+ 0.0  // planBias : pas de plan
 			+ 0.0  // colonizationBuildBias : pas de lisiere chaude
 			+ 0.0  // colonySiteBuildBias : pas de brief de chantier (ouverture non portee)

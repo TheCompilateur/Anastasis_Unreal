@@ -494,26 +494,40 @@ poste, n'est pas porté. Un geste fait au poste mais plus près d'un autre bâti
 l'autre, et le `laborToday` du poste en manque une part. `helpFarm` (help-farm-001) passe aussi par
 `workAtWorkplaceYard` dans la référence : même manque.
 
-### n° 27 — Planificateur collectif non porté : biais, planchers et urgence vides
+### n° 27 — Planificateur collectif : branché sur une colonie reprise, pas sur le village du C++
 
 - **classe** : REDUIT
 - **destin** : A_FERMER
-- **fermeture** : planner-module-001, puis build-decision-001
+- **fermeture** : passe quotidienne des priorités (`updateCollectivePrioritiesDaily`), `pickCollectiveBuilding`, colonie du village C++
 - **statut** : OUVERT
 - **entree** : help-farm-001
-- **reference** : `src/sim/collectivePriorities.js` (`collectiveGoalBias`, `collectiveGoalFloor`, `isFoodRush`, `farmStaffingGap`, `isWoodBootstrapDraftee`), `src/sim/npc.js` (`collectiveUrgencyBiasMap`, fin d'`adultScores` l. 1205-1258)
-- **cpp** : `Village/AnastasisVillage.cpp`, `CollectiveDecisionOf` (vide) et `ApplyCollectivePass`
+- **modifie** : planner-wiring-001
+- **reference** : `src/sim/collectivePriorities.js` (`collectiveGoalBias`, `collectiveGoalFloor`, `isFoodRush`, `farmStaffingGap`, `isWoodBootstrapDraftee`, `collectiveBuildingNeedScore`, `pickCollectiveBuilding`), `src/sim/npc.js` (`collectiveUrgencyBiasMap`, fin d'`adultScores` l. 1205-1258, `buildScore` l. 2733)
+- **cpp** : `Village/AnastasisVillage.cpp`, `CollectiveDecisionOf`, `BuildPlannerView` / `WritePlannerView`, `BuildRowScore`
 - **harnais** : actors, rng
-- **detail** : `docs/migration/phase3/P3_PLANIFICATEUR.md` (sur agent/build-decision-001)
+- **detail** : `docs/migration/phase3/P3_PLANIFICATEUR.md`
 
-La passe finale de la table (urgence collective, plancher après `workFactor`, corvée de bois, rush famine)
-est branchée à sa place, mais le planificateur qui l'alimente n'est pas porté : `FCollectiveDecision`
-est vide, la table garde ses bits. Sur `endurance`, la référence a pourtant des planchers `gatherFood` 40,
-`helpFarm` 28, `build` 24 et des biais `build` 20, `gatherFood` 14, `gatherWood` 14, `helpFarm` 10
-(constants sur la journée) : ce sont eux qui font choisir `helpFarm` sans ferme (tick 196) et `build`
-sans chantier (tick 32).
-Depuis planner-module-001, le planificateur est porté en module seul (`Village/AnastasisPlanner`, prouvé au
-bit par `Anastasis.Sim.Parite.Planificateur`) : il reste à remplir `CollectiveDecisionOf` depuis sa vue.
+Depuis planner-wiring-001, `CollectiveDecisionOf` est remplie par le planificateur (`AnastasisPlanner::DecisionFor`)
+sur une vue du village, et ses écritures (vacance des maisons, stock des bâtiments, rapport de stock, charte,
+caches) reviennent au village. La ligne `build` est calculée sans chantier (`buildScore` : besoin, liquidité,
+traits, biais collectif) et sa cible est `marketAccessPoint`. Ce qui reste :
+
+- **village sans colonie** : un village créé par le C++ n'a pas de `colony` ; il ne consulte pas le planificateur
+  (décision vide, la table garde ses bits) et sa ligne `build` garde le besoin fixe 85 d'un chantier ouvert ;
+- **passe quotidienne** : `updateCollectivePrioritiesDaily` (niveaux, métiers, scores stockés, focus, et la remise
+  à zéro du cache `_effects`) n'est pas portée ; masquée dans le harnais. Le cache n'est donc vidé qu'à
+  l'expiration de la charte, jamais au changement de jour ;
+- **`isEssentialBuildType(chooseBuildingType())`** : `pickCollectiveBuilding` n'est pas porté, lu faux. Ne
+  pèse que si le trésor est entre 1 et 14 pièces, sans chantier ni fondation possible (liquidité 0,35 au lieu de 1) ;
+  son `stampDecision` n'est pas écrit ;
+- **`colonizationBuildBias`, `colonySiteBuildBias`** : nuls (pas de lisière chaude ni de brief de chantier) ;
+- **`liveHotPads`** : lu comme `doctrine.hotPads.length`, sans `pruneHotPads` ;
+- **`findBuildSpot`** (frontière urbaine) : non fourni à la vue ;
+- **ordre d'appel** : la référence interroge le planificateur ligne par ligne pendant la table ; le C++ une fois,
+  avant la table. Seul le rafraîchissement paresseux du rapport de stock tire `sim.rng` (une fois par jour au plus) :
+  le jour où il tire, son tirage peut changer de place dans le flux ;
+- **arrivée sans chantier** : `tryOpenNewConstruction` / `tryBuild` ne sont pas portés (n° 18) : le bâtisseur
+  arrivé au site du marché attend, puis se redirige après trois échecs.
 
 ### n° 28 — Mortalité : seule la mort par santé épuisée est portée
 
@@ -557,11 +571,11 @@ Le même multiplicateur de la grille de navigation que lit l'A* devient le temps
 - **entree** : planner-module-001
 - **reference** : `src/sim/collectivePriorities.js` `woodBootstrapDraft` (`String(a.id).localeCompare(String(b.id))`)
 - **cpp** : `Village/AnastasisPlanner.cpp`, `WoodBootstrapDraft`
-- **harnais** : aucune
+- **harnais** : actors
 
 À aptitude égale, la référence classe les habitants par `localeCompare` (collation ICU de la locale) ; le C++
 les classe par ordre ordinal des identifiants. Les deux ordres coïncident pour des identifiants de même forme
 (`npc-0`, `npc-12`, `npc-3` : chiffres comparés caractère par caractère), qui sont ceux de tous les scénarios ;
-ils divergent pour des identifiants mêlant casses ou ponctuation. Module seul aujourd'hui : une fois branché, la
+ils divergent pour des identifiants mêlant casses ou ponctuation. Branché depuis planner-wiring-001 : la
 divergence toucherait `actors`. Porter la collation ICU ou restreindre la forme
 des identifiants : à trancher.

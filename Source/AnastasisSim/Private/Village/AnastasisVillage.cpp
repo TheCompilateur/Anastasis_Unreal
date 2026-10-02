@@ -1731,11 +1731,238 @@ namespace AnastasisVillage
 		Act(Npc, Dt);
 	}
 
-	FCollectiveDecision FVillage::CollectiveDecisionOf(const FNpc& Npc) const
+	namespace PlannerWiring
+	{
+		// `worldArchetypes.js` : `scarceSeed` par archetype (jours de graine rare). Seuls bois et pierre
+		// sont lus par le planificateur (`exploitSpinePending`, `stoneFirst`).
+		void ScarceSeedOf(AnastasisWorldArchetype::EId Id, double& OutWood, double& OutStone)
+		{
+			OutWood = 0.0;
+			OutStone = 0.0;
+			const FString Name = AnastasisWorldArchetype::IdName(Id);
+			if (Name == TEXT("delta")) { OutWood = 2.0; OutStone = 3.0; }
+			else if (Name == TEXT("plateau")) { OutWood = 2.0; }
+			else if (Name == TEXT("highland")) { OutWood = 3.0; }
+			else if (Name == TEXT("deepwood")) { OutStone = 3.0; }
+		}
+
+		const TCHAR* ResourceName(AnastasisWorld::EResource Resource)
+		{
+			switch (Resource)
+			{
+			case AnastasisWorld::EResource::Stone: return TEXT("stone");
+			case AnastasisWorld::EResource::Wood: return TEXT("wood");
+			case AnastasisWorld::EResource::Food: return TEXT("food");
+			default: return TEXT("");
+			}
+		}
+
+		void SetSlot(TArray<TPair<FString, AnastasisPlanner::FStockSlot>>& Stock, const TCHAR* Resource, int32 Physical, int32 Reserved, bool bAddIfMissing)
+		{
+			for (TPair<FString, AnastasisPlanner::FStockSlot>& Slot : Stock)
+			{
+				if (Slot.Key == Resource)
+				{
+					Slot.Value.Physical = Physical;
+					Slot.Value.Reserved = Reserved;
+					return;
+				}
+			}
+			if (!bAddIfMissing) return;
+			AnastasisPlanner::FStockSlot New;
+			New.Physical = Physical;
+			New.Reserved = Reserved;
+			Stock.Emplace(Resource, New);
+		}
+
+		const AnastasisPlanner::FStockSlot* FindSlot(const TArray<TPair<FString, AnastasisPlanner::FStockSlot>>& Stock, const TCHAR* Resource)
+		{
+			for (const TPair<FString, AnastasisPlanner::FStockSlot>& Slot : Stock)
+			{
+				if (Slot.Key == Resource) return &Slot.Value;
+			}
+			return nullptr;
+		}
+	}
+
+	void FVillage::RestoreColonyForHarness(const AnastasisPlanner::FColonyState& InColony, const AnastasisPlanner::FOrderedMap& InMarketStock,
+		const TOptional<double>& InSettlementClearRadius, const TOptional<double>& InTreasury)
+	{
+		ColonyTreasury = InTreasury;
+		bHasColony = true;
+		Colony = InColony;
+		MarketStock = InMarketStock;
+		SettlementClearRadius = InSettlementClearRadius;
+		UrgencyBucket.Reset();
+		UrgencyCache.Reset();
+	}
+
+	AnastasisPlanner::FPlannerVillage FVillage::BuildPlannerView()
+	{
+		AnastasisPlanner::FPlannerVillage View;
+		View.Day = static_cast<double>(Day());
+		View.Time = Now;
+		View.W = World ? World->W : 0;
+		View.H = World ? World->H : 0;
+		View.bHasSettlement = true;
+		View.SettlementX = Settlement.X;
+		View.SettlementY = Settlement.Y;
+		View.SettlementClearRadius = SettlementClearRadius;
+		View.MarketDx = MarketDx;
+		View.MarketDy = MarketDy;
+		// `sim._marketPos` : pose a l'achevement d'un marche ; ce village n'en batit pas.
+		for (const FBuilding& B : Buildings.GetItems())
+		{
+			AnastasisPlanner::FPlannerBuilding& Out = View.Buildings.AddDefaulted_GetRef();
+			Out.Id = B.Id;
+			Out.Type = B.Type;
+			Out.Progress = B.Progress;
+			Out.X = B.X;
+			Out.Y = B.Y;
+			Out.Owner = B.Owner;
+			if (B.VacantSinceDay >= 0) Out.VacantSinceDay = static_cast<double>(B.VacantSinceDay);
+			// `createdDay || day` : un 0 se lit comme une absence, des deux cotes.
+			Out.CreatedDay = static_cast<double>(B.CreatedDay);
+			if (B.Type == HouseType) Out.HousePhase = static_cast<double>(B.HousePhase);
+			if (B.bHasMaterials)
+			{
+				Out.bHasMaterialsNeeded = true;
+				if (B.Materials.NeedWood > 0) Out.MaterialsNeeded.Set(TEXT("wood"), B.Materials.NeedWood);
+				if (B.Materials.NeedStone > 0) Out.MaterialsNeeded.Set(TEXT("stone"), B.Materials.NeedStone);
+				if (B.Materials.ConsumedWood > 0) Out.MaterialsConsumed.Set(TEXT("wood"), B.Materials.ConsumedWood);
+				if (B.Materials.ConsumedStone > 0) Out.MaterialsConsumed.Set(TEXT("stone"), B.Materials.ConsumedStone);
+			}
+			Out.PiecesPlaced = B.PiecesPlaced;
+			// Le stock : les cases de la reference, avec la nourriture et le stock de chantier tenus par le C++.
+			Out.bHasStock = B.bHasPlannerStock;
+			Out.Stock = B.PlannerStock;
+			if (B.Type == GranaryType || PlannerWiring::FindSlot(Out.Stock, TEXT("food")))
+			{
+				PlannerWiring::SetSlot(Out.Stock, TEXT("food"), B.FoodPhysical, B.FoodReserved, Out.bHasStock);
+			}
+			if (B.bHasMaterials && Out.bHasStock)
+			{
+				PlannerWiring::SetSlot(Out.Stock, TEXT("wood"), B.Materials.StockWood, 0, false);
+				PlannerWiring::SetSlot(Out.Stock, TEXT("stone"), B.Materials.StockStone, 0, false);
+			}
+		}
+		for (const FNpc& N : Actors.GetItems())
+		{
+			AnastasisPlanner::FPlannerActor& Out = View.Actors.AddDefaulted_GetRef();
+			Out.Id = N.Id;
+			// Adultes seulement, vivants (ecart n°8).
+			Out.LifeStage = FString();
+			Out.JobId = N.JobId;
+			Out.bAlive = true;
+			Out.HomeId = N.HomeId;
+			Out.ShelterId = N.ShelterId;
+			Out.WorkplaceId = N.WorkplaceId;
+			Out.TraitGather = AnastasisGather::TraitAt(N.TraitIndex).Gather;
+			// Pas de bois porte dans ce village.
+			Out.InventoryWood = 0;
+		}
+		View.bHasColony = bHasColony;
+		View.Colony = Colony;
+		View.MarketStock = MarketStock;
+		if (World) PlannerWiring::ScarceSeedOf(World->Archetype.Id, View.ScarceSeedWood, View.ScarceSeedStone);
+		View.TileAt = [this](int32 X, int32 Y, AnastasisPlanner::FPlannerTile& Out)
+		{
+			if (!World || X < 0 || Y < 0 || X >= World->W || Y >= World->H) return false;
+			const AnastasisWorld::FTile Tile = LiveTileAt(X, Y);
+			const TCHAR* TypeName = AnastasisWorld::TileTypeName(Tile.Type);
+			Out.Type = TypeName ? TypeName : TEXT("");
+			Out.Resource = PlannerWiring::ResourceName(Tile.Resource);
+			Out.Amount = static_cast<double>(Tile.Amount);
+			return true;
+		};
+		// `findBuildSpot` : la frontiere urbaine n'est pas portee (ecart n°27) : non fournie.
+		View.Rng = &VillageRng;
+		View.UrgencyBucket = UrgencyBucket;
+		View.UrgencyCache = UrgencyCache;
+		return View;
+	}
+
+	void FVillage::WritePlannerView(const AnastasisPlanner::FPlannerVillage& View)
+	{
+		// L'ordre de la fiche du planificateur : vacance, stock des batiments, rapport (et flux, tenu
+		// en place : `View.Rng` est le flux du village), charte, caches.
+		TArray<FBuilding>& Items = Buildings.GetItemsMutable();
+		for (int32 I = 0; I < Items.Num() && I < View.Buildings.Num(); ++I)
+		{
+			FBuilding& B = Items[I];
+			const AnastasisPlanner::FPlannerBuilding& V = View.Buildings[I];
+			B.VacantSinceDay = V.VacantSinceDay.IsSet() ? static_cast<int32>(V.VacantSinceDay.GetValue()) : -1;
+			B.bHasPlannerStock = V.bHasStock;
+			B.PlannerStock = V.Stock;
+			if (const AnastasisPlanner::FStockSlot* Food = PlannerWiring::FindSlot(V.Stock, TEXT("food")))
+			{
+				B.FoodPhysical = Food->Physical;
+				B.FoodReserved = Food->Reserved;
+			}
+			if (B.bHasMaterials)
+			{
+				if (const AnastasisPlanner::FStockSlot* Wood = PlannerWiring::FindSlot(V.Stock, TEXT("wood"))) B.Materials.StockWood = Wood->Physical;
+				if (const AnastasisPlanner::FStockSlot* Stone = PlannerWiring::FindSlot(V.Stock, TEXT("stone"))) B.Materials.StockStone = Stone->Physical;
+			}
+		}
+		Colony = View.Colony;
+		UrgencyBucket = View.UrgencyBucket;
+		UrgencyCache = View.UrgencyCache;
+	}
+
+	FCollectiveDecision FVillage::CollectiveDecisionOf(const FNpc& Npc)
 	{
 		if (CollectiveDecisionOverride) return CollectiveDecisionOverride(Npc);
-		// Le planificateur collectif n'est pas encore branche (planner-module-001) : rien a dire (ecart n°27).
-		return FCollectiveDecision();
+		// Un village cree par le C++ n'a pas de colonie : la reference, sans `sim.colony`, rend des biais
+		// et des planchers nuls ; son urgence et sa corvee de bois, elles, ne sont pas consultees ici (ecart n°27).
+		if (!bHasColony) return FCollectiveDecision();
+		// Le cache des effets n'est vide, dans la reference, que par la passe quotidienne
+		// (`updateCollectivePrioritiesDaily`, non portee, masquee dans le harnais) et l'expiration de la charte :
+		// il n'est donc pas vide au changement de jour ici (ecart n°27).
+		AnastasisPlanner::FPlannerVillage View = BuildPlannerView();
+		const AnastasisPlanner::FPlannerDecision D = AnastasisPlanner::DecisionFor(View, Npc.Id);
+		FCollectiveDecision Out;
+		// `buildScore` (npc.js l. 2733) : ses lectures du planificateur, dans son ordre.
+		Out.bHasColony = true;
+		{
+			const double Need = D.BuildingNeedScore;
+			const int32 HotPads = View.Colony.DoctrineHotPads;
+			const bool bSpine = !AnastasisPlanner::ExploitSpinePending(View).IsEmpty();
+			const bool bAmenity = !AnastasisPlanner::VillageAmenityPending(View).IsEmpty();
+			const bool bCraft = !AnastasisPlanner::VillageCraftPending(View).IsEmpty();
+			const bool bHerd = !AnastasisPlanner::VillageHerdPending(View).IsEmpty();
+			const bool bBootstrap = !AnastasisPlanner::CraftBootstrapPending(View).IsEmpty();
+			const bool bAnyPending = bSpine || bAmenity || bCraft || bHerd || bBootstrap;
+			if (Need <= 0.0 && HotPads <= 0 && !bAnyPending)
+			{
+				Out.bBuildIdle = true;
+			}
+			else
+			{
+				namespace B = AnastasisBuild;
+				const bool bActiveSite = AnastasisPlanner::ActiveConstructionCount(View) > 0;
+				const int32 Treasury = ColonyTreasury.IsSet() ? AnastasisJs::ToInt32(ColonyTreasury.GetValue()) : 0;
+				// `(npc.inventory?.wood | 0) + (sim.market?.stock?.wood | 0)` : personne ne porte de bois ici.
+				const int32 Wood = AnastasisJs::ToInt32(View.MarketStock.Get(TEXT("wood")));
+				const bool bFoundationOk = bBootstrap && (Treasury >= B::FoundationWageGold || Wood >= B::FoundationInKindWood);
+				// `isEssentialBuildType(sim, sim.chooseBuildingType())` : `pickCollectiveBuilding` n'est pas
+				// porte ; lu faux. Ne pese qu'entre 1 et 14 pieces d'or, sans chantier ni fondation (ecart n°27).
+				const bool bEssentialOk = false;
+				const bool bCanPay = Treasury >= B::BuildWage || bFoundationOk || bEssentialOk || Treasury <= 0;
+				const double Liquidity = bActiveSite ? 1.0 : bCanPay ? 1.0 : Treasury > 0 ? 0.35 : 0.15;
+				const double NeedFloor = FMath::Max(Need, FMath::Max(HotPads > 0 ? 28.0 : 0.0, bAnyPending ? 48.0 : 0.0));
+				Out.BuildNeedTerm = NeedFloor * Liquidity;
+			}
+		}
+		WritePlannerView(View);
+		Out.GoalBias = D.GoalBias;
+		Out.GoalFloor = D.GoalFloor;
+		Out.UrgencyBias = D.UrgencyBias;
+		Out.bWoodBootstrapDraftee = D.bWoodBootstrapDraftee;
+		Out.bFoodRush = D.bFoodRush;
+		Out.FarmStaffingGap = D.FarmStaffingGap;
+		Out.BuildingNeedScore = D.BuildingNeedScore;
+		return Out;
 	}
 
 	void FVillage::ApplyCollectivePass(const FNpc& Npc, const FCollectiveDecision& Collective,
@@ -1866,9 +2093,9 @@ namespace AnastasisVillage
 				Rows.Add(TPair<FString, double>(G, SocialRowScore(Npc, G, Need, AnastasisRhythm::PhaseBias(Phase, Subject, G), Noise)));
 				continue;
 			}
-			else if (bSite && G == AnastasisBuild::GoalBuild)
+			else if ((bSite || Collective.bHasColony) && G == AnastasisBuild::GoalBuild)
 			{
-				Rows.Add(TPair<FString, double>(G, BuildRowScore(Npc, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work, Noise)));
+				Rows.Add(TPair<FString, double>(G, BuildRowScore(Npc, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work, Noise, Collective)));
 				continue;
 			}
 			else if (G == GoalHelpFarm)
@@ -1948,7 +2175,7 @@ namespace AnastasisVillage
 			else if (Row.Key == GoalSocialize) Trace.SocializeRowScore = Row.Value;
 			else if (Row.Key == GoalRelax) Trace.RelaxRowScore = Row.Value;
 			else if (bWorker && Row.Key == GoalGatherFood) Trace.GatherRowScore = Row.Value;
-			else if (bSite && Row.Key == AnastasisBuild::GoalBuild) Trace.BuildRowScore = Row.Value;
+			else if ((bSite || Collective.bHasColony) && Row.Key == AnastasisBuild::GoalBuild) Trace.BuildRowScore = Row.Value;
 			else if (bWorker && Row.Key == GoalDeliver) Trace.DeliverRowScore = Row.Value;
 			else if (Row.Key == GoalShelterRain) Trace.ShelterRowScore = Row.Value;
 			else if (Row.Value > Trace.FloorScore)
@@ -2082,8 +2309,15 @@ namespace AnastasisVillage
 		else if (Npc.Goal == GoalHelpFarm) bFound = HelpFarmTarget(Npc, Target, Source);
 		else if (Npc.Goal == AnastasisBuild::GoalBuild)
 		{
+			// `bindBuildSite` puis `constructionAccessPoint`, sinon `marketAccessPoint` : sans chantier,
+			// le batisseur va au site du marche (planner-wiring-001).
 			bFound = ConstructionAccessPoint(Npc, Target);
 			Source = TEXT("site");
+			if (!bFound && bHasColony)
+			{
+				bFound = MarketAccessPoint(&Npc, Target);
+				Source = TEXT("market");
+			}
 		}
 		else
 		{
@@ -2164,13 +2398,38 @@ namespace AnastasisVillage
 		return FMath::Max(FMath::Abs(AX - TX), FMath::Abs(AY - TY)) <= 1;
 	}
 
+	namespace
+	{
+		/** `travelActivity(goal)` (npc.js l. 3821) : le mot d'un habitant en route, selon son but. */
+		const TCHAR* JsTravelActivity(const FString& Goal)
+		{
+			if (Goal == TEXT("deliver") || Goal == TEXT("sell") || Goal == TEXT("buy") || Goal == TEXT("fetchInput")
+				|| Goal == TEXT("haulJob") || Goal == TEXT("haulCart")) return TEXT("livre");
+			if (Goal == TEXT("socialize") || Goal == TEXT("visitFamily") || Goal == TEXT("aidHousehold") || Goal == TEXT("play")) return TEXT("socialise");
+			if (Goal == TEXT("relax")) return TEXT("relaxe");
+			if (Goal == TEXT("relieve")) return TEXT("besoins");
+			if (Goal == TEXT("drink")) return TEXT("boit");
+			if (Goal == TEXT("gatherWood") || Goal == TEXT("gatherStone") || Goal == TEXT("gatherFood") || Goal == TEXT("explore")
+				|| Goal == TEXT("helpFarm")) return TEXT("cherche");
+			if (Goal == TEXT("build")) return TEXT("chantier");
+			if (Goal == TEXT("craft") || Goal == TEXT("maintain")) return TEXT("travaille");
+			if (Goal == TEXT("apprentice")) return TEXT("apprend");
+			if (Goal == TEXT("study")) return TEXT("etudie");
+			if (Goal == TEXT("rest")) return TEXT("repose");
+			if (Goal == TEXT("eat") || Goal == TEXT("eatTogether")) return TEXT("mange");
+			// Rites orthodoxes, `confront`, `shelterRain`, `closeWorkplace` et le reste.
+			return TEXT("marche");
+		}
+	}
+
 	void FVillage::Act(FNpc& Npc, double Dt)
 	{
 		if (Npc.bHasTarget && !ReachedMoveTarget(Npc, Npc.Target))
 		{
 			// `if (!CRAFT_GOALS.has(npc.goal)) clearWorkSession(npc)`.
 			if (Npc.Goal != GoalGatherFood && Npc.Goal != AnastasisBuild::GoalBuild) ClearWorkSession(Npc);
-			Npc.Activity = TEXT("marche");
+			// `setActivity(sim, npc, travelActivity(npc.goal))` (planner-wiring-001 : le C++ ecrivait « marche » pour tous).
+			Npc.Activity = JsTravelActivity(Npc.Goal);
 			MoveActor(Npc, Npc.Target, Dt);
 			return;
 		}
@@ -5526,13 +5785,27 @@ namespace AnastasisVillage
 		return 1;
 	}
 
-	double FVillage::BuildRowScore(const FNpc& Npc, double PhaseBias, const FWorkRowContext& Work, double Noise) const
+	double FVillage::BuildRowScore(const FNpc& Npc, double PhaseBias, const FWorkRowContext& Work, double Noise,
+		const FCollectiveDecision& Collective) const
 	{
 		namespace B = AnastasisBuild;
 		namespace G = AnastasisGather;
 		const G::FTrait& Trait = G::TraitAt(Npc.TraitIndex);
+		// `buildScore` : avec une colonie, le besoin et la liquidite du planificateur, puis
+		// `planBias` (nul, ecart n°24), `colonizationBuildBias` et `colonySiteBuildBias` (nuls, ecart n°27),
+		// et le biais collectif. Sans colonie, le chantier ouvert du village cree par le C++.
+		double Base = 0.0;
+		if (!Collective.bHasColony) Base = B::BuildScoreActiveSite(Trait.Build, Npc.JobId);
+		else if (!Collective.bBuildIdle)
+		{
+			Base = B::BuildScoreFromNeed(Collective.BuildNeedTerm, Trait.Build, Npc.JobId)
+				+ 0.0  // planBias
+				+ 0.0  // colonizationBuildBias
+				+ 0.0  // colonySiteBuildBias
+				+ Collective.BiasOf(B::GoalBuild);
+		}
 		// `(buildScore + goalNoise(sim, 14)) * wf("build")` : le bruit est tire par ChooseGoal, a sa place dans la table.
-		double Score = (B::BuildScoreActiveSite(Trait.Build, Npc.JobId) + Noise) * G::SurvivalWorkFactor(B::GoalBuild, Work.WorkFactor, Work.bMealBlocked);
+		double Score = (Base + Noise) * G::SurvivalWorkFactor(B::GoalBuild, Work.WorkFactor, Work.bMealBlocked);
 		// Les biais, dans l'ordre d'adultScores. Le poste (grenier) ne pese pas sur `build` ;
 		// statut, age, district, foyer, episodes, scenes, humeur, plans, meteo, nature
 		// (moyenne), memoire sociale et d'echec, ordres, prevision, risque, urgence : nuls.

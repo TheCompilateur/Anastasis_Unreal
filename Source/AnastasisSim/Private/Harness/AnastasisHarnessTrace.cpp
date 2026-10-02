@@ -114,6 +114,129 @@ namespace AnastasisHarnessTrace
 		return AnastasisJsSave::Read(*Save, OutState, OutError);
 	}
 
+	namespace
+	{
+		double NumOr(const FValue* V, double Fallback) { return (V && V->IsNumber()) ? V->Number : Fallback; }
+		FString StrOr(const FValue* V) { return (V && V->IsString()) ? V->String : FString(); }
+
+		/** Un objet `{ cle: nombre }`, dans l'ordre ; les valeurs non numeriques sont sautees. */
+		void ReadNumberMap(const FValue* Obj, AnastasisPlanner::FOrderedMap& Out)
+		{
+			if (!Obj || !Obj->IsObject()) return;
+			for (int32 K = 0; K < Obj->Keys.Num(); ++K)
+			{
+				if (Obj->Items[K].IsNumber()) Out.Set(Obj->Keys[K], Obj->Items[K].Number);
+			}
+		}
+
+		/**
+		 * `sim.colony` (planner-wiring-001) : ce que lit le planificateur collectif. Les caches `_effects`
+		 * et `_woodDraft` ne sont pas relus : absents de la sauvegarde d'endurance, ils se recalculent.
+		 */
+		void ReadColony(const FValue& C, AnastasisPlanner::FColonyState& Out)
+		{
+			if (const FValue* Morale = C.Find(TEXT("morale")); Morale && Morale->IsNumber()) Out.Morale = Morale->Number;
+			if (const FValue* Doctrine = C.Find(TEXT("doctrine")); Doctrine && Doctrine->IsObject())
+			{
+				const FValue* Pads = Doctrine->Find(TEXT("hotPads"));
+				Out.DoctrineHotPads = (Pads && Pads->IsArray()) ? Pads->Items.Num() : 0;
+				const double Bonus = NumOr(Doctrine->Find(TEXT("expansionBonus")), 0.0);
+				Out.DoctrineExpansionBonus = FMath::IsFinite(Bonus) ? Bonus : 0.0;
+			}
+			if (const FValue* P = C.Find(TEXT("priorities")); P && P->IsObject())
+			{
+				AnastasisPlanner::FCollectivePriorities& Pr = Out.Priorities;
+				const FValue* Levels = P->Find(TEXT("priorities"));
+				for (const TCHAR* Type : { TEXT("food"), TEXT("housing"), TEXT("tools"), TEXT("labor"), TEXT("transport"), TEXT("security") })
+				{
+					const FValue* Entry = Levels ? Levels->Find(Type) : nullptr;
+					const double Level = Entry ? NumOr(Entry->Find(TEXT("level")), 0.0) : 0.0;
+					Pr.Levels.Set(Type, Level != 0.0 && !FMath::IsNaN(Level) ? Level : 0.0);
+				}
+				if (const FValue* Jobs = P->Find(TEXT("jobs")); Jobs && Jobs->IsObject())
+				{
+					for (const FValue& J : Jobs->Items)
+					{
+						if (!J.IsObject()) continue;
+						AnastasisPlanner::FJobNeed& Need = Pr.Jobs.AddDefaulted_GetRef();
+						Need.JobId = StrOr(J.Find(TEXT("jobId")));
+						Need.Current = NumOr(J.Find(TEXT("current")), 0.0);
+						Need.Needed = NumOr(J.Find(TEXT("needed")), 0.0);
+						Need.Need = NumOr(J.Find(TEXT("need")), 0.0);
+						Need.Surplus = NumOr(J.Find(TEXT("surplus")), 0.0);
+					}
+				}
+				ReadNumberMap(P->Find(TEXT("buildingScores")), Pr.BuildingScores);
+				if (const FValue* Focus = P->Find(TEXT("dailyFocus")); Focus && Focus->IsObject())
+				{
+					const FString Id = StrOr(Focus->Find(TEXT("id")));
+					if (!Id.IsEmpty())
+					{
+						AnastasisPlanner::FDailyFocus F;
+						F.Id = Id;
+						F.Forced = StrOr(Focus->Find(TEXT("forced")));
+						Pr.DailyFocus = F;
+					}
+				}
+				if (const FValue* Watch = P->Find(TEXT("siteWatch")); Watch && Watch->IsObject())
+				{
+					if (const FValue* Sites = Watch->Find(TEXT("sites")); Sites && Sites->IsObject())
+					{
+						for (int32 K = 0; K < Sites->Keys.Num(); ++K)
+						{
+							const FValue* Since = Sites->Items[K].IsObject() ? Sites->Items[K].Find(TEXT("stalledSinceDay")) : nullptr;
+							if (Since && Since->IsNumber() && FMath::IsFinite(Since->Number)) Pr.SiteStalledSinceDay.Add(Sites->Keys[K], Since->Number);
+						}
+					}
+				}
+			}
+			if (const FValue* Report = C.Find(TEXT("stockReport")); Report && Report->IsObject())
+			{
+				AnastasisPlanner::FStockReport& R = Out.StockReport;
+				R.bPresent = true;
+				R.Day = NumOr(Report->Find(TEXT("day")), 0.0);
+				R.LastRefreshDay = NumOr(Report->Find(TEXT("lastRefreshDay")), -1.0);
+				ReadNumberMap(Report->Find(TEXT("stock")), R.Stock);
+				if (const FValue* Rumor = Report->Find(TEXT("rumor")); Rumor && Rumor->IsObject())
+				{
+					AnastasisPlanner::FStockRumor Ru;
+					Ru.Resource = StrOr(Rumor->Find(TEXT("resource")));
+					Ru.Mul = NumOr(Rumor->Find(TEXT("mul")), 1.0);
+					Ru.UntilDay = NumOr(Rumor->Find(TEXT("untilDay")), 0.0);
+					Ru.Cause = StrOr(Rumor->Find(TEXT("cause")));
+					R.Rumor = Ru;
+				}
+				if (const FValue* Blind = Report->Find(TEXT("blind")); Blind && Blind->IsArray())
+				{
+					for (const FValue& B : Blind->Items)
+					{
+						if (!B.IsObject()) continue;
+						AnastasisPlanner::FStockBlind& Bl = R.Blind.AddDefaulted_GetRef();
+						Bl.Resource = StrOr(B.Find(TEXT("resource")));
+						Bl.Missed = NumOr(B.Find(TEXT("missed")), 0.0);
+						Bl.BuildingType = StrOr(B.Find(TEXT("buildingType")));
+						Bl.BuildingId = StrOr(B.Find(TEXT("buildingId")));
+						Bl.Dist = NumOr(B.Find(TEXT("dist")), 0.0);
+					}
+				}
+				R.CertifiedNear = NumOr(Report->Find(TEXT("certifiedNear")), 0.0);
+				R.IgnoredFar = NumOr(Report->Find(TEXT("ignoredFar")), 0.0);
+			}
+			if (const FValue* Charter = C.Find(TEXT("charter")); Charter && Charter->IsObject())
+			{
+				const FString Theme = StrOr(Charter->Find(TEXT("themeId")));
+				const FValue* Until = Charter->Find(TEXT("untilDay"));
+				if (!Theme.IsEmpty() && Until && Until->IsNumber())
+				{
+					AnastasisPlanner::FCharterState Ch;
+					Ch.ThemeId = Theme;
+					Ch.UntilDay = Until->Number;
+					Out.Charter = Ch;
+				}
+			}
+		}
+	}
+
 	bool Restore(const AnastasisJsSave::FState& Read, FAnastasisSimulation& Sim, FString& OutError)
 	{
 		AnastasisWorld::FWorld World = Read.World;
@@ -146,6 +269,25 @@ namespace AnastasisHarnessTrace
 			Read.Meals.Reservations, Read.Meals.Seq, NextBuildingId, NextNpcId, OutError))
 		{
 			return false;
+		}
+		// `sim.colony`, `sim.market.stock`, `settlement.clearRadius` : le planificateur collectif (planner-wiring-001).
+		if (const FValue* Colony = Read.Source.Find(TEXT("colony")); Colony && Colony->IsObject())
+		{
+			AnastasisPlanner::FColonyState State;
+			ReadColony(*Colony, State);
+			AnastasisPlanner::FOrderedMap MarketStock;
+			if (const FValue* Market = Read.Source.Find(TEXT("market")); Market && Market->IsObject())
+			{
+				ReadNumberMap(Market->Find(TEXT("stock")), MarketStock);
+			}
+			TOptional<double> ClearRadius;
+			if (const FValue* Settlement = Read.Source.Find(TEXT("settlement")))
+			{
+				if (const FValue* R = Settlement->Find(TEXT("clearRadius")); R && R->IsNumber()) ClearRadius = R->Number;
+			}
+			TOptional<double> Treasury;
+			if (const FValue* T = Colony->Find(TEXT("treasury")); T && T->IsNumber()) Treasury = T->Number;
+			Village.RestoreColonyForHarness(State, MarketStock, ClearRadius, Treasury);
 		}
 		// `sim.rng` reprend la ou la sauvegarde l'a laisse (`save.rng`) : apres `ResetFromWorld`, qui
 		// l'a seme sur la graine (`makeRng(seed)`), comme `deserialize` (reader-rng-001).

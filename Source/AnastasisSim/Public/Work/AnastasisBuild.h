@@ -88,6 +88,18 @@ namespace AnastasisBuild
 	 */
 	ANASTASISSIM_API double BuildScoreActiveSite(double TraitBuild, const FString& JobId);
 
+	/** `BUILD_WAGE` : le salaire d'une journee de chantier (content.js). */
+	inline constexpr int32 BuildWage = 15;
+	/** `FOUNDATION.wageGold` / `FOUNDATION.inKindWood`. */
+	inline constexpr int32 FoundationWageGold = 4;
+	inline constexpr int32 FoundationInKindWood = 4;
+
+	/**
+	 * `buildScore` sans les biais de plan, de colonisation et de brief :
+	 * `needFloor x liquidity x trait.build x job.traitBias.build + builderFit + jobPriority(build)`.
+	 */
+	ANASTASISSIM_API double BuildScoreFromNeed(double NeedTimesLiquidity, double TraitBuild, const FString& JobId);
+
 	/** `swingPeriodFor(npc, "build")`, sans coup de main ni technique. */
 	ANASTASISSIM_API double SwingPeriod(double Skill, int32 SwingsDone, double Energy);
 
