@@ -98,6 +98,29 @@ namespace
 		}
 	};
 
+	/** Forces a float CVar for the scope of a test, and puts the exact value back. */
+	struct FScopedFloatCVar
+	{
+		IConsoleVariable* CVar = nullptr;
+		float Before = 0.0f;
+
+		FScopedFloatCVar(const TCHAR* Name, const float Value)
+		{
+			CVar = IConsoleManager::Get().FindConsoleVariable(Name);
+			if (CVar)
+			{
+				Before = CVar->GetFloat();
+				CVar->Set(Value, ECVF_SetByCode);
+			}
+		}
+		~FScopedFloatCVar()
+		{
+			if (CVar)
+			{
+				CVar->Set(Before, ECVF_SetByCode);
+			}
+		}
+	};
 	struct FScopedEyePlaneCVar
 	{
 		IConsoleVariable* CVar = nullptr;
@@ -506,6 +529,8 @@ bool FAnastasisAtmosphereRealismReversible::RunTest(const FString&)
 	// The eye plane is on by default. This test locks the profile itself, so hold the plane off
 	// until the block that is about the plane.
 	FScopedEyePlaneCVar EyePlane(0);
+	// CONTINENTAL_001 : le plafond de perspective aerienne vit hors du profil ; ce test fige le profil lui-meme.
+	FScopedFloatCVar AerialCap(TEXT("anastasis.Atmosphere.AerialCap"), 0.0f);
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	Params.ObjectFlags |= RF_Transient;
