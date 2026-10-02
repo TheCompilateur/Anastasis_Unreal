@@ -231,6 +231,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetBuildStatus(const UObject* WorldContextObject);
 
+	/** Capacites et resultats observes du village courant ; les buts sont des intentions instantanees. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetBuildingCapacityStatus(const UObject* WorldContextObject);
+
 	/**
 	 * VILLAGER_PNG_001, en JSON : nombre d'habitants simules et de cartes, puis une ligne par
 	 * habitant avec sa carte (portrait, pieds, cachee, en miroir), "look":"" s'il n'en a pas.

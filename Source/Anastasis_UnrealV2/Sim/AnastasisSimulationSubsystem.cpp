@@ -1,4 +1,5 @@
 #include "Sim/AnastasisSimulationSubsystem.h"
+#include "Sim/AnastasisBuildingCapacity.h"
 
 #include "Anastasis_UnrealV2.h"
 #include "Stats/Stats.h"
@@ -914,6 +915,19 @@ static FAutoConsoleCommandWithWorld CmdAnastasisVillageStatus(
 		}
 	}));
 
+static FAutoConsoleCommandWithWorld CmdAnastasisVillageCapacities(
+	TEXT("Anastasis.Village.Capacities"),
+	TEXT("Logs a JSON snapshot of occupied housing, food capacity, active sites, actual work and needs."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		if (const UAnastasisSimulationSubsystem* Host = VillageHost(World))
+		{
+			const FAnastasisSimulation& Sim = Host->GetSimulation();
+			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("BUILDING_CAPACITIES %s"),
+				*FAnastasisBuildingCapacitySnapshot::Capture(Sim.GetVillage(), Sim.GetTime()).ToJson());
+		}
+	}));
+
 static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVillageRemoveBuilding(
 	TEXT("Anastasis.Village.RemoveBuilding"),
 	TEXT("Anastasis.Village.RemoveBuilding <building-N> - removes a building from the simulation; its actor follows."),
@@ -1383,6 +1397,15 @@ FString UAnastasisSimulationDebugLibrary::GetBuildStatus(const UObject* WorldCon
 		Builder ? *Builder->Goal : TEXT(""), Builder ? *Builder->Activity : TEXT(""),
 		Builder && Builder->WorkSession.bActive ? TEXT("true") : TEXT("false"),
 		S.X, S.Y, S.Z, N.X, N.Y, N.Z);
+}
+
+FString UAnastasisSimulationDebugLibrary::GetBuildingCapacityStatus(const UObject* WorldContextObject)
+{
+	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	const UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+	if (!Host || !Host->GetSimulation().IsRunning()) return TEXT("{}");
+	const FAnastasisSimulation& Sim = Host->GetSimulation();
+	return FAnastasisBuildingCapacitySnapshot::Capture(Sim.GetVillage(), Sim.GetTime()).ToJson();
 }
 
 FString UAnastasisSimulationDebugLibrary::GetVillagerCards(const UObject* WorldContextObject)
