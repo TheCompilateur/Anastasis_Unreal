@@ -19,16 +19,16 @@ Unreal, il ne se traduit pas. Ce document dit, fichier par fichier, dans quel se
 | | fichiers | lignes | dont code | dont code a porter |
 | --- | ---: | ---: | ---: | ---: |
 | **A porter** | 160 | 50855 | 39819 | 39819 |
-| **Partiellement porte** | 34 | 28454 | 23539 | 17901 |
+| **Partiellement porte** | 34 | 28454 | 23539 | 17863 |
 | **A generer** (donnees) | 4 | 2101 | 1278 | 0 |
 | **A jeter** | 23 | 4968 | 3847 | 0 |
 | Deja porte | 12 | 2687 | 1939 | 0 |
-| **Total** | 233 | 89065 | 70422 | 57720 |
+| **Total** | 233 | 89065 | 70422 | 57682 |
 
 Sur les 50855 lignes des modules a porter, 5559 sont du commentaire et
 3755 des lignes vides : **39819 lignes de code**. Les 34 modules
-partiellement portes ajoutent **17901 lignes de code** qui restent (sur 23539 ;
-5638 portees, 0 hors perimetre). Total a porter : **57720 lignes de code**.
+partiellement portes ajoutent **17863 lignes de code** qui restent (sur 23539 ;
+5676 portees, 0 hors perimetre). Total a porter : **57682 lignes de code**.
 12 modules a porter melangent logique et table de contenu : la table s'extrait, le selecteur se porte.
 
 ## Reste a porter, par vague
@@ -43,8 +43,8 @@ pas l'interet du gameplay. Un module partiellement porte compte pour ce qui lui 
 | 2 — navigation | 8 | 2 | 639 |
 | 3 — budget et LOD logique | 1 | 0 | 228 |
 | 4 — etat du monde et sauvegarde | 3 | 2 | 701 |
-| 5 — boucle de simulation | 79 | 9 | 33191 |
-| 6 — vie, IA, langue | 100 | 18 | 22274 |
+| 5 — boucle de simulation | 79 | 9 | 33182 |
+| 6 — vie, IA, langue | 100 | 18 | 22245 |
 
 Les vagues 5 et 6 ne sont pas des vagues, ce sont des marecages : 179 modules a
 elles deux. Elles se decoupent en chantiers, et c'est a ce grain qu'un module se confie.
@@ -56,7 +56,7 @@ elles deux. Elles se decoupent en chantiers, et c'est a ce grain qu'un module se
 | 2 | navigation | 8 | 639 | `sim/crowdNav.js` (228) |
 | 3 | budget et LOD | 1 | 228 | `sim/logicalLod.js` (228) |
 | 4 | etat et sauvegarde | 3 | 701 | `sim/save.js` (609, partiel) |
-| 5 | noyau de boucle | 8 | 12411 | `sim/simulation.js` (6647, partiel) |
+| 5 | noyau de boucle | 8 | 12402 | `sim/simulation.js` (6638, partiel) |
 | 5 | societe et institutions | 8 | 6629 | `sim/collectivePriorities.js` (3035) |
 | 5 | urbanisme | 14 | 3954 | `sim/urban/intent.js` (489) |
 | 5 | economie et travail | 18 | 3373 | `sim/craftWork.js` (854, partiel) |
@@ -64,7 +64,7 @@ elles deux. Elles se decoupent en chantiers, et c'est a ce grain qu'un module se
 | 5 | chronique et memoire collective | 11 | 2483 | `sim/villageChronicle.js` (414) |
 | 5 | regne animal | 7 | 1031 | `sim/animaux/updateAnimals.js` (465) |
 | 6 | personne et famille | 32 | 6286 | `life/lifeScenes.js` (818) |
-| 6 | cognition | 30 | 5549 | `ai/memory.js` (717, partiel) |
+| 6 | cognition | 30 | 5520 | `ai/memory.js` (688, partiel) |
 | 6 | parole et narration | 15 | 4074 | `life/talk.js` (1464, partiel) |
 | 6 | rites et culture | 14 | 4072 | `life/kosmos1204UneBouchePlus.js` (640) |
 | 6 | langue | 9 | 2293 | `lang/lexicon.js` (646) |
@@ -79,11 +79,11 @@ reparti entre `porte` et `reste` au prorata du code de fonctions.
 
 | Module | C++ | fonctions portees | reduites | code | porte | hors | reste | source PORTAGE.md |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `sim/simulation.js` | Village/AnastasisVillage, Sim/AnastasisSimulation, Work/AnastasisFields, Work/AnastasisBuild, Life/AnastasisWeatherBehavior | 24 / 388 | 6 | 7196 | 549 | 0 | **6647** | couche 2 ; puits ; maison ; gather-deliver ; field-regrow ; social-relax ; bonds-rumors ; village-weather ; build-001 |
+| `sim/simulation.js` | Village/AnastasisVillage, Sim/AnastasisSimulation, Work/AnastasisFields, Work/AnastasisBuild, Life/AnastasisWeatherBehavior | 25 / 388 | 6 | 7196 | 558 | 0 | **6638** | couche 2 ; puits ; maison ; gather-deliver ; field-regrow ; social-relax ; bonds-rumors ; village-weather ; build-001 |
 | `sim/npc.js` | Village/AnastasisVillage, Work/AnastasisGather, Life/AnastasisWeatherBehavior, Ai/AnastasisGoalNoise | 22 / 181 | 10 | 5169 | 665 | 0 | **4504** | puits ; maison ; grenier ; gather-deliver ; social-relax ; bonds-rumors ; village-weather ; build-001 ; sim-rng-001 (goalNoise, fonction pure non branchee) |
 | `life/talk.js` | Life/AnastasisBonds, Village/AnastasisVillage | 15 / 92 | 0 | 1887 | 423 | 0 | **1464** | bonds-rumors (hash, portes, durees, tours, refus) |
 | `sim/craftWork.js` | Work/AnastasisGather, Work/AnastasisBuild | 4 / 51 | 0 | 964 | 110 | 0 | **854** | gather-deliver ; build-001 (profil build) |
-| `ai/memory.js` | Village/AnastasisVillage, Work/AnastasisGather | 8 / 53 | 0 | 873 | 156 | 0 | **717** | grenier ; gather-deliver ; bonds-rumors (n° 14) |
+| `ai/memory.js` | Village/AnastasisVillage, Work/AnastasisGather, World/AnastasisExplore | 11 / 53 | 0 | 873 | 185 | 0 | **688** | grenier ; gather-deliver ; bonds-rumors (n° 14) ; perception-explore-001 |
 | `sim/save.js` | Harness/AnastasisJsSave | 1 / 11 | 4 | 656 | 47 | 0 | **609** | sim-state-reader-001 (lecteur du harnais) |
 | `sim/worldArchetypes.js` | World/AnastasisWorldArchetype | 2 / 4 | 1 | 752 | 157 | 0 | **595** | couche 1 (knobs sim seuls) |
 | `life/speechActs.js` | Village/AnastasisVillage | 3 / 33 | 0 | 553 | 50 | 0 | **503** | bonds-rumors |
@@ -141,10 +141,10 @@ reparti entre `porte` et `reste` au prorata du code de fonctions.
 - portees (1) : `decisionIntervalSeconds`
 - restent (4 fonctions) : `deterministicStagger` (9), `nextDecisionAt` (9), `shouldRunDecision` (6), `scheduleNextDecision` (6)
 
-**`ai/memory.js`** — Village/AnastasisVillage, Work/AnastasisGather. Reste 717 lignes de code sur 873 (dont 45 des 55 lignes hors fonction, au prorata).
+**`ai/memory.js`** — Village/AnastasisVillage, Work/AnastasisGather, World/AnastasisExplore. Reste 688 lignes de code sur 873 (dont 43 des 55 lignes hors fonction, au prorata).
 
-- portees (8) : `perceive`, `forgetEmptied`, `rememberSpot`, `trimMemory`, `forgetStale`, `recallResource`, `presumedNoise`, `believedStock`
-- restent (45 fonctions) : `repairMindReferences` (88), `stampMarketBelief` (52), `perceiveBeliefs` (51), `seedFoundingCampStockBeliefs` (39), `shareRumors` (34), `createMind` (27), `scrubBeliefMap` (27), `rememberBeliefEntry` (24), … et 37 autres
+- portees (11) : `perceive`, `forgetEmptied`, `rememberSpot`, `trimMemory`, `forgetStale`, `markCell`, `cellIndex`, `recallResource`, `presumedNoise`, `believedStock`, `exploreTarget`
+- restent (42 fonctions) : `repairMindReferences` (88), `stampMarketBelief` (52), `perceiveBeliefs` (51), `seedFoundingCampStockBeliefs` (39), `shareRumors` (34), `createMind` (27), `scrubBeliefMap` (27), `rememberBeliefEntry` (24), … et 34 autres
 
 **`ai/moralPressure.js`** — Work/AnastasisGather. Reste 46 lignes de code sur 116 (dont 11 des 27 lignes hors fonction, au prorata).
 
@@ -264,11 +264,11 @@ reparti entre `porte` et `reste` au prorata du code de fonctions.
 - reduites (4) : `serialize`, `deserialize`, `applyTileDiff`, `unpackActor`
 - restent (6 fonctions) : `repairReferences` (68), `packActor` (12), `unpackTraffic` (8), `packTraffic` (7), `normalizeMarketStock` (5), `rehydrateJob` (5)
 
-**`sim/simulation.js`** — Village/AnastasisVillage, Sim/AnastasisSimulation, Work/AnastasisFields, Work/AnastasisBuild, Life/AnastasisWeatherBehavior. Reste 6647 lignes de code sur 7196 (dont 591 des 640 lignes hors fonction, au prorata).
+**`sim/simulation.js`** — Village/AnastasisVillage, Sim/AnastasisSimulation, Work/AnastasisFields, Work/AnastasisBuild, Life/AnastasisWeatherBehavior. Reste 6638 lignes de code sur 7196 (dont 590 des 640 lignes hors fonction, au prorata).
 
-- portees (24) : `socialPos`, `buildingNearActor`, `buildingForIndoorAction`, `workplaceAcceptsIndoorGoal`, `enterBuilding`, `exitBuilding`, `costMultiplier`, `buildCost`, `blockedAt`, `footBlockedAt`, `tileTraversalCost`, `depleteTile`, `regrowFieldTile`, `regrowFieldsDaily`, `countBuildings`, `siteCanPlacePiece`, `consumeSiteMaterials`, `constructionAccessPoint`, `workConstruction`, `addBuilding`, `drinkAccessPoint`, `accessPointNear`, `localOccupancy`, `resourceTileNear`
+- portees (25) : `socialPos`, `buildingNearActor`, `buildingForIndoorAction`, `workplaceAcceptsIndoorGoal`, `enterBuilding`, `exitBuilding`, `costMultiplier`, `buildCost`, `blockedAt`, `footBlockedAt`, `tileTraversalCost`, `depleteTile`, `regrowFieldTile`, `regrowFieldsDaily`, `countBuildings`, `siteCanPlacePiece`, `consumeSiteMaterials`, `constructionAccessPoint`, `workConstruction`, `addBuilding`, `drinkAccessPoint`, `accessPointNear`, `localOccupancy`, `resourceTileNear`, `randomWalkTarget`
 - reduites (6) : `movementSpeedFactor`, `tick`, `enqueueDayDeferred`, `assignHomeToHousehold`, `moveActor`, `nextWaypoint`
-- restent (358 fonctions) : `resolveDailyBuildingProduction` (133), `urbanSpotScore` (115), `resetWorldBase` (97), `onNewDay` (91), `populateFoundingLife` (78), `ensureFarmFieldParcel` (78), `seedShoreTerminus` (78), `stampClearingFieldClusters` (75), … et 350 autres
+- restent (357 fonctions) : `resolveDailyBuildingProduction` (133), `urbanSpotScore` (115), `resetWorldBase` (97), `onNewDay` (91), `populateFoundingLife` (78), `ensureFarmFieldParcel` (78), `seedShoreTerminus` (78), `stampClearingFieldClusters` (75), … et 349 autres
 
 **`sim/spatialGrid.js`** — Core/AnastasisSpatialGrid. Reste 24 lignes de code sur 100 (dont 1 des 4 lignes hors fonction, au prorata).
 
@@ -544,7 +544,7 @@ importent celui-ci.
 | partiel | `sim/pathfinding.js` | 212 | 179 | 7 | 0 | 3 | 2 | navigation | World/AnastasisPathfinding — 13/15 fonctions portees |
 | partiel | `sim/save.js` | 829 | 656 | 609 | 2 | 0 | 4 | etat et sauvegarde | Harness/AnastasisJsSave — 1/11 fonctions portees |
 | partiel | `sim/pristineWorld.js` | 56 | 39 | 9 | 0 | 2 | 4 | etat et sauvegarde | Harness/AnastasisJsSave (GenerateWorld) — 2/4 fonctions portees |
-| partiel | `sim/simulation.js` | 8664 | 7196 | 6647 | 16 | 1 | 5 | noyau de boucle | Village/AnastasisVillage, Sim/AnastasisSimulation, Work/AnastasisFields, Work/AnastasisBuild, Life/AnastasisWeatherBehavior — 24/388 fonctions portees |
+| partiel | `sim/simulation.js` | 8664 | 7196 | 6638 | 16 | 1 | 5 | noyau de boucle | Village/AnastasisVillage, Sim/AnastasisSimulation, Work/AnastasisFields, Work/AnastasisBuild, Life/AnastasisWeatherBehavior — 25/388 fonctions portees |
 | partiel | `sim/npc.js` | 6060 | 5169 | 4504 | 41 | 3 | 5 | noyau de boucle | Village/AnastasisVillage, Work/AnastasisGather, Life/AnastasisWeatherBehavior, Ai/AnastasisGoalNoise — 22/181 fonctions portees |
 | partiel | `sim/craftWork.js` | 1133 | 964 | 854 | 0 | 4 | 5 | economie et travail | Work/AnastasisGather, Work/AnastasisBuild — 4/51 fonctions portees |
 | partiel | `sim/transport/stockLedger.js` | 498 | 395 | 355 | 7 | 18 | 5 | transport et logistique | Village/AnastasisVillage — 3/30 fonctions portees |
@@ -554,7 +554,7 @@ importent celui-ci.
 | partiel | `sim/craftFatigue.js` | 71 | 43 | 4 | 0 | 2 | 5 | economie et travail | Work/AnastasisGather — 2/3 fonctions portees |
 | partiel | `sim/fieldWorkPosts.js` | 127 | 104 | 3 | 0 | 2 | 5 | economie et travail | Work/AnastasisGather, Village/AnastasisVillage — 6/7 fonctions portees |
 | partiel | `life/talk.js` | 2220 | 1887 | 1464 | 0 | 4 | 6 | parole et narration | Life/AnastasisBonds, Village/AnastasisVillage — 15/92 fonctions portees |
-| partiel | `ai/memory.js` | 1050 | 873 | 717 | 14 | 6 | 6 | cognition | Village/AnastasisVillage, Work/AnastasisGather — 8/53 fonctions portees |
+| partiel | `ai/memory.js` | 1050 | 873 | 688 | 14 | 6 | 6 | cognition | Village/AnastasisVillage, Work/AnastasisGather, World/AnastasisExplore — 11/53 fonctions portees |
 | partiel | `life/speechActs.js` | 613 | 553 | 503 | 21 | 5 | 6 | parole et narration | Village/AnastasisVillage — 3/33 fonctions portees |
 | partiel | `life/domestic.js` | 434 | 361 | 259 | 1 | 8 | 6 | personne et famille | Life/AnastasisNeeds, Village/AnastasisVillage — 9/31 fonctions portees |
 | partiel | `ai/socialMemory.js` | 515 | 407 | 177 | 1 | 10 | 6 | cognition | Life/AnastasisBonds — 13/23 fonctions portees |
