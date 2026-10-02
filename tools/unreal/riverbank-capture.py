@@ -66,7 +66,8 @@ try:
     if not states or any(x not in STATE_CMDS for x in states):
         raise RuntimeError('ANASTASIS_RIVERBANK_STATES invalide : %r' % states)
     os.makedirs(OUT, exist_ok=True)
-    les.load_level(LEVEL)
+    if ues.get_editor_world().get_path_name().split('.')[0] != LEVEL:
+        les.load_level(LEVEL)
     world = ues.get_editor_world()
 
     def cmd(c):
@@ -217,6 +218,9 @@ except Exception as exc:  # noqa: BLE001
     raise
 
 look = unreal.MathLibrary.find_look_at_rotation
+selected_views = os.environ.get('ANASTASIS_CAPTURE_VIEWS', '').split(',')
+if selected_views != ['']:
+    views = [v for v in views if v[0] in selected_views]
 queue = [(states[0], v) for v in views]
 state_i = 0
 phase, mark, shot, first = 'boot', time.monotonic(), None, True

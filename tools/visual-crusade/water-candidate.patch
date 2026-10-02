@@ -1,0 +1,32 @@
+diff --git a/tools/unreal/water-look.py b/tools/unreal/water-look.py
+index 0b6dfc3..978b43d 100644
+--- a/tools/unreal/water-look.py
++++ b/tools/unreal/water-look.py
+@@ -50,6 +50,9 @@ mel = unreal.MaterialEditingLibrary
+ # exactement les cinq vagues d'avant : le cout et le reflet des plans d'eau ne bougent pas.
+ NORMAL_HLSL = r'''
+ float2 p = P.xy * 0.01;
++// VISUAL_CRUSADE_001: curved, interrupted wave fronts, not infinite parallel rails.
++float2 bend = float2(sin(p.y*.41 + sin(p.x*.17)), sin(p.x*.33 + sin(p.y*.23)));
++p += bend * .42;
+ float spd = saturate(length(Flow));
+ float ph0 = frac(T * 0.18);
+ float ph1 = frac(T * 0.18 + 0.5);
+@@ -60,7 +63,7 @@ if (spd < 0.012)
+     float2 adv = Flow * 7.0;
+     float2 q0 = p - adv * ph0;
+     float2 q1 = p - adv * ph1 + float2(17.3, 5.1);
+-    float amp = Calm * (1.0 + 2.2 * spd);
++    float amp = Calm * (1.0 + 2.2 * spd) * (.68 + .22*sin(p.x*.71 + sin(p.y*.53)));
+     float2 g = 0;
+     float2 d; float k; float w;
+     d = float2(0.97, 0.24);  k = 7.85; w = 0.6 * sqrt(9.81 * k);
+@@ -95,7 +98,7 @@ float2 q0 = p - adv * 0.45 * ph0;
+ float2 q1 = p - adv * 0.45 * ph1 + float2(17.3, 5.1);
+ float2 f0 = p - adv * 1.35 * ph0;
+ float2 f1 = p - adv * 1.35 * ph1 + float2(4.2, 9.7);
+-float ampL = Calm * (1.15 - 0.40 * spd);
++float ampL = Calm * (.78 - 0.30 * spd) * (.82 + .18*sin(p.x*.63 + sin(p.y*.47)));
+ float ampS = Calm * (0.15 + 1.15 * spd) * lerp(0.55, 1.0, center);
+ float2 g = 0;
+ float2 d; float k; float w;

@@ -803,7 +803,7 @@ def branch_between(mesh, start, end, radius, tip, steps=8):
 def leaf_blades(centres, color, rng, width=.58, alt=None, alt_share=0.0):
     """Opaque folded blades: real silhouette gaps, no alpha overdraw or external texture.
 
-    Positions and palette are recipe-seeded. Four triangles per blade, with a raised
+    Positions and palette are recipe-seeded. Eight triangles per blade, with a raised
     central vein; broad crown volumes become small readable groups at human height.
     """
     vertices, triangles, colors, uv = [], [], [], []
@@ -813,18 +813,21 @@ def leaf_blades(centres, color, rng, width=.58, alt=None, alt_share=0.0):
         axis = (math.cos(angle), math.sin(angle), tilt)
         side = (-math.sin(angle), math.cos(angle), rng.uniform(-0.25, 0.25))
         base = len(vertices)
-        for along, across, lift, u, v in ((-1, 0, 0, 0.5, 0), (0, width, 0, 1, .5),
-                                         (1, 0, 0, .5, 1), (0, -width, 0, 0, .5),
-                                         (0, 0, .16, .5, .5)):
-            vertices.append(unreal.Vector(cx + size*(along*axis[0]+across*side[0]),
-                                          cy + size*(along*axis[1]+across*side[1]),
-                                          cz + size*(along*axis[2]+across*side[2]+lift)))
-            uv.append(unreal.Vector2D(u,v))
+        # Narrow petiole, asymmetric shoulders and a pointed tip; folded midrib.
+        # Eight small triangles replace the large four-triangle diamond.
+        outline = ((-1.,0.),(-.52,.65),(.02,1.),(.56,.57),
+                   (1.,0.),(.46,-.65),(-.12,-.88),(-.65,-.43))
+        for along, across in outline + ((0.,0.),):
+            lift = .075 if (along,across)==(0.,0.) else .025*along
+            vertices.append(unreal.Vector(cx + size*(along*axis[0]+across*width*side[0]),
+                                          cy + size*(along*axis[1]+across*width*side[1]),
+                                          cz + size*(along*axis[2]+across*width*side[2]+lift)))
+            uv.append(unreal.Vector2D(.5+across*.5,.5+along*.5))
         tint = rng.uniform(.80, 1.18)
         # Deux tons : la face inferieure argentee de l'olivier et du chene vert.
         tone = alt if (alt is not None and rng.random() < alt_share) else color
-        colors.extend([unreal.LinearColor(tone.r*tint, tone.g*tint, tone.b*tint, 1)]*5)
-        for i in range(4): triangles.append(unreal.IntVector(base+4,base+(i+1)%4,base+i))
+        colors.extend([unreal.LinearColor(tone.r*tint, tone.g*tint, tone.b*tint, 1)]*9)
+        for i in range(8): triangles.append(unreal.IntVector(base+8,base+(i+1)%8,base+i))
     buffers = unreal.GeometryScriptSimpleMeshBuffers(vertices=vertices,triangles=triangles,
                                                      vertex_colors=colors,uv0=uv)
     mesh, unused = unreal.GeometryScript_MeshEdits.append_buffers_to_mesh(
@@ -846,20 +849,30 @@ def living_crown(spec, rng):
             origin = axis_point(spec, cz - radius*.6)
             if math.dist(origin, (cx, cy, cz)) > 1.0:
                 wood = branch_between(wood,origin,(cx,cy,cz),spec.get('twig_radius',.72),.22)
-            # Small inner groups carry volume; disconnected outer blades carry the edge.
+            # VISUAL_CRUSADE_001: branchlets carry clustered leaves instead of
+            # closed spheres. Same crown envelope, explicit gaps and tapered tips.
             for k in range(groups):
-                theta = k * 2.399963 + rng.uniform(-.15,.15)
+                theta = k * 2.399963 + rng.uniform(-.30,.30)
                 z = 1 - 2*(k+.5)/groups
                 ring = math.sqrt(max(0,1-z*z))
-                px,py,pz = cx+radius*.62*ring*math.cos(theta),cy+radius*.62*ring*math.sin(theta),cz+radius*.62*z*squash
-                part = lobe(unreal.DynamicMesh(),radius*rng.uniform(.18,.25),px,py,pz,.8)
-                foliage = merge(foliage,coloured(part,unreal.LinearColor(color.r*.88,color.g*.88,color.b*.88,1)))
+                endpoint = (cx+radius*.86*ring*math.cos(theta),
+                            cy+radius*.86*ring*math.sin(theta), cz+radius*.86*z*squash)
+                joint = tuple(origin[j]*.25 + (cx,cy,cz)[j]*.75 for j in range(3))
+                wood = branch_between(wood,joint,endpoint,.16,.035,steps=6)
+                # Small porous tufts replace each former solid internal lobe.
+                for leaf in range(12):
+                    spread=radius*.20
+                    point=[endpoint[j]+rng.uniform(-spread,spread) for j in range(3)]
+                    blades.append((*point,radius*rng.uniform(size_lo,size_hi)*.85))
+            # Keep the authored outer crown coverage. The first branch-only pass
+            # looked defoliated; removing opaque cores must not remove the canopy.
             for k in range(per_lobe):
-                theta = k*2.399963
-                z = 1-2*(k+.5)/per_lobe
-                ring = math.sqrt(max(0,1-z*z))
-                shell = rng.uniform(.68,1.02)
-                blades.append((cx+radius*shell*ring*math.cos(theta),cy+radius*shell*ring*math.sin(theta),
+                theta=k*2.399963
+                z=1-2*(k+.5)/per_lobe
+                ring=math.sqrt(max(0,1-z*z))
+                shell=rng.uniform(.65,1.02)
+                blades.append((cx+radius*shell*ring*math.cos(theta),
+                               cy+radius*shell*ring*math.sin(theta),
                                cz+radius*shell*z*squash,radius*rng.uniform(size_lo,size_hi)))
     else:
         # Thin sprays transmit light. Closed ellipsoids here create black stacked
@@ -907,8 +920,12 @@ def build_family(spec):
         roots=unreal.DynamicMesh()
         radius=slender[0][0] if slender else spec['stems'][0][2]
         for k in range(6):
-            angle=k*math.tau/6+.25
-            roots=branch_between(roots,(0,0,-45),(radius*2.1*math.cos(angle),radius*2.1*math.sin(angle),-49.3),radius*.48,.18)
+            angle=k*math.tau/6+.25+rng.uniform(-.18,.18)
+            reach=radius*rng.uniform(1.6,2.2)
+            joint=(reach*.52*math.cos(angle+.10),reach*.52*math.sin(angle+.10),-49.0)
+            end=(reach*math.cos(angle),reach*math.sin(angle),-49.8)
+            roots=branch_between(roots,(0,0,-47.4),joint,radius*.40,radius*.16,steps=10)
+            roots=branch_between(roots,joint,end,radius*.16,.07,steps=8)
         if spec['tiers']:
             roots=taper(roots,slender[-1][1],.15,slender[-1][3],49,steps=9,prim=PRIM_WOOD)
         parts.append(coloured(roots,spec['bark']))
@@ -947,19 +964,30 @@ def distant_crown(spec):
                          location=unreal.Vector(radius*.35*math.cos(angle),
                                                 radius*.35*math.sin(angle), z0))
             crown = merge(crown, part)
-    # Une enveloppe par lobe, tessellation basse : a 5 % d'ecran la silhouette compte, pas
-    # la rondeur. Les especes a beaucoup de lobes (cypres, chene vert) restent sous ~1k.
-    far_steps = (4, 9) if spec.get('stems') else None
+    # VISUAL_CRUSADE_001: retain distant coverage with irregular subcrowns.
+    # A single low-resolution ellipsoid per lobe became a bright polygonal block
+    # at medium distance. Three overlapping off-axis masses keep a broken contour.
+    rng = random.Random(spec['name'] + ':distant-subcrowns')
     for radius, cx, cy, cz, squash in spec['lobes']:
-        crown = merge(crown, lobe(unreal.DynamicMesh(), radius, cx, cy, cz, squash, far_steps))
+        for k in range(3):
+            angle = k*2.399963 + rng.uniform(-.35,.35)
+            r = radius*rng.uniform(.53,.70)
+            offset = radius*.43
+            part = lobe(unreal.DynamicMesh(), r,
+                        cx+offset*math.cos(angle), cy+offset*math.sin(angle),
+                        cz+radius*rng.uniform(-.32,.32)*squash,
+                        squash*rng.uniform(.80,1.20), (5,9))
+            tone = rng.uniform(.66,.86)
+            c = spec['foliage']
+            mesh = merge(mesh,coloured(part,unreal.LinearColor(c.r*tone,c.g*tone,c.b*tone,1)))
+    # Tier conifers keep their closed distant profile; broadleaf subcrowns above
+    # already carry their own colors.
     mesh = merge(mesh, coloured(crown, spec['foliage']))
     return shade(normalise(mesh, spec['name'] + ' distant'))
 
 
 def save_static_mesh(mesh, asset_path, far_mesh):
-    if unreal.EditorAssetLibrary.does_asset_exist(asset_path):
-        unreal.EditorAssetLibrary.delete_asset(asset_path)
-
+    existing = unreal.EditorAssetLibrary.load_asset(asset_path) if unreal.EditorAssetLibrary.does_asset_exist(asset_path) else None
     options = unreal.GeometryScriptCreateNewStaticMeshAssetOptions()
     # FAUX AMI : a True, le build recalcule et JETTE les normales fractionnees
     # authorees par shade(). Le mesh repartirait tout lisse et .5b n'aurait
@@ -970,8 +998,16 @@ def save_static_mesh(mesh, asset_path, far_mesh):
     # refuse une feature qui n'a pas gagne son existence.
     options.set_editor_property("enable_nanite", False)
 
-    asset, outcome = unreal.GeometryScript_NewAssetUtils.create_new_static_mesh_asset_from_mesh(
-        mesh, asset_path, options)
+    if existing is not None:
+        asset = existing
+        copy_options = unreal.GeometryScriptCopyMeshToAssetOptions(enable_recompute_tangents=True)
+        unused, outcome = unreal.GeometryScript_AssetUtils.copy_mesh_to_static_mesh(
+            mesh, asset, copy_options, unreal.GeometryScriptMeshWriteLOD(lod_index=0))
+        if outcome != unreal.GeometryScriptOutcomePins.SUCCESS:
+            raise RuntimeError('Render mesh update failed: ' + asset_path)
+    else:
+        asset, outcome = unreal.GeometryScript_NewAssetUtils.create_new_static_mesh_asset_from_mesh(
+            mesh, asset_path, options)
     if asset is None:
         raise Exception("%s: create_new_static_mesh_asset_from_mesh a rendu None (%s)"
                         % (asset_path, outcome))
@@ -999,8 +1035,9 @@ def save_static_mesh(mesh, asset_path, far_mesh):
         raise Exception(str(exc))
 
     try:
-        unreal.EditorStaticMeshLibrary.add_simple_collisions(
-            asset, unreal.ScriptingCollisionShapeType.NDOP10_X)
+        if existing is None:
+            unreal.EditorStaticMeshLibrary.add_simple_collisions(
+                asset, unreal.ScriptingCollisionShapeType.NDOP10_X)
     except Exception as exc:  # noqa: BLE001 -- best effort, comme la version precedente
         log("WARN collision simple refusee sur %s: %s" % (asset_path, exc))
 
@@ -1542,4 +1579,5 @@ def main():
     return True
 
 
-main()
+if __name__ == '__main__':
+    main()

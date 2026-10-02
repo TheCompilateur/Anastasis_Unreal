@@ -238,6 +238,18 @@ except Exception as exc:  # noqa: BLE001
     raise
 
 look = unreal.MathLibrary.find_look_at_rotation
+camera_file = os.environ.get('ANASTASIS_GROUND_CAMERAS')
+if camera_file:
+    with open(camera_file, encoding='utf-8') as f:
+        saved_views = json.load(f)['views']
+    views = [(n, V(*e), V(*t)) for n, e, t in saved_views]
+selected_views = os.environ.get('ANASTASIS_CAPTURE_VIEWS', '').split(',')
+if selected_views != ['']:
+    views = [v for v in views if v[0] in selected_views]
+# Record the poses actually used, including an explicitly supplied baseline.
+with open(os.path.join(OUT, 'cameras.json'), 'w') as f:
+    json.dump({'tile_uu': T, 'camera_source': camera_file,
+               'views': [[n, [e.x,e.y,e.z], [t.x,t.y,t.z]] for n,e,t in views]}, f, indent=1)
 queue = [(states[0], v) for v in views]
 state_i = 0
 phase, mark, shot, first = 'boot', time.monotonic(), None, True
