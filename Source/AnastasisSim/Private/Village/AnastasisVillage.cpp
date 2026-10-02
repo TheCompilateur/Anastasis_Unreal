@@ -565,6 +565,50 @@ namespace AnastasisVillage
 		return false;
 	}
 
+	namespace Market
+	{
+		// `CAMP_MARKET_MIN_CHEBYSHEV` (simulation.js l. 781).
+		constexpr int32 CampMarketMinChebyshev = 4;
+
+		// `ensureMarketOffset(dx, dy)` (simulation.js l. 783) : le site reserve est strictement au-dela
+		// de l'espacement camp / marche, en distance de Chebyshev.
+		void EnsureMarketOffset(const TOptional<double>& Dx, const TOptional<double>& Dy, int32& OutX, int32& OutY)
+		{
+			const int32 MinDist = CampMarketMinChebyshev + 1;
+			const int32 FallbackY = -FMath::Max(2, MinDist / 2);
+			// `Math.trunc` d'un fini ; `Number.isFinite` faux = repli.
+			int32 Ox = (Dx.IsSet() && FMath::IsFinite(*Dx)) ? static_cast<int32>(FMath::TruncToDouble(*Dx)) : MinDist;
+			int32 Oy = (Dy.IsSet() && FMath::IsFinite(*Dy)) ? static_cast<int32>(FMath::TruncToDouble(*Dy)) : FallbackY;
+			if (Ox == 0 && Oy == 0)
+			{
+				Ox = MinDist;
+				Oy = FallbackY;
+			}
+			while (FMath::Max(FMath::Abs(Ox), FMath::Abs(Oy)) <= CampMarketMinChebyshev)
+			{
+				if (FMath::Abs(Ox) >= FMath::Abs(Oy)) Ox += Ox >= 0 ? 1 : -1;
+				else Oy += Oy >= 0 ? 1 : -1;
+			}
+			OutX = Ox;
+			OutY = Oy;
+		}
+	}
+
+	FPoint FVillage::PlannedMarketPos() const
+	{
+		int32 Dx = 0;
+		int32 Dy = 0;
+		Market::EnsureMarketOffset(MarketDx, MarketDy, Dx, Dy);
+		return { Settlement.X + Dx, Settlement.Y + Dy };
+	}
+
+	bool FVillage::MarketAccessPoint(const FNpc* Actor, FPoint& Out) const
+	{
+		// Aucun type `market` dans ce village : `accessPointNear(plannedMarketPos(), actor)`.
+		const FPoint Planned = PlannedMarketPos();
+		return AccessPointNear(Planned.X, Planned.Y, Actor, Out);
+	}
+
 	bool FVillage::AccessPointNear(double PosX, double PosY, const FNpc* Actor, FPoint& Out) const
 	{
 		const FPoint Origin = Actor ? FPoint{ Actor->X, Actor->Y } : Settlement;

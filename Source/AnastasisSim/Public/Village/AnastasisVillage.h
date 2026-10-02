@@ -925,6 +925,19 @@ namespace AnastasisVillage
 		bool IsTerrainTravelCostEnabled() const { return bTerrainTravelCostEnabled; }
 
 		/**
+		 * `settlement.marketDx/marketDy` (build-decision-001) : le site reserve au marche, relatif au
+		 * camp. Non pose = `undefined` cote reference : `ensureMarketOffset` prend alors son repli.
+		 */
+		void SetMarketOffset(const TOptional<double>& Dx, const TOptional<double>& Dy) { MarketDx = Dx; MarketDy = Dy; }
+		/** `plannedMarketPos()` : le camp + le decalage du marche, garde hors du camp. */
+		FPoint PlannedMarketPos() const;
+		/**
+		 * `marketAccessPoint(actor)` : le seuil du marche ; sans marche bati (aucun dans ce village),
+		 * `accessPointNear(plannedMarketPos(), actor)`.
+		 */
+		bool MarketAccessPoint(const FNpc* Actor, FPoint& Out) const;
+
+		/**
 		 * `addBuilding(type, x, y)` — identifiant `building-N`, case bloquee, cout
 		 * infini, seuils calcules, version de navigation incrementee.
 		 * Rend l'identifiant, vide si la case est hors bornes ou deja bloquee.
@@ -1563,6 +1576,8 @@ namespace AnastasisVillage
 		bool bTerrainTravelCostEnabled = false;
 		int32 NavVersion = 0;
 		FPoint Settlement;
+		TOptional<double> MarketDx;
+		TOptional<double> MarketDy;
 		int32 NextBuildingId = 0;
 		TArray<FDeath> DeathLog;
 		int32 NextNpcId = 0;

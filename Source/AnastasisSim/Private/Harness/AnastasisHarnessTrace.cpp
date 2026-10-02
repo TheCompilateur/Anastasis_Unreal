@@ -129,6 +129,12 @@ namespace AnastasisHarnessTrace
 			{
 				Village.SetSettlement(X->Number, Y->Number);
 			}
+			// Le site reserve au marche (build-decision-001) : la cible d'un batisseur sans chantier.
+			const FValue* Dx = Settlement->Find(TEXT("marketDx"));
+			const FValue* Dy = Settlement->Find(TEXT("marketDy"));
+			Village.SetMarketOffset(
+				(Dx && Dx->IsNumber()) ? TOptional<double>(Dx->Number) : TOptional<double>(),
+				(Dy && Dy->IsNumber()) ? TOptional<double>(Dy->Number) : TOptional<double>());
 		}
 		// `_nextBuildingId`, `_nextId` : les identifiants des entites a venir.
 		int32 NextBuildingId = Read.Buildings.Num();
