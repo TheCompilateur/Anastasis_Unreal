@@ -46,4 +46,3 @@ ecotone-capture | tools/unreal/ground-cover-capture.py | ECOTONE_CAPTURE PASS | 
 anthropic-paths-capture | tools/unreal/anthropic-paths-capture.py | ANTHROPIC_PATHS PASS | ANTHROPIC_PATHS FAIL|ANTHROPIC_PATH_CHECK FAIL | 480 | -
 
 anthropic-routine-capture | tools/unreal/anthropic-paths-capture.py | ANTHROPIC_PATHS PASS | ANTHROPIC_PATHS FAIL|ANTHROPIC_PATH_CHECK FAIL | 660 | ANASTASIS_PATHS_SCENARIO=farmer
-# Woodland sequence: exact bank/meadow positions and bounded instance budget.
