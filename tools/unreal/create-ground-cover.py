@@ -10,6 +10,9 @@ PROPRIETE DES ASSETS. Ce script est la SOURCE D'AUTORITE de
   /Game/Anastasis/GroundCover/SM_Grass_Fern_01          H5a fougere en volant, frondes divisees
   /Game/Anastasis/GroundCover/SM_Grass_HartsTongue_01   H5b scolopendre, lanieres entieres
   /Game/Anastasis/GroundCover/SM_Grass_WoodHerb_01      H5c herbacee d'ombre, luzule et anemones
+  /Game/Anastasis/GroundCover/SM_Grass_FlowerWarm_01    H7a fleurs chaudes : coquelicot, bouton-d'or, epervier (WILDFLOWERS_001)
+  /Game/Anastasis/GroundCover/SM_Grass_FlowerCool_01    H7b fleurs froides : bleuet, chicoree, sauge des pres
+  /Game/Anastasis/GroundCover/SM_Grass_FlowerWhite_01   H7c fleurs claires : marguerite, ombelle, achillee
   /Game/Anastasis/Materials/M_AnastasisGrass
 Il les recree a l'identique a chaque run (graine fixe). Une touffe se change ICI, dans les
 chiffres : une retouche a la main ne survit pas au run suivant.
@@ -204,6 +207,47 @@ FAMILIES = [
         'heads': 10, 'head_height': (14.0, 24.0), 'head_color': c(0.62, 0.62, 0.56),
         'head_size': (2.4, 1.3),
     },
+    # FLEURS SAUVAGES (H7, WILDFLOWERS_001). Une touffe de prairie (herbes de MeadowShort, en moins
+    # fournie) piquee de 11 a 13 fleurs de trois especes : l'instance REMPLACE une touffe d'herbe, la
+    # prairie ne se troue donc pas. Les especes d'une famille poussent ensemble dans la nature : les
+    # coquelicots avec le bouton-d'or sur sol sec, les bleuets avec la chicoree au frais, les
+    # marguerites avec l'ombelle partout.
+    {
+        'name': 'SM_Grass_FlowerWarm_01',
+        'note': "H7a fleurs chaudes : coquelicots, boutons-d'or, eperviers dans une touffe de prairie",
+        'radius': 58.0, 'tufts': 5, 'blades': 64, 'spread': 11.0, 'fill': 0.30,
+        'height': (14.0, 34.0), 'width': (0.45, 0.85), 'lean': (0.08, 0.42), 'bend': (0.30, 0.95),
+        'segments': 4,
+        'base': c(0.028, 0.042, 0.015),
+        'tips': [(0.50, c(0.145, 0.175, 0.060)), (0.32, c(0.230, 0.205, 0.085)), (0.18, None)],
+        'straw': (c(0.140, 0.122, 0.064), c(0.285, 0.245, 0.130)),
+        'heads': 0,
+        'flowers': {'count': 20, 'species': [(0.40, 'poppy'), (0.35, 'buttercup'), (0.25, 'hawkbit')]},
+    },
+    {
+        'name': 'SM_Grass_FlowerCool_01',
+        'note': 'H7b fleurs froides : bleuets, chicoree, sauge des pres dans une touffe de prairie',
+        'radius': 58.0, 'tufts': 5, 'blades': 64, 'spread': 11.0, 'fill': 0.30,
+        'height': (16.0, 40.0), 'width': (0.45, 0.85), 'lean': (0.08, 0.42), 'bend': (0.30, 0.95),
+        'segments': 4,
+        'base': c(0.026, 0.041, 0.016),
+        'tips': [(0.55, c(0.135, 0.172, 0.062)), (0.28, c(0.215, 0.200, 0.085)), (0.17, None)],
+        'straw': (c(0.135, 0.120, 0.064), c(0.270, 0.240, 0.130)),
+        'heads': 0,
+        'flowers': {'count': 18, 'species': [(0.40, 'cornflower'), (0.32, 'chicory'), (0.28, 'sage')]},
+    },
+    {
+        'name': 'SM_Grass_FlowerWhite_01',
+        'note': 'H7c fleurs claires : marguerites, ombelles, achillee dans une touffe de prairie',
+        'radius': 58.0, 'tufts': 5, 'blades': 64, 'spread': 11.0, 'fill': 0.30,
+        'height': (12.0, 30.0), 'width': (0.45, 0.85), 'lean': (0.08, 0.42), 'bend': (0.30, 0.95),
+        'segments': 4,
+        'base': c(0.028, 0.043, 0.015),
+        'tips': [(0.52, c(0.140, 0.176, 0.062)), (0.30, c(0.225, 0.205, 0.085)), (0.18, None)],
+        'straw': (c(0.140, 0.124, 0.064), c(0.290, 0.250, 0.130)),
+        'heads': 0,
+        'flowers': {'count': 22, 'species': [(0.50, 'daisy'), (0.28, 'umbel'), (0.22, 'yarrow')]},
+    },
 ]
 
 
@@ -264,6 +308,7 @@ def blade(buf, base, yaw, height, width, lean, bend, segments, col_base, col_tip
             left_right.append((a, b))
         else:
             tip = buf.vertex(tuple(p), normal, rgb, alpha, (0.5, 1.0))
+            tip_pos = tuple(p)
         angle = lean + bend * (s + 0.5) / segments
         p[0] += dx * math.sin(angle) * step
         p[1] += dy * math.sin(angle) * step
@@ -275,6 +320,7 @@ def blade(buf, base, yaw, height, width, lean, bend, segments, col_base, col_tip
         buf.tri(a1, b0, b1)
     a0, a1 = left_right[-1]
     buf.tri(a0, tip, a1)
+    return tip_pos
 
 
 def seed_head(buf, base, yaw, height, lean, color_stem, color_head, outward, size=(9.0, 0.55)):
@@ -305,6 +351,120 @@ def seed_head(buf, base, yaw, height, lean, color_stem, color_head, outward, siz
     for k in range(4):
         buf.tri(bottom, ring[k], ring[(k + 1) % 4])
         buf.tri(ring[k], tip, ring[(k + 1) % 4])
+
+
+# FLEURS SAUVAGES (WILDFLOWERS_001). Une prairie pontique de debut d'ete n'est pas verte : elle est
+# piquetee. Chaque espece est une tige fine, des petales en cerf-volant autour d'un coeur ; la
+# couleur est dans le sommet, comme le reste de la strate. Des teintes de terre, pas de neon :
+# ATM-05 interdit la sursaturation, et le soleil de 75 000 lux fait deja le reste.
+STEM = c(0.030, 0.056, 0.020)
+SPECIES = {
+    'poppy': {'height': (38.0, 72.0), 'petals': 4, 'length': 3.4, 'width': 3.6, 'tilt': 0.80, 'disc': 0.9,
+              'petal': c(0.42, 0.030, 0.020), 'petal_tip': c(0.30, 0.018, 0.014), 'base_mix': 0.7,
+              'center': c(0.010, 0.010, 0.010), 'stem': STEM},
+    'buttercup': {'height': (24.0, 55.0), 'petals': 5, 'length': 1.5, 'width': 1.7, 'tilt': 0.45, 'disc': 0.5,
+                  'petal': c(0.62, 0.42, 0.012), 'petal_tip': c(0.55, 0.36, 0.010), 'base_mix': 0.0,
+                  'center': c(0.40, 0.26, 0.008), 'stem': STEM},
+    'hawkbit': {'height': (22.0, 50.0), 'petals': 11, 'length': 2.1, 'width': 0.65, 'tilt': 0.30, 'disc': 0.45,
+                'petal': c(0.66, 0.46, 0.014), 'petal_tip': c(0.58, 0.40, 0.012), 'base_mix': 0.0,
+                'center': c(0.46, 0.30, 0.010), 'stem': STEM},
+    'cornflower': {'height': (40.0, 80.0), 'petals': 8, 'length': 2.5, 'width': 0.95, 'tilt': 0.40, 'disc': 0.55,
+                   'petal': c(0.050, 0.085, 0.46), 'petal_tip': c(0.040, 0.070, 0.38), 'base_mix': 0.0,
+                   'center': c(0.10, 0.030, 0.20), 'stem': STEM},
+    'chicory': {'height': (50.0, 92.0), 'petals': 10, 'length': 2.9, 'width': 0.95, 'tilt': 0.25, 'disc': 0.5,
+                'petal': c(0.13, 0.19, 0.58), 'petal_tip': c(0.11, 0.16, 0.50), 'base_mix': 0.0,
+                'center': c(0.08, 0.06, 0.20), 'stem': STEM},
+    'sage': {'height': (35.0, 70.0), 'petals': 5, 'length': 1.8, 'width': 1.1, 'tilt': 0.55, 'disc': 0.4,
+             'petal': c(0.23, 0.080, 0.44), 'petal_tip': c(0.18, 0.060, 0.36), 'base_mix': 0.0,
+             'center': c(0.12, 0.04, 0.22), 'stem': STEM},
+    'daisy': {'height': (18.0, 40.0), 'petals': 14, 'length': 1.9, 'width': 0.55, 'tilt': 0.12, 'disc': 0.75,
+              'petal': c(0.78, 0.78, 0.72), 'petal_tip': c(0.70, 0.70, 0.64), 'base_mix': 0.0,
+              'center': c(0.50, 0.36, 0.020), 'stem': STEM},
+    'umbel': {'height': (55.0, 98.0), 'petals': 11, 'length': 4.6, 'width': 2.3, 'tilt': 0.05, 'disc': 0.8,
+              'petal': c(0.68, 0.66, 0.54), 'petal_tip': c(0.60, 0.58, 0.46), 'base_mix': 0.0,
+              'center': c(0.52, 0.50, 0.40), 'stem': STEM},
+    'yarrow': {'height': (30.0, 62.0), 'petals': 8, 'length': 2.8, 'width': 1.5, 'tilt': 0.10, 'disc': 0.6,
+               'petal': c(0.72, 0.70, 0.62), 'petal_tip': c(0.64, 0.62, 0.54), 'base_mix': 0.0,
+               'center': c(0.46, 0.40, 0.18), 'stem': STEM},
+}
+
+
+def draw_flowers(spec, rng):
+    """Tire les plantes UNE fois (espece, place, taille) ; les LOD en gardent une part fixe."""
+    cfg = spec['flowers']
+    total = sum(w for w, _ in cfg['species'])
+    plants = []
+    for k in range(cfg['count']):
+        roll, acc, name = rng.random() * total, 0.0, cfg['species'][-1][1]
+        for w, cand in cfg['species']:
+            acc += w
+            if roll <= acc:
+                name = cand
+                break
+        sp = SPECIES[name]
+        r, a = spec['radius'] * 0.9 * math.sqrt(rng.random()), rng.random() * math.tau
+        plants.append({'sp': sp, 'base': (r * math.cos(a), r * math.sin(a), -6.0), 'yaw': rng.random() * math.tau,
+                       'height': rng.uniform(*sp['height']), 'lean': rng.uniform(0.02, 0.30),
+                       'tint': rng.uniform(0.88, 1.12), 'keep': rng.random()})
+    return plants
+
+
+# v2 : a hauteur d'oeil, des petales de 2 a 3 cm se perdent dans l'herbe (v1 : points a peine visibles a 5 m).
+FLOWER_SCALE = 1.9
+
+
+def flower_head(buf, top, sp, tint, yaw, lod):
+    """Coeur en hexagone, puis un cerf-volant par petale, couche a `tilt` au-dessus de l'horizontale.
+
+    LOD0/1 : tous les petales. LOD2 : une pastille hexagonale de la couleur du petale -- a 60 m une
+    fleur n'est qu'une touche de couleur, mais cette touche est ce qui fait lire une prairie fleurie.
+    """
+    n, tilt = sp['petals'], sp['tilt']
+    length, width, disc = sp['length'] * FLOWER_SCALE, sp['width'] * FLOWER_SCALE, sp['disc'] * FLOWER_SCALE
+    normal = up_normal((0.0, 0.0))
+    alpha = max(0.0, min(1.0, top[2] / 100.0))
+    col, tip_col = scaled(sp['petal'], tint), scaled(sp['petal_tip'], tint)
+    if lod == 2:
+        middle = buf.vertex((top[0], top[1], top[2] + 0.3), normal, col, alpha, (0.5, 0.0))
+        ring = [buf.vertex((top[0] + math.cos(yaw + k * math.tau / 6.0) * (disc + 0.8 * length),
+                            top[1] + math.sin(yaw + k * math.tau / 6.0) * (disc + 0.8 * length), top[2] + 0.3),
+                           normal, col, alpha, (k / 6.0, 1.0)) for k in range(6)]
+        for k in range(6):
+            buf.tri(middle, ring[k], ring[(k + 1) % 6])
+        return
+    centre = buf.vertex((top[0], top[1], top[2] + 0.5), normal, sp['center'], alpha, (0.5, 0.0))
+    ring = [buf.vertex((top[0] + math.cos(yaw + k * math.tau / 6.0) * disc,
+                        top[1] + math.sin(yaw + k * math.tau / 6.0) * disc, top[2] + 0.4),
+                       normal, sp['center'], alpha, (k / 6.0, 0.2)) for k in range(6)]
+    for k in range(6):
+        buf.tri(centre, ring[k], ring[(k + 1) % 6])
+    ct, st = math.cos(tilt), math.sin(tilt)
+    for i in range(n):
+        phi = yaw + i * math.tau / n + 0.12 * math.sin(i * 2.7)
+        dx, dy = math.cos(phi), math.sin(phi)
+        sx, sy = -dy, dx
+        reach = 1.0 + 0.10 * math.sin(i * 1.9 + yaw)
+
+        def point(radial, lateral, dx=dx, dy=dy, sx=sx, sy=sy):
+            return (top[0] + dx * radial * ct + sx * lateral, top[1] + dy * radial * ct + sy * lateral,
+                    top[2] + 0.4 + radial * st)
+        mid = disc + 0.62 * length * reach
+        root = buf.vertex(point(disc, 0.0), normal, lerp3(col, sp['center'], sp['base_mix']), alpha, (0.5, 0.0))
+        left = buf.vertex(point(mid, -0.5 * width), normal, col, alpha, (0.0, 0.6))
+        right = buf.vertex(point(mid, 0.5 * width), normal, col, alpha, (1.0, 0.6))
+        tip = buf.vertex(point(disc + length * reach, 0.0), normal, tip_col, alpha, (0.5, 1.0))
+        buf.tri(root, right, left)
+        buf.tri(left, right, tip)
+
+
+def flower_plant(buf, plant, lod):
+    sp = plant['sp']
+    segments = 3 if lod == 0 else 2
+    stem_hi = scaled(sp['stem'], 1.3)
+    out = (math.cos(plant['yaw']), math.sin(plant['yaw']))
+    top = blade(buf, plant['base'], plant['yaw'], plant['height'], 0.6, plant['lean'], 0.12, segments,
+                sp['stem'], stem_hi, out)
+    flower_head(buf, top, sp, plant['tint'], plant['yaw'], lod)
 
 
 def draw_blades(spec, rng):
@@ -437,7 +597,7 @@ def build_fern_lod(spec, fronds, lod):
     return buf.mesh(), len(buf.t)
 
 
-def build_lod(spec, blades, heads, lod):
+def build_lod(spec, blades, heads, lod, flowers=None):
     keep = (1.0, 0.45, 0.30)[lod]
     # LOD2 ne double plus la largeur : un triangle deux fois plus gros remplissait encore l'oeil.
     widen = (1.0, 1.15, 1.35)[lod]
@@ -455,6 +615,11 @@ def build_lod(spec, blades, heads, lod):
                 continue
             seed_head(buf, h['base'], h['yaw'], h['height'], h['lean'], stem, spec['head_color'],
                       (math.cos(h['yaw']), math.sin(h['yaw'])), spec.get('head_size', (9.0, 0.55)))
+    # Les fleurs gardent leur nombre plus longtemps que l'herbe : une touche de couleur est ce qui
+    # se lit encore a 60 m (LOD1 : 75 %, LOD2 : 55 %).
+    for plant in flowers or []:
+        if plant['keep'] < (1.0, 0.75, 0.55)[lod]:
+            flower_plant(buf, plant, lod)
     if not buf.t:
         raise RuntimeError('%s LOD%d: aucun triangle' % (spec['name'], lod))
     return buf.mesh(), len(buf.t)
@@ -637,20 +802,34 @@ def main():
     # Les touffes d'abord, le materiau ensuite : supprimer M_AnastasisGrass pendant que les
     # touffes le referencent laisse un paquet que ForceDeleteObjects ne sait plus decharger
     # (ensure ObjectTools.cpp:4045 au deuxieme run, v2).
-    for spec in FAMILIES:
+    # ANASTASIS_GROUND_COVER_ONLY=flowers (ou une liste de noms, separes par des virgules) : ne
+    # regenere que ces touffes, et garde M_AnastasisGrass tel quel. Une regeneration complete
+    # reecrit des assets binaires identiques au bit pres a la graine pres -- et collisionne avec toute
+    # autre mission qui y touche.
+    only = os.environ.get('ANASTASIS_GROUND_COVER_ONLY', '').strip()
+    families = FAMILIES
+    if only:
+        wanted = set(n.strip() for n in only.split(',') if n.strip())
+        families = [f for f in FAMILIES if f['name'] in wanted or ('flowers' in wanted and f.get('flowers'))]
+        if not families:
+            raise RuntimeError('ANASTASIS_GROUND_COVER_ONLY=%s ne designe aucune famille' % only)
+    for spec in families:
         path = PACKAGE_PATH + '/' + spec['name']
         if unreal.EditorAssetLibrary.does_asset_exist(path):
             unreal.EditorAssetLibrary.delete_asset(path)
-    material = ensure_material()
+    material = unreal.load_asset(MATERIAL_PATH) if only else ensure_material()
+    if material is None:
+        raise RuntimeError('%s absent : lancer une regeneration complete (sans ANASTASIS_GROUND_COVER_ONLY)' % MATERIAL_PATH)
     report = []
-    for spec in FAMILIES:
+    for spec in families:
         rng = random.Random('%d/%s' % (SEED, spec['name']))
         if spec.get('kind') == 'fern':
             fronds = draw_fern(spec, rng)
             built = [build_fern_lod(spec, fronds, lod) for lod in range(3)]
         else:
             blades, heads = draw_blades(spec, rng)
-            built = [build_lod(spec, blades, heads, lod) for lod in range(3)]
+            flowers = draw_flowers(spec, rng) if spec.get('flowers') else None
+            built = [build_lod(spec, blades, heads, lod, flowers) for lod in range(3)]
         triangles = save_static_mesh([m for m, n in built], PACKAGE_PATH + '/' + spec['name'], material)
         report.append('%s=%s' % (spec['name'], triangles))
         log('  %s -- %s' % (spec['name'], spec['note']))

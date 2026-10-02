@@ -14,6 +14,9 @@
  *   H5a Fern         fougere en volant, frondes divisees (EZ3 "fougeres & herbacees") : trouees, bord de couronne
  *   H5b HartsTongue  scolopendre, lanieres entieres luisantes (EZ3, palette) : ombre humide
  *   H5c WoodHerb     herbacee d'ombre, luzule / anemone (EZ3 "strate herbacee") : ombre profonde
+ *   H7a FlowerWarm   fleurs chaudes de prairie : coquelicot, bouton-d'or, epervier (WILDFLOWERS_001)
+ *   H7b FlowerCool   fleurs froides : bleuet, chicoree, sauge des pres
+ *   H7c FlowerWhite  fleurs claires : marguerite, ombelle, achillee
  * Reste a faire : joncs de rive (H4). Au-dela de MaxSlopeDegrees (falaise) et au pied des troncs,
  * rien n'est pose.
  *
@@ -23,7 +26,10 @@
  */
 namespace AnastasisGroundCover
 {
-enum class EFamily : uint8 { MeadowTall, MeadowShort, Sedge, HeathTussock, Heather, Fern, HartsTongue, WoodHerb, Count };
+enum class EFamily : uint8 { MeadowTall, MeadowShort, Sedge, HeathTussock, Heather, Fern, HartsTongue, WoodHerb, FlowerWarm, FlowerCool, FlowerWhite, Count };
+
+/** Les trois familles de fleurs sauvages (WILDFLOWERS_001) : posees dans la prairie, jamais en sous-bois ni en lande. */
+inline bool IsFlower(EFamily Family) { return Family == EFamily::FlowerWarm || Family == EFamily::FlowerCool || Family == EFamily::FlowerWhite; }
 
 inline constexpr int32 FamilyCount = static_cast<int32>(EFamily::Count);
 
@@ -35,6 +41,13 @@ struct FSettings
 {
 	/** Natural-history-001: presentation habitat rules; false retains the reference A/B. */
 	bool bNaturalHistory = false;
+	/**
+	 * WILDFLOWERS_001 : part de la prairie fleurie, en moyenne. 0 = la distribution de reference
+	 * (aucune fleur) ; les fleurs viennent par dérives -- une tache de coquelicots, puis des
+	 * bleuets plus loin -- jamais en semis regulier. Elles REMPLACENT une touffe d'herbe : leur mesh
+	 * porte lui-meme quelques lames, la prairie ne se troue pas.
+	 */
+	double FlowerShare = 0.0;
 	/** Une candidate par cellule, jittee dans la cellule. */
 	double CellUU = 120.0;
 	/** Rayon des sondes de pente : celui de la foret macro, pour que les deux lisent le meme sol. */

@@ -1,6 +1,10 @@
 # GROUND_COVER_001 -- (re)genere les trois touffes d'herbe et M_AnastasisGrass dans un editeur
 # dedie, discret, qui se ferme. Voir create-ground-cover.py (source d'autorite des assets).
-param([int]$TimeoutSec=1500)
+#
+# -Only flowers (WILDFLOWERS_001) : ne regenere que les trois familles de fleurs sauvages et garde
+# M_AnastasisGrass et les autres touffes tels quels (ANASTASIS_GROUND_COVER_ONLY). Une liste de noms
+# d'assets, separes par des virgules, est aussi acceptee.
+param([int]$TimeoutSec=1500, [string]$Only='')
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
@@ -10,6 +14,7 @@ New-Item -ItemType Directory -Force $dir | Out-Null
 $log=Join-Path $dir 'create-ground-cover.log'
 if(Test-Path $log){Remove-Item $log}
 $env:ANASTASIS_GROUND_COVER_QUIT='1'
+$env:ANASTASIS_GROUND_COVER_ONLY=$Only
 $py=(Join-Path $Root 'tools\unreal\create-ground-cover.py').Replace('\','/')
 $launchArgs=@(
  ('"'+(Join-Path $Root 'Anastasis_UnrealV2.uproject')+'"'),

@@ -70,6 +70,7 @@ bool ValidSettings(const FSettings& C)
 		&& Finite(C.UnderstoryDensity) && C.UnderstoryDensity > 0.0 && C.UnderstoryDensity <= 1.0
 		&& Finite(C.UnderstoryPatchFloor) && C.UnderstoryPatchFloor >= 0.0 && C.UnderstoryPatchFloor <= 1.0
 		&& Finite(C.HartsTongueWetness) && C.HartsTongueWetness > 0.0
+		&& Finite(C.FlowerShare) && C.FlowerShare >= 0.0 && C.FlowerShare <= 0.5
 		&& Finite(C.ScaleMin) && Finite(C.ScaleMax) && C.ScaleMin > 0.0 && C.ScaleMax >= C.ScaleMin && C.ScaleMax <= 4.0
 		&& C.MaxInstances > 0;
 }
@@ -147,7 +148,7 @@ void AnastasisGroundCover::BuildCoverField(const FPlan& Plan, const FBox2D& Boun
 		FVector4f& C = Out.Cover[Y * Out.W + X];
 		switch (P.Family)
 		{
-		case EFamily::MeadowTall: case EFamily::MeadowShort: C.X += PerTuft; break;
+		case EFamily::MeadowTall: case EFamily::MeadowShort: case EFamily::FlowerWarm: case EFamily::FlowerCool: case EFamily::FlowerWhite: C.X += PerTuft; break;
 		case EFamily::Sedge: C.Y += PerTuft; break;
 		case EFamily::HeathTussock: case EFamily::Heather: C.Z += PerTuft; break;
 		default: C.W += PerTuft; break;
@@ -218,6 +219,9 @@ const TCHAR* AnastasisGroundCover::FamilyName(EFamily Family)
 	case EFamily::Fern: return TEXT("Fern");
 	case EFamily::HartsTongue: return TEXT("HartsTongue");
 	case EFamily::WoodHerb: return TEXT("WoodHerb");
+	case EFamily::FlowerWarm: return TEXT("FlowerWarm");
+	case EFamily::FlowerCool: return TEXT("FlowerCool");
+	case EFamily::FlowerWhite: return TEXT("FlowerWhite");
 	default: return TEXT("Unknown");
 	}
 }
@@ -484,6 +488,26 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 						const double Ourlet = 4.0 * Shade * (1.0 - Shade);
 						const double TallChance = Flat * Trampled * FMath::Min(1.0, Mix * (1.0 - 0.6 * Shade) + 0.7 * Ourlet);
 						Family = Unit(Hash(In.Seed, GX, GY, 15)) < TallChance ? EFamily::MeadowTall : EFamily::MeadowShort;
+						// WILDFLOWERS_001. Une prairie fleurit par derives : un champ de taches d'environ
+						// 15 m (un quart de la prairie), et dans une tache UNE espece dominante, choisie
+						// par un second champ plus large -- coquelicots ici, bleuets plus loin. Hors des
+						// taches, quelques fleurs isolees. A l'ombre et sol pietine, peu de fleurs.
+						if (C.FlowerShare > 0.0 && Slope <= C.MeadowSlopeDegrees)
+						{
+							const double Drift = Smooth((Patch(In.Seed, X, Y, 1500.0, 91) - 0.52) / 0.25);
+							const double Chance = C.FlowerShare * (0.12 + 3.2 * Drift) * (1.0 - 0.85 * Shade) * Trampled;
+							if (Unit(Hash(In.Seed, GX, GY, 92)) < Chance)
+							{
+								double Pick = Smooth((Patch(In.Seed, X, Y, 2600.0, 93) - 0.28) / 0.44);
+								// Une fleur sur cinq sort de la dominante de sa tache : un melange, pas un aplat.
+								Pick = FMath::Frac(Pick + (Unit(Hash(In.Seed, GX, GY, 94)) < 0.2 ? Unit(Hash(In.Seed, GX, GY, 95)) : 0.0));
+								// Le sec et le chaud : coquelicots ; le frais : bleuets ; partout : les claires.
+								const double Dryness = 1.0 - Smooth(Wet / 0.35);
+								if (Pick < 0.34 + 0.18 * (Dryness - 0.5)) Family = EFamily::FlowerWarm;
+								else if (Pick < 0.70 + 0.10 * (Dryness - 0.5)) Family = EFamily::FlowerCool;
+								else Family = EFamily::FlowerWhite;
+							}
+						}
 					}
 
 					FPlacement& P = Row.Instances.AddDefaulted_GetRef();

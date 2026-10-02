@@ -387,4 +387,99 @@ bool FAnastasisNaturalHistoryCover::RunTest(const FString&)
  return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisGroundCoverWildflowers, "Anastasis.GroundCover.Wildflowers",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisGroundCoverWildflowers::RunTest(const FString&)
+{
+	namespace GC = AnastasisGroundCover;
+	using AnastasisGroundCoverTestFixture::Count;
+	FString Error;
+	// Sans fleurs (FlowerShare = 0, le defaut), la distribution de reference est inchangee : aucune
+	// famille de fleur n'apparait, nulle part.
+	GC::FPlan Reference;
+	TestTrue(TEXT("reference builds"), GC::Build(AnastasisGroundCoverTestFixture::OpenPlane(3.0), GC::FSettings(), Reference, Error));
+	int32 ReferenceFlowers = 0;
+	for (const GC::FPlacement& P : Reference.Instances) ReferenceFlowers += GC::IsFlower(P.Family) ? 1 : 0;
+	TestEqual(TEXT("no flower without FlowerShare"), ReferenceFlowers, 0);
+
+	GC::FSettings Bloom;
+	Bloom.FlowerShare = 0.10;
+	GC::FPlan A, B;
+	TestTrue(TEXT("bloom builds"), GC::Build(AnastasisGroundCoverTestFixture::OpenPlane(3.0), Bloom, A, Error));
+	TestTrue(TEXT("bloom builds again"), GC::Build(AnastasisGroundCoverTestFixture::OpenPlane(3.0), Bloom, B, Error));
+	const int32 Warm = Count(A, GC::EFamily::FlowerWarm), Cool = Count(A, GC::EFamily::FlowerCool), White = Count(A, GC::EFamily::FlowerWhite);
+	const int32 Flowers = Warm + Cool + White;
+	const double Share = static_cast<double>(Flowers) / FMath::Max(1, A.Instances.Num());
+	TestTrue(FString::Printf(TEXT("the three families bloom (warm %d, cool %d, white %d)"), Warm, Cool, White), Warm > 0 && Cool > 0 && White > 0);
+	TestTrue(FString::Printf(TEXT("flowers are 2 to 20 %% of the meadow (%.1f %%)"), Share * 100.0), Share > 0.02 && Share < 0.20);
+	// Une dérive n'est pas un semis : les fleurs se groupent. Part de fleurs dans les cellules de 15 m qui en
+	// portent le plus, contre la moyenne.
+	TMap<FIntPoint, int32> PerCell, FlowerPerCell;
+	for (const GC::FPlacement& P : A.Instances)
+	{
+		const FIntPoint Cell(FMath::FloorToInt(P.Ground.X / 1500.0), FMath::FloorToInt(P.Ground.Y / 1500.0));
+		++PerCell.FindOrAdd(Cell);
+		if (GC::IsFlower(P.Family)) ++FlowerPerCell.FindOrAdd(Cell);
+	}
+	double MaxCellShare = 0.0, MinCellShare = 1.0;
+	for (const TPair<FIntPoint, int32>& Cell : PerCell)
+	{
+		if (Cell.Value < 40) continue;
+		const double CellShare = static_cast<double>(FlowerPerCell.FindRef(Cell.Key)) / Cell.Value;
+		MaxCellShare = FMath::Max(MaxCellShare, CellShare);
+		MinCellShare = FMath::Min(MinCellShare, CellShare);
+	}
+	TestTrue(FString::Printf(TEXT("flowers drift: the densest 15 m cell holds %.0f %%, the sparsest %.0f %%"), MaxCellShare * 100.0, MinCellShare * 100.0),
+		MaxCellShare > 2.0 * MinCellShare + 0.04);
+	// Un plan d'ensemble identique d'une passe a l'autre.
+	bool bSame = A.Instances.Num() == B.Instances.Num();
+	for (int32 I = 0; bSame && I < A.Instances.Num(); ++I)
+	{
+		bSame = A.Instances[I].Family == B.Instances[I].Family && A.Instances[I].Ground.Equals(B.Instances[I].Ground, 0.0);
+	}
+	TestTrue(TEXT("deterministic"), bSame);
+	// Meme nombre de touffes : une fleur remplace une touffe d'herbe, elle n'en ajoute pas.
+	TestEqual(TEXT("flowers replace tufts, they do not add any"), A.Instances.Num(), Reference.Instances.Num());
+
+	// Jamais en lande (versant) ni sur sol mouille (laiches) ni en sous-bois.
+	GC::FPlan Slope;
+	TestTrue(TEXT("slope builds"), GC::Build(AnastasisGroundCoverTestFixture::OpenPlane(28.0), Bloom, Slope, Error));
+	int32 SlopeFlowers = 0;
+	for (const GC::FPlacement& P : Slope.Instances) SlopeFlowers += GC::IsFlower(P.Family) ? 1 : 0;
+	TestEqual(TEXT("no flower on the lande slope"), SlopeFlowers, 0);
+	GC::FInputs Wet = AnastasisGroundCoverTestFixture::OpenPlane(3.0);
+	Wet.SampleWetness = [](double, double, double& W) { W = 0.95; return true; };
+	GC::FPlan Marsh;
+	TestTrue(TEXT("marsh builds"), GC::Build(Wet, Bloom, Marsh, Error));
+	int32 MarshFlowers = 0;
+	for (const GC::FPlacement& P : Marsh.Instances) MarshFlowers += GC::IsFlower(P.Family) ? 1 : 0;
+	TestEqual(TEXT("no flower on saturated ground"), MarshFlowers, 0);
+	GC::FInputs Shaded = AnastasisGroundCoverTestFixture::OpenPlane(3.0);
+	for (double X = 250.0; X < 10000.0; X += 500.0)
+	{
+		for (double Y = 250.0; Y < 10000.0; Y += 500.0) Shaded.Canopy.Add(FVector(X, Y, 450.0));
+	}
+	GC::FPlan Under;
+	TestTrue(TEXT("shaded builds"), GC::Build(Shaded, Bloom, Under, Error));
+	int32 UnderFlowers = 0;
+	for (const GC::FPlacement& P : Under.Instances) UnderFlowers += GC::IsFlower(P.Family) ? 1 : 0;
+	TestEqual(TEXT("no flower under the crowns"), UnderFlowers, 0);
+
+	// Les trois familles de fleurs ont un nom, un chemin d'asset distinct, et comptent comme prairie
+	// dans le champ de couverture (elles teintent le sol comme l'herbe qu'elles remplacent).
+	TestTrue(TEXT("distinct asset paths"), GC::MeshPath(GC::EFamily::FlowerWarm) != GC::MeshPath(GC::EFamily::FlowerCool)
+		&& GC::MeshPath(GC::EFamily::FlowerCool) != GC::MeshPath(GC::EFamily::FlowerWhite));
+	TestTrue(TEXT("named"), FString(GC::FamilyName(GC::EFamily::FlowerWarm)) == TEXT("FlowerWarm")
+		&& FString(GC::FamilyName(GC::EFamily::FlowerWhite)) == TEXT("FlowerWhite"));
+	GC::FCoverField Field;
+	GC::BuildCoverField(A, FBox2D(FVector2D(0, 0), FVector2D(10000, 10000)), 400.0, 120.0, Field);
+	GC::FCoverField FieldRef;
+	GC::BuildCoverField(Reference, FBox2D(FVector2D(0, 0), FVector2D(10000, 10000)), 400.0, 120.0, FieldRef);
+	TestTrue(TEXT("flowers count as meadow in the cover field"), Field.IsValid() && FieldRef.IsValid()
+		&& FMath::IsNearlyEqual(Field.Sample(5000, 5000).X, FieldRef.Sample(5000, 5000).X, 0.15f) && Field.Sample(5000, 5000).W == 0.f);
+	AddInfo(FString::Printf(TEXT("WILDFLOWERS tufts=%d flowers=%d (warm=%d cool=%d white=%d) share=%.1f%% cell_share=[%.0f%%,%.0f%%]"),
+		A.Instances.Num(), Flowers, Warm, Cool, White, Share * 100.0, MinCellShare * 100.0, MaxCellShare * 100.0));
+	return true;
+}
+
 #endif

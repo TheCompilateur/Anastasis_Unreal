@@ -70,6 +70,11 @@ static TAutoConsoleVariable<int32> CVarGroundCover(
     TEXT("anastasis.Dressing.GroundCover"), 1,
     TEXT("0=sol nu entre les arbres, 1=prairies haute, basse et humide sur les espaces ouverts de la vallee ; applique a l'incarnation."), ECVF_Default);
 
+// WILDFLOWERS_001. Coupable pour l'A/B : meme prairie, memes touffes, sans les fleurs sauvages.
+static TAutoConsoleVariable<int32> CVarWildflowers(
+    TEXT("anastasis.Dressing.Wildflowers"), 1,
+    TEXT("0=prairie d'herbes seules (distribution de reference), 1=fleurs sauvages par derives (coquelicots, bouton-d'or, bleuets, marguerites, ombelles) ; applique a l'incarnation."), ECVF_Default);
+
 // Ombres portees des touffes proches (les lointaines n'en portent jamais). Bouton de mesure du cout.
 static TAutoConsoleVariable<int32> CVarGroundCoverShadows(
     TEXT("anastasis.GroundCover.Shadows"), 1,
@@ -1376,6 +1381,7 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 	FString Error;
 	GC::FSettings CoverSettings;
 	CoverSettings.bNaturalHistory = CVarNaturalHistory.GetValueOnGameThread() != 0;
+	CoverSettings.FlowerShare = CVarWildflowers.GetValueOnGameThread() != 0 ? 0.24 : 0.0;
 	if (!GC::Build(In, CoverSettings, Cover, Error))
 	{
 		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_GROUND_COVER rejected=%s"), *Error);
@@ -1403,6 +1409,10 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 	// parcourues. La distance est mesuree au centre des bornes : coupe + demi-diagonale.
 	constexpr double ChunkUU = 16000.0;
 	const double ChunkReach = ChunkUU * 0.5 * UE_SQRT_2;
+	// Les fleurs sont clairsemees (4 a 10 % des cellules de prairie) : des tuiles de 480 m
+	// plutot que 160 m, neuf fois moins de HISM pour trois familles de plus (VEG-03).
+	constexpr double FlowerChunkUU = ChunkUU * 3.0;
+	const double FlowerChunkReach = FlowerChunkUU * 0.5 * UE_SQRT_2;
 	UStaticMesh* Meshes[GC::FamilyCount] = {};
 	UMaterialInstanceDynamic* Mids[GC::FamilyCount][2] = {};
 	double MeshRadius[GC::FamilyCount] = {};
@@ -1423,6 +1433,19 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 			}
 		}
 	}
+	// WILDFLOWERS_001 : sans l'asset d'une famille de fleurs (pas encore genere), la touffe d'herbe
+	// qu'elle remplace est posee a sa place -- la prairie ne se troue pas. `Missing` le dit quand meme.
+	for (int32 F = 0; F < GC::FamilyCount; ++F)
+	{
+		if (!Meshes[F] && GC::IsFlower(static_cast<GC::EFamily>(F)))
+		{
+			const int32 Grass = static_cast<int32>(GC::EFamily::MeadowShort);
+			Meshes[F] = Meshes[Grass];
+			MeshRadius[F] = MeshRadius[Grass];
+			Mids[F][0] = Mids[Grass][0];
+			Mids[F][1] = Mids[Grass][1];
+		}
+	}
 	// Cle : famille, tier, tuile. Ordre de remplissage = ordre du plan : deterministe.
 	const auto KeyOf = [](int32 F, int32 K, int32 CX, int32 CY)
 	{
@@ -1441,7 +1464,8 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 		const double Residual = FMath::Acos(FMath::Clamp(FVector::DotProduct(Up, P.Normal), -1.0, 1.0));
 		const double Sink = 2.0 + MeshRadius[F] * Scale * FMath::Tan(Residual);
 		const FQuat Rotation = FQuat::FindBetweenNormals(FVector::UpVector, Up) * FQuat(FVector::UpVector, FMath::DegreesToRadians(P.Yaw));
-		const int32 CX = FMath::FloorToInt(P.Ground.X / ChunkUU), CY = FMath::FloorToInt(P.Ground.Y / ChunkUU);
+		const double Chunk = GC::IsFlower(P.Family) ? FlowerChunkUU : ChunkUU;
+		const int32 CX = FMath::FloorToInt(P.Ground.X / Chunk), CY = FMath::FloorToInt(P.Ground.Y / Chunk);
 		Batches.FindOrAdd(KeyOf(F, K, CX, CY)).Add(FTransform(Rotation, P.Ground - FVector(0, 0, Sink), FVector(Scale)));
 		OutsideValley += AnastasisPlaces::ValleyWeightAt(CanonicalSource, P.Ground.X, P.Ground.Y) < 0.05 ? 1 : 0;
 	}
@@ -1472,7 +1496,7 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 		Made->SetStaticMesh(Meshes[F]);
 		Made->SetCastShadow(Tier.bShadow);
 		Made->SetCullDistances(static_cast<int32>(Tier.FadeStart), Tier.CullEnd);
-		Made->LDMaxDrawDistance = static_cast<float>(Tier.CullEnd + ChunkReach);
+		Made->LDMaxDrawDistance = static_cast<float>(Tier.CullEnd + (GC::IsFlower(static_cast<GC::EFamily>(F)) ? FlowerChunkReach : ChunkReach));
 		Made->SetCachedMaxDrawDistance(Made->LDMaxDrawDistance);
 		if (Mids[F][K]) Made->SetMaterial(0, Mids[F][K]);
 		Made->AddInstances(Batch.Value, false, false, false);
@@ -1534,6 +1558,16 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 		Cover.Candidates, Cover.RejectedMask, Cover.RejectedGround, Cover.RejectedWater, Cover.RejectedSlope,
 		Cover.RejectedCanopy, Cover.RejectedDensity, Canopy.Num(), In.Clearings.Num(), Cover.bTruncated, Missing,
 		PlanMs, (FPlatformTime::Seconds() - Start) * 1000.0);
+	// WILDFLOWERS_001 : meme plan que ci-dessus, lu famille par famille (le format de la ligne
+	// ANASTASIS_GROUND_COVER, que des scripts parsent, ne change pas).
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_WILDFLOWERS enabled=%d warm=%d cool=%d white=%d share_of_meadow=%.4f"),
+		CoverSettings.FlowerShare > 0.0,
+		Cover.Counts[static_cast<int32>(GC::EFamily::FlowerWarm)], Cover.Counts[static_cast<int32>(GC::EFamily::FlowerCool)],
+		Cover.Counts[static_cast<int32>(GC::EFamily::FlowerWhite)],
+		static_cast<double>(Cover.Counts[static_cast<int32>(GC::EFamily::FlowerWarm)] + Cover.Counts[static_cast<int32>(GC::EFamily::FlowerCool)]
+			+ Cover.Counts[static_cast<int32>(GC::EFamily::FlowerWhite)])
+			/ FMath::Max(1, Cover.Counts[0] + Cover.Counts[1] + Cover.Counts[static_cast<int32>(GC::EFamily::FlowerWarm)]
+				+ Cover.Counts[static_cast<int32>(GC::EFamily::FlowerCool)] + Cover.Counts[static_cast<int32>(GC::EFamily::FlowerWhite)]));
 	// La lande se juge sur le relief reellement mesure : ou sont les pentes, et ce qui les refuse.
 	UE_LOG(LogAnastasis_UnrealV2, Display,
 		TEXT("ANASTASIS_GROUND_SLOPES dry_candidates_by_slope 0-10=%d 10-20=%d 20-30=%d 30-45=%d 45-60=%d 60+=%d steep_refused_canopy=%d lande_above_floor_m=[%.1f %.1f %.1f] valley_floor_z=%.0f"),
