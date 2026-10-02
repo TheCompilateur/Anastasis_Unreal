@@ -59,13 +59,15 @@ namespace AnastasisSkyClock
 		double Humidity = 0.0;
 		double Wetness = 0.0;
 		/**
-		 * The weather the SKY shows: the simulation's humidity, wind and cover, cross-faded over
+		 * The weather the SKY shows: the simulation's humidity, wind, cover and rain, cross-faded over
 		 * the profile's WeatherBlendHours around midnight (see SkyWeatherAt). Weather above stays
-		 * the simulation's own, bit for bit; only fog, mist and clouds read these.
+		 * the simulation's own, bit for bit; fog, mist, clouds and rain read these.
 		 */
 		double SkyHumidity = 0.0;
 		double SkyWind = 0.0;
 		double SkyCover = 0.0;
+		/** Visual rain on the same midnight blend as the clouds; never changes Weather.Rain. */
+		double SkyRain = 0.0;
 		/** 0..1 share of the sun's light the fog may scatter (SunFogScatteringFor). */
 		double SunFogScattering = 1.0;
 		/** True when the moon, not the sun, is the forward-shading light (MoonLeadsForwardShading). */
@@ -148,6 +150,7 @@ namespace AnastasisSkyClock
 		double Humidity = 0.0;
 		double Wind = 0.0;
 		double Cover = 0.0;
+		double Rain = 0.0;
 	};
 
 	/**

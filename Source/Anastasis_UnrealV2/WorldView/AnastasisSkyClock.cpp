@@ -101,6 +101,7 @@ FSkyState Evaluate(const UAnastasisAtmosphereProfile& Profile, const double SimT
 	State.SkyHumidity = Sky.Humidity;
 	State.SkyWind = Sky.Wind;
 	State.SkyCover = Sky.Cover;
+	State.SkyRain = Sky.Rain;
 
 	State.SunFogScattering = SunFogScatteringFor(Profile, State.SunElevationDegrees);
 	State.bMoonLeadsForward = MoonLeadsForwardShading(State.SunElevationDegrees);
@@ -123,6 +124,7 @@ namespace
 		Out.Humidity = AnastasisWeather::WeatherHumidityAt(W);
 		Out.Wind = W.Wind;
 		Out.Cover = W.Cover;
+		Out.Rain = W.Rain;
 		return Out;
 	}
 
@@ -132,6 +134,7 @@ namespace
 		Out.Humidity = FMath::Lerp(A.Humidity, B.Humidity, Alpha);
 		Out.Wind = FMath::Lerp(A.Wind, B.Wind, Alpha);
 		Out.Cover = FMath::Lerp(A.Cover, B.Cover, Alpha);
+		Out.Rain = FMath::Lerp(A.Rain, B.Rain, Alpha);
 		return Out;
 	}
 

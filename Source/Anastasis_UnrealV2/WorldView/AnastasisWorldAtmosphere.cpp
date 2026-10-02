@@ -559,8 +559,12 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 void AAnastasisWorldAtmosphere::UpdateRain(const AnastasisSkyClock::FSkyState& Sky, const bool bWeatherDrivesSky)
 {
 	const bool bEnabled = CVarWeatherRain.GetValueOnGameThread() != 0;
+	// WEATHER_TRANSITION_002: clouds and visible rain share the same calendar blend.
+	// Keep the simulation weather untouched, including the raw rain logged below.
+	AnastasisWeather::FWeather VisualWeather = Sky.Weather;
+	VisualWeather.Rain = Sky.SkyRain;
 	const AnastasisRain::FRainVisual Rain = AnastasisRain::VisualFor(
-		Sky.Weather, bWeatherDrivesSky, static_cast<double>(CVarSkyRain.GetValueOnGameThread()));
+		VisualWeather, bWeatherDrivesSky, static_cast<double>(CVarSkyRain.GetValueOnGameThread()));
 	const double Amount = bEnabled ? Rain.Amount : 0.0;
 
 	if (Amount > 0.0 && !RainStreaks)
