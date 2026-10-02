@@ -331,6 +331,7 @@ Opérateur et portails :
 | `proofs.txt` | registre des preuves PIE rejouables en lot : nom, script, motif de réussite, motif d'échec, délai, variables ; une fiche les déclare par `PROOFS:` |
 | `weather-materials.ps1` + `weather-materials.py` | regenere uniquement les materiaux existants de vegetation, herbe, eau, bois et roche avec la collection meteo commune ; ecrit Content/ |
 | `weather-contract.py` | preuve editeur numerique des consommateurs de la collection meteo et des valeurs ecrites par Apply ; aucun asset sauve |
+| `valley-air.ps1` + `valley-air.py` | diagnostic transitoire du voile a 14 h : deux poses, retrait independant fog global/perspective aerienne/brumes, temoin repete ; aucun asset sauve |
 | `weather-visibility.py` | A/B de AirVisibility a 14 h et 7 h, memes poses vallee/rive, sans changer exposition ni brume locale ; via weather-reference.ps1 -Mode visibility |
 | `weather-reference.ps1` + `weather-reference.py` | capture-sky aux memes cameras : 14 h avant/apres, matin humide, couvert ; completion technique seulement |
 | `weather_materials.py` | aide partagee des autorites de materiaux : collection MPC_AnastasisWeather, vent monde, perturbation eau, humidite bornee |

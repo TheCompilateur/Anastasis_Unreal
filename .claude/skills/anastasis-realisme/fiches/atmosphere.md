@@ -118,3 +118,16 @@ le statut SCN et le cout reel. Le lanceur refuse un MAIN.lock present.
 existante par `.4 + .6*Humidity*Humidity`. A/B borne : `weather-reference.ps1 -Mode visibility`.
 KEEP partiel a 14 h : plans lointains plus lisibles, fond encore laiteux. A 7 h, vallee encore sombre
 et brumeuse ; matin non valide artistiquement. Mesures et limites GPU dans la passation.
+
+
+## Voile a 14 h : exclusion mesuree (valley-air-001)
+
+Sur fe474f7, deux vues rive/hauteur, H.45, vent.3, couverture.25 : retirer le composant
+ExponentialHeightFog change nettement le paysage lointain ; retirer la perspective aerienne
+ne depasse pas le temoin dans la zone cible. Cela ne separe pas encore brouillard exponentiel
+et volumetrique. Les brumes locales restent un mecanisme distinct.
+
+REJECT : FogMaxOpacity .48 -> .30. Deux A/B dans une session : ROI arbres lointains
+.352/.364% de pixels >16, contre .368% entre temoins. Aucun gain reproductible ; conserver .48.
+Ne pas recommencer ce seul changement sans fait nouveau. Scripts `valley-air.ps1/.py`,
+mode diagnostic puis candidate ; fiche `docs/unreal/handoffs/valley-air-001.md`.
