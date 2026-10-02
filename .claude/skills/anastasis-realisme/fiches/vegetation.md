@@ -30,7 +30,7 @@ Pas de PCG, de Procedural Foliage, de Foliage Tool, de Landscape Grass, de Speed
 | Placement | C++ déterministe (graine) : `AnastasisEcologicalDressing::Build` puis `AnastasisForestStructure` (âges, groupes, clairières) ; HISM transitoires, non sauvés dans la map | `FOREST_STRUCTURE_001.md` |
 | Forêt | 16 120 arbres, 6 HISM, hauteurs 7,70 / 14,17 / 27,08 m (`FOREST_STRUCTURE_001`) ; au 2026-10-01, l'inventaire de `vegetation-cost-capture.ps1` compte 5 688 arbres en 266 composants | idem |
 | Coût GPU (2026-10-01, RTX 3060, viewport éditeur 1280×720) | arbres 0,3 à **3,75 ms** (intérieur de forêt) ; herbe 0,1 à **3,75 ms** (vallée B) ; sous-bois non mesurable (< 0,4 ms, dans le bruit) ; toute la végétation 2,2 à 6,2 ms sur 10,3 à 14,2 ms par vue | `handoffs/forest-cost-001.md` |
-| Vent | WPO sinusoïdal dans `M_AnastasisVegetation`, sans `WindDirectionalSource` | `handoffs/forest-canopy-wind-sway.md` |
+| Vent | WPO pilote par `MPC_AnastasisWeather`, direction monde et fronts communs herbe/couronnes ; troncs fixes ; reponse historique par `Atmosphere.Coupling 0`, sans `WindDirectionalSource` | `handoffs/atmosphere-crusade-001.md` |
 | Herbe | `SM_Grass_*` + `M_AnastasisGrass` ; environ 988 000 touffes en 683 HISM sur des tuiles de 160 m ; proche 40 → 55 m avec ombres, lointain 70 → 105 m ; +1,5 à 2 ms | `GROUND_COVER_001.md`, `handoffs/ground-cover-001.md` |
 | Sous-bois, rives | `AnastasisUnderstory` (maquis, ronces, roches), `AnastasisMicroEcology`, rive (`anastasis.Dressing.Riverbank`) | `MICRO_ECOLOGY_001.md`, `RIVERBANK_LIFE_001.md` |
 

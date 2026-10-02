@@ -96,3 +96,25 @@ Seuils empiriques, posés sur les captures de `DAY_NIGHT_WEATHER_001`. Autres pr
   0 par défaut). À rouvrir si le brouillard devient dense (orage, brume de vallée épaisse) : c'est là que la
   diffusion multiple existe vraiment ; refaire alors l'A/B avec `.SceneColor` à 0 et à 1.
 - Seuils de `atmosphere-metrics.py` à recaler sur un plus grand nombre de captures.
+
+## Couplage meteo de presentation (atmosphere-crusade-001)
+
+`AAnastasisWorldAtmosphere` ecrit `MPC_AnastasisWeather` : WeatherWind = direction XY / intensite Z,
+WeatherAir = humidite R / humidification visuelle G / couverture B. Le simulateur fournit l'intensite,
+pas la direction : `anastasis.Sky.WindHeading` est un choix de presentation explicite en degres monde.
+`Sky.Wind` et `Sky.Cover` epinglent la presentation (moins 1 = simulation), comme `Sky.Humidity`.
+`Atmosphere.Coupling 0` restitue la reponse anterieure des materiaux et des nuages ; 1 les couple.
+Le noeud moteur `Layout_WindControls` a ete inspecte en editeur : RGB = axes monde signes,
+alpha = multiplicateur. Les nuages lisent la meme direction/intensite que l'herbe et l'eau.
+Mie varie seulement de x0.85 a x1.15 avec l'humidite. Les brumes locales existantes restent gouvernees
+par Wetness, le soleil et le vent. Aucun volume supplementaire.
+
+Autorite des materiaux : `tools/unreal/weather-materials.ps1`. Observation directe :
+`tools/unreal/weather-reference.ps1 -Label <nom>` (14 h A/B + temoin, matin humide, couvert ;
+5 poses fixes). La generation nullrhi ne prouve pas l'aspect ; voir la fiche de passation pour
+le statut SCN et le cout reel. Le lanceur refuse un MAIN.lock present.
+
+`Atmosphere.AirVisibility` (1 par defaut, actif seulement avec Coupling) multiplie la densite
+existante par `.4 + .6*Humidity*Humidity`. A/B borne : `weather-reference.ps1 -Mode visibility`.
+KEEP partiel a 14 h : plans lointains plus lisibles, fond encore laiteux. A 7 h, vallee encore sombre
+et brumeuse ; matin non valide artistiquement. Mesures et limites GPU dans la passation.

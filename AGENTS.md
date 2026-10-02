@@ -329,6 +329,11 @@ Opérateur et portails :
 | `report-tests.ps1` | suite `Anastasis`, classée PASS / KNOWN_EXPECTED_FAILURE / FAIL, refuse un run tronqué |
 | `editor-batch.ps1` + `editor-batch.py` | plusieurs preuves PIE du registre dans **un seul** éditeur (EDITOR_QUEUE_001) : `-Proofs a,b` ; le `quit_editor()` de chaque script passe au suivant, PIE arrêté et rythme (`TimeScale`, `Speed`, `Warp`) reposé entre deux ; verdict `PROOF::PASS/FAIL` par preuve → `Saved/EditorBatch/<horodatage>/` ; appelé par `integrate-batch` |
 | `proofs.txt` | registre des preuves PIE rejouables en lot : nom, script, motif de réussite, motif d'échec, délai, variables ; une fiche les déclare par `PROOFS:` |
+| `weather-materials.ps1` + `weather-materials.py` | regenere uniquement les materiaux existants de vegetation, herbe, eau, bois et roche avec la collection meteo commune ; ecrit Content/ |
+| `weather-contract.py` | preuve editeur numerique des consommateurs de la collection meteo et des valeurs ecrites par Apply ; aucun asset sauve |
+| `weather-visibility.py` | A/B de AirVisibility a 14 h et 7 h, memes poses vallee/rive, sans changer exposition ni brume locale ; via weather-reference.ps1 -Mode visibility |
+| `weather-reference.ps1` + `weather-reference.py` | capture-sky aux memes cameras : 14 h avant/apres, matin humide, couvert ; completion technique seulement |
+| `weather_materials.py` | aide partagee des autorites de materiaux : collection MPC_AnastasisWeather, vent monde, perturbation eau, humidite bornee |
 | `project-health.ps1` | rapport de santé des preuves (appelé par `health`) ; absent ou périmé ≠ PASS |
 | `automation-log.ps1` | lecture de log d'automation partagée par les deux précédents, pas un point d'entrée |
 | `scheduled-verify.ps1` | run nocturne (Planificateur de tâches) : `verify` puis `report-tests` |

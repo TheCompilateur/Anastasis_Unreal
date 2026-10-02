@@ -19,6 +19,8 @@
 #include "HAL/IConsoleManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialParameterCollection.h"
+#include "Materials/MaterialParameterCollectionInstance.h"
 #include "Life/AnastasisVillageRhythm.h"
 #include "Sim/AnastasisSimulationSubsystem.h"
 #include "WorldView/AnastasisAtmosphereProfile.h"
@@ -70,6 +72,23 @@ static TAutoConsoleVariable<float> CVarSkyHumidity(
 	-1.0f,
 	TEXT("Pins the humidity the SKY shows [0,1] (fog density, mist) for captures; -1 follows the simulation's weather. Never moves the simulation."),
 	ECVF_Default);
+
+// Presentation only: no writes to AnastasisWeather or simulation RNG.
+static TAutoConsoleVariable<int32> CVarWeatherCoupling(
+    TEXT("anastasis.Atmosphere.Coupling"), 1,
+    TEXT("Shared visual weather in foliage, grass and water. 0=authored legacy material response for A/B."), ECVF_Default);
+static TAutoConsoleVariable<int32> CVarAirVisibility(
+    TEXT("anastasis.Atmosphere.AirVisibility"), 1,
+    TEXT("0=authored global fog, 1=less global haze in unsaturated visual weather; local wetness mist preserved. Requires Coupling."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarSkyWind(
+    TEXT("anastasis.Sky.Wind"), -1.0f,
+    TEXT("Visual wind strength [0,1]; -1 follows the same blended weather as the clouds."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarSkyCover(
+    TEXT("anastasis.Sky.Cover"), -1.0f,
+    TEXT("Visual cloud cover [0,1]; -1 follows simulation weather."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarWindHeading(
+    TEXT("anastasis.Sky.WindHeading"), 26.565f,
+    TEXT("Visual downwind heading in world XY degrees. The simulation has intensity, no direction."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarRealism(
 	TEXT("anastasis.Atmosphere.Realism"),
@@ -164,6 +183,10 @@ namespace
 	/** Capture pins that change what the sky SHOWS, never the simulation (cf. anastasis.Sky.Hour). */
 	void ApplySkyPins(AnastasisSkyClock::FSkyState& State)
 	{
+        if (CVarSkyWind.GetValueOnAnyThread() >= 0.0f)
+            State.SkyWind = FMath::Clamp(double(CVarSkyWind.GetValueOnAnyThread()), 0.0, 1.0);
+        if (CVarSkyCover.GetValueOnAnyThread() >= 0.0f)
+            State.SkyCover = FMath::Clamp(double(CVarSkyCover.GetValueOnAnyThread()), 0.0, 1.0);
 		const float PinnedHumidity = CVarSkyHumidity.GetValueOnAnyThread();
 		if (PinnedHumidity >= 0.0f)
 		{
@@ -409,12 +432,52 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 
 	// --- Weather: clouds and fog -------------------------------------------------------
 	const bool bWeather = Profile.bWeatherDrivesSky && CVarSkyWeather.GetValueOnAnyThread() != 0;
+    // One world-local uniform buffer, shared by all vegetation and water instances.
+    // Soft asset reference is serialized on the actor CDO for cooking; failed load logs once.
+    if (!WeatherCollection && !bWeatherCollectionLoadAttempted)
+    {
+        bWeatherCollectionLoadAttempted = true;
+        WeatherCollection = WeatherParameters.LoadSynchronous();
+        if (!WeatherCollection)
+            UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_WEATHER missing_collection rebuild weather-materials.py"));
+    }
+    const float Wind = bWeather ? float(LastSky.SkyWind) : 0.3f;
+    const float Humidity = bWeather ? float(LastSky.SkyHumidity) : 0.45f;
+    const float Cover = bWeather ? float(LastSky.SkyCover) : 0.25f;
+    const bool bCoupled = CVarWeatherCoupling.GetValueOnAnyThread() != 0;
+    const float Heading = FMath::DegreesToRadians(CVarWindHeading.GetValueOnAnyThread());
+    // Dampness is a bounded visual readiness signal, not rain accumulation or hydrology.
+    const float Dampness = FMath::Clamp((Humidity - 0.65f) / 0.35f, 0.0f, 1.0f);
+    if (WeatherCollection)
+    {
+        UMaterialParameterCollectionInstance* Parameters = GetWorld()->GetParameterCollectionInstance(WeatherCollection);
+        Parameters->SetVectorParameterValue(TEXT("WeatherWind"), FLinearColor(FMath::Cos(Heading), FMath::Sin(Heading), Wind, 0));
+        Parameters->SetVectorParameterValue(TEXT("WeatherAir"), FLinearColor(Humidity, Dampness, Cover, 0));
+        Parameters->SetScalarParameterValue(TEXT("WeatherCoupling"), bCoupled ? 1.0f : 0.0f);
+    }
+    // Aerosol variation is restrained; do not increase the global height-fog wall.
+    if (bRealismApplied && SkyAtmosphere)
+    {
+        if (USkyAtmosphereComponent* Air = SkyAtmosphere->FindComponentByClass<USkyAtmosphereComponent>())
+        {
+            const float Mie = Profile.SkyMieScatteringScale * (bCoupled ? FMath::Lerp(0.85f, 1.15f, Humidity) : 1.0f);
+            if (!FMath::IsNearlyEqual(Air->MieScatteringScale, Mie, 1.e-6f))
+                Air->SetMieScatteringScale(Mie);
+        }
+    }
+    if (bForceLog)
+        UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_WEATHER coupled=%d collection=%d wind=%.3f heading=%.2f humidity=%.3f cover=%.3f dampness=%.3f"),
+            bCoupled ? 1 : 0, WeatherCollection ? 1 : 0, Wind, CVarWindHeading.GetValueOnAnyThread(), Humidity, Cover, Dampness);
 	if (Fog)
 	{
 		if (UExponentialHeightFogComponent* FogComponent = Fog->GetComponent())
 		{
 			const double Scale = bWeather ? AnastasisSkyClock::FogDensityScaleFor(Profile, LastSky.SkyHumidity) : 1.0;
-			const float Density = static_cast<float>(Profile.FogDensity * Scale);
+			// Global aerosol veil is weaker outside saturated weather. Local valley pockets
+            // retain their own terrain/wetness signal; they are not flattened into this layer.
+            const float Visibility = bCoupled && CVarAirVisibility.GetValueOnAnyThread() != 0
+                ? 0.4f + 0.6f * Humidity * Humidity : 1.0f;
+            const float Density = static_cast<float>(Profile.FogDensity * Scale) * Visibility;
 			if (!FMath::IsNearlyEqual(FogComponent->FogDensity, Density, 1e-6f))
 			{
 				FogComponent->SetFogDensity(Density);
@@ -464,6 +527,19 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 			{
 				CloudMaterialInstance->SetScalarParameterValue(TEXT("Cloud_GlobalCoverage"),
 					static_cast<float>(AnastasisSkyClock::CloudCoverageFor(Profile, LastSky.SkyCover)));
+                // Engine material node description verified in Unreal: RGB = signed world-axis
+                // wind strength, A = uniform strength multiplier. Preserve authored defaults for A/B.
+                FLinearColor AuthoredWind;
+                if (UMaterialInterface* Base = CloudMaterialInstance->Parent)
+                {
+                    if (Base->GetVectorParameterValue(FMaterialParameterInfo(TEXT("Layout_WindControls")), AuthoredWind))
+                    {
+                        const FLinearColor CloudWind = bCoupled
+                            ? FLinearColor(FMath::Cos(Heading), FMath::Sin(Heading), 0.0f, Wind)
+                            : AuthoredWind;
+                        CloudMaterialInstance->SetVectorParameterValue(TEXT("Layout_WindControls"), CloudWind);
+                    }
+                }
 			}
 		}
 	}

@@ -34,6 +34,10 @@ Variables d'environnement :
 """
 import os
 import unreal
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import weather_materials
+
 
 PKG = '/Game/Anastasis/Materials'
 NAME = 'M_AnastasisWater'
@@ -242,6 +246,7 @@ def build(mat=None):
     normal_rgb = mask(normal, True, True, True, False, -700, 0)
     foam = mask(normal, False, False, False, True, -700, 120)
     wiring['normal'] = mel.connect_material_property(normal_rgb, '', unreal.MaterialProperty.MP_NORMAL)
+    weather_materials.water_normal(mat, normal, uv2, wpos, time)
 
     shade = custom(mat, SHADE_HLSL, 'WaterShade', unreal.CustomMaterialOutputType.CMOT_FLOAT2,
                    ('Flow', 'Along', 'Curve', 'Body'), -1100, 420)
@@ -320,18 +325,19 @@ def build(mat=None):
 # Regeneration EN PLACE : si un package tient deja le materiau (le terrain de
 # Lvl_AnastasisSlice, quand l'editeur s'ouvre dessus), delete_asset echoue sans bruit. On vide
 # son graphe et on le recable -- meme asset, memes references.
-try:
-    if not unreal.EditorAssetLibrary.does_asset_exist(PATH):
-        build()
-    elif os.environ.get('ANASTASIS_WATER_REBUILD', '0') == '1':
-        existing = unreal.EditorAssetLibrary.load_asset(PATH)
-        mel.delete_all_material_expressions(existing)
-        unreal.log('WATER_MATERIAL_CLEARED ' + PATH)
-        build(existing)
-    else:
-        unreal.log('WATER_MATERIAL_PRESENT ' + PATH)
-except Exception as e:
-    unreal.log_error('WATER_MATERIAL_FAIL %r' % e)
+if __name__ == '__main__':
+    try:
+        if not unreal.EditorAssetLibrary.does_asset_exist(PATH):
+            build()
+        elif os.environ.get('ANASTASIS_WATER_REBUILD', '0') == '1':
+            existing = unreal.EditorAssetLibrary.load_asset(PATH)
+            mel.delete_all_material_expressions(existing)
+            unreal.log('WATER_MATERIAL_CLEARED ' + PATH)
+            build(existing)
+        else:
+            unreal.log('WATER_MATERIAL_PRESENT ' + PATH)
+    except Exception as e:
+        unreal.log_error('WATER_MATERIAL_FAIL %r' % e)
 
-unreal.log('WATER_MATERIAL_DONE exists=%s' % unreal.EditorAssetLibrary.does_asset_exist(PATH))
-unreal.SystemLibrary.quit_editor()
+    unreal.log('WATER_MATERIAL_DONE exists=%s' % unreal.EditorAssetLibrary.does_asset_exist(PATH))
+    unreal.SystemLibrary.quit_editor()

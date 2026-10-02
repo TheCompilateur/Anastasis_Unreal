@@ -49,6 +49,10 @@ import math
 import os
 import random
 import unreal
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import weather_materials
+
 
 PACKAGE_PATH = '/Game/Anastasis/GroundCover'
 MATERIAL_DIR = '/Game/Anastasis/Materials'
@@ -517,7 +521,12 @@ float phase = T * %(speed).2f + dot(Position.xy, float2(0.0021, 0.0013)) + Rand 
 float gust = sin(phase) * 0.7 + sin(phase * 2.3 + 1.7) * 0.3;
 float k = Height * Height * (1.0 - fade);
 float3 wind = float3(gust, gust * 0.45, 0.0) * %(amp).1f * k;
-return wind + (Obj - Position) * fade;
+float2 d = normalize(Weather.xy + float2(0.00001,0));
+float front = dot(Position.xy,d)*0.0012 - T*0.65;
+float packet = 0.65 + 0.25*sin(front) + 0.10*sin(front*1.71 + 1.2);
+float flutter = 0.7 + 0.2*sin(T*2.8 + Rand*6.283) + 0.1*sin(T*5.1 + Rand*9);
+float3 coherent = float3(d,0) * 5.0 * saturate(Weather.z) * packet * flutter * k;
+return lerp(wind, coherent, Enabled) + (Obj - Position) * fade;
 ''' % {'speed': WIND_SPEED, 'amp': WIND_AMPLITUDE}
 
 
@@ -527,11 +536,14 @@ def ensure_material():
     WPO = vent (hauteur^2, dephase par instance et par position : des vagues, pas un unisson)
     + fondu de distance (la touffe s'enfonce vers son pivot entre FADE_START et FADE_END).
     """
-    if unreal.EditorAssetLibrary.does_asset_exist(MATERIAL_PATH):
-        unreal.EditorAssetLibrary.delete_asset(MATERIAL_PATH)
-    mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
-        MATERIAL_NAME, MATERIAL_DIR, unreal.Material, unreal.MaterialFactoryNew())
     mel = unreal.MaterialEditingLibrary
+    mat = unreal.load_asset(MATERIAL_PATH)
+    if mat:
+        # Rewire in place: preserve every existing mesh material reference.
+        mel.delete_all_material_expressions(mat)
+    else:
+        mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+            MATERIAL_NAME, MATERIAL_DIR, unreal.Material, unreal.MaterialFactoryNew())
 
     vc = mel.create_material_expression(mat, unreal.MaterialExpressionVertexColor, -900, 0)
     base_out = None
@@ -581,7 +593,9 @@ def ensure_material():
                ('Rand', unreal.MaterialExpressionPerInstanceRandom, ''),
                ('Height', None, 'A'),
                ('FadeStart', 'FadeStart', FADE_START),
-               ('FadeEnd', 'FadeEnd', FADE_END))
+               ('FadeEnd', 'FadeEnd', FADE_END),
+               ('Weather', 'MPC:WeatherWind', ''),
+               ('Enabled', 'MPC:WeatherCoupling', ''))
     inputs = []
     for name, cls, out in sources:
         entry = unreal.CustomInput()
@@ -589,7 +603,10 @@ def ensure_material():
         inputs.append(entry)
     wind.set_editor_property('inputs', inputs)
     for i, (name, cls, out) in enumerate(sources):
-        if isinstance(cls, str):
+        if isinstance(cls, str) and cls.startswith('MPC:'):
+            node = weather_materials.parameter(mat, cls[4:])
+            out = ''
+        elif isinstance(cls, str):
             # Parametre scalaire : le MID de chaque HISM le surcharge.
             node = mel.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -800, 520 + 70 * i)
             node.set_editor_property('parameter_name', cls)
@@ -640,10 +657,11 @@ def main():
     log('GROUND_COVER_ASSETS::PASS %s' % ' '.join(report))
 
 
-try:
-    main()
-except Exception as exc:  # noqa: BLE001
-    unreal.log_error('GROUND_COVER_ASSETS::FAIL %s' % exc)
-finally:
-    if os.environ.get('ANASTASIS_GROUND_COVER_QUIT') == '1':
-        unreal.SystemLibrary.quit_editor()
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as exc:  # noqa: BLE001
+        unreal.log_error('GROUND_COVER_ASSETS::FAIL %s' % exc)
+    finally:
+        if os.environ.get('ANASTASIS_GROUND_COVER_QUIT') == '1':
+            unreal.SystemLibrary.quit_editor()

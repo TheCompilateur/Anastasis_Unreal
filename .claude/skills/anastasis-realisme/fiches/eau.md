@@ -70,3 +70,12 @@ CVars : `anastasis.Terrain.WaterLook` (1 ; 0 = eau d'avant), `anastasis.Terrain.
   (RU-002-12).
 - Le fond de l'eau, la pluie au sol et les aubes sont sur la branche `agent/env-realism-002`, non versée
   au 2026-10-01 (`docs/unreal/ENV_REALISM_002.md` sur cette branche).
+
+## Vent partage (atmosphere-crusade-001)
+
+Le materiau lit WeatherWind dans `MPC_AnastasisWeather` : les lacs gardent 12 % des pentes de rides
+historiques sans vent, jusqu'a 100 % au vent maximal ; le courant des rivieres conserve ses rides.
+Une perturbation supplementaire est orientee selon le vent monde, avec modulation transversale de
+phase. L'optique Single Layer Water reste celle du ciel/lumiere reels. `Atmosphere.Coupling 0`
+restitue la normale historique. Aucune ecriture dans l'hydrologie. La preuve et le cout sont dans
+`handoffs/atmosphere-crusade-001.md`, sans assimiler generation de materiau et victoire visuelle.

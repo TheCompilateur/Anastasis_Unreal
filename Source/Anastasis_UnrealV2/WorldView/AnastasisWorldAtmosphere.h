@@ -256,6 +256,14 @@ protected:
 	double AppliedExposureEV = 0.0;
 	bool bHasAppliedExposure = false;
 
+    /** Shared material weather contract. Serialized soft reference retains it in cooked builds. */
+    UPROPERTY(EditDefaultsOnly, Category="Atmosphere")
+    TSoftObjectPtr<class UMaterialParameterCollection> WeatherParameters = TSoftObjectPtr<UMaterialParameterCollection>(FSoftObjectPath(TEXT("/Game/Anastasis/Materials/MPC_AnastasisWeather.MPC_AnastasisWeather")));
+
+    UPROPERTY()
+    TObjectPtr<class UMaterialParameterCollection> WeatherCollection;
+    bool bWeatherCollectionLoadAttempted = false;
+
 	/** Coverage lives on a material parameter: the engine instance is shared, so this actor drives its own dynamic instance. */
 	UPROPERTY()
 	TObjectPtr<class UMaterialInstanceDynamic> CloudMaterialInstance;

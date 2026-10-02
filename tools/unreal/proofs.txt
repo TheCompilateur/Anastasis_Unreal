@@ -28,3 +28,6 @@ anthropic-memory-pie | tools/unreal/anthropic-memory-pie.py | ANTHROPIC_PIE PASS
 
 # Capture editor (SCN seulement), cinq habitats et aerien, terrain echantillonne stable.
 natural-history-capture | tools/unreal/ground-cover-capture.py | NATURAL_HISTORY_CAPTURE PASS | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/NaturalHistoryEvidence;ANASTASIS_GROUND_STATES=reference,natural,reference2;ANASTASIS_GROUND_VIEWS=prairie_eye,lisiere_eye,sousbois_eye,riviere_eye,lande_eye,aerien
+
+weather-contract | tools/unreal/weather-contract.py | WEATHER_CONTRACT PASS | WEATHER_CONTRACT FAIL|Traceback | 180 | -
+weather-reference | tools/unreal/weather-reference.py | SKY_CAPTURE_COMPLETE | SKY_CAPTURE_FAIL|SKY_CAPTURE_TIMEOUT|SKY_SHOT_MISSING|Traceback | 900 | ANASTASIS_SKY_OUT=@Saved/SkyEvidence/weather-reference

@@ -41,7 +41,8 @@ SEED = 12345
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
-les.load_level(LEVEL)
+if ues.get_editor_world().get_path_name().split(".")[0] != LEVEL:
+    les.load_level(LEVEL)
 world = ues.get_editor_world()
 
 

@@ -53,6 +53,10 @@ import math
 import os
 import random
 import unreal
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import weather_materials
+
 
 PACKAGE_PATH = "/Game/Anastasis/Vegetation"
 MATERIAL_DIR = "/Game/Anastasis/Materials"
@@ -1333,6 +1337,9 @@ return Colour * (1.0 + (broad * 0.28 + fine * 0.12 * fade) * saturate(Mask));
                       op(unreal.MaterialExpressionAppendVector, sway_masked, zero, -450, 1200), zero, -300, 1200)
         r_wpo = mel.connect_material_property(sway_xyz, '', unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
 
+    old_wpo = mel.get_material_property_input_node(mat, unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+    weather_materials.tree_wind(mat, old_wpo, vc)
+
     mat.set_editor_property('two_sided', True)
 
     shading = 'ABSENT'
@@ -1447,6 +1454,7 @@ def ensure_bark_material():
 
     log("BARK_MATERIAL wiring base_color=%s roughness=%s specular=%s shading=%s"
         % (wired, r_rough, r_spec, shading))
+    weather_materials.wet_surface(mat)
     errors = list(mel.recompile_material(mat) or [])
     if errors:
         for e in errors:
@@ -1521,6 +1529,7 @@ def ensure_rock_material():
     spec.set_editor_property('r', 0.25)
     mel.connect_material_property(spec, '', unreal.MaterialProperty.MP_SPECULAR)
     mat.set_editor_property('two_sided', False)
+    weather_materials.wet_surface(mat)
     errors = list(mel.recompile_material(mat) or [])
     if errors:
         for e in errors:
