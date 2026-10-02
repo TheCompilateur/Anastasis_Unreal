@@ -84,8 +84,9 @@ double AnastasisAnthropic::FMemory::StrengthAt(const FVector2D& Point) const
         {
             const double Edge = FMath::Clamp(1.0 - FVector2D::Distance(Point, C->Position) / 75.0, 0.0, 1.0);
             // A single traverse is invisible; repeated observed distance opens a soft, narrow tread.
-            Strength = FMath::Max(Strength, FMath::Clamp((C->Metres - 2.0) / 6.0, 0.0, 1.0) * Edge);
+            // Blend adjoining observed cells so grid boundaries do not create a dotted trail.
+            Strength += FMath::Clamp((C->Metres - 2.0) / 6.0, 0.0, 1.0) * Edge;
         }
     }
-    return Strength;
+    return FMath::Clamp(Strength, 0.0, 1.0);
 }

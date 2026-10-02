@@ -37,6 +37,10 @@ private:
     double ApplyMs = 0.0;
     uint32 Seed = 0;
     bool bActive = false;
+    bool bDrawn = false;
+    double AppliedTime = -1.0;
+    FVector Focus = FVector::ZeroVector;
+    double FocusStrength = 0.0;
     bool bTruncatedGrass = false;
     int32 Restored = 0;
     int32 RestoreErrors = 0;

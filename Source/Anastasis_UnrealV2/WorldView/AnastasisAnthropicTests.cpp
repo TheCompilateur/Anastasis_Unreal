@@ -77,4 +77,17 @@ bool FAnthropicDistanceTest::RunTest(const FString&)
     TestTrue(TEXT("subdivision differs only by decay time"), FMath::Abs(DA - DB) < 0.0001);
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnthropicContinuityTest, "Anastasis.Anthropic.ObservedContinuity",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnthropicContinuityTest::RunTest(const FString&)
+{
+    AnastasisAnthropic::FMemory M;
+    // Repeated observed 1.8m traverses across a cell boundary; no guessed connecting route.
+    for (int32 I=0; I<31; ++I)
+        M.Observe(I/60.0, {{TEXT("walker"), FVector2D(I%2 ? 190 : 10,50),true}});
+    TestTrue(TEXT("boundary remains a connected tread"),M.StrengthAt(FVector2D(100,50))>0.6);
+    TestEqual(TEXT("unvisited parallel strip is intact"),M.StrengthAt(FVector2D(100,130)),0.0);
+    TestTrue(TEXT("wear remains bounded"),M.StrengthAt(FVector2D(55,50))<=1.0);
+    return true;
+}
 #endif

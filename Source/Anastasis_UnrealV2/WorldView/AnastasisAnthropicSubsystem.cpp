@@ -12,6 +12,11 @@ static TAutoConsoleVariable<int32> CVarAnthropicMemory(
     TEXT("anastasis.Anthropic.Memory"), 0,
     TEXT("Experimental sampled NPC tread: 1 records outdoor displacement and lowers nearby grass; 0 restores grass and clears presentation memory. No simulation writes, no saved history. Default off pending visual/GPU evidence."));
 
+// Visibility is independent of observation: A/B never invents or erases traffic.
+static TAutoConsoleVariable<int32> CVarAnthropicDraw(
+    TEXT("anastasis.Anthropic.Draw"), 1,
+    TEXT("Show recorded grass tread. 0 restores grass but retains and continues observation memory; 1 reapplies it."));
+
 bool UAnastasisAnthropicSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 {
     const UWorld* W = Cast<UWorld>(Outer);
@@ -45,7 +50,7 @@ void UAnastasisAnthropicSubsystem::Restore()
 }
 void UAnastasisAnthropicSubsystem::ResetPresentation()
 {
-    Restore(); Memory.Reset(); LastTime = -1.0; Refresh = 0.0; ApplyMs = 0.0; bActive = false; bTruncatedGrass = false;
+    Restore(); Memory.Reset(); LastTime = -1.0; Refresh = 0.0; ApplyMs = 0.0; bActive = false; bDrawn = false; AppliedTime = -1.0; Focus = FVector::ZeroVector; FocusStrength = 0.0; bTruncatedGrass = false;
 }
 void UAnastasisAnthropicSubsystem::Deinitialize()
 {
@@ -57,7 +62,7 @@ void UAnastasisAnthropicSubsystem::Tick(float DeltaTime)
     if (!GetWorld() || !GetWorld()->HasBegunPlay()) return;
     if (CVarAnthropicMemory.GetValueOnGameThread() == 0)
     {
-        if (bActive) { Restore(); Memory.Reset(); LastTime = -1.0; bActive = false; }
+        if (bActive) { Restore(); Memory.Reset(); LastTime = -1.0; bActive = false; bDrawn = false; AppliedTime = -1.0; }
         return;
     }
     auto* Host = GetWorld()->GetSubsystem<UAnastasisSimulationSubsystem>();
@@ -70,7 +75,11 @@ void UAnastasisAnthropicSubsystem::Tick(float DeltaTime)
     bActive = true; Seed = Sim.GetSeed();
     double Scale = 0.0;
     for (TActorIterator<AAnastasisWorldEmbodiment> It(GetWorld()); It; ++It)
-    { Scale = It->GetSnapshot().SpatialScale; break; }
+    {
+        const auto& Snapshot = It->GetSnapshot();
+        if (Snapshot.Seed == Sim.GetSeed() && Snapshot.SourceW == Sim.GetWorld().W && Snapshot.SourceH == Sim.GetWorld().H)
+        { Scale = Snapshot.SpatialScale; break; }
+    }
     if (Scale <= 0.0) return; // no known rendered coordinate system, no invented placement
     TArray<AnastasisAnthropic::FObservation> People;
     const auto& W = Sim.GetWorld();
@@ -85,7 +94,16 @@ void UAnastasisAnthropicSubsystem::Tick(float DeltaTime)
     Memory.Observe(Sim.GetTime(), People);
     LastTime = Sim.GetTime();
     Refresh += DeltaTime;
-    if (Refresh >= 1.0) { Refresh = 0.0; ApplyGrass(); }
+    const bool bWantDraw = CVarAnthropicDraw.GetValueOnGameThread() != 0;
+    if (!bWantDraw)
+    {
+        if (bDrawn) Restore();
+        bDrawn = false;
+    }
+    else if (!bDrawn || (Refresh >= 1.0 && AppliedTime != Sim.GetTime()))
+    {
+        Refresh = 0.0; ApplyGrass(); bDrawn = true; AppliedTime = Sim.GetTime();
+    }
 }
 void UAnastasisAnthropicSubsystem::ApplyGrass()
 {
@@ -93,6 +111,7 @@ void UAnastasisAnthropicSubsystem::ApplyGrass()
     // Restore before overlap queries: compressed instances must not shrink out of the search.
     Restore();
     bTruncatedGrass = false;
+    FocusStrength = 0.0;
     TArray<AnastasisAnthropic::FCell> Visible;
     for (const auto& Pair : Memory.GetCells())
         if (Pair.Value.Metres > 2.0) Visible.Add(Pair.Value);
@@ -130,6 +149,7 @@ void UAnastasisAnthropicSubsystem::ApplyGrass()
                 const FVector P = Original.GetLocation();
                 const double Strength = Memory.StrengthAt(FVector2D(P.X, P.Y));
                 if (Strength <= 0.001) continue;
+                if (Strength > FocusStrength) { FocusStrength = Strength; Focus = P; }
                 FTransform Applied = Original;
                 FVector Size = Original.GetScale3D();
                 Size.Z *= FMath::Lerp(1.0, 0.08, Strength);
@@ -147,9 +167,9 @@ void UAnastasisAnthropicSubsystem::ApplyGrass()
 }
 FString UAnastasisAnthropicSubsystem::GetReport() const
 {
-    return FString::Printf(TEXT("active=%d cells=%d grass=%d gaps=%d jumps=%d dropped=%d grass_cap=%d apply_ms=%.3f restored=%d restore_errors=%d"),
+    return FString::Printf(TEXT("active=%d cells=%d grass=%d gaps=%d jumps=%d dropped=%d grass_cap=%d apply_ms=%.3f restored=%d restore_errors=%d drawn=%d focus_x=%.3f focus_y=%.3f focus_z=%.3f focus_strength=%.3f"),
         bActive, Memory.GetCells().Num(), Grass.Num(), Memory.RejectedGaps, Memory.RejectedJumps,
-        Memory.DroppedCells, bTruncatedGrass, ApplyMs, Restored, RestoreErrors);
+        Memory.DroppedCells, bTruncatedGrass, ApplyMs, Restored, RestoreErrors, bDrawn, Focus.X, Focus.Y, Focus.Z, FocusStrength);
 }
 
 
