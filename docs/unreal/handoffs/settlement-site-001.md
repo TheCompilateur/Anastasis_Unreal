@@ -24,7 +24,7 @@ HEAD de agent/settlement-site-001 ; base 506f6db49aea640d4f0a8f96373b2e84d885359
 
 ## MEC
 
-- BUILD: PASS, première compilation 182.76 s, compilation de l'API de preuve 45.17 s.
+- BUILD: PASS, première compilation 182.76 s, compilation de l'API de preuve 45.17 s ; correction de la marge de placement 175.06 s.
 - TESTS: PENDING. Trois tests ciblés : GeographicChoice, BarriersAndMissingEvidence, ResourcesDriveChoice. Le script de preuve les exécute dans le même éditeur avant le PIE, exige les trois fins Success dans la portion courante du log.
 - Commande : tools/unreal/editor-batch.ps1 -Proofs settlement-site-pie
 - PYTHON_AST: PASS.
@@ -37,7 +37,7 @@ PROOFS: settlement-site-pie
 
 Le premier tick attend l'incarnation de son propre monde. Le relevé lit les triangles des sections 0 (sol), 1 (lacs) et 2 (rubans d'eau) du composant ExperimentalTerrain, avec identité graine/dimensions et transformation vérifiées. Aucun cache Forge global ni nouveau relief n'est utilisé.
 
-Neuf sondes par tuile donnent une pente locale conservatrice et une marge au-dessus de l'eau rendue. La sélection croise ces données avec IsFootBlocked, les types et quantités de ressources existants. Elle exige : site herbe/broussailles hors zone très humide, pente <=8 degrés, marge d'eau rendue >=1 m, au moins trois sorties cardinales, >=9 cellules contiguës d'expansion <=12 degrés ; accès à une rive eau sémantique ET rendue <=300 m, champ productif <=600 m et ressource bois <=600 m.
+Neuf sondes par tuile donnent une pente locale conservatrice et une marge au-dessus de l'eau rendue. La sélection croise ces données avec IsFootBlocked, les types et quantités de ressources existants. Elle exige : site herbe/broussailles hors zone très humide, pente <=8 degrés, marge d'eau rendue >=1 m, marge de deux cellules aux bords conforme � SeedFirstWell, au moins trois sorties cardinales, >=9 cellules contiguës d'expansion <=12 degrés ; accès à une rive eau sémantique ET rendue <=300 m, champ productif <=600 m et ressource bois <=600 m.
 
 Les distances sont des longueurs de parcours sur un sous-graphe cardinal praticable, filtré à 18 degrés, pas des distances à vol d'oiseau. Elles ne sont PAS le coût exact de l'A* des PNJ. Le score favorise surface disponible (40), eau (25), nourriture (20), bois (15) ; départage par index de tuile. Aucun nouveau tirage aléatoire.
 

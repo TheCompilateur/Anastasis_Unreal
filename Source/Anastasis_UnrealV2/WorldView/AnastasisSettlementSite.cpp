@@ -80,7 +80,10 @@ AnastasisSettlementSite::FReport AnastasisSettlementSite::Choose(const FInputs& 
         C.WaterAccess = Target[0][I]; C.FoodAccess = Target[1][I]; C.WoodAccess = Target[2][I];
         int32 Free = 0;
         Neighbours(I, [&](int32 J) { if (Edge(I,J)) ++Free; });
-        const bool bBase = Open[I] && In.Cells[I].bCenterAllowed && C.Slope <= S.SiteSlope && Free >= 3;
+        // SeedFirstWell requires a two-cell map margin; keep selection inside its placement contract.
+        const int32 SiteX = I % In.W, SiteY = I / In.W;
+        const bool bMargin = SiteX >= 2 && SiteY >= 2 && SiteX <= In.W-3 && SiteY <= In.H-3;
+        const bool bBase = bMargin && Open[I] && In.Cells[I].bCenterAllowed && C.Slope <= S.SiteSlope && Free >= 3;
         if (bBase)
         {
             TSet<int32> Seen; TArray<int32> Queue; Seen.Add(I); Queue.Add(I);

@@ -50,6 +50,9 @@ bool FSettlementBarrierTest::RunTest(const FString&)
     R=AnastasisSettlementSite::Choose(In);
     TestFalse(TEXT("missing rendered ground never becomes PASS"),R.Best.bEligible);
     TestEqual(TEXT("no implicit centre fallback"),R.Best.Index,INDEX_NONE);
+    In=AnastasisSettlementSiteTests::Valley();
+    for(int32 I=0;I<In.Cells.Num();++I) In.Cells[I].bCenterAllowed=(I/In.W==1);
+    TestFalse(TEXT("opening placement margin respected"),AnastasisSettlementSite::Choose(In).Best.bEligible);
     In.Cells.Reset();
     TestFalse(TEXT("malformed input rejected"),AnastasisSettlementSite::Choose(In).bValidInput);
     return true;
