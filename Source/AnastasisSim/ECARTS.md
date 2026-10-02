@@ -110,23 +110,27 @@ urbaine ne propose rien.
 Pas de file de porte, pas d'hésitation, pas de facteur de vitesse (sauf le bloc pluie, n° 17), pas de
 contournement local, pas de verrou de seuil domestique en route.
 
-### n° 5 — Pas de cadence de simulation par bande
+### n° 5 — Pas de cadence de simulation par bande sans vue posée
 
 - **classe** : REDUIT
 - **destin** : A_FERMER
-- **fermeture** : nav-service-001, ou une mission courte dédiée avant elle (`P3_PREMIER_RAPPORT.md`)
+- **fermeture** : budget-cadence-001 (cb44bdf) a fermé le cas avec vue ; reste, sans vue posée : à attribuer
 - **statut** : OUVERT
-- **entree** : tranches puits → grenier (first-building-001, house-rest-001, granary-eat-001)
+- **entree** : tranches puits → grenier (first-building-001, house-rest-001, granary-eat-001) ; réduit par budget-cadence-001 (cb44bdf)
 - **reference** : `src/sim/simulationBudget.js` `consumeNpcSimulationCadence`, `src/sim/logicalLod.js`
-- **cpp** : `Core/AnastasisSimBudget.h` porté bit à bit mais **non branché** dans `FVillage::UpdateActors`
+- **cpp** : `Village/AnastasisVillage.cpp`, tête d'`UpdateNpc` : `Core/AnastasisSimBudget.h` branché dès que `SetSimulationView` pose une vue ; sans vue, chaque habitant pense à chaque tick
 - **harnais** : actors
 - **masques** : lodLogique
-- **detail** : `docs/migration/phase3/P3_PREMIER_RAPPORT.md`
-- **jugement** : `docs/migration/ecarts/n05.md` (2026-10-01, labo-ecarts-001) — au bit `DIVERGE` tick 1 ; statistique `RUPTURE` contre la référence du harnais (vue 0,0 : bande far), indiscernable du bruit A/A contre la référence vue du village (`endurance` N=40, `genese` N=30, 3 j)
+- **detail** : `docs/migration/phase3/P3_PREMIER_RAPPORT.md` (rapports 1 et 2) ; `Public/Village/AnastasisVillage.h`, n° 5
+- **jugement** : `docs/migration/ecarts/n05.md` (2026-10-01, labo-ecarts-001, mesuré AVANT budget-cadence-001, sur l'écart entier) — au bit `DIVERGE` tick 1 ; statistique `RUPTURE` contre la référence du harnais (vue 0,0 : bande far), indiscernable du bruit A/A contre la référence vue du village (`endurance` N=40, `genese` N=30, 3 j)
 
 **Premier tick divergent du premier rapport JS / Unreal (tick 1).** En JS, un habitant en bande
-*far* pense à 1 Hz avec un `dt` accumulé (`_simBudgetAccum`) ; en C++, chaque habitant pense à chaque
-tick. Le masque `lodLogique` neutralise le LOD logique, pas la cadence du budget.
+*far* pense à 1 Hz avec un `dt` accumulé (`_simBudgetAccum`) ; le C++ d'alors faisait penser chaque
+habitant à chaque tick. Le masque `lodLogique` neutralise le LOD logique, pas la cadence du budget.
+Depuis budget-cadence-001 (décision d'Alexandre, option B), le scénario `endurance` (format 2) épingle
+la vue du budget sur le village des deux côtés, et le C++ applique la cadence. Le reste de l'écart est
+le cas **sans vue posée** (tests d'assemblage, jeu sans caméra branchée), où la référence a toujours une
+vue, (0, 0) sans caméra.
 
 ### n° 6 — `RemoveBuilding` : la démolition
 

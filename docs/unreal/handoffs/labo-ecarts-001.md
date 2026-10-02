@@ -13,25 +13,28 @@ rumeurs). Branche partie de `agent/ecarts-protocole-001` (PR #2, non versée dan
   `bras.mjs`, `injections.mjs`, `tolerances.json`, `experiences/n05.json`, `experiences/n16.json`, `LISEZMOI.md`
 - `docs/migration/ecarts/` (nouveau) : `METHODE.md`, `n05.md`, `n16.md`, `cones/n05.md`, `cones/n16.md`,
   `donnees/n05.json`, `donnees/n16.json`, `donnees/n05-resultats.md`, `donnees/n16-resultats.md`
-- `Source/AnastasisSim/ECARTS.md` : champ `jugement` (table du format, fiches n° 5 et n° 16). Aucun destin
-  ni statut changé.
+- `Source/AnastasisSim/ECARTS.md` : champ `jugement` (table du format, fiches n° 5 et n° 16) ; fiche n° 5
+  remise à jour après `budget-cadence-001` (voir ECARTS). Aucun destin ni statut changé.
 - `docs/migration/PROTOCOLE_ECARTS.md` : un paragraphe de renvoi au laboratoire.
-- `tools/unreal/agent-worktree.ps1` (résolution de conflit, voir INTEGRATION_RISK) et
-  `tools/unreal/test-agent-worktree.ps1` (le dépôt jetable reçoit ce que lit `check-ecarts.mjs`).
+- `tools/unreal/agent-worktree.ps1`, `.claude/skills/anastasis-mission/SKILL.md` (résolutions de conflit,
+  voir INTEGRATION_RISK) et `tools/unreal/test-agent-worktree.ps1` (le dépôt jetable reçoit ce que lit
+  `check-ecarts.mjs`).
 
 ## COMMIT
 
-BRANCH_HEAD sur `agent/labo-ecarts-001`, rebasée sur `main` (`ce939f8`) le 2026-10-01 pour versement.
-Le lot versé contient **cinq** commits : les deux de `ecarts-protocole-001` (PR #2 : registre, contrôleur,
-protocole), puis les trois de cette mission — le laboratoire et les **prédictions seules** (`442656e`,
-`baa47e5` avant rebase, commité avant toute expérience à N répliques), les résultats, cette fiche.
+BRANCH_HEAD sur `agent/labo-ecarts-001`, rebasée sur `main` (`22db051`, après `editor-queue-001`) le
+2026-10-01, au signal de l'intégrateur. Le lot contient les deux commits de `ecarts-protocole-001` (PR #2 :
+registre, contrôleur, protocole), puis ceux de cette mission : le laboratoire et les **prédictions seules**
+(`882a216` ; `baa47e5` avant rebase, commité avant toute expérience à N répliques), les résultats, le
+correctif du banc, les fiches.
 
 ## MEC
 
-- BUILD / TESTS : voir la sortie de `finish` (versement du 2026-10-01). La mission ne touche aucun `.cpp`
-  ni `.h`. Un premier `finish`, avant rebase, s'était arrêté au contrôle des écarts : `ECARTS.md` n'existait
-  pas dans `main`, et la section `ECARTS` de cette fiche ne nommait pas les fiches que le lot apporte avec
-  la PR #2 (`ECARTS::FAIL fail=17`). Corrigé ci-dessous, section `ECARTS`.
+- BUILD / TESTS : `finish` sur la pointe rebasée → voir le message à l'intégrateur (`HANDOFF_READY::YES (queued)`
+  attendu : build seul, la suite au lot). Historique : sur `1342e8a` (base `b720008`), `finish` complet avait
+  rendu `ECARTS::PASS`, `BUILD::PASS`, suite **PASS 231 / KNOWN_EXPECTED_FAILURE 4 / FAIL 0** ; `integrate`
+  avait été refusé (main avait bougé), puis tout arrêté sur la consigne d'Alexandre (arrêt des tests,
+  intégrateur unique). Ce résultat porte sur une base périmée : ce n'est pas la preuve de cette pointe.
   Note : la consigne annonçait une session cloud Linux ; la mission a tourné sur le poste Windows
   d'Alexandre (worktree `C:\dev\ANASTASIS_WORKTREES\labo-ecarts-001`).
 - Référence : `git clone --depth 1 --branch anastasis-ref-p3` → `HEAD = fee66ae8b571f6f7bcbe6a61f9749d0a812b84e2`,
@@ -42,11 +45,10 @@ protocole), puis les trois de cette mission — le laboratoire et les **prédict
 - Calibration A/A (`endurance`, 6 paires de témoins) : règle v1 → 6/6 `DERIVE` ; règle v2 (Holm) → 1/6
   `DERIVE`, 5/6 `INDETERMINE`, 0/6 `NEUTRE`. Contrôle de bout en bout A = B (même bras) : `IDENTIQUE`, toutes
   différences nulles.
-- `node tools/migration/check-ecarts.mjs -base main -handoff docs/unreal/handoffs/labo-ecarts-001.md` → voir
-  `finish`. Avant rebase, contre `origin/agent/ecarts-protocole-001` : `ECARTS::PASS fiches=19 fail=0 warn=3`
-  (avertissements préexistants : « à attribuer » n° 9 et 17, marques manquantes).
-- `node tools/migration/check-ecarts.mjs` → `ECARTS::PASS fiches=19 ouvertes=19 fail=0 warn=3` (inchangé) ;
-  `-bilan` → `A_FERMER=15 A_TRANCHER=4` (inchangé).
+- `node tools/migration/check-ecarts.mjs -base main -handoff docs/unreal/handoffs/labo-ecarts-001.md` sur
+  `22db051` → `ECARTS::PASS fiches=19 ouvertes=19 fail=0 warn=4` (« à attribuer » n° 5, 9, 17 ; marques
+  manquantes 6, 7, 14, 15, 19 — le n° 5 a désormais sa marque, posée par `budget-cadence-001`).
+- `-bilan` → `A_FERMER=15 A_TRANCHER=4` (inchangé).
 - COMMANDS (depuis la racine, `<jsref>` = clone du tag, `<runs>` = dossier hors dépôt) :
   - `python tools/migration/labo_ecarts/labo.py cone --ref <jsref> --experience tools/migration/labo_ecarts/experiences/n05.json`
   - `python tools/migration/labo_ecarts/labo.py lancer --ref <jsref> --experience tools/migration/labo_ecarts/experiences/n05.json --out <runs>`
@@ -70,14 +72,23 @@ Mécanisme du n° 5 (`OBS` code, `INF` effet) : à 1 Hz, la chance de reconsidé
 
 NOT_APPLICABLE — aucun changement de jeu, aucun asset, aucun niveau.
 
+## PROOFS
+
+PROOFS: (aucune)
+
 ## ECARTS
 
 - **n° 1 à 19 : fiches créées par `ecarts-protocole-001`** (PR #2), versées dans `main` avec ce lot ; leur
   détail et leur banc sont dans `docs/unreal/handoffs/ecarts-protocole-001.md`. Cette mission n'en crée,
   n'en ferme et n'en reclasse aucune.
-- Cette mission ajoute seulement le champ `jugement` (table du format, fiches de la cadence et du flux des
-  rumeurs), sans changer classe, destin ni statut, et ne modifie aucun code C++ de `Source/AnastasisSim/`
-  (aucun `.cpp`, aucun `.h`).
+- Cette mission ajoute le champ `jugement` (table du format, fiches de la cadence et du flux des rumeurs),
+  sans changer classe, destin ni statut, et ne modifie aucun code C++ de `Source/AnastasisSim/`. Le seul
+  `.h` du lot est celui de la PR #2 (deux lignes de commentaire dans `AnastasisVillage.h`).
+- **n° 5 modifié (texte seulement)** : `budget-cadence-001` (`cb44bdf`, déjà dans `main`) a branché la
+  cadence dès qu'une vue est posée, sans toucher `ECARTS.md` (absent de `main` à ce moment). La fiche
+  disait « non branché » : titre, `cpp`, `fermeture`, `entree` et texte remis à jour d'après son commit et
+  l'en-tête `AnastasisVillage.h` ; classe `REDUIT`, destin `A_FERMER`, statut `OUVERT` inchangés (le reste :
+  sans vue posée). Le `jugement` précise qu'il a été mesuré avant ce branchement.
 
 ## INTEGRATION_RISK
 
@@ -90,8 +101,10 @@ NOT_APPLICABLE — aucun changement de jeu, aucun asset, aucun niveau.
   `test-agent-worktree.ps1` l'a pris en défaut : son dépôt jetable n'avait pas `check-ecarts.mjs`, et S8 à
   S11 tombaient (`MODULE_NOT_FOUND`). Le banc copie désormais le contrôleur, `masks.mjs` et `ECARTS.md` :
   **23/23 PASS**.
-- `ECARTS.md` : la fiche n° 5 sera touchée par `budget-cadence-001` (autre session, qui branche la cadence) ;
-  conflit textuel possible sur la fiche, à fusionner à la main (garder les deux champs).
+- **Conflits résolus au rebase sur `22db051`** (`editor-queue-001`) : dans `finish`, le contrôle des preuves
+  déclarées (`PROOFS:`) d'abord, puis le contrôle des écarts, puis `Invoke-UnrealGate` (build seul, la suite
+  au lot) ; dans `SKILL.md`, la fiche demande à la fois `ECARTS` et `PROOFS:`. `test-agent-worktree.ps1`
+  sur la pointe rebasée : **36/36 PASS, 0 FAIL**.
 - `tolerances.json` v1 et les règles v1 / v2 sont des **propositions** de l'agent, non validées par
   Alexandre ; la v2 a été introduite **après** la première mesure, à cause de la calibration A/A — dit dans
   `METHODE.md` et `n05.md`, les deux règles sont rapportées.
