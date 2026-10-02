@@ -66,3 +66,7 @@ Four targeted tests Success; geographic village and frozen-memory restoration ch
 compare.py, 1166x856: eye off/on 1.47% pixels above16, off/off2 1.28%; oblique1.34% vs reference1.19%. Marginal difference does not establish a legible path. Default remains OFF. A new external water-look NullRHI commandlet was seen at process-release check; frozen-frame GPU numbers are not accepted as a controlled performance comparison until overlap is excluded.
 
 One bounded follow-up is prepared using EXISTING FirstFarmer1, not injected traffic: 260wall seconds at TimeScale0.3, actual delivery counter and food-conservation samples recorded. Requires at least three completed deliveries; no forced routes, resource refill or altered behaviour. Separate farmer output folder preserves opening evidence. Registered anthropic-routine-capture. Queue rank after soil-contact-003 then woodland-sequence-003; no launch until their actual release. This is a scenario proof, not normal-village traffic evidence.
+
+## ROUTINE ATTRIBUTION GUARD
+
+The farmer variant keeps memory OFF during opening village setup, checks zero recorded cells, and enables it only after FirstFarmer replaces that village. This prevents initial villagers from contaminating the farmer evidence. No simulator or visual response changes. Python AST checked; routine execution still pending exclusive editor access.

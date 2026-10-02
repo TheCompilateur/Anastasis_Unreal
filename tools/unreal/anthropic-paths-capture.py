@@ -68,7 +68,7 @@ def run(dt):
         if set(s['tests'])!=expected: return
         check('four_targeted_tests',all(v=='Success' for v in s['tests'].values()))
         if not s['checks'][-1][1]: finish('tests failed'); return
-        for c in ['anastasis.Sim.Speed 1','anastasis.Sim.Warp 1','anastasis.Sim.TimeScale 0.15','anastasis.Village.StartVillagers 12','anastasis.Anthropic.Memory 1','anastasis.Anthropic.Draw 1','anastasis.Sky.Hour 11','anastasis.Village.Debug 0']: cmd(c)
+        for c in ['anastasis.Sim.Speed 1','anastasis.Sim.Warp 1','anastasis.Sim.TimeScale 0.15','anastasis.Village.StartVillagers 12','anastasis.Anthropic.Memory '+('0' if ROUTINE else '1'),'anastasis.Anthropic.Draw 1','anastasis.Sky.Hour 11','anastasis.Village.Debug 0']: cmd(c)
         les.editor_request_begin_play(); s['phase']='opening'
     elif phase=='opening' and les.is_in_play_in_editor():
         w=ues.get_game_world()
@@ -78,7 +78,10 @@ def run(dt):
         if not s['checks'][-1][1]: finish('village unavailable'); return
         s['site']=data; s['at']=now; s['phase']='observe'; s['sample_at']=0
         if ROUTINE:
+            check('routine_starts_without_opening_traces',report().get('cells')==0)
+            if not s['checks'][-1][1]: finish('opening traffic contaminated routine'); return
             cmd('Anastasis.Village.FirstFarmer 1')
+            cmd('anastasis.Anthropic.Memory 1')
             cmd('anastasis.Sim.TimeScale 0.3')
             s['routine_samples']=[]
         s['sim_start']=DBG.get_simulation_time(w)
