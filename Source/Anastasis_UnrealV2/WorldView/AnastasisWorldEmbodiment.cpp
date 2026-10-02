@@ -12,6 +12,7 @@
 #include "WorldView/AnastasisForestStructure.h"
 #include "WorldView/AnastasisHeroCanopy.h"
 #include "WorldView/AnastasisUnderstory.h"
+#include "WorldView/AnastasisTrunkContact.h"
 #include "WorldView/AnastasisMicroEcology.h"
 #include "WorldView/AnastasisRiverbank.h"
 
@@ -91,6 +92,10 @@ static TAutoConsoleVariable<int32> CVarCanopyShell(
 static TAutoConsoleVariable<int32> CVarHeroCanopyInAutomation(
 	TEXT("anastasis.HeroCanopy.InAutomation"), 0,
 	TEXT("0=pas de heros ni d'enveloppe pendant les tests d'automatisation (defaut), 1=aussi sous automatisation."), ECVF_Default);
+// Pied de tronc. Quelques milliers de pastilles, coupees a 16 m : rien a voir avec le million de touffes.
+static TAutoConsoleVariable<int32> CVarTrunkContact(
+	TEXT("anastasis.Dressing.TrunkContact"), 1,
+	TEXT("0=pied de tronc nu, 1=litiere et mousse a moins d'un metre du tronc, visibles a une dizaine de metres ; applique a l'incarnation."), ECVF_Default);
 
 // SOL SOUS L'HERBE. Coupable pour l'A/B : memes touffes, sol teinte ou non.
 // MICRO_ECOLOGY_001. Poches de berge, lisiere, sous-bois. 0 = le dressing deja en place, sans cette couche.
@@ -968,7 +973,10 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	UE_LOG(LogAnastasis_UnrealV2, Display,
 		TEXT("ANASTASIS_DRESSING ground=%s instances=%d refused_ungrounded=%d"),
 		SurfaceCrop ? TEXT("surface") : TEXT("slab"), DressingInstanceCount, UngroundedTiles);
+	// Les troncs, avant que le maquis n'ajoute buissons et rochers a Canopy.
+	const TArray<FVector> Trunks = Canopy;
 	PlaceUnderstory(CanonicalSource, Canopy, bEcology);
+	PlaceTrunkContact(CanonicalSource, Trunks, bEcology);
 	PlaceGroundCover(CanonicalSource, Places, Canopy, bEcology);
 	PlaceMicroEcology(CanonicalSource, Places, Canopy, bEcology);
 	PlaceRiverbank(CanonicalSource, true);
@@ -1178,6 +1186,106 @@ void AAnastasisWorldEmbodiment::PlaceUnderstory(const AnastasisWorldView::FWorld
 		UnderPlan.Counts[static_cast<int32>(US::EKind::Broom)], UnderPlan.Counts[static_cast<int32>(US::EKind::Bramble)],
 		UnderPlan.Counts[static_cast<int32>(US::EKind::Rock)], Placed, UnderPlan.Cells, UnderPlan.RejectedWater, UnderPlan.RejectedReserved,
 		UnderstoryMeshes.Num(), MissingPaths.Num(), UnderPlan.bTruncated ? 1 : 0, PlanMs, (FPlatformTime::Seconds() - Start) * 1000.0);
+}
+
+void AAnastasisWorldEmbodiment::PlaceTrunkContact(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,
+	const TArray<FVector>& Trunks, bool bEnabled)
+{
+	for (UHierarchicalInstancedStaticMeshComponent* M : TrunkContactMeshes)
+	{
+		if (IsValid(M)) M->ClearInstances();
+	}
+	TrunkContactMeshes.RemoveAll([](const TObjectPtr<UHierarchicalInstancedStaticMeshComponent>& M) { return !IsValid(M); });
+	const double Tile = AnastasisWorldView::TileWorldSize * CanonicalSource.SpatialScale;
+	double Probe = 0.0;
+	const bool bGround = AnastasisTerrainForge::SampleActive(
+		(CanonicalSource.OriginX + CanonicalSource.W * 0.5) * Tile,
+		(CanonicalSource.OriginY + CanonicalSource.H * 0.5) * Tile, Probe);
+	if (!bEnabled || CVarTrunkContact.GetValueOnGameThread() == 0 || !bGround)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_TRUNK_CONTACT enabled=0 ecology=%d rendered_ground=%d"),
+			bEnabled, bGround);
+		return;
+	}
+	namespace TC = AnastasisTrunkContact;
+	TArray<TC::FPatch> Patches;
+	TC::FReport Report;
+	FString Error;
+	if (!TC::Build(Trunks, CanonicalSource.Seed, Patches, Report, Error))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_TRUNK_CONTACT rejected=%s"), *Error);
+		return;
+	}
+	const TCHAR* Paths[2] = {
+		TEXT("/Game/Anastasis/GroundCover/SM_Grass_MeadowShort_01.SM_Grass_MeadowShort_01"),
+		TEXT("/Game/Anastasis/GroundCover/SM_Grass_Sedge_01.SM_Grass_Sedge_01"),
+	};
+	UHierarchicalInstancedStaticMeshComponent* ByKind[2] = {nullptr, nullptr};
+	double MeshRadius[2] = {20.0, 20.0};
+	int32 Missing = 0;
+	TMap<FName, UHierarchicalInstancedStaticMeshComponent*> Existing;
+	for (UHierarchicalInstancedStaticMeshComponent* M : TrunkContactMeshes) Existing.Add(M->GetFName(), M);
+	for (int32 Kind = 0; Kind < 2; ++Kind)
+	{
+		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, Paths[Kind]);
+		if (!Mesh) { ++Missing; continue; }
+		const FBox Bounds = Mesh->GetBoundingBox();
+		MeshRadius[Kind] = FVector2D(Bounds.GetExtent().X, Bounds.GetExtent().Y).GetMax();
+		const FName Name = Kind == 0 ? TEXT("TrunkContact_Litter") : TEXT("TrunkContact_Moss");
+		UHierarchicalInstancedStaticMeshComponent* Hism = Existing.FindRef(Name);
+		if (!Hism)
+		{
+			Hism = NewObject<UHierarchicalInstancedStaticMeshComponent>(this,
+				MakeUniqueObjectName(this, UHierarchicalInstancedStaticMeshComponent::StaticClass(), Name));
+			Hism->SetFlags(RF_Transient);
+			Hism->SetupAttachment(GetRootComponent());
+			Hism->SetMobility(EComponentMobility::Movable);
+			Hism->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Hism->SetGenerateOverlapEvents(false);
+			Hism->SetCanEverAffectNavigation(false);
+			Hism->RegisterComponent();
+			TrunkContactMeshes.Add(Hism);
+		}
+		Hism->SetStaticMesh(Mesh);
+		Hism->SetCastShadow(false);
+		// Fondu entre 10 et 16 m : le pied se lit a hauteur d'homme, pas depuis la crete.
+		Hism->SetCullDistances(1000, 1600);
+		ByKind[Kind] = Hism;
+	}
+	int32 Placed = 0, RefusedGround = 0, RefusedWater = 0;
+	for (const TC::FPatch& Patch : Patches)
+	{
+		UHierarchicalInstancedStaticMeshComponent* Hism = ByKind[Patch.Kind == 1 ? 1 : 0];
+		if (!Hism) continue;
+		double Z = 0.0, Zx = 0.0, Zy = 0.0, Water = 0.0;
+		if (!AnastasisTerrainForge::SampleActive(Patch.Position.X, Patch.Position.Y, Z)) { ++RefusedGround; continue; }
+		if (AnastasisTerrainForge::SampleActiveWater(Patch.Position.X, Patch.Position.Y, Water) && Water > Z + 4.0)
+		{
+			++RefusedWater;
+			continue;
+		}
+		const bool bX = AnastasisTerrainForge::SampleActive(Patch.Position.X + 40.0, Patch.Position.Y, Zx);
+		const bool bY = AnastasisTerrainForge::SampleActive(Patch.Position.X, Patch.Position.Y + 40.0, Zy);
+		const FVector Normal = (bX && bY)
+			? FVector::CrossProduct(FVector(0.0, 40.0, Zy - Z), FVector(40.0, 0.0, Zx - Z)).GetSafeNormal()
+			: FVector::UpVector;
+		const FVector Up = FMath::Lerp(FVector::UpVector, Normal.Z < 0.0 ? -Normal : Normal, 0.85).GetSafeNormal();
+		const double Residual = FMath::Acos(FMath::Clamp(FVector::DotProduct(Up, Normal.Z < 0.0 ? -Normal : Normal), -1.0, 1.0));
+		const double Sink = 3.0 + MeshRadius[Patch.Kind] * Patch.ScaleXY * FMath::Tan(Residual);
+		const FQuat Rotation = FQuat::FindBetweenNormals(FVector::UpVector, Up)
+			* FQuat(FVector::UpVector, FMath::DegreesToRadians(Patch.YawDegrees));
+		Hism->AddInstance(FTransform(Rotation,
+			FVector(Patch.Position.X, Patch.Position.Y, Z - Sink),
+			FVector(Patch.ScaleXY, Patch.ScaleXY, Patch.ScaleZ)), false);
+		++Placed;
+	}
+	for (UHierarchicalInstancedStaticMeshComponent* M : TrunkContactMeshes)
+	{
+		if (IsValid(M)) M->MarkRenderStateDirty();
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_TRUNK_CONTACT enabled=1 trunks=%d patches=%d litter=%d moss=%d placed=%d refused_ground=%d refused_water=%d missing_meshes=%d"),
+		Report.Trunks, Report.Patches, Report.Litter, Report.Moss, Placed, RefusedGround, RefusedWater, Missing);
 }
 
 void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,
