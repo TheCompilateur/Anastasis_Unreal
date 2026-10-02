@@ -28,7 +28,8 @@
 | Forêt | environ 48 images/s après le Hit Lighting | idem |
 | Vues d'herbe | frame p50 environ 10–15 ms | `handoffs/ground-cover-001.md` |
 | Postes connus | Hit Lighting +0,5 à +3,4 ms ; herbe +1,5 à 2 ms ; eau environ 1,07 ms | fiches du domaine |
-| Budget écrit | **aucun** | — |
+| Végétation par strate (2026-10-01, viewport 1280×720) | image entière 10,3–14,2 ms ; arbres 0,3–3,75 ; herbe 0,1–3,75 ; sous-bois < 0,4 (bruit) ; scène sans végétation 7,9–8,4 ms ; témoin ≤ 0,34 ms | `handoffs/forest-cost-001.md` |
+| Budget écrit | **aucun** : proposition chiffrée en attente d'Alexandre (section Ouvert) | — |
 | Bruit de capture | ~3,6 % des pixels à plus de 16/255 entre deux runs du même état | `PIEGES_UNREAL.md` |
 
 ## Règles
@@ -49,6 +50,7 @@
 tools\unreal\riverbank-capture.ps1 -Label <x> -Profile          # ProfileGPU par vue
 tools\unreal\capture-ground-cover.ps1 -Label <x> -States on,off  # frame p50/p95 + GPU par vue
 tools\unreal\measure-tree-cost.ps1                               # triangles, LOD, instances soumises
+tools\unreal\vegetation-cost-capture.ps1 -Label <x>             # ms GPU par strate de végétation, vue par vue
 ```
 
 ## Ne pas faire
@@ -59,10 +61,18 @@ tools\unreal\measure-tree-cost.ps1                               # triangles, LO
 
 ## Ouvert
 
-- **Budget GPU cible** : non écrit. Proposition à soumettre à Alexandre : partir des 17–21 ms mesurés et
-  fixer un plafond par vue (par exemple 16,7 ms en vue forêt sur RTX 3060), puis refuser tout ajout qui le
-  dépasse sans compensation.
-- Coût GPU de la forêt : jamais mesuré seul.
+- **Budget GPU cible** : non écrit. Proposition chiffrée de `forest-cost-001` (2026-10-01), à valider par
+  Alexandre, dans le banc de `vegetation-cost-capture.ps1` (RTX 3060, viewport éditeur 1280×720, midi sec) :
+  - plafond **16,7 ms GPU par vue** (60 images/s) ; la vue la plus chère est aujourd'hui à 14,2 ms
+    (intérieur de forêt), soit 2,5 ms de marge ;
+  - **végétation ≤ 6,5 ms** dans toute vue (aujourd'hui 6,2 ms au plus) ;
+  - tout ajout donne son coût dans ce banc (PERF-01) et ne passe que si chaque vue reste sous le plafond,
+    ou s'il retire ailleurs ce qu'il ajoute.
+  Ce plafond vaut pour ce banc, pas pour le jeu : un 1080p plein écran a 2,25 fois plus de pixels, et les
+  passes qui en dépendent (Lumen, ombres, post) grandiront d'autant. Mesurer un jeu packagé avant de
+  promettre une fréquence d'image (PERF-03).
+- Coût GPU de la forêt : mesuré par strate le 2026-10-01 (`handoffs/forest-cost-001.md`). Les 17–21 ms
+  ci-dessus et les 10–14 ms de cette mesure ne sont pas comparables : autres vues, autre taille de viewport.
 - Le budget conditionne Lumen Lite (RU-002-01) : sans plafond écrit, rien ne justifie de céder de la
   qualité de GI pour des ms.
 - `stat unit` affiche en 5.8 la VRAM utilisée et son budget (RU-002-18) : à faire lire par les scripts de
