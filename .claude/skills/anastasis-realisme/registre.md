@@ -140,7 +140,7 @@ a été lue dans le code du moteur installé ; le moteur fait foi contre les not
 
 | ID | Affirmation | Statut | Pourquoi | Règle |
 |---|---|---|---|---|
-| RU-002-06 | Fog Screen Space Scattering (expérimental) : diffusion multiple du brouillard de hauteur, halo autour des sources | `OUVERT` | candidat de mission. Deux interrupteurs : `r.Fog.ScreenSpaceScattering` (1 par défaut) **et** `UExponentialHeightFogComponent::bEnableFSSS` (false par défaut), réglé par `FSSSSpreadScale` (0,1). Le projet ne pose pas `bEnableFSSS` : l'activer passe par `AAnastasisWorldAtmosphere` et le profil. Risque : halo partout (ATM-05) | ATM-06, ATM Ouvert |
+| RU-002-06 | Fog Screen Space Scattering (expérimental) : diffusion multiple du brouillard de hauteur, halo autour des sources | `REJETÉ` | branché le 2026-10-01 (`fog-fsss-001`) derrière `anastasis.Atmosphere.FogScattering` (0 par défaut), puis mesuré : dans notre brouillard léger, tout l'effet visible vient de la couleur de scène injectée, qui assombrit l'image de 0,4 à 5,6 niveaux sous une exposition fixe ; sans elle (`.SceneColor 0` ou `0.5`), l'image ne s'écarte pas du témoin. +0,2 à +0,35 ms GPU. À rouvrir pour un brouillard dense | ATM, Ne pas faire |
 | RU-002-07 | SkyAtmosphere, Volumetric Clouds : rien de nouveau en 5.8 | `APPLIQUÉ` | rien à faire | ATM-02 |
 
 ### Matériaux

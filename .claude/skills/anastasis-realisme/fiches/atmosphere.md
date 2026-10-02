@@ -79,6 +79,12 @@ Seuils empiriques, posés sur les captures de `DAY_NIGHT_WEATHER_001`. Autres pr
 
 - Monter la densité du brouillard pour « faire profond » : c'est le mur (`WALL`).
 - Laisser le soleil diffuser sous l'horizon : flash au coucher.
+- Activer Fog Screen Space Scattering (`anastasis.Atmosphere.FogScattering 1`) pour « adoucir le lointain »
+  (RU-002-06, `handoffs/fog-fsss-001.md`). Mesuré le 2026-10-01 avec `capture-sky.ps1` : dans notre
+  brouillard léger (densité 0,012), tout l'effet visible vient de la couleur de scène injectée
+  (`FSSSSceneColorScatteringAmountScale`, 1 par défaut) ; elle assombrit l'image de 0,4 à 5,6 niveaux et
+  bleuit moins la brume, sous une exposition fixe qui ne peut pas compenser (ECL-01). À 0 ou 0,5, l'image
+  ne s'écarte plus du témoin. Coût +0,2 à +0,35 ms GPU (médiane), pour rien de visible.
 - Croire un réglage d'atmosphère validé sans l'avoir vu : `ATMOSPHERE_COHERENCE_001.md` note lui-même
   que l'aube, le coucher et l'aspect du brouillard n'ont **pas été observés** en moteur après sa
   correction.
@@ -86,10 +92,7 @@ Seuils empiriques, posés sur les captures de `DAY_NIGHT_WEATHER_001`. Autres pr
 ## Ouvert
 
 - Pluie et neige invisibles : pas de Niagara (`handoffs/env-realism-001.md`). Mission à part.
-- **Fog Screen Space Scattering** (5.8, expérimental, RU-002-06) : halo de diffusion multiple dans le
-  brouillard de hauteur, autour du soleil et des zones claires. Il faut `bEnableFSSS` sur le composant de
-  brouillard (false par défaut ; `r.Fog.ScreenSpaceScattering` vaut déjà 1) et `FSSSSpreadScale` (0,1).
-  À poser par `AAnastasisWorldAtmosphere` et le profil (ATM-06), derrière une CVar `anastasis.*` pour
-  l'A/B `capture-sky.ps1 -Preset cycle`. Risque à mesurer : un halo partout (ATM-05) et `HAZE`. Ne touche
-  ni les nuages ni la brume locale.
+- **Fog Screen Space Scattering** (RU-002-06) : branché et coupé (`anastasis.Atmosphere.FogScattering`,
+  0 par défaut). À rouvrir si le brouillard devient dense (orage, brume de vallée épaisse) : c'est là que la
+  diffusion multiple existe vraiment ; refaire alors l'A/B avec `.SceneColor` à 0 et à 1.
 - Seuils de `atmosphere-metrics.py` à recaler sur un plus grand nombre de captures.
