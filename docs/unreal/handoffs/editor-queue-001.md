@@ -23,7 +23,7 @@ par des agents qui se prouvaient chacun de leur côté.
 
 ## COMMIT
 
-PENDING
+`0bb9277` (file, éditeur unique, verrou), `44aebe6` (porte mémoire équitable), puis cette fiche.
 
 ## PROOFS
 
@@ -32,7 +32,15 @@ PROOFS: (aucune)
 ## MEC
 
 - BUILD: sans objet (aucun fichier Unreal).
-- TESTS: `tools\unreal\test-agent-worktree.ps1` — PENDING
+- TESTS: `tools\unreal\test-agent-worktree.ps1` (2026-10-01, sur cette branche seule) : 35 PASS, 1 FAIL attendu —
+  S18 `registre lisible, scripts presents` : `player-pie.py` ABSENT tant que player-minimal-001 n'est pas dans
+  la base. Versée APRÈS player-minimal-001 (même lot, dans cet ordre), S18 doit passer : à relancer sur `main`
+  après versement.
+  - S13/S14 verrou de main (tenu → refus ; périmé → repris, rendu), S15 `queued` renvoyé au lot, S16/S17
+    preuves déclarées, S18 registre + `-DryRun`, S19 porte équitable (ticket vivant plus ancien d'abord,
+    ticket mort ignoré) : PASS.
+- PIE : `editor-batch.ps1 -Proofs player-pie,village-weather-pie` **jamais exécuté jusqu'au bout** (arrêté
+  pour laisser passer un lot, puis tests suspendus par Alexandre). `-List` et `-DryRun` vérifiés.
 - COMMANDS:
   - `tools\unreal\test-agent-worktree.ps1`
   - `tools\unreal\editor-batch.ps1 -Proofs player-pie,village-weather-pie` (validation réelle, un éditeur)
