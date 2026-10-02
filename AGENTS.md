@@ -370,6 +370,7 @@ Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
 | `capture-tree-lineup.ps1` + `capture-tree-lineup.py` | planche de stature de la grammaire d'arbres ; `-Set species [-Shape 01..03]` : planche des sept essences a leur hauteur mediane |
 | `astral-observe.py` | A/B lumière du jour fixe, Ecology seule variable |
 | `measure-tree-cost.ps1` + `measure-tree-cost.py` | triangles, LOD, instances HISM réellement soumis |
+| `vegetation-cost-capture.ps1` + `vegetation-cost-capture.py` | coût GPU de la végétation strate par strate (`FOREST_COST_001`) : monde incarné une fois, arbres / sous-bois / herbe / rives masqués à l'exécution (ni dessin ni ombre), aux mêmes caméras (intérieur de forêt, lisière, prairie, vallée B, oblique, aérien) ; états `all,notrees,nounder,nograss,bare,all2` (all2 = témoin), GPU p50 de `stat unit` par vue, inventaire des instances par strate → `Saved/VegetationCostEvidence/<Label>/` ; rien de sauvé |
 | `inspect_presentation_registry.py` | dump de `DA_AnastasisPresentation` |
 | `introspect_geoscript.py` | docstrings des fonctions GeometryScript utilisées |
 
