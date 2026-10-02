@@ -137,9 +137,23 @@ bool FAnastasisVillageWeatherStormTest::RunTest(const FString&)
 	const double DecidedBefore = Village.FindNpc(Farmer)->LastDecision.Time;
 	Village.SetForcedWeather(Storm(Rain));
 	RunUntil(Village, Time, 90.0, [&] { return Village.FindNpc(Farmer)->LastDecision.Time > DecidedBefore; });
+	// Exemption de la porte : `Next !== "deliver"` (npc.js l. 2055-2071). S'il porte deja sa recolte quand
+	// l'orage le fait decider, il la livre d'abord ; c'est sa decision suivante sous l'orage qui l'abrite.
+	bool bDeliveredFirst = false;
+	{
+		const FNpc* First = Village.FindNpc(Farmer);
+		if (First->Goal == GoalDeliver && First->InventoryFood > 0)
+		{
+			TestFalse(TEXT("storm with cargo: the storm gate exempts deliver"), First->LastDecision.bStormGate);
+			AddInfo(FString::Printf(TEXT("ORAGE cargaison : livre d'abord (sac %d, decision %.3f)"), First->InventoryFood, First->LastDecision.Time));
+			bDeliveredFirst = true;
+			const double DeliverDecision = First->LastDecision.Time;
+			RunUntil(Village, Time, 90.0, [&] { return Village.FindNpc(Farmer)->LastDecision.Time > DeliverDecision; });
+		}
+	}
 	const bool bSheltering = Village.FindNpc(Farmer)->Goal == GoalShelterRain;
 	const FNpc* N = Village.FindNpc(Farmer);
-	if (!TestTrue(TEXT("storm: his first decision under the storm drops the harvest for shelter"), bSheltering))
+	if (!TestTrue(TEXT("storm: his first decision under the storm (after delivering any cargo) drops the harvest for shelter"), bSheltering))
 	{
 		AddInfo(FString::Printf(TEXT("goal=%s winner=%s rain=%.3f shelterRow=%.3f restRow=%.3f gatherRow=%.3f gate=%d shift=%d"),
 			*N->Goal, *N->LastDecision.TableWinner, N->LastDecision.WeatherRain, N->LastDecision.ShelterRowScore,
@@ -164,12 +178,17 @@ bool FAnastasisVillageWeatherStormTest::RunTest(const FString&)
 		TestFalse(TEXT("no storm gate needed"), Why.bStormGate);
 		TestTrue(TEXT("so no resume goal (the reference sets it only through the gate)"), N->ShelterResumeGoal.IsEmpty());
 	}
-	else
+	else if (!bDeliveredFirst)
 	{
 		TestTrue(TEXT("the harvest kept the table with its stickiness"), Why.Stickiness > 0.0);
 		TestEqual(TEXT("the harvest wins the table"), Why.TableWinner, FString(GoalGatherFood));
 		TestTrue(TEXT("the storm gate sends him to shelter"), Why.bStormGate);
 		TestEqual(TEXT("and keeps the harvest to resume"), N->ShelterResumeGoal, FString(GoalGatherFood));
+	}
+	else
+	{
+		// Apres la livraison, la cueillette ne garde pas la table par le collant : seule la porte l'abrite.
+		TestTrue(TEXT("after delivering, the storm gate sends him to shelter"), Why.bStormGate);
 	}
 	const FString Resume = N->ShelterResumeGoal;
 	TestEqual(TEXT("shelter: his workplace (no home)"), Why.TargetSource, FString(TEXT("workplace")));
