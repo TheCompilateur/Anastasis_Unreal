@@ -197,6 +197,10 @@ try:
         # SOL -- la mosaique prairie / laiches / lande de la vue aerienne d'EZ5.
         ('aerien', (30.0, 34.0), 30000, (52.0, 58.0), 0),
     ]
+    plan.extend([
+        ('prairie_ground', (44.0,52.0),170,(44.45,52.35),0),
+        ('rive_ground', (49.5,55.2),170,(49.75,55.6),0),
+    ])
     for pid, x, y, z, r in report:
         if pid == 'hameau':
             # Oeil DANS l'emprise pietinee, tourne vers le fond de vallee : le sol tasse au
@@ -352,6 +356,15 @@ try:
             unreal.log_warning('GROUND_CAPTURE_SKIP %s sol absent' % name)
             continue
         views.append((name, eye, tgt))
+    if SOIL_PARAMETER == 'SoilMatrixStructure':
+        pilot = next((v for v in views if v[0] == 'prairie_ground'), None)
+        if pilot is None:
+            raise RuntimeError('SoilMatrixStructure requires prairie_ground')
+        target = pilot[2]
+        for mid in soil_mids:
+            mid.set_vector_parameter_value('SoilMatrixCenter', unreal.LinearColor(target.x,target.y,target.z,0))
+            mid.set_scalar_parameter_value('SoilMatrixRadius',1600.0)
+        unreal.log('SOIL_MATRIX_PILOT center=(%.1f,%.1f,%.1f) radius=1600' % (target.x,target.y,target.z))
     with open(os.path.join(OUT, 'cameras.json'), 'w') as f:
         json.dump({'tile_uu': T, 'views': [[n, [e.x, e.y, e.z], [t.x, t.y, t.z]] for n, e, t in views]}, f, indent=1)
     unreal.log('GROUND_CAPTURE_VIEWS %d tile_uu=%.1f' % (len(views), T))

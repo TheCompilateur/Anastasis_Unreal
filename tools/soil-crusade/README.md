@@ -80,3 +80,46 @@ Contact003 now defaults OFF until image review. The registered soil-contact-capt
 job enables it temporarily, captures15images and restores its prior CVar/visibility.
 Completion is technical only. The source can be queued without shipping an active
 unreviewed composition. Do not enable the default based solely on capture COMPLETE.
+
+
+## Soil matrix experiment 004 (prepared, not rendered)
+
+Source comparison: https://polyhaven.com/a/sparse_grass (2m, context photograph),
+https://polyhaven.com/a/brown_mud_02 (1.3m, diffuse map),
+https://polyhaven.com/a/forest_leaves_02 (3m, diffuse map). These are existing CC0
+sources, not newly imported assets. A diffuse map is not a field photograph.
+Current Grass200cm/Worked130cm/Litter300cm match the published dimensions.
+Do not shrink the textures to explain a grain-size impression without A/B evidence.
+
+Observed in suite-002-final prairie/river captures: beige corrugated foreground,
+weak distinction between quiet earth and debris, rapid loss of close detail.
+Code finding: SoilHistory.Matrix also increases compact-mud texture weight over dry
+meadow ground. Hypothesis: that conflates an earth-colored matrix with a specific
+mud morphology. Not yet established as the dominant cause of the rendered defect.
+
+Experimental SoilMatrixStructure defaults0. Only the texture weight changes inside
+a16m-radius disk; close earth color, terrain, vegetation, source scales and samplers
+are retained. At1, the close Matrix contribution to compact mud is reduced by80%
+on dry ground, progressively restored with existing Wet0.20..0.68; explicit thin
+and fine soil contributions remain. Existing Grass photo contains roots/earth.
+This does NOT add physical aggregates, root meshes, new textures or real moisture.
+
+Sequential comparisons, one hypothesis per run, after coordinated editor slot:
+1. Existing assets, ANASTASIS_SOIL_PARAMETER=BumpStrength,
+   ANASTASIS_SOIL_BEFORE=0.16, ANASTASIS_SOIL_AFTER=0,
+   ANASTASIS_SOIL_VIEWS=prairie_ground,rive_ground,prairie_eye,
+   capture.ps1 -Label matrix-normal-check (NO -Rebuild).
+2. Only if that result leaves the material-mix issue unresolved: reset numeric
+   BEFORE/AFTER to0/1, PARAMETER=SoilMatrixStructure, same VIEWS,
+   capture.ps1 -Label matrix-structure-v1 -Rebuild.
+   The disk center is set from the actual prairie_ground target, radius1600cm.
+   Rive_ground is an outside-disk control. The master remains default0 after regen.
+Before/after/control use the same MIDs and camera poses. No combined tweak of normal,
+color, texture scale or grass density. All images must be inspected and compared
+against before/control drift; source Python syntax is not HLSL compilation proof.
+
+KEEP requires visibly separate fine roots/debris and quieter earth in the close
+prairie view, with no green carpet, repeated scan stamp or artificial disk edge.
+REJECT if the ground simply becomes smooth, the old problem shifts into vegetation,
+or the water/soil control changes beyond its baseline variation. Record GPU delta,
+including whether it exceeds0.5ms relative to repeated baseline. No player claim.

@@ -750,7 +750,26 @@ return float3(lerp(Rock, rock, enabled), saturate(thin * 0.65) * enabled, fines 
     exposed_soil = g.sat(g.add(thin_soil, '', fine_soil, '', -780, 2520), '', -600, 2520)
     exposed_soil = g.sat(g.add(exposed_soil, '', soil, 'Matrix', -500, 2660), '', -340, 2660)
     # Reuse the existing fine mineral/mud photo; do not merely recolor grass into soil.
-    texture_worked = g.lerp(w_worked, '', g.one_minus(w_litter, '', -780, 2660), '', exposed_soil, '', -600, 2600)
+    # SOIL_MATRIX_004 experimental local A/B. Keep the close earth COLOR above;
+    # decouple it from mandatory compact-mud PHOTO coverage on dry meadow ground.
+    # The existing Grass scan already contains fine roots and bare earth. No new noise,
+    # sampler, scale change, semantic UV write or vegetation change. Default is OFF.
+    matrix_texture = g.custom("""
+float local = 1.0 - smoothstep(Radius * 0.75, max(Radius, 1.0), length(P.xy - Center.xy));
+float active = saturate(Enabled) * local;
+float moist = smoothstep(0.20, 0.68, Wet);
+float keep = lerp(0.20, 1.0, moist);
+float matrix = Matrix * lerp(1.0, keep, active);
+return saturate(Thin + Fine + matrix);
+""", 'SoilMatrixTexture', CMOT_FLOAT1,
+        ('P', 'Center', 'Radius', 'Enabled', 'Wet', 'Matrix', 'Thin', 'Fine'), (), -800, 3400)
+    for name, src, output in (('P', wp, ''), ('Wet', wetness, ''),
+                              ('Matrix', soil, 'Matrix'), ('Thin', thin_soil, ''), ('Fine', fine_soil, '')):
+        g.link(src, output, matrix_texture, name)
+    g.link(g.vector('SoilMatrixCenter', (89000.0, 105000.0, 0.0), P + 'SoilMatrix', -1900, 3400), '', matrix_texture, 'Center')
+    g.link(g.scalar('SoilMatrixRadius', 1600.0, P + 'SoilMatrix', -1900, 3460), '', matrix_texture, 'Radius')
+    g.link(g.scalar('SoilMatrixStructure', 0.0, P + 'SoilMatrix', -1900, 3520), '', matrix_texture, 'Enabled')
+    texture_worked = g.lerp(w_worked, '', g.one_minus(w_litter, '', -780, 2660), '', matrix_texture, '', -600, 2600)
 
     # ------------------------------------------------------------------ textures photo
     # Le detail sous le metre, que la geometrie ne porte pas. Un seul noeud Custom : la
