@@ -2044,11 +2044,13 @@ namespace AnastasisVillage
 			// s = believedStock : sans souvenir de marche, la presomption bruitee.
 			Work.Believed = AnastasisGather::BelievedFoodPresumed(Npc.Id);
 			Work.bMealBlocked = AnastasisGather::MealPathBlocked(Npc.Needs.Hunger, Npc.InventoryFood, Work.Believed);
-			// `pressure.effectiveWork * phaseWorkFactor * elderWorkFactor * natureWorkFactor`,
-			// adulte (1) de nature moyenne (0,92 + corps * 0,08).
-			const double NatureWorkFactor = Clamp(0.92 + 1.0 * 0.08, 0.72, 1.22);
+			// `pressure.effectiveWork * phaseWorkFactor * elderWorkFactor * natureWorkFactor` (lifestyle-decision-001) :
+			// la phase personnelle avec metier et mode de vie, adulte (1), la nature lue (moyenne sans elle).
+			AnastasisNature::FNature Average;
+			const double NatureWorkFactor = AnastasisNature::NatureWorkFactor(Npc.Nature.IsSet() ? Npc.Nature.GetValue() : Average);
+			const FString LifestyleId = Npc.Lifestyle.IsSet() ? Npc.Lifestyle->Id : FString();
 			Work.WorkFactor = AnastasisGather::MoralEffectiveWork(Npc.Needs, MarketFood(), Day())
-				* AnastasisRhythm::PhaseWork(Phase) * 1.0 * NatureWorkFactor;
+				* AnastasisRhythm::PhaseWorkFactor(Phase, Npc.JobId, LifestyleId) * 1.0 * NatureWorkFactor;
 			if (bWorker || bSite) Trace.WorkFactor = Work.WorkFactor;
 		}
 		// Ce que le planificateur collectif dit pour cet habitant : lu une fois, pour les lignes et la passe finale.
@@ -2108,7 +2110,7 @@ namespace AnastasisVillage
 			else if (G == GoalSocialize || G == GoalRelax)
 			{
 				const double Need = G == GoalSocialize ? Trace.NeedScores.Socialize : Trace.NeedScores.Relax;
-				Rows.Add(TPair<FString, double>(G, SocialRowScore(Npc, G, Need, AnastasisRhythm::PhaseBias(Phase, Subject, G), Noise)));
+				Rows.Add(TPair<FString, double>(G, SocialRowScore(Npc, G, Need, RhythmStatusLifestyle(Npc, Phase, Subject, G), Noise)));
 				continue;
 			}
 			else if (G == TEXT("gatherWood") && IsWoodHarvester(Npc))
@@ -2118,17 +2120,17 @@ namespace AnastasisVillage
 			}
 			else if ((bSite || Collective.bHasColony) && G == AnastasisBuild::GoalBuild)
 			{
-				Rows.Add(TPair<FString, double>(G, BuildRowScore(Npc, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work, Noise, Collective)));
+				Rows.Add(TPair<FString, double>(G, BuildRowScore(Npc, RhythmStatusLifestyle(Npc, Phase, Subject, G), Work, Noise, Collective)));
 				continue;
 			}
 			else if (G == GoalHelpFarm)
 			{
-				Rows.Add(TPair<FString, double>(G, HelpFarmRowScore(Npc, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work, Noise, Collective)));
+				Rows.Add(TPair<FString, double>(G, HelpFarmRowScore(Npc, RhythmStatusLifestyle(Npc, Phase, Subject, G), Work, Noise, Collective)));
 				continue;
 			}
 			else if (bWorker && (G == GoalGatherFood || G == GoalDeliver))
 			{
-				const double Row = WorkRowScore(Npc, G, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work, Noise);
+				const double Row = WorkRowScore(Npc, G, RhythmStatusLifestyle(Npc, Phase, Subject, G), Work, Noise);
 				(G == GoalGatherFood ? Trace.GatherRowTable : Trace.DeliverRowTable) = Row;
 				Rows.Add(TPair<FString, double>(G, Row));
 				continue;
@@ -2140,7 +2142,7 @@ namespace AnastasisVillage
 				Score = Npc.InventoryFood == 0 && HasKnownFoodSource(Npc) && KnownFoodDepot(Npc) ? 85.0 : -1000.0;
 			if (FoodSources.Num() > 0 && G == TEXT("deliver"))
 				Score = Npc.InventoryFood > 0 && KnownFoodDepot(Npc) ? 100.0 + 5.0 * Npc.InventoryFood : -1000.0;
-			Score += AnastasisRhythm::PhaseBias(Phase, Subject, G);
+			Score += RhythmStatusLifestyle(Npc, Phase, Subject, G);
 			Rows.Add(TPair<FString, double>(G, Score));
 		}
 
@@ -2150,6 +2152,8 @@ namespace AnastasisVillage
 		for (TPair<FString, double>& Row : Rows)
 		{
 			Row.Value += AnastasisWeatherBehavior::WeatherGoalBias(TickWeather, Npc.JobId, Row.Key);
+			// `score.nature` (lifestyle-decision-001), juste apres la meteo et le trait dans la chaine.
+			Row.Value += NatureGoalBiasOf(Npc, Row.Key);
 		}
 		// --- resource-targets-001 : `score.survival_forecast` puis `score.spatial_risk`, `map[score.goal] || 0`,
 		// a leur place dans la chaine (apres la meteo et les biais non portes, avant l'urgence collective).
@@ -2184,6 +2188,8 @@ namespace AnastasisVillage
 			Stick.TraitExplore = T.Explore;
 			Stick.bWorkSession = Npc.WorkSession.bActive;
 			Stick.InventoryLoad = Npc.InventoryFood + Npc.InventoryWood;
+
+			if (Npc.Nature.IsSet()) Stick.NatureStick = AnastasisNature::NatureStickBonus(Npc.Nature.GetValue());
 			for (TPair<FString, double>& Row : Rows)
 			{
 				const double Bonus = AnastasisReconsider::GoalStickinessBonus(Stick, Now, Row.Key);
@@ -2387,6 +2393,55 @@ namespace AnastasisVillage
 		double RoundTenth(double V) { return AnastasisJs::Round(V * 10.0) / 10.0; }
 	}
 
+	double FVillage::StatusBias(const FNpc& Npc, const FString& Goal)
+	{
+		// `(npc.gold || 0)` : sans or lu, celui d'un habitant tout juste cree (10 a 29) : ni misere ni aisance.
+		const double Gold = Npc.Gold.IsSet() ? (FMath::IsNaN(Npc.Gold.GetValue()) ? 0.0 : Npc.Gold.GetValue()) : 10.0;
+		const double Morale = Npc.Needs.Morale != 0.0 && !FMath::IsNaN(Npc.Needs.Morale) ? Npc.Needs.Morale : 100.0;
+		const bool bMisery = Morale < 18.0 || Npc.Needs.Hunger > 90.0 || (Gold <= 2.0 && Npc.HomeId.IsEmpty());
+		const bool bComfortable = !bMisery && (Gold >= 95.0 || Npc.Reputation >= 76.0);
+		if (bMisery)
+		{
+			if (Goal == TEXT("sell") || Goal == TEXT("deliver")) return -12.0;
+			if (Goal == GoalEat || Goal == TEXT("eatTogether") || Goal == GoalRest || Goal == GoalDrink) return 14.0;
+			if (Goal == GoalSocialize || Goal == GoalRelax) return 8.0;
+		}
+		if (bComfortable)
+		{
+			if (Goal == TEXT("sell") && Npc.JobId == TEXT("merchant")) return 5.0;
+			if (Goal == TEXT("buy")) return 4.0;
+			if (Goal == GoalSocialize || Goal == TEXT("visitFamily") || Goal == TEXT("eatTogether") || Goal == GoalRelax) return 6.0;
+			if (Goal.StartsWith(TEXT("gather"), ESearchCase::CaseSensitive)) return -3.0;
+		}
+		return 0.0;
+	}
+
+	double FVillage::NatureGoalBiasOf(const FNpc& Npc, const FString& Goal)
+	{
+		return Npc.Nature.IsSet() ? AnastasisNature::NatureGoalBias(Npc.Nature.GetValue(), Goal) : 0.0;
+	}
+
+	double FVillage::RhythmStatusLifestyle(const FNpc& Npc, AnastasisRhythm::EPhase Phase, const AnastasisRhythm::FPhaseSubject& Subject, const FString& Goal) const
+	{
+		double Score = AnastasisRhythm::PhaseBias(Phase, Subject, Goal) + StatusBias(Npc, Goal);
+		// `lifestyleBias(sim, npc, goal)` a l'heure du VILLAGE (`sim.dayFrac()`). Sans mode de vie, la reference
+		// en tirerait un dans `sim.rng` : ceux du C++ restent sans, et le penchant vaut 0 (ecart n°8).
+		if (Npc.Lifestyle.IsSet())
+		{
+			TOptional<AnastasisLifestyle::FLifestyle> Lifestyle = Npc.Lifestyle;
+			AnastasisLifestyle::FLifestyleSubject S;
+			S.JobId = Npc.JobId;
+			S.HomeId = Npc.HomeId;
+			S.Skill = Npc.Skill;
+			S.Energy = Npc.Needs.Energy;
+			S.Goal = Npc.Goal;
+			S.bHasTarget = Npc.bHasTarget;
+			S.FavoriteBuildingId = Npc.FavoriteBuildingId;
+			Score += AnastasisLifestyle::LifestyleBias(Lifestyle, S, nullptr, AnastasisRhythm::DayFracOf(Now), Goal);
+		}
+		return Score;
+	}
+
 	void FVillage::CaptureGoalExplain(FNpc& Npc, const TArray<TPair<FString, double>>& Scores)
 	{
 		// `EXPLAIN_GOAL.minCause` = 4.
@@ -2415,6 +2470,8 @@ namespace AnastasisVillage
 		Stick.bWorkSession = Npc.WorkSession.bActive;
 		Stick.InventoryLoad = Npc.InventoryFood;
 
+		if (Npc.Nature.IsSet()) Stick.NatureStick = AnastasisNature::NatureStickBonus(Npc.Nature.GetValue());
+
 		struct FPart { const TCHAR* Key; const TCHAR* Label; double Value; };
 		for (int32 I = 0; I < Scores.Num() && I < 3; ++I)
 		{
@@ -2439,6 +2496,8 @@ namespace AnastasisVillage
 			if (Weather >= MinCause) Push(TEXT("weather"), TEXT("meteo"), Weather);
 			else if (Weather <= -MinCause) Push(TEXT("weather"), TEXT("meteo"), FMath::Abs(Weather));
 			Push(TEXT("trait"), TEXT("temperament"), AnastasisGather::TraitGoalBias(Trait, Goal));
+			const double Nature = NatureGoalBiasOf(Npc, Goal);
+			if (Nature >= MinCause || Nature <= -MinCause) Push(TEXT("nature"), TEXT("caractere"), FMath::Abs(Nature));
 			const double Skill = SkillBiasFor(Npc, Goal);
 			if (Skill >= MinCause) Push(TEXT("skill"), TEXT("competence"), Skill);
 			Push(TEXT("stick"), TEXT("habitude"), Goal == Npc.Goal ? AnastasisReconsider::GoalStickinessBonus(Stick, Now, Goal) : 0.0);

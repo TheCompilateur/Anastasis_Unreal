@@ -213,6 +213,7 @@
 #include "Core/AnastasisSpatialGrid.h"
 #include "Life/AnastasisBonds.h"
 #include "Life/AnastasisLifestyle.h"
+#include "Life/AnastasisNature.h"
 #include "Life/AnastasisNeeds.h"
 #include "Life/AnastasisVillageRhythm.h"
 #include "Life/AnastasisWeatherBehavior.h"
@@ -926,6 +927,16 @@ namespace AnastasisVillage
 		 * sans mode de vie, et aucun tirage pour lui en donner un (ecart n°8).
 		 */
 		TOptional<AnastasisLifestyle::FLifestyle> Lifestyle;
+		/**
+		 * `npc.nature` (lifestyle-decision-001) : lue de la sauvegarde. Un habitant cree par le C++ n'en a pas ;
+		 * la reference lui en tirerait une dans le flux de secours : il garde la nature moyenne (ecart n°10).
+		 */
+		TOptional<AnastasisNature::FNature> Nature;
+		/**
+		 * `npc.gold` (lifestyle-decision-001), lu pour `statusBias`. L'or ne bouge pas ici (ecart n°12). Un
+		 * habitant cree par le C++ n'en a pas : `createNpc` lui en donnerait 10 a 29, ni pauvre ni aise.
+		 */
+		TOptional<double> Gold;
 
 		/**
 		 * `npc.placeMemory` (act-gate-001) : un lieu par batiment frequente, dans l'ordre de premiere
@@ -1468,6 +1479,15 @@ namespace AnastasisVillage
 		/** Rend 1 (mange), 0 (echec), -1 (en route : `null` de la reference). */
 		int32 TryAlgorithmicEat(FNpc& Npc);
 		int32 RunHungerActionStep(FNpc& Npc, bool bAtFoodAccess, const FString& SourceBuildingId);
+		/**
+		 * `rhythmBias + statusBias + lifestyleBias` (adultScores, le terme `score.rhythm_status_lifestyle`)
+		 * pour un but : la phase personnelle, le statut, le mode de vie a l'heure du village.
+		 */
+		double RhythmStatusLifestyle(const FNpc& Npc, AnastasisRhythm::EPhase Phase, const AnastasisRhythm::FPhaseSubject& Subject, const FString& Goal) const;
+		/** `statusBias(npc, goal)` : misere (moral, faim, or sans toit) ou aisance (or, reputation). */
+		static double StatusBias(const FNpc& Npc, const FString& Goal);
+		/** `natureGoalBias(npc, goal)` ; sans nature, 0 (nature moyenne). */
+		static double NatureGoalBiasOf(const FNpc& Npc, const FString& Goal);
 		/** `setActivity(sim, npc, activity)` : l'activite, et l'heure ou elle a change. */
 		void SetActivity(FNpc& Npc, const FString& Activity);
 		/** `captureGoalExplain(sim, npc, scores, extrasFor)` : les trois premieres lignes et leur cause. */

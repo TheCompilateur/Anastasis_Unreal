@@ -214,6 +214,12 @@ vie (`lifestyleBias` dans la table, `lifestyleTravelFactor`, `lifestyleIndoorDur
 attendent la décision (n° 1). Depuis act-gate-001, `notePlaceUse` appelle `lifestyleNotePlaceUse` pour
 un habitant qui a un mode de vie ; pour un habitant sans, la référence en tirerait un dans le flux de
 secours : ce tirage est sauté, l'habitant reste sans mode de vie.
+Depuis lifestyle-decision-001, la table lit le mode de vie : `lifestyleBias` dans le terme
+`rhythmBias + statusBias + lifestyleBias` (à l'heure du village), et `phaseWorkFactor` complet (garde la nuit,
+aubergiste le soir, bourreau de travail, noctambule, matinal) dans le facteur de travail. Pour un habitant sans
+mode de vie, la référence en tirerait un dans `sim.rng` : le penchant vaut 0. Restent `lifestyleTravelFactor`
+(nav-service-001), `lifestyleIndoorDuration` et `lifestyleTarget`.
+
 chat-on-haul-001 : sans aîné, `maybeCounselPair` de la causette au dépôt ne conseille jamais.
 
 ### n° 9 — Noûs partiel
@@ -246,6 +252,12 @@ toit va manger chez lui « à vide », même si sa réservation est au grenier.
 `settler` et `farmer` ; `gatherFood` et `deliver` ne sont calculées que pour le fermier d'un grenier
 achevé. Nature moyenne, trait « gardien », compétences à 1 : des options légales de `createNpc`, pas
 des tirages.
+Depuis lifestyle-decision-001, la nature lue de la sauvegarde pèse dans la décision : `natureGoalBias` sur
+chaque ligne, `natureWorkFactor` dans le facteur de travail, `natureStickBonus` dans le collant et
+`goalExplain` (module `Life/AnastasisNature`, `Parite.Nature`). Un habitant créé par le C++ n'a pas de nature :
+la référence lui en tirerait une dans le flux de secours (`rollNature`) ; il garde la nature moyenne. Restent
+moyens : `natureSocialMods` (liens), `natureLearnFactor` (apprentissage), l'héritage.
+
 chat-on-haul-001 : aucune technique (`npc.techniques` vide) ; la chance de raté lit une maîtrise de 0
 (`bestCraftMastery`), comme la référence pour un habitant sans livre de techniques — vrai des cinq
 habitants d'endurance.

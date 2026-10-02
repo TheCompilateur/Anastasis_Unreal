@@ -59,6 +59,19 @@ namespace AnastasisRhythm
 		return TEXT("night");
 	}
 
+	double PhaseWorkFactor(EPhase Phase, const FString& JobId, const FString& LifestyleId)
+	{
+		if (JobId == TEXT("guard") && Phase == EPhase::Night) return 1.15;
+		if (JobId == TEXT("innkeeper") && (Phase == EPhase::Evening || Phase == EPhase::Night)) return 0.85;
+		if (LifestyleId == TEXT("workhorse") && (Phase == EPhase::Midday || Phase == EPhase::Evening))
+		{
+			return FMath::Min(1.0, PhaseWork(Phase) + 0.18);
+		}
+		if (LifestyleId == TEXT("nightOwl") && Phase == EPhase::Morning) return PhaseWork(Phase) * 0.7;
+		if (LifestyleId == TEXT("earlyBird") && Phase == EPhase::Evening) return PhaseWork(Phase) * 0.75;
+		return PhaseWork(Phase);
+	}
+
 	double PhaseWork(EPhase Phase)
 	{
 		switch (Phase)

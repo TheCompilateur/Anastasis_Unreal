@@ -2,6 +2,7 @@
 
 #include "Life/AnastasisNeeds.h"
 #include "Life/AnastasisVillageRhythm.h"
+#include "Life/AnastasisReconsider.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -86,7 +87,30 @@ bool FAnastasisParityRhythmTest::RunTest(const FString&)
 		}
 	}
 
-	const int32 Total = UE_ARRAY_COUNT(VillagePhaseVectors) + UE_ARRAY_COUNT(PhaseBiasVectors) + UE_ARRAY_COUNT(SleepQualityVectors);
+	for (int32 I = 0; I < UE_ARRAY_COUNT(PhaseWorkFactorVectors); ++I)
+	{
+		const FPhaseWorkFactorVector& V = PhaseWorkFactorVectors[I];
+		const FString Job = UTF8_TO_TCHAR(V.A1);
+		const FString Id = UTF8_TO_TCHAR(V.A2);
+		TOptional<AnastasisLifestyle::FLifestyle> Lifestyle;
+		if (!Id.IsEmpty())
+		{
+			AnastasisLifestyle::FLifestyle L;
+			L.Id = Id;
+			Lifestyle = L;
+		}
+		const AnastasisRhythm::EPhase Personal = AnastasisReconsider::PersonalPhase(RhythmFromBits(V.A0Bits), Lifestyle);
+		const double Got = AnastasisRhythm::PhaseWorkFactor(Personal, Job, Id);
+		if (RhythmToBits(Got) != V.AttenduBits)
+		{
+			++Failures;
+			AddError(FString::Printf(TEXT("PhaseWorkFactor[%d] %s %s frac=%.17g : %.17g attendu %.17g"),
+				I, *Job, *Id, RhythmFromBits(V.A0Bits), Got, RhythmFromBits(V.AttenduBits)));
+		}
+	}
+
+	const int32 Total = UE_ARRAY_COUNT(VillagePhaseVectors) + UE_ARRAY_COUNT(PhaseBiasVectors) + UE_ARRAY_COUNT(SleepQualityVectors)
+		+ UE_ARRAY_COUNT(PhaseWorkFactorVectors);
 	AddInfo(FString::Printf(TEXT("Rythme + foyer : %d vecteurs, %d ecarts"), Total, Failures));
 	return Failures == 0;
 }

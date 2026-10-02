@@ -37,6 +37,13 @@ namespace AnastasisRhythm
 	/** `PHASES[id].work` — facteur de travail de la phase. */
 	ANASTASISSIM_API double PhaseWork(EPhase Phase);
 
+	/**
+	 * `phaseWorkFactor(sim, npc)` a phase PERSONNELLE donnee (`villagePhaseFor`) : garde la nuit 1,15,
+	 * aubergiste le soir et la nuit 0,85, puis les modes de vie (bourreau de travail, noctambule, matinal).
+	 * Identifiants vides = absents.
+	 */
+	ANASTASISSIM_API double PhaseWorkFactor(EPhase PersonalPhase, const FString& JobId, const FString& LifestyleId);
+
 	/** `dayFracOf(sim)` = `(time % DAY_LENGTH) / DAY_LENGTH`. */
 	ANASTASISSIM_API double DayFracOf(double Time);
 

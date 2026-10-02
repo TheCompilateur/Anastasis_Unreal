@@ -51,5 +51,19 @@ export default {
         but,
       ),
     },
+
+    {
+      name: "PhaseWorkFactor",
+      comment: "phaseWorkFactor(sim, npc) : phase personnelle (mode de vie), garde la nuit, aubergiste le soir, modes de vie",
+      // fraction du jour, metier, mode de vie
+      args: ["double", "string", "string"],
+      ret: "double",
+      inputs: croiser(FRACS, ["", "farmer", "guard", "innkeeper", "settler"],
+        ["", "earlyBird", "nightOwl", "workhorse", "wanderer", "familyFirst", "tavernRegular"]),
+      call: (mod, [f, job, id]) => mod.phaseWorkFactor(
+        { dayFrac: () => f },
+        { jobId: job || undefined, lifestyle: id ? { id } : undefined },
+      ),
+    },
   ],
 };

@@ -735,6 +735,29 @@ namespace AnastasisJsSave
 				return false;
 			}
 			if (!R.OptDouble(A, TEXT("skill"), Where, Out.Skill)) return false;
+			// `npc.gold` et `npc.nature` (lifestyle-decision-001) : lus pour la decision, jamais reecrits.
+			if (const FValue* Gold = A.Find(TEXT("gold")); Gold && Gold->IsNumber()) Out.Gold = Gold->Number;
+			if (const FValue* Nat = A.Find(TEXT("nature")); Nat && Nat->IsObject())
+			{
+				AnastasisNature::FNature Read;
+				auto Num = [Nat](const TCHAR* Key) { const FValue* V = Nat->Find(Key); return (V && V->IsNumber()) ? V->Number : 0.0; };
+				Read.Corps = Num(TEXT("corps"));
+				Read.Esprit = Num(TEXT("esprit"));
+				Read.Coeur = Num(TEXT("coeur"));
+				auto Ids = [Nat](const TCHAR* Key, TArray<FString>& OutIds)
+				{
+					if (const FValue* L = Nat->Find(Key); L && L->IsArray())
+					{
+						for (const FValue& Item : L->Items)
+						{
+							if (Item.IsString()) OutIds.Add(Item.String);
+						}
+					}
+				};
+				Ids(TEXT("qualities"), Read.Qualities);
+				Ids(TEXT("flaws"), Read.Flaws);
+				Out.Nature = Read;
+			}
 			if (const FValue* Skills = A.Find(TEXT("skills")); Skills && Skills->IsObject())
 			{
 				const FString W = Where + TEXT(".skills");
