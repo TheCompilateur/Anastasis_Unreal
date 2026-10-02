@@ -12,6 +12,11 @@
 #   agent-worktree.ps1 status
 #   agent-worktree.ps1 finish     -Mission world-slice-007          (build seul ; -Prove : + suite ici)
 #   agent-worktree.ps1 integrate  -Mission world-slice-007          (mission deja prouvee seulement)
+#
+# RETEST_RULE_001 (2026-10-01) : une preuve se refait quand ce qu'elle juge a change, pas quand main a
+# bouge. Si les arbres Unreal (Source/, Config/, Content/, Plugins/, .uproject) du commit que finish a
+# prouve sont identiques a ceux de l'arbre rebase ou empile, ni build ni suite : RETEST::SKIP, la
+# preuve du commit marque est reprise telle quelle -- ce n'est pas un nouveau PASS. Sinon, portail complet.
 #   agent-worktree.ps1 integrate-batch -Missions mission-a,mission-b   (la voie normale : verrou de main,
 #                                       un build, une suite, toutes les preuves PIE dans un editeur)
 #
@@ -152,9 +157,41 @@ function Invoke-Git {
   return [PSCustomObject]@{ Code = $LASTEXITCODE; Out = $out }
 }
 
-# Fichiers Unreal touches par une plage de commits (`base..tete`) d'un depot.
+# Fichiers Unreal qui different entre deux arbres (`a..b` : arbre de a contre arbre de b). Sans
+# detection de renommage : un Source/x deplace vers docs/x ne montrait que docs/x.
 function Unreal-Changes([string]$repo, [string]$range) {
-  return @((Invoke-Git -C $repo diff --name-only $range).Out | Where-Object { $_ -and (Test-UnrealPath $_) })
+  return @((Invoke-Git -C $repo diff --no-renames --name-only $range).Out | Where-Object { $_ -and (Test-UnrealPath $_) })
+}
+
+# RETEST_RULE_001. Le commit $proved (marque par finish) et $rev ont-ils les memes arbres Unreal ?
+# Faux si $proved n'existe plus dans le depot (rebase puis gc) : on ne reprend pas une preuve
+# qu'on ne peut plus comparer.
+function Test-SameUnrealTrees([string]$repo, [string]$proved, [string]$rev) {
+  if (-not $proved) { return $false }
+  if ((Invoke-Git -C $repo cat-file -e "$($proved)^{commit}").Code -ne 0) { return $false }
+  return (@(Unreal-Changes $repo "$proved..$rev").Count -eq 0)
+}
+function Write-RetestSkip([string]$proved, [string]$mode, [string]$who) {
+  Write-Output "RETEST::SKIP (arbres Unreal identiques a $($proved.Substring(0, 7))$who)"
+  Write-Output "BUILD::SKIP  TESTS::SKIP  -- preuve reprise du commit $($proved.Substring(0, 7)) ($mode), rien n a ete rejoue : ce n est pas un nouveau PASS"
+}
+
+# Le worktree d'integration persistant, remis sur main (integrate-batch, et integrate quand il
+# faut rebaser). Ses Binaries/ et Intermediate/ (ignores) survivent : build incremental.
+# Appele sous le verrou de main seulement : un seul utilisateur a la fois.
+function Reset-IntegrationTree([string]$integ, [string]$ib) {
+  if (-not (Test-Path -LiteralPath $integ)) {
+    $w = Invoke-Git -C $Canonical worktree add -B $ib $integ main
+    if ($w.Code -ne 0) { $w.Out | ForEach-Object { Write-Output ('    ' + $_) }; Fail 'FAIL: worktree d integration' }
+    return
+  }
+  $o = @(Find-WorktreeEditor $integ)
+  if ($o.Count -gt 0) { Fail "FAIL: editeur ouvert sur $integ" }
+  $null = Invoke-Git -C $integ cherry-pick --abort
+  $c = Invoke-Git -C $integ checkout -q -f -B $ib main
+  if ($c.Code -ne 0) { $c.Out | ForEach-Object { Write-Output ('    ' + $_) }; Fail 'FAIL: remise a zero du worktree d integration' }
+  # Sans -x : Binaries/ et Intermediate/ (ignores) restent, le build reste incremental.
+  $null = Invoke-Git -C $integ clean -fdq
 }
 
 # Le build et la suite d'un arbre, ou rien s'il n'y a pas de changement Unreal.
@@ -430,7 +467,23 @@ switch ($Command) {
     # Build seulement si la branche change quelque chose qu'il juge ; la suite, seulement avec
     # -Prove ou -Full (EDITOR_QUEUE_001 : sinon elle attend le lot, un editeur pour tous).
     $mb = (Invoke-Git -C $path merge-base main HEAD).Out[0]
-    Invoke-UnrealGate $path @(Unreal-Changes $path "$mb..HEAD") ([bool]($Prove -or $Full))
+    $unreal = @(Unreal-Changes $path "$mb..HEAD")
+    # RETEST_RULE_001 : finish apres un rebase. Le commit marque a deja passe ce portail ; si
+    # ses arbres Unreal sont ceux de HEAD, le rejouer ne jugerait rien de nouveau. Le mode
+    # prouve est conserve : un `queued` reste `queued` (la suite attend toujours le lot), et
+    # -Prove n'est satisfait que par un `proved`. -Full force le portail.
+    $head = (Invoke-Git -C $path rev-parse HEAD).Out[0]
+    $prev = Read-HandoffMarker $Mission
+    $reuse = $unreal.Count -gt 0 -and -not $Full -and $prev -and $prev.Sha -ne $head -and
+      ($prev.Mode -eq 'proved' -or ($prev.Mode -eq 'queued' -and -not $Prove)) -and
+      (Test-SameUnrealTrees $path $prev.Sha $head)
+    if ($reuse) {
+      Write-RetestSkip $prev.Sha $prev.Mode ''
+      $script:GateOk = $true
+      $script:GateMode = $prev.Mode
+    } else {
+      Invoke-UnrealGate $path $unreal ([bool]($Prove -or $Full))
+    }
     if (-not $script:GateOk) { exit 1 }
     $dirty = @(& git -C $path status --porcelain --untracked-files=all)
     Write-Output ''
@@ -441,7 +494,7 @@ switch ($Command) {
       Write-Output 'Un commit est l unite de passation : commit tout avant de passer la main.'
       exit 1
     }
-    Write-HandoffMarker $Mission (Invoke-Git -C $path rev-parse HEAD).Out[0] $script:GateMode
+    Write-HandoffMarker $Mission $head $script:GateMode
     Write-Output "HANDOFF_READY::YES ($($script:GateMode))"
     if ($script:GateMode -eq 'queued') {
       Write-Output 'Passation : la mission attend le prochain lot. L integrateur la verse avec les autres :'
@@ -480,10 +533,46 @@ switch ($Command) {
       Fail "FAIL: $Mission attend le lot (TESTS::QUEUED) : tools\unreal\agent-worktree.ps1 integrate-batch -Missions $Mission"
     }
     Enter-MainLock "integrate:$Mission"
+    $target = $branch
     if ((Invoke-Git -C $Canonical merge-base --is-ancestor main $branch).Code -ne 0) {
-      Write-Output 'FAIL: pas d avance rapide possible (main a avance). Dans le worktree :'
-      Write-Output "    git rebase main ; tools\unreal\agent-worktree.ps1 finish -Mission $Mission"
-      exit 1
+      # RETEST_RULE_001 : main a avance. Plutot que renvoyer l'agent rebaser et se reprouver, la
+      # branche est rejouee sur main dans le worktree d'integration ; si le resultat ne demande
+      # rien de neuf au build ni a la suite, elle est versee telle quelle. Il faut une preuve
+      # de finish sur le commit actuel de la branche.
+      if (-not $marker -or $marker.Sha -ne $tipNow -or $Full) {
+        Write-Output 'FAIL: pas d avance rapide possible (main a avance). Dans le worktree :'
+        Write-Output "    git rebase main ; tools\unreal\agent-worktree.ps1 finish -Mission $Mission"
+        exit 1
+      }
+      Write-Output 'NOTE: main a avance : la branche est rejouee sur main (worktree d integration)'
+      $integ = Join-Path $WorktreeRoot '_integration'
+      Reset-IntegrationTree $integ 'integration/batch'
+      $integBase = (Invoke-Git -C $integ rev-parse HEAD).Out[0]
+      $commits = @((Invoke-Git -C $integ cherry HEAD $branch).Out | Where-Object { $_ -like '+ *' } | ForEach-Object { $_.Substring(2).Trim() })
+      if ($commits.Count -eq 0) { Write-Output "NOTHING_TO_INTEGRATE::$branch deja dans main (par contenu)"; exit 0 }
+      $p = Invoke-Git -C $integ cherry-pick @commits
+      if ($p.Code -ne 0) {
+        $null = Invoke-Git -C $integ cherry-pick --abort
+        $null = Invoke-Git -C $integ reset -q --hard main
+        Write-Output 'FAIL: conflit avec main. Dans le worktree :'
+        Write-Output "    git rebase main ; tools\unreal\agent-worktree.ps1 finish -Mission $Mission"
+        exit 1
+      }
+      $target = (Invoke-Git -C $integ rev-parse HEAD).Out[0]
+      $unreal = @(Unreal-Changes $integ "$integBase..$target")
+      if ($unreal.Count -eq 0) {
+        Write-Output 'UNREAL_CHANGE::NON (ni Source/, ni Config/, ni Content/, ni Plugins/, ni .uproject)'
+        Write-Output 'BUILD::SKIP  TESTS::SKIP  -- rien a montrer au build ni a la suite'
+      } elseif ($marker.Mode -eq 'proved' -and (Test-SameUnrealTrees $integ $marker.Sha $target)) {
+        Write-RetestSkip $marker.Sha $marker.Mode ''
+      } else {
+        $diff = @(Unreal-Changes $integ "$($marker.Sha)..$target")
+        $why = if ($marker.Mode -ne 'proved') { "preuve $($marker.Mode)" } else { "$($diff.Count) fichier(s) Unreal differents de $($marker.Sha.Substring(0, 7)), par ex. $($diff[0])" }
+        Write-Output "RETEST::REQUIS ($why) : main a change ce que la preuve jugeait. Dans le worktree :"
+        Write-Output "    git rebase main ; tools\unreal\agent-worktree.ps1 finish -Mission $Mission ; puis integrate-batch"
+        exit 1
+      }
+      $ahead = $commits.Count
     }
 
     # 2. Les controles de finish, rejoues sur l'arbre qui va devenir main. Avance rapide :
@@ -494,7 +583,7 @@ switch ($Command) {
     try {
       $tar = Join-Path $tree 'tree.tar'
       # Fichier, pas un pipe : PowerShell 5.1 corrompt un flux binaire entre deux exe natifs.
-      $a = Invoke-Git -C $Canonical archive --format=tar -o $tar $branch AGENTS.md tools/unreal
+      $a = Invoke-Git -C $Canonical archive --format=tar -o $tar $target AGENTS.md tools/unreal
       if ($a.Code -ne 0) { Fail ("FAIL: git archive`n" + ($a.Out -join "`n")) }
       & tar.exe -xf $tar -C $tree
       if ($LASTEXITCODE -ne 0) { Fail 'FAIL: extraction de l arbre a integrer' }
@@ -515,11 +604,11 @@ switch ($Command) {
     Write-Output 'CHECKS::PASS index tools/unreal, lancements Unreal'
 
     # 3. Deplacer main.
-    Move-Main $branch
+    Move-Main $target
     if (-not $script:MoveOk) { exit 1 }
     $mainAfter = (Invoke-Git -C $Canonical rev-parse main).Out[0]
     Write-Output "MAIN_AFTER::$mainAfter"
-    Write-Output "INTEGRATED::$branch ($ahead commit(s))"
+    Write-Output "INTEGRATED::$branch ($ahead commit(s)$(if ($target -ne $branch) { ', rejoues sur main' }))"
     Write-Output 'Ensuite : git push origin main (le pre-push compile le canonique), puis'
     Write-Output "          tools\unreal\agent-worktree.ps1 prune -Mission $Mission"
   }
@@ -568,20 +657,7 @@ switch ($Command) {
     #    le build y est incremental d'un lot a l'autre).
     $integ = Join-Path $WorktreeRoot '_integration'
     $ib = 'integration/batch'
-    if ($ready.Count -gt 0) {
-      if (-not (Test-Path -LiteralPath $integ)) {
-        $w = Invoke-Git -C $Canonical worktree add -B $ib $integ main
-        if ($w.Code -ne 0) { $w.Out | ForEach-Object { Write-Output ('    ' + $_) }; Fail 'FAIL: worktree d integration' }
-      } else {
-        $o = @(Find-WorktreeEditor $integ)
-        if ($o.Count -gt 0) { Fail "FAIL: editeur ouvert sur $integ" }
-        $null = Invoke-Git -C $integ cherry-pick --abort
-        $c = Invoke-Git -C $integ checkout -q -f -B $ib main
-        if ($c.Code -ne 0) { $c.Out | ForEach-Object { Write-Output ('    ' + $_) }; Fail 'FAIL: remise a zero du worktree d integration' }
-        # Sans -x : Binaries/ et Intermediate/ (ignores) restent, le build reste incremental.
-        $null = Invoke-Git -C $integ clean -fdq
-      }
-    }
+    if ($ready.Count -gt 0) { Reset-IntegrationTree $integ $ib }
     $applied = @()
     foreach ($m in $ready) {
       $b = Branch-Of $m
@@ -620,11 +696,6 @@ switch ($Command) {
     Write-Output 'CHECKS::PASS index tools/unreal, lancements Unreal'
     # Le lot sert tous les agents : ses editeurs passent en tete de la file de la porte memoire.
     $env:ANASTASIS_EDITOR_PRIORITY = '0'
-    Invoke-UnrealGate $integ @(Unreal-Changes $integ "$mainBefore..HEAD")
-    if (-not $script:GateOk) { Write-Output 'BATCH::FAIL rien n a bouge (main intact)'; exit 1 }
-
-    # 3b. Les preuves PIE declarees par les missions du lot, toutes dans UN editeur
-    #     (EDITOR_QUEUE_001). Une preuve en echec designe sa mission.
     $owner = @{}
     foreach ($a in $applied) {
       foreach ($pr in (Get-DeclaredProofs $Canonical (Branch-Of $a.Mission) $a.Mission)) {
@@ -632,7 +703,38 @@ switch ($Command) {
         $owner[$pr] += $a.Mission
       }
     }
+    $top = (Invoke-Git -C $integ rev-parse HEAD).Out[0]
+    $unreal = @(Unreal-Changes $integ "$mainBefore..$top")
+    # RETEST_RULE_001 : une mission du lot dont `finish -Prove` a juge exactement ces arbres
+    # Unreal (typiquement une mission seule, rejouee sur un main qui n'a bouge qu'en docs) : la
+    # suite ne jugerait rien de neuf. Seul `proved` compte : `queued` n'a pas vu la suite.
+    $reusedFrom = $null
+    if ($unreal.Count -gt 0 -and -not $Full) {
+      foreach ($a in $applied) {
+        $mk = Read-HandoffMarker $a.Mission
+        if ($mk -and $mk.Mode -eq 'proved' -and (Test-SameUnrealTrees $integ $mk.Sha $top)) { $reusedFrom = [PSCustomObject]@{ Mission = $a.Mission; Sha = $mk.Sha }; break }
+      }
+    }
+    $built = $false
+    if ($reusedFrom) {
+      Write-Output "UNREAL_CHANGE::OUI ($($unreal.Count) fichier(s), par ex. $($unreal[0]))"
+      Write-RetestSkip $reusedFrom.Sha 'proved' ", finish -Prove de $($reusedFrom.Mission)"
+    } else {
+      Invoke-UnrealGate $integ $unreal
+      if (-not $script:GateOk) { Write-Output 'BATCH::FAIL rien n a bouge (main intact)'; exit 1 }
+      $built = $script:GateMode -ne 'nounreal'
+    }
+
+    # 3b. Les preuves PIE declarees par les missions du lot, toutes dans UN editeur
+    #     (EDITOR_QUEUE_001). Une preuve en echec designe sa mission.
     if ($owner.Count -gt 0) {
+      # Les preuves tournent sur les binaires du worktree d'integration : sans build dans CE lot
+      # (RETEST::SKIP ou lot sans changement Unreal), ils peuvent dater d'un lot precedent.
+      if (-not $built) {
+        Write-Output 'BUILD::RUN pour les preuves PIE : binaires du worktree d integration a jour (incremental)'
+        & (Join-Path $integ 'tools\unreal\anastasis-unreal.ps1') build
+        if ($LASTEXITCODE -ne 0) { Write-Output 'BATCH::FAIL build avant les preuves PIE, rien n a bouge (main intact)'; exit 1 }
+      }
       $known = @(Get-RegisteredProofs $integ)
       $missing = @($owner.Keys | Where-Object { $known -notcontains $_ })
       if ($missing.Count -gt 0) { Write-Output ('BATCH::FAIL preuve(s) absente(s) du registre du lot : ' + ($missing -join ', ')); exit 1 }
@@ -656,7 +758,6 @@ switch ($Command) {
       Write-Output "FAIL: main a bouge pendant le lot ($($mainBefore.Substring(0, 7)) -> $($mainNow.Substring(0, 7))) : relancer integrate-batch"
       exit 1
     }
-    $top = (Invoke-Git -C $integ rev-parse HEAD).Out[0]
     Move-Main $top
     if (-not $script:MoveOk) { exit 1 }
     $mainAfter = (Invoke-Git -C $Canonical rev-parse main).Out[0]

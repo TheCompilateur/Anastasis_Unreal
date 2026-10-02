@@ -55,7 +55,7 @@ Cycle de vie, un outil unique : `tools\unreal\agent-worktree.ps1`
 | `status` | tous les worktrees : modifications, avance/retard sur `main`, branches non intégrées, **verrou de `main`**, **missions prêtes pour le lot** et la commande `integrate-batch` à lancer |
 | `finish -Mission <m>` | portail de fin : index `tools/unreal/` à jour, aucun Unreal lancé hors `Start-AnastasisEditor`, aucun éditeur encore ouvert sur le worktree, preuves déclarées (`PROOFS:` de la fiche) présentes au registre, **build seul** si la branche touche `Source/`, `Config/`, `Content/`, `Plugins/` ou le `.uproject` — **pas d'éditeur : la suite et les preuves PIE attendent le lot** (`TESTS::QUEUED`) ; `-Prove` lance la suite ici (ancien finish), `-Full` force build + suite même sans changement Unreal ; refuse de passer la main si du travail n'est pas commité ; marque le commit (`ANASTASIS_WORKTREES\.handoff\<m>.txt` : `<sha> proved|queued|nounreal`) |
 | `mcp -Mission <m>` | (ré)enregistre le port MCP d'un worktree existant côté Claude Code |
-| `integrate -Mission <m>` | rôle intégrateur, **une mission déjà prouvée** (`proved` / `nounreal`) : prend le verrou de `main`, avance rapide de **`main`** (jamais de la branche extraite du canonique), après avoir rejoué index et lancements Unreal sur l'arbre versé ; canonique hors `main` → copie de travail intacte. Refuse une mission `queued` (elle passe par le lot) et refuse pendant un lot (`MAIN_LOCK::TENU`) |
+| `integrate -Mission <m>` | rôle intégrateur, **une mission déjà prouvée** (`proved` / `nounreal`) : prend le verrou de `main`, avance rapide de **`main`** (jamais de la branche extraite du canonique), après avoir rejoué index et lancements Unreal sur l'arbre versé ; canonique hors `main` → copie de travail intacte. Refuse une mission `queued` (elle passe par le lot) et refuse pendant un lot (`MAIN_LOCK::TENU`). Si `main` a avancé : rejoue la branche sur `main` et la verse si la règle de retest le permet (point 6 ci-dessous), sinon `RETEST::REQUIS` |
 | `integrate-batch -Missions a,b,c` | rôle intégrateur, **file groupée — la voie normale** : prend le verrou de `main` (personne ne la déplace pendant le lot), admet les missions dont `finish` a passé sur le commit actuel, les empile sur `main` dans le worktree d'intégration persistant `ANASTASIS_WORKTREES\_integration` (une mission en conflit est écartée, les autres passent), **un seul** portail (index, lancements, build + suite si le lot touche Unreal), puis **toutes les preuves PIE déclarées par le lot dans un seul éditeur** (`editor-batch.ps1` ; une preuve en échec désigne sa mission, `main` intact), puis avance rapide de `main` |
 | `prune -Mission <m>` | après versement : worktree, branche et enregistrement MCP local supprimés ; refuse si un commit manque à `main` (par contenu : une copie versée par lot compte) ou si le worktree n'est pas propre |
 | `preflight` | avant un `verify`/seal : dit ce qui bloque et **ouvre une fenêtre** d'observation |
@@ -85,6 +85,13 @@ avançait `main` pendant ces 25 min. Désormais :
    jamais contourner par un `git merge` / `git fetch . x:main` à la main.
 5. **Regarder dans l'éditeur** (MCP, capture, réglage à l'œil) reste permis, un à la fois : `anastasis-unreal.ps1 editor`,
    puis fermer. Pas pendant qu'un lot tourne (`status` → `MAIN_LOCK`).
+6. **Règle de retest (RETEST_RULE_001, adoptée par Alexandre le 2026-10-01)** : si les arbres git de `Source/`,
+   `Config/`, `Content/`, `Plugins/` et du `.uproject` du commit marqué par `finish` sont identiques à ceux de
+   l'arbre rebasé (`finish` après `git rebase main`) ou empilé (`integrate`, `integrate-batch`), ni build ni suite :
+   `RETEST::SKIP (arbres Unreal identiques à <sha>)`, la preuve du commit marqué est **reprise**, ce n'est pas un
+   nouveau PASS. Un seul fichier Unreal différent : portail complet (`RETEST::REQUIS` dans `integrate`). Seule
+   une preuve `proved` couvre la suite ; `queued` ne couvre que le build. `integrate` rejoue désormais sur `main`
+   une branche qui n'est plus en avance rapide, au lieu de la refuser, quand la règle le permet ; `-Full` la désactive.
 6. **`finish -Prove`** (suite dans ton propre éditeur) est l'exception : quand Alexandre attend un verdict
    tout de suite, ou pour une mission que le lot ne peut pas juger.
 
@@ -298,7 +305,7 @@ Opérateur et portails :
 |---|---|
 | `anastasis-unreal.ps1` | `status` / `build` / `build-game` / `verify` / `health` / `editor` |
 | `agent-worktree.ps1` | cycle de vie multi-agent : `create` / `status` / `finish` / `integrate` / `integrate-batch` / `prune` / `preflight` / `postflight` / `mcp` |
-| `test-agent-worktree.ps1` | banc d'essai de `finish` (saut sans changement Unreal, preuves déclarées), `integrate`, `integrate-batch`, verrou de `main` et `prune` sur un dépôt jetable ; à relancer après toute modification de `agent-worktree.ps1` |
+| `test-agent-worktree.ps1` | banc d'essai de `finish` (saut sans changement Unreal, preuves déclarées), `integrate`, `integrate-batch`, verrou de `main`, règle de retest (arbres identiques / un `Source/` changé) et `prune` sur un dépôt jetable ; à relancer après toute modification de `agent-worktree.ps1` |
 | `mcp-port.ps1` | port MCP d'une racine, à dot-sourcer |
 | `tools-index.ps1` | contrôle cet index contre le dossier, à dot-sourcer : `finish` bloque, `health` passe YELLOW |
 | `editor-launch.ps1` | `Start-AnastasisEditor` : lancement d'Unreal sans focus, avec gardien, derrière la porte mémoire, à dot-sourcer |

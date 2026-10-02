@@ -221,4 +221,47 @@ $got = Invoke-AnastasisEditorGated -Launch { 'lance' } -MaxEditors 99 -MinRamGB 
 Check 'S19 file : ticket d un lanceur mort ignore et retire, pas de ticket laisse' ($got -eq 'lance' -and -not (Test-Path $dead) -and -not @(Get-ChildItem $env:ANASTASIS_EDITOR_QUEUE_DIR -Filter '*.ticket').Count) $got
 Remove-Item Env:ANASTASIS_EDITOR_QUEUE_DIR
 
+# --- RETEST_RULE_001 ----------------------------------------------------------------------
+# Le build echoue toujours sur ce depot sans moteur : un portail rejoue se voit (UNREAL_CHANGE::OUI,
+# pas de HANDOFF_READY). Les preuves `proved` sont posees a la main, comme en S15.
+G checkout -q -f main | Out-Null; G clean -fdq | Out-Null
+function Prove($m) { Set-Content (Join-Path $wtRoot ".handoff\$m.txt") ((G rev-parse "agent/$m") + ' proved') }
+function SourceFile($name) { return { param($w) New-Item -ItemType Directory -Force "$w\Source" | Out-Null; Set-Content "$w\Source\$name.cpp" "// $name" }.GetNewClosure() }
+function AdvanceMain($name, [scriptblock]$change) { NewBranch $name $change; $null = AW integrate -Mission $name }
+
+# 20. Arbres Unreal identiques : main n'a bouge qu'en docs depuis la preuve.
+$wr1 = NewMission 'r1' @((SourceFile 'r1'))
+$null = NewMission 'r2' @((SourceFile 'r2'))
+Prove 'r1'; Prove 'r2'
+AdvanceMain 'd20' { param($w) Set-Content "$w\doc-d20.md" 'd20' }
+$old1 = (G rev-parse agent/r1)
+& git -C $wr1 rebase -q main 2>&1 | Out-Null
+$new1 = (G rev-parse agent/r1)
+$r = AW finish -Mission r1
+Check 'S20 finish apres rebase, arbres identiques : RETEST::SKIP, ni build ni suite' ($r.Code -eq 0 -and $new1 -ne $old1 -and $r.Out -match "RETEST::SKIP \(arbres Unreal identiques a $($old1.Substring(0, 7))\)" -and $r.Out -notmatch 'UNREAL_CHANGE::OUI|BUILD::PASS' -and $r.Out -match 'HANDOFF_READY::YES \(proved\)') $r.Out
+Check 'S20 marqueur reporte sur le commit rebase, mode conserve' ((Get-Content (Join-Path $wtRoot '.handoff\r1.txt') -Raw).Trim() -eq "$new1 proved")
+$mainAvant = (G rev-parse main)
+$r = AW integrate -Mission r2
+Check 'S20 integrate sans avance rapide, arbres identiques : rejouee sur main et versee' ($r.Code -eq 0 -and $r.Out -match 'RETEST::SKIP' -and $r.Out -notmatch 'UNREAL_CHANGE::OUI' -and (G rev-parse main) -ne $mainAvant -and (G show 'main:Source/r2.cpp') -eq '// r2' -and (G show 'main:doc-d20.md') -eq 'd20') $r.Out
+$null = NewMission 'r3' @((SourceFile 'r3'))
+Prove 'r3'
+AdvanceMain 'd21' { param($w) Set-Content "$w\doc-d21.md" 'd21' }
+$r = AW integrate-batch -Missions 'r3'
+Check 'S20 lot, arbres identiques : RETEST::SKIP, verse sans portail' ($r.Code -eq 0 -and $r.Out -match 'RETEST::SKIP \(arbres Unreal identiques a \w{7}, finish -Prove de r3\)' -and $r.Out -notmatch 'BUILD::PASS|TESTS::(PASS|QUEUED)' -and $r.Out -match 'BATCH_INTEGRATED::r3' -and (G show 'main:Source/r3.cpp') -eq '// r3') $r.Out
+
+# 21. Un seul fichier Source/ change sur main depuis la preuve : portail complet, jamais de reprise.
+#     r1 a ete prouvee avant que r2 et r3 n'arrivent dans main.
+$mainAvant = (G rev-parse main)
+$r = AW integrate -Mission r1
+Check 'S21 integrate, Source/ change depuis la preuve : RETEST::REQUIS, main intacte' ($r.Code -ne 0 -and $r.Out -match 'RETEST::REQUIS \(\d+ fichier\(s\) Unreal differents' -and $r.Out -notmatch 'RETEST::SKIP' -and (G rev-parse main) -eq $mainAvant) $r.Out
+$null = NewMission 'r4' @((SourceFile 'r4'))
+Prove 'r4'
+AdvanceMain 'd22' (SourceFile 'main22')
+$mainAvant = (G rev-parse main)
+$r = AW integrate-batch -Missions 'r4'
+Check 'S21 lot, Source/ change depuis la preuve : portail rejoue (build tente), main intacte' ($r.Code -ne 0 -and $r.Out -match 'UNREAL_CHANGE::OUI' -and $r.Out -notmatch 'RETEST::SKIP' -and (G rev-parse main) -eq $mainAvant) $r.Out
+& git -C $wr1 rebase -q main 2>&1 | Out-Null
+$r = AW finish -Mission r1
+Check 'S21 finish apres rebase, Source/ change : build tente, pas de HANDOFF_READY' ($r.Code -ne 0 -and $r.Out -match 'UNREAL_CHANGE::OUI' -and $r.Out -notmatch 'RETEST::SKIP|HANDOFF_READY::YES' -and (Get-Content (Join-Path $wtRoot '.handoff\r1.txt') -Raw).Trim() -eq "$new1 proved") $r.Out
+
 Remove-Item $base -Recurse -Force -ErrorAction SilentlyContinue
