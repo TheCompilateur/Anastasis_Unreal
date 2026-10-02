@@ -1254,6 +1254,11 @@ namespace AnastasisVillage
 		static bool BodyOverrides(const FNpc& Npc);
 		/** EXTENSION : `Goal` soigne-t-il le besoin qui parle (boire / soif, manger / faim, dormir / fatigue) ? */
 		static bool IsRemedyFor(const FNpc& Npc, const FString& Goal);
+		/**
+		 * Le but est-il vraiment dans la table du joueur : porte pour lui, et calcule (pas un plancher) --
+		 * `build` sans chantier ouvert n'y est pas.
+		 */
+		bool IsPlayerTableGoal(const FNpc& Npc, const FString& Goal) const;
 		/** L'humain attend : `idle`, sans cible, sans travail, sans repas reserve. */
 		void CommitPlayerIdle(FNpc& Npc);
 		/** Direction, intention, refus et options oublies (incarnation, liberation, retrait). */

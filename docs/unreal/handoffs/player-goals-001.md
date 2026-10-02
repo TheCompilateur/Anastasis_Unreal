@@ -72,3 +72,15 @@ ligne BUTS ; 0 retire l'intention.
 - ouvert : n° 22 — Présence, oisiveté et réputation du joueur (EXTENSION, A_TRANCHER ; entré avec player-minimal-001 sans fiche, numéroté ici)
 - ouvert : n° 23 — Réputation : seul le mérite des bâtiments est porté (REDUIT, A_TRANCHER)
 - cités, inchangés : n° 1 (but non porté dans la table du joueur), n° 2 (collant non porté, ligne retouchée)
+
+## REPRISE APRÈS LE LOT 5 (refusé)
+
+- Lot 5 (intégrateur) : `Anastasis.Sim.Joueur.Choix.Refus` FAIL — `build` sans chantier n'était pas refusé et
+  l'habitant tombait en `observer`. Cause : `IsPortedGoalFor` tient `build` pour porté sans condition, et la
+  ligne `build` existe toujours dans la table (plancher 42 sans chantier). Le joueur obtenait `build`, puis
+  `AssignTarget` ne trouvait rien et retombait sur `observer`.
+- Corrigé : `IsPlayerTableGoal` (porté ET calculé : `build` exige un chantier ouvert) pour la décision et les
+  options ; et, filet de sécurité, un but humain sans cible atteignable devient attente + refus `hors-table`,
+  jamais `observer`.
+- Leçon : `finish` sans `-Prove` ne fait tourner AUCUN test ; mes nouveaux tests ont vu le jour dans le lot, et
+  c'est le lot entier qui a échoué. Pour une mission qui ajoute des tests, `finish -Prove` d'abord.

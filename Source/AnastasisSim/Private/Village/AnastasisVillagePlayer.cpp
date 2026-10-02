@@ -169,6 +169,15 @@ namespace AnastasisVillage
 			|| (Goal == GoalRest && Npc.Needs.Energy <= PlayerDecision::EnergyRelease);
 	}
 
+	bool FVillage::IsPlayerTableGoal(const FNpc& Npc, const FString& Goal) const
+	{
+		if (!IsPortedGoalFor(Npc, Goal)) return false;
+		// La ligne `build` existe toujours dans la table, mais sans chantier ouvert ce n'est qu'un plancher
+		// (`UnportedGoalsFloor`) : rien a batir, le but n'est pas reellement dans la table.
+		if (Goal == AnastasisBuild::GoalBuild && ActiveSites().Num() == 0) return false;
+		return true;
+	}
+
 	FString FVillage::CedePlayerGoal(const FString& Reason)
 	{
 		++PlayerChoice.Yields;
@@ -196,7 +205,7 @@ namespace AnastasisVillage
 		//    « le joueur doit choisir le remede » : le remede du besoin qui parle passe.
 		if (BodyOverrides(Npc) && !IsRemedyFor(Npc, Wanted)) return CedePlayerGoal(PlayerDecision::RefusalBody);
 		// 2. SYM-1 : la table fait foi. Un but absent de la table, ou que ce portage ne sait pas executer (ecart n°1), est impossible maintenant.
-		const bool bInTable = IsPortedGoalFor(Npc, Wanted)
+		const bool bInTable = IsPlayerTableGoal(Npc, Wanted)
 			&& Rows.ContainsByPredicate([&](const TPair<FString, double>& Row) { return Row.Key == Wanted; });
 		if (!bInTable) return CedePlayerGoal(PlayerDecision::RefusalNotInTable);
 		// 3. SYM-3 : les verrous ne connaissent pas le joueur.

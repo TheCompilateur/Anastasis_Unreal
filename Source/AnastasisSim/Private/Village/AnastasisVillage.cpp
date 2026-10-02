@@ -1635,7 +1635,7 @@ namespace AnastasisVillage
 			for (const TPair<FString, double>& Row : Rows)
 			{
 				if (PlayerOptions.Num() >= PlayerDecision::OptionsKept) break;
-				if (IsPortedGoalFor(Npc, Row.Key)) PlayerOptions.Add({ Row.Key, Row.Value });
+				if (IsPlayerTableGoal(Npc, Row.Key)) PlayerOptions.Add({ Row.Key, Row.Value });
 			}
 			Next = DecideAsPlayer(Npc, Rows, Next, Next != Gated);
 			if (Next == GoalIdle)
@@ -1649,6 +1649,15 @@ namespace AnastasisVillage
 			Trace.CommitGate = TEXT("player");
 		}
 		CommitGoal(Npc, Next, Trace);
+		// Le but humain passe la table mais ne trouve rien a viser (pas de puits atteignable, pas de
+		// logement) : `AssignTarget` retombe sur `observer`, qui n'est pas un but humain. L'humain attend,
+		// et le refus le dit -- impossible ici et maintenant.
+		if (bPlayer && Npc.Goal == GoalObserver)
+		{
+			CedePlayerGoal(PlayerDecision::RefusalNotInTable);
+			CommitPlayerIdle(Npc);
+			Npc.LastDecision.Winner = GoalIdle;
+		}
 	}
 
 	void FVillage::CommitGoal(FNpc& Npc, const FString& Next, FDecisionTrace& Trace)
