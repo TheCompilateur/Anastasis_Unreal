@@ -19,6 +19,8 @@ river-use-pie | tools/unreal/river-use-pie.py | RIVER_USE PASS | RIVER_USE FAIL|
 # WILDFLOWERS_001 : meme prairie, fleurs sauvages seules en jeu (anastasis.Dressing.Wildflowers 0 / 1), ciel a 11 h.
 # Capture editor (SCN seulement) ; le verdict artistique est dans la passation.
 wildflowers-capture | tools/unreal/ground-cover-capture.py | GROUND_CAPTURE_COMPLETE | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/WildflowersEvidence;ANASTASIS_GROUND_STATES=noflowers,flowers,noflowers2;ANASTASIS_GROUND_VIEWS=prairie_eye,lisiere_eye,riviere_eye,aerien
+# Existing material only. Numeric BumpStrength .16/0/.16; no material regeneration.
+soil-matrix-normal-capture | tools/soil-crusade/capture.py | GROUND_CAPTURE_COMPLETE | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING|Traceback | 600 | ANASTASIS_GROUND_OUT=@Saved/SoilEvidence/matrix-normal-batch;ANASTASIS_GROUND_STATES=soil_before,soil_after,soil_control;ANASTASIS_SOIL_CONTACT=0;ANASTASIS_SOIL_PARAMETER=BumpStrength;ANASTASIS_SOIL_BEFORE=0.16;ANASTASIS_SOIL_AFTER=0;ANASTASIS_SOIL_VIEWS=prairie_ground,rive_ground,prairie_eye
 # Default-off soil pilot: completion is technical, not an artistic verdict.
 
 player-pie | tools/unreal/player-pie.py | PLAYER_PIE PASS | PLAYER_PIE FAIL|PLAYER_PIE_TIMEOUT|PLAYER_PIE CHECK FAIL | 600 | ANASTASIS_PLAYER_PIE_OUT=@Saved/PlayerEvidence/pie

@@ -123,3 +123,8 @@ prairie view, with no green carpet, repeated scan stamp or artificial disk edge.
 REJECT if the ground simply becomes smooth, the old problem shifts into vegetation,
 or the water/soil control changes beyond its baseline variation. Record GPU delta,
 including whether it exceeds0.5ms relative to repeated baseline. No player claim.
+
+The first diagnostic is now registered as soil-matrix-normal-capture for the shared
+editor batch. It uses existing assets only, produces9images, and never calls the
+material generator. SoilMatrixStructure HLSL compilation and artistic verdict remain
+pending even if this diagnostic completes. The default stays0.
