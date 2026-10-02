@@ -37,8 +37,8 @@ BRANCH_HEAD
   `Anastasis.HeroCanopy.Select` controle desormais : deux massifs sur trois (le troisieme sans hauteur
   rendue), le plus dense d'abord, sol = moyenne des troncs (500 cm), sommet <= mediane, base entre sol
   et sommet, rayon < 15 m malgre un tronc a 27 m au coin de la cellule, teinte = secheresse moyenne.
-- Suite `Anastasis` complete : NON lancee (Alexandre a demande ce soir d'arreter les tests ; relaye
-  par la session « Mecanisme d'acceleration temporelle »). Le portail `finish` la lancera.
+- Suite `Anastasis` complete : non lancee par cette mission (Alexandre a demande ce soir d'arreter
+  les tests). Le lot de l'integrateur la rejoue.
 - Enveloppe corrigee (C++) :
   - cellule de massif 30 m, au moins 4 troncs ; rayon = distance mediane des troncs x sqrt(2) + 2,5 m,
     borne 6 a 18 m ;
@@ -48,6 +48,13 @@ BRANCH_HEAD
   - plafond 600, les massifs les plus denses d'abord. Log reel : `stands=616 shells=600 placed_shells=597`.
 - `anastasis.Dressing.CanopyShell` (nouvelle, defaut 0) : l'enveloppe ne se pose plus par defaut. Les
   huit heros restent sous `anastasis.Dressing.HeroCanopy` 1.
+
+## PROOFS
+
+Aucune preuve PIE du registre `tools/unreal/proofs.txt` ne cadre l'enveloppe ; la preuve est
+l'A/B de captures ci-dessous, faite avant rebase sur `5fa5853`.
+
+PROOFS: (aucune)
 
 ## SCN
 
