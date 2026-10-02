@@ -382,7 +382,7 @@ bool FAnastasisEcotoneTreeIdentity::RunTest(const FString&)
 		In.Canopy.Add(FVector(X*2200.0, Y*2200.0, 450.0)); // Non-tree exclusions only.
 	FSettings Legacy, Typed;
 	Typed.bTreeCanopyEcotone = true;
-	FPlan Old, NoTrees, Trees, Repeat;
+	AnastasisMicroEcology::FPlan Old, NoTrees, Trees, Repeat;
 	FString Error;
 	TestTrue(TEXT("reference builds"), Build(In, Legacy, Old, Error));
 	TestTrue(TEXT("reference generated forest from untyped obstacles"), Old.Instances.Num() > 0);
