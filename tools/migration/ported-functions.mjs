@@ -85,9 +85,20 @@ export const PORTAGE_DECLARE = [
   // --- Tranches verticales -----------------------------------------------------
   {
     module: "src/life/needs.js", cpp: "Life/AnastasisNeeds (+ Work/AnastasisGather)",
-    source: "puits ; maison ; grenier ; gather-deliver ; social-relax",
-    fonctions: ["urgeScore", "needGoalScores", "tickNeeds", "tickVitality", "satisfyDrink", "satisfyRest", "satisfyEat", "satisfySocial", "satisfyRelax", "workWillFactor"],
+    source: "puits ; maison ; grenier ; gather-deliver ; social-relax ; needs-factors-001",
+    fonctions: ["urgeScore", "needGoalScores", "tickNeeds", "tickVitality", "satisfyDrink", "satisfyRest", "satisfyEat", "satisfySocial", "satisfyRelax", "workWillFactor",
+      "hydrationLossFactor", "metabolicDemandFactor", "fatigueRecoveryFactor", "fatigueAdaptationFactor", "recoveryConditioningFactor", "needsCritical"],
+    alias: { needsCritical: "AreNeedsCritical" },
   },
+  {
+    module: "src/life/genome.js", cpp: "Life/AnastasisGenome", source: "needs-factors-001",
+    fonctions: ["hashString", "deriveGenomeSeed", "createGenome", "mutateAllele", "recombineGenome", "derivePhenotype", "clamp01",
+      "hydrationLossMultiplierFromRetention", "heatDissipationEfficiencyFromRetention", "metabolicDemandMultiplierFromEfficiency",
+      "metabolicPeakRecoveryMultiplierFromEfficiency", "fatigueRecoveryMultiplierFromRecovery", "fatigueRecoveryStrainCostFromRecovery",
+      "ensureGenome", "genomeFingerprint"],
+    alias: { clamp01: "GenomeClamp01" },
+  },
+  { module: "src/life/conditioning.js", cpp: "Life/AnastasisConditioning", source: "needs-factors-001", entier: true },
   {
     module: "src/life/villageRhythm.js", cpp: "Life/AnastasisVillageRhythm, Village/AnastasisVillage",
     source: "maison ; puits ; grenier ; social-relax",

@@ -18,17 +18,17 @@ Unreal, il ne se traduit pas. Ce document dit, fichier par fichier, dans quel se
 
 | | fichiers | lignes | dont code | dont code a porter |
 | --- | ---: | ---: | ---: | ---: |
-| **A porter** | 163 | 51506 | 40256 | 40256 |
-| **Partiellement porte** | 33 | 28161 | 23366 | 17892 |
+| **A porter** | 161 | 51104 | 40035 | 40035 |
+| **Partiellement porte** | 34 | 28454 | 23539 | 17904 |
 | **A generer** (donnees) | 4 | 2101 | 1278 | 0 |
 | **A jeter** | 23 | 4968 | 3847 | 0 |
-| Deja porte | 10 | 2329 | 1675 | 0 |
-| **Total** | 233 | 89065 | 70422 | 58148 |
+| Deja porte | 11 | 2438 | 1723 | 0 |
+| **Total** | 233 | 89065 | 70422 | 57939 |
 
-Sur les 51506 lignes des modules a porter, 5706 sont du commentaire et
-3813 des lignes vides : **40256 lignes de code**. Les 33 modules
-partiellement portes ajoutent **17892 lignes de code** qui restent (sur 23366 ;
-5474 portees, 0 hors perimetre). Total a porter : **58148 lignes de code**.
+Sur les 51104 lignes des modules a porter, 5564 sont du commentaire et
+3774 des lignes vides : **40035 lignes de code**. Les 34 modules
+partiellement portes ajoutent **17904 lignes de code** qui restent (sur 23539 ;
+5635 portees, 0 hors perimetre). Total a porter : **57939 lignes de code**.
 12 modules a porter melangent logique et table de contenu : la table s'extrait, le selecteur se porte.
 
 ## Reste a porter, par vague
@@ -44,9 +44,9 @@ pas l'interet du gameplay. Un module partiellement porte compte pour ce qui lui 
 | 3 — budget et LOD logique | 1 | 0 | 228 |
 | 4 — etat du monde et sauvegarde | 3 | 2 | 701 |
 | 5 — boucle de simulation | 80 | 9 | 33410 |
-| 6 — vie, IA, langue | 101 | 17 | 22483 |
+| 6 — vie, IA, langue | 100 | 18 | 22274 |
 
-Les vagues 5 et 6 ne sont pas des vagues, ce sont des marecages : 181 modules a
+Les vagues 5 et 6 ne sont pas des vagues, ce sont des marecages : 180 modules a
 elles deux. Elles se decoupent en chantiers, et c'est a ce grain qu'un module se confie.
 
 | Vague | Chantier | fichiers | lignes de code a porter | plus gros reste |
@@ -63,7 +63,7 @@ elles deux. Elles se decoupent en chantiers, et c'est a ce grain qu'un module se
 | 5 | transport et logistique | 13 | 3310 | `sim/transport/delivery.js` (770) |
 | 5 | chronique et memoire collective | 11 | 2483 | `sim/villageChronicle.js` (414) |
 | 5 | regne animal | 7 | 1031 | `sim/animaux/updateAnimals.js` (465) |
-| 6 | personne et famille | 33 | 6495 | `life/lifeScenes.js` (818) |
+| 6 | personne et famille | 32 | 6286 | `life/lifeScenes.js` (818) |
 | 6 | cognition | 30 | 5549 | `ai/memory.js` (717, partiel) |
 | 6 | parole et narration | 15 | 4074 | `life/talk.js` (1464, partiel) |
 | 6 | rites et culture | 14 | 4072 | `life/kosmos1204UneBouchePlus.js` (640) |
@@ -90,7 +90,7 @@ reparti entre `porte` et `reste` au prorata du code de fonctions.
 | `sim/transport/stockLedger.js` | Village/AnastasisVillage | 3 / 30 | 0 | 395 | 40 | 0 | **355** | grenier (reserver / rendre / prelever) |
 | `life/domestic.js` | Life/AnastasisNeeds, Village/AnastasisVillage | 9 / 31 | 0 | 361 | 102 | 0 | **259** | maison ; social-relax |
 | `ai/socialMemory.js` | Life/AnastasisBonds | 13 / 23 | 0 | 407 | 230 | 0 | **177** | bonds-rumors |
-| `life/needs.js` | Life/AnastasisNeeds (+ Work/AnastasisGather) | 14 / 29 | 0 | 466 | 295 | 0 | **171** | puits ; maison ; grenier ; gather-deliver ; social-relax |
+| `life/needs.js` | Life/AnastasisNeeds (+ Work/AnastasisGather) | 19 / 29 | 0 | 466 | 314 | 0 | **152** | puits ; maison ; grenier ; gather-deliver ; social-relax ; needs-factors-001 |
 | `life/villageRhythm.js` | Life/AnastasisVillageRhythm, Village/AnastasisVillage | 8 / 20 | 0 | 343 | 230 | 0 | **113** | maison ; puits ; grenier ; social-relax |
 | `life/bonds.js` | Life/AnastasisBonds | 10 / 22 | 0 | 328 | 231 | 0 | **97** | bonds-rumors |
 | `life/moodlets.js` | Life/AnastasisBonds | 4 / 11 | 0 | 220 | 123 | 0 | **97** | bonds-rumors (newFriend) |
@@ -104,6 +104,7 @@ reparti entre `porte` et `reste` au prorata du code de fonctions.
 | `ai/algorithmic/runtime.js` | Village/AnastasisVillage | 4 / 9 | 0 | 224 | 183 | 0 | **41** | grenier |
 | `sim/constructionPieces.js` | Work/AnastasisBuild | 1 / 5 | 0 | 62 | 23 | 0 | **39** | build-001 |
 | `ai/algorithmic/scheduler.js` | Ai/AnastasisNous | 1 / 5 | 0 | 51 | 15 | 0 | **36** | grenier |
+| `life/genome.js` | Life/AnastasisGenome | 15 / 18 | 0 | 173 | 142 | 0 | **31** | needs-factors-001 |
 | `ai/weatherGoalBias.js` | Life/AnastasisWeatherBehavior | 6 / 8 | 0 | 166 | 137 | 0 | **29** | village-weather-001 |
 | `ai/algorithmic/hungerAction.js` | Village/AnastasisVillage | 3 / 5 | 0 | 205 | 180 | 0 | **25** | grenier |
 | `sim/spatialGrid.js` | Core/AnastasisSpatialGrid | 6 / 12 | 0 | 100 | 76 | 0 | **24** | couche 0 |
@@ -170,15 +171,20 @@ reparti entre `porte` et `reste` au prorata du code de fonctions.
 - portees (9) : `distToBuilding`, `nearLivingHome`, `isEnterableHousing`, `domesticTarget`, `findOpenShelter`, `shelterCapacity`, `countShelterOccupants`, `assignSheltersDaily`, `sleepQuality`
 - restent (22 fonctions) : `tryHostGuest` (77), `householdMembersUnderRoof` (33), `reconcileHospitality` (17), `hospitalityState` (14), `ensureHouseTableSlot` (13), `closeHospitalityRelation` (12), `buildingIdHash` (9), `endHospitality` (9), … et 14 autres
 
+**`life/genome.js`** — Life/AnastasisGenome. Reste 31 lignes de code sur 173 (dont 4 des 21 lignes hors fonction, au prorata).
+
+- portees (15) : `hashString`, `deriveGenomeSeed`, `createGenome`, `mutateAllele`, `recombineGenome`, `derivePhenotype`, `clamp01`, `hydrationLossMultiplierFromRetention`, `heatDissipationEfficiencyFromRetention`, `metabolicDemandMultiplierFromEfficiency`, `metabolicPeakRecoveryMultiplierFromEfficiency`, `fatigueRecoveryMultiplierFromRecovery`, `fatigueRecoveryStrainCostFromRecovery`, `ensureGenome`, `genomeFingerprint`
+- restent (3 fonctions) : `serializeGenome` (16), `phenotypeSummary` (7), `deserializeGenome` (4)
+
 **`life/moodlets.js`** — Life/AnastasisBonds. Reste 97 lignes de code sur 220 (dont 44 des 100 lignes hors fonction, au prorata).
 
 - portees (4) : `pruneMoodlets`, `stampMoodlet`, `moodletGoalBias`, `tickMoodlets`
 - restent (7 fonctions) : `primaryMoodlet` (14), `stampMoodletOnActors` (13), `moodletVignetteLine` (8), `ensureMoodlets` (5), `hasMoodlet` (5), `moodletProfile` (4), `moodletLabel` (4)
 
-**`life/needs.js`** — Life/AnastasisNeeds (+ Work/AnastasisGather). Reste 171 lignes de code sur 466 (dont 33 des 89 lignes hors fonction, au prorata).
+**`life/needs.js`** — Life/AnastasisNeeds (+ Work/AnastasisGather). Reste 152 lignes de code sur 466 (dont 29 des 89 lignes hors fonction, au prorata).
 
-- portees (14) : `atDrinkSpot`, `tickNeeds`, `tickVitality`, `urgeScore`, `needGoalScores`, `risingWillTier`, `workWillFactor`, `needsCritical`, `restActivity`, `satisfyDrink`, `satisfyEat`, `satisfyRest`, `satisfySocial`, `satisfyRelax`
-- restent (15 fonctions) : `workNeedFactor` (23), `ensureNeeds` (19), `streetUrgency` (19), `dominantNeedLabel` (15), `satisfyRelieve` (14), `worstWillTier` (13), `indoorNeedDuration` (9), `needsReconsiderChance` (5), … et 7 autres
+- portees (19) : `atDrinkSpot`, `hydrationLossFactor`, `metabolicDemandFactor`, `fatigueRecoveryFactor`, `fatigueAdaptationFactor`, `recoveryConditioningFactor`, `tickNeeds`, `tickVitality`, `urgeScore`, `needGoalScores`, `risingWillTier`, `workWillFactor`, `needsCritical`, `restActivity`, `satisfyDrink`, `satisfyEat`, `satisfyRest`, `satisfySocial`, `satisfyRelax`
+- restent (10 fonctions) : `workNeedFactor` (23), `ensureNeeds` (19), `streetUrgency` (19), `dominantNeedLabel` (15), `satisfyRelieve` (14), `worstWillTier` (13), `indoorNeedDuration` (9), `needsReconsiderChance` (5), … et 2 autres
 
 **`life/skills.js`** — Work/AnastasisGather. Reste 78 lignes de code sur 122 (dont 22 des 34 lignes hors fonction, au prorata).
 
@@ -295,6 +301,7 @@ C++ — ou ecartee par PORTAGE.md :
 | `ai/algorithmic/decision.js` | Ai/AnastasisNous | 3 | — | grenier |
 | `ai/algorithmic/hungerUtility.js` | Ai/AnastasisNous | 6 | — | grenier |
 | `ai/algorithmic/inertia.js` | Ai/AnastasisNous | 2 | — | grenier |
+| `life/conditioning.js` | Life/AnastasisConditioning | 4 | — | needs-factors-001 |
 | `runtime/simClock.js` | Core/AnastasisSimClock | 4 | `simSpeedRenderGate3d`, `applySimSpeedRenderGate3d` | couche 0 |
 | `sim/hydrology.js` | World/AnastasisHydrology | 13 | — | couche 1 |
 | `sim/navService.js` | World/AnastasisNavService | 22 | — | couche 2 (nav-service-001, module seul) |
@@ -490,7 +497,6 @@ importent celui-ci.
 | porter | `life/mortality.js` | 262 | 184 | 184 | 3 | 2 | 6 | personne et famille |  |
 | porter | `lang/fromNpc.js` | 250 | 183 | 183 | 1 | 2 | 6 | langue |  |
 | porter | `life/socialMemoryIntegrity.js` | 189 | 176 | 176 | 0 | 2 | 6 | personne et famille |  |
-| porter | `life/genome.js` | 293 | 173 | 173 | 0 | 2 | 6 | personne et famille |  |
 | porter | `ai/failureMemory.js` | 202 | 168 | 168 | 3 | 4 | 6 | cognition |  |
 | porter | `ai/negativeKnowledge.js` | 195 | 164 | 164 | 1 | 3 | 6 | cognition |  |
 | porter | `ai/socialStanding.js` | 206 | 161 | 161 | 0 | 1 | 6 | cognition |  |
@@ -523,7 +529,6 @@ importent celui-ci.
 | porter | `life/landAmbition.js` | 101 | 60 | 60 | 0 | 3 | 6 | personne et famille |  |
 | porter + scinder | `life/arrivalContext.js` | 77 | 53 | 53 | 13 | 2 | 6 | personne et famille | logique posee sur une table (20% de litteraux) |
 | porter | `lang/idiolect.js` | 102 | 51 | 51 | 0 | 2 | 6 | langue |  |
-| porter | `life/conditioning.js` | 109 | 48 | 48 | 0 | 3 | 6 | personne et famille |  |
 | porter | `life/followMotif.js` | 85 | 43 | 43 | 0 | 4 | 6 | parole et narration |  |
 | porter | `ai/algorithmic/metrics.js` | 48 | 41 | 41 | 0 | 4 | 6 | cognition |  |
 | porter | `life/familyVisual.js` | 52 | 38 | 38 | 0 | 1 | 6 | personne et famille |  |
@@ -553,7 +558,7 @@ importent celui-ci.
 | partiel | `life/speechActs.js` | 613 | 553 | 503 | 21 | 5 | 6 | parole et narration | Village/AnastasisVillage — 3/33 fonctions portees |
 | partiel | `life/domestic.js` | 434 | 361 | 259 | 1 | 8 | 6 | personne et famille | Life/AnastasisNeeds, Village/AnastasisVillage — 9/31 fonctions portees |
 | partiel | `ai/socialMemory.js` | 515 | 407 | 177 | 1 | 10 | 6 | cognition | Life/AnastasisBonds — 13/23 fonctions portees |
-| partiel | `life/needs.js` | 702 | 466 | 171 | 0 | 21 | 6 | personne et famille | Life/AnastasisNeeds (+ Work/AnastasisGather) — 14/29 fonctions portees |
+| partiel | `life/needs.js` | 702 | 466 | 152 | 0 | 21 | 6 | personne et famille | Life/AnastasisNeeds (+ Work/AnastasisGather) — 19/29 fonctions portees |
 | partiel | `life/villageRhythm.js` | 412 | 343 | 113 | 5 | 10 | 6 | personne et famille | Life/AnastasisVillageRhythm, Village/AnastasisVillage — 8/20 fonctions portees |
 | partiel | `life/bonds.js` | 422 | 328 | 97 | 0 | 6 | 6 | personne et famille | Life/AnastasisBonds — 10/22 fonctions portees |
 | partiel | `life/moodlets.js` | 291 | 220 | 97 | 32 | 6 | 6 | personne et famille | Life/AnastasisBonds — 4/11 fonctions portees |
@@ -562,6 +567,7 @@ importent celui-ci.
 | partiel | `ai/moralPressure.js` | 165 | 116 | 46 | 0 | 2 | 6 | cognition | Work/AnastasisGather — 1/4 fonctions portees |
 | partiel | `ai/algorithmic/runtime.js` | 247 | 224 | 41 | 0 | 2 | 6 | cognition | Village/AnastasisVillage — 4/9 fonctions portees |
 | partiel | `ai/algorithmic/scheduler.js` | 66 | 51 | 36 | 0 | 2 | 6 | cognition | Ai/AnastasisNous — 1/5 fonctions portees |
+| partiel | `life/genome.js` | 293 | 173 | 31 | 0 | 2 | 6 | personne et famille | Life/AnastasisGenome — 15/18 fonctions portees |
 | partiel | `ai/weatherGoalBias.js` | 212 | 166 | 29 | 0 | 4 | 6 | cognition | Life/AnastasisWeatherBehavior — 6/8 fonctions portees |
 | partiel | `ai/algorithmic/hungerAction.js` | 230 | 205 | 25 | 0 | 4 | 6 | cognition | Village/AnastasisVillage — 3/5 fonctions portees |
 | partiel | `ai/algorithmic/bridge.js` | 215 | 191 | 12 | 2 | 1 | 6 | cognition | Village/AnastasisVillage — 3/5 fonctions portees |
@@ -600,5 +606,6 @@ importent celui-ci.
 | porte | `sim/navService.js` | 511 | 391 | 0 | 3 | 2 | 2 | — | World/AnastasisNavService |
 | porte | `sim/simulationBudget.js` | 275 | 166 | 0 | 0 | 2 | 3 | — | Core/AnastasisSimBudget |
 | porte | `ai/algorithmic/hungerUtility.js` | 245 | 204 | 0 | 2 | 4 | 6 | — | Ai/AnastasisNous |
+| porte | `life/conditioning.js` | 109 | 48 | 0 | 0 | 3 | 6 | — | Life/AnastasisConditioning |
 | porte | `ai/algorithmic/inertia.js` | 55 | 41 | 0 | 0 | 4 | 6 | — | Ai/AnastasisNous |
 | porte | `ai/algorithmic/decision.js` | 59 | 40 | 0 | 0 | 4 | 6 | — | Ai/AnastasisNous |

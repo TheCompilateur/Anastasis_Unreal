@@ -316,6 +316,30 @@ repris par l'hôte et tourne depuis `sim-digest-emitter-001` (`Harness/Anastasis
 JS. Premier rapport, première divergence (la cadence du budget, non branchée dans `UpdateActors`) :
 `docs/migration/phase3/P3_PREMIER_RAPPORT.md`.
 
+### Fait — les besoins au rythme de chaque habitant (mission needs-factors-001)
+
+Le rapport 2 (`P3_PREMIER_RAPPORT.md`) place la première divergence au tick 1 sur les besoins : dans la
+référence, faim, soif et énergie avancent au rythme propre de chaque habitant. Cinq facteurs le font,
+lus au début de `tickNeeds` ; les branches C++ les reçoivent désormais en argument.
+
+| Unreal | Source JS (`anastasis-ref-p3`) | Preuve |
+| --- | --- | --- |
+| `Life/AnastasisGenome.h/.cpp` | `life/genome.js` : `hashString`, `deriveGenomeSeed`, `createGenome`, `recombineGenome` (mutations comprises), `derivePhenotype` et ses six dérivées, `ensureGenome`, `genomeFingerprint` | `Parite.Genome` (232 vecteurs, allèle par allèle) |
+| `Life/AnastasisConditioning.h/.cpp` | `life/conditioning.js` entier | `Parite.Conditionnement` (266) |
+| `Life/AnastasisNeeds.*` (ajouts) | `needs.js` : les cinq facteurs, `FNeedFactors` en argument de chaque branche (défaut 1 partout), branche intérieure `relieve`, `needsCritical` (`AreNeedsCritical`), l'appel de `tickConditioning` en fin de tick (`TickNeedsConditioning`) | `Parite.BesoinsFacteurs` (1 908 vecteurs, quatorze situations, conditionnement relu après le tick) |
+
+**Pas branché dans le village** : `FNpc` ne porte ni phénotype ni conditionnement, et les appels du village
+passent le défaut — multiplier par 1,0 est exact, donc aucun test `Village.*` ne bouge. Le branchement
+(champs de `FNpc`, lecteur, `UpdateNpc`) est une autre mission.
+
+Deux choses que le branchement doit respecter : les facteurs sont lus **avant** la branche, et
+`tickConditioning` passe **après** la branche et `tickMoodlets` (qui peut écrire `morale`, donc la porte
+`overworked`). Le génome tire sur son **propre** flux, dérivé de `sim.seed` et de l'identifiant de
+l'habitant, jamais sur `sim.rng`.
+
+`AreNeedsCritical` et non `NeedsCritical` : `AnastasisVillage` porte déjà une fonction de ce nom sur
+`FNeeds`, même formule. La recherche dépendante des arguments rendait ses appels ambigus.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

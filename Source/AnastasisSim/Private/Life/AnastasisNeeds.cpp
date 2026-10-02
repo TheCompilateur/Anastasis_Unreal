@@ -77,12 +77,11 @@ namespace AnastasisNeeds
 		return S;
 	}
 
-	void TickNeeds(FNeeds& N, double Dt, bool bDrinking, bool bWorking)
+	void TickNeeds(FNeeds& N, double Dt, bool bDrinking, bool bWorking, const FNeedFactors& Factors)
 	{
-		// Genome et conditionnement neutres : voir l'en-tete.
-		constexpr double HydrationMul = 1.0;
-		constexpr double MetabolicMul = 1.0;
-		constexpr double FatigueAdaptationMul = 1.0;
+		const double HydrationMul = Factors.Hydration;
+		const double MetabolicMul = Factors.Metabolic;
+		const double FatigueAdaptationMul = Factors.FatigueAdaptation;
 
 		if (bDrinking)
 		{
@@ -103,12 +102,12 @@ namespace AnastasisNeeds
 		TickVitality(N, Dt);
 	}
 
-	void TickNeedsRestInside(FNeeds& N, double Dt, bool bNight, double SleepQuality)
+	void TickNeedsRestInside(FNeeds& N, double Dt, bool bNight, double SleepQuality, const FNeedFactors& Factors)
 	{
-		constexpr double HydrationMul = 1.0;
-		constexpr double MetabolicMul = 1.0;
-		constexpr double FatigueRecoveryMul = 1.0;
-		constexpr double RecoveryConditioningMul = 1.0;
+		const double HydrationMul = Factors.Hydration;
+		const double MetabolicMul = Factors.Metabolic;
+		const double FatigueRecoveryMul = Factors.FatigueRecovery;
+		const double RecoveryConditioningMul = Factors.RecoveryConditioning;
 
 		const double Rate = bNight ? SleepEnergyGain : NapEnergyGain;
 		N.Energy = Clamp(N.Energy + Dt * Rate * FatigueRecoveryMul * RecoveryConditioningMul, 0.0, 100.0);
@@ -125,22 +124,34 @@ namespace AnastasisNeeds
 		TickVitality(N, Dt);
 	}
 
-	void TickNeedsEatInside(FNeeds& N, double Dt)
+	void TickNeedsEatInside(FNeeds& N, double Dt, const FNeedFactors& Factors)
 	{
-		constexpr double HydrationMul = 1.0;
-		constexpr double MetabolicMul = 1.0;
-		constexpr double FatigueAdaptationMul = 1.0;
+		const double HydrationMul = Factors.Hydration;
+		const double MetabolicMul = Factors.Metabolic;
+		const double FatigueAdaptationMul = Factors.FatigueAdaptation;
 		N.Hunger = Clamp(N.Hunger - Dt * EatHungerFall, 0.0, 100.0);
 		N.Thirst = Clamp(N.Thirst + Dt * ThirstRise * 0.3 * HydrationMul, 0.0, 100.0);
 		N.Energy = Clamp(N.Energy - Dt * EnergyFall * 0.25 * MetabolicMul * FatigueAdaptationMul, 0.0, 100.0);
 		TickVitality(N, Dt);
 	}
 
-	void TickNeedsSocialize(FNeeds& N, double Dt, bool bInsideGoal)
+	void TickNeedsRelieveInside(FNeeds& N, double Dt, const FNeedFactors& Factors)
 	{
-		constexpr double HydrationMul = 1.0;
-		constexpr double MetabolicMul = 1.0;
-		constexpr double FatigueAdaptationMul = 1.0;
+		const double HydrationMul = Factors.Hydration;
+		const double MetabolicMul = Factors.Metabolic;
+		const double FatigueAdaptationMul = Factors.FatigueAdaptation;
+		N.Hygiene = Clamp(N.Hygiene + Dt * 8.5, 0.0, 100.0);
+		N.Hunger = Clamp(N.Hunger + Dt * HungerRise * 0.4 * MetabolicMul, 0.0, 100.0);
+		N.Thirst = Clamp(N.Thirst + Dt * ThirstRise * 0.45 * HydrationMul, 0.0, 100.0);
+		N.Energy = Clamp(N.Energy - Dt * EnergyFall * 0.2 * MetabolicMul * FatigueAdaptationMul, 0.0, 100.0);
+		TickVitality(N, Dt);
+	}
+
+	void TickNeedsSocialize(FNeeds& N, double Dt, bool bInsideGoal, const FNeedFactors& Factors)
+	{
+		const double HydrationMul = Factors.Hydration;
+		const double MetabolicMul = Factors.Metabolic;
+		const double FatigueAdaptationMul = Factors.FatigueAdaptation;
 		N.Social = Clamp(N.Social + Dt * TalkSocialGain * (bInsideGoal ? 1.0 : 0.45), 0.0, 100.0);
 		N.Hunger = Clamp(N.Hunger + Dt * HungerRise * 0.7 * MetabolicMul, 0.0, 100.0);
 		N.Thirst = Clamp(N.Thirst + Dt * ThirstRise * 0.75 * HydrationMul, 0.0, 100.0);
@@ -149,10 +160,11 @@ namespace AnastasisNeeds
 		TickVitality(N, Dt);
 	}
 
-	void TickNeedsRelax(FNeeds& N, double Dt)
+	void TickNeedsRelax(FNeeds& N, double Dt, const FNeedFactors& Factors)
 	{
-		constexpr double HydrationMul = 1.0;
-		constexpr double MetabolicMul = 1.0;
+		// Le gain d'energie de `relax` ne porte AUCUN facteur dans la reference.
+		const double HydrationMul = Factors.Hydration;
+		const double MetabolicMul = Factors.Metabolic;
 		N.Leisure = Clamp(N.Leisure + Dt * RelaxLeisureGain, 0.0, 100.0);
 		N.Energy = Clamp(N.Energy + Dt * RelaxEnergyGain, 0.0, 100.0);
 		N.Hunger = Clamp(N.Hunger + Dt * HungerRise * 0.55 * MetabolicMul, 0.0, 100.0);
@@ -283,5 +295,74 @@ namespace AnastasisNeeds
 		const double Morale = N.Morale != 0.0 && !FMath::IsNaN(N.Morale) ? N.Morale : 50.0;
 		N.Morale = Clamp(Morale + DrinkMorale, 0.0, 100.0);
 		N.Health = Clamp(N.Health + DrinkHealth, 0.0, 100.0);
+	}
+
+	double HydrationLossFactor(const AnastasisGenome::FPhenotype* Phenotype)
+	{
+		return Phenotype ? Phenotype->HydrationLossMultiplier : 1.0;
+	}
+
+	double MetabolicDemandFactor(const AnastasisGenome::FPhenotype* Phenotype)
+	{
+		return Phenotype ? Phenotype->MetabolicDemandMultiplier : 1.0;
+	}
+
+	double FatigueRecoveryFactor(const AnastasisGenome::FPhenotype* Phenotype)
+	{
+		return Phenotype ? Phenotype->FatigueRecoveryMultiplier : 1.0;
+	}
+
+	double FatigueAdaptationFactor(const AnastasisConditioning::FConditioning* Conditioning)
+	{
+		return AnastasisConditioning::FatigueAdaptationEnergyFallMultiplier(
+			Conditioning ? Conditioning->FatigueAdaptation : 0.5);
+	}
+
+	double RecoveryConditioningFactor(const AnastasisConditioning::FConditioning* Conditioning)
+	{
+		return AnastasisConditioning::RecoveryConditioningEnergyGainMultiplier(
+			Conditioning ? Conditioning->RecoveryConditioning : 0.5);
+	}
+
+	FNeedFactors NeedFactorsFor(
+		const AnastasisGenome::FPhenotype* Phenotype,
+		const AnastasisConditioning::FConditioning* Conditioning)
+	{
+		FNeedFactors F;
+		F.Hydration = HydrationLossFactor(Phenotype);
+		F.Metabolic = MetabolicDemandFactor(Phenotype);
+		F.FatigueRecovery = FatigueRecoveryFactor(Phenotype);
+		F.FatigueAdaptation = FatigueAdaptationFactor(Conditioning);
+		F.RecoveryConditioning = RecoveryConditioningFactor(Conditioning);
+		return F;
+	}
+
+	bool AreNeedsCritical(const FNeeds& N)
+	{
+		// `(npc.morale ?? 50)` : seul un moral absent vaut 50, pas un moral nul.
+		return N.Hunger >= HungerCritical
+			|| N.Energy <= 100.0 - FatigueCritical
+			|| N.Social <= 100.0 - LonelyCritical
+			|| N.Leisure <= 100.0 - BoredCritical
+			|| N.Hygiene <= 100.0 - HygieneCritical
+			|| N.Thirst >= ThirstCritical
+			|| N.Health <= HealthCritical
+			|| N.Morale < MoraleCritical;
+	}
+
+	void TickNeedsConditioning(
+		AnastasisConditioning::FConditioning& Conditioning,
+		const FNeeds& NeedsAfterTick,
+		double Dt,
+		bool bWorkGoal,
+		bool bRestGoal)
+	{
+		AnastasisConditioning::TickConditioning(
+			Conditioning,
+			Dt,
+			bWorkGoal,
+			bRestGoal,
+			AreNeedsCritical(NeedsAfterTick),
+			100.0 - NeedsAfterTick.Energy >= FatigueUrge);
 	}
 }

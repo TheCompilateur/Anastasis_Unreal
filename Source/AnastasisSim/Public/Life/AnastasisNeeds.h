@@ -1,24 +1,40 @@
 // Besoins d'un habitant — portage partiel de `src/life/needs.js`.
 //
-// Porte, et prouve par vecteurs (`Anastasis.Sim.Parite.Besoins`) :
+// Porte, et prouve par vecteurs (`Anastasis.Sim.Parite.Besoins`,
+// `Anastasis.Sim.Parite.BesoinsFacteurs`) :
 //   urgeScore, needGoalScores (les six buts de besoin, entiers),
-//   tickNeeds (branche « boit », branches interieures « rest » et « eat »,
-//   branche par defaut) + tickVitality, satisfyDrink, satisfyRest, satisfyEat.
+//   tickNeeds (toutes ses branches : boit, interieur rest / relieve / eat,
+//   socialize, relax, defaut) + tickVitality, satisfyDrink, satisfyRest,
+//   satisfyEat, satisfySocial, satisfyRelax, needsCritical ;
+//   les cinq facteurs PAR HABITANT (mission needs-factors-001) :
+//   hydrationLossFactor, metabolicDemandFactor, fatigueRecoveryFactor
+//   (phenotype, voir Life/AnastasisGenome.h), fatigueAdaptationFactor,
+//   recoveryConditioningFactor (conditionnement, Life/AnastasisConditioning.h),
+//   et l'appel de tickConditioning en fin de tickNeeds.
+//
+// LES FACTEURS SONT UN ARGUMENT, PAS UN ETAT. Chaque branche prend un
+// `FNeedFactors` dont le defaut vaut 1 partout : un habitant median, sans
+// conditionnement acquis. Multiplier par 1,0 est exact, donc tout appelant qui
+// n'en passe pas garde ses bits — c'est voulu, le village ne les branche pas
+// encore.
+//
+// L'ORDRE DE FIN DE tickNeeds compte, et reste a l'appelant :
+//   1. la branche (+ tickVitality), avec les facteurs lus AVANT le tick ;
+//   2. tickMoodlets (non porte) — il peut ecrire `morale` ;
+//   3. tickConditioning, dont la porte `overworked` lit needsCritical APRES 1 et 2
+//      (`TickNeedsConditioning`).
+// Les facteurs du tick suivant se relisent donc sur le conditionnement deja avance.
 //
 // PAS porte, volontairement :
-//   - les autres branches interieures de tickNeeds (relieve / socialize /
-//     relax) : leurs buts n'ont pas encore de boucle. `rest` et `eat` entrent.
-//   - tickMoodlets et tickConditioning, appeles en fin de tickNeeds. Ils
-//     n'ecrivent aucun des huit metres ci-dessous au meme tick, mais
-//     tickConditioning fait deriver `conditioning.fatigueAdaptation`, donc le
-//     multiplicateur de fatigue des ticks SUIVANTS. Ici il vaut 1 (valeur
-//     neutre 0,5 de la reference) : la parite tient pour un habitant sans
-//     conditionnement acquis, pas au-dela.
-//   - le genome (phenotype.*Multiplier) : 1 partout, comme un habitant median.
+//   - tickMoodlets : sans moodlet actif, il ne fait rien.
+//   - ensureNeeds : il tire sur `sim.rng` pour les metres absents ; c'est
+//     l'affaire du lecteur et du village, pas des fonctions pures.
 
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Life/AnastasisConditioning.h"
+#include "Life/AnastasisGenome.h"
 
 namespace AnastasisNeeds
 {
@@ -127,6 +143,64 @@ namespace AnastasisNeeds
 		double Drink = 0.0;
 	};
 
+	/**
+	 * Les cinq multiplicateurs propres a un habitant, lus au DEBUT de tickNeeds.
+	 * Defaut : 1 partout (phenotype median, conditionnement neutre).
+	 */
+	struct FNeedFactors
+	{
+		/** `hydrationLossFactor` — la soif qui MONTE. */
+		double Hydration = 1.0;
+		/** `metabolicDemandFactor` — la faim qui monte ET l'energie depensee. */
+		double Metabolic = 1.0;
+		/** `fatigueRecoveryFactor` — le gain continu d'energie en dormant. */
+		double FatigueRecovery = 1.0;
+		/** `fatigueAdaptationFactor` — l'energie depensee, en plus de Metabolic. */
+		double FatigueAdaptation = 1.0;
+		/** `recoveryConditioningFactor` — le gain en dormant, en plus de FatigueRecovery. */
+		double RecoveryConditioning = 1.0;
+	};
+
+	/** `hydrationLossFactor(npc)` = `npc.phenotype?.hydrationLossMultiplier ?? 1`. */
+	ANASTASISSIM_API double HydrationLossFactor(const AnastasisGenome::FPhenotype* Phenotype);
+	/** `metabolicDemandFactor(npc)` = `npc.phenotype?.metabolicDemandMultiplier ?? 1`. */
+	ANASTASISSIM_API double MetabolicDemandFactor(const AnastasisGenome::FPhenotype* Phenotype);
+	/** `fatigueRecoveryFactor(npc)` = `npc.phenotype?.fatigueRecoveryMultiplier ?? 1`. */
+	ANASTASISSIM_API double FatigueRecoveryFactor(const AnastasisGenome::FPhenotype* Phenotype);
+	/** `fatigueAdaptationFactor(npc)` — `npc.conditioning?.fatigueAdaptation`, absent = 0,5. */
+	ANASTASISSIM_API double FatigueAdaptationFactor(const AnastasisConditioning::FConditioning* Conditioning);
+	/** `recoveryConditioningFactor(npc)` — `npc.conditioning?.recoveryConditioning`, absent = 0,5. */
+	ANASTASISSIM_API double RecoveryConditioningFactor(const AnastasisConditioning::FConditioning* Conditioning);
+
+	/** Les cinq d'un coup. nullptr = champ absent sur l'habitant JS. */
+	ANASTASISSIM_API FNeedFactors NeedFactorsFor(
+		const AnastasisGenome::FPhenotype* Phenotype,
+		const AnastasisConditioning::FConditioning* Conditioning);
+
+	/**
+	 * `needsCritical(npc)` — un metre au-dela de son seuil critique, sante basse
+	 * ou moral (`?? 50`) sous moraleCritical. Le `ensureNeeds` de tete n'est pas
+	 * repris : les metres d'un FNeeds existent toujours.
+	 */
+	ANASTASISSIM_API bool AreNeedsCritical(const FNeeds& Needs);
+	// Pas `NeedsCritical` : AnastasisVillage porte deja une fonction de ce nom sur FNeeds,
+	// et la recherche dependante des arguments rendrait ses appels ambigus.
+
+	/**
+	 * La fin de `tickNeeds` : `tickConditioning` avec les drapeaux de la reference.
+	 *   working    = WORK_GOALS.has(npc.goal)  — dedans OU dehors, contrairement a
+	 *                bWorking de TickNeeds qui exclut l'interieur ;
+	 *   resting    = npc.goal === "rest" ;
+	 *   overworked = needsCritical(npc), sur les metres APRES le tick et les moodlets ;
+	 *   fatigued   = 100 - energy >= fatigueUrge.
+	 */
+	ANASTASISSIM_API void TickNeedsConditioning(
+		AnastasisConditioning::FConditioning& Conditioning,
+		const FNeeds& NeedsAfterTick,
+		double Dt,
+		bool bWorkGoal,
+		bool bRestGoal);
+
 	/** `urgeScore` — discret sous le seuil, deborde les metiers au-dela. */
 	ANASTASISSIM_API double UrgeScore(double Pressure, double UrgeAt, double CriticalAt);
 
@@ -144,26 +218,29 @@ namespace AnastasisNeeds
 	 * bWorking  = but de travail et pas a l'interieur.
 	 * Le test d'eau reste a l'appelant : il lit les tuiles et les puits.
 	 */
-	ANASTASISSIM_API void TickNeeds(FNeeds& Needs, double Dt, bool bDrinking, bool bWorking);
+	ANASTASISSIM_API void TickNeeds(FNeeds& Needs, double Dt, bool bDrinking, bool bWorking, const FNeedFactors& Factors = FNeedFactors());
 
 	/**
 	 * `tickNeeds`, branche interieure `rest` (`insideGoal === "rest"`), puis `tickVitality`.
 	 * bNight = `isNightPhase(sim)` ; SleepQuality = `sleepQuality(npc)` (domestic.js).
 	 */
-	ANASTASISSIM_API void TickNeedsRestInside(FNeeds& Needs, double Dt, bool bNight, double SleepQuality);
+	ANASTASISSIM_API void TickNeedsRestInside(FNeeds& Needs, double Dt, bool bNight, double SleepQuality, const FNeedFactors& Factors = FNeedFactors());
 
 	/** `tickNeeds`, branche interieure `eat` / `eatTogether`, puis `tickVitality`. */
-	ANASTASISSIM_API void TickNeedsEatInside(FNeeds& Needs, double Dt);
+	ANASTASISSIM_API void TickNeedsEatInside(FNeeds& Needs, double Dt, const FNeedFactors& Factors = FNeedFactors());
+
+	/** `tickNeeds`, branche interieure `relieve`, puis `tickVitality`. */
+	ANASTASISSIM_API void TickNeedsRelieveInside(FNeeds& Needs, double Dt, const FNeedFactors& Factors = FNeedFactors());
 
 	/** `tickVitality` — un seul drain a la fois : famine > soif > epuisement. */
 	/**
 	 * `tickNeeds`, branche `socialize` : dedans (`insideGoal`), ou dehors tant que le
 	 * but est `socialize` (gain x 0,45). Ni hygiene ni repos ne bougent ici.
 	 */
-	ANASTASISSIM_API void TickNeedsSocialize(FNeeds& N, double Dt, bool bInsideGoal);
+	ANASTASISSIM_API void TickNeedsSocialize(FNeeds& N, double Dt, bool bInsideGoal, const FNeedFactors& Factors = FNeedFactors());
 
 	/** `tickNeeds`, branche `relax` : dedans ou dehors, meme branche. */
-	ANASTASISSIM_API void TickNeedsRelax(FNeeds& N, double Dt);
+	ANASTASISSIM_API void TickNeedsRelax(FNeeds& N, double Dt, const FNeedFactors& Factors = FNeedFactors());
 
 	/** `satisfySocial(npc, amount)` : dedans, gain x 0,45 et loisir +3 au lieu de +6. */
 	ANASTASISSIM_API void SatisfySocial(FNeeds& N, double Amount, bool bIndoor);
