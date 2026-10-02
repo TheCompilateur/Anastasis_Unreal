@@ -81,5 +81,7 @@ est le contrat de parité JS : **on n'y touche pas pour une raison visuelle**.
 ## Ouvert
 
 - Mesh Terrain (5.8) : intéressant pour les surplombs, mais expérimental et construit pour l'édition à la
-  main. Pas de mandat.
+  main. Pas de mandat. Il repose sur le plugin `MeshPartition` (modificateurs non destructifs, sans
+  Landscape), et `MeshPartitionWater` y branche le plugin Water (RU-002-10, RU-002-11). Y passer
+  remplacerait la génération du terrain par la simulation : décision d'Alexandre, pas d'un agent.
 - Le seuil de roche du sol n'est plus atteint après érosion (`fiches/sol.md`, SOL-05).

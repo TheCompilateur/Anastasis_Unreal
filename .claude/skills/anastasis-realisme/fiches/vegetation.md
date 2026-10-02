@@ -65,7 +65,9 @@ touffes faisait tomber la suite de tests par manque de mémoire.
 ## Ne pas faire
 
 - Activer Nanite sur le feuillage : feuillage en cartes masquées + WPO, incompatible avec un simple
-  « activer Nanite » (`AAA_VISUAL_TARGET_LAB.md`).
+  « activer Nanite » (`AAA_VISUAL_TARGET_LAB.md`). Nanite Foliage (RU-002-13) ne lève pas cet interdit :
+  il anime par des os (plugin `DynamicWind`), pas par le WPO, donc il demande des arbres refaits, pas une
+  case cochée.
 - Une HISM pour toute la carte (+12 ms).
 - Couper les ombres de l'herbe pour gagner : aucun gain mesurable.
 - Passer `enable_recompute_normals=True` à la création d'un mesh : jette les normales écrites, sans
@@ -75,5 +77,9 @@ touffes faisait tomber la suite de tests par manque de mémoire.
 
 - Coût GPU de la forêt : jamais mesuré.
 - Vent : estimé, pas mesuré, et pas de `WindDirectionalSource`.
-- PVE (5.8) ou Nanite Foliage pour des arbres « héros » : pas de mandat.
+- PVE (5.8) ou Nanite Foliage pour des arbres « héros » : pas de mandat. Faits à connaître avant d'en
+  proposer un (RU-002-13, RU-002-14) : tout est expérimental ; `r.Nanite.Foliage` est en lecture seule
+  (0 par défaut, réglage de projet et redémarrage) ; vent global seulement, pas de collision ; les assets
+  PVE de 5.7 ne s'ouvrent pas en 5.8, ce qui heurte VEG-02 (assets régénérables par script). Un premier
+  essai se ferait dans le labo isolé (`aaa-visual-lab.ps1`), jamais sur la carte du jeu.
 - Essences méditerranéennes contre direction pontique : voir le skill, section 6.

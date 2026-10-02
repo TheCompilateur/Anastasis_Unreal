@@ -86,4 +86,10 @@ Seuils empiriques, posés sur les captures de `DAY_NIGHT_WEATHER_001`. Autres pr
 ## Ouvert
 
 - Pluie et neige invisibles : pas de Niagara (`handoffs/env-realism-001.md`). Mission à part.
+- **Fog Screen Space Scattering** (5.8, expérimental, RU-002-06) : halo de diffusion multiple dans le
+  brouillard de hauteur, autour du soleil et des zones claires. Il faut `bEnableFSSS` sur le composant de
+  brouillard (false par défaut ; `r.Fog.ScreenSpaceScattering` vaut déjà 1) et `FSSSSpreadScale` (0,1).
+  À poser par `AAnastasisWorldAtmosphere` et le profil (ATM-06), derrière une CVar `anastasis.*` pour
+  l'A/B `capture-sky.ps1 -Preset cycle`. Risque à mesurer : un halo partout (ATM-05) et `HAZE`. Ne touche
+  ni les nuages ni la brume locale.
 - Seuils de `atmosphere-metrics.py` à recaler sur un plus grand nombre de captures.

@@ -38,7 +38,7 @@ en production, pas de RVT, pas de Megascans. Chacun de ces choix est **délibér
 | sol en plâtre, damier de tuiles, sol lisse, pente sans roche, « textures », « RVT » | `fiches/sol.md` |
 | arbres en plastique, forêt clairsemée, herbe en tapis, « Nanite », « SpeedTree », « PCG » | `fiches/vegetation.md` |
 | eau bleue carrelage, rive tranchée, rivière qui ne coule pas, « plugin Water » | `fiches/eau.md` |
-| « color grading », « bloom », « DOF », « LUT », « tonemapper » | `fiches/post-traitement.md` |
+| « color grading », « bloom », « DOF », « LUT », « tonemapper », herbe ou branches qui scintillent, « TSR » | `fiches/post-traitement.md` |
 | image lente, fps, mémoire, « HLOD », « budget », « profiler » | `fiches/performance.md` |
 | une recommandation précise lue dans une recherche | `registre.md` (chercher son identifiant) |
 

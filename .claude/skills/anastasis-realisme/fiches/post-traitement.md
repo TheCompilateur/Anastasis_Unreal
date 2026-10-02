@@ -54,3 +54,9 @@ A/B par `-PreCmds` (skill `anastasis-capture`), puis `atmosphere-metrics.py` pou
 ## Ouvert
 
 - Une gradation finale, une fois la scène juste : décision de direction artistique, pas d'un agent.
+- **Scintillement de l'herbe et des branches** (RU-002-16) : l'anti-crénelage TSR (méthode par défaut,
+  non surchargée par `DefaultEngine.ini`) a une détection de géométrie fine, `r.TSR.ThinGeometryDetection`,
+  **à 0 par défaut** ; elle assouplit le rejet d'historique sur le feuillage à couverture partielle
+  (visible en `r.TSR.Visualize 15`). A/B sans code par `-PreCmds`. Le défaut est **temporel** : une
+  capture fixe ne le montre pas. Il faut des images successives, caméra fixe et vent actif, et mesurer
+  l'écart d'une image à la suivante ; aucun script ne le fait aujourd'hui.

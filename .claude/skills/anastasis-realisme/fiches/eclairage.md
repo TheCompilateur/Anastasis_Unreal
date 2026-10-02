@@ -13,8 +13,11 @@
   Diagnostic : `r.Lumen.Visualize 3` (cache de surface), `r.Lumen.Visualize 5`.
 - Lumen veut un éclairage **entièrement dynamique** : lumières `Movable`, SkyLight `Movable` en capture
   temps réel, pas de lightmaps. Un SkyLight `Stationary` est un réflexe de l'éclairage précalculé.
-- **Lumen Lite** (5.8) : mode de GI annoncé deux fois plus rapide que Lumen en haute qualité, pensé pour
-  les consoles et le moyen de gamme. Rien ne l'a mesuré ici.
+- **Lumen Lite** (5.8, Beta) : mode de GI annoncé deux fois plus rapide que Lumen en haute qualité, pensé
+  pour les consoles et le moyen de gamme. C'est l'**Irradiance Field Gather** (`r.Lumen.FinalGatherMethod
+  0`, que la scalabilité pose au niveau GI 1 : `sg.GlobalIlluminationQuality 1`), contre le Screen Probe
+  Gather (`1`, défaut). Ses reflets ne tracent pas de rayons. Une voie de coût, pas de réalisme ; rien ne
+  l'a mesuré ici (RU-002-01). `2` = ReSTIR, ray tracing matériel seulement, non documenté (RU-002-02).
 - **Virtual Shadow Maps (VSM)** : ombres de très haute résolution (16k virtuels par niveau de clipmap)
   qui remplacent les cascades et suivent le détail géométrique. Il n'y a pas de « taille max » à régler :
   la netteté se règle par biais de résolution (`r.Shadow.Virtual.ResolutionLodBiasDirectional`). La
@@ -80,7 +83,8 @@ Tout l'éclairage est posé par `AAnastasisWorldAtmosphere` à partir de `DA_Ana
 
 ## Ouvert
 
-- **Lumen Lite** : candidat si le budget GPU l'exige. Non mesuré.
+- **Lumen Lite** : candidat si le budget GPU l'exige, et seulement alors (RU-002-01). Non mesuré. A/B :
+  `capture-slice.ps1 -PreCmds 'r.Lumen.FinalGatherMethod 0'`, image **et** ms (ECL-07).
 - **Arbres noirs pour Lumen** : la cause n'est pas établie (`lumen-hit-lighting-001.md`).
 - Le `Source Angle` du soleil n'est pas posé par le projet (valeur par défaut du moteur) et n'a jamais été
   mesuré en A/B.

@@ -64,5 +64,9 @@ CVars : `anastasis.Terrain.WaterLook` (1 ; 0 = eau d'avant), `anastasis.Terrain.
 ## Ouvert
 
 - Coût de l'eau sur plus d'un échantillon.
+- `MeshPartitionWater` (5.8, expérimental) fait marcher le plugin Water sur Mesh Partition, sans Landscape
+  (RU-002-11). C'est un fait nouveau contre la raison d'EAU-01, mais il suppose de passer le terrain à
+  Mesh Terrain : décision d'Alexandre. La vélocité de Single Layer Water est déjà écrite par défaut
+  (RU-002-12).
 - Le fond de l'eau, la pluie au sol et les aubes sont sur la branche `agent/env-realism-002`, non versée
   au 2026-10-01 (`docs/unreal/ENV_REALISM_002.md` sur cette branche).

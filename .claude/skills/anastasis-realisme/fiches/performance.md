@@ -63,3 +63,7 @@ tools\unreal\measure-tree-cost.ps1                               # triangles, LO
   fixer un plafond par vue (par exemple 16,7 ms en vue forêt sur RTX 3060), puis refuser tout ajout qui le
   dépasse sans compensation.
 - Coût GPU de la forêt : jamais mesuré seul.
+- Le budget conditionne Lumen Lite (RU-002-01) : sans plafond écrit, rien ne justifie de céder de la
+  qualité de GI pour des ms.
+- `stat unit` affiche en 5.8 la VRAM utilisée et son budget (RU-002-18) : à faire lire par les scripts de
+  capture pour reconnaître une VRAM saturée (PERF-04).

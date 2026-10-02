@@ -10,3 +10,4 @@ Procédure d'ajout : `SKILL.md` du skill, section 5 (« Ingérer une nouvelle re
 | ID | Fichier | Nature | Reçu | Ingéré |
 |---|---|---|---|---|
 | RU-001 | `RU-001_resume-executif.pdf` | « Résumé exécutif », rapport ChatGPT Deep Research, 10 pages : pipeline AAA de monde ouvert sous UE 5.8 | 2026-10-01 | oui, 54 affirmations (`RU-001-01` à `RU-001-54`) |
+| RU-002 | `RU-002_ue58-sources-primaires.md` | Recherche sur sources primaires : notes de version Epic 5.7 / 5.8 et moteur 5.8.2 installé (plugins, CVars lus dans le code) | 2026-10-01 | oui, 20 affirmations (`RU-002-01` à `RU-002-20`) |

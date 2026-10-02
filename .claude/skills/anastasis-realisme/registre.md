@@ -35,7 +35,7 @@ recoupé avec les notes de version d'UE 5.8 ou avec le code du projet.
 
 | ID | Affirmation | Statut | Pourquoi | Règle |
 |---|---|---|---|---|
-| RU-001-06 | Mesh Terrain (5.8, expérimental) pour surplombs et tunnels | `OUVERT` | existe bien en 5.8 ; construit pour l'édition à la main | TER, Ouvert |
+| RU-001-06 | Mesh Terrain (5.8, expérimental) pour surplombs et tunnels | `OUVERT` | existe bien en 5.8, sur le plugin Mesh Partition ; construit pour l'édition à la main (RU-002-10, RU-002-11) | TER, Ouvert |
 | RU-001-07 | Heightmap générée par Gaea, World Creator ou Houdini | `HORS_PÉRIMÈTRE` | le relief vient de la simulation (graine 12345) | TER-01 |
 | RU-001-08 | Convertir la map en World Partition | `REJETÉ` | monde de 1,9 km, une seule carte rebâtie à l'incarnation, aucun acteur placé à la main | TER-02 |
 | RU-001-09 | Régler résolution, sections et LOD du Landscape | `HORS_PÉRIMÈTRE` | pas de Landscape ; l'équivalent est `Forge.Subdiv` | TER-01 |
@@ -57,10 +57,10 @@ recoupé avec les notes de version d'UE 5.8 ou avec le code du projet.
 | RU-001-15 | Herbe par Landscape Grass Output | `ÉQUIVALENT` | herbe en HISM tuilées par le C++ (`GROUND_COVER_001`) | VEG-03 |
 | RU-001-16 | Arbres SpeedTree ou Megaplants | `ÉQUIVALENT` | arbres GeometryScript, 7 essences × 3 formes (`create_tree_asset.py`) | VEG-02 |
 | RU-001-17 | Placement : à la main sur les rives et lisières, Procedural Foliage ailleurs | `ÉQUIVALENT` | placement C++ déterministe, structure d'âges, groupes et clairières | VEG-01, VEG-05 |
-| RU-001-18 | Procedural Vegetation Editor (expérimental) | `OUVERT` | existe en 5.7–5.8 ; pas de mandat | VEG, Ouvert |
+| RU-001-18 | Procedural Vegetation Editor (expérimental) | `OUVERT` | existe en 5.7–5.8, assets 5.7 incompatibles 5.8 (RU-002-14) ; pas de mandat | VEG, Ouvert |
 | RU-001-19 | Instancier l'herbe et les végétaux répétés | `APPLIQUÉ` | HISM partout | VEG-01 |
 | RU-001-20 | Varier formes, orientations et tailles | `APPLIQUÉ` | essences, formes, couches d'âge, émergents | VEG-05 |
-| RU-001-21 | Activer Nanite sur les meshes compatibles | `REJETÉ` pour le feuillage, `OUVERT` pour l'opaque héros | feuillage en cartes + WPO ; roche, mur et ruine sont « NANITE GOOD CANDIDATE » (`AAA_VISUAL_TARGET_LAB.md`) | VEG, Ne pas faire |
+| RU-001-21 | Activer Nanite sur les meshes compatibles | `REJETÉ` pour le feuillage, `OUVERT` pour l'opaque héros | feuillage en cartes + WPO ; roche, mur et ruine sont « NANITE GOOD CANDIDATE » (`AAA_VISUAL_TARGET_LAB.md`). Fait nouveau : Nanite Foliage remplace le WPO par des os (RU-002-13) | VEG, Ne pas faire |
 | RU-001-22 | Nanite : régler le Fallback LOD, le couper sur les grandes surfaces pour la collision | `HORS_PÉRIMÈTRE` | pas de Nanite en production | — |
 
 ### Eau
@@ -80,7 +80,7 @@ recoupé avec les notes de version d'UE 5.8 ou avec le code du projet.
 | RU-001-28 | Volumetric Clouds | `APPLIQUÉ` | nuages à 1,5 km, 3 km d'épaisseur, couverture selon la météo | ATM |
 | RU-001-29 | Lune, réglages de nuit | `APPLIQUÉ` | lune à 0,3 lux, une seule lumière directionnelle principale | ECL-04 |
 | RU-001-30 | Lumen GI, qualité selon la cible | `APPLIQUÉ` | Lumen en ray tracing matériel, Hit Lighting | ECL-03 |
-| RU-001-31 | Lumen Lite, « deux fois plus rapide » | `OUVERT` | annoncé par Epic pour 5.8 ; non mesuré ici | ECL-07 |
+| RU-001-31 | Lumen Lite, « deux fois plus rapide » | `OUVERT` | confirmé, Beta : c'est l'Irradiance Field Gather (RU-002-01) ; non mesuré ici | ECL-07 |
 | RU-001-32 | Lumen : « Surfel » contre « Hardware RTGI » | `FAUX` | Lumen trace en logiciel (champs de distance) ou en matériel ; pas de mode Surfel | ECL |
 | RU-001-33 | Lumen Scene Detail à 100 % et plus, Max Trace Distance | `OUVERT` | réglages réels de Lumen, jamais mesurés ici | ECL-07 |
 | RU-001-34 | VSM requises par Nanite ; `r.Shadow.Virtual.Enable=1` | `APPLIQUÉ` | actives, même sans Nanite | ECL-05 |
@@ -119,3 +119,64 @@ recoupé avec les notes de version d'UE 5.8 ou avec le code du projet.
 | RU-001-52 | Chaos : végétation froissée ; « Chaos Cloth pour plantes vivantes prêt en 5.8 » | `FAUX` | affirmation non sourcée, introuvable dans les notes de version | — |
 | RU-001-53 | Plugin « Chaos Terrain de Trajectoire » | `FAUX` | introuvable ; vraisemblablement inventé | — |
 | RU-001-54 | Megascans « gratuit pour UE » | `HORS_PÉRIMÈTRE` | la licence Megascans a changé avec Fab ; à vérifier si un jour on en importe | — |
+
+## RU-002 — Sources primaires UE 5.8 (notes de version Epic + moteur 5.8.2 installé, 2026-10-01)
+
+Recherche faite pour recouper RU-001 et trouver les nouveautés 5.8. Source :
+`docs/recherche/realisme-unreal/RU-002_ue58-sources-primaires.md`, avec les URL Epic. Chaque CVar citée ici
+a été lue dans le code du moteur installé ; le moteur fait foi contre les notes de version.
+
+### Éclairage
+
+| ID | Affirmation | Statut | Pourquoi | Règle |
+|---|---|---|---|---|
+| RU-002-01 | Lumen Lite (Beta) : deux fois plus rapide, `sg.GlobalIlluminationQuality 1` + `sg.ReflectionQuality 1` ; reflets sans rayons | `OUVERT` | c'est l'Irradiance Field Gather (`r.Lumen.FinalGatherMethod 0`), que le moteur décrit comme « plus rapide, qualité moindre, PC milieu de gamme ». Une voie de **coût**, pas de réalisme ; ses reflets sans rayons défont une partie du Hit Lighting (ECL-03). N'a de sens qu'avec un budget GPU écrit | ECL-07, PERF Ouvert |
+| RU-002-02 | `r.Lumen.FinalGatherMethod 2` = ReSTIR, ray tracing matériel seulement | `OUVERT` | présent dans le code, absent des notes de version ; jamais mesuré | ECL-07 |
+| RU-002-03 | MegaLights passe Production Ready | `HORS_PÉRIMÈTRE` | le jeu n'a aucune lumière locale (seul le gabarit `Variant_Horror` en pose) ; à rouvrir si des foyers ou torches de nuit arrivent | ECL-02 |
+| RU-002-04 | `r.Lumen.HeightFog` à 1 par défaut ; SSGI déprécié | `APPLIQUÉ` | défauts du moteur 5.8.2, déjà en vigueur | — |
+| RU-002-05 | Ombres lointaines préfiltrées des VSM, `r.Shadow.Virtual.PrefilteredDistant.ProjectEnable` | `OUVERT` | annoncé, mais CVar introuvable sous ce nom dans `Renderer/Private` et `Engine/Private` du 5.8.2 : ne pas la citer avant de l'avoir trouvée | ECL-05 |
+
+### Atmosphère
+
+| ID | Affirmation | Statut | Pourquoi | Règle |
+|---|---|---|---|---|
+| RU-002-06 | Fog Screen Space Scattering (expérimental) : diffusion multiple du brouillard de hauteur, halo autour des sources | `OUVERT` | candidat de mission. Deux interrupteurs : `r.Fog.ScreenSpaceScattering` (1 par défaut) **et** `UExponentialHeightFogComponent::bEnableFSSS` (false par défaut), réglé par `FSSSSpreadScale` (0,1). Le projet ne pose pas `bEnableFSSS` : l'activer passe par `AAnastasisWorldAtmosphere` et le profil. Risque : halo partout (ATM-05) | ATM-06, ATM Ouvert |
+| RU-002-07 | SkyAtmosphere, Volumetric Clouds : rien de nouveau en 5.8 | `APPLIQUÉ` | rien à faire | ATM-02 |
+
+### Matériaux
+
+| ID | Affirmation | Statut | Pourquoi | Règle |
+|---|---|---|---|---|
+| RU-002-08 | Substrate : diffuse rugueuse passée au modèle EON en 5.8 | `APPLIQUÉ` | automatique pour un projet Substrate ; à garder en tête si un albédo mesuré en 5.7 ne colle plus | SOL-01 |
+| RU-002-09 | Toon / NPR Substrate (expérimental) | `HORS_PÉRIMÈTRE` | photoréel sobre (RU-001-01) | loi 2 |
+
+### Terrain et eau
+
+| ID | Affirmation | Statut | Pourquoi | Règle |
+|---|---|---|---|---|
+| RU-002-10 | Mesh Terrain (expérimental) : surplombs, tunnels, parois ; repose sur le plugin `MeshPartition` (modificateurs non destructifs), outil `MeshTerrainMode` | `OUVERT` | confirme RU-001-06. Construit pour l'édition, pas pour un relief issu de la simulation. Changer de terrain est une décision d'Alexandre | TER-01, TER Ouvert |
+| RU-002-11 | `MeshPartitionWater` : le plugin Water fonctionne sur Mesh Partition, donc sans Landscape | `OUVERT` | **fait nouveau** contre la raison d'EAU-01 (« le carving exige un Landscape »), mais seulement si le terrain passe à Mesh Terrain. EAU-01 tient tant qu'Alexandre ne tranche pas | EAU-01 |
+| RU-002-12 | Single Layer Water écrit sa vélocité en pré-passe (`r.Water.SingleLayer.VelocityOutputPass`) | `APPLIQUÉ` | vaut 1 par défaut (« Depth Prepass ») : déjà actif, rien à activer | EAU-02 |
+
+### Végétation
+
+| ID | Affirmation | Statut | Pourquoi | Règle |
+|---|---|---|---|---|
+| RU-002-13 | Nanite Foliage (expérimental depuis 5.7) : vent par os (plugin `DynamicWind`, « extremely experimental »), pas de WPO, pas de collision ; `r.Nanite.Foliage` en lecture seule, 0 par défaut | `OUVERT` | **fait nouveau** contre RU-001-21 : le rejet visait « activer Nanite » sur des cartes animées par WPO. Nanite Foliage remplace le WPO par un squelette : c'est une refonte du pipeline d'arbres (`create_tree_asset.py`), pas un interrupteur. Réglage de projet + redémarrage | VEG-02, VEG Ouvert |
+| RU-002-14 | PVE (expérimental) : arbres poussés dans l'éditeur, export Nanite Foliage ou static mesh ; assets 5.7 incompatibles 5.8 | `OUVERT` | confirme RU-001-18. L'incompatibilité d'une version à l'autre contredit la règle des scripts d'autorité régénérables | VEG-02 |
+| RU-002-15 | PCG production, dispersion GPU au runtime ; `PCGGeometryScriptInterop` (Beta) | `ÉQUIVALENT` | placement C++ déterministe par graine | VEG-01 |
+
+### Post-traitement
+
+| ID | Affirmation | Statut | Pourquoi | Règle |
+|---|---|---|---|---|
+| RU-002-16 | TSR : détection de la géométrie fine contre le scintillement | `OUVERT` | candidat d'A/B **sans code** : l'interrupteur est `r.TSR.ThinGeometryDetection` (**0** par défaut), `...AntiFlickering` vaut déjà 1 mais n'agit qu'avec lui. Visible en `r.TSR.Visualize 15`. Le scintillement est **temporel** : une capture fixe ne le montre pas | POST, Vérifier |
+| RU-002-17 | ACES 2.0 en SDR, `r.LUT.Shaper`, visualisation de la gradation | `HORS_PÉRIMÈTRE` | pas de LUT ni de gradation avant que la scène soit juste | POST-01 |
+
+### Performance et outils
+
+| ID | Affirmation | Statut | Pourquoi | Règle |
+|---|---|---|---|---|
+| RU-002-18 | `stat unit` affiche la VRAM utilisée et son budget | `OUVERT` | utile pour reconnaître une VRAM saturée (PERF-04) ; pas encore lu par les scripts de capture | PERF-04 |
+| RU-002-19 | Modeling Tools et Geometry Script : weight maps, bruit de Perlin | `OUVERT` | Geometry Script est déjà la base des assets ; le bruit de Perlin pourrait servir aux écorces et roches | VEG-02 |
+| RU-002-20 | Recoupement de RU-001-52 (Chaos Cloth pour plantes) et RU-001-53 (« Chaos Terrain de Trajectoire ») | `FAUX` | Chaos Cloth est prêt pour les vêtements, pas les plantes ; le second plugin n'existe ni dans les notes ni dans le moteur | — |
