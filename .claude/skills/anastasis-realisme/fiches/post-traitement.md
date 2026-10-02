@@ -45,18 +45,24 @@ du moteur. Les scripts de capture coupent le flou de mouvement (`r.MotionBlurQua
 A/B par `-PreCmds` (skill `anastasis-capture`), puis `atmosphere-metrics.py` pour les drapeaux
 `CLIPPED` (hautes lumières coupées) et `BLACK` (noirs bouchés).
 
+Un défaut **temporel** (scintillement, traînée) ne se voit pas sur une capture fixe :
+`tsr-flicker-pie.ps1 -Label <x> [-States 'a=cvar|b=cvar|a2=cvar']` prend N images successives en PIE,
+puis `tsr-flicker-metrics.py` mesure la dérivée seconde temporelle (le balancement régulier du vent s'y
+annule, un clignotement ressort) contre un témoin. `Shot` ne prend qu'une image toutes les ~0,2 s :
+avec le vent, son mouvement domine ; geler le temps (`slomo 0.0001`) isole l'anticrénelage.
+
 ## Ne pas faire
 
 - « Bloom à 50 % », « LUT cinématique », « vignettage léger » appliqués d'office : interdits par la
   direction artistique tant que la scène n'est pas juste sans eux.
 - Activer l'eye adaptation pour « cinématiser » : elle casse l'exposition fixe (`ECL-01`).
+- Activer `r.TSR.ThinGeometryDetection` contre le scintillement de l'herbe (RU-002-16). Mesuré le
+  2026-10-01 par `tsr-flicker-pie.ps1` (images successives en PIE, caméra fixe, états 0 / 1 / 0 témoin,
+  dérivée seconde temporelle sur la géométrie fine) : avec le vent, aucun écart au-delà du témoin ; temps
+  gelé (`slomo 0.0001`), −3 à −4 % d'un résidu de 1,6 à 2,6 niveaux sur 255, invisible.
 
 ## Ouvert
 
 - Une gradation finale, une fois la scène juste : décision de direction artistique, pas d'un agent.
-- **Scintillement de l'herbe et des branches** (RU-002-16) : l'anti-crénelage TSR (méthode par défaut,
-  non surchargée par `DefaultEngine.ini`) a une détection de géométrie fine, `r.TSR.ThinGeometryDetection`,
-  **à 0 par défaut** ; elle assouplit le rejet d'historique sur le feuillage à couverture partielle
-  (visible en `r.TSR.Visualize 15`). A/B sans code par `-PreCmds`. Le défaut est **temporel** : une
-  capture fixe ne le montre pas. Il faut des images successives, caméra fixe et vent actif, et mesurer
-  l'écart d'une image à la suivante ; aucun script ne le fait aujourd'hui.
+- **Scintillement vu en jeu** : `tsr-flicker-001` n'en a pas trouvé de mesurable (section Ne pas faire). Si
+  quelqu'un le **voit**, refaire la mesure à cet endroit précis avant de toucher un réglage.

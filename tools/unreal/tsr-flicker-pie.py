@@ -39,6 +39,9 @@ ONLY = [v.strip() for v in os.environ.get('ANASTASIS_TSR_VIEWS', '').split(',') 
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
 SHOTS_DIR = ROOT / 'Saved' / 'Screenshots'
 SETTLE_S = 3.0  # historique TSR + compilation eventuelle du shader de detection
+# Premiere sequence d'un run : le monde PIE finit de se poser (ab-001, static-001 : intervalle
+# 0,3-0,5 s et mouvement x8 sur la seule premiere sequence).
+SETTLE_FIRST_S = 8.0
 CAMERA_LABEL = 'TsrFlickerProofCamera'
 
 
@@ -189,7 +192,8 @@ def tick(_dt):
         st['phase'], st['mark'] = 'settle', now
         return
     if phase == 'settle':
-        if el > SETTLE_S:
+        if el > (SETTLE_FIRST_S if not st.get('settled_once') else SETTLE_S):
+            st['settled_once'] = True
             st['phase'] = 'fire'
         return
     if phase == 'fire':

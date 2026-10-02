@@ -170,7 +170,7 @@ a été lue dans le code du moteur installé ; le moteur fait foi contre les not
 
 | ID | Affirmation | Statut | Pourquoi | Règle |
 |---|---|---|---|---|
-| RU-002-16 | TSR : détection de la géométrie fine contre le scintillement | `OUVERT` | candidat d'A/B **sans code** : l'interrupteur est `r.TSR.ThinGeometryDetection` (**0** par défaut), `...AntiFlickering` vaut déjà 1 mais n'agit qu'avec lui. Visible en `r.TSR.Visualize 15`. Le scintillement est **temporel** : une capture fixe ne le montre pas | POST, Vérifier |
+| RU-002-16 | TSR : détection de la géométrie fine contre le scintillement | `REJETÉ` | mesuré le 2026-10-01 (`tsr-flicker-001`, `tsr-flicker-pie.ps1`) en images successives, caméra fixe, prairie, ras du sol et lisière : avec le vent, aucun écart au-delà du témoin ; temps gelé, −3 à −4 % d'un scintillement résiduel déjà bas (1,6 à 2,6 /255 sur la géométrie fine), soit 0,05 niveau, invisible. `r.TSR.ThinGeometryDetection` reste à 0 ; à refaire si un scintillement est **vu** en jeu | POST, Ne pas faire |
 | RU-002-17 | ACES 2.0 en SDR, `r.LUT.Shaper`, visualisation de la gradation | `HORS_PÉRIMÈTRE` | pas de LUT ni de gradation avant que la scène soit juste | POST-01 |
 
 ### Performance et outils

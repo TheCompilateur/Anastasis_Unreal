@@ -18,7 +18,8 @@ Lit les sequences <vue>_<etat>/fNN.png de tsr-flicker-pie.py. Par sequence, sur 
 Une carte du flicker (moyenne de |derivee seconde|, x8) par sequence : flicker_<seq>.png.
 
 Verdict par vue : temoin = |d0 - d0b| (meme etat, avant et apres) ; l'effet de d1 n'est
-revendique que si |d1 - moyenne(d0, d0b)| depasse 2 x temoin. Ecrit metrics.json.
+revendique que si |d1 - moyenne(d0, d0b)| depasse 2 x temoin ET 0,25 niveau (un temoin
+nul, temps gele, ne rend pas visible un ecart infime). Ecrit metrics.json.
 """
 import json
 import sys
@@ -28,6 +29,9 @@ import numpy as np
 from PIL import Image
 
 BLINK = 4.0
+# Un temoin nul (temps gele : l'image est deterministe) rendrait revendicable un ecart infime.
+# En dessous d'un quart de niveau sur 255, l'ecart ne se voit pas : il ne se revendique pas.
+MIN_EFFECT = 0.25
 
 
 def luminance(path):
@@ -91,7 +95,7 @@ def main():
             effect = by['d1'][key] - base
             v[key] = {'d0': by['d0'][key], 'd1': by['d1'][key], 'd0b': by['d0b'][key], 'effect': effect,
                       'effect_pct': 100.0 * effect / base if base else 0.0, 'witness': witness,
-                      'claimable': abs(effect) > 2.0 * witness}
+                      'claimable': abs(effect) > max(2.0 * witness, MIN_EFFECT)}
         verdicts[view] = v
         f = v['flicker_detail']
         print('TSR_VERDICT %-12s flicker_detail d0=%.2f d1=%.2f d0b=%.2f effet=%+.2f (%+.1f %%) temoin=%.2f %s'
