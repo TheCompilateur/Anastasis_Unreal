@@ -6,7 +6,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnthropicObservationTest, "Anastasis.Anthropic
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnthropicObservationTest::RunTest(const FString&)
 {
-    
+
     AnastasisAnthropic::FMemory M;
     M.Observe(1.0, {{TEXT("a"), FVector2D(10, 10), true}});
     M.Observe(1.0, {{TEXT("a"), FVector2D(100, 10), true}});
@@ -36,7 +36,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnthropicMemoryTest, "Anastasis.Anthropic.Repe
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnthropicMemoryTest::RunTest(const FString&)
 {
-    
+
     AnastasisAnthropic::FMemory M;
     double T = 0.0;
     for (int32 I = 0; I < 21; ++I)
@@ -63,7 +63,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnthropicDistanceTest, "Anastasis.Anthropic.Di
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAnthropicDistanceTest::RunTest(const FString&)
 {
-    
+
     AnastasisAnthropic::FMemory A, B;
     A.Observe(0, {{TEXT("a"), FVector2D(10, 50), true}});
     A.Observe(1.0/60.0, {{TEXT("a"), FVector2D(190, 50), true}});
