@@ -10,9 +10,13 @@
 # Usage :
 #   agent-worktree.ps1 create     -Mission world-slice-007
 #   agent-worktree.ps1 status
-#   agent-worktree.ps1 finish     -Mission world-slice-007
-#   agent-worktree.ps1 integrate  -Mission world-slice-007
-#   agent-worktree.ps1 integrate-batch -Missions mission-a,mission-b   (file d'integration groupee)
+#   agent-worktree.ps1 finish     -Mission world-slice-007          (build seul ; -Prove : + suite ici)
+#   agent-worktree.ps1 integrate  -Mission world-slice-007          (mission deja prouvee seulement)
+#   agent-worktree.ps1 integrate-batch -Missions mission-a,mission-b   (la voie normale : verrou de main,
+#                                       un build, une suite, toutes les preuves PIE dans un editeur)
+#
+# EDITOR_QUEUE_001 (2026-10-01) : une file, un editeur. Les agents ne demarrent plus d'editeur pour
+# se prouver ; l'integrateur rejoue suite et preuves de tout un lot. Voir AGENTS.md.
 #   agent-worktree.ps1 preflight
 #   agent-worktree.ps1 postflight
 #   agent-worktree.ps1 mcp        -Mission world-slice-007
@@ -25,7 +29,10 @@ param(
   [string[]]$Missions,
   [string]$From = 'main',
   # finish / integrate-batch : build et tests Unreal meme sans changement Unreal.
-  [switch]$Full
+  [switch]$Full,
+  # finish : lancer la suite ICI, dans un editeur a soi (l'ancien finish). Par defaut, la suite et
+  # les preuves PIE attendent le lot (EDITOR_QUEUE_001) : un seul editeur pour tout le monde.
+  [switch]$Prove
 )
 $ErrorActionPreference = 'Stop'
 
@@ -51,6 +58,83 @@ function Handoff-Path($m) { return (Join-Path (Path-Of $m) "docs\unreal\handoffs
 $HandoffDir = Join-Path $WorktreeRoot '.handoff'
 function Handoff-Marker($m) { return (Join-Path $HandoffDir "$m.txt") }
 
+# Le marqueur dit AUSSI ce que finish a prouve (EDITOR_QUEUE_001) : `<sha> <mode>`.
+#   proved    build + suite passes dans le worktree (finish -Prove, ou -Full)
+#   queued    build passe ; suite et preuves PIE attendent le lot (integrate-batch)
+#   nounreal  rien que le build ou la suite puissent juger
+# Un marqueur d'avant (sha seul) vaut `proved`.
+function Read-HandoffMarker($m) {
+  $file = Handoff-Marker $m
+  if (-not (Test-Path -LiteralPath $file)) { return $null }
+  $parts = @((Get-Content -LiteralPath $file -Raw).Trim() -split '\s+')
+  return [PSCustomObject]@{ Sha = $parts[0]; Mode = $(if ($parts.Count -gt 1) { $parts[1] } else { 'proved' }) }
+}
+function Write-HandoffMarker($m, [string]$sha, [string]$mode) {
+  New-Item -ItemType Directory -Force $HandoffDir | Out-Null
+  "$sha $mode" | Set-Content (Handoff-Marker $m) -Encoding ascii
+}
+
+# Verrou de main (EDITOR_QUEUE_001). Un lot dure 20 a 40 min (porte memoire, build, suite, preuves) ;
+# sans verrou, un `integrate` d'un autre agent avancait main pendant ce temps et le lot entier
+# etait perdu (« main a bouge pendant le lot ») -- deux fois le 2026-10-01. Pris par integrate et
+# integrate-batch, rendu a la fin ; un verrou dont le processus n'existe plus est repris.
+$MainLock = Join-Path $HandoffDir 'MAIN.lock'
+$script:LockHeld = $false
+function Read-MainLock {
+  if (-not (Test-Path -LiteralPath $MainLock)) { return $null }
+  try { $l = Get-Content -LiteralPath $MainLock -Raw | ConvertFrom-Json } catch { return [PSCustomObject]@{ Holder = 'illisible'; Alive = $false } }
+  $proc = if ($l.Pid) { Get-Process -Id $l.Pid -ErrorAction SilentlyContinue } else { $null }
+  # Un pid recycle n'est pas le titulaire : son processus a demarre apres la prise du verrou.
+  $alive = $proc -and (-not $proc.StartTime -or $proc.StartTime -le [datetime]$l.Since)
+  return [PSCustomObject]@{ Holder = $l.Holder; Pid = $l.Pid; Since = $l.Since; Alive = [bool]$alive }
+}
+function Enter-MainLock([string]$holder) {
+  New-Item -ItemType Directory -Force $HandoffDir | Out-Null
+  for ($try = 0; $try -lt 2; $try++) {
+    try {
+      $fs = [IO.File]::Open($MainLock, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+      $bytes = [Text.Encoding]::UTF8.GetBytes(([PSCustomObject]@{ Holder = $holder; Pid = $PID; Since = (Get-Date -Format 'o') } | ConvertTo-Json -Compress))
+      $fs.Write($bytes, 0, $bytes.Length)
+      $fs.Close()
+      $script:LockHeld = $true
+      Write-Output "MAIN_LOCK::PRIS $holder"
+      return
+    } catch {
+      $l = Read-MainLock
+      if ($l -and $l.Alive) {
+        Fail ("FAIL: MAIN_LOCK::TENU par $($l.Holder) (pid $($l.Pid), depuis $($l.Since)). Un versement est en cours : " +
+          'main ne bougera pas sous lui. Attendre BATCH_INTEGRATED, ou confier la mission au lot suivant.')
+      }
+      Write-Output "NOTE: verrou de main perime ($(if ($l) { $l.Holder } else { '?' })) : repris"
+      Remove-Item -LiteralPath $MainLock -Force -ErrorAction SilentlyContinue
+    }
+  }
+  Fail 'FAIL: verrou de main impossible a prendre'
+}
+function Exit-MainLock {
+  if ($script:LockHeld) { Remove-Item -LiteralPath $MainLock -Force -ErrorAction SilentlyContinue; $script:LockHeld = $false }
+}
+
+# Preuves PIE qu'une mission declare dans sa fiche : une ligne `PROOFS: a, b` (noms de
+# tools/unreal/proofs.txt). `(aucune)`, `aucune` ou `-` : rien. Lue dans le commit de la branche.
+function Get-DeclaredProofs([string]$repo, [string]$rev, [string]$m) {
+  $text = (Invoke-Git -C $repo show "$($rev):docs/unreal/handoffs/$m.md").Out
+  $names = @()
+  foreach ($line in $text) {
+    if ($line -match '^\s*PROOFS\s*:\s*(.+)$') {
+      $names += @($Matches[1] -split ',' | ForEach-Object { $_.Trim().Trim('`') } |
+        Where-Object { $_ -and $_ -notmatch '^\(?aucune\)?$' -and $_ -ne '-' })
+    }
+  }
+  return @($names | Select-Object -Unique)
+}
+function Get-RegisteredProofs([string]$root) {
+  $file = Join-Path $root 'tools\unreal\proofs.txt'
+  if (-not (Test-Path $file)) { return @() }
+  return @(Get-Content $file -Encoding UTF8 | Where-Object { $_.Trim() -and -not $_.TrimStart().StartsWith('#') } |
+    ForEach-Object { ($_ -split '\s\|\s')[0].Trim() })
+}
+
 # Un changement « Unreal » : ce que le build ou la suite d'automation peuvent juger. Une
 # branche qui ne touche que docs/, tools/migration/ ou des scripts n'a rien a leur montrer,
 # et leur passage coutait 15 a 20 min de porte memoire et d'editeur par mission
@@ -74,9 +158,11 @@ function Unreal-Changes([string]$repo, [string]$range) {
 }
 
 # Le build et la suite d'un arbre, ou rien s'il n'y a pas de changement Unreal.
-# Ecrit son compte rendu et pose $script:GateOk.
-function Invoke-UnrealGate([string]$root, [string[]]$unreal) {
+# Sans $runTests (finish par defaut) : le build seul, la suite attend le lot -- pas d'editeur.
+# Ecrit son compte rendu et pose $script:GateOk et $script:GateMode (proved | queued | nounreal).
+function Invoke-UnrealGate([string]$root, [string[]]$unreal, [bool]$runTests = $true) {
   $script:GateOk = $false
+  $script:GateMode = 'nounreal'
   if ($unreal.Count -eq 0 -and -not $Full) {
     Write-Output 'UNREAL_CHANGE::NON (ni Source/, ni Config/, ni Content/, ni Plugins/, ni .uproject)'
     Write-Output 'BUILD::SKIP  TESTS::SKIP  -- rien a montrer au build ni a la suite (-Full pour les forcer)'
@@ -86,8 +172,15 @@ function Invoke-UnrealGate([string]$root, [string[]]$unreal) {
   if ($unreal.Count -gt 0) { Write-Output "UNREAL_CHANGE::OUI ($($unreal.Count) fichier(s), par ex. $($unreal[0]))" }
   & (Join-Path $root 'tools\unreal\anastasis-unreal.ps1') build
   if ($LASTEXITCODE -ne 0) { Write-Output 'FAIL: build'; return }
+  if (-not $runTests) {
+    Write-Output 'TESTS::QUEUED -- la suite et les preuves PIE tournent au lot (integrate-batch), dans UN editeur pour tout le lot'
+    $script:GateMode = 'queued'
+    $script:GateOk = $true
+    return
+  }
   & (Join-Path $root 'tools\unreal\report-tests.ps1')
   if ($LASTEXITCODE -ne 0) { Write-Output 'FAIL: des tests sont en echec reel'; return }
+  $script:GateMode = 'proved'
   $script:GateOk = $true
 }
 
@@ -203,6 +296,8 @@ function Canonical-State {
   }
 }
 
+# Le verrou de main est rendu quoi qu'il arrive : `exit` (Fail) execute aussi ce finally.
+try {
 switch ($Command) {
 
   'create' {
@@ -270,6 +365,21 @@ switch ($Command) {
     } else {
       Write-Output 'BRANCHES_NON_INTEGREES::aucune'
     }
+    # EDITOR_QUEUE_001 : ce que l'integrateur a a verser, et si un lot tient main.
+    $lock = Read-MainLock
+    Write-Output ('MAIN_LOCK::' + $(if ($lock -and $lock.Alive) { "TENU $($lock.Holder) depuis $($lock.Since)" } else { 'libre' }))
+    $readyRows = @()
+    foreach ($r in $rows) {
+      if ($r.Ahead -eq '0' -or -not $r.Branch.StartsWith('agent/')) { continue }
+      $mk = Read-HandoffMarker $r.Mission
+      if ($mk -and $mk.Sha -eq (& git -C $Canonical rev-parse $r.Branch).Trim()) { $readyRows += $r.Mission + " ($($mk.Mode))" }
+    }
+    if ($readyRows.Count -gt 0) {
+      Write-Output ('PRETES_POUR_LE_LOT::' + ($readyRows -join ', '))
+      Write-Output ('    tools\unreal\agent-worktree.ps1 integrate-batch -Missions ' + (($readyRows | ForEach-Object { ($_ -split ' ')[0] }) -join ','))
+    } else {
+      Write-Output 'PRETES_POUR_LE_LOT::aucune'
+    }
   }
 
   'finish' {
@@ -306,9 +416,21 @@ switch ($Command) {
       Write-Output '    Fermeture propre : quit_editor() par MCP, ou Stop-Process -Id <pid> (c est le tien : son chemin est ce worktree).'
       exit 1
     }
-    # Build et suite seulement si la branche change quelque chose qu'ils jugent.
+    # Les preuves PIE que la fiche declare (`PROOFS: a, b`) doivent exister au registre : le lot
+    # les rejouera, et une preuve inconnue y ferait echouer TOUT le lot.
+    $declared = @(Get-DeclaredProofs $path 'HEAD' $Mission)
+    $known = @(Get-RegisteredProofs $path)
+    $unknownProofs = @($declared | Where-Object { $known -notcontains $_ })
+    if ($unknownProofs.Count -gt 0) {
+      Write-Output ('FAIL: preuve(s) declaree(s) absente(s) de tools/unreal/proofs.txt : ' + ($unknownProofs -join ', '))
+      Write-Output '    Inscrire la preuve au registre (nom | script | reussite | echec | delai | variables), ou la retirer de PROOFS:'
+      exit 1
+    }
+    Write-Output ('PROOFS::' + $(if ($declared.Count) { $declared -join ', ' } else { '(aucune)' }))
+    # Build seulement si la branche change quelque chose qu'il juge ; la suite, seulement avec
+    # -Prove ou -Full (EDITOR_QUEUE_001 : sinon elle attend le lot, un editeur pour tous).
     $mb = (Invoke-Git -C $path merge-base main HEAD).Out[0]
-    Invoke-UnrealGate $path @(Unreal-Changes $path "$mb..HEAD")
+    Invoke-UnrealGate $path @(Unreal-Changes $path "$mb..HEAD") ([bool]($Prove -or $Full))
     if (-not $script:GateOk) { exit 1 }
     $dirty = @(& git -C $path status --porcelain --untracked-files=all)
     Write-Output ''
@@ -319,11 +441,15 @@ switch ($Command) {
       Write-Output 'Un commit est l unite de passation : commit tout avant de passer la main.'
       exit 1
     }
-    New-Item -ItemType Directory -Force $HandoffDir | Out-Null
-    (Invoke-Git -C $path rev-parse HEAD).Out[0] | Set-Content (Handoff-Marker $Mission) -Encoding ascii
-    Write-Output 'HANDOFF_READY::YES'
-    Write-Output "Passation : tools\unreal\agent-worktree.ps1 integrate -Mission $Mission"
-    Write-Output "     ou, groupee : tools\unreal\agent-worktree.ps1 integrate-batch -Missions $Mission,<autres>"
+    Write-HandoffMarker $Mission (Invoke-Git -C $path rev-parse HEAD).Out[0] $script:GateMode
+    Write-Output "HANDOFF_READY::YES ($($script:GateMode))"
+    if ($script:GateMode -eq 'queued') {
+      Write-Output 'Passation : la mission attend le prochain lot. L integrateur la verse avec les autres :'
+      Write-Output "     tools\unreal\agent-worktree.ps1 integrate-batch -Missions $Mission,<autres>"
+      Write-Output '     (suite + preuves PIE declarees, un seul editeur pour tout le lot). Ne pas lancer d editeur pour se prouver.'
+    } else {
+      Write-Output "Passation : tools\unreal\agent-worktree.ps1 integrate-batch -Missions $Mission,<autres>"
+    }
   }
 
   'integrate' {
@@ -347,6 +473,13 @@ switch ($Command) {
     #    versements, n'est plus un ancetre-de-main mais n'a plus rien a apporter.
     $ahead = [int](Invoke-Git -C $Canonical rev-list --count "main..$branch").Out[0]
     if ($ahead -eq 0) { Write-Output "NOTHING_TO_INTEGRATE::$branch deja dans main"; exit 0 }
+    # Une mission dont la suite attend le lot n'a rien prouve d'executable : elle passe par le lot.
+    $marker = Read-HandoffMarker $Mission
+    $tipNow = (Invoke-Git -C $Canonical rev-parse $branch).Out[0]
+    if ($marker -and $marker.Mode -eq 'queued' -and $marker.Sha -eq $tipNow) {
+      Fail "FAIL: $Mission attend le lot (TESTS::QUEUED) : tools\unreal\agent-worktree.ps1 integrate-batch -Missions $Mission"
+    }
+    Enter-MainLock "integrate:$Mission"
     if ((Invoke-Git -C $Canonical merge-base --is-ancestor main $branch).Code -ne 0) {
       Write-Output 'FAIL: pas d avance rapide possible (main a avance). Dans le worktree :'
       Write-Output "    git rebase main ; tools\unreal\agent-worktree.ps1 finish -Mission $Mission"
@@ -410,6 +543,8 @@ switch ($Command) {
     foreach ($m in $list) {
       if ($m -notmatch '^[a-z0-9][a-z0-9._-]*$') { Fail "FAIL: nom de mission invalide '$m'" }
     }
+    # Le verrou AVANT de lire main : personne ne la deplacera sous le lot.
+    Enter-MainLock ('integrate-batch:' + ($list -join ','))
     $mainBefore = (Invoke-Git -C $Canonical rev-parse main).Out[0]
     Write-Output "MAIN_BEFORE::$mainBefore"
 
@@ -420,8 +555,8 @@ switch ($Command) {
       $b = Branch-Of $m
       if ((Invoke-Git -C $Canonical rev-parse --verify --quiet $b).Code -ne 0) { $rejected += "$m : branche introuvable"; continue }
       $tip = (Invoke-Git -C $Canonical rev-parse $b).Out[0]
-      $marker = Handoff-Marker $m
-      $proved = if (Test-Path -LiteralPath $marker) { (Get-Content -LiteralPath $marker -Raw).Trim() } else { '' }
+      $marker = Read-HandoffMarker $m
+      $proved = if ($marker) { $marker.Sha } else { '' }
       if ($proved -ne $tip) {
         $rejected += "$m : pas de HANDOFF_READY sur son commit actuel $($tip.Substring(0, 7)) (relancer finish)"
         continue
@@ -485,6 +620,33 @@ switch ($Command) {
     Write-Output 'CHECKS::PASS index tools/unreal, lancements Unreal'
     Invoke-UnrealGate $integ @(Unreal-Changes $integ "$mainBefore..HEAD")
     if (-not $script:GateOk) { Write-Output 'BATCH::FAIL rien n a bouge (main intact)'; exit 1 }
+
+    # 3b. Les preuves PIE declarees par les missions du lot, toutes dans UN editeur
+    #     (EDITOR_QUEUE_001). Une preuve en echec designe sa mission.
+    $owner = @{}
+    foreach ($a in $applied) {
+      foreach ($pr in (Get-DeclaredProofs $Canonical (Branch-Of $a.Mission) $a.Mission)) {
+        if (-not $owner.ContainsKey($pr)) { $owner[$pr] = @() }
+        $owner[$pr] += $a.Mission
+      }
+    }
+    if ($owner.Count -gt 0) {
+      $known = @(Get-RegisteredProofs $integ)
+      $missing = @($owner.Keys | Where-Object { $known -notcontains $_ })
+      if ($missing.Count -gt 0) { Write-Output ('BATCH::FAIL preuve(s) absente(s) du registre du lot : ' + ($missing -join ', ')); exit 1 }
+      $proofOut = @(& (Join-Path $integ 'tools\unreal\editor-batch.ps1') -Proofs @($owner.Keys) 2>&1 | ForEach-Object { "$_" })
+      $proofCode = $LASTEXITCODE
+      $proofOut | ForEach-Object { Write-Output $_ }
+      if ($proofCode -ne 0) {
+        foreach ($line in $proofOut) {
+          if ($line -match '^PROOF::FAIL (\S+)') { Write-Output "BATCH_PROOF_FAIL::$($Matches[1]) (mission $($owner[$Matches[1]] -join ', '))" }
+        }
+        Write-Output 'BATCH::FAIL preuves PIE en echec, rien n a bouge (main intact) : relancer le lot sans la mission designee'
+        exit 1
+      }
+    } else {
+      Write-Output 'PROOFS::aucune preuve PIE declaree par le lot'
+    }
 
     # 4. Avance rapide de main sur le sommet du lot.
     $mainNow = (Invoke-Git -C $Canonical rev-parse main).Out[0]
@@ -595,3 +757,4 @@ switch ($Command) {
     Write-Output 'POSTFLIGHT::PASS  aucune mutation pendant la fenetre'
   }
 }
+} finally { Exit-MainLock }

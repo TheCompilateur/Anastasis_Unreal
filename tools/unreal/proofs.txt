@@ -1,0 +1,17 @@
+# Registre des preuves PIE rejouables en lot (EDITOR_QUEUE_001).
+#
+# Une mission declare les preuves de son chantier dans sa fiche de passation :
+#     PROOFS: player-pie, village-weather-pie
+# integrate-batch les rejoue toutes, pour tout le lot, dans UN SEUL editeur (editor-batch.ps1).
+#
+# Une ligne par preuve, six champs separes par « | » ENTOURE D'ESPACES (un motif regex garde ses
+# alternatives `a|b` collees) :
+#   nom | script | motif de reussite (regex) | motif d'echec (regex, - si aucun) | delai (s) | variables
+# Reussite = le motif de reussite apparait entre le debut et la fin du travail, et le motif d'echec non.
+# Variables : NOM=valeur;NOM=valeur. Une valeur qui commence par @ est un chemin relatif a la racine.
+# Un script qui ne logue qu'un *_COMPLETE prouve seulement qu'il est alle au bout : lui donner un
+# motif d'echec, ou mieux un verdict PASS/FAIL, avant de l'inscrire.
+
+player-pie | tools/unreal/player-pie.py | PLAYER_PIE PASS | PLAYER_PIE FAIL|PLAYER_PIE_TIMEOUT|PLAYER_PIE CHECK FAIL | 600 | ANASTASIS_PLAYER_PIE_OUT=@Saved/PlayerEvidence/pie
+village-weather-pie | tools/unreal/village-weather-pie.py | VILLAGE_WEATHER_COMPLETE | VILLAGE_WEATHER_(NO_SHELTER_GOAL|NEVER_INSIDE|NEVER_LEFT|TIMEOUT) | 900 | -
+villager-pie | tools/unreal/villager-pie.py | VILLAGER_PIE PASS | VILLAGER_PIE FAIL | 900 | ANASTASIS_VILLAGER_PIE_OUT=@Saved/VillagerEvidence/pie;ANASTASIS_VILLAGER_PIE_NPCS=12

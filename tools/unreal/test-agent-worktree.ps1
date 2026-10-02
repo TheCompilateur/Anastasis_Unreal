@@ -121,7 +121,7 @@ $w8 = NewMission 'b1' @({ param($w) Set-Content "$w\doc-b1.md" 'b1' })
 $r = AW finish -Mission b1
 $marker = Join-Path $wtRoot '.handoff\b1.txt'
 Check 'S8 finish docs seulement : build et tests sautes' ($r.Code -eq 0 -and $r.Out -match 'TESTS::SKIP' -and $r.Out -match 'HANDOFF_READY::YES') $r.Out
-Check 'S8 marqueur HANDOFF_READY = commit de la branche' ((Test-Path $marker) -and ((Get-Content $marker -Raw).Trim() -eq (G rev-parse agent/b1)))
+Check 'S8 marqueur HANDOFF_READY = commit de la branche, mode nounreal' ((Test-Path $marker) -and ((Get-Content $marker -Raw).Trim() -eq ((G rev-parse agent/b1) + ' nounreal')))
 
 # 9. finish avec un changement Unreal : le build est tente (il echoue sur ce depot sans moteur).
 $w9 = NewMission 'u1' @({ param($w) New-Item -ItemType Directory -Force "$w\Source" | Out-Null; Set-Content "$w\Source\x.cpp" '// x' })
@@ -152,5 +152,56 @@ Check 'S11 prune reconnait une mission versee par lot' ($r.Code -eq 0 -and -not 
 & git -C $w2 commit -q --allow-empty -m 'apres finish' 2>&1 | Out-Null
 $r = AW integrate-batch -Missions 'b2'
 Check 'S12 lot : commit posterieur a finish refuse' ($r.Code -ne 0 -and $r.Out -match 'BATCH_REJECTED::b2 : pas de HANDOFF_READY') $r.Out
+
+# --- EDITOR_QUEUE_001 ---------------------------------------------------------------------
+$lockFile = Join-Path $wtRoot '.handoff\MAIN.lock'
+G checkout -q -f main | Out-Null; G clean -fdq | Out-Null
+
+# 13. Verrou de main tenu par un processus vivant (ce banc) : integrate refuse, main intacte.
+NewBranch 'l1' { param($w) Set-Content "$w\doc-l1.md" 'l1' }
+New-Item -ItemType Directory -Force (Split-Path $lockFile) | Out-Null
+[PSCustomObject]@{ Holder = 'integrate-batch:banc'; Pid = $PID; Since = (Get-Date -Format 'o') } | ConvertTo-Json -Compress | Set-Content $lockFile
+$mainAvant = (G rev-parse main)
+$r = AW integrate -Mission l1
+Check 'S13 verrou tenu : integrate refuse, main intacte' ($r.Code -ne 0 -and $r.Out -match 'MAIN_LOCK::TENU par integrate-batch:banc' -and (G rev-parse main) -eq $mainAvant) $r.Out
+$r = AW status
+Check 'S13 status montre le verrou' ($r.Out -match 'MAIN_LOCK::TENU integrate-batch:banc') $r.Out
+
+# 14. Verrou perime (processus disparu) : repris, integre, puis rendu.
+[PSCustomObject]@{ Holder = 'mort'; Pid = 999999; Since = (Get-Date -Format 'o') } | ConvertTo-Json -Compress | Set-Content $lockFile
+$r = AW integrate -Mission l1
+Check 'S14 verrou perime repris, integre' ($r.Code -eq 0 -and $r.Out -match 'verrou de main perime \(mort\)' -and (G rev-parse main) -eq (G rev-parse agent/l1)) $r.Out
+Check 'S14 verrou rendu apres integrate' (-not (Test-Path $lockFile))
+
+# 15. Une mission dont la suite attend le lot (queued) : integrate la renvoie au lot.
+NewBranch 'q1' { param($w) Set-Content "$w\doc-q1.md" 'q1' }
+Set-Content (Join-Path $wtRoot '.handoff\q1.txt') ((G rev-parse agent/q1) + ' queued')
+$mainAvant = (G rev-parse main)
+$r = AW integrate -Mission q1
+Check 'S15 mission queued : integrate refuse, renvoie au lot' ($r.Code -ne 0 -and $r.Out -match 'attend le lot' -and (G rev-parse main) -eq $mainAvant -and -not (Test-Path $lockFile)) $r.Out
+
+# 16. Fiche qui declare une preuve absente du registre : finish refuse.
+$null = NewMission 'p1' @({ param($w) Add-Content "$w\docs\unreal\handoffs\p1.md" 'PROOFS: inconnue-pie' })
+$r = AW finish -Mission p1
+Check 'S16 preuve inconnue : finish refuse' ($r.Code -ne 0 -and $r.Out -match 'absente\(s\) de tools/unreal/proofs.txt : inconnue-pie' -and -not (Test-Path (Join-Path $wtRoot '.handoff\p1.txt'))) $r.Out
+
+# 17. Preuve connue declaree, docs seulement : finish passe et la cite ; status la donne prete.
+$null = NewMission 'p2' @({ param($w) Add-Content "$w\docs\unreal\handoffs\p2.md" 'PROOFS: village-weather-pie' })
+$r = AW finish -Mission p2
+Check 'S17 preuve connue : finish passe et la cite' ($r.Code -eq 0 -and $r.Out -match 'PROOFS::village-weather-pie' -and $r.Out -match 'HANDOFF_READY::YES \(nounreal\)') $r.Out
+$r = AW status
+Check 'S17 status : p2 prete pour le lot, commande donnee' ($r.Out -match 'PRETES_POUR_LE_LOT::.*p2 \(nounreal\)' -and $r.Out -match 'integrate-batch -Missions .*p2') $r.Out
+
+# 18. Registre des preuves : chaque ligne se lit (six champs), chaque script existe ; un lot se
+#     prepare sans editeur (-DryRun) ; une preuve inconnue est refusee avant tout demarrage.
+$eb = "$repo\tools\unreal\editor-batch.ps1"
+$list = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $eb -List 2>&1 | ForEach-Object { "$_" })
+$registered = @($list | Where-Object { $_ -like 'PROOF_REGISTERED::*' })
+Check 'S18 registre lisible, scripts presents' ($LASTEXITCODE -eq 0 -and $registered.Count -ge 1 -and -not ($registered -match 'script=ABSENT')) ($list -join "`n")
+$names = ($registered | ForEach-Object { ($_ -split '::')[1].Split(' ')[0] }) -join ','
+$dry = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $eb -Proofs $names -DryRun 2>&1 | ForEach-Object { "$_" }) -join "`n"
+Check 'S18 lot prepare sans editeur (-DryRun)' ($LASTEXITCODE -eq 0 -and $dry -match "EDITOR_BATCH::DRYRUN $($registered.Count) preuve") $dry
+$bad = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $eb -Proofs 'inconnue-pie' -DryRun 2>&1 | ForEach-Object { "$_" }) -join "`n"
+Check 'S18 preuve inconnue refusee avant l editeur' ($bad -match 'absente\(s\) de proofs.txt : inconnue-pie') $bad
 
 Remove-Item $base -Recurse -Force -ErrorAction SilentlyContinue
