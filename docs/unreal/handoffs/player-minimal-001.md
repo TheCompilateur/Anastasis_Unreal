@@ -23,12 +23,17 @@ jours oisifs font baisser sa réputation. Détail : `docs/unreal/PLAYER_MINIMAL_
 
 ## COMMIT
 
-PENDING
+`6529e38` (code, preuve), puis cette fiche.
 
 ## MEC
 
-- BUILD: PENDING
-- TESTS: PENDING
+- BUILD: `BUILD::PASS` ; unity prouvé par `Build.bat ... -DisableAdaptiveUnity` (`Module.AnastasisSim.cpp`,
+  `Module.Anastasis_UnrealV2.1.cpp` recompilés, `Result: Succeeded`).
+- TESTS (`finish`, 2026-10-01) : PASS 236, KNOWN_EXPECTED_FAILURE 4 (les quatre du registre), FAIL 0, TOTAL 240 =
+  annoncés 240. `HANDOFF_READY::YES`.
+  - `Anastasis.Sim.Joueur.Observateur` / `.Incarnation` / `.Marche` / `.Presence` / `.Reputation` : Success
+  - déterminisme intact : `Anastasis.Sim.Tick.Determinism`, `Village.Endurance`, `Village.{Puits,Maison,Grenier,Recolte}.MultiAgents`,
+    `Harnais.Trace`, `Empreinte.Parite` / `.Invariants`, `Parite.Liens`, `Parite.Nous` : Success
 - COMMANDS:
   - `tools\unreal\anastasis-unreal.ps1 build`
   - `tools\unreal\player-pie.ps1`
