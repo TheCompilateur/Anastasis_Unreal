@@ -64,3 +64,11 @@ ligne BUTS ; 0 retire l'intention.
 - Parole dirigée (`T`) : non portée. Mode visuel `PLAYER` : non commencé.
 - Pas de touche dédiée par but : 1 à 5 suivent l'ordre de la table du moment, qui change avec les besoins
   (comme la référence). La ligne BUTS dit ce que chaque touche fait maintenant.
+
+## ECARTS
+
+- ouvert : n° 20 — Le joueur est un habitant : incarnation et main portées, sans flux joueur ni parole dirigée (A_TRANCHER)
+- ouvert : n° 21 — Le remède passe quand le corps parle (EXTENSION, A_TRANCHER : à trancher par Alexandre)
+- ouvert : n° 22 — Présence, oisiveté et réputation du joueur (EXTENSION, A_TRANCHER ; entré avec player-minimal-001 sans fiche, numéroté ici)
+- ouvert : n° 23 — Réputation : seul le mérite des bâtiments est porté (REDUIT, A_TRANCHER)
+- cités, inchangés : n° 1 (but non porté dans la table du joueur), n° 2 (collant non porté, ligne retouchée)

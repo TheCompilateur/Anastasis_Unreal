@@ -4,11 +4,11 @@
 // drivePlayerActor, choosePlayerGoal, playerGoalOptions, playerRefusal), `decisionProvider.js`
 // (decideAsPlayer : sans commande l'habitant incarne attend, avec une intention il la tient tant
 // qu'elle passe, et cede en disant pourquoi) et `updateNpc` de npc.js (branche `playerControlled`).
-// Porte aussi : la reputation (`standing.js`, merite des batiments acheves).
-// PAS porte : la parole dirigee (`requestPlayerTellResourceSpot`), le flux aleatoire joueur
+// Porte aussi : la reputation (`standing.js`, merite des batiments acheves ; le reste : ecart n°23).
+// PAS porte (ecart n°20) : la parole dirigee (`requestPlayerTellResourceSpot`), le flux aleatoire joueur
 // (`spawnNpc` n'en tire aucun ici).
 //
-// EXTENSION (TIME_WARP_001, demande d'Alexandre) : presence et oisivete. Un joueur qui accelere le
+// EXTENSION (TIME_WARP_001, demande d'Alexandre, ecart n°22) : presence et oisivete. Un joueur qui accelere le
 // temps ne fait rien aux yeux du village ; il s'efface de leur vue et sa reputation baisse.
 
 #include "Village/AnastasisVillage.h"
@@ -191,11 +191,11 @@ namespace AnastasisVillage
 		}
 		const FString& Wanted = PlayerChoice.Goal;
 		// 1. Le corps passe devant. L'intention n'est pas retiree : le joueur choisit le remede.
-		//    EXTENSION (ecart assume) : la reference teste `bodyOverrides` avant tout et refuse donc AUSSI
+		//    EXTENSION (ecart n°21) : la reference teste `bodyOverrides` avant tout et refuse donc AUSSI
 		//    le remede -- un joueur a soif 88 ne pourrait plus jamais boire. Son propre commentaire dit
 		//    « le joueur doit choisir le remede » : le remede du besoin qui parle passe.
 		if (BodyOverrides(Npc) && !IsRemedyFor(Npc, Wanted)) return CedePlayerGoal(PlayerDecision::RefusalBody);
-		// 2. SYM-1 : la table fait foi. Un but absent (ou non porte ici) est impossible maintenant.
+		// 2. SYM-1 : la table fait foi. Un but absent de la table, ou que ce portage ne sait pas executer (ecart n°1), est impossible maintenant.
 		const bool bInTable = IsPortedGoalFor(Npc, Wanted)
 			&& Rows.ContainsByPredicate([&](const TPair<FString, double>& Row) { return Row.Key == Wanted; });
 		if (!bInTable) return CedePlayerGoal(PlayerDecision::RefusalNotInTable);
@@ -237,8 +237,8 @@ namespace AnastasisVillage
 	{
 		for (FNpc& Npc : Actors.GetItemsMutable())
 		{
-			// Merite de la reference : `deeds.built x buildGain` (porte) ; ambitions, jalons, conseils,
-			// vols : non portes. EXTENSION : l'oisivete du joueur, qui ne s'efface pas (un acte reste un acte).
+			// Merite de la reference : `deeds.built x buildGain` (porte) ; ambitions, jalons, conseils (ecart n°23),
+			// vols : non portes (ecart n°23). EXTENSION (ecart n°22) : l'oisivete du joueur, qui ne s'efface pas (un acte reste un acte).
 			const double IdleDays = Npc.IdleSeconds / AnastasisRhythm::DayLength;
 			const double Merit = Npc.BuildingsCompleted * Standing::BuildGain - IdleDays * Standing::IdleMeritPerDay;
 			const double Target = Clamp(Standing::Base + Merit, 0.0, 100.0);

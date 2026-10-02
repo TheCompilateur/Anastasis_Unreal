@@ -353,3 +353,64 @@ sec attend, le bois et la pierre ne se récoltent pas encore.
 Registre fini lu sur une tuile `Food` générée, collecte et livraison à scores bornés, sans repousse.
 À trancher : fonction du jeu (`ASSUME`), ou banc d'essai à retirer quand la cueillette des sans-métier
 sera portée (goals-resources-001) ?
+
+### n° 20 — Le joueur est un habitant : incarnation et main portées, sans flux joueur ni parole dirigée
+
+- **classe** : REDUIT
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : player-minimal-001 (incarnation, attente, marche directe), player-goals-001 (choix de but, refus)
+- **reference** : `src/sim/simulation.js` (`incarnate`, `release`, `arriveAsPlayer`, `setPlayerMovementInput`, `drivePlayerActor`, `choosePlayerGoal`, `playerGoalOptions`), `src/sim/decisionProvider.js`
+- **cpp** : `Village/AnastasisVillagePlayer.cpp` ; seams dans `Village/AnastasisVillage.cpp` (`UpdateNpc`, `ChooseGoal`)
+- **harnais** : aucune
+- **detail** : `docs/unreal/PLAYER_MINIMAL_001.md`
+
+Aucun scénario du harnais n'incarne de joueur, et `player*` est hors périmètre projeté. Porté : `playerPersonId` seule vérité, attente `idle`, marche directe, intention qui dure et cède avec
+`hors-table` / `verrou` / `le-corps-parle`, Noûs muet pour l'incarné. Non porté : `_playerRng` (ici
+`spawnNpc` ne tire rien, il n'y a donc pas de flux à isoler), la parole dirigée (`playerTalkIntent`,
+`requestPlayerTellResourceSpot`). `ArriveAsPlayer` cherche le premier sol libre en anneaux, là où la
+référence pose sans vérifier. Les options affichées sont celles de la dernière décision, sans relecture.
+
+### n° 21 — Le remède passe quand le corps parle
+
+- **classe** : EXTENSION
+- **destin** : A_TRANCHER
+- **activation** : joueur incarné dont l'intention est `drink` (soif ≥ 88), `eat` (faim ≥ 92) ou `rest` (énergie ≤ 12) ; aucun scénario du harnais n'incarne de joueur
+- **statut** : OUVERT
+- **entree** : player-goals-001
+- **reference** : `src/sim/decisionProvider.js` `decideAsPlayer` (`bodyOverrides` testé avant la table)
+- **cpp** : `Village/AnastasisVillagePlayer.cpp` `DecideAsPlayer`, `IsRemedyFor`
+- **harnais** : aucune
+
+La référence cède à TOUTE intention quand le corps parle, remède compris : un joueur à soif 88 ne
+pourrait plus jamais boire et finirait par mourir. Son propre commentaire dit « le joueur doit choisir
+le remède ». À trancher par Alexandre : `ASSUME` (le jeu garde ce comportement) ou corriger la référence.
+
+### n° 22 — Présence, oisiveté et réputation du joueur (temps accéléré)
+
+- **classe** : EXTENSION
+- **destin** : A_TRANCHER
+- **activation** : hôte seulement — `FVillage::ObservePlayer`, appelé par le témoin TIME_WARP_001 pour un joueur incarné ; sans joueur, présence 1 et réputation 50 rendent chaque règle au bit près ; aucun scénario du harnais ne l'appelle
+- **statut** : OUVERT
+- **entree** : player-minimal-001 (sans fiche à l'époque) ; numéroté par player-goals-001
+- **reference** : aucune — demande d'Alexandre du 2026-10-01 (`docs/unreal/TIME_WARP_001.md`)
+- **cpp** : `Village/AnastasisVillagePlayer.cpp` (`ObservePlayer`, `Sees`, `ReputationAffinity`, oisiveté dans `UpdateReputationDaily`) ; `Village/AnastasisVillage.cpp` (`PickSocialCompanion`, `BondSocialTarget`, `PickRememberedSeekFor`)
+- **harnais** : aucune
+
+`Presence`, `IdleSeconds` et `Reputation` sont hors empreinte. Un joueur qui accélère le temps ne fait rien aux yeux du village : il est vu jusqu'à présence × portée
+(plus du tout sous 5 %), oublié sous 25 %, et ses jours oisifs sont un mérite négatif permanent de sa
+réputation, qui pèse sur l'envie de lui parler (le joueur seulement).
+
+### n° 23 — Réputation : seul le mérite des bâtiments est porté
+
+- **classe** : REDUIT
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : player-minimal-001 (structure), player-goals-001 (`deeds.built`)
+- **reference** : `src/life/standing.js` `updateReputationDaily` (ambitions, jalons, conseils d'aîné, vols, plancher des aînés)
+- **cpp** : `Village/AnastasisVillagePlayer.cpp` `UpdateReputationDaily`, appelé par `FAnastasisSimulation::OnNewDay`
+- **harnais** : aucune
+
+La réputation n'est pas dans l'empreinte C++. `reputation += (cible − reputation) × 0,4` à minuit, cible = 50 + `BuildingsCompleted × 3`. Ambitions,
+jalons, conseils, vols et le plancher des aînés ne sont pas portés. Entre habitants, la réputation ne
+pèse sur aucune décision (n° 22 : seul le joueur).

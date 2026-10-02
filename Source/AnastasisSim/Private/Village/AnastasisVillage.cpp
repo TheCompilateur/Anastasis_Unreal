@@ -1424,7 +1424,7 @@ namespace AnastasisVillage
 			ClearNavigation(Npc);
 		}
 
-		// `playerControlled` (player-minimal-001) : l'habitant incarne pense sans Nous et marche a la main.
+		// `playerControlled` (player-minimal-001, ecart n°20) : l'habitant incarne pense sans Nous et marche a la main.
 		if (IsPlayer(Npc))
 		{
 			UpdatePlayer(Npc, Dt);
@@ -1560,7 +1560,7 @@ namespace AnastasisVillage
 			Row.Value += AnastasisWeatherBehavior::WeatherGoalBias(TickWeather, Npc.JobId, Row.Key);
 		}
 
-		// commitGoalChoice : (collant non porte) Noûs biaise la table avant le tri. Pas pour l'habitant
+		// commitGoalChoice : (collant non porte, ecart n°2) Noûs biaise la table avant le tri. Pas pour l'habitant
 		// incarne : `algoOn = !playerControlled` (npc.js), Noûs ne pense pas pour lui.
 		const bool bPlayer = IsPlayer(Npc);
 		if (!bPlayer)
@@ -1627,7 +1627,7 @@ namespace AnastasisVillage
 				Trace.bStormGate = true;
 			}
 		}
-		// `decideGoal(sim, npc, scores, ctx)` (player-goals-001) : le seam unique, APRES le tri,
+		// `decideGoal(sim, npc, scores, ctx)` (player-goals-001, ecart n°20) : le seam unique, APRES le tri,
 		// l'eligibilite et les verrous. Pour tout autre habitant, la fonction identite.
 		if (bPlayer)
 		{
@@ -4012,7 +4012,7 @@ namespace AnastasisVillage
 			FNpc& Other = Items[Index];
 			if (&Other == &Npc) return;
 			const double D = Dist(Npc.X, Npc.Y, Other.X, Other.Y);
-			// EXTENSION (player-minimal-001) : presence 1, exactement `D > MaxDistance`.
+			// EXTENSION (player-minimal-001, ecart n°22) : presence 1, exactement `D > MaxDistance`.
 			if (!Sees(Other, D, MaxDistance)) return;
 			const BD::FPersonRow* Row = BD::FindPerson(Npc.People, Other.Id);
 			const double Affinity = BD::CompanionAffinity(RelationOf(Npc, Other.Id), Row ? Row->Trust : 0.0,
@@ -4315,7 +4315,7 @@ namespace AnastasisVillage
 			// Sans famille ni partenaire : seuls les amis comptent.
 			if (RelationOf(Npc, Other.Id) < BD::FriendAt) return;
 			const double D = Dist(Npc.X, Npc.Y, Other.X, Other.Y);
-			// EXTENSION (player-minimal-001) : presence 1, exactement `D > Range`.
+			// EXTENSION (player-minimal-001, ecart n°22) : presence 1, exactement `D > Range`.
 			if (!Sees(Other, D, Range)) return;
 			if (Other.Inside.bActive && Other.Inside.BuildingId != Living && !IsSociallyAvailable(Other)) return;
 			const BD::FPersonRow* Row = BD::FindPerson(Npc.People, Other.Id);
@@ -4382,7 +4382,7 @@ namespace AnastasisVillage
 			[&](const FString& Id, double& X, double& Y)
 			{
 				const FNpc* Other = Actors.FindById(Id);
-				// EXTENSION (player-minimal-001) : on ne va plus chercher quelqu'un qu'on ne voit plus.
+				// EXTENSION (player-minimal-001, ecart n°22) : on ne va plus chercher quelqu'un qu'on ne voit plus.
 				if (!Other || Other->Presence < Standing::RememberPresenceMin) return false;
 				X = Other->X;
 				Y = Other->Y;
