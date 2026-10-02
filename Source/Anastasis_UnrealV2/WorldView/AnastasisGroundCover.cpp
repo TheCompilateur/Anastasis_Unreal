@@ -65,6 +65,10 @@ bool ValidSettings(const FSettings& C)
 		&& Finite(C.Density) && C.Density > 0.0 && C.Density <= 1.0
 		&& Finite(C.CanopyExclusion) && Finite(C.CanopyShade)
 		&& C.CanopyExclusion >= 0.0 && C.CanopyShade >= C.CanopyExclusion
+		&& Finite(C.TrunkClearance) && C.TrunkClearance >= 0.0 && C.TrunkClearance < C.CanopyExclusion
+		&& Finite(C.UnderstoryDensity) && C.UnderstoryDensity > 0.0 && C.UnderstoryDensity <= 1.0
+		&& Finite(C.UnderstoryPatchFloor) && C.UnderstoryPatchFloor >= 0.0 && C.UnderstoryPatchFloor <= 1.0
+		&& Finite(C.HartsTongueWetness) && C.HartsTongueWetness > 0.0
 		&& Finite(C.ScaleMin) && Finite(C.ScaleMax) && C.ScaleMin > 0.0 && C.ScaleMax >= C.ScaleMin && C.ScaleMax <= 4.0
 		&& C.MaxInstances > 0;
 }
@@ -112,11 +116,11 @@ struct FCanopyIndex
 };
 }
 
-FVector3f AnastasisGroundCover::FCoverField::Sample(double X, double Y) const
+FVector4f AnastasisGroundCover::FCoverField::Sample(double X, double Y) const
 {
-	if (!IsValid()) return FVector3f::ZeroVector;
+	if (!IsValid()) return FVector4f(0, 0, 0, 0);
 	const double U = (X - Origin.X) / CellUU - 0.5, V = (Y - Origin.Y) / CellUU - 0.5;
-	if (!FMath::IsFinite(U) || !FMath::IsFinite(V) || U < -0.5 || V < -0.5 || U > W - 0.5 || V > H - 0.5) return FVector3f::ZeroVector;
+	if (!FMath::IsFinite(U) || !FMath::IsFinite(V) || U < -0.5 || V < -0.5 || U > W - 0.5 || V > H - 0.5) return FVector4f(0, 0, 0, 0);
 	const int32 X0 = FMath::Clamp(FMath::FloorToInt(U), 0, W - 2), Y0 = FMath::Clamp(FMath::FloorToInt(V), 0, H - 2);
 	const float FX = static_cast<float>(FMath::Clamp(U - X0, 0.0, 1.0)), FY = static_cast<float>(FMath::Clamp(V - Y0, 0.0, 1.0));
 	const int32 A = Y0 * W + X0;
@@ -139,16 +143,17 @@ void AnastasisGroundCover::BuildCoverField(const FPlan& Plan, const FBox2D& Boun
 	{
 		const int32 X = FMath::FloorToInt((P.Ground.X - Out.Origin.X) / CellUU), Y = FMath::FloorToInt((P.Ground.Y - Out.Origin.Y) / CellUU);
 		if (X < 0 || Y < 0 || X >= Out.W || Y >= Out.H) continue;
-		FVector3f& C = Out.Cover[Y * Out.W + X];
+		FVector4f& C = Out.Cover[Y * Out.W + X];
 		switch (P.Family)
 		{
 		case EFamily::MeadowTall: case EFamily::MeadowShort: C.X += PerTuft; break;
 		case EFamily::Sedge: C.Y += PerTuft; break;
-		default: C.Z += PerTuft; break;
+		case EFamily::HeathTussock: case EFamily::Heather: C.Z += PerTuft; break;
+		default: C.W += PerTuft; break;
 		}
 	}
 	// Deux passes de flou 3x3 : ~3 cellules de portee, pas de marche a la frontiere d'une tache.
-	TArray<FVector3f> Tmp;
+	TArray<FVector4f> Tmp;
 	for (int32 Pass = 0; Pass < 2; ++Pass)
 	{
 		Tmp = Out.Cover;
@@ -156,7 +161,7 @@ void AnastasisGroundCover::BuildCoverField(const FPlan& Plan, const FBox2D& Boun
 		{
 			for (int32 X = 0; X < Out.W; ++X)
 			{
-				FVector3f Sum = FVector3f::ZeroVector;
+				FVector4f Sum(0, 0, 0, 0);
 				int32 N = 0;
 				for (int32 DY = -1; DY <= 1; ++DY)
 				{
@@ -172,16 +177,16 @@ void AnastasisGroundCover::BuildCoverField(const FPlan& Plan, const FBox2D& Boun
 			}
 		}
 	}
-	for (FVector3f& C : Out.Cover)
+	for (FVector4f& C : Out.Cover)
 	{
-		C = FVector3f(FMath::Clamp(C.X, 0.f, 1.f), FMath::Clamp(C.Y, 0.f, 1.f), FMath::Clamp(C.Z, 0.f, 1.f));
+		C = FVector4f(FMath::Clamp(C.X, 0.f, 1.f), FMath::Clamp(C.Y, 0.f, 1.f), FMath::Clamp(C.Z, 0.f, 1.f), FMath::Clamp(C.W, 0.f, 1.f));
 	}
 }
 
-FLinearColor AnastasisGroundCover::TintSoil(const FLinearColor& Base, const FVector3f& Cover, const FSoilTint& T, double* Amount)
+FLinearColor AnastasisGroundCover::TintSoil(const FLinearColor& Base, const FVector4f& Cover, const FSoilTint& T, double* Amount)
 {
 	using namespace AnastasisGroundCover::Detail;
-	const double Total = static_cast<double>(Cover.X) + Cover.Y + Cover.Z;
+	const double Total = static_cast<double>(Cover.X) + Cover.Y + Cover.Z + Cover.W;
 	if (Amount) *Amount = 0.0;
 	if (!(Total > 1e-4) || !(T.FullCover > 0.0)) return Base;
 	const auto Target = [&](const FLinearColor& Factor, const FLinearColor& Absolute)
@@ -191,7 +196,8 @@ FLinearColor AnastasisGroundCover::TintSoil(const FLinearColor& Base, const FVec
 	};
 	const FLinearColor Mixed = (Target(T.MeadowFactor, T.MeadowAbsolute) * Cover.X
 		+ Target(T.SedgeFactor, T.SedgeAbsolute) * Cover.Y
-		+ Target(T.LandeFactor, T.LandeAbsolute) * Cover.Z) / static_cast<float>(Total);
+		+ Target(T.LandeFactor, T.LandeAbsolute) * Cover.Z
+		+ Target(T.UnderstoryFactor, T.UnderstoryAbsolute) * Cover.W) / static_cast<float>(Total);
 	const double Share = FMath::Clamp(T.Strength, 0.0, 1.0) * Smooth(FMath::Min(Total, 1.0) / T.FullCover);
 	if (Amount) *Amount = Share;
 	FLinearColor Out = FMath::Lerp(Base, Mixed, static_cast<float>(Share));
@@ -208,6 +214,9 @@ const TCHAR* AnastasisGroundCover::FamilyName(EFamily Family)
 	case EFamily::Sedge: return TEXT("Sedge");
 	case EFamily::HeathTussock: return TEXT("HeathTussock");
 	case EFamily::Heather: return TEXT("Heather");
+	case EFamily::Fern: return TEXT("Fern");
+	case EFamily::HartsTongue: return TEXT("HartsTongue");
+	case EFamily::WoodHerb: return TEXT("WoodHerb");
 	default: return TEXT("Unknown");
 	}
 }
@@ -326,8 +335,54 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 					const double CrownDistance = Canopy.Nearest(X, Y);
 					if (CrownDistance < C.CanopyExclusion)
 					{
-						++Row.RejectedCanopy;
-						Row.RejectedCanopySteep += Slope > C.MeadowSlopeDegrees ? 1 : 0;
+						// SOUS-BOIS (H5). Sous la couronne, la prairie cede la place aux fougeres et aux
+						// herbacees d'ombre (EZ3). Pas au pied du tronc : racines et ombre la plus dense.
+						if (CrownDistance < C.TrunkClearance)
+						{
+							++Row.RejectedCanopy;
+							Row.RejectedCanopySteep += Slope > C.MeadowSlopeDegrees ? 1 : 0;
+							continue;
+						}
+						double Wet = 0.0;
+						if (In.SampleWetness)
+						{
+							double W;
+							if (In.SampleWetness(X, Y, W) && FMath::IsFinite(W)) Wet = FMath::Clamp(W, 0.0, 1.0);
+						}
+						if (C.DampHeightUU > 0.0 && AboveWater < TNumericLimits<double>::Max())
+						{
+							Wet = FMath::Max(Wet, 1.0 - Smooth((AboveWater - C.WaterClearanceUU) / C.DampHeightUU));
+						}
+						// Plaques franches : une fougeraie, puis de la litiere, puis une autre.
+						const double Plaque = Patch(In.Seed, X, Y, C.PatchSpanUU * 0.7, 61);
+						const double UDensity = C.UnderstoryDensity
+							* FMath::Lerp(C.UnderstoryPatchFloor, 1.0, Smooth((Plaque - 0.3) / 0.45))
+							* (1.0 - 0.4 * Smooth((Slope - 30.0) / 15.0));
+						if (Unit(Hash(In.Seed, GX, GY, 13)) >= UDensity) { ++Row.RejectedDensity; continue; }
+						// Lumiere : 0 au pied du tronc, 1 au bord de la couronne. Fougere dans les trouees
+						// et en lisiere de couronne, herbacee dans l'ombre profonde, scolopendre a l'humide.
+						const double Light = Smooth((CrownDistance - C.TrunkClearance) / (C.CanopyExclusion - C.TrunkClearance));
+						EFamily UFamily;
+						if (Unit(Hash(In.Seed, GX, GY, 21)) < 0.08 + 0.6 * Smooth((Wet - C.HartsTongueWetness * 0.5) / C.HartsTongueWetness))
+						{
+							UFamily = EFamily::HartsTongue;
+						}
+						else
+						{
+							const double FernChance = FMath::Lerp(0.35, 0.85, Light)
+								* FMath::Lerp(0.5, 1.0, Smooth((Patch(In.Seed, X, Y, C.PatchSpanUU * 0.5, 71) - 0.25) / 0.5));
+							UFamily = Unit(Hash(In.Seed, GX, GY, 22)) < FernChance ? EFamily::Fern : EFamily::WoodHerb;
+						}
+						FPlacement& U = Row.Instances.AddDefaulted_GetRef();
+						U.Ground = FVector(X, Y, Z);
+						U.Normal = FVector(-(East - West) / (2.0 * R), -(North - South) / (2.0 * R), 1.0).GetSafeNormal();
+						U.Yaw = 360.0 * Unit(Hash(In.Seed, GX, GY, 16));
+						U.Scale = FMath::Lerp(C.ScaleMin, C.ScaleMax, Unit(Hash(In.Seed, GX, GY, 17)));
+						U.SlopeDegrees = Slope;
+						U.Wetness = Wet;
+						U.Family = UFamily;
+						U.Thin = Unit(Hash(In.Seed, GX, GY, 18));
+						++Row.Understory;
 						continue;
 					}
 					const double Shade = C.CanopyShade > C.CanopyExclusion
@@ -441,6 +496,7 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 		Out.RejectedCanopy += Row.RejectedCanopy;
 		Out.RejectedDensity += Row.RejectedDensity;
 		Out.RejectedCanopySteep += Row.RejectedCanopySteep;
+		Out.Understory += Row.Understory;
 		for (int32 B = 0; B < 6; ++B) Out.SlopeBins[B] += Row.SlopeBins[B];
 		for (const FPlacement& P : Row.Instances)
 		{

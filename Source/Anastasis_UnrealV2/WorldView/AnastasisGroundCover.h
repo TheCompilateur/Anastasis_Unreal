@@ -11,8 +11,11 @@
  *   H3  Sedge        prairie humide, laiches et carex (EZ5, EZ4, EZ2)   : rive, creux mouilles
  *   H6a HeathTussock touffe d'eboulis, graminee dure (EZ1 "rochers, eboulis") : versant 20-45 deg
  *   H6b Heather      callune de lande, epis mauves (EZ1 "pente subalpine : landes") : haut de versant
- * Restent a faire : joncs de rive (H4), herbacees de sous-bois (H5). Au-dela de
- * MaxSlopeDegrees (falaise) et sous la couronne d'un arbre, rien n'est pose.
+ *   H5a Fern         fougere en volant, frondes divisees (EZ3 "fougeres & herbacees") : trouees, bord de couronne
+ *   H5b HartsTongue  scolopendre, lanieres entieres luisantes (EZ3, palette) : ombre humide
+ *   H5c WoodHerb     herbacee d'ombre, luzule / anemone (EZ3 "strate herbacee") : ombre profonde
+ * Reste a faire : joncs de rive (H4). Au-dela de MaxSlopeDegrees (falaise) et au pied des troncs,
+ * rien n'est pose.
  *
  * Pure et deterministe : aucune dependance UObject, aucun etat global. L'incarnation fournit
  * le sol, l'eau et l'humidite REELLEMENT rendus, le masque des espaces ouverts et les
@@ -20,7 +23,7 @@
  */
 namespace AnastasisGroundCover
 {
-enum class EFamily : uint8 { MeadowTall, MeadowShort, Sedge, HeathTussock, Heather, Count };
+enum class EFamily : uint8 { MeadowTall, MeadowShort, Sedge, HeathTussock, Heather, Fern, HartsTongue, WoodHerb, Count };
 
 inline constexpr int32 FamilyCount = static_cast<int32>(EFamily::Count);
 
@@ -78,6 +81,13 @@ struct FSettings
 	double CanopyShade = 1.6;
 	/** Sous ce multiple du rayon de couronne : sous-bois, pas de prairie. */
 	double CanopyExclusion = 0.8;
+	/** Sous-bois (H5) : rien sous ce multiple du rayon (pied du tronc, racines, ombre la plus dense). */
+	double TrunkClearance = 0.15;
+	/** Densite du sous-bois et plancher de ses taches : il colonise par plaques, sol de litiere entre elles. */
+	double UnderstoryDensity = 0.6;
+	double UnderstoryPatchFloor = 0.2;
+	/** Humidite a partir de laquelle la scolopendre prend le pas. */
+	double HartsTongueWetness = 0.3;
 	double ScaleMin = 0.8;
 	double ScaleMax = 1.2;
 	/** Garde-fou de cout : au-dela, la passe s'arrete et le dit. Toute la carte : ~1 M attendu. */
@@ -143,6 +153,8 @@ struct FPlan
 	int32 RejectedWater = 0;
 	int32 RejectedSlope = 0;
 	int32 RejectedCanopy = 0;
+	/** Candidates posees en sous-bois (sous une couronne). */
+	int32 Understory = 0;
 	int32 RejectedDensity = 0;
 	/** Candidates sur sol sec par pente mesuree : 0-10, 10-20, 20-30, 30-45, 45-60, 60+ deg. */
 	int32 SlopeBins[6] = {};
@@ -157,7 +169,8 @@ bool Build(const FInputs& In, const FSettings& Settings, FPlan& Out, FString& Ou
 
 /**
  * SOL SOUS L'HERBE. Part du sol couverte, par groupe de familles, lissee sur une grille de
- * quelques metres : X prairie (haute + basse), Y laiches, Z lande (touffes + callune), [0,1].
+ * quelques metres : X prairie (haute + basse), Y laiches, Z lande (touffes + callune), W sous-bois
+ * (fougeres, scolopendre, herbacees d'ombre), [0,1].
  * C'est un champ BASSE FREQUENCE : il teinte la couleur de sommet du sol, qui porte la chromie
  * large (GROUND_HYDROLOGY_ARBITRATION.md) ; le materiau de sol garde le detail.
  */
@@ -167,11 +180,11 @@ struct FCoverField
 	double CellUU = 400.0;
 	int32 W = 0;
 	int32 H = 0;
-	TArray<FVector3f> Cover;
+	TArray<FVector4f> Cover;
 
 	bool IsValid() const { return W > 1 && H > 1 && Cover.Num() == W * H && CellUU > 0.0; }
 	/** Bilineaire entre centres de cellules ; hors grille : zero. */
-	FVector3f Sample(double X, double Y) const;
+	FVector4f Sample(double X, double Y) const;
 };
 
 /** Teinte du sol sous chaque groupe : multiplicative sur la teinte de tuile, puis tiree vers un absolu. */
@@ -181,10 +194,13 @@ struct FSoilTint
 	FLinearColor MeadowFactor = FLinearColor(0.62f, 0.70f, 0.50f);
 	FLinearColor SedgeFactor = FLinearColor(0.50f, 0.58f, 0.50f);
 	FLinearColor LandeFactor = FLinearColor(0.82f, 0.72f, 0.62f);
+	/** Sous-bois : litiere de feuilles mortes et humus (EZ3, "litiere forestiere"). */
+	FLinearColor UnderstoryFactor = FLinearColor(0.72f, 0.60f, 0.46f);
 	/** Couleurs absolues vers lesquelles on tire a moitie : un sable sous prairie verdit. */
 	FLinearColor MeadowAbsolute = FLinearColor(0.070f, 0.085f, 0.035f);
 	FLinearColor SedgeAbsolute = FLinearColor(0.050f, 0.062f, 0.038f);
 	FLinearColor LandeAbsolute = FLinearColor(0.095f, 0.082f, 0.060f);
+	FLinearColor UnderstoryAbsolute = FLinearColor(0.055f, 0.042f, 0.026f);
 	double AbsoluteShare = 0.5;
 	/** Couverture a partir de laquelle la teinte est pleine. */
 	double FullCover = 0.6;
@@ -194,5 +210,5 @@ struct FSoilTint
 /** Champ de couverture d'un plan : comptes par cellule normalises, puis deux passes de flou 3x3. */
 void BuildCoverField(const FPlan& Plan, const FBox2D& Bounds, double CellUU, double CandidateCellUU, FCoverField& Out);
 /** Teinte d'un sommet de sol ; Amount (optionnel) recoit la part de teinte appliquee [0,1]. Alpha intact. */
-FLinearColor TintSoil(const FLinearColor& Base, const FVector3f& Cover, const FSoilTint& Tint, double* Amount = nullptr);
+FLinearColor TintSoil(const FLinearColor& Base, const FVector4f& Cover, const FSoilTint& Tint, double* Amount = nullptr);
 }

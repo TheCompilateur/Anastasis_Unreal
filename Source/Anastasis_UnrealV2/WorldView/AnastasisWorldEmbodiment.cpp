@@ -1506,8 +1506,9 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 		CVarGroundCoverSoilTint.GetValueOnGameThread() != 0, TintedVertices, TintedVertices > 0 ? TintSum / TintedVertices : 0.0);
 
 	UE_LOG(LogAnastasis_UnrealV2, Display,
-		TEXT("ANASTASIS_GROUND_COVER enabled=1 tall=%d short=%d sedge=%d heath=%d heather=%d placed=%d near=%d far=%d chunks=%d outside_valley=%d shadows=%d candidates=%d refused_mask=%d refused_ground=%d refused_water=%d refused_slope=%d refused_canopy=%d refused_density=%d crowns=%d clearings=%d truncated=%d missing_meshes=%d plan_ms=%.1f total_ms=%.1f"),
-		Cover.Counts[0], Cover.Counts[1], Cover.Counts[2], Cover.Counts[3], Cover.Counts[4], Placed, PerTier[0], PerTier[1], Chunks, OutsideValley, bShadows,
+		TEXT("ANASTASIS_GROUND_COVER enabled=1 tall=%d short=%d sedge=%d heath=%d heather=%d fern=%d harts=%d herb=%d understory=%d placed=%d near=%d far=%d chunks=%d outside_valley=%d shadows=%d candidates=%d refused_mask=%d refused_ground=%d refused_water=%d refused_slope=%d refused_canopy=%d refused_density=%d crowns=%d clearings=%d truncated=%d missing_meshes=%d plan_ms=%.1f total_ms=%.1f"),
+		Cover.Counts[0], Cover.Counts[1], Cover.Counts[2], Cover.Counts[3], Cover.Counts[4],
+		Cover.Counts[5], Cover.Counts[6], Cover.Counts[7], Cover.Understory, Placed, PerTier[0], PerTier[1], Chunks, OutsideValley, bShadows,
 		Cover.Candidates, Cover.RejectedMask, Cover.RejectedGround, Cover.RejectedWater, Cover.RejectedSlope,
 		Cover.RejectedCanopy, Cover.RejectedDensity, Canopy.Num(), In.Clearings.Num(), Cover.bTruncated, Missing,
 		PlanMs, (FPlatformTime::Seconds() - Start) * 1000.0);

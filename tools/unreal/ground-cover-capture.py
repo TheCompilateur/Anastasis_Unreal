@@ -205,6 +205,23 @@ try:
         d = math.hypot(dx, dy) or 1.0
         plan.append(('lande_eye', (heath[0] - dx / d, heath[1] - dy / d), 170, (heath[0] + dx / d * 0.5, heath[1] + dy / d * 0.5), 60))
     unreal.log('GROUND_CAPTURE_LANDE %s' % (('tile=%.1f,%.1f' % heath) if heath else 'NONE'))
+    # Sous-bois (H5) : debout dans la tuile de fougeres la plus fournie, regard vers le centre.
+    fern, best = None, 0
+    for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
+        if not comp.get_name().startswith('GroundCover_Fern_Near'):
+            continue
+        n = comp.get_instance_count()
+        if n > best:
+            got = comp.get_instance_transform(n // 2, True)
+            xf = got[1] if isinstance(got, tuple) else got
+            tx, ty = xf.translation.x / T, xf.translation.y / T
+            if 8 < tx < 88 and 8 < ty < 88:
+                fern, best = (tx, ty), n
+    if fern:
+        dx, dy = 48.0 - fern[0], 48.0 - fern[1]
+        d = math.hypot(dx, dy) or 1.0
+        plan.append(('sousbois_eye', (fern[0] - dx / d * 0.4, fern[1] - dy / d * 0.4), 170, (fern[0] + dx / d * 0.6, fern[1] + dy / d * 0.6), 40))
+    unreal.log('GROUND_CAPTURE_SOUSBOIS %s' % (('tile=%.1f,%.1f' % fern) if fern else 'NONE'))
 
     views = []
     for name, eye_t, lift, tgt_t, tlift in plan:

@@ -7,6 +7,9 @@ PROPRIETE DES ASSETS. Ce script est la SOURCE D'AUTORITE de
   /Game/Anastasis/GroundCover/SM_Grass_Sedge_01         H3 prairie humide (laiches, carex)
   /Game/Anastasis/GroundCover/SM_Grass_HeathTussock_01  H6a touffe d'eboulis (lande, graminee dure)
   /Game/Anastasis/GroundCover/SM_Grass_Heather_01       H6b callune de lande, epis mauves
+  /Game/Anastasis/GroundCover/SM_Grass_Fern_01          H5a fougere en volant, frondes divisees
+  /Game/Anastasis/GroundCover/SM_Grass_HartsTongue_01   H5b scolopendre, lanieres entieres
+  /Game/Anastasis/GroundCover/SM_Grass_WoodHerb_01      H5c herbacee d'ombre, luzule et anemones
   /Game/Anastasis/Materials/M_AnastasisGrass
 Il les recree a l'identique a chaque run (graine fixe). Une touffe se change ICI, dans les
 chiffres : une retouche a la main ne survit pas au run suivant.
@@ -154,6 +157,48 @@ FAMILIES = [
         # Mauve sourd, pas magenta : v1 a (0.200, 0.085, 0.170) sortait rose vif sous le soleil du banc.
         'heads': 60, 'head_height': (18.0, 36.0), 'head_color': c(0.150, 0.070, 0.135),
         'head_size': (6.0, 0.9),
+    },
+    # SOUS-BOIS (H5). EZ3 : "strate herbacee : fougeres, graminees, plantes vivaces, luzules,
+    # asperules, anemones" ; palette "fougeres, scolopendre" ; "sous-bois sombre, ambiance humide".
+    {
+        # Fougere en volant (fougere male / aigle) : 6-9 frondes divisees qui montent puis
+        # s'arquent. Pas une herbe : une tige (rachis) et des paires de folioles qui
+        # raccourcissent vers la pointe. Fin d'ete : un quart des frondes bronze.
+        'name': 'SM_Grass_Fern_01',
+        'note': 'H5a fougere : 6-9 frondes de 50-95 cm, 14-18 paires de folioles, 25 % bronze',
+        'kind': 'fern',
+        'fronds': (6, 9), 'length': (50.0, 95.0), 'lift': (0.30, 0.60), 'droop': (1.10, 1.50),
+        'pairs': (14, 18), 'pinna_len': (9.0, 16.0), 'pinna_w': (2.0, 2.8),
+        'base': c(0.030, 0.058, 0.020),
+        'tip': c(0.078, 0.140, 0.042),
+        'bronze': (0.25, c(0.060, 0.050, 0.022), c(0.165, 0.112, 0.046)),
+    },
+    {
+        # Scolopendre : rosette de lanieres entieres, larges, vert sombre luisant, qui
+        # retombent. Les lames du pipeline d'herbe, mais larges et peu nombreuses.
+        'name': 'SM_Grass_HartsTongue_01',
+        'note': 'H5b scolopendre : 14 lanieres de 25-45 cm, 3,5-5,5 cm de large, vert sombre',
+        'radius': 18.0, 'tufts': 1, 'blades': 14, 'spread': 3.0,
+        'height': (25.0, 45.0), 'width': (3.5, 5.5), 'lean': (0.45, 0.85), 'bend': (0.50, 1.00),
+        'segments': 5,
+        'base': c(0.022, 0.048, 0.020),
+        'tips': [(0.85, c(0.045, 0.098, 0.035)), (0.15, c(0.080, 0.090, 0.040))],
+        'straw': (c(0.060, 0.055, 0.030), c(0.110, 0.090, 0.050)),
+        'heads': 0,
+    },
+    {
+        # Herbacee d'ombre : touffe basse de luzule, vert sombre, quelques etoiles blanches
+        # d'anemone des bois (le petit blanc de la planche EZ3, "fougeres & herbacees").
+        'name': 'SM_Grass_WoodHerb_01',
+        'note': 'H5c herbacee d ombre : luzule 12-28 cm vert sombre, 10 etoiles blanches',
+        'radius': 30.0, 'tufts': 4, 'blades': 110, 'spread': 7.0, 'fill': 0.2,
+        'height': (12.0, 28.0), 'width': (0.8, 1.4), 'lean': (0.20, 0.70), 'bend': (0.40, 1.10),
+        'segments': 3,
+        'base': c(0.024, 0.044, 0.018),
+        'tips': [(0.80, c(0.055, 0.098, 0.036)), (0.20, c(0.090, 0.100, 0.045))],
+        'straw': (c(0.070, 0.060, 0.035), c(0.120, 0.100, 0.060)),
+        'heads': 10, 'head_height': (14.0, 24.0), 'head_color': c(0.62, 0.62, 0.56),
+        'head_size': (2.4, 1.3),
     },
 ]
 
@@ -309,6 +354,83 @@ def draw_blades(spec, rng):
                       'height': rng.uniform(*spec['head_height']), 'lean': rng.uniform(0.04, 0.22),
                       'keep': rng.random()})
     return blades, heads
+
+
+def draw_fern(spec, rng):
+    """Tire les frondes UNE fois ; les LOD en simplifient le dessin, pas la disposition."""
+    n = rng.randint(*spec['fronds'])
+    fronds = []
+    for k in range(n):
+        yaw = (k + rng.uniform(-0.3, 0.3)) * math.tau / n
+        bronze = rng.random() < spec['bronze'][0]
+        tint = rng.uniform(0.88, 1.12)
+        base, tip = (spec['bronze'][1], spec['bronze'][2]) if bronze else (spec['base'], spec['tip'])
+        fronds.append({'yaw': yaw, 'length': rng.uniform(*spec['length']), 'lift': rng.uniform(*spec['lift']),
+                       'droop': rng.uniform(*spec['droop']), 'pairs': rng.randint(*spec['pairs']),
+                       'pinna_len': rng.uniform(*spec['pinna_len']), 'pinna_w': rng.uniform(*spec['pinna_w']),
+                       'col_base': scaled(base, tint), 'col_tip': scaled(tip, tint),
+                       'origin': (rng.gauss(0.0, 2.0), rng.gauss(0.0, 2.0), -3.0)})
+    return fronds
+
+
+def fern_frond(buf, f, lod):
+    """Rachis en arc, puis paires de folioles posees presque a plat, plus courtes vers la pointe.
+
+    LOD0 : toutes les paires, folioles a 2 segments. LOD1 : une paire sur deux, elargies, 1 segment.
+    LOD2 : la fronde entiere devient une seule lame large, de la largeur de ses folioles.
+    """
+    yaw, length = f['yaw'], f['length']
+    dx, dy = math.cos(yaw), math.sin(yaw)
+    out = (dx, dy)
+    if lod == 2:
+        blade(buf, f['origin'], yaw, length, 1.6 * f['pinna_len'], f['lift'] + 0.2, f['droop'] - f['lift'],
+              2, f['col_base'], f['col_tip'], out)
+        return
+    nodes = f['pairs'] + 3
+    step = length / nodes
+    p = list(f['origin'])
+    pts = []
+    for i in range(nodes + 1):
+        t = i / float(nodes)
+        pts.append((tuple(p), t))
+        ang = f['lift'] + (f['droop'] - f['lift']) * t ** 1.5
+        p[0] += dx * math.sin(ang) * step
+        p[1] += dy * math.sin(ang) * step
+        p[2] += math.cos(ang) * step
+    # Rachis : un ruban fin le long de l'arc (stipe nu sur les trois premiers noeuds).
+    sx, sy = -dy, dx
+    normal = up_normal(out)
+    prev = None
+    for (q, t) in pts:
+        half = 0.35 * (1.0 - 0.7 * t)
+        rgb = lerp3(f['col_base'], f['col_tip'], t)
+        alpha = max(0.0, min(1.0, q[2] / 100.0))
+        a = buf.vertex((q[0] - sx * half, q[1] - sy * half, q[2]), normal, rgb, alpha, (0.0, t))
+        b = buf.vertex((q[0] + sx * half, q[1] + sy * half, q[2]), normal, rgb, alpha, (1.0, t))
+        if prev:
+            buf.tri(prev[0], a, prev[1])
+            buf.tri(prev[1], a, b)
+        prev = (a, b)
+    stride = 1 if lod == 0 else 2
+    widen = 1.0 if lod == 0 else 1.7
+    segments = 2 if lod == 0 else 1
+    for i in range(3, nodes, stride):
+        t = (i - 3) / float(max(1, nodes - 4))
+        # Fronde triangulaire : folioles longues a la base, courtes a la pointe.
+        plen = f['pinna_len'] * (1.0 - 0.85 * t) + 1.0
+        pw = f['pinna_w'] * (1.0 - 0.5 * t) * widen
+        rgb_b = lerp3(f['col_base'], f['col_tip'], 0.4 + 0.6 * t)
+        for side in (-1, 1):
+            blade(buf, pts[i][0], yaw + side * 1.25, plen, pw, 1.30, 0.25, segments, rgb_b, f['col_tip'], out)
+
+
+def build_fern_lod(spec, fronds, lod):
+    buf = Buffers()
+    for f in fronds:
+        fern_frond(buf, f, lod)
+    if not buf.t:
+        raise RuntimeError('%s LOD%d: aucun triangle' % (spec['name'], lod))
+    return buf.mesh(), len(buf.t)
 
 
 def build_lod(spec, blades, heads, lod):
@@ -506,8 +628,12 @@ def main():
     report = []
     for spec in FAMILIES:
         rng = random.Random('%d/%s' % (SEED, spec['name']))
-        blades, heads = draw_blades(spec, rng)
-        built = [build_lod(spec, blades, heads, lod) for lod in range(3)]
+        if spec.get('kind') == 'fern':
+            fronds = draw_fern(spec, rng)
+            built = [build_fern_lod(spec, fronds, lod) for lod in range(3)]
+        else:
+            blades, heads = draw_blades(spec, rng)
+            built = [build_lod(spec, blades, heads, lod) for lod in range(3)]
         triangles = save_static_mesh([m for m, n in built], PACKAGE_PATH + '/' + spec['name'], material)
         report.append('%s=%s' % (spec['name'], triangles))
         log('  %s -- %s' % (spec['name'], spec['note']))

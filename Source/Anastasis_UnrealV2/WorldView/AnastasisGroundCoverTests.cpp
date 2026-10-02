@@ -171,29 +171,33 @@ bool FAnastasisGroundCoverSoilTint::RunTest(const FString&)
 	AnastasisGroundCover::FCoverField Field;
 	AnastasisGroundCover::BuildCoverField(Plan, Half.Bounds, 400.0, AnastasisGroundCover::FSettings().CellUU, Field);
 	TestTrue(TEXT("field is valid"), Field.IsValid());
-	const FVector3f West = Field.Sample(2000.0, 5000.0), East = Field.Sample(8500.0, 5000.0);
+	const FVector4f West = Field.Sample(2000.0, 5000.0), East = Field.Sample(8500.0, 5000.0);
 	AddInfo(FString::Printf(TEXT("cover west=(%.2f %.2f %.2f) east=(%.2f %.2f %.2f)"), West.X, West.Y, West.Z, East.X, East.Y, East.Z));
-	TestTrue(TEXT("meadow covers the west"), West.X > 0.3f && West.Y < 0.01f && West.Z < 0.01f);
-	TestTrue(TEXT("nothing covers the east"), East.X + East.Y + East.Z < 0.01f);
-	TestTrue(TEXT("outside the grid is bare"), Field.Sample(-5000.0, 5000.0).IsNearlyZero());
+	TestTrue(TEXT("meadow covers the west"), West.X > 0.3f && West.Y < 0.01f && West.Z < 0.01f && West.W < 0.01f);
+	TestTrue(TEXT("nothing covers the east"), East.X + East.Y + East.Z + East.W < 0.01f);
+	const FVector4f Outside = Field.Sample(-5000.0, 5000.0);
+	TestTrue(TEXT("outside the grid is bare"), Outside.X + Outside.Y + Outside.Z + Outside.W == 0.f);
 
 	// Teinte : sol nu intact, alpha intact, prairie plus sombre et plus verte que la lande.
 	const AnastasisGroundCover::FSoilTint Tint;
 	const FLinearColor Grass(0.16f, 0.19f, 0.07f, 0.0f), Sand(0.30f, 0.25f, 0.15f, 1.0f);
 	double Amount = -1.0;
-	TestTrue(TEXT("bare soil unchanged"), AnastasisGroundCover::TintSoil(Grass, FVector3f::ZeroVector, Tint, &Amount).Equals(Grass) && Amount == 0.0);
-	const FLinearColor UnderMeadow = AnastasisGroundCover::TintSoil(Grass, FVector3f(1, 0, 0), Tint, &Amount);
+	TestTrue(TEXT("bare soil unchanged"), AnastasisGroundCover::TintSoil(Grass, FVector4f(0, 0, 0, 0), Tint, &Amount).Equals(Grass) && Amount == 0.0);
+	const FLinearColor UnderMeadow = AnastasisGroundCover::TintSoil(Grass, FVector4f(1, 0, 0, 0), Tint, &Amount);
 	TestTrue(TEXT("full cover tints at full strength"), FMath::IsNearlyEqual(Amount, Tint.Strength, 1e-6));
-	TestTrue(TEXT("alpha (underwater flag) kept"), UnderMeadow.A == Grass.A && AnastasisGroundCover::TintSoil(Sand, FVector3f(1, 0, 0), Tint).A == Sand.A);
+	TestTrue(TEXT("alpha (underwater flag) kept"), UnderMeadow.A == Grass.A && AnastasisGroundCover::TintSoil(Sand, FVector4f(1, 0, 0, 0), Tint).A == Sand.A);
 	TestTrue(TEXT("soil under meadow is darker"), UnderMeadow.GetLuminance() < Grass.GetLuminance());
-	const FLinearColor SandMeadow = AnastasisGroundCover::TintSoil(Sand, FVector3f(1, 0, 0), Tint);
+	const FLinearColor SandMeadow = AnastasisGroundCover::TintSoil(Sand, FVector4f(1, 0, 0, 0), Tint);
 	TestTrue(TEXT("sand under meadow turns greener"), SandMeadow.G / SandMeadow.R > Sand.G / Sand.R);
-	const FLinearColor UnderLande = AnastasisGroundCover::TintSoil(Grass, FVector3f(0, 0, 1), Tint);
+	const FLinearColor UnderLande = AnastasisGroundCover::TintSoil(Grass, FVector4f(0, 0, 1, 0), Tint);
 	TestTrue(TEXT("lande soil is browner than meadow soil"), UnderLande.R / UnderLande.G > UnderMeadow.R / UnderMeadow.G);
-	const FLinearColor UnderSedge = AnastasisGroundCover::TintSoil(Grass, FVector3f(0, 1, 0), Tint);
+	const FLinearColor UnderSedge = AnastasisGroundCover::TintSoil(Grass, FVector4f(0, 1, 0, 0), Tint);
 	TestTrue(TEXT("sedge soil is the darkest"), UnderSedge.GetLuminance() < UnderMeadow.GetLuminance());
+	const FLinearColor UnderWood = AnastasisGroundCover::TintSoil(Grass, FVector4f(0, 0, 0, 1), Tint);
+	TestTrue(TEXT("forest litter is brown and dark"), UnderWood.R / UnderWood.G > UnderMeadow.R / UnderMeadow.G
+		&& UnderWood.GetLuminance() < UnderMeadow.GetLuminance());
 	double Thin = 0.0;
-	AnastasisGroundCover::TintSoil(Grass, FVector3f(0.15f, 0, 0), Tint, &Thin);
+	AnastasisGroundCover::TintSoil(Grass, FVector4f(0.15f, 0, 0, 0), Tint, &Thin);
 	TestTrue(TEXT("sparse cover tints less"), Thin > 0.0 && Thin < Amount);
 	return true;
 }
@@ -251,16 +255,34 @@ bool FAnastasisGroundCoverCanopyAndClearing::RunTest(const FString&)
 	Wood.Canopy.Add(FVector(7000, 7000, 900));
 	AnastasisGroundCover::FPlan Edge;
 	TestTrue(TEXT("canopy builds"), AnastasisGroundCover::Build(Wood, Settings, Edge, Error));
-	bool bOutside = true;
+	// Prairie hors des couronnes, sous-bois dessous (H5), rien au pied du tronc.
+	bool bMeadowOutside = true, bUnderstoryInside = true, bTrunkClear = true;
+	int32 UnderCount = 0;
 	for (const AnastasisGroundCover::FPlacement& P : Edge.Instances)
 	{
+		const bool bUnder = P.Family == AnastasisGroundCover::EFamily::Fern || P.Family == AnastasisGroundCover::EFamily::HartsTongue
+			|| P.Family == AnastasisGroundCover::EFamily::WoodHerb;
+		UnderCount += bUnder ? 1 : 0;
+		double Nearest = TNumericLimits<double>::Max();
 		for (const FVector& C : Wood.Canopy)
 		{
-			bOutside &= FVector2D::Distance(FVector2D(P.Ground), FVector2D(C.X, C.Y)) >= Settings.CanopyExclusion * C.Z;
+			Nearest = FMath::Min(Nearest, FVector2D::Distance(FVector2D(P.Ground), FVector2D(C.X, C.Y)) / C.Z);
 		}
+		bMeadowOutside &= bUnder || Nearest >= Settings.CanopyExclusion;
+		bUnderstoryInside &= !bUnder || Nearest < Settings.CanopyExclusion;
+		bTrunkClear &= Nearest >= Settings.TrunkClearance;
 	}
-	TestTrue(TEXT("no meadow under a crown"), bOutside);
-	TestTrue(TEXT("refused by canopy"), Edge.RejectedCanopy > 0);
+	AddInfo(FString::Printf(TEXT("understory=%d fern=%d harts=%d herb=%d"), UnderCount, Edge.Counts[5], Edge.Counts[6], Edge.Counts[7]));
+	TestTrue(TEXT("no meadow under a crown"), bMeadowOutside);
+	TestTrue(TEXT("understory only under a crown"), bUnderstoryInside && UnderCount > 0 && UnderCount == Edge.Understory);
+	TestTrue(TEXT("nothing at the trunk"), bTrunkClear && Edge.RejectedCanopy > 0);
+	TestTrue(TEXT("dry understory is mostly fern and herbs"), Edge.Counts[5] > 0 && Edge.Counts[7] > 0 && Edge.Counts[6] < Edge.Counts[5]);
+	// Sous-bois humide : la scolopendre prend le pas.
+	AnastasisGroundCover::FInputs WetWood = Wood;
+	WetWood.SampleWetness = [](double, double, double& W) { W = 0.9; return true; };
+	AnastasisGroundCover::FPlan Damp;
+	TestTrue(TEXT("damp wood builds"), AnastasisGroundCover::Build(WetWood, Settings, Damp, Error));
+	TestTrue(TEXT("damp understory favours harts-tongue"), Damp.Counts[6] > Damp.Counts[5] && Damp.Counts[6] > Damp.Counts[7]);
 
 	AnastasisGroundCover::FInputs Hamlet = AnastasisGroundCoverTestFixture::OpenPlane(3.0);
 	Hamlet.Clearings.Add({FVector2D(5000, 5000), 2000.0, 0.3});
