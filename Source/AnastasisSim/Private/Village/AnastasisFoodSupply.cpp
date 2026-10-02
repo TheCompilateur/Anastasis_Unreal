@@ -81,7 +81,7 @@ namespace AnastasisVillage
 			N.InventoryFood += Take;
 			N.GatheredFood += Take;
 			N.KnownFoodSources.Add(S->TileIndex, S->Remaining);
-			N.Activity = S->Remaining > 0 ? TEXT("cueille") : TEXT("source epuisee");
+			SetActivity(N, S->Remaining > 0 ? TEXT("cueille") : TEXT("source epuisee"));
 			// End work commitment when carrying; Noûs can still choose an urgent meal.
 			N.bHasAlgoDecision = false;
 			N.bAlgoInertiaKeep = false;
@@ -94,7 +94,7 @@ namespace AnastasisVillage
 		const int32 Moved = CreditFood(Depot->Id, FMath::Min(8, N.InventoryFood));
 		N.InventoryFood -= Moved;
 		N.DeliveredFood += Moved;
-		N.Activity = Moved > 0 ? TEXT("depose") : TEXT("grenier plein");
+		SetActivity(N, Moved > 0 ? TEXT("depose") : TEXT("grenier plein"));
 		Perceive(N, true);
 		N.bHasAlgoDecision = false;
 		N.bAlgoInertiaKeep = false;

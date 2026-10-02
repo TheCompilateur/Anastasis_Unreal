@@ -77,6 +77,10 @@ build-decision-001 ; d'ici là, l'habitant vaque.
 resource-targets-001 : la prévision de survie (`survivalForecastBias`) et le risque spatial
 (`spatialRiskBiasMap`) sont portés. Ils s'ajoutent à chaque ligne, plancher compris, à leur place dans la
 chaîne, comme la météo et la passe collective. Leurs replis réduits sont l'écart n° 33.
+premiere-pensee-001 : `goalExplain` (les trois premières lignes, leur cause dominante) et `streetDecision`
+(la marge avec la deuxième) sont écrits au commit, sur la table du C++. Tant qu'une ligne reste au plancher,
+ses causes non portées (micro-plan, ambition, teinte du jour, mémoire sociale, souvenir, mandats) manquent, et
+le rang, le score et la marge diffèrent de la référence.
 
 ### n° 2 — Des cibles relâchées que la référence garderait
 
@@ -637,6 +641,57 @@ relevé, les deux croyances répondent toujours (381 décisions sur 381) : les d
 diffèrent dès que la croyance n'est pas le repli du C++. Ce repli appelle aussi `buildingAccessPoint`, ce
 que la croyance ne fait pas : seuils filtrés et destination posée en plus. La doctrine de lisière est
 lue comme fausse ; elle ne l'est jamais devenue dans le relevé.
+
+### n° 34 — Traces de repos non posées au changement d'activité
+
+- **classe** : REDUIT
+- **destin** : A_FERMER
+- **fermeture** : à attribuer (traces de vie : `life/restTraces.js`)
+- **statut** : OUVERT
+- **entree** : premiere-pensee-001
+- **reference** : `src/sim/npc.js` (`setActivity`, l. 3811), `src/life/restTraces.js` (`maybeStampRestTrace`, `stampRestTrace`)
+- **cpp** : `Village/AnastasisVillage.cpp`, `FVillage::SetActivity`
+- **harnais** : buildings
+
+`setActivity` est porté (l'activité et `activitySince`, à chaque changement). Quand la nouvelle activité est
+`repose`, `relaxe` ou `dort`, la référence pose en plus une trace de repos sur le bâtiment où l'habitant se
+repose (son foyer, son poste pour les outils, ou le bâtiment le plus proche dehors). Ces traces ne sont pas
+portées : aucun bâtiment C++ n'en porte.
+
+### n° 35 — Noûs : le paquet de débogage `_algoDebug` n'est pas tenu
+
+- **classe** : REDUIT
+- **destin** : A_FERMER
+- **fermeture** : à attribuer (`nous-debug-001`)
+- **statut** : OUVERT
+- **entree** : premiere-pensee-001
+- **reference** : `src/ai/algorithmic/runtime.js` (`stampDebug`, `computeAlgorithmicDecision`), `src/ai/algorithmic/bridge.js`
+- **cpp** : `Village/AnastasisVillage.cpp`, `ComputeAlgorithmicDecision`
+- **harnais** : actors
+
+Dès sa première décision Noûs, la référence écrit `npc._algoDebug` : décision choisie, tous les candidats avec
+leurs métadonnées, contexte de perception (faim, sources connues, gisements, or), exclusions, inertie, but
+traduit, trace du pont (`bridgeTrace`) et compte des changements récents. Le pont relit une partie de ce
+paquet (`decision`, `inertia`, `mappedGoal`). Le C++ tient la décision dans `FNpc::AlgoDecision`, mais pas
+ce paquet : la clé manque à chaque habitant qui a pensé.
+### n° 36 — `workTimer` remis à zéro au changement de but
+
+- **classe** : SUBSTITUT
+- **destin** : A_FERMER
+- **fermeture** : worktimer-001
+- **statut** : OUVERT
+- **entree** : premiere-pensee-001
+- **reference** : `src/sim/npc.js` (`commitGoalChoice` l. 2110-2135 : aucune remise à zéro ; `act` l. 3387 et 3522-3527 : seules écritures)
+- **cpp** : `Village/AnastasisVillage.cpp`, `CommitGoal`
+- **harnais** : actors
+
+Dans la référence, `workTimer` ne revient à zéro qu'au geste (seuil d'1 s atteint) ou dans l'attente du joueur : le
+reste d'une attente passe au but suivant. Au tick 32, npc-2 garde ainsi 0,5167 (31 ticks d'attente en `observer`)
+en partant bâtir. Le C++ le remet à zéro à chaque changement de but. Retirer cette remise à zéro (mesuré dans
+premiere-pensee-001) change trois tests de scénario écrits sur l'ancien comportement : `Village.Liens.Conversation`
+(13 échanges avant la session au lieu de 3, la relation passe l'amitié), `Village.Liens.Amitie` (deux
+conversations au premier échange) et `Village.Endurance` (un jour sans livraison). Les refaire est la mission
+worktimer-001.
 
 ### n° 37 — Réserve d'eau expérimentale des champs
 

@@ -546,6 +546,106 @@ namespace AnastasisJsSave
 		// ou non : la reference ne l'ecrit qu'apres un passage hors de la bande near),
 		// phenotype, conditioning, et genome.loci quand le phenotype manque.
 
+		/**
+		 * Ce que la premiere pensee ecrit (premiere-pensee-001) : `workShift`, `hungerAction`,
+		 * `nocturnalIntent`, `buildBinding`, `socialSeekId`, `goalExplain`, `streetDecision`,
+		 * `mind.failures`. Absents d'une sauvegarde ou personne n'a encore pense.
+		 */
+		bool ReadFirstThought(FReader& R, const FValue& A, const FString& Where, AnastasisVillage::FNpc& Out)
+		{
+			if (const FValue* S = A.Find(TEXT("workShift")); S && !S->IsNull())
+			{
+				const FString W = FReader::At(Where, TEXT("workShift"));
+				if (!S->IsObject()) return R.Fail(W, TEXT("objet attendu"));
+				FString State;
+				if (!R.String(*S, TEXT("state"), W, State)) return false;
+				using AnastasisWorkShift::EState;
+				bool bFound = false;
+				for (const EState E : { EState::OffDuty, EState::Commuting, EState::OnShift, EState::Break })
+				{
+					if (State == AnastasisWorkShift::StateId(E)) { Out.WorkShift.State = E; bFound = true; }
+				}
+				if (!bFound) return R.Fail(W, TEXT("etat de quart inconnu"));
+				if (!R.OptId(*S, TEXT("goal"), W, Out.WorkShift.Goal) || !R.OptDouble(*S, TEXT("startedAt"), W, Out.WorkShift.StartedAt)
+					|| !R.OptDouble(*S, TEXT("floorUntil"), W, Out.WorkShift.FloorUntil)) return false;
+			}
+			if (const FValue* H = A.Find(TEXT("hungerAction")); H && !H->IsNull())
+			{
+				const FString W = FReader::At(Where, TEXT("hungerAction"));
+				if (!H->IsObject()) return R.Fail(W, TEXT("objet attendu"));
+				AnastasisVillage::FHungerAction& Act = Out.HungerAction;
+				if (!R.OptString(*H, TEXT("state"), W, Act.State) || !R.OptId(*H, TEXT("targetId"), W, Act.TargetId)
+					|| !R.OptDouble(*H, TEXT("startedAt"), W, Act.StartedAt) || !R.OptId(*H, TEXT("lastFailure"), W, Act.LastFailure)
+					|| !R.OptDouble(*H, TEXT("cooldownUntil"), W, Act.CooldownUntil) || !R.OptDouble(*H, TEXT("progress"), W, Act.Progress)
+					|| !R.OptId(*H, TEXT("reservationId"), W, Act.ReservationId) || !R.OptId(*H, TEXT("sourceBuildingId"), W, Act.SourceBuildingId)
+					|| !R.OptId(*H, TEXT("excludedType"), W, Act.ExcludedType)) return false;
+				Out.bHasHungerAction = true;
+			}
+			if (A.Find(TEXT("nocturnalIntent")))
+			{
+				bool bValue = false;
+				if (!R.OptBool(A, TEXT("nocturnalIntent"), Where, bValue)) return false;
+				Out.NocturnalIntent = bValue;
+			}
+			if (A.Find(TEXT("buildBinding")))
+			{
+				if (!R.OptId(A, TEXT("buildBinding"), Where, Out.BuildBinding)) return false;
+				Out.bHasBuildBinding = true;
+			}
+			if (A.Find(TEXT("socialSeekId")))
+			{
+				if (!R.OptId(A, TEXT("socialSeekId"), Where, Out.SocialSeekId)) return false;
+				Out.bHasSocialSeekId = true;
+			}
+			if (const FValue* E = A.Find(TEXT("goalExplain")); E && !E->IsNull())
+			{
+				const FString W = FReader::At(Where, TEXT("goalExplain"));
+				if (!E->IsObject()) return R.Fail(W, TEXT("objet attendu"));
+				AnastasisVillage::FGoalExplain Explain;
+				if (!R.OptDouble(*E, TEXT("at"), W, Explain.At) || !R.OptId(*E, TEXT("goal"), W, Explain.Goal)
+					|| !R.OptString(*E, TEXT("line"), W, Explain.Line)) return false;
+				if (const FValue* Top = E->Find(TEXT("top")); Top && Top->IsArray())
+				{
+					for (int32 K = 0; K < Top->Items.Num(); ++K)
+					{
+						const FString WK = FString::Printf(TEXT("%s.top[%d]"), *W, K);
+						AnastasisVillage::FGoalExplainEntry Entry;
+						if (!R.String(Top->Items[K], TEXT("goal"), WK, Entry.Goal) || !R.OptDouble(Top->Items[K], TEXT("score"), WK, Entry.Score)
+							|| !R.OptString(Top->Items[K], TEXT("cause"), WK, Entry.Cause) || !R.OptString(Top->Items[K], TEXT("causeKey"), WK, Entry.CauseKey)
+							|| !R.OptDouble(Top->Items[K], TEXT("causeValue"), WK, Entry.CauseValue)) return false;
+						Explain.Top.Add(MoveTemp(Entry));
+					}
+				}
+				Out.GoalExplain = MoveTemp(Explain);
+			}
+			if (const FValue* D = A.Find(TEXT("streetDecision")); D && !D->IsNull())
+			{
+				const FString W = FReader::At(Where, TEXT("streetDecision"));
+				if (!D->IsObject()) return R.Fail(W, TEXT("objet attendu"));
+				AnastasisVillage::FStreetDecision S;
+				if (!R.OptDouble(*D, TEXT("at"), W, S.At) || !R.OptDouble(*D, TEXT("until"), W, S.Until)
+					|| !R.OptString(*D, TEXT("goal"), W, S.Goal) || !R.OptId(*D, TEXT("from"), W, S.From)
+					|| !R.OptDouble(*D, TEXT("margin"), W, S.Margin) || !R.OptBool(*D, TEXT("changed"), W, S.bChanged)
+					|| !R.OptBool(*D, TEXT("tight"), W, S.bTight) || !R.OptString(*D, TEXT("cause"), W, S.Cause)) return false;
+				Out.StreetDecision = S;
+			}
+			if (const FValue* Mind = A.Find(TEXT("mind")); Mind && Mind->IsObject())
+			{
+				if (const FValue* F = Mind->Find(TEXT("failures")); F && !F->IsNull())
+				{
+					// La memoire des echecs n'est pas portee (ecart n°9) : seule une memoire vide se reprend.
+					const FString W = FReader::At(Where, TEXT("mind.failures"));
+					if (!F->IsObject()) return R.Fail(W, TEXT("objet attendu"));
+					for (int32 K = 0; K < F->Keys.Num(); ++K)
+					{
+						if (!F->Items[K].IsObject() || F->Items[K].Keys.Num() > 0) return R.Fail(W, TEXT("echecs memorises : non portes (ecart n°9)"));
+					}
+					// La forme ancienne `{}` est convertie a la premiere pensee (`ensureFailures`) : rien a marquer ici.
+				}
+			}
+			return true;
+		}
+
 		/** `genome.loci` : `{ <locus>: [a, b] }`. Le reste du genome n'entre pas dans le phenotype. */
 		bool ReadGenomeLoci(FReader& R, const FValue& G, const FString& Where, AnastasisGenome::FGenome& Out)
 		{
@@ -639,7 +739,7 @@ namespace AnastasisJsSave
 			{
 				const FString W = Where + TEXT(".skills");
 				if (!R.OptDouble(*Skills, TEXT("gather"), W, Out.SkillGather) || !R.OptDouble(*Skills, TEXT("trade"), W, Out.SkillTrade)
-					|| !R.OptDouble(*Skills, TEXT("craft"), W, Out.SkillCraft))
+					|| !R.OptDouble(*Skills, TEXT("craft"), W, Out.SkillCraft) || !R.OptDouble(*Skills, TEXT("care"), W, Out.SkillCare))
 				{
 					return false;
 				}
@@ -657,6 +757,9 @@ namespace AnastasisJsSave
 			if (!R.OptBool(A, TEXT("pathFailed"), Where, Out.bPathFailed) || !R.OptDouble(A, TEXT("stuckTimer"), Where, Out.StuckTimer)) return false;
 			if (!R.OptDouble(A, TEXT("doorStuckAt"), Where, Out.DoorStuckAt) || !R.OptDouble(A, TEXT("doorApproachAt"), Where, Out.DoorApproachAt)) return false;
 			if (!R.OptId(A, TEXT("talkWithId"), Where, Out.TalkWithId) || !R.OptDouble(A, TEXT("talkUntil"), Where, Out.TalkUntil)) return false;
+			// `actor.activitySince = saved.activitySince ?? 0`.
+			if (const FValue* Since = A.Find(TEXT("activitySince")); Since && Since->IsNumber()) Out.ActivitySince = Since->Number;
+			if (!ReadFirstThought(R, A, Where, Out)) return false;
 			// Absents d'une sauvegarde au repos (< 0 et vide cote C++) ; la reference les ecrit au
 			// premier tick ou l'habitant pense.
 			if (!R.OptDouble(A, TEXT("aiThinkAt"), Where, Out.AiThinkAt) || !R.OptString(A, TEXT("villagePhase"), Where, Out.VillagePhase)) return false;
@@ -776,6 +879,85 @@ namespace AnastasisJsSave
 			return true;
 		}
 
+		/** Les cles de la premiere pensee (premiere-pensee-001), ecrites des que le C++ les tient. */
+		void ProjectFirstThought(const AnastasisVillage::FNpc& N, FValue& Out)
+		{
+			if (N.WorkShift.State != AnastasisWorkShift::EState::None)
+			{
+				FValue S = FValue::MakeObject();
+				S.Set(TEXT("state"), Str(AnastasisWorkShift::StateId(N.WorkShift.State)));
+				S.Set(TEXT("goal"), IdOrNull(N.WorkShift.Goal));
+				S.Set(TEXT("startedAt"), Num(N.WorkShift.StartedAt));
+				S.Set(TEXT("floorUntil"), Num(N.WorkShift.FloorUntil));
+				Out.Set(TEXT("workShift"), S);
+			}
+			if (N.bHasHungerAction)
+			{
+				const AnastasisVillage::FHungerAction& A = N.HungerAction;
+				FValue H = FValue::MakeObject();
+				H.Set(TEXT("state"), Str(A.State));
+				H.Set(TEXT("targetId"), IdOrNull(A.TargetId));
+				H.Set(TEXT("startedAt"), Num(A.StartedAt));
+				H.Set(TEXT("lastFailure"), IdOrNull(A.LastFailure));
+				H.Set(TEXT("cooldownUntil"), Num(A.CooldownUntil));
+				H.Set(TEXT("progress"), Num(A.Progress));
+				H.Set(TEXT("reservationId"), IdOrNull(A.ReservationId));
+				H.Set(TEXT("sourceBuildingId"), IdOrNull(A.SourceBuildingId));
+				H.Set(TEXT("excludedType"), IdOrNull(A.ExcludedType));
+				Out.Set(TEXT("hungerAction"), H);
+			}
+			if (N.NocturnalIntent.IsSet()) Out.Set(TEXT("nocturnalIntent"), FValue::MakeBool(N.NocturnalIntent.GetValue()));
+			if (N.bHasBuildBinding) Out.Set(TEXT("buildBinding"), IdOrNull(N.BuildBinding));
+			if (N.bHasSocialSeekId) Out.Set(TEXT("socialSeekId"), IdOrNull(N.SocialSeekId));
+			if (N.GoalExplain.IsSet())
+			{
+				const AnastasisVillage::FGoalExplain& E = N.GoalExplain.GetValue();
+				FValue Obj = FValue::MakeObject();
+				Obj.Set(TEXT("at"), Num(E.At));
+				Obj.Set(TEXT("goal"), IdOrNull(E.Goal));
+				FValue Top = FValue::MakeArray();
+				for (const AnastasisVillage::FGoalExplainEntry& Entry : E.Top)
+				{
+					FValue T = FValue::MakeObject();
+					T.Set(TEXT("goal"), Str(Entry.Goal));
+					T.Set(TEXT("score"), Num(Entry.Score));
+					T.Set(TEXT("cause"), Str(Entry.Cause));
+					T.Set(TEXT("causeKey"), Str(Entry.CauseKey));
+					T.Set(TEXT("causeValue"), Num(Entry.CauseValue));
+					Top.Items.Add(MoveTemp(T));
+				}
+				Obj.Set(TEXT("top"), Top);
+				Obj.Set(TEXT("line"), Str(E.Line));
+				Out.Set(TEXT("goalExplain"), Obj);
+			}
+			if (N.StreetDecision.IsSet())
+			{
+				const AnastasisVillage::FStreetDecision& D = N.StreetDecision.GetValue();
+				FValue Obj = FValue::MakeObject();
+				Obj.Set(TEXT("at"), Num(D.At));
+				Obj.Set(TEXT("until"), Num(D.Until));
+				Obj.Set(TEXT("goal"), Str(D.Goal));
+				Obj.Set(TEXT("from"), IdOrNull(D.From));
+				Obj.Set(TEXT("margin"), Num(D.Margin));
+				Obj.Set(TEXT("changed"), FValue::MakeBool(D.bChanged));
+				Obj.Set(TEXT("tight"), FValue::MakeBool(D.bTight));
+				Obj.Set(TEXT("cause"), Str(D.Cause));
+				Out.Set(TEXT("streetDecision"), Obj);
+			}
+			if (N.bHasFailureStore)
+			{
+				if (FValue* Mind = Out.Find(TEXT("mind")); Mind && Mind->IsObject())
+				{
+					// `{ goals: {}, causes: {} }` (`ensureFailures`), puis `negative: {}` (`failureStore`).
+					FValue F = FValue::MakeObject();
+					F.Set(TEXT("goals"), FValue::MakeObject());
+					F.Set(TEXT("causes"), FValue::MakeObject());
+					F.Set(TEXT("negative"), FValue::MakeObject());
+					Mind->Set(TEXT("failures"), F);
+				}
+			}
+		}
+
 		FValue ProjectActor(const AnastasisVillage::FNpc& N, const FValue* Base)
 		{
 			const bool bNew = Base == nullptr;
@@ -794,6 +976,7 @@ namespace AnastasisJsSave
 			Put(Out, TEXT("morale"), Num(N.Needs.Morale), bNew);
 			Put(Out, TEXT("goal"), Str(N.Goal), bNew);
 			Put(Out, TEXT("activity"), Str(N.Activity), bNew);
+			Put(Out, TEXT("activitySince"), Num(N.ActivitySince), bNew);
 			Put(Out, TEXT("goalSince"), Num(N.GoalSince), bNew);
 			Put(Out, TEXT("workTimer"), Num(N.WorkTimer), bNew);
 			Put(Out, TEXT("jobId"), Str(N.JobId), bNew);
@@ -947,6 +1130,7 @@ namespace AnastasisJsSave
 				Places.Set(TEXT("favoriteBuildingId"), IdOrNull(N.FavoriteBuildingId));
 				Out.Set(TEXT("placeMemory"), Places);
 			}
+			ProjectFirstThought(N, Out);
 			// `inside` non nul n'est pas lu (ReadActor refuse) : un habitant lu est dehors.
 			Put(Out, TEXT("inside"), FValue(), bNew);
 			return Out;

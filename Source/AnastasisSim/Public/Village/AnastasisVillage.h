@@ -475,6 +475,41 @@ namespace AnastasisVillage
 		double LastDistance = 0.0;
 	};
 
+	/** Une ligne de `npc.goalExplain.top` : un des trois premiers buts, et sa cause dominante. */
+	struct FGoalExplainEntry
+	{
+		FString Goal;
+		/** Arrondis au dixieme (`Math.round(x * 10) / 10`). */
+		double Score = 0.0;
+		FString Cause;
+		FString CauseKey;
+		double CauseValue = 0.0;
+	};
+
+	/** `npc.goalExplain` (`captureGoalExplain`, ai/explainGoal.js) : pourquoi ce but, au commit. */
+	struct FGoalExplain
+	{
+		double At = 0.0;
+		/** `scores[0].goal` ; vide = `null` (table vide). */
+		FString Goal;
+		TArray<FGoalExplainEntry> Top;
+		FString Line;
+	};
+
+	/** `npc.streetDecision` (`stampStreetDecision`, ai/streetSignal.js) : la fenetre d'une bascule. */
+	struct FStreetDecision
+	{
+		double At = 0.0;
+		double Until = 0.0;
+		FString Goal;
+		/** Vide = `null`. */
+		FString From;
+		double Margin = 0.0;
+		bool bChanged = false;
+		bool bTight = false;
+		FString Cause;
+	};
+
 	/** `npc.hungerAction` — la machine a etats du repas. */
 	struct FHungerAction
 	{
@@ -820,6 +855,26 @@ namespace AnastasisVillage
 		TOptional<double> PhaseChangedAt;
 		/** `npc.workShift` (reconsider-001) — NON sauvegarde par la reference : absent au chargement. */
 		AnastasisWorkShift::FWorkShift WorkShift;
+		/** `npc.activitySince` : l'heure du dernier changement d'activite (`setActivity`). */
+		double ActivitySince = 0.0;
+		/**
+		 * Ce que la premiere pensee ecrit (premiere-pensee-001). Chaque cle apparait dans la
+		 * reference au moment ou elle est ecrite pour la premiere fois ; le C++ la tient des ce moment.
+		 */
+		TOptional<FGoalExplain> GoalExplain;
+		TOptional<FStreetDecision> StreetDecision;
+		/** `npc.hungerAction` cree (`ensureHungerAction`, des la premiere decision Noûs). */
+		bool bHasHungerAction = false;
+		/** `npc.nocturnalIntent`, pose par `phaseBias` a chaque ligne de la table. */
+		TOptional<bool> NocturnalIntent;
+		/** `npc.buildBinding` ecrit (au commit : `null` hors `build`, sinon `bindBuildSite`). */
+		bool bHasBuildBinding = false;
+		/** `npc.socialSeekId` ecrit (`resolveNpcDestination`, a chaque cible). */
+		bool bHasSocialSeekId = false;
+		/** `npc.mind.failures` cree (`ensureFailures` dans `failureTargetBiasMap`) ; toujours vide ici (ecart n°9). */
+		bool bHasFailureStore = false;
+		/** `skills.care` (lu pour `skillGoalBias` des buts sociaux). */
+		double SkillCare = 0.0;
 		/** `npc._algoDebug` : la decision Noûs courante et son contexte. */
 		bool bHasAlgoDecision = false;
 		AnastasisNous::FDecision AlgoDecision;
@@ -1396,7 +1451,7 @@ namespace AnastasisVillage
 		bool PerformFoodSupply(FNpc& Npc);
 		bool HasKnownFoodSource(const FNpc& Npc) const;
 		const FBuilding* KnownFoodDepot(const FNpc& Npc) const;
-		void CommitGoal(FNpc& Npc, const FString& Next, FDecisionTrace& Trace);
+		void CommitGoal(FNpc& Npc, const FString& Next, FDecisionTrace& Trace, const TArray<TPair<FString, double>>* Scores = nullptr);
 		bool AssignTarget(FNpc& Npc, FDecisionTrace& Trace);
 
 		// Perception (ai/memory.js, branche nourriture).
@@ -1413,6 +1468,12 @@ namespace AnastasisVillage
 		/** Rend 1 (mange), 0 (echec), -1 (en route : `null` de la reference). */
 		int32 TryAlgorithmicEat(FNpc& Npc);
 		int32 RunHungerActionStep(FNpc& Npc, bool bAtFoodAccess, const FString& SourceBuildingId);
+		/** `setActivity(sim, npc, activity)` : l'activite, et l'heure ou elle a change. */
+		void SetActivity(FNpc& Npc, const FString& Activity);
+		/** `captureGoalExplain(sim, npc, scores, extrasFor)` : les trois premieres lignes et leur cause. */
+		void CaptureGoalExplain(FNpc& Npc, const TArray<TPair<FString, double>>& Scores);
+		/** `stampStreetDecision(sim, npc, scores, previousGoal)`. */
+		void StampStreetDecision(FNpc& Npc, const TArray<TPair<FString, double>>& Scores, const FString& PreviousGoal);
 		void FailHungerAction(FNpc& Npc, const FString& Reason, const FString& ExcludedType);
 		void CancelHungerAction(FNpc& Npc, const FString& Reason);
 		bool Eat(FNpc& Npc);

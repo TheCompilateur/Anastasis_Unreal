@@ -352,7 +352,7 @@ namespace AnastasisVillage
 				Npc.WorkTimer = 0.0;
 				Npc.DoorStuckAt = 0.0;
 				Npc.DoorApproachAt = 0.0;
-				Npc.Activity = TEXT("attend");
+				SetActivity(Npc, TEXT("attend"));
 			}
 		}
 		return true;
@@ -1339,7 +1339,7 @@ namespace AnastasisVillage
 
 	void FVillage::UpdateInside(FNpc& Npc, double Dt)
 	{
-		Npc.Activity = Npc.Inside.Activity;
+		SetActivity(Npc, Npc.Inside.Activity);
 		// `notePlaceUse(npc, npc.activity, dt * 0.5)` a chaque tick dedans, puis, l'acte fait et
 		// AVANT la sortie, `notePlaceUse(npc, inside.goal || npc.goal, 1.2)`.
 		NotePlaceUse(Npc, Npc.Activity, Dt * 0.5);
@@ -1350,7 +1350,7 @@ namespace AnastasisVillage
 		ExitBuilding(Npc);
 		if (!bWorked)
 		{
-			Npc.Activity = TEXT("attend");
+			SetActivity(Npc, TEXT("attend"));
 			if (++Npc.FailedActions >= 3) RedirectAfterFailure(Npc);
 		}
 		else
@@ -2160,6 +2160,12 @@ namespace AnastasisVillage
 			Row.Value += AnastasisSpatialRisk::BiasOf(SpatialRiskBias, Row.Key);
 		}
 		// --- fin resource-targets-001
+		// Ce que la table ecrit en passant (premiere-pensee-001) : `failureTargetBiasMap` cree
+		// `mind.failures` (`ensureFailures`, puis sa case `negative`), et `phaseBias` pose `nocturnalIntent`
+		// a chaque ligne : la nuit, hors garde, `isNocturnalWanderer` ; de jour, faux ; garde de nuit, inchange.
+		Npc.bHasFailureStore = true;
+		if (Phase != AnastasisRhythm::EPhase::Night) Npc.NocturnalIntent = false;
+		else if (!Subject.bGuard) Npc.NocturnalIntent = Subject.bNocturnalWanderer;
 		// La fin de la chaine d'`adultScores` : urgence collective, plancher collectif, rush famine.
 		ApplyCollectivePass(Npc, Collective, Rows, Trace);
 
@@ -2283,7 +2289,7 @@ namespace AnastasisVillage
 			}
 			Trace.CommitGate = TEXT("player");
 		}
-		CommitGoal(Npc, Next, Trace);
+		CommitGoal(Npc, Next, Trace, &Rows);
 		// Le but humain passe la table mais ne trouve rien a viser (pas de puits atteignable, pas de
 		// logement) : `AssignTarget` retombe sur `observer`, qui n'est pas un but humain. L'humain attend,
 		// et le refus le dit -- impossible ici et maintenant.
@@ -2295,20 +2301,29 @@ namespace AnastasisVillage
 		}
 	}
 
-	void FVillage::CommitGoal(FNpc& Npc, const FString& Next, FDecisionTrace& Trace)
+	void FVillage::CommitGoal(FNpc& Npc, const FString& Next, FDecisionTrace& Trace, const TArray<TPair<FString, double>>* Scores)
 	{
 		const FString Previous = Npc.Goal;
 		// Un but non porte qui gagne ne fait rien : `observer`.
 		const FString NewGoal = IsPortedGoalFor(Npc, Next) ? Next : FString(GoalObserver);
 		Npc.DestBuildingId.Reset();
 		Npc.Goal = NewGoal;
+		// `captureGoalExplain` juste apres `npc.goal = nextGoal` (le collant se lit sur le nouveau but),
+		// `stampStreetDecision` apres `onAlgorithmicGoalCommitted` (premiere-pensee-001).
+		if (Scores) CaptureGoalExplain(Npc, *Scores);
 		OnAlgorithmicGoalCommitted(Npc, Previous, NewGoal);
+		if (Scores) StampStreetDecision(Npc, *Scores, Previous);
 		if (NewGoal != Previous)
 		{
 			Npc.GoalSince = Now;
 			Npc.DoorStuckAt = 0.0;
+			// La reference ne remet pas `workTimer` a zero au changement de but : le reste d'une attente compte
+			// pour le but suivant. Remis a zero ici (ecart n°36).
 			Npc.WorkTimer = 0.0;
 		}
+		// `if (npc.goal !== "build") npc.buildBinding = null` : la cle existe des le premier commit.
+		Npc.bHasBuildBinding = true;
+		if (Npc.Goal != AnastasisBuild::GoalBuild) Npc.BuildBinding.Reset();
 		AssignTarget(Npc, Trace);
 		// `noteShiftGoalCommit(sim, npc)` (reconsider-001) : le point de decision ouvre, continue ou
 		// ferme le quart. Apres la cible : `opensExtractionShift` lit `npc.target`.
@@ -2324,8 +2339,177 @@ namespace AnastasisVillage
 		Npc.LastDecision = MoveTemp(Trace);
 	}
 
+	namespace
+	{
+		/** `SHORT_GOAL` d'explainGoal.js, puis `goalLabel(goal).split(" ")[0]`. */
+		FString ShortGoal(const FString& Goal)
+		{
+			static const TPair<const TCHAR*, const TCHAR*> Short[] = {
+				{ TEXT("eat"), TEXT("manger") }, { TEXT("eatTogether"), TEXT("table") }, { TEXT("rest"), TEXT("dormir") },
+				{ TEXT("drink"), TEXT("boire") }, { TEXT("relax"), TEXT("souffler") }, { TEXT("relieve"), TEXT("besoins") },
+				{ TEXT("gatherWood"), TEXT("bois") }, { TEXT("gatherStone"), TEXT("pierre") }, { TEXT("gatherFood"), TEXT("nourriture") },
+				{ TEXT("sell"), TEXT("vendre") }, { TEXT("buy"), TEXT("acheter") }, { TEXT("build"), TEXT("batir") },
+				{ TEXT("craft"), TEXT("fabriquer") }, { TEXT("maintain"), TEXT("entretenir") }, { TEXT("deliver"), TEXT("livrer") },
+				{ TEXT("haulJob"), TEXT("transporter") }, { TEXT("explore"), TEXT("explorer") }, { TEXT("socialize"), TEXT("parler") },
+				{ TEXT("visitFamily"), TEXT("famille") }, { TEXT("confront"), TEXT("affronter") }, { TEXT("play"), TEXT("jouer") },
+				{ TEXT("study"), TEXT("etudier") }, { TEXT("apprentice"), TEXT("apprendre") }, { TEXT("helpFarm"), TEXT("champs") },
+			};
+			if (Goal.IsEmpty()) return TEXT("?");
+			for (const TPair<const TCHAR*, const TCHAR*>& S : Short)
+			{
+				if (Goal == S.Key) return S.Value;
+			}
+			// `GOAL_LABELS` (ai/goalLabels.js), premier mot ; sinon l'identifiant.
+			static const TPair<const TCHAR*, const TCHAR*> Labels[] = {
+				{ TEXT("observer"), TEXT("observer") }, { TEXT("patrol"), TEXT("faire") }, { TEXT("haulCart"), TEXT("conduire") },
+				{ TEXT("shelterRain"), TEXT("s'abriter") }, { TEXT("fetchInput"), TEXT("chercher") }, { TEXT("closeWorkplace"), TEXT("fermer") },
+			};
+			for (const TPair<const TCHAR*, const TCHAR*>& L : Labels)
+			{
+				if (Goal == L.Key) return L.Value;
+			}
+			return Goal;
+		}
+
+		/** `skillGoalBias` : le domaine du but (`GOAL_DOMAIN`, `domainForGoal`), `(skills[domain] || 1) - 1) * 8`. */
+		double SkillBiasFor(const FNpc& Npc, const FString& Goal)
+		{
+			double V = 0.0;
+			if (Goal == TEXT("craft") || Goal == TEXT("maintain") || Goal == TEXT("build") || Goal == TEXT("apprentice")) V = Npc.SkillCraft;
+			else if (Goal == TEXT("helpFarm") || Goal.StartsWith(TEXT("gather"), ESearchCase::CaseSensitive)) V = Npc.SkillGather;
+			else if (Goal == TEXT("sell") || Goal == TEXT("buy") || Goal == TEXT("deliver") || Goal == TEXT("haulJob")) V = Npc.SkillTrade;
+			else if (Goal == TEXT("socialize") || Goal == TEXT("visitFamily") || Goal == TEXT("play") || Goal == TEXT("study")) V = Npc.SkillCare;
+			else return 0.0;
+			if (V == 0.0 || FMath::IsNaN(V)) V = 1.0;
+			return (V - 1.0) * 8.0;
+		}
+
+		double RoundTenth(double V) { return AnastasisJs::Round(V * 10.0) / 10.0; }
+	}
+
+	void FVillage::CaptureGoalExplain(FNpc& Npc, const TArray<TPair<FString, double>>& Scores)
+	{
+		// `EXPLAIN_GOAL.minCause` = 4.
+		constexpr double MinCause = 4.0;
+		FGoalExplain Explain;
+		Explain.At = Now;
+		if (Scores.Num() == 0)
+		{
+			Npc.GoalExplain = Explain;
+			return;
+		}
+		Explain.Goal = Scores[0].Key;
+		const AnastasisNeeds::FNeedGoalScores Needs = AnastasisNeeds::NeedGoalScores(Npc.Needs, CountBuildings(WellType), /*CompletedTaverns=*/0);
+		const AnastasisGather::FTrait& Trait = AnastasisGather::TraitAt(Npc.TraitIndex);
+		const bool bCritical = NeedsCritical(Npc.Needs);
+		// `goalStickinessBonus(sim, npc, goal)` lu sur le but deja commis, avant `clearWorkSession`.
+		AnastasisReconsider::FStickSubject Stick;
+		Stick.CurrentGoal = Npc.Goal;
+		Stick.bCritical = bCritical;
+		Stick.bCurrentRelievesCritical = AnastasisReconsider::IsCriticalReliefGoal(Npc.Needs, Npc.InventoryFood, Npc.Goal);
+		Stick.PhaseChangedAt = Npc.PhaseChangedAt;
+		Stick.TraitBuild = Trait.Build;
+		Stick.TraitTrade = Trait.Trade;
+		Stick.TraitGather = Trait.Gather;
+		Stick.TraitExplore = Trait.Explore;
+		Stick.bWorkSession = Npc.WorkSession.bActive;
+		Stick.InventoryLoad = Npc.InventoryFood;
+
+		struct FPart { const TCHAR* Key; const TCHAR* Label; double Value; };
+		for (int32 I = 0; I < Scores.Num() && I < 3; ++I)
+		{
+			const FString& Goal = Scores[I].Key;
+			// `goalCauseParts` : dans son ordre. Les biais non portes valent 0 et ne passent pas le seuil
+			// (micro-plan, foyer, age, ambition, teinte du jour, nature, memoire sociale, echec, souvenir,
+			// mandats : ecarts n°1, n°10, n°24, n°27).
+			TArray<FPart> Parts;
+			auto Push = [&Parts](const TCHAR* Key, const TCHAR* Label, double Value)
+			{
+				const double V = FMath::IsNaN(Value) ? 0.0 : Value;
+				if (V >= MinCause) Parts.Add({ Key, Label, V });
+			};
+			if (Goal == GoalEat || Goal == TEXT("eatTogether")) Push(TEXT("need_eat"), TEXT("faim"), Needs.Eat);
+			if (Goal == TEXT("eatTogether")) Push(TEXT("household"), TEXT("foyer"), 10.0);
+			if (Goal == GoalRest) Push(TEXT("need_rest"), TEXT("fatigue"), Needs.Rest);
+			if (Goal == GoalDrink) Push(TEXT("need_drink"), TEXT("soif"), Needs.Drink);
+			if (Goal == GoalRelax) Push(TEXT("need_relax"), TEXT("ennui"), Needs.Relax);
+			if (Goal == TEXT("relieve")) Push(TEXT("need_hygiene"), TEXT("proprete"), Needs.Relieve);
+			if (Goal == GoalSocialize || Goal == TEXT("visitFamily") || Goal == TEXT("play")) Push(TEXT("need_social"), TEXT("solitude"), Needs.Socialize);
+			const double Weather = AnastasisWeatherBehavior::WeatherGoalBias(TickWeather, Npc.JobId, Goal);
+			if (Weather >= MinCause) Push(TEXT("weather"), TEXT("meteo"), Weather);
+			else if (Weather <= -MinCause) Push(TEXT("weather"), TEXT("meteo"), FMath::Abs(Weather));
+			Push(TEXT("trait"), TEXT("temperament"), AnastasisGather::TraitGoalBias(Trait, Goal));
+			const double Skill = SkillBiasFor(Npc, Goal);
+			if (Skill >= MinCause) Push(TEXT("skill"), TEXT("competence"), Skill);
+			Push(TEXT("stick"), TEXT("habitude"), Goal == Npc.Goal ? AnastasisReconsider::GoalStickinessBonus(Stick, Now, Goal) : 0.0);
+			Push(TEXT("job"), TEXT("metier"), AnastasisGather::JobPriority(Npc.JobId, Goal));
+			if (bCritical && (Goal == GoalEat || Goal == TEXT("eatTogether") || Goal == GoalRest || Goal == GoalDrink))
+			{
+				const bool bEat = Goal == GoalEat || Goal == TEXT("eatTogether");
+				const double Survival = bEat ? Needs.Eat : Goal == GoalRest ? Needs.Rest : Needs.Drink;
+				Push(TEXT("survival"), bEat ? TEXT("faim") : Goal == GoalRest ? TEXT("fatigue") : TEXT("soif"), Survival + 8.0);
+			}
+			// `parts.sort((a, b) => b.value - a.value)` (stable), puis le premier strictement plus grand.
+			Parts.StableSort([](const FPart& A, const FPart& B) { return A.Value > B.Value; });
+			FPart Best = Parts.Num() > 0 ? Parts[0] : FPart{ TEXT("work"), TEXT("travail"), 0.0 };
+			for (const FPart& Part : Parts)
+			{
+				if (Part.Value > Best.Value) Best = Part;
+			}
+			FGoalExplainEntry& Entry = Explain.Top.AddDefaulted_GetRef();
+			Entry.Goal = Goal;
+			Entry.Score = RoundTenth(Scores[I].Value);
+			Entry.Cause = Best.Label;
+			Entry.CauseKey = Best.Key;
+			Entry.CauseValue = RoundTenth(Best.Value);
+		}
+		// `formatExplainLine(top)`.
+		const FGoalExplainEntry& Head = Explain.Top[0];
+		if (Explain.Top.Num() < 2 || Head.Score >= Explain.Top[1].Score + 35.0)
+		{
+			Explain.Line = FString(TEXT("parce que ")) + Head.Cause;
+		}
+		else
+		{
+			TArray<FString> Bits;
+			for (const FGoalExplainEntry& E : Explain.Top) Bits.Add(ShortGoal(E.Goal) + TEXT(": ") + E.Cause);
+			Explain.Line = FString::Join(Bits, TEXT(" \u00B7 "));
+		}
+		Npc.GoalExplain = MoveTemp(Explain);
+	}
+
+	void FVillage::StampStreetDecision(FNpc& Npc, const TArray<TPair<FString, double>>& Scores, const FString& PreviousGoal)
+	{
+		if (Scores.Num() == 0) return;
+		// `STREET_DECISION` : holdChange 4,5 ; holdTight 3,2 ; holdCritical 6,5 ; holdSoft 3 ; tightMargin 18.
+		const double Margin = Scores[0].Value - (Scores.Num() > 1 ? Scores[1].Value : 0.0);
+		const FString& Goal = Scores[0].Key;
+		const bool bChanged = Goal != PreviousGoal;
+		const bool bTight = !bChanged && Margin >= 0.0 && Margin < 18.0;
+		if (!bChanged && !bTight) return;
+		double Hold = bChanged ? 4.5 : 3.2;
+		const bool bSoft = Goal == GoalObserver || Goal == TEXT("explore") || Goal == GoalSocialize || Goal == GoalRelax
+			|| Goal == TEXT("play") || Goal == TEXT("study");
+		if (NeedsCritical(Npc.Needs)) Hold = 6.5;
+		else if (bSoft) Hold = FMath::Min(Hold, 3.0);
+		FStreetDecision D;
+		D.At = Now;
+		D.Until = Now + Hold;
+		D.Goal = Goal;
+		D.From = PreviousGoal;
+		D.Margin = RoundTenth(Margin);
+		D.bChanged = bChanged;
+		D.bTight = bTight;
+		D.Cause = (Npc.GoalExplain.IsSet() && Npc.GoalExplain->Top.Num() > 0) ? Npc.GoalExplain->Top[0].Cause : FString();
+		Npc.StreetDecision = D;
+	}
+
 	bool FVillage::AssignTarget(FNpc& Npc, FDecisionTrace& Trace)
 	{
+		// `resolveTarget` -> `resolveNpcDestination` (destination.js), en fin d'`assignTarget` pour tout but :
+		// hors `socialize` / `visitFamily` (et `play`), `npc.socialSeekId = null` (premiere-pensee-001).
+		Npc.bHasSocialSeekId = true;
+		if (Npc.Goal != GoalSocialize && Npc.Goal != TEXT("visitFamily") && Npc.Goal != TEXT("play")) Npc.SocialSeekId.Reset();
 		FPoint Target;
 		FString Source;
 		bool bFound = false;
@@ -2395,7 +2579,7 @@ namespace AnastasisVillage
 		Npc.StuckStage = 0;
 		Npc.DoorStuckAt = 0.0;
 		Npc.DoorApproachAt = 0.0;
-		Npc.Activity = TEXT("attend");
+		SetActivity(Npc, TEXT("attend"));
 	}
 
 	void FVillage::RedirectDomesticDoorFailure(FNpc& Npc)
@@ -2455,6 +2639,14 @@ namespace AnastasisVillage
 		}
 	}
 
+	void FVillage::SetActivity(FNpc& Npc, const FString& Activity)
+	{
+		// `maybeStampRestTrace` (repose, relaxe, dort) n'est pas porte (ecart n°34).
+		if (Npc.Activity == Activity) return;
+		Npc.Activity = Activity;
+		Npc.ActivitySince = Now;
+	}
+
 	void FVillage::Act(FNpc& Npc, double Dt)
 	{
 		if (Npc.bHasTarget && !ReachedMoveTarget(Npc, Npc.Target))
@@ -2462,7 +2654,7 @@ namespace AnastasisVillage
 			// `if (!CRAFT_GOALS.has(npc.goal)) clearWorkSession(npc)`.
 			if (Npc.Goal != GoalGatherFood && Npc.Goal != AnastasisBuild::GoalBuild) ClearWorkSession(Npc);
 			// `setActivity(sim, npc, travelActivity(npc.goal))` (planner-wiring-001 : le C++ ecrivait « marche » pour tous).
-			Npc.Activity = JsTravelActivity(Npc.Goal);
+			SetActivity(Npc, JsTravelActivity(Npc.Goal));
 			MoveActor(Npc, Npc.Target, Dt);
 			return;
 		}
@@ -2495,7 +2687,7 @@ namespace AnastasisVillage
 					Npc.bHasTarget = true;
 					Npc.Target = Access;
 				}
-				Npc.Activity = DomesticActivity(Npc.Goal, IsNight());
+				SetActivity(Npc, DomesticActivity(Npc.Goal, IsNight()));
 				const bool bAtDoor = bAccess && Dist(Npc.X, Npc.Y, Access.X, Access.Y) <= DoorAccessRadius;
 				if (!bAccess || !bAtDoor)
 				{
@@ -2519,7 +2711,7 @@ namespace AnastasisVillage
 		if (!IsPortedGoalFor(Npc, Npc.Goal) && Npc.Goal != GoalObserver)
 		{
 			// But non porte : il n'accomplit rien. La reference ferait `perform`.
-			Npc.Activity = TEXT("attend");
+			SetActivity(Npc, TEXT("attend"));
 			Npc.WorkTimer = 0.0;
 			return;
 		}
@@ -2543,7 +2735,7 @@ namespace AnastasisVillage
 				Npc.FailedActions = 0;
 				return;
 			}
-			Npc.Activity = TEXT("attend");
+			SetActivity(Npc, TEXT("attend"));
 			if (++Npc.FailedActions >= 3) RedirectAfterFailure(Npc);
 			return;
 		}
@@ -2558,7 +2750,7 @@ namespace AnastasisVillage
 				Npc.FailedActions = 0;
 				return;
 			}
-			Npc.Activity = TEXT("attend");
+			SetActivity(Npc, TEXT("attend"));
 			if (++Npc.FailedActions >= 3) RedirectAfterFailure(Npc);
 			return;
 		}
@@ -2578,7 +2770,7 @@ namespace AnastasisVillage
 				}
 				return;
 			}
-			Npc.Activity = TEXT("attend");
+			SetActivity(Npc, TEXT("attend"));
 			if (++Npc.FailedActions >= 3) RedirectAfterFailure(Npc);
 			return;
 		}
@@ -2593,7 +2785,7 @@ namespace AnastasisVillage
 			// `waitingActivity` : « boit », « mange », « livre » ; pour rest, `restActivity`.
 			// L'extension food-supply garde ses mots (« cueille », « depose »).
 			const bool bWorker = IsGranaryWorker(Npc);
-			Npc.Activity = Npc.Goal == GoalDrink ? TEXT("boit")
+			SetActivity(Npc, Npc.Goal == GoalDrink ? TEXT("boit")
 				: Npc.Goal == GoalEat ? TEXT("mange")
 				: Npc.Goal == GoalDeliver ? (bWorker ? TEXT("livre") : TEXT("depose"))
 				: Npc.Goal == GoalGatherFood ? TEXT("cueille")
@@ -2601,7 +2793,7 @@ namespace AnastasisVillage
 				: Npc.Goal == GoalRelax ? TEXT("relaxe")
 				: Npc.Goal == GoalShelterRain ? TEXT("abrite")
 				: Npc.Goal == GoalObserver ? TEXT("attend")
-				: RestActivity(IsNight());
+				: RestActivity(IsNight()));
 			return;
 		}
 		Npc.WorkTimer = 0.0;
@@ -2612,7 +2804,7 @@ namespace AnastasisVillage
 		if (bWorked) NotePlaceUse(Npc, GoalBefore, 1.0);
 		if (!bWorked)
 		{
-			Npc.Activity = TEXT("attend");
+			SetActivity(Npc, TEXT("attend"));
 			// `if (npc.failedActions >= 3) redirectAfterFailure(sim, npc)` (act-gate-001 : la porte
 			// generique le fait, comme `updateInside`).
 			if (++Npc.FailedActions >= 3) RedirectAfterFailure(Npc);
@@ -2660,7 +2852,7 @@ namespace AnastasisVillage
 		if (Npc.Goal == GoalDrink)
 		{
 			// `case "drink"` : setActivity("boit"), satisfyDrink, markDrink (gestuelle, non portee).
-			Npc.Activity = TEXT("boit");
+			SetActivity(Npc, TEXT("boit"));
 			AnastasisNeeds::SatisfyDrink(Npc.Needs);
 			++Npc.DrinksTaken;
 			return true;
@@ -2668,14 +2860,14 @@ namespace AnastasisVillage
 		if (Npc.Goal == GoalEat)
 		{
 			// `case "eat"` : setActivity("mange"), eat().
-			Npc.Activity = TEXT("mange");
+			SetActivity(Npc, TEXT("mange"));
 			return Eat(Npc);
 		}
 		if (Npc.Goal == GoalSocialize)
 		{
 			// `case "socialize"` : socialize(). Compagnon le mieux place a portee (ecart n°16),
 			// sinon la branche ambiante : `satisfySocial(npc, NEEDS.socialAmbient)` puis moral +1.
-			Npc.Activity = TEXT("discute");
+			SetActivity(Npc, TEXT("discute"));
 			++Npc.SocialsTaken;
 			const double MaxDistance = Npc.Inside.bActive ? AnastasisBonds::MaxIndoor : AnastasisBonds::MaxOutdoor;
 			if (FNpc* Other = PickSocialCompanion(Npc, MaxDistance))
@@ -2690,7 +2882,7 @@ namespace AnastasisVillage
 		if (Npc.Goal == GoalRelax)
 		{
 			// `case "relax"` : setActivity("relaxe"), satisfyRelax (scene de foyer : non portee).
-			Npc.Activity = TEXT("relaxe");
+			SetActivity(Npc, TEXT("relaxe"));
 			AnastasisNeeds::SatisfyRelax(Npc.Needs, Npc.Inside.bActive);
 			++Npc.RelaxesTaken;
 			return true;
@@ -2698,13 +2890,13 @@ namespace AnastasisVillage
 		if (Npc.Goal == GoalShelterRain)
 		{
 			// `case "shelterRain"` : setActivity("abrite"), performShelterRain().
-			Npc.Activity = TEXT("abrite");
+			SetActivity(Npc, TEXT("abrite"));
 			return PerformShelterRain(Npc);
 		}
 		if (Npc.Goal == GoalDeliver)
 		{
 			// `case "deliver"` : setActivity("livre"), deliver().
-			Npc.Activity = TEXT("livre");
+			SetActivity(Npc, TEXT("livre"));
 			return Deliver(Npc);
 		}
 		if (Npc.Goal == GoalRest)
@@ -2713,7 +2905,7 @@ namespace AnastasisVillage
 			const bool bNight = IsNight();
 			const FString& Living = Npc.LivingHomeId();
 			const bool bAtHome = !Living.IsEmpty() && Npc.Inside.bActive && Npc.Inside.BuildingId == Living;
-			Npc.Activity = RestActivity(bNight);
+			SetActivity(Npc, RestActivity(bNight));
 			AnastasisNeeds::SatisfyRest(Npc.Needs, bNight, SleepQualityOf(Npc), Npc.Inside.bActive, bAtHome);
 			++Npc.RestsTaken;
 			return true;
@@ -3631,6 +3823,7 @@ namespace AnastasisVillage
 
 	void FVillage::FailHungerAction(FNpc& Npc, const FString& Reason, const FString& ExcludedType)
 	{
+		Npc.bHasHungerAction = true;
 		ReleaseMeal(Npc, Reason);
 		FHungerAction& A = Npc.HungerAction;
 		A.State = TEXT("failed");
@@ -3642,6 +3835,7 @@ namespace AnastasisVillage
 
 	void FVillage::CancelHungerAction(FNpc& Npc, const FString& Reason)
 	{
+		Npc.bHasHungerAction = true;
 		FHungerAction& A = Npc.HungerAction;
 		if (A.State != TEXT("completed") && A.State != TEXT("failed") && A.State != TEXT("cancelled"))
 		{
@@ -3655,6 +3849,7 @@ namespace AnastasisVillage
 
 	int32 FVillage::RunHungerActionStep(FNpc& Npc, bool bAtFoodAccess, const FString& SourceBuildingId)
 	{
+		Npc.bHasHungerAction = true;
 		FHungerAction& A = Npc.HungerAction;
 		if (A.CooldownUntil > Now && A.State == TEXT("failed"))
 		{
@@ -3799,7 +3994,7 @@ namespace AnastasisVillage
 			return false;
 		}
 		// `null` : encore en route — ne pas consommer a distance.
-		Npc.Activity = TEXT("marche");
+		SetActivity(Npc, TEXT("marche"));
 		return true;
 	}
 
@@ -3807,6 +4002,9 @@ namespace AnastasisVillage
 
 	void FVillage::ComputeAlgorithmicDecision(FNpc& Npc)
 	{
+		// `cooldownExcludeTypes` -> `ensureHungerAction(npc)` : la cle existe des la premiere decision.
+		// Le paquet `_algoDebug` (decision, candidats, contexte) n'est pas tenu : ecart n°35.
+		Npc.bHasHungerAction = true;
 		TArray<FString> Exclude;
 		const FHungerAction& A = Npc.HungerAction;
 		if (A.CooldownUntil > Now && !A.ExcludedType.IsEmpty())
@@ -4561,10 +4759,10 @@ namespace AnastasisVillage
 		// « Marche d'abord : findTendFieldNear peut etre a plusieurs cases (pas adjacent comme gather). »
 		if (Dist(Npc.X, Npc.Y, Npc.Target.X, Npc.Target.Y) > 0.85)
 		{
-			Npc.Activity = TEXT("cherche");
+			SetActivity(Npc, TEXT("cherche"));
 			return 1;
 		}
-		Npc.Activity = TEXT("recolte");
+		SetActivity(Npc, TEXT("recolte"));
 		if (Now < Npc.WorkSession.NextSwingAt) return 1;
 
 		// `rollCraftMiss(sim, npc, "tend")` tire `sim.rng` : pas de rate (ecart n°11), a brancher sur
@@ -4716,7 +4914,7 @@ namespace AnastasisVillage
 			? FieldWorkTarget(Npc, Tile)
 			: FPoint{ Tile.X + 0.5, Tile.Y + 0.5 };
 		Npc.bHasTarget = true;
-		Npc.Activity = TEXT("recolte");
+		SetActivity(Npc, TEXT("recolte"));
 		if (Now < Npc.WorkSession.NextSwingAt) return 1;
 
 		// Micro-echec rare : geste sans rendement, reprise un peu plus lente (chat-on-haul-001).
@@ -5369,7 +5567,7 @@ namespace AnastasisVillage
 		{
 			AdvanceTalkTurn(Npc, *Partner);
 		}
-		Npc.Activity = TEXT("socialise");
+		SetActivity(Npc, TEXT("socialise"));
 		if (!Npc.Inside.bActive)
 		{
 			// Le regard ancre sur le partenaire, sans marcher : la cible d'origine est ecrasee.
@@ -5831,12 +6029,12 @@ namespace AnastasisVillage
 		Npc.bHasTarget = true;
 		if (Dist(Npc.X, Npc.Y, SiteTarget.X, SiteTarget.Y) > B::SiteReachDistance)
 		{
-			Npc.Activity = TEXT("chantier");
+			SetActivity(Npc, TEXT("chantier"));
 			MoveActor(Npc, SiteTarget, Dt);
 			return 1;
 		}
 		EnsureBuildSession(Npc, *Site);
-		Npc.Activity = TEXT("chantier");
+		SetActivity(Npc, TEXT("chantier"));
 		if (Now < Npc.WorkSession.NextSwingAt) return 1;
 
 		// Piece mal calee : swing visible, pas de pose, reprise (`rollCraftMiss(sim, npc, "build")`).

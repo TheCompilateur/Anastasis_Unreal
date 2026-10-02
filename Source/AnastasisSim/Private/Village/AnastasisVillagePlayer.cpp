@@ -313,7 +313,7 @@ namespace AnastasisVillage
 		if (bDrive)
 		{
 			DrivePlayer(Npc, Dt);
-			Npc.Activity = TEXT("marche");
+			SetActivity(Npc, TEXT("marche"));
 			return;
 		}
 		if (Npc.Inside.bActive)
@@ -326,7 +326,7 @@ namespace AnastasisVillage
 			// `act` pour PLAYER_IDLE_GOAL : pas de cible, pas de travail, il attend.
 			Npc.bHasTarget = false;
 			Npc.WorkTimer = 0.0;
-			Npc.Activity = TEXT("attend");
+			SetActivity(Npc, TEXT("attend"));
 			return;
 		}
 		if (Npc.FailedActions >= 3)
@@ -335,7 +335,7 @@ namespace AnastasisVillage
 			Npc.FailedActions = 0;
 			Npc.StuckStage = 0;
 			CommitPlayerIdle(Npc);
-			Npc.Activity = TEXT("attend");
+			SetActivity(Npc, TEXT("attend"));
 			return;
 		}
 		// Le but humain s'execute comme celui de n'importe qui : memes cibles, memes portes, memes effets.
