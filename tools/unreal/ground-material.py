@@ -686,6 +686,45 @@ def build_master(textures):
     meso_damp = g.addc(g.mulc(n_meso, '', 0.8, -1700, 780), '', 0.6, -1540, 780)
     damp_mask = g.sat(g.mul(damp, '', meso_damp, '', -1380, 470), '', -1240, 470)
 
+    # SOIL_CRUSADE_001: pilot bounds retained; shipped MI covers the world. Wetness is a
+    # proximity proxy, NOT a sediment simulation. Slope and wetness gate every patch;
+    # existing meso noise only breaks their edges. No new texture samples or geometry.
+    soil = g.custom("""
+float pilot = 1.0 - smoothstep(Radius * 0.8, max(Radius, 1.0), length(P.xy - Center.xy));
+float enabled = saturate(Enabled) * pilot;
+float slope = saturate(1.0 - normalize(N).z);
+float open = 1.0 - saturate(Litter);
+float patch = smoothstep(0.28, 0.72, Meso);
+// Rendered slopes: 26 to 53 degrees, not the old pre-erosion 68 to 80 degrees.
+float exposure = smoothstep(0.10, 0.40, slope) * (0.45 + 0.55 * patch);
+float rock = max(Rock, exposure * (1.0 - 0.55 * Wet) * (0.45 + 0.55 * open));
+// Moist low-gradient ground: a plausible fine-deposit signature, not proof of alluvium.
+float fines = smoothstep(0.20, 0.68, Wet) * (1.0 - smoothstep(0.025, 0.16, slope));
+fines *= (0.35 + 0.65 * patch) * (1.0 - rock) * (0.25 + 0.75 * open);
+// Thin dry soil follows slope; no random bare islands on flat meadows.
+float thin = smoothstep(0.025, 0.16, slope) * (1.0 - smoothstep(0.20, 0.60, Wet));
+thin *= (0.30 + 0.70 * patch) * (1.0 - rock) * open;
+// Close ground is a soil matrix under separate blades, not another green canopy.
+// At distance the original color represents unresolved vegetation; retain that proxy.
+Matrix = enabled * (1.0 - rock) * (1.0 - saturate(Worked)) * (0.55 + 0.15 * patch) * Near;
+return float3(lerp(Rock, rock, enabled), saturate(thin * 0.65) * enabled, fines * enabled);
+""", 'SoilHistory', CMOT_FLOAT3,
+        ('P', 'N', 'Center', 'Radius', 'Enabled', 'Wet', 'Litter', 'Meso', 'Rock', 'Worked', 'Near'),
+        (('Matrix', CMOT_FLOAT1),), -1180, 2480)
+    for name, src in (('P', wp), ('N', nws), ('Wet', wetness), ('Litter', w_litter),
+                      ('Meso', n_meso), ('Rock', rock_mask), ('Worked', w_worked), ('Near', detail_fade)):
+        g.link(src, '', soil, name)
+    g.link(g.vector('SoilPilotCenter', (96000.0, 110000.0, 0.0), P + 'SoilHistory', -1900, 2500), '', soil, 'Center')
+    g.link(g.scalar('SoilPilotRadius', 38000.0, P + 'SoilHistory', -1900, 2560), '', soil, 'Radius')
+    g.link(g.scalar('SoilHistory', 1.0, P + 'SoilHistory', -1900, 2620), '', soil, 'Enabled')
+    rock_mask = g.mask(soil, '', True, False, False, -960, 2480)
+    thin_soil = g.mask(soil, '', False, True, False, -960, 2540)
+    fine_soil = g.mask(soil, '', False, False, True, -960, 2600)
+    exposed_soil = g.sat(g.add(thin_soil, '', fine_soil, '', -780, 2520), '', -600, 2520)
+    exposed_soil = g.sat(g.add(exposed_soil, '', soil, 'Matrix', -500, 2660), '', -340, 2660)
+    # Reuse the existing fine mineral/mud photo; do not merely recolor grass into soil.
+    texture_worked = g.lerp(w_worked, '', g.one_minus(w_litter, '', -780, 2660), '', exposed_soil, '', -600, 2600)
+
     # ------------------------------------------------------------------ textures photo
     # Le detail sous le metre, que la geometrie ne porte pas. Un seul noeud Custom : la
     # projection triplanaire branchee, le melange par hauteur et la pose de la normale
@@ -725,7 +764,7 @@ def build_master(textures):
     tex = g.custom(ground_texture_hlsl(), 'GroundTexture', CMOT_FLOAT3, tex_inputs,
                    (('TexNormal', CMOT_FLOAT3), ('TexRough', CMOT_FLOAT1)), -1100, 1500)
     for name, src in (('P', wp), ('N', nws), ('RockMask', rock_mask), ('RockW', w_rock),
-                      ('Litter', w_litter), ('Worked', w_worked), ('Fade', tex_fade)):
+                      ('Litter', w_litter), ('Worked', texture_worked), ('Fade', tex_fade)):
         g.link(src, '', tex, name)
     for name, src in tex_params.items():
         g.link(src, '', tex, name)
@@ -761,6 +800,16 @@ def build_master(textures):
     rossa_mask = g.sat(g.mul(rossa_mask, '', p_rossa_amt, '', -740, 1640), '', -580, 1640)
     base = g.lerp(base, '', p_rossa, '', rossa_mask, '', -120, 1500)
 
+    # Mineral earth and fines remain restrained linear albedos. Existing wet-bank
+    # chroma is retained (partial blend), as is the simulation Forest litter mask.
+    dry_earth = g.vector('ThinSoilColor', (0.135, 0.105, 0.070), P + 'SoilHistory', -1900, 2700)
+    fine_earth = g.vector('FineSoilColor', (0.105, 0.092, 0.072), P + 'SoilHistory', -1900, 2760)
+    organic_earth = g.vector('OrganicSoilColor', (0.075, 0.060, 0.040), P + 'SoilHistory', -1900, 2820)
+    soil_matrix_color = g.lerp(dry_earth, '', organic_earth, '', w_litter, '', -140, 2900)
+    base = g.lerp(base, '', soil_matrix_color, '', soil, 'Matrix', 20, 2900)
+    base = g.lerp(base, '', dry_earth, '', thin_soil, '', 20, 1500)
+    base = g.lerp(base, '', fine_earth, '', g.mulc(fine_soil, '', 0.65, -120, 1580), '', 180, 1500)
+
     # Meso et grain : des modulations de VALEUR centrees sur 1, donc neutres en moyenne.
     # Moduler ainsi plutot que multiplier par le bruit lui-meme evite d'assombrir
     # globalement le sol a chaque couche ajoutee. Le recentrage differe parce que les
@@ -792,6 +841,8 @@ def build_master(textures):
 
     # ---------------------------------------------------------------------- rugosite
     r = g.lerp(p_soil_rough, '', p_rock_rough, '', rock_mask, '', -120, 400)
+    r = g.lerp(r, '', g.const(0.86, -120, 2820), '', thin_soil, '', 0, 2800)
+    r = g.lerp(r, '', g.const(0.72, -120, 2880), '', fine_soil, '', 160, 2800)
     r = g.lerp(r, '', p_damp_rough, '', damp_mask, '', 40, 400)
     r = g.add(r, '', g.mul(g.mul(p_rough_grain, '', detail_fade, '', 200, 520), '', d_grain, '', 200, 460), '', 360, 400)
     r = g.add(r, '', tex, 'TexRough', 440, 400)
@@ -859,6 +910,25 @@ def build_master(textures):
     return mat
 
 
+def publish_soil_scope(mi):
+    """Publish the validated soil treatment over the full supported world footprint.
+
+    The master retains its 380 m diagnostic pilot. The shipped instance explicitly
+    covers the world; slope/wetness/litter and near-detail fade still gate the effect.
+    SoilHistory=0 is the reversible switch, radius=38000 restores the original pilot.
+    """
+    radius = 10000000.0
+    # UE5.8 setter returns false unconditionally; validate the actual readback.
+    mel.set_material_instance_scalar_parameter_value(mi, 'SoilPilotRadius', radius)
+    mel.update_material_instance(mi)
+    got = mel.get_material_instance_scalar_parameter_value(mi, 'SoilPilotRadius')
+    if abs(got - radius) > 1.0:
+        raise RuntimeError('SoilPilotRadius readback mismatch: %s' % got)
+    if not eal.save_asset(INSTANCE):
+        raise RuntimeError('MI_AnastasisGround save failed')
+    log('SOIL_SCOPE_SAVED radius_cm=10000000 switch=SoilHistory')
+
+
 def build_instance(master):
     mi = tools.create_asset('MI_AnastasisGround', PKG, unreal.MaterialInstanceConstant,
                             unreal.MaterialInstanceConstantFactoryNew())
@@ -867,12 +937,8 @@ def build_instance(master):
     if mi.get_name() != 'MI_AnastasisGround':
         raise RuntimeError('asset renomme en %s : l ancien n a pas ete supprime' % mi.get_name())
     mel.set_material_instance_parent(mi, master)
-    # AUCUN override pose ici, volontairement. L'instance est une surface de retouche
-    # vide : tout ce qu'elle montre vient du maitre, donc il n'existe qu'UNE valeur par
-    # defaut, et elle est visible au meme endroit que la structure qui la consomme. Un
-    # override pose d'avance serait une seconde verite, et la plus dure a trouver.
-    eal.save_asset(INSTANCE)
-    log('INSTANCE_SAVED parent=M_AnastasisGround overrides=0')
+    publish_soil_scope(mi)
+    log('INSTANCE_SAVED parent=M_AnastasisGround overrides=1 (SoilPilotRadius)')
     return mi
 
 

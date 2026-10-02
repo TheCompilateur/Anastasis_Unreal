@@ -69,3 +69,22 @@ texture : un écart lointain entre `on` et `on_notex` est un défaut.
 
 - Recalibrer les seuils de roche de pente (SOL-05) : à trancher.
 - Le RVT ne servirait qu'avec des décalques en masse (pistes, ornières). Pas de besoin mesuré.
+
+## Sol soil-crusade-001 (2026-10-02, KEEP local / artistique PARTIAL)
+
+`ground-material.py` ajoute `SoilHistory` (0 = comportement precedent, 1 = sol).
+Le master garde `SoilPilotCenter=(96000,110000,0)` cm et `SoilPilotRadius=38000` cm,
+transition sur les 20 % externes. L'instance livree porte le rayon a 10000000 cm
+pour couvrir le monde; remettre 38000 pour le pilote initial (graine12345, echelle5).
+La pente rendue (1-Nz, 0.10..0.40 pour la roche), UV1.y (proximite humide),
+UV0.y (famille litiere) et le champ meso existant gouvernent la matiere.
+Matrice minerale/organique proche, attenuee de 2.5 a16m, sous les brins separes.
+Les fines sont une signature plausible sur replats humides, pas une reconstruction
+sedimentaire. UV0.y suit les tuiles Forest, pas chaque couronne placee.
+Aucune geometrie, texture, collision ou logique de simulation ajoutee.
+Generation Unreal : 1066 instructions pixel, 10 samplers. Pilote V2 : 18 images,
+sortie propre, GPU apres11.379..15.973ms; deltas dans la derive du temoin.
+`tools/soil-crusade/capture.ps1 -Label pilot-v2 -Rebuild` compare SoilHistory0/1/0;
+`-Label deployed -Deploy` sauvegarde la couverture et controle deux vues hors pilote.
+Limites : grain proche parfois trop regulier; pas de preuve PLY ni d'histoire alluviale.
+Details et preuves dans `docs/unreal/handoffs/soil-crusade-001.md`.
