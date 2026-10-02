@@ -23,7 +23,7 @@ Use the commit containing this handoff; exact owned paths only. No push requeste
 - TESTS: queued for the combined integration; no general stability claim.
 
 ## PROOFS
-PROOFS: (aucune)
+PROOFS: villager-pie
 
 ## SCN
 PARTIAL, OBSERVED IN UNREAL, saved in the mission worktree; not yet integrated in main.
@@ -38,7 +38,7 @@ PARTIAL, OBSERVED IN UNREAL, saved in the mission worktree; not yet integrated i
 - No loaded realistic replacement library found locally. No purchase/download performed. Existing recipe-generated assets improved instead.
 
 ## PLY
-UNKNOWN. Earlier batch crashed at PIE duplication before PNJ activity was proved. Combined integration still requires a fresh targeted PIE observation with PNJs, simulation and camera movement. Static editor images are not player proof.
+UNKNOWN. Earlier batch crashed at PIE duplication before PNJ activity was proved. Combined integration declares the existing villager-pie proof for live PNJs, simulation and character bindings. Its fog-disabled portrait images are functional evidence, not visual A/B evidence. A separate short camera move remains required. Static editor images are not player proof.
 
 ## ECARTS
 AUCUN: Source/AnastasisSim untouched. No simulation behavior introduced.
