@@ -15,7 +15,7 @@ Vues (calculees une fois sur le sol trace, avant toute capture) :
 "Plus longue vue" : 24 azimuts, trace a 3 degres sous l'horizontale ; une camera qui regarde
 une pente a 10 m ne prouve rien sur la profondeur atmospherique.
 
-ANASTASIS_SKY_OUT     dossier de sortie (PNG + sky.json)
+ANASTASIS_SKY_OUT     dossier de sortie (PNG + sky.json, avec le GPU p50 de stat unit par image)
 ANASTASIS_SKY_STATES  etats, separes par '|'. Un etat est "etiquette=cvar;cvar" ; un
                           nombre seul N vaut "rN=anastasis.Atmosphere.Realism N".
                           Defaut "1|0".
@@ -143,8 +143,9 @@ views = [('ov_sw', V(-W * 0.16, -W * 0.16, W * 0.42), V(W * 0.55, W * 0.55, 0)),
 
 look = unreal.MathLibrary.find_look_at_rotation
 queue, state_i, phase, mark, shot, handle, first = [], -1, 'boot', time.monotonic(), None, None, True
+gpu = []  # GPU ms de stat unit (GetFrameTimingsMs), echantillonne pendant l'attente de la vue
 report = {'level': LEVEL, 'seed': SEED, 'world_uu': W, 'low': low, 'high': high,
-          'valley_sight_uu': valley[0], 'ridge_sight_uu': ridge[0], 'states': {}}
+          'valley_sight_uu': valley[0], 'ridge_sight_uu': ridge[0], 'states': {}, 'gpu_ms_p50': {}}
 
 
 def apply_state(state):
@@ -181,7 +182,7 @@ def finish(msg, error=False):
 
 
 def tick(_dt):
-    global phase, mark, shot, first, state_i, queue
+    global phase, mark, shot, first, state_i, queue, gpu
     el = time.monotonic() - mark
     try:
         les.editor_invalidate_viewports()
@@ -207,7 +208,13 @@ def tick(_dt):
             return
         state, (name, e, tgt) = queue[0]
         ues.set_level_viewport_camera_info(e, look(e, tgt))
+        # Apres 2 s : la vue est posee, l'image ne porte plus le changement d'etat ou de camera.
+        if el > 2:
+            gpu.append(emb.call_method('GetFrameTimingsMs').z)
         if el > (14 if first else 5):
+            g = sorted(gpu)
+            report['gpu_ms_p50']['%s_%s' % (name, state[0])] = round(g[len(g) // 2], 3) if g else -1
+            gpu = []
             shot = os.path.join(OUT, '%s_%s.png' % (name, state[0])).replace('\\', '/')
             if os.path.exists(shot):
                 os.remove(shot)
@@ -219,7 +226,8 @@ def tick(_dt):
                 finish('SKY_SHOT_MISSING %s' % shot, True)
             return
         if el > 1:
-            unreal.log('SKY_SHOT_OK %s' % os.path.basename(shot))
+            unreal.log('SKY_SHOT_OK %s gpu_ms_p50=%.2f' % (os.path.basename(shot),
+                       report['gpu_ms_p50'].get(os.path.splitext(os.path.basename(shot))[0], -1)))
             queue.pop(0)
             first = False
             phase, mark = 'aim', time.monotonic()

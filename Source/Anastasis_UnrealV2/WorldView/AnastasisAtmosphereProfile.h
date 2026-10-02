@@ -351,6 +351,24 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Atmosphere|Realism|Fog", meta = (ClampMin = "-0.9", ClampMax = "0.9"))
 	float VolumetricFogScatteringDistribution = 0.3f;
 
+	/**
+	 * FOG_FSSS_001. Fog Screen Space Scattering (UE 5.8, EXPERIMENTAL): approximates the light
+	 * the height fog scatters more than once -- the soft glow around the sun and bright ground
+	 * seen through humid air, which single-scattering fog cannot make. Screen space, so it
+	 * spreads nothing that is off screen; it does not touch clouds or the mist volumes.
+	 * Effective only with anastasis.Atmosphere.FogScattering 1 (see RU-002-06).
+	 */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|Realism|Fog")
+	bool bFogScreenSpaceScattering = true;
+
+	/** Blur radius of the scattered light (engine default 0.1). Epic warns of halos at depth edges when raised. */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|Realism|Fog", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float FogScatteringSpreadScale = 0.1f;
+
+	/** Share of the scene's own colour fed into the scattering (engine default 1; 0 = fog luminance only). */
+	UPROPERTY(EditAnywhere, Category = "Atmosphere|Realism|Fog", meta = (ClampMin = "0.0", ClampMax = "4.0"))
+	float FogScatteringSceneColorScale = 1.0f;
+
 	// --- Sky clock and weather (DAY_NIGHT_WEATHER_001) ---------------------------------
 	//
 	// See AnastasisSkyClock.h. The sky follows the SIMULATION's clock and weather instead of

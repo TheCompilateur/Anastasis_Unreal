@@ -46,7 +46,7 @@ $p=Start-AnastasisEditor $Editor $launchArgs
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
 $p.Refresh()
 if(-not $p.HasExited){ Stop-Process -Id $p.Id -Force; throw 'CAPTURE::FAIL editeur bloque' }
-Select-String -Path $log -Pattern 'SKY_CAPTURE|SKY_STATE|SKY_VIEWS|SKY_RELIEF|ANASTASIS_SKY |ANASTASIS_ATMOSPHERE applied|ANASTASIS_MIST ' |
+Select-String -Path $log -Pattern 'SKY_CAPTURE|SKY_STATE|SKY_SHOT_OK|SKY_VIEWS|SKY_RELIEF|ANASTASIS_SKY |ANASTASIS_ATMOSPHERE applied|ANASTASIS_MIST ' |
   ForEach-Object { ($_.Line -replace '^\[[^\]]*\]\[[ 0-9]*\]','') } | Select-Object -Unique
 if(-not (Select-String -Path $log -Pattern 'SKY_CAPTURE_COMPLETE' -Quiet)){ throw 'CAPTURE::FAIL capture incomplete' }
 Write-Output ('CAPTURE::PASS ' + $dir)

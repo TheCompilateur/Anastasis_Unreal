@@ -67,15 +67,15 @@ namespace
 		return Count;
 	}
 
-	/** Forces anastasis.Atmosphere.Realism for the scope of a test, and puts it back. */
+	/** Forces anastasis.Atmosphere.Realism (or another int CVar) for the scope of a test, and puts it back. */
 	struct FScopedRealismCVar
 	{
 		IConsoleVariable* CVar = nullptr;
 		int32 Before = 1;
 
-		explicit FScopedRealismCVar(const int32 Value)
+		explicit FScopedRealismCVar(const int32 Value, const TCHAR* Name = TEXT("anastasis.Atmosphere.Realism"))
 		{
-			CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Atmosphere.Realism"));
+			CVar = IConsoleManager::Get().FindConsoleVariable(Name);
 			if (CVar)
 			{
 				Before = CVar->GetInt();
@@ -612,6 +612,90 @@ bool FAnastasisAtmosphereRealismReversible::RunTest(const FString&)
 		TestEqual(TEXT("plane off: fog start back to the profile"), F->StartDistance, Profile.FogStartDistance);
 		TestEqual(TEXT("plane off: volumetric distance back to the profile"), F->VolumetricFogDistance, Profile.VolumetricFogDistanceUU);
 		TestEqual(TEXT("plane off: volumetric start back to the engine default"), F->VolumetricFogStartDistance, FogDefault->VolumetricFogStartDistance);
+	}
+
+	Atmosphere->DestroySpawnedActors();
+	Atmosphere->Destroy();
+	return true;
+}
+
+/**
+ * FOG_FSSS_001. Fog Screen Space Scattering is written straight into the fog component (5.8
+ * has no setter), so nothing in the engine resets it: this test is what proves the switch
+ * really switches. On only when the realism layer AND anastasis.Atmosphere.FogScattering ask
+ * for it; every other case leaves the engine default, the image before this mission.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisAtmosphereRealismFogScattering, "Anastasis.Atmosphere.Realism.FogScattering", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisAtmosphereRealismFogScattering::RunTest(const FString&)
+{
+	UWorld* World = FindAtmosphereAutomationWorld();
+	if (!World)
+	{
+		AddInfo(TEXT("no editor/game world available; not exercised"));
+		return true;
+	}
+	const UAnastasisAtmosphereProfile& Profile = AnastasisAtmosphere::GetProfile();
+	if (!Profile.bRealismEnabled || !Profile.bFogEnabled || !Profile.bFogScreenSpaceScattering)
+	{
+		AddInfo(TEXT("profile disables the realism layer, the fog or its scattering; not exercised"));
+		return true;
+	}
+
+	FScopedRealismCVar Realism(1);
+	FScopedRealismCVar Scattering(1, TEXT("anastasis.Atmosphere.FogScattering"));
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	Params.ObjectFlags |= RF_Transient;
+	AAnastasisWorldAtmosphere* Atmosphere = World->SpawnActor<AAnastasisWorldAtmosphere>(
+		AAnastasisWorldAtmosphere::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+	if (!TestNotNull(TEXT("atmosphere actor spawns"), Atmosphere))
+	{
+		return false;
+	}
+
+	const UExponentialHeightFogComponent* FogDefault = GetDefault<UExponentialHeightFogComponent>();
+	auto FogC = [Atmosphere]() { return Atmosphere->GetFog() ? Atmosphere->GetFog()->GetComponent() : nullptr; };
+	auto ExpectDefault = [this, FogDefault](const UExponentialHeightFogComponent* F, const TCHAR* Case)
+	{
+		TestEqual(FString::Printf(TEXT("%s: scattering back to the engine default"), Case), F->bEnableFSSS, FogDefault->bEnableFSSS);
+		TestEqual(FString::Printf(TEXT("%s: spread back to the engine default"), Case), F->FSSSSpreadScale, FogDefault->FSSSSpreadScale);
+		TestEqual(FString::Printf(TEXT("%s: scene colour back to the engine default"), Case), F->FSSSSceneColorScatteringAmountScale, FogDefault->FSSSSceneColorScatteringAmountScale);
+	};
+
+	TestTrue(TEXT("apply (on)"), Atmosphere->Apply());
+	if (const UExponentialHeightFogComponent* F = FogC())
+	{
+		TestTrue(TEXT("on: scattering enabled"), F->bEnableFSSS);
+		TestEqual(TEXT("on: spread from the profile"), F->FSSSSpreadScale, Profile.FogScatteringSpreadScale);
+		TestEqual(TEXT("on: scene colour from the profile"), F->FSSSSceneColorScatteringAmountScale, Profile.FogScatteringSceneColorScale);
+	}
+	else
+	{
+		AddError(TEXT("the profile enables fog but the atmosphere has no fog component"));
+	}
+	TestTrue(TEXT("on: the summary reports it"), Atmosphere->GetLastSummary().Contains(TEXT("fog_scattering=1")));
+
+	Scattering.Set(0);
+	TestTrue(TEXT("apply (scattering off)"), Atmosphere->Apply());
+	if (const UExponentialHeightFogComponent* F = FogC())
+	{
+		ExpectDefault(F, TEXT("scattering off"));
+	}
+
+	// The realism layer is the outer switch: scattering asked for, layer off -> engine default.
+	Scattering.Set(1);
+	Realism.Set(0);
+	TestTrue(TEXT("apply (realism off)"), Atmosphere->Apply());
+	if (const UExponentialHeightFogComponent* F = FogC())
+	{
+		ExpectDefault(F, TEXT("realism off"));
+	}
+
+	Realism.Set(1);
+	TestTrue(TEXT("apply (on again)"), Atmosphere->Apply());
+	if (const UExponentialHeightFogComponent* F = FogC())
+	{
+		TestTrue(TEXT("on again: scattering enabled"), F->bEnableFSSS);
 	}
 
 	Atmosphere->DestroySpawnedActors();

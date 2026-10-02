@@ -80,6 +80,18 @@ static TAutoConsoleVariable<int32> CVarEyePlane(
 	TEXT("EYE_PLANE_001. 1=at eye height the first 7 m stay outside the volumetric fog, then local colour (olive, pebble, wall) falls toward the air out to about 160 m. 0=the profile's own aerial scale, fog and extinction. Read on every Apply()."),
 	ECVF_Default);
 
+static TAutoConsoleVariable<int32> CVarFogScattering(
+	TEXT("anastasis.Atmosphere.FogScattering"),
+	0,
+	TEXT("FOG_FSSS_001: Fog Screen Space Scattering (UE 5.8, experimental) on the height fog, inside the realism layer. 0=engine default (off), 1=profile values; read on every Apply()."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<float> CVarFogScatteringSceneColor(
+	TEXT("anastasis.Atmosphere.FogScattering.SceneColor"),
+	-1.0f,
+	TEXT("FOG_FSSS_001 capture override of the profile's FogScatteringSceneColorScale (share of scene colour fed into the scattering); -1 = the profile. Read on every Apply()."),
+	ECVF_Default);
+
 const FName AAnastasisWorldAtmosphere::MoonTag(TEXT("AnastasisMoon"));
 const FName AAnastasisWorldAtmosphere::RealismCloudTag(TEXT("AnastasisRealismCloud"));
 
@@ -537,6 +549,23 @@ void AAnastasisWorldAtmosphere::ApplyRealism(const UAnastasisAtmosphereProfile& 
 			FogComponent->SetVolumetricFogDistance(bVolumetric ? Profile.VolumetricFogDistanceUU : D->VolumetricFogDistance);
 			FogComponent->SetVolumetricFogExtinctionScale(bVolumetric ? Profile.VolumetricFogExtinctionScale : D->VolumetricFogExtinctionScale);
 			FogComponent->SetVolumetricFogScatteringDistribution(bVolumetric ? Profile.VolumetricFogScatteringDistribution : D->VolumetricFogScatteringDistribution);
+
+			// FSSS has no setter in 5.8: write the properties, then rebuild the fog's render
+			// state ourselves -- only on a change, Apply() runs again on every sky pin.
+			const bool bScatter = bOn && Profile.bFogScreenSpaceScattering && CVarFogScattering.GetValueOnAnyThread() != 0;
+			const float Spread = bScatter ? Profile.FogScatteringSpreadScale : D->FSSSSpreadScale;
+			const float SceneColorPin = CVarFogScatteringSceneColor.GetValueOnAnyThread();
+			const float SceneColor = !bScatter ? D->FSSSSceneColorScatteringAmountScale
+				: (SceneColorPin >= 0.0f ? SceneColorPin : Profile.FogScatteringSceneColorScale);
+			if (FogComponent->bEnableFSSS != bScatter
+				|| !FMath::IsNearlyEqual(FogComponent->FSSSSpreadScale, Spread)
+				|| !FMath::IsNearlyEqual(FogComponent->FSSSSceneColorScatteringAmountScale, SceneColor))
+			{
+				FogComponent->bEnableFSSS = bScatter;
+				FogComponent->FSSSSpreadScale = Spread;
+				FogComponent->FSSSSceneColorScatteringAmountScale = SceneColor;
+				FogComponent->MarkRenderStateDirty();
+			}
 		}
 	}
 
@@ -871,7 +900,7 @@ bool AAnastasisWorldAtmosphere::Apply()
 	LastSummary = FString::Printf(
 		TEXT("ANASTASIS_ATMOSPHERE applied=1 profile=%s sun_source=%s sun_pitch=%.3f sun_yaw=%.3f lux=%.1f ")
 		TEXT("fog=%d fog_density=%.4f ev100=%.2f adopted=%d spawned=%d realism=%d moon=%d clouds=%d volumetric_fog=%d ")
-		TEXT("forward_light=%s extra_directional_lights=%d eye_plane=%d"),
+		TEXT("fog_scattering=%d forward_light=%s extra_directional_lights=%d eye_plane=%d"),
 		Source,
 		Profile.bDeriveSunFromTimeOfDay ? TEXT("time_of_day") : TEXT("explicit"),
 		SunRotation.Pitch, SunRotation.Yaw, Profile.SunIntensityLux,
@@ -879,6 +908,7 @@ bool AAnastasisWorldAtmosphere::Apply()
 		AdoptedCount, SpawnedCount,
 		bRealismApplied ? 1 : 0, Moon ? 1 : 0, Cloud ? 1 : 0,
 		(Fog && Fog->GetComponent() && Fog->GetComponent()->bEnableVolumetricFog) ? 1 : 0,
+		(Fog && Fog->GetComponent() && Fog->GetComponent()->bEnableFSSS) ? 1 : 0,
 		bMoonLeadsForward ? TEXT("moon") : TEXT("sun"), ExtraDirectionalLights,
 		(bRealismOn && CVarEyePlane.GetValueOnGameThread() != 0) ? 1 : 0);
 	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("%s"), *LastSummary);
