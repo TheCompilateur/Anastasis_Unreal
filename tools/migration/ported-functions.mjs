@@ -63,14 +63,19 @@ export const PORTAGE_DECLARE = [
   // --- Couche 2, navigation ----------------------------------------------------
   {
     module: "src/sim/navGrid.js", cpp: "World/AnastasisNavGrid, World/AnastasisNavService",
-    source: "couche 2 (couche terrain) ; puits (seuils) ; nav-service-001 (metriques, anneau de trace, cle de cible)",
-    fonctions: ["footBlockedAt", "createNavMetrics", "recordNavTransition", "navTraceSnapshot", "navigationTargetKey"],
-    reduites: ["ensureNavigation", "syncNavigationFromActor"],
+    source: "couche 2 (couche terrain) ; puits (seuils) ; nav-service-001 (metriques, anneau de trace, cle de cible) ; nav-wiring-001",
+    fonctions: ["footBlockedAt", "createNavMetrics", "recordNavTransition", "navTraceSnapshot", "navigationTargetKey",
+      "syncNavigationFromActor", "buildingForAccessTarget"],
+    reduites: ["ensureNavigation"],
     alias: { createNavMetrics: "FNavMetrics", navTraceSnapshot: "TraceSnapshot" },
+  },
+  {
+    module: "src/sim/crowdNav.js", cpp: "Village/AnastasisVillageNav", source: "nav-wiring-001 (file de porte)",
+    fonctions: ["sameTargetCell", "isDoorLikeTarget", "resolveDoorQueue", "doorQueueWaypoint"],
   },
   { module: "src/sim/pathfinding.js", cpp: "World/AnastasisPathfinding", source: "couche 2", entier: true, alias: { MinHeap: "FMinHeap", constructor: "FMinHeap" } },
   {
-    module: "src/sim/navService.js", cpp: "World/AnastasisNavService", source: "couche 2 (nav-service-001, module seul)", entier: true,
+    module: "src/sim/navService.js", cpp: "World/AnastasisNavService", source: "couche 2 (nav-service-001, module seul ; branche par nav-wiring-001)", entier: true,
     alias: { createNavService: "FNavService", ensureNavService: "FNavService", clonePath: "FNavCacheEntry", resolveJobActor: "FindLiveAgent" },
   },
 
@@ -138,9 +143,10 @@ export const PORTAGE_DECLARE = [
       "housingCapacity", "pendingHousingCapacity", "houseCapacity", "housePhase", "completedBuildingEntries", "marketCaps",
       "totalBuildingValue", "costMultiplier", "buildCost", "hasSawCapacity", "siteCanPlacePiece", "marketPos", "plannedMarketPos",
       "workersAtBuilding", "buildingNeedScore",
+      "nextWaypoint", "steerAroundBlock", "resolveStuckActor", "recordPassage", "hashText01",
       "buildCost", "costMultiplier", "siteCanPlacePiece", "consumeSiteMaterials", "constructionAccessPoint", "workConstruction",
     ],
-    reduites: ["tick", "moveActor", "nextWaypoint", "enqueueDayDeferred", "assignHomeToHousehold", "movementSpeedFactor",
+    reduites: ["tick", "moveActor", "enqueueDayDeferred", "assignHomeToHousehold", "movementSpeedFactor",
       "maintenancePos", "workCommutePos", "farmPos", "pickDailyBuilding"],
   },
   {

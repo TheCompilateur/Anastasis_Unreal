@@ -134,7 +134,7 @@ ses quartiers, score chaque bâtiment (`districtDestinationScore`) : le bâtimen
 - **masques** : separationFoule
 - **detail** : `docs/migration/phase3/P3_NAV_RELEVE.md`
 
-Depuis nav-service-001, la marche passe par le service de navigation (`requestPath` : cache exact et de
+Depuis nav-wiring-001, la marche passe par le service de navigation (`requestPath` : cache exact et de
 zone, A* sous budget, file vidée avant et après la boucle des habitants), avec la file de porte, l'hésitation,
 le facteur de vitesse de l'état porté (mode de vie compris), le contournement local, l'escalade anti-blocage et
 les passages (`recordPassage`). Le harnais projette `navigation`, le chemin, `lastMoveDir`, `trafficTimer`,

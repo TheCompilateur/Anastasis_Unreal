@@ -170,7 +170,7 @@
 //     reference, il abrite donc ; un grenier qui n'est pas son poste, groupe food, non),
 //     la duree d'abri, la recuperation sous l'auvent, `performShelterRain` (energie +14,
 //     moral +2, delai de grace 18 s, reprise du but expose), `applyRainExposure`, et le bloc
-//     pluie de `movementSpeedFactor` (le reste de ce facteur n'est pas porte : ecart n°4).
+//     pluie de `movementSpeedFactor` (le reste du facteur : nav-wiring-001).
 //     Non porte : `bestKnownBed` (le foyer en tient lieu), la taverne (absente), le biais
 //     `shelterRain` de la prevision de survie, `weatherGoalLabel` (inspecteur). Apres l'abri,
 //     un but repris qui n'est pas expose devient `craft` dans la reference : non porte, donc
@@ -370,7 +370,7 @@ namespace AnastasisVillage
 	/** `NPC_UNSTICK` de npc.js — la porte du foyer. */
 	inline constexpr double DoorWaitSeconds = 2.8;
 	inline constexpr double DoorApproachSeconds = 5.5;
-	/** `NPC_UNSTICK.pathFailStreakMax` (nav-service-001) : trois A* en echec de suite, la cible est abandonnee. */
+	/** `NPC_UNSTICK.pathFailStreakMax` (nav-wiring-001) : trois A* en echec de suite, la cible est abandonnee. */
 	inline constexpr int32 PathFailStreakMax = 3;
 	inline constexpr double DoorAccessRadius = 1.05;
 
@@ -790,7 +790,7 @@ namespace AnastasisVillage
 		double StuckTimer = 0.0;
 		int32 StuckStage = 0;
 
-		// Service de navigation et pas de marche (nav-service-001).
+		// Service de navigation et pas de marche (nav-wiring-001).
 		/** `actor.pathFailStreak`. */
 		int32 PathFailStreak = 0;
 		/** `navigation.requestedAt`. */
@@ -1046,7 +1046,7 @@ namespace AnastasisVillage
 	class ANASTASISSIM_API FVillage : public AnastasisNavService::INavServiceHost
 	{
 	public:
-		// --- Hote du service de navigation (nav-service-001) ---------------------
+		// --- Hote du service de navigation (nav-wiring-001) ---------------------
 		double GetTime() const override { return Now; }
 		/** `sim.speedScale` : le harnais tourne a 1. */
 		double GetSpeedScale() const override { return 1.0; }
@@ -1833,7 +1833,7 @@ namespace AnastasisVillage
 		bool bTerrainTravelCostEnabled = false;
 		FString MaterialCourierId;
 		int32 NavVersion = 0;
-		/** `sim.navService` (nav-service-001). */
+		/** `sim.navService` (nav-wiring-001). */
 		AnastasisNavService::FNavService NavService;
 		/** Vues des habitants prises par le service pendant un appel, recopiees a la sortie (`FlushNavAgents`). */
 		TMap<FString, AnastasisNavService::FNavAgent> NavAgents;

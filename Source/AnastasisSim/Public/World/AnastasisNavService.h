@@ -5,10 +5,9 @@
 // navigation (`createNavMetrics`), l'anneau de trace (`recordNavTransition`,
 // `navTraceSnapshot`) et la cle de cible (`navigationTargetKey`).
 //
-// MODULE SEUL. Le village ne l'appelle pas encore: il cherche toujours ses
-// chemins par `AnastasisPath::FindPath` directement. Le branchement (dans
-// `FVillage::UpdateNpc`, `beginNavTick` + deux `processNavQueue` autour de la
-// boucle des PNJ, comme `simulation.js` le fait) est une mission a part.
+// BRANCHE depuis nav-wiring-001 : le village en est l'hote (`FVillage`, INavServiceHost),
+// `beginNavTick` + deux `processNavQueue` autour de la boucle des habitants, et
+// `nextWaypoint` passe par `requestPath` (Village/AnastasisVillageNav.cpp).
 //
 // --- CE QUI DECIDE, ET QU'IL NE FAUT PAS "AMELIORER" --------------------------
 //
@@ -43,7 +42,9 @@
 //   recherche par identifiant designent le meme acteur (identifiants uniques).
 // - `actor.navigation.path` / `pathIndex`: dans le JS, des copies de
 //   `actor.path` / `actor.pathStep` resynchronisees a chaque ecriture
-//   (`syncNavigationFromActor`). Le C++ n'a qu'un stockage.
+//   (`syncNavigationFromActor`). Le service n'ecrit que `Path` / `PathStep` ; le
+//   village tient la copie (`FNpc::NavPath`) et la resynchronise quand `ApplyCount`
+//   dit qu'un chemin a ete pose.
 // - Le journal `ARRIVAL` de l'anneau de trace: l'anneau est porte entier, mais
 //   seul le service de navigation l'alimente pour l'instant.
 
@@ -205,7 +206,7 @@ namespace AnastasisNavService
 		int32 NavVersion = -1;
 
 		/**
-		 * Compte les `applyPathToActor` (nav-service-001) : l'hote sait ainsi qu'un chemin a ete pose,
+		 * Compte les `applyPathToActor` (nav-wiring-001) : l'hote sait ainsi qu'un chemin a ete pose,
 		 * donc que `syncNavigationFromActor` a recopie `navigation.path` / `pathIndex`.
 		 */
 		int32 ApplyCount = 0;

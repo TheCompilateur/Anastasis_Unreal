@@ -289,7 +289,7 @@ namespace AnastasisHarnessTrace
 			if (const FValue* T = Colony->Find(TEXT("treasury")); T && T->IsNumber()) Treasury = T->Number;
 			Village.RestoreColonyForHarness(State, MarketStock, ClearRadius, Treasury);
 		}
-		// `sim.navVersion = data.navVersion | 0`, puis `navCache` filtre sur cette version (nav-service-001) :
+		// `sim.navVersion = data.navVersion | 0`, puis `navCache` filtre sur cette version (nav-wiring-001) :
 		// les chemins deja calcules, servis tels quels par le cache exact ou de zone.
 		{
 			int32 SavedNavVersion = Village.GetNavVersion();

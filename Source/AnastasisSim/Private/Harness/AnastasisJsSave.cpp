@@ -482,7 +482,7 @@ namespace AnastasisJsSave
 			if (bNew || Obj.Find(Key)) Obj.Set(Key, Value);
 		}
 
-		/** Un chemin : `[{x, y}, ...]` (nav-service-001). */
+		/** Un chemin : `[{x, y}, ...]` (nav-wiring-001). */
 		FValue PointsValue(const TArray<AnastasisVillage::FPoint>& Points)
 		{
 			FValue Arr = FValue::MakeArray();
@@ -800,7 +800,7 @@ namespace AnastasisJsSave
 			}
 			if (!R.OptInt(A, TEXT("pathStep"), Where, Out.PathStep) || !R.OptDouble(A, TEXT("pathCooldown"), Where, Out.PathCooldown)) return false;
 			if (!R.OptBool(A, TEXT("pathFailed"), Where, Out.bPathFailed) || !R.OptDouble(A, TEXT("stuckTimer"), Where, Out.StuckTimer)) return false;
-			// Le chemin et `actor.navigation` (nav-service-001).
+			// Le chemin et `actor.navigation` (nav-wiring-001).
 			auto ReadPoints = [&R](const FValue& V, const FString& W, TArray<AnastasisVillage::FPoint>& OutPoints) -> bool
 			{
 				if (!V.IsArray()) return R.Fail(W, TEXT("tableau de points attendu"));
@@ -1112,7 +1112,7 @@ namespace AnastasisJsSave
 			Put(Out, TEXT("pathCooldown"), Num(N.PathCooldown), bNew);
 			Put(Out, TEXT("pathFailed"), FValue::MakeBool(N.bPathFailed), bNew);
 			Put(Out, TEXT("stuckTimer"), Num(N.StuckTimer), bNew);
-			// Le chemin et `actor.navigation` (nav-service-001).
+			// Le chemin et `actor.navigation` (nav-wiring-001).
 			Put(Out, TEXT("path"), N.Path.Num() > 0 ? PointsValue(N.Path) : FValue(), bNew);
 			Put(Out, TEXT("pathGoal"), N.bHasPathGoal ? PointValue(N.PathGoal) : FValue(), bNew);
 			Put(Out, TEXT("pathFailStreak"), Num(N.PathFailStreak), bNew);

@@ -1,4 +1,4 @@
-// nav-service-001 -- la marche : le service de navigation branche sur le village, et le pas.
+// nav-wiring-001 -- la marche : le service de navigation branche sur le village, et le pas.
 //
 // Port de `simulation.js` (`nextWaypoint`, `moveActor`, `resolveStuckActor`, `steerAroundBlock`,
 // `movementSpeedFactor`, `recordPassage`), de `crowdNav.js` (`resolveDoorQueue`, `doorQueueWaypoint`) et de

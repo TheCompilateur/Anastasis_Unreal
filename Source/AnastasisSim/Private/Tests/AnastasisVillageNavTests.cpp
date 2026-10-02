@@ -8,7 +8,7 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-// La marche du village par le service de navigation (nav-service-001).
+// La marche du village par le service de navigation (nav-wiring-001).
 //
 // Le service lui-meme (file, cache, budget) est prouve par Anastasis.Sim.Parite.NavService et NavServiceFonctions ; ici,
 // l'ASSEMBLAGE dans le pas des habitants :

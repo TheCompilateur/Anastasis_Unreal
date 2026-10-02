@@ -1,6 +1,6 @@
 # Releve de la navigation — endurance, 16200 ticks
 
-Genere par `node tools/migration/trace-nav.mjs -ref <clone> -ticks 16200` (mission nav-service-001).
+Genere par `node tools/migration/trace-nav.mjs -ref <clone> -ticks 16200` (mission nav-wiring-001).
 Cache de navigation a la fin : 24 entrees ; file : 0.
 
 | Appels | Premier tick | Fonction -> branche |

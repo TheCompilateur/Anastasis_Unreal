@@ -1169,7 +1169,7 @@ namespace AnastasisVillage
 		Npc.Inside.Until = Now + FMath::Max(0.45, Duration);
 		Npc.Inside.ExitX = Entrance.X;
 		Npc.Inside.ExitY = Entrance.Y;
-		// `actor.target = null ; path = null ; pathStep = 0 ; pathGoal = null ; stuckTimer = 0` (nav-service-001).
+		// `actor.target = null ; path = null ; pathStep = 0 ; pathGoal = null ; stuckTimer = 0` (nav-wiring-001).
 		Npc.bHasTarget = false;
 		Npc.Path.Reset();
 		Npc.PathStep = 0;
@@ -1538,7 +1538,7 @@ namespace AnastasisVillage
 		Points.Reserve(Items.Num());
 		for (const FNpc& Npc : Items) Points.Add(FVector2D(Npc.X, Npc.Y));
 		Grid.Rebuild(Points);
-		// Pathfinding (nav-service-001) : budget A* du tick (file + cache), avant et apres les habitants.
+		// Pathfinding (nav-wiring-001) : budget A* du tick (file + cache), avant et apres les habitants.
 		NavService.BeginNavTick(*this, 1.0);
 		ProcessNavQueue();
 		for (int32 Index = 0; Index < Items.Num(); ++Index)
@@ -2737,7 +2737,7 @@ namespace AnastasisVillage
 			// `setActivity(sim, npc, travelActivity(npc.goal))` (planner-wiring-001 : le C++ ecrivait « marche » pour tous).
 			SetActivity(Npc, JsTravelActivity(Npc.Goal));
 			MoveActor(Npc, Npc.Target, Dt);
-			// A* qui echoue en boucle (`NPC_UNSTICK.pathFailStreakMax`, nav-service-001) : abandonner la cible
+			// A* qui echoue en boucle (`NPC_UNSTICK.pathFailStreakMax`, nav-wiring-001) : abandonner la cible
 			// plutot que buter contre un mur.
 			if (Npc.PathFailStreak >= PathFailStreakMax)
 			{
@@ -3028,7 +3028,7 @@ namespace AnastasisVillage
 
 	void FVillage::ResolveStuckActor(FNpc& Npc, const FPoint& Target)
 	{
-		// Escalade anti-blocage (nav-service-001) : 1) recalcul depuis la position, 2) autre seuil du
+		// Escalade anti-blocage (nav-wiring-001) : 1) recalcul depuis la position, 2) autre seuil du
 		// batiment, 3) abandon temporaire du but.
 		Npc.Path.Reset();
 		Npc.PathCooldown = 0.0;

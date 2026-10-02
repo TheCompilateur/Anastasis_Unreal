@@ -459,6 +459,17 @@ Relevé : `tools/migration/trace-spatial-risk.mjs` → `docs/migration/phase3/P3
 (endurance, 16 200 ticks : 381 décisions, biais non nul dans 255, une écriture de seuil, 57 tirages tous dans
 `intentExploreHint`). Écarts : n° 33 (croyances des lieux sûrs, doctrine de lisière), n° 3, 7, 24.
 
+### Fait — la marche par le service de navigation (mission nav-wiring-001)
+
+| Unreal | Source JS (`anastasis-ref-p3`) | Preuve |
+| --- | --- | --- |
+| `Village/AnastasisVillageNav.cpp` | `simulation.js` : `nextWaypoint` (par `requestPath`), `moveActor` (hésitation, `lastMoveDir`, anti-blocage, `trafficTimer`), `steerAroundBlock`, `movementSpeedFactor` (état porté, mode de vie compris), `recordPassage`, `hashText01` local ; `crowdNav.js` : `resolveDoorQueue`, `doorQueueWaypoint` | `Village.Navigation` ; harnais : au tick 32, navigation et pas de npc-2 identiques |
+| `Village/AnastasisVillage.cpp` | `beginNavTick`, `processNavQueue` autour de la boucle des habitants ; `resolveStuckActor` ; garde-fou `pathFailStreak` de `act` ; sites qui jettent le chemin | suite `Anastasis.Sim` |
+| `Harness/AnastasisJsSave.cpp`, `AnastasisHarnessTrace.cpp` | `navigation`, chemin, `lastMoveDir`, `trafficTimer`, `hesitation*` lus et projetés ; `navVersion`, `navCache` repris | harnais |
+
+Relevé : `tools/migration/trace-nav.mjs` → `docs/migration/phase3/P3_NAV_RELEVE.md`. Écart n° 4 réduit (reste :
+`destBuildingId`, séparation de foule masquée, verrou du seuil domestique en route).
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

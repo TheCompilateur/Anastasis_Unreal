@@ -1,4 +1,4 @@
-// RELEVE DE LA NAVIGATION — mission nav-service-001.
+// RELEVE DE LA NAVIGATION — mission nav-wiring-001.
 //
 //   node tools/migration/trace-nav.mjs -ref <clone anastasis-ref-p3> [-ticks 600]
 //        [-scenario tools/migration/scenarios/endurance.json] [-md <sortie.md>] [-actor npc-2 -at 32]
@@ -135,7 +135,7 @@ rmSync(COPIE, { recursive: true, force: true });
 const L = [];
 L.push(`# Releve de la navigation — ${scenario.nom || "endurance"}, ${TICKS} ticks`);
 L.push("");
-L.push(`Genere par \`node tools/migration/trace-nav.mjs -ref <clone> -ticks ${TICKS}\` (mission nav-service-001).`);
+L.push(`Genere par \`node tools/migration/trace-nav.mjs -ref <clone> -ticks ${TICKS}\` (mission nav-wiring-001).`);
 L.push(`Cache de navigation a la fin : ${sim.navService?.cache?.size ?? 0} entrees ; file : ${sim.navService?.queue?.length ?? 0}.`);
 L.push("");
 L.push("| Appels | Premier tick | Fonction -> branche |");
