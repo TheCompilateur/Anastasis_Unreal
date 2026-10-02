@@ -7,6 +7,8 @@
 
 class USmartObjectComponent;
 class USmartObjectDefinition;
+class UMaterialInstanceDynamic;
+class UMaterialInterface;
 class UPointLightComponent;
 class UStaticMeshComponent;
 
@@ -53,6 +55,15 @@ public:
 	void SetHearth(double Level);
 	double GetHearth() const { return HearthLevel; }
 
+	/**
+	 * ABANDON_001 : l'usure d'une maison que personne n'habite (AnastasisMetabolism::FState::Neglect,
+	 * 0..1, vient des jours de vacance de la simulation). 0 = le materiau d'origine, intact. Sans
+	 * l'asset M_VillageBuilding_Aged l'appel ne fait rien (l'ancien rendu reste).
+	 */
+	void SetNeglect(double Level);
+	double GetNeglect() const { return NeglectLevel; }
+	UMaterialInstanceDynamic* GetAgedMaterial() const { return AgedMaterial; }
+
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis")
 	TObjectPtr<USmartObjectComponent> SmartObject;
@@ -65,6 +76,15 @@ private:
 	TObjectPtr<UPointLightComponent> Hearth;
 
 	double HearthLevel = 0.0;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> OriginalMaterial;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> AgedMaterial;
+
+	double NeglectLevel = 0.0;
+	bool bAgedMaterialMissing = false;
 
 	UPROPERTY()
 	FName SimId;

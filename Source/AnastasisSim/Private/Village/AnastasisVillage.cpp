@@ -225,6 +225,8 @@ namespace AnastasisVillage
 		Building.Progress = Progress;
 		Building.CreatedDay = Day;
 		Building.HousePhase = 1;
+		// `addBuilding` : `if (type === "house") { if (!building.owner) building.vacantSinceDay = this.day }`.
+		StampHouseVacant(Building, Day);
 
 		Nav.Blocked[Index] = 1;
 		Nav.MoveCost[Index] = std::numeric_limits<float>::infinity();
@@ -819,6 +821,7 @@ namespace AnastasisVillage
 			return false;
 		}
 		House->Owner = NpcId;
+		StampHouseOccupied(*House);
 		Npc->HomeId = HouseId;
 		// `owner.morale = clamp(owner.morale + 12, 0, 100)` — sans repli sur 50.
 		Npc->Needs.Morale = Clamp(Npc->Needs.Morale + 12.0, 0.0, 100.0);
@@ -1349,7 +1352,12 @@ namespace AnastasisVillage
 		// mort (mortality.js) ; sans cela la maison resterait close pour toujours.
 		for (FBuilding& B : Buildings.GetItemsMutable())
 		{
-			if (B.Owner == Id) B.Owner.Reset();
+			if (B.Owner == Id)
+			{
+				B.Owner.Reset();
+				// `releaseHome(npc, day)` -> `stampHouseVacant(npc.home, day)` (mortality.js).
+				StampHouseVacant(B, Day());
+			}
 		}
 		// `playerActor()` ne rend plus personne : on ne reste pas maitre d'un absent.
 		if (Id == PlayerPersonId)
@@ -2717,6 +2725,50 @@ namespace AnastasisVillage
 	{
 		// `day = 1 + floor(time / DAY_LENGTH)`, comme l'hote.
 		return 1 + static_cast<int32>(AnastasisJs::Floor(Now / AnastasisRhythm::DayLength));
+	}
+
+	void StampHouseVacant(FBuilding& Building, const int32 Day)
+	{
+		if (Building.Type != HouseType)
+		{
+			return;
+		}
+		if (!Building.Owner.IsEmpty())
+		{
+			Building.VacantSinceDay = -1;
+			return;
+		}
+		if (Building.VacantSinceDay < 0)
+		{
+			Building.VacantSinceDay = Day;
+		}
+	}
+
+	void StampHouseOccupied(FBuilding& Building)
+	{
+		Building.VacantSinceDay = -1;
+	}
+
+	int32 VacantAgeDays(const FBuilding& Building, const int32 Day)
+	{
+		if (!Building.Owner.IsEmpty() || Building.Type != HouseType)
+		{
+			return 0;
+		}
+		// `createdDay || day` : 0 est faux en JS.
+		const int32 Since = Building.VacantSinceDay >= 0
+			? Building.VacantSinceDay
+			: (Building.CreatedDay != 0 ? Building.CreatedDay : Day);
+		return FMath::Max(0, Day - Since);
+	}
+
+	int32 VacantAgeBand(const FBuilding& Building, const int32 Day)
+	{
+		const int32 Days = VacantAgeDays(Building, Day);
+		if (Days >= 45) return 3;
+		if (Days >= 18) return 2;
+		if (Days >= 6) return 1;
+		return 0;
 	}
 
 	void FVillage::PerceiveNow(const FString& NpcId)

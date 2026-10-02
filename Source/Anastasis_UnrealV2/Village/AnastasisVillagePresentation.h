@@ -33,7 +33,7 @@ public:
 
 	/**
 	 * Aligne les acteurs sur les enregistrements. Rend le nombre d'acteurs crees + detruits.
-	 * ICEBERG_001 : `Daylight` (0 nuit, 1 plein jour : celui du ciel que le joueur voit) et `Mode`
+	 * ICEBERG_001 : `Daylight` (0 nuit, 1 plein jour : celui du ciel que le joueur voit), `Day` (jour de la simulation) et `Mode`
 	 * donnent a chaque maison le foyer que la simulation lui prete (AnastasisMetabolism). Le defaut
 	 * (plein jour) n'allume rien : les appelants qui ne connaissent pas le ciel gardent l'ancien rendu.
 	 */
@@ -42,7 +42,8 @@ public:
 		const AnastasisWorld::FWorld& World,
 		UAnastasisVillageInteractionSubsystem& Rooms,
 		double Daylight = 1.0,
-		AnastasisMetabolism::EMode Mode = AnastasisMetabolism::EMode::Truth);
+		AnastasisMetabolism::EMode Mode = AnastasisMetabolism::EMode::Truth,
+		int32 Day = 1);
 
 	/** Detruit tous les acteurs refletes. */
 	void Clear(UAnastasisVillageInteractionSubsystem* Rooms);

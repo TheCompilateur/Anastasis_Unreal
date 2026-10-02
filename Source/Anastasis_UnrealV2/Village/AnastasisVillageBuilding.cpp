@@ -3,6 +3,7 @@
 #include "Anastasis_UnrealV2.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "HAL/IConsoleManager.h"
 #include "Engine/StaticMesh.h"
 #include "SmartObjectComponent.h"
@@ -61,6 +62,52 @@ AAnastasisVillageBuilding::AAnastasisVillageBuilding()
 	Hearth->SetVolumetricScatteringIntensity(0.f);
 	Hearth->SetIntensity(0.f);
 	Hearth->SetVisibility(false);
+}
+
+void AAnastasisVillageBuilding::SetNeglect(const double Level)
+{
+	if (!Body || Kind != EAnastasisVillageBuildingKind::House)
+	{
+		return;
+	}
+	const double Clamped = FMath::Clamp(Level, 0.0, 1.0);
+	if (FMath::IsNearlyEqual(Clamped, NeglectLevel, 0.002))
+	{
+		return;
+	}
+	if (Clamped <= 0.0)
+	{
+		// Quelqu'un est revenu : la maison reprend son materiau d'origine.
+		NeglectLevel = 0.0;
+		if (OriginalMaterial)
+		{
+			Body->SetMaterial(0, OriginalMaterial);
+		}
+		return;
+	}
+	if (!AgedMaterial)
+	{
+		if (bAgedMaterialMissing)
+		{
+			return;
+		}
+		UMaterialInterface* Aged = LoadObject<UMaterialInterface>(
+			nullptr, TEXT("/Game/Anastasis/VillageBuildings/M_VillageBuilding_Aged.M_VillageBuilding_Aged"));
+		if (!Aged)
+		{
+			bAgedMaterialMissing = true;
+			UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VILLAGE aging material missing: M_VillageBuilding_Aged (run create-building-aging.ps1)"));
+			return;
+		}
+		OriginalMaterial = Body->GetMaterial(0);
+		AgedMaterial = UMaterialInstanceDynamic::Create(Aged, this);
+	}
+	NeglectLevel = Clamped;
+	AgedMaterial->SetScalarParameterValue(TEXT("Neglect"), static_cast<float>(Clamped));
+	if (Body->GetMaterial(0) != AgedMaterial)
+	{
+		Body->SetMaterial(0, AgedMaterial);
+	}
 }
 
 void AAnastasisVillageBuilding::SetHearth(const double Level)

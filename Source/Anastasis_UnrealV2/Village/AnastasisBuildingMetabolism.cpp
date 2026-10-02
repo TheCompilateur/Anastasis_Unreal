@@ -19,10 +19,34 @@ namespace AnastasisMetabolism
 		return Input.Residents > 0 ? EOccupancy::Resident : EOccupancy::Vacant;
 	}
 
+	double NeglectForDays(const int32 VacantDays)
+	{
+		struct FKey { double Days; double Value; };
+		static constexpr FKey Keys[] = {{0.0, 0.0}, {6.0, 0.2}, {18.0, 0.55}, {45.0, 1.0}};
+		const double D = FMath::Max(0, VacantDays);
+		if (D >= Keys[3].Days)
+		{
+			return 1.0;
+		}
+		for (int32 I = 1; I < 4; ++I)
+		{
+			if (D <= Keys[I].Days)
+			{
+				const double T = (D - Keys[I - 1].Days) / (Keys[I].Days - Keys[I - 1].Days);
+				return Keys[I - 1].Value + (Keys[I].Value - Keys[I - 1].Value) * T;
+			}
+		}
+		return 1.0;
+	}
+
 	FState Derive(const FInput& Input, const EMode Mode)
 	{
 		FState State;
 		State.Occupancy = OccupancyOf(Input);
+		if (Mode == EMode::Truth && State.Occupancy == EOccupancy::Vacant)
+		{
+			State.Neglect = NeglectForDays(Input.VacantDays);
+		}
 		if (Mode == EMode::Off)
 		{
 			return State;

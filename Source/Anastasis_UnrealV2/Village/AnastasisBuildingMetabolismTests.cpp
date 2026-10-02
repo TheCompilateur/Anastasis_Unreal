@@ -170,4 +170,45 @@ bool FAnastasisMetabolismProjectionTest::RunTest(const FString&)
 	return true;
 }
 
+/**
+ * ABANDON_001 : l'usure suit les jours de vacance (ancrage : bandes de la reference 6 / 18 / 45 j),
+ * jamais l'heure, jamais l'occupation. Une maison habitee ne vieillit pas ; le temoin faux reste propre.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAnastasisMetabolismNeglectTest,
+	"Anastasis.Village.Metabolism.Neglect",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAnastasisMetabolismNeglectTest::RunTest(const FString&)
+{
+	TestEqual(TEXT("jour 0"), AnastasisMetabolism::NeglectForDays(0), 0.0);
+	TestEqual(TEXT("6 j : vide"), AnastasisMetabolism::NeglectForDays(6), 0.2);
+	TestEqual(TEXT("18 j : use"), AnastasisMetabolism::NeglectForDays(18), 0.55);
+	TestEqual(TEXT("45 j : long abandon"), AnastasisMetabolism::NeglectForDays(45), 1.0);
+	TestEqual(TEXT("au-dela, plafonne"), AnastasisMetabolism::NeglectForDays(900), 1.0);
+	TestEqual(TEXT("negatif borne"), AnastasisMetabolism::NeglectForDays(-4), 0.0);
+	double Previous = -1.0;
+	bool bMonotonic = true;
+	for (int32 D = 0; D <= 60; ++D)
+	{
+		const double N = AnastasisMetabolism::NeglectForDays(D);
+		bMonotonic &= N >= Previous;
+		Previous = N;
+	}
+	TestTrue(TEXT("monotone en jours vides"), bMonotonic);
+
+	FInput Empty = House(true, 0, 0, 1.0);
+	Empty.VacantDays = 45;
+	TestEqual(TEXT("maison vide depuis 45 j (Truth)"), AnastasisMetabolism::Derive(Empty, EMode::Truth).Neglect, 1.0);
+	TestEqual(TEXT("meme maison, temoin faux : propre"), AnastasisMetabolism::Derive(Empty, EMode::WrongWitness).Neglect, 0.0);
+	TestEqual(TEXT("meme maison, Off : ancien rendu"), AnastasisMetabolism::Derive(Empty, EMode::Off).Neglect, 0.0);
+	FInput Lived = House(true, 1, 0, 1.0);
+	Lived.VacantDays = 45;
+	TestEqual(TEXT("un foyer vivant ne s'use pas, quoi que dise l'horloge"), AnastasisMetabolism::Derive(Lived, EMode::Truth).Neglect, 0.0);
+	FInput Site = House(false, 0, 0, 1.0);
+	Site.VacantDays = 45;
+	TestEqual(TEXT("un chantier ne s'use pas"), AnastasisMetabolism::Derive(Site, EMode::Truth).Neglect, 0.0);
+	return true;
+}
+
 #endif

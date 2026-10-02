@@ -112,7 +112,8 @@ int32 FAnastasisVillagePresentation::Sync(
 	const AnastasisWorld::FWorld& World,
 	UAnastasisVillageInteractionSubsystem& Rooms,
 	const double Daylight,
-	const AnastasisMetabolism::EMode Mode)
+	const AnastasisMetabolism::EMode Mode,
+	const int32 Day)
 {
 	int32 Changes = 0;
 
@@ -127,8 +128,17 @@ int32 FAnastasisVillagePresentation::Sync(
 		{
 			In.Residents = Village.CountShelterOccupants(Building.Id);
 			In.Inside = Village.InsideOf(Building.Id).Num();
+			// Les jours vides vont de `vacantSinceDay` (reference) ; une maison finie ne vieillit pas
+			// avant son achevement (la reference date aussi les chantiers, le visiteur n'en voit pas).
+			In.VacantDays = AnastasisVillage::VacantAgeDays(Building, Day);
+			if (Building.CompletedDay >= 0)
+			{
+				In.VacantDays = FMath::Min(In.VacantDays, FMath::Max(0, Day - Building.CompletedDay));
+			}
 		}
-		Actor.SetHearth(AnastasisMetabolism::Derive(In, Mode).Hearth);
+		const AnastasisMetabolism::FState State = AnastasisMetabolism::Derive(In, Mode);
+		Actor.SetHearth(State.Hearth);
+		Actor.SetNeglect(State.Neglect);
 	};
 
 	// Retirer d'abord : un acteur dont l'enregistrement a disparu, ou qui a ete

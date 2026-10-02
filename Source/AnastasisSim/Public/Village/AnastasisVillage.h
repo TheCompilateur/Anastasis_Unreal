@@ -423,6 +423,13 @@ namespace AnastasisVillage
 		int32 CompletedDay = -1;
 		FString CompletedById;
 
+		/**
+		 * `building.vacantSinceDay` (collectivePriorities.js, `stampHouseVacant`) : jour ou la maison
+		 * est devenue libre, -1 = `null` (occupee). HORS DIGEST : la projection canonique ne l'ecrit
+		 * pas (la reference non plus ne la compare pas). Pose par AddBuilding, RemoveNpc, AssignHome.
+		 */
+		int32 VacantSinceDay = -1;
+
 		bool IsCompleted() const { return Progress >= 1.0; }
 		int32 FoodAvailable() const { return FMath::Max(0, FoodPhysical - FoodReserved); }
 	};
@@ -1562,6 +1569,17 @@ namespace AnastasisVillage
 
 	/** `commitHearsayResourceSpot` puis `trimResourceSpotMemory`. Rend vrai si le gisement entre. */
 	ANASTASISSIM_API bool CommitHearsaySpot(TArray<FResourceSpot>& Target, const FSpotAct& Act, int32 Day, double Time);
+
+	/**
+	 * ABANDON_001 -- `stampHouseVacant` / `stampHouseOccupied` / `vacantAgeDays` / `vacantAgeBand`
+	 * (collectivePriorities.js), portes tels quels. Une maison libre date de `VacantSinceDay` ; a defaut
+	 * de `createdDay` (jamais occupee) ; a defaut du jour courant. Bandes : 0 frais, 1 vide (>= 6 j),
+	 * 2 use (>= 18 j), 3 long abandon (>= 45 j).
+	 */
+	ANASTASISSIM_API void StampHouseVacant(FBuilding& Building, int32 Day);
+	ANASTASISSIM_API void StampHouseOccupied(FBuilding& Building);
+	ANASTASISSIM_API int32 VacantAgeDays(const FBuilding& Building, int32 Day);
+	ANASTASISSIM_API int32 VacantAgeBand(const FBuilding& Building, int32 Day);
 
 	/** `aiThinkStagger` — decalage FNV-1a de l'identifiant, dans [0, thinkEvery). */
 	ANASTASISSIM_API double AiThinkStagger(const FString& Id);

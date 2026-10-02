@@ -307,7 +307,8 @@ int32 UAnastasisSimulationSubsystem::SyncVillagePresentation()
 		: 1.0;
 	return VillagePresentation.Sync(
 		Simulation.GetVillage(), Simulation.GetWorld(), *Rooms, Daylight,
-		AnastasisMetabolism::ModeFromInt(CVarVillageMetabolism.GetValueOnGameThread()));
+		AnastasisMetabolism::ModeFromInt(CVarVillageMetabolism.GetValueOnGameThread()),
+		1 + static_cast<int32>(FMath::FloorToDouble(Simulation.GetTime() / AnastasisSkyClock::DayLengthSeconds)));
 }
 
 FString UAnastasisSimulationSubsystem::SeedFirstWell(int32 NpcCount, int32 TileX, int32 TileY)

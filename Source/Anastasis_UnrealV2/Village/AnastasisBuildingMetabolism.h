@@ -19,9 +19,11 @@
  *   completed -- FBuilding::IsCompleted(): a building site shows nothing.
  *   daylight  -- AnastasisSkyClock::FSkyState::Daylight, the daylight the viewer actually sees.
  *
- * What it does NOT know, on purpose: since when a house is empty. The sim keeps no vacated
- * date, so weathering, moss and a roof that gives way are NOT derived here (frontier, see
- * the handoff). The only thing a vacant house can honestly show today is the absence of life.
+ * ABANDON_001 adds the second half: since when. The reference keeps `vacantSinceDay` on every
+ * house (collectivePriorities.js), now ported (FBuilding::VacantSinceDay, AnastasisVillage::
+ * VacantAgeDays). A vacant house therefore ages on screen with the days it has been empty;
+ * an occupied one never does, so the ageing is reversible the day somebody moves back in.
+ * What stays NOT derived: roof collapse, vegetation taking the plot back (other owners, frontier).
  */
 namespace AnastasisMetabolism
 {
@@ -62,6 +64,8 @@ namespace AnastasisMetabolism
 		int32 Inside = 0;
 		/** [0,1]: 0 at night, 1 in full day. */
 		double Daylight = 1.0;
+		/** AnastasisVillage::VacantAgeDays, clamped to the days since completion by the caller. */
+		int32 VacantDays = 0;
 	};
 
 	struct FState
@@ -69,10 +73,19 @@ namespace AnastasisMetabolism
 		EOccupancy Occupancy = EOccupancy::NotADwelling;
 		/** [0,1] strength of the hearth glow seen through the openings; 0 = dark. */
 		double Hearth = 0.0;
+		/** [0,1] weathering of a house nobody lives in: 0 = kept, 1 = long abandoned. */
+		double Neglect = 0.0;
 	};
 
 	/** Hearth share of a household that is registered but out of the house (banked embers). */
 	inline constexpr double ResidentHearth = 0.25;
+
+	/**
+	 * Weathering for days empty. Anchored on the reference's own bands (vacantAgeBand: >= 6 d vide,
+	 * >= 18 d use, >= 45 d long abandon) at 0.2 / 0.55 / 1.0, linear between: continuous, so a house
+	 * does not change look in one frame, and the band thresholds are still the ones the reference states.
+	 */
+	double NeglectForDays(int32 VacantDays);
 
 	/** Occupancy of a building from the sim's numbers. Pure. */
 	EOccupancy OccupancyOf(const FInput& Input);
