@@ -674,6 +674,16 @@ namespace AnastasisVillage
 		double SimBudgetAccum = 0.0;
 		bool bHasSimBudgetAccum = false;
 
+		/**
+		 * `npc.phenotype` et `npc.conditioning` (needs-wiring-001) : ce que lisent les cinq
+		 * facteurs des besoins (`AnastasisNeeds::NeedFactorsFor`). Le phenotype ne change pas
+		 * de la vie ; le conditionnement avance en fin de besoins (`TickNeedsConditioning`).
+		 * Non poses : habitant median, facteurs 1, conditionnement immobile -- c'est le cas de
+		 * tout habitant cree par le C++ (ecart n°8).
+		 */
+		TOptional<AnastasisGenome::FPhenotype> Phenotype;
+		TOptional<AnastasisConditioning::FConditioning> Conditioning;
+
 		/** `npc.relations` (ordre d'insertion), `mind.people`, `mind.tom`, `npc.moodlets`. */
 		TArray<TPair<FString, double>> Relations;
 		TArray<AnastasisBonds::FPersonRow> People;

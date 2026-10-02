@@ -344,6 +344,15 @@ l'habitant, jamais sur `sim.rng`.
 `AreNeedsCritical` et non `NeedsCritical` : `AnastasisVillage` porte déjà une fonction de ce nom sur
 `FNeeds`, même formule. La recherche dépendante des arguments rendait ses appels ambigus.
 
+**Branché par needs-wiring-001.** `FNpc` porte `Phenotype` et `Conditioning` (`TOptional`), le lecteur les
+lit comme `deserialize` les complète (`ensureGenome(actor, sim.seed)` : phénotype lu, ou dérivé du génome,
+ou d'un génome créé ; `ensureConditioning` : neutre s'il manque) et projette le conditionnement.
+`UpdateNpc` lit les facteurs avant la branche, puis `tickMoodlets`, `TickNeedsConditioning` (travail =
+`WORK_GOALS`, dedans compris ; repos = but `rest`), puis la pluie. `AnastasisVillage::NeedsCritical`
+délègue à `AreNeedsCritical`. Un habitant créé par le C++ n'a ni phénotype ni conditionnement : il reste
+médian et garde ses bits (écart n° 8). Preuve : `Anastasis.Sim.Village.BesoinsParHabitant` ; au forage du
+tick 1 du scénario `endurance`, les huit mètres et le conditionnement sont égaux à la référence.
+
 ### Fait — le mode de vie (mission lifestyle-001), module seul
 
 | Unreal | Source JS (`anastasis-ref-p3`) | Preuve |

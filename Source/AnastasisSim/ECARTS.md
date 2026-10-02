@@ -168,13 +168,16 @@ ni dortoir. `redirectDomesticDoorFailure` bascule sur `explore`, non porté : ic
 - **fermeture** : goals-family-001, puis jalon D
 - **statut** : OUVERT
 - **entree** : tranches puits → grenier (first-building-001, house-rest-001, granary-eat-001)
-- **reference** : `createNpc` (âge, famille, mode de vie), `jobPriority`
-- **cpp** : `Village/AnastasisVillage.cpp`, création des habitants
+- **reference** : `createNpc` (âge, famille, mode de vie, `ensureGenome`, `ensureConditioning`), `jobPriority`
+- **cpp** : `Village/AnastasisVillage.cpp`, création des habitants ; `FNpc::Phenotype` / `FNpc::Conditioning` non posés
 - **harnais** : actors
 - **detail** : `Public/Village/AnastasisVillage.h`, n° 8
 
 `jobPriority(rest)` = 15,5 et `jobPriority(eat)` = 18 sont repris en constantes : vrais pour tous les
 métiers du catalogue. Le rendu (`Anastasis_UnrealV2/Village`) n'a donc pas d'enfants à dessiner.
+Depuis needs-wiring-001, les besoins lisent le phénotype et le conditionnement de l'habitant ; un
+habitant créé par le C++ n'a ni génome ni conditionnement, il reste médian (facteurs 1, conditionnement
+immobile). Le harnais n'en souffre pas : ses habitants sont lus, `deserialize` les complète.
 
 ### n° 9 — Noûs partiel
 

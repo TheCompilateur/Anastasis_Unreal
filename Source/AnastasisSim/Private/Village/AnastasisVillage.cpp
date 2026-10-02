@@ -109,15 +109,9 @@ namespace AnastasisVillage
 
 	bool NeedsCritical(const AnastasisNeeds::FNeeds& N)
 	{
-		using namespace AnastasisNeeds::Constants;
-		return N.Hunger >= HungerCritical
-			|| N.Energy <= 100.0 - FatigueCritical
-			|| N.Social <= 100.0 - LonelyCritical
-			|| N.Leisure <= 100.0 - BoredCritical
-			|| N.Hygiene <= 100.0 - HygieneCritical
-			|| N.Thirst >= ThirstCritical
-			|| N.Health <= HealthCritical
-			|| N.Morale < MoraleCritical;
+		// Une seule formule : `needsCritical` est porte et prouve dans le module des besoins
+		// (`Anastasis.Sim.Parite.BesoinsFacteurs`, 18 cas de part et d'autre des seuils).
+		return AnastasisNeeds::AreNeedsCritical(N);
 	}
 
 	int32 HousingOfType(const FString& Type)
@@ -1353,22 +1347,27 @@ namespace AnastasisVillage
 			Dt = Step.Dt;
 		}
 
+		// Les cinq facteurs de l'habitant, lus en tete de `tickNeeds`, AVANT la branche.
+		// Sans phenotype ni conditionnement (habitant cree par le C++), facteurs 1 : ecart n°8.
+		const AnastasisNeeds::FNeedFactors Factors = AnastasisNeeds::NeedFactorsFor(
+			Npc.Phenotype.IsSet() ? &Npc.Phenotype.GetValue() : nullptr,
+			Npc.Conditioning.IsSet() ? &Npc.Conditioning.GetValue() : nullptr);
 		if (Npc.Inside.bActive && Npc.Inside.Goal == GoalRest)
 		{
-			AnastasisNeeds::TickNeedsRestInside(Npc.Needs, Dt, IsNight(), SleepQualityOf(Npc));
+			AnastasisNeeds::TickNeedsRestInside(Npc.Needs, Dt, IsNight(), SleepQualityOf(Npc), Factors);
 		}
 		else if (Npc.Inside.bActive && Npc.Inside.Goal == GoalEat)
 		{
-			AnastasisNeeds::TickNeedsEatInside(Npc.Needs, Dt);
+			AnastasisNeeds::TickNeedsEatInside(Npc.Needs, Dt, Factors);
 		}
 		else if ((Npc.Inside.bActive && Npc.Inside.Goal == GoalSocialize) || Npc.Goal == GoalSocialize)
 		{
 			// `insideGoal === "socialize" || npc.goal === "socialize"` : dehors, gain x 0,45.
-			AnastasisNeeds::TickNeedsSocialize(Npc.Needs, Dt, Npc.Inside.bActive);
+			AnastasisNeeds::TickNeedsSocialize(Npc.Needs, Dt, Npc.Inside.bActive, Factors);
 		}
 		else if ((Npc.Inside.bActive && Npc.Inside.Goal == GoalRelax) || Npc.Goal == GoalRelax)
 		{
-			AnastasisNeeds::TickNeedsRelax(Npc.Needs, Dt);
+			AnastasisNeeds::TickNeedsRelax(Npc.Needs, Dt, Factors);
 		}
 		else
 		{
@@ -1378,13 +1377,22 @@ namespace AnastasisVillage
 			const bool bWorking = IsGranaryWorker(Npc)
 				? (Npc.Goal == GoalGatherFood || Npc.Goal == GoalDeliver) && !Npc.Inside.bActive
 				: Npc.Goal == TEXT("gatherFood");
-			AnastasisNeeds::TickNeeds(Npc.Needs, Dt, bDrinking, bWorking);
+			AnastasisNeeds::TickNeeds(Npc.Needs, Dt, bDrinking, bWorking, Factors);
+		}
+		// La fin de `tickNeeds`, dans son ordre : `tickMoodlets` (l'humeur d'une amitie neuve monte
+		// le moral, plafonnee), puis `tickConditioning`, dont la porte de surmenage lit les metres
+		// APRES la branche et les moodlets. Avant needs-wiring-001, les moodlets suivaient la pluie :
+		// ils n'ecrivent que le moral, la pluie l'energie et la sante, l'echange ne change aucun bit.
+		AnastasisBonds::TickMoodlets(Npc.Moodlets, Npc.Needs.Morale, Dt, Now);
+		if (Npc.Conditioning.IsSet())
+		{
+			// `working: WORK_GOALS.has(npc.goal)` (dedans compris), `resting: npc.goal === "rest"`.
+			AnastasisNeeds::TickNeedsConditioning(Npc.Conditioning.GetValue(), Npc.Needs, Dt,
+				AnastasisRhythm::IsWorkGoal(Npc.Goal), Npc.Goal == GoalRest);
 		}
 		// `applyRainExposure`, juste apres `tickNeeds` : dehors sous l'orage, l'energie fond.
 		AnastasisWeatherBehavior::ApplyRainExposure(TickWeather.Rain, Npc.Inside.bActive, Npc.Goal, Dt,
 			Npc.Needs.Energy, Npc.Needs.Health);
-		// `tickMoodlets` : l'humeur d'une amitie neuve monte le moral, plafonnee.
-		AnastasisBonds::TickMoodlets(Npc.Moodlets, Npc.Needs.Morale, Dt, Now);
 
 		// `holdTalkAct` : en conversation, l'habitant est fige (ni pensee, ni marche).
 		if (HoldTalk(Npc))

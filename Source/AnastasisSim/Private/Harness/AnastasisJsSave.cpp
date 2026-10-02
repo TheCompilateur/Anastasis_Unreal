@@ -497,9 +497,57 @@ namespace AnastasisJsSave
 		// skills.{gather, trade, craft}, inventory.food, target, pathStep,
 		// pathCooldown, pathFailed, stuckTimer, doorStuckAt, doorApproachAt,
 		// talkWithId, talkUntil, inside (null seulement), _simBudgetAccum (cle presente
-		// ou non : la reference ne l'ecrit qu'apres un passage hors de la bande near).
+		// ou non : la reference ne l'ecrit qu'apres un passage hors de la bande near),
+		// phenotype, conditioning, et genome.loci quand le phenotype manque.
 
-		bool ReadActor(FReader& R, const FValue& A, const FString& Where, AnastasisVillage::FNpc& Out)
+		/** `genome.loci` : `{ <locus>: [a, b] }`. Le reste du genome n'entre pas dans le phenotype. */
+		bool ReadGenomeLoci(FReader& R, const FValue& G, const FString& Where, AnastasisGenome::FGenome& Out)
+		{
+			if (!G.IsObject()) return R.Fail(Where, TEXT("objet attendu"));
+			const FValue* Loci = G.Find(TEXT("loci"));
+			if (!Loci || !Loci->IsObject()) return R.Fail(FReader::At(Where, TEXT("loci")), TEXT("objet attendu"));
+			for (int32 L = 0; L < AnastasisGenome::NumLoci; ++L)
+			{
+				const TCHAR* Name = AnastasisGenome::LocusName(static_cast<AnastasisGenome::ELocus>(L));
+				const FValue* Pair = Loci->Find(Name);
+				const FString W = FReader::At(FReader::At(Where, TEXT("loci")), Name);
+				if (!Pair || !Pair->IsArray() || Pair->Items.Num() != 2 || !Pair->Items[0].IsNumber() || !Pair->Items[1].IsNumber())
+				{
+					return R.Fail(W, TEXT("paire de nombres attendue"));
+				}
+				Out.Alleles[L][0] = Pair->Items[0].Number;
+				Out.Alleles[L][1] = Pair->Items[1].Number;
+			}
+			return true;
+		}
+
+		/** `npc.phenotype` : les douze loci et les six derivees ; un champ absent garde son defaut. */
+		bool ReadPhenotype(FReader& R, const FValue& P, const FString& Where, AnastasisGenome::FPhenotype& Out)
+		{
+			if (!P.IsObject()) return R.Fail(Where, TEXT("objet attendu"));
+			for (int32 L = 0; L < AnastasisGenome::NumLoci; ++L)
+			{
+				if (!R.OptDouble(P, AnastasisGenome::LocusName(static_cast<AnastasisGenome::ELocus>(L)), Where, Out.Loci[L])) return false;
+			}
+			return R.OptDouble(P, TEXT("hydrationLossMultiplier"), Where, Out.HydrationLossMultiplier)
+				&& R.OptDouble(P, TEXT("heatDissipationEfficiency"), Where, Out.HeatDissipationEfficiency)
+				&& R.OptDouble(P, TEXT("metabolicDemandMultiplier"), Where, Out.MetabolicDemandMultiplier)
+				&& R.OptDouble(P, TEXT("metabolicPeakRecoveryMultiplier"), Where, Out.MetabolicPeakRecoveryMultiplier)
+				&& R.OptDouble(P, TEXT("fatigueRecoveryMultiplier"), Where, Out.FatigueRecoveryMultiplier)
+				&& R.OptDouble(P, TEXT("fatigueRecoveryStrainCost"), Where, Out.FatigueRecoveryStrainCost);
+		}
+
+		/** `npc.conditioning` ; un champ absent garde le neutre de `ensureConditioning`. */
+		bool ReadConditioning(FReader& R, const FValue& C, const FString& Where, AnastasisConditioning::FConditioning& Out)
+		{
+			if (!C.IsObject()) return R.Fail(Where, TEXT("objet attendu"));
+			return R.OptInt(C, TEXT("version"), Where, Out.Version)
+				&& R.OptDouble(C, TEXT("workConditioning"), Where, Out.WorkConditioning)
+				&& R.OptDouble(C, TEXT("fatigueAdaptation"), Where, Out.FatigueAdaptation)
+				&& R.OptDouble(C, TEXT("recoveryConditioning"), Where, Out.RecoveryConditioning);
+		}
+
+		bool ReadActor(FReader& R, const FValue& A, const FString& Where, uint32 WorldSeed, AnastasisVillage::FNpc& Out)
 		{
 			if (!A.IsObject()) return R.Fail(Where, TEXT("objet attendu"));
 			if (!R.String(A, TEXT("id"), Where, Out.Id)) return false;
@@ -544,10 +592,32 @@ namespace AnastasisJsSave
 			if (!R.OptBool(A, TEXT("pathFailed"), Where, Out.bPathFailed) || !R.OptDouble(A, TEXT("stuckTimer"), Where, Out.StuckTimer)) return false;
 			if (!R.OptDouble(A, TEXT("doorStuckAt"), Where, Out.DoorStuckAt) || !R.OptDouble(A, TEXT("doorApproachAt"), Where, Out.DoorApproachAt)) return false;
 			if (!R.OptId(A, TEXT("talkWithId"), Where, Out.TalkWithId) || !R.OptDouble(A, TEXT("talkUntil"), Where, Out.TalkUntil)) return false;
+			// Absents d'une sauvegarde au repos (< 0 et vide cote C++) ; la reference les ecrit au
+			// premier tick ou l'habitant pense.
+			if (!R.OptDouble(A, TEXT("aiThinkAt"), Where, Out.AiThinkAt) || !R.OptString(A, TEXT("villagePhase"), Where, Out.VillagePhase)) return false;
 			if (A.Find(TEXT("_simBudgetAccum")))
 			{
 				if (!R.OptDouble(A, TEXT("_simBudgetAccum"), Where, Out.SimBudgetAccum)) return false;
 				Out.bHasSimBudgetAccum = true;
+			}
+			// `deserialize` complete chaque habitant par `ensureGenome(actor, sim.seed)` puis
+			// `ensureConditioning(actor)` : un phenotype manquant se derive du genome (cree s'il
+			// manque, depuis la graine du monde et l'identifiant), un conditionnement manquant est
+			// neutre. Seuls phenotype et conditioning sont gardes : ce sont eux que les besoins lisent.
+			TOptional<AnastasisGenome::FGenome> Genome;
+			if (const FValue* P = A.Find(TEXT("phenotype")); P && !P->IsNull())
+			{
+				if (!ReadPhenotype(R, *P, FReader::At(Where, TEXT("phenotype")), Out.Phenotype.Emplace())) return false;
+			}
+			else if (const FValue* G = A.Find(TEXT("genome")); G && !G->IsNull())
+			{
+				if (!ReadGenomeLoci(R, *G, FReader::At(Where, TEXT("genome")), Genome.Emplace())) return false;
+			}
+			AnastasisGenome::EnsureGenome(Genome, Out.Phenotype, WorldSeed, Out.Id);
+			Out.Conditioning.Emplace();
+			if (const FValue* C = A.Find(TEXT("conditioning")); C && !C->IsNull())
+			{
+				if (!ReadConditioning(R, *C, FReader::At(Where, TEXT("conditioning")), Out.Conditioning.GetValue())) return false;
 			}
 			if (const FValue* Inside = A.Find(TEXT("inside")); Inside && !Inside->IsNull())
 			{
@@ -618,6 +688,24 @@ namespace AnastasisJsSave
 			if (N.bHasSimBudgetAccum)
 			{
 				Out.Set(TEXT("_simBudgetAccum"), Num(N.SimBudgetAccum));
+			}
+			// `aiThinkAt` et `villagePhase` apparaissent quand l'habitant pense : comme `_simBudgetAccum`,
+			// la cle est ecrite des que le C++ la tient, presente ou non au depart.
+			if (N.AiThinkAt >= 0.0) Out.Set(TEXT("aiThinkAt"), Num(N.AiThinkAt));
+			if (!N.VillagePhase.IsEmpty()) Out.Set(TEXT("villagePhase"), Str(N.VillagePhase));
+			// Le conditionnement avance a chaque tick ; le phenotype et le genome, jamais : ils
+			// restent ceux du depart. `version` n'est pas reecrite par `tickConditioning`.
+			if (N.Conditioning.IsSet() && (bNew || Out.Find(TEXT("conditioning"))))
+			{
+				const AnastasisConditioning::FConditioning& C = N.Conditioning.GetValue();
+				const FValue* Old = Out.Find(TEXT("conditioning"));
+				const bool bNewObject = !(Old && Old->IsObject());
+				FValue Obj = bNewObject ? FValue::MakeObject() : *Old;
+				if (bNewObject) Obj.Set(TEXT("version"), Num(C.Version));
+				Obj.Set(TEXT("workConditioning"), Num(C.WorkConditioning));
+				Obj.Set(TEXT("fatigueAdaptation"), Num(C.FatigueAdaptation));
+				Obj.Set(TEXT("recoveryConditioning"), Num(C.RecoveryConditioning));
+				Out.Set(TEXT("conditioning"), Obj);
 			}
 			// `inside` non nul n'est pas lu (ReadActor refuse) : un habitant lu est dehors.
 			Put(Out, TEXT("inside"), FValue(), bNew);
@@ -750,7 +838,7 @@ namespace AnastasisJsSave
 		for (int32 K = 0; K < Actors->Items.Num(); ++K)
 		{
 			AnastasisVillage::FNpc N;
-			if (!ReadActor(R, Actors->Items[K], FString::Printf(TEXT("actors[%d]"), K), N))
+			if (!ReadActor(R, Actors->Items[K], FString::Printf(TEXT("actors[%d]"), K), Out.Seed, N))
 			{
 				OutError = R.Error;
 				return false;
