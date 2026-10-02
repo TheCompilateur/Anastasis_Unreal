@@ -756,6 +756,9 @@ namespace AnastasisVillage
 		int32 MaterialSourceIndex = INDEX_NONE;
 		double MaterialRetryAt = 0.0;
 		int32 MaterialsDelivered = 0;
+		/** Confirmed wood removed from live tiles; no depot transfer yet (ecart n°30). */
+		int32 InventoryWood = 0;
+		int32 GatheredWood = 0;
 		int32 GatheredFood = 0;
 		int32 DeliveredFood = 0;
 		int32 FoodSourceIndex = INDEX_NONE;
@@ -1583,6 +1586,11 @@ namespace AnastasisVillage
 			const FCollectiveDecision& Collective) const;
 		/** `assignTarget` pour `helpFarm` : la parcelle faible, sinon `farmPos`. */
 		bool HelpFarmTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
+		/** Bucheron qui n'est pas le porteur de materiaux : la recolte (ecart n°30) ne double jamais le porteur. */
+		bool IsWoodHarvester(const FNpc& Npc) const;
+		bool WoodTarget(const FNpc& Npc, FPoint& OutTarget, FString& OutSource) const;
+		int32 ProgressWoodGather(FNpc& Npc);
+		double WoodRowScore(const FNpc& Npc, double PhaseBias, const FWorkRowContext& Work, double Noise) const;
 		FPoint FieldWorkTarget(FNpc& Npc, const AnastasisWorld::FTile& Tile);
 
 		// --- Prevision de survie et risque spatial d'adultScores (resource-targets-001,

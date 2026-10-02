@@ -22,6 +22,7 @@ namespace AnastasisGather
 			TEXT("eat"), TEXT("rest"), TEXT("gatherFood"), TEXT("deliver"), TEXT("sell"), TEXT("buy"),
 			TEXT("socialize"), TEXT("relax"), TEXT("visitFamily"), TEXT("build"), TEXT("explore"),
 		};
+		const TCHAR* const WoodPriority[] = { TEXT("eat"), TEXT("rest"), TEXT("gatherWood"), TEXT("deliver"), TEXT("sell"), TEXT("buy"), TEXT("maintain"), TEXT("build"), TEXT("socialize"), TEXT("relax"), TEXT("visitFamily"), TEXT("explore") };
 		const TCHAR* const SettlerPriority[] = {
 			TEXT("eat"), TEXT("rest"), TEXT("gatherWood"), TEXT("gatherStone"), TEXT("gatherFood"), TEXT("deliver"),
 			TEXT("sell"), TEXT("buy"), TEXT("build"), TEXT("socialize"), TEXT("relax"), TEXT("visitFamily"), TEXT("explore"),
@@ -88,6 +89,7 @@ namespace AnastasisGather
 	{
 		int32 Rank = INDEX_NONE;
 		if (JobId == JobFarmer) Rank = RankIn(FarmerPriority, Goal);
+		else if (JobId == TEXT("woodcutter")) Rank = RankIn(WoodPriority, Goal);
 		else if (JobId == JobSettler) Rank = RankIn(SettlerPriority, Goal);
 		else if (JobId == TEXT("builder")) Rank = RankIn(BuilderPriority, Goal);
 		return Rank < 0 ? 0.0 : FMath::Max(0.0, 18.0 - Rank * 2.5);
@@ -95,7 +97,7 @@ namespace AnastasisGather
 
 	double JobTraitBiasGather(const FString& JobId)
 	{
-		return JobId == JobFarmer ? 1.25 : 1.0;
+		return JobId == TEXT("woodcutter") ? 1.35 : JobId == JobFarmer ? 1.25 : 1.0;
 	}
 
 	double PresumedNoise(const FString& NpcId, const FString& Resource)

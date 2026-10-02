@@ -586,6 +586,20 @@ les besoins d'un habitant C++ existent toujours.
 
 Le même multiplicateur de la grille de navigation que lit l'A* devient le temps dépensé par segment de marche : une route réduit le temps par distance, une herbe humide l'augmente. Aucun nouveau graphe, tirage ni changement de choix de chemin. Le harnais n'active pas cette extension : `FVillage` démarre à 0 et seuls les pas de l'hôte Unreal la mettent à 1. Ce multiplicateur est une règle de jeu, pas une mesure physique ou une pente du maillage rendu. À trancher : conserver cette divergence ou rapprocher la référence JS lors d'une décision de simulation commune.
 
+### n° 30 — Recolte de bois bornee, sans logistique ni doctrine forestiere complete
+
+- **classe** : REDUIT
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : anthropic-wood-001 (portage autorise apres audit), verse par relay-wood-001 sans son transport vers le chantier (option c d'Alexandre)
+- **reference** : fee66ae, src/sim/npc.js progressCraftGather/resourceScore, craftWork.js chop, forestSustain.js, metiers/catalog.js woodcutter
+- **cpp** : Village/AnastasisVillageWood.cpp, Village/AnastasisVillage.cpp, Work/AnastasisWoodHarvest.h
+- **harnais** : actors, tileDiff
+
+SetJob accepte woodcutter, qui decide et preleve localement dans les tuiles connues. Rendement chop 3/4, ancrage 0.42, periode/fatigue et stock minimal 4 pour une foret aux attributs crown/clearing absents sont portes. Le helper porte aussi le plancher profond 10 et l'exemption frontier, mais le runtime ne dispose pas de ces autorites et ne les invente pas. Pas de colonisation, densite forestiere, pression de chantier, depot bois, transfert chantier, vente, relais, regeneration, technique, boost joueur, changement d'outil ou tirage de rate. La recolte est restreinte au metier explicite ; score et rappel sont des sous-ensembles declares. Le sac reste conserve et la recolte cesse au seuil de transport existant (>9, nourriture incluse), sans faux credit a un depot. Filtre de disponibilite sur tuiles memorisees et arret observer remplacent exploration/livraison manquantes. Une session distante ne permet pas de couper hors voisinage. Pas de flux aleatoire ajoute.
+
+Le bois coupe n'a aucun puits : il reste dans `InventoryWood`, le planificateur ne le compte pas comme mobilisable, et aucun chemin nouveau ne le livre au chantier. Le seul transport de materiaux reste le porteur opt-in deja present sur main, qui garde sa propre charge ; le porteur n'est jamais traite comme bucheron (`IsWoodHarvester`), les deux flux ne partagent pas un habitant. Aucune fermeture d'un autre ecart n'est revendiquee.
+
 ### n° 32 — Planificateur : la corvée de bois départage les égalités en ordre ordinal
 
 - **classe** : SUBSTITUT

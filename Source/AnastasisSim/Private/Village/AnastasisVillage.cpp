@@ -1505,6 +1505,7 @@ namespace AnastasisVillage
 	bool FVillage::IsPortedGoalFor(const FNpc& Npc, const FString& Goal) const
 	{
 		if (IsPortedGoal(Goal)) return true;
+		if (Goal == TEXT("gatherWood")) return IsWoodHarvester(Npc); // ecart n°30
 		if (Goal == AnastasisBuild::GoalBuild) return true;
 		// `helpFarm` (help-farm-001) : soigner une parcelle, pour tout adulte.
 		if (Goal == GoalHelpFarm) return true;
@@ -1637,7 +1638,7 @@ namespace AnastasisVillage
 			// l'extension food-supply garde sa regle (collecte seule).
 			const bool bWorking = IsGranaryWorker(Npc)
 				? (Npc.Goal == GoalGatherFood || Npc.Goal == GoalDeliver) && !Npc.Inside.bActive
-				: Npc.Goal == TEXT("gatherFood");
+				: Npc.Goal == TEXT("gatherFood") || (Npc.Goal == TEXT("gatherWood") && IsWoodHarvester(Npc) && !Npc.Inside.bActive);
 			AnastasisNeeds::TickNeeds(Npc.Needs, Dt, bDrinking, bWorking, Factors);
 		}
 		// La fin de `tickNeeds`, dans son ordre : `tickMoodlets` (l'humeur d'une amitie neuve monte
@@ -1866,7 +1867,8 @@ namespace AnastasisVillage
 			Out.ShelterId = N.ShelterId;
 			Out.WorkplaceId = N.WorkplaceId;
 			Out.TraitGather = AnastasisGather::TraitAt(N.TraitIndex).Gather;
-			// Pas de bois porte dans ce village.
+			// Le bois coupe par le bucheron (ecart n°30) reste dans son sac : aucun chemin ne le
+			// livre, il n est donc pas mobilisable pour le planificateur.
 			Out.InventoryWood = 0;
 		}
 		View.bHasColony = bHasColony;
@@ -2109,6 +2111,11 @@ namespace AnastasisVillage
 				Rows.Add(TPair<FString, double>(G, SocialRowScore(Npc, G, Need, AnastasisRhythm::PhaseBias(Phase, Subject, G), Noise)));
 				continue;
 			}
+			else if (G == TEXT("gatherWood") && IsWoodHarvester(Npc))
+			{
+				Rows.Add(TPair<FString, double>(G, WoodRowScore(Npc, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work, Noise)));
+				continue;
+			}
 			else if ((bSite || Collective.bHasColony) && G == AnastasisBuild::GoalBuild)
 			{
 				Rows.Add(TPair<FString, double>(G, BuildRowScore(Npc, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work, Noise, Collective)));
@@ -2170,7 +2177,7 @@ namespace AnastasisVillage
 			Stick.TraitGather = T.Gather;
 			Stick.TraitExplore = T.Explore;
 			Stick.bWorkSession = Npc.WorkSession.bActive;
-			Stick.InventoryLoad = Npc.InventoryFood;
+			Stick.InventoryLoad = Npc.InventoryFood + Npc.InventoryWood;
 			for (TPair<FString, double>& Row : Rows)
 			{
 				const double Bonus = AnastasisReconsider::GoalStickinessBonus(Stick, Now, Row.Key);
@@ -2327,6 +2334,7 @@ namespace AnastasisVillage
 		else if (Npc.Goal == GoalEat) bFound = EatTarget(Npc, Target, Source);
 		else if (Npc.Goal == GoalSocialize) bFound = SocializeTarget(Npc, Target, Source);
 		else if (Npc.Goal == GoalRelax) bFound = RelaxTarget(Npc, Target, Source);
+		else if (Npc.Goal == TEXT("gatherWood") && IsWoodHarvester(Npc)) bFound = WoodTarget(Npc, Target, Source);
 		else if (IsGranaryWorker(Npc) && Npc.Goal == GoalGatherFood) bFound = GatherTarget(Npc, Target, Source);
 		else if (IsGranaryWorker(Npc) && Npc.Goal == GoalDeliver) bFound = DeliverTarget(Npc, Target, Source);
 		else if (Npc.Goal == TEXT("gatherFood") || Npc.Goal == TEXT("deliver")) bFound = FoodSupplyTarget(Npc, Target, Source);
@@ -2513,6 +2521,14 @@ namespace AnastasisVillage
 			// But non porte : il n'accomplit rien. La reference ferait `perform`.
 			Npc.Activity = TEXT("attend");
 			Npc.WorkTimer = 0.0;
+			return;
+		}
+
+		if (Npc.Goal == TEXT("gatherWood"))
+		{
+			if (ProgressWoodGather(Npc) == 1) { Npc.FailedActions = 0; return; }
+			ClearWorkSession(Npc);
+			Npc.Goal = GoalObserver; Npc.bHasTarget = false; ClearNavigation(Npc);
 			return;
 		}
 
@@ -3007,6 +3023,12 @@ namespace AnastasisVillage
 			Writer.Key(TEXT("morale")).Number(N.Needs.Morale);
 			Writer.Key(TEXT("workTimer")).Number(N.WorkTimer);
 			Writer.Key(TEXT("inventoryFood")).Number(N.InventoryFood);
+			// ecart n°30: preserve legacy digest for actors carrying no wood.
+			if (N.InventoryWood != 0 || N.GatheredWood != 0)
+			{
+				Writer.Key(TEXT("inventoryWood")).Number(N.InventoryWood);
+				Writer.Key(TEXT("gatheredWood")).Number(N.GatheredWood);
+			}
 			Writer.Key(TEXT("foodSource")).Number(N.FoodSourceIndex);
 			Writer.Key(TEXT("knownFood")).BeginArray(FoodSources.Num());
 			for (const FFoodSource& S : FoodSources)
@@ -5625,7 +5647,7 @@ namespace AnastasisVillage
 	{
 		FNpc* Npc = Actors.FindById(NpcId);
 		if (!Npc) return false;
-		if (JobId != AnastasisGather::JobSettler && JobId != AnastasisGather::JobFarmer && JobId != AnastasisBuild::JobBuilder) return false;
+		if (JobId != AnastasisGather::JobSettler && JobId != AnastasisGather::JobFarmer && JobId != AnastasisBuild::JobBuilder && JobId != TEXT("woodcutter")) return false;
 		Npc->JobId = JobId;
 		return true;
 	}
@@ -5679,6 +5701,7 @@ namespace AnastasisVillage
 	{
 		if (!Npc.WorkSession.bActive) return FString();
 		if (Npc.WorkSession.CraftId == TEXT("farm")) return GoalGatherFood;
+		if (Npc.WorkSession.CraftId == TEXT("chop")) return TEXT("gatherWood");
 		if (Npc.WorkSession.CraftId == AnastasisBuild::CraftBuild) return AnastasisBuild::GoalBuild;
 		return FString();
 	}
