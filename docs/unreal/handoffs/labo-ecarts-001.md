@@ -84,6 +84,12 @@ NOT_APPLICABLE — aucun changement de jeu, aucun asset, aucun niveau.
 - **Le versement apporte aussi la PR #2** (`ecarts-protocole-001`) : `ECARTS.md`, `check-ecarts.mjs`, le
   protocole, et l'appel du contrôleur dans `agent-worktree.ps1 finish`, qui devient actif pour toutes les
   missions suivantes. La PR #2 sur GitHub reste à fermer ou à rebaser après le push.
+- **Conflit résolu au rebase sur `ce939f8`** : `integration-queue-001` a remplacé, dans `finish`, le build et
+  la suite systématiques par un portail Unreal conditionnel (`Invoke-UnrealGate`) ; la PR #2 y insérait le
+  contrôle des écarts. Résolution : contrôle des écarts d'abord, puis le portail conditionnel de `main`.
+  `test-agent-worktree.ps1` l'a pris en défaut : son dépôt jetable n'avait pas `check-ecarts.mjs`, et S8 à
+  S11 tombaient (`MODULE_NOT_FOUND`). Le banc copie désormais le contrôleur, `masks.mjs` et `ECARTS.md` :
+  **23/23 PASS**.
 - `ECARTS.md` : la fiche n° 5 sera touchée par `budget-cadence-001` (autre session, qui branche la cadence) ;
   conflit textuel possible sur la fiche, à fusionner à la main (garder les deux champs).
 - `tolerances.json` v1 et les règles v1 / v2 sont des **propositions** de l'agent, non validées par
