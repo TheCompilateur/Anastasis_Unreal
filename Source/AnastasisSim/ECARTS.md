@@ -371,6 +371,10 @@ gisements dans les deux sens, gain de lien). Comme pour `socialize`, `shareRumor
 ni accès bloqués, ni savoir négatif, ni croyance de marché, ni croyances (eau, lits, dangers), ni
 `spreadRumorExchange` (personnes : `tellPerson` tire dans `sim.rng`, épisodes, chronique). `bondTalkGain`
 sans partenaire, famille, aîné ni nature (« ami » seulement, comme `socialize`).
+spatial-risk-test-001 : depuis resource-targets-001, le lecteur relit et reprojette `mind.spots`. Un gisement
+d'on-dit créé par le C++ (`CommitHearsaySpot`) n'a ni `speechActId`, ni `confidence` (0,72 dans la référence),
+ni `viaPlayerId` : sa projection diffère de la référence dans `actors` dès qu'une rumeur de gisement passe.
+`recallResource` ne lit aucun des trois : le choix du gisement n'en dépend pas.
 
 ### n° 17 — Météo des habitants : ce qui n'est pas porté
 
