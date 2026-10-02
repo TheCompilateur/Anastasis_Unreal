@@ -218,7 +218,17 @@ static bool Consider(const FInputs& In, const FSettings& C, const FMicroCanopyIn
 			++Row.RejectedSlope;
 			return false;
 		}
-		const EPocket Pocket = Slope > C.MaxBankSlope ? EPocket::Rocky : BankPocket(In.Seed, X, Y, C);
+		EPocket Pocket = Slope > C.MaxBankSlope ? EPocket::Rocky : BankPocket(In.Seed, X, Y, C);
+		if (C.bNaturalHistory && Slope <= C.MaxBankSlope)
+		{
+			// Immediate bank -> damp shoulder. Keep openings; rock needs an exposed slope.
+			const double Patch = MicroCluster(In.Seed, X / C.BankPocketSpanUU, Y / C.BankPocketSpanUU, 91u);
+			if (Slope > 18.0) Pocket = EPocket::Rocky;
+			else if (Patch < 0.26) Pocket = EPocket::Clean;
+			else if (Above < 35.0 && Patch < 0.58) Pocket = EPocket::Muddy;
+			else if (Wetness > 0.25 || Above < 65.0) Pocket = EPocket::Vegetated;
+			else Pocket = EPocket::Clean;
+		}
 		Row.Stamps.Add(FStamp{X, Y, Pocket});
 		const bool bPlants = Slope <= C.MaxVegSlope;
 		switch (Pocket)
@@ -280,7 +290,8 @@ static bool Consider(const FInputs& In, const FSettings& C, const FMicroCanopyIn
 		++Row.RejectedSlope;
 		return false;
 	}
-	const EPocket Pocket = MeadowPocket(In.Seed, X, Y, C);
+	const EPocket Pocket = C.bNaturalHistory ? MeadowPocketForSite(In.Seed, X, Y, Wetness, Slope)
+		: MeadowPocket(In.Seed, X, Y, C);
 	if (Pocket != EPocket::None) Row.Stamps.Add(FStamp{X, Y, Pocket});
 	switch (Pocket)
 	{
@@ -402,7 +413,7 @@ static void AddForest(const FInputs& In, const FSettings& C, const FMicroCanopyI
 		const double Pick = MicroUnit(MicroMix(In.Seed, IX, IY, bEdge ? 91u : 93u));
 		if (bEdge)
 		{
-			const bool bInner = RingT < 1.55;
+			const bool bInner = (C.bNaturalHistory ? Crown : RingT) < 1.55;
 			const bool bSapling = bInner ? Pick < 0.72 : Pick >= 0.82;
 			if (bSapling) Arm(P, In.Seed, IX, IY, ERole::EdgeSapling, EPocket::None, 0.55, 1.00, 97u);
 			else Arm(P, In.Seed, IX, IY, ERole::EdgeBush, EPocket::None, 0.80, 1.40, 97u);
@@ -417,7 +428,12 @@ static void AddForest(const FInputs& In, const FSettings& C, const FMicroCanopyI
 				else if (Pick < 0.78) Arm(P, In.Seed, IX, IY, ERole::UnderBranch, EPocket::None, 0.55, 0.95, 107u);
 				else Arm(P, In.Seed, IX, IY, ERole::UnderRoots, EPocket::None, 0.70, 1.10, 109u);
 			}
-			else Arm(P, In.Seed, IX, IY, ERole::UnderSapling, EPocket::None, 0.50, 0.90, 113u);
+			else
+			{
+				// Regeneration needs a crown opening. Deep shade retains litter/deadwood.
+				if (C.bNaturalHistory && Crown < 0.62) return false;
+				Arm(P, In.Seed, IX, IY, ERole::UnderSapling, EPocket::None, 0.50, 0.90, 113u);
+			}
 		}
 		Row.Items.Add(P);
 		return true;
@@ -578,6 +594,20 @@ EPocket MeadowPocket(uint32 Seed, double X, double Y, const FSettings& Settings)
 	if (N < 0.82) return EPocket::MeadowDry;
 	if (N < 0.88) return EPocket::MeadowStone;
 	return EPocket::MeadowWet;
+}
+
+EPocket MeadowPocketForSite(uint32 Seed, double X, double Y, double Wetness, double SlopeDegrees)
+{
+	// A coherent patch modulates an eligible habitat; it cannot invent a wet or rocky site.
+	const double N = Detail::MicroCluster(Seed ^ 0xA5u, X / 2400.0, Y / 2400.0, 71u);
+	const double Wet = FMath::Clamp(Wetness, 0.0, 1.0);
+	const double Slope = FMath::Max(0.0, SlopeDegrees);
+	if (Wet > 0.18 + 0.20 * N && Slope < 16.0) return EPocket::MeadowWet;
+	if (N < 0.54) return EPocket::None;
+	if (Slope > 12.0 && Wet < 0.18 && N > 0.66) return EPocket::MeadowStone;
+	if (Wet < 0.12 && Slope > 4.0) return EPocket::MeadowDry;
+	// Sparse bare patches represent incomplete cover, not an invented human disturbance.
+	return N > 0.66 && Wet < 0.18 ? EPocket::MeadowBare : EPocket::None;
 }
 
 EPocket FSoilField::Sample(double X, double Y) const

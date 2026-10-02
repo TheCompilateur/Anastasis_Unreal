@@ -13,10 +13,12 @@ sans ombres sortait plus lente qu'avec) ; le GPU mesure la scene.
 La vue hors_vallee est choisie parmi les touffes REELLEMENT posees (HISM GroundCover_*) loin
 des ellipses de la vallee ecrite : elle prouve que la carte entiere est couverte.
 
+ANASTASIS_GROUND_VIEWS   optional comma-separated existing view names; missing view fails
 ANASTASIS_GROUND_OUT     dossier de sortie (obligatoire)
 ANASTASIS_GROUND_STATES  etats captures, dans l'ordre, le premier doit poser l'herbe
                          (defaut "on,off") : on | off | noshadow | notint | on2
                          | on_notex | bare | bare_notex   (GROUND_TEXTURE_001)
+                         | natural | reference | reference2 (NaturalHistory A/B, sky pinned at 11)
                          | eco | noeco   (MICRO_ECOLOGY_001 : herbe laissee, seule la micro-ecologie change)
 
 Etats *_notex : le sol est rendu par une instance DYNAMIQUE de MI_AnastasisGround dont le
@@ -24,10 +26,13 @@ fondu des textures photo est ferme (TexFadeStart 0, TexFadeEnd 1). Le materiau r
 exactement l'ancien sol, aux memes cameras. Rien n'est ecrit dans l'asset : une MID est
 transitoire, et l'editeur n'a aucun paquet sale a proposer de sauver en quittant.
 """
-import os, time, math, json, unreal
+import os, time, math, json, hashlib, unreal
 
 OUT = os.environ.get('ANASTASIS_GROUND_OUT')
 STATE_CMDS = {
+    'natural': ('anastasis.Dressing.NaturalHistory 1',),
+    'reference': ('anastasis.Dressing.NaturalHistory 0',),
+    'reference2': ('anastasis.Dressing.NaturalHistory 0',),
     'on': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     'off': ('anastasis.Dressing.GroundCover 0', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     'noshadow': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 0', 'anastasis.GroundCover.SoilTint 1'),
@@ -55,9 +60,17 @@ les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 handle = None
+natural_run = any(s in ('natural', 'reference', 'reference2') for s in states)
+original_hour = unreal.SystemLibrary.get_console_variable_float_value('anastasis.Sky.Hour')
+original_natural = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.NaturalHistory')
+habitat = {}
+
 
 
 def finish(msg, error=False):
+    if natural_run:
+        unreal.SystemLibrary.execute_console_command(None, 'anastasis.Sky.Hour %s' % original_hour)
+        unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.NaturalHistory %s' % original_natural)
     (unreal.log_error if error else unreal.log)(msg)
     if handle is not None:
         unreal.unregister_slate_post_tick_callback(handle)
@@ -76,6 +89,8 @@ try:
     def cmd(c):
         unreal.SystemLibrary.execute_console_command(world, c)
 
+    if natural_run:
+        cmd('anastasis.Sky.Hour 11')
     for c in ('ShowFlag.Sprites 0', 'ShowFlag.Grid 0', 'viewmode lit') + STATE_CMDS[states[0]]:
         cmd(c)
     cls = unreal.load_class(None, '/Script/Anastasis_UnrealV2.AnastasisWorldEmbodiment')
@@ -124,6 +139,40 @@ try:
     T = W / 96.0
     if T <= 0:
         raise RuntimeError('sol introuvable : emprise nulle')
+
+    def record_habitat(state):
+        if not natural_run:
+            return
+        actual = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.NaturalHistory')
+        if actual != (1 if state == 'natural' else 0):
+            raise RuntimeError('NaturalHistory switch not applied')
+        counts = {}
+        spatial = []
+        for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
+            count = comp.get_instance_count()
+            if count:
+                counts[comp.get_name()] = count
+                # UObject names acquire suffixes after a rebuild; they are not spatial identities.
+                mesh = comp.get_editor_property('static_mesh')
+                if mesh is None:
+                    raise RuntimeError('populated HISM without mesh')
+                samples = []
+                for i in sorted({0, count//2, count-1}):
+                    got = comp.get_instance_transform(i, True)
+                    xf = got[1] if isinstance(got, tuple) else got
+                    samples.append([round(xf.translation.x, 4), round(xf.translation.y, 4), round(xf.translation.z, 4)])
+                spatial.append([mesh.get_path_name(), count, samples])
+        if not any(n.startswith('GroundCover_') for n in counts):
+            raise RuntimeError('no ground cover to compare')
+        heights = [ground(x*T, y*T) for y in range(4, 93, 4) for x in range(4, 93, 4)]
+        if any(z is None for z in heights):
+            raise RuntimeError('sampled terrain missing')
+        habitat[state] = {'switch': actual, 'instances': counts, 'spatial_inventory': sorted(spatial),
+                          'sampled_ground_sha256': hashlib.sha256(json.dumps(heights).encode()).hexdigest()}
+        unreal.log('NATURAL_HISTORY_SAMPLE state=%s instances=%d ground=%s' % (
+            state, sum(counts.values()), habitat[state]['sampled_ground_sha256']))
+
+    record_habitat(states[0])
 
     def at(tx, ty, lift):
         x, y = tx * T, ty * T
@@ -223,6 +272,12 @@ try:
         plan.append(('sousbois_eye', (fern[0] - dx / d * 0.4, fern[1] - dy / d * 0.4), 170, (fern[0] + dx / d * 0.6, fern[1] + dy / d * 0.6), 40))
     unreal.log('GROUND_CAPTURE_SOUSBOIS %s' % (('tile=%.1f,%.1f' % fern) if fern else 'NONE'))
 
+    selected = os.environ.get('ANASTASIS_GROUND_VIEWS', '')
+    if selected:
+        wanted = set(selected.split(','))
+        plan = [p for p in plan if p[0] in wanted]
+        if {p[0] for p in plan} != wanted:
+            raise RuntimeError('requested ecological view missing: %s' % (wanted - {p[0] for p in plan}))
     views = []
     for name, eye_t, lift, tgt_t, tlift in plan:
         eye, tgt = at(eye_t[0], eye_t[1], lift), at(tgt_t[0], tgt_t[1], tlift)
@@ -278,12 +333,22 @@ def tick(dt):
                 if state_i >= len(states):
                     with open(os.path.join(OUT, 'ground-cover.json'), 'w') as f:
                         json.dump(metrics, f, indent=1)
+                    if natural_run:
+                        with open(os.path.join(OUT, 'habitat.json'), 'w') as f:
+                            json.dump(habitat, f, indent=1)
+                        hashes = {v['sampled_ground_sha256'] for v in habitat.values()}
+                        if len(hashes) != 1:
+                            raise RuntimeError('terrain samples changed between states')
+                        if 'reference2' in habitat and habitat['reference']['spatial_inventory'] != habitat['reference2']['spatial_inventory']:
+                            raise RuntimeError('reference spatial inventory not reproducible')
+                        unreal.log('NATURAL_HISTORY_CAPTURE PASS sampled_ground_unchanged=1 views=%d' % len(views))
                     finish('GROUND_CAPTURE_COMPLETE views=%d states=%d' % (len(views), len(states)))
                     return
                 for c in STATE_CMDS[states[state_i]]:
                     cmd(c)
                 actor.call_method('EmbodyCanonical', args=(SEED,))
                 texture_state(states[state_i])
+                record_habitat(states[state_i])
                 queue = [(states[state_i], v) for v in views]
                 first, mark, frames, timings = True, time.monotonic(), [], []
                 return

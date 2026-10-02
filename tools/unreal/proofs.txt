@@ -25,3 +25,6 @@ house-rest-pie | tools/unreal/house-rest-pie.py | HOUSE_REST_COMPLETE | HOUSE_RE
 # granary-eat : deja a Speed 10. COMPLETE exige au moins un repas pris au grenier (verdict faible : pas trois).
 granary-eat-pie | tools/unreal/granary-eat-pie.py | GRANARY_EAT_COMPLETE | GRANARY_EAT_TIMEOUT | 300 | -
 anthropic-memory-pie | tools/unreal/anthropic-memory-pie.py | ANTHROPIC_PIE PASS | ANTHROPIC_PIE FAIL | 360 | -
+
+# Capture editor (SCN seulement), cinq habitats et aerien, terrain echantillonne stable.
+natural-history-capture | tools/unreal/ground-cover-capture.py | NATURAL_HISTORY_CAPTURE PASS | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/NaturalHistoryEvidence;ANASTASIS_GROUND_STATES=reference,natural,reference2;ANASTASIS_GROUND_VIEWS=prairie_eye,lisiere_eye,sousbois_eye,riviere_eye,lande_eye,aerien

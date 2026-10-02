@@ -86,3 +86,13 @@ touffes faisait tomber la suite de tests par manque de mémoire.
   PVE de 5.7 ne s'ouvrent pas en 5.8, ce qui heurte VEG-02 (assets régénérables par script). Un premier
   essai se ferait dans le labo isolé (`aaa-visual-lab.ps1`), jamais sur la carte du jeu.
 - Essences méditerranéennes contre direction pontique : voir le skill, section 6.
+
+## Naturalisation en cours : natural-history-001
+
+`anastasis.Dressing.NaturalHistory` conditionne les poches de sol et de couverture basse
+par humidite riveraine et pente rendue, gradue les laiches, reserve la regeneration du
+sous-bois aux ouvertures de couronne et conditionne la maturite des peuplements par
+la pente et les cretes. 0 restitue la distribution de reference ; 1 active ces regles.
+Les maxima d'instances, exclusions humaines, terrain, hydrologie et assets sont conserves.
+Aucune reconstitution botanique historique revendiquee. Preuve visuelle :
+`editor-batch.ps1 -Proofs natural-history-capture` ; verdict artistique dans la passation.

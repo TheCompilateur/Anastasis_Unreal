@@ -33,6 +33,8 @@ FString MeshPath(EFamily Family);
 
 struct FSettings
 {
+	/** Natural-history-001: presentation habitat rules; false retains the reference A/B. */
+	bool bNaturalHistory = false;
 	/** Une candidate par cellule, jittee dans la cellule. */
 	double CellUU = 120.0;
 	/** Rayon des sondes de pente : celui de la foret macro, pour que les deux lisent le meme sol. */

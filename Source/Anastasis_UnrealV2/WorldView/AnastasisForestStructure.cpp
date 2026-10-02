@@ -179,7 +179,8 @@ bool Shape(
 	AnastasisEcologicalDressing::FPlan& InOut,
 	TArray<FNote>& OutNotes,
 	FReport& OutReport,
-	FString& Error)
+	FString& Error,
+	bool bNaturalHistory)
 {
 	OutNotes.Reset();
 	OutReport = FReport{};
@@ -249,11 +250,11 @@ bool Shape(
 			Item.Note.Stand = EStand::Clearing;
 			Item.Note.bCorridor = false;
 		}
-		else if (Disturb > 0.86)
+		else if (Disturb > 0.86 && (!bNaturalHistory || Item.Note.bCrest || SourcePlacement.SlopeDegrees > 24.0))
 			Item.Note.Stand = EStand::Disturbed;
 		else if (Age < 0.38)
 			Item.Note.Stand = EStand::Young;
-		else if (Age > 0.52)
+		else if (Age > 0.52 && (!bNaturalHistory || (!Item.Note.bCrest && SourcePlacement.SlopeDegrees < 24.0)))
 			Item.Note.Stand = EStand::Old;
 		else
 			Item.Note.Stand = EStand::Mature;
@@ -342,6 +343,12 @@ bool Shape(
 			Layer = Roll < 0.12 ? ELayer::Young : Roll < 0.42 ? ELayer::Secondary : ELayer::Canopy;
 			Bias = 0.2 + 0.8 * Roll;
 			break;
+		}
+		// Existing forest margin and clearing borders carry younger cohorts; no extra trunks.
+		if (bNaturalHistory && Tree.Note.bCorridor && Layer == ELayer::Canopy)
+		{
+			Layer = Roll < 0.55 ? ELayer::Young : ELayer::Secondary;
+			Bias = Roll * 0.8;
 		}
 		if (Tree.Note.bCrest && Layer == ELayer::Canopy)
 		{

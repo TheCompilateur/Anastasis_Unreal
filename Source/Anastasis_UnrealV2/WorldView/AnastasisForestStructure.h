@@ -61,5 +61,6 @@ bool Shape(
 	AnastasisEcologicalDressing::FPlan& InOut,
 	TArray<FNote>& OutNotes,
 	FReport& OutReport,
-	FString& OutError);
+	FString& OutError,
+	bool bNaturalHistory = false);
 }

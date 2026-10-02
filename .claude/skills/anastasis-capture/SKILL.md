@@ -55,3 +55,17 @@ témoin du même état et comparer les deux témoins entre eux.
 Dans la fiche de passation : commande exacte, chemins des images, chiffres de `compare.py`, et ce que
 l'image ne montre pas. Les images restent dans `Saved/` ; on ne commite pas d'artefact généré, sauf
 planche choisie dans `docs/visual/` quand la mission le demande.
+
+## Naturalisation ecologique (natural-history-001)
+
+Reutiliser `ground-cover-capture.py` : etats `reference,natural,reference2` basculent uniquement
+`anastasis.Dressing.NaturalHistory`, ciel fixe a 11 h. `ANASTASIS_GROUND_VIEWS` permet de borner
+le lot a prairie_eye,lisiere_eye,sousbois_eye,riviere_eye,lande_eye,aerien. Une vue demandee
+absente fait echouer le run. La preuve `natural-history-capture` est au registre :
+`editor-batch.ps1 -Proofs natural-history-capture`.
+
+Le PASS de ce script couvre la fin des captures, les hauteurs du sol **echantillonnees**
+inchangees et les inventaires (mesh, compte, positions echantillonnees) identiques entre les references.
+Les noms UObject ne sont pas des identites stables apres reincarnation. Il ne juge ni
+la qualite ecologique, ni la botanique historique, ni la marche en PIE. Regarder les six
+triplets, mesurer leur ecart contre reference/reference2, lire le GPU par vue.

@@ -1,5 +1,6 @@
 #include "WorldView/AnastasisGroundCover.h"
 #include "Async/ParallelFor.h"
+#include "WorldView/AnastasisMicroEcology.h"
 
 // Espace nomme, pas anonyme : en build unity, un Smooth() anonyme d'un autre fichier du meme
 // lot entre en collision (cf. AnastasisDrainage.cpp).
@@ -363,7 +364,7 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 						// et en lisiere de couronne, herbacee dans l'ombre profonde, scolopendre a l'humide.
 						const double Light = Smooth((CrownDistance - C.TrunkClearance) / (C.CanopyExclusion - C.TrunkClearance));
 						EFamily UFamily;
-						if (Unit(Hash(In.Seed, GX, GY, 21)) < 0.08 + 0.6 * Smooth((Wet - C.HartsTongueWetness * 0.5) / C.HartsTongueWetness))
+						if (Unit(Hash(In.Seed, GX, GY, 21)) < (C.bNaturalHistory ? 0.0 : 0.08) + 0.6 * Smooth((Wet - C.HartsTongueWetness * 0.5) / C.HartsTongueWetness))
 						{
 							UFamily = EFamily::HartsTongue;
 						}
@@ -438,6 +439,18 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 							* (1.0 - 0.75 * Shade)
 							* Trampled;
 					}
+					if (C.bNaturalHistory)
+					{
+						using AnastasisMicroEcology::EPocket;
+						const EPocket Site = AnastasisMicroEcology::MeadowPocketForSite(In.Seed, X, Y, Wet, Slope);
+						// Habitat-linked openings only: keep the meadow stature; no broad noise-driven thinning.
+						double Keep = bLande ? 1.0 - 0.2 * Smooth((Slope - 30.0) / 15.0)
+							: 1.0;
+						if (Site == EPocket::MeadowBare) Keep *= 0.65;
+						if (Site == EPocket::MeadowStone) Keep *= 0.60;
+						if (Site == EPocket::MeadowDry) Keep *= 0.80;
+						Density *= Keep;
+					}
 					if (Unit(Hash(In.Seed, GX, GY, 13)) >= Density) { ++Row.RejectedDensity; continue; }
 
 					// Famille. Lande : la callune tient le haut des versants, loin du fond de vallee,
@@ -453,7 +466,9 @@ bool AnastasisGroundCover::Build(const FInputs& In, const FSettings& C, FPlan& O
 							* FMath::Lerp(0.25, 1.0, Smooth((Patch(In.Seed, X, Y, C.PatchSpanUU * 0.8, 51) - 0.2) / 0.5));
 						Family = Unit(Hash(In.Seed, GX, GY, 20)) < HeatherChance ? EFamily::Heather : EFamily::HeathTussock;
 					}
-					else if (Wet >= WetDraw)
+					else if (C.bNaturalHistory
+						? Unit(Hash(In.Seed, GX, GY, 14)) < Smooth((Wet - 0.10) / 0.55)
+						: Wet >= WetDraw)
 					{
 						Family = EFamily::Sedge;
 					}

@@ -47,6 +47,8 @@ inline constexpr int32 PocketCount = static_cast<int32>(EPocket::Count);
 
 struct FSettings
 {
+	/** Natural-history-001: presentation habitat rules; false retains the reference A/B. */
+	bool bNaturalHistory = false;
 	/** Pas des candidats de berge (uu). Un candidat par cellule, jamais un tapis. */
 	double BankCellUU = 200.0;
 	/** Hauteur au-dessus de la nappe ou la berge existe (uu). Au-dela, seulement si l'humidite de rive est forte. */
@@ -142,6 +144,10 @@ const TCHAR* PocketName(EPocket Pocket);
 EPocket BankPocket(uint32 Seed, double X, double Y, const FSettings& Settings);
 /** None sur la majeure partie de la prairie ; les autres etats sont des taches. */
 EPocket MeadowPocket(uint32 Seed, double X, double Y, const FSettings& Settings);
+
+/** Shared meadow pocket: measured riparian wetness and rendered slope gate the spatial patches.
+ * Visual habitat approximation, not soil chemistry or reconstructed historical flora. */
+EPocket MeadowPocketForSite(uint32 Seed, double X, double Y, double Wetness, double SlopeDegrees);
 
 bool Build(const FInputs& In, const FSettings& Settings, FPlan& Out, FString& OutError);
 

@@ -38,6 +38,10 @@ static TAutoConsoleVariable<int32> CVarEcologicalDressing(
     TEXT("0=legacy tile dressing, 1=forest grammar on continuous terrain; applied on embodiment."), ECVF_Default);
 
 // WORLD_DRESSING_01. Coupable pour les captures A/B : meme monde, meme dressing, sans les lieux.
+static TAutoConsoleVariable<int32> CVarNaturalHistory(
+	TEXT("anastasis.Dressing.NaturalHistory"), 1,
+	TEXT("1=habitat-conditioned patches, wet meadow gradient and forest regeneration; 0=reference distribution. Applied on embodiment."), ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarPlaces(
     TEXT("anastasis.Dressing.Places"), 1,
     TEXT("0=aucun lieu compose, 1=lieux lus dans la geographie (source, col, guet, hameau...) ; applique a l'incarnation."), ECVF_Default);
@@ -590,7 +594,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
             TArray<AnastasisForestStructure::FNote> StructureNotes;
             FString StructureError;
             if (!AnastasisForestStructure::Shape(CanonicalSource, ForestDressing, bMacro,
-                ForestPlan, StructureNotes, StructureReport, StructureError))
+                ForestPlan, StructureNotes, StructureReport, StructureError, CVarNaturalHistory.GetValueOnGameThread() != 0))
             {
                 UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_FOREST_STRUCTURE rejected=%s"), *StructureError);
             }
@@ -1354,7 +1358,9 @@ void AAnastasisWorldEmbodiment::PlaceGroundCover(const AnastasisWorldView::FWorl
 	}
 	GC::FPlan Cover;
 	FString Error;
-	if (!GC::Build(In, GC::FSettings(), Cover, Error))
+	GC::FSettings CoverSettings;
+	CoverSettings.bNaturalHistory = CVarNaturalHistory.GetValueOnGameThread() != 0;
+	if (!GC::Build(In, CoverSettings, Cover, Error))
 	{
 		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_GROUND_COVER rejected=%s"), *Error);
 		return;
@@ -1555,7 +1561,9 @@ void AAnastasisWorldEmbodiment::PlaceMicroEcology(const AnastasisWorldView::FWor
 	}
 	AnastasisMicroEcology::FPlan Eco;
 	FString Error;
-	if (!AnastasisMicroEcology::Build(In, AnastasisMicroEcology::FSettings(), Eco, Error))
+	AnastasisMicroEcology::FSettings EcoSettings;
+	EcoSettings.bNaturalHistory = CVarNaturalHistory.GetValueOnGameThread() != 0;
+	if (!AnastasisMicroEcology::Build(In, EcoSettings, Eco, Error))
 	{
 		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_MICRO_ECOLOGY rejected=%s"), *Error);
 		return;

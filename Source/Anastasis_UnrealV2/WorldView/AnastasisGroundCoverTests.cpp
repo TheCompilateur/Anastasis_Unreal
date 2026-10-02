@@ -354,4 +354,37 @@ bool FAnastasisGroundCoverPatchesAndMask::RunTest(const FString&)
 	TestTrue(TEXT("cap reported"), Cut.bTruncated && Cut.Instances.Num() == 100);
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisNaturalHistoryCover, "Anastasis.GroundCover.NaturalHistoryCounterfactual",
+ EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisNaturalHistoryCover::RunTest(const FString&)
+{
+ namespace GC = AnastasisGroundCover;
+ auto In = AnastasisGroundCoverTestFixture::OpenPlane(5.0);
+ GC::FSettings Natural;
+ Natural.bNaturalHistory = true;
+ GC::FPlan Reference, Dry, Repeat, Wet;
+ FString Error;
+ TestTrue(TEXT("reference builds"), GC::Build(In, GC::FSettings(), Reference, Error));
+ TestTrue(TEXT("dry builds"), GC::Build(In, Natural, Dry, Error));
+ TestTrue(TEXT("repeat builds"), GC::Build(In, Natural, Repeat, Error));
+ TestTrue(TEXT("dry meadow remains open and populated"), Dry.Instances.Num() > 0 && Dry.Instances.Num() <= Reference.Instances.Num());
+ bool Same = Dry.Instances.Num() == Repeat.Instances.Num();
+ for (int32 I=0; Same && I<Dry.Instances.Num(); ++I)
+  Same = Dry.Instances[I].Ground.Equals(Repeat.Instances[I].Ground, 0.0) && Dry.Instances[I].Family == Repeat.Instances[I].Family;
+ TestTrue(TEXT("natural plan is deterministic"), Same);
+ In.SampleWetness = [](double, double, double& W) { W=0.8; return true; };
+ TestTrue(TEXT("wet counterfactual builds"), GC::Build(In, Natural, Wet, Error));
+ TestTrue(TEXT("wetness alone increases sedges"), Wet.Counts[2] > Dry.Counts[2] && Wet.Counts[2] > Wet.Instances.Num()/2);
+ TestTrue(TEXT("wet meadow no sparser than dry without raising reference budget"), Wet.Instances.Num() >= Dry.Instances.Num() && Wet.Instances.Num() <= Reference.Instances.Num());
+ // Same wet site, existing water clearance still wins over habitat preference.
+ In.SampleWaterHeight = [](double, double, double& W) { W=100000.0; return true; };
+ GC::FPlan Flooded;
+ TestTrue(TEXT("flooded builds"), GC::Build(In, Natural, Flooded, Error));
+ TestEqual(TEXT("no terrestrial cover under water"), Flooded.Instances.Num(), 0);
+ AddInfo(FString::Printf(TEXT("NATURAL_HISTORY reference=%d dry=%d wet=%d dry_sedge=%d wet_sedge=%d"),
+  Reference.Instances.Num(), Dry.Instances.Num(), Wet.Instances.Num(), Dry.Counts[2], Wet.Counts[2]));
+ return true;
+}
+
 #endif

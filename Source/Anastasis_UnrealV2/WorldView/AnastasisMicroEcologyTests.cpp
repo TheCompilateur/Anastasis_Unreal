@@ -340,4 +340,29 @@ bool FAnastasisMicroEcologyRejects::RunTest(const FString&)
 	TestTrue(TEXT("cap truncates without emptying"), Plan.bTruncated && Plan.Instances.Num() > 0 && Plan.Instances.Num() < Full.Instances.Num());
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisNaturalHistoryPockets, "Anastasis.MicroEcology.NaturalHistoryHabitat",
+ EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisNaturalHistoryPockets::RunTest(const FString&)
+{
+ using AnastasisMicroEcology::EPocket;
+ int32 Wet=0, Rock=0, Open=0;
+ bool NoFalseWet=true, NoFalseRock=true;
+ for (int32 Y=0; Y<100; ++Y) for (int32 X=0; X<100; ++X)
+ {
+  const auto Dry = AnastasisMicroEcology::MeadowPocketForSite(12345, X*400.0, Y*400.0, 0.0, 2.0);
+  const auto Damp = AnastasisMicroEcology::MeadowPocketForSite(12345, X*400.0, Y*400.0, 0.8, 2.0);
+  const auto Slope = AnastasisMicroEcology::MeadowPocketForSite(12345, X*400.0, Y*400.0, 0.0, 25.0);
+  NoFalseWet &= Dry != EPocket::MeadowWet;
+  NoFalseRock &= Dry != EPocket::MeadowStone && Damp != EPocket::MeadowStone;
+  Wet += Damp == EPocket::MeadowWet;
+  Rock += Slope == EPocket::MeadowStone;
+  Open += Dry == EPocket::None;
+ }
+ TestTrue(TEXT("dry flat ground does not invent wet or rocky soil"), NoFalseWet && NoFalseRock);
+ TestTrue(TEXT("wetness creates wet habitat; slope creates sparse rocky pockets"), Wet>0 && Rock>0);
+ TestTrue(TEXT("most dry flat ground is left alone"), Open>5000);
+ return true;
+}
+
 #endif
