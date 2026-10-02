@@ -43,6 +43,7 @@ PROOFS: gather-deliver-pie
 ## ECARTS
 
 - ouvert : n° 29 — temps de trajet payé au coût du terrain dans le jeu Unreal (A_TRANCHER). Le village C++ seul reste désactivé pour le harnais JS.
+- empile dessous (versement de l'integrateur) : n° 28 de mortality-001, verse dans le meme lot ; cette mission ne le modifie pas.
 
 ## INTEGRATION_RISK
 
