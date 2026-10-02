@@ -21,6 +21,9 @@ river-use-pie | tools/unreal/river-use-pie.py | RIVER_USE PASS | RIVER_USE FAIL|
 wildflowers-capture | tools/unreal/ground-cover-capture.py | GROUND_CAPTURE_COMPLETE | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/WildflowersEvidence;ANASTASIS_GROUND_STATES=noflowers,flowers,noflowers2;ANASTASIS_GROUND_VIEWS=prairie_eye,lisiere_eye,riviere_eye,aerien
 # Existing material only. Numeric BumpStrength .16/0/.16; no material regeneration.
 soil-matrix-normal-capture | tools/soil-crusade/capture.py | GROUND_CAPTURE_COMPLETE | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING|Traceback | 600 | ANASTASIS_GROUND_OUT=@Saved/SoilEvidence/matrix-normal-batch;ANASTASIS_GROUND_STATES=soil_before,soil_after,soil_control;ANASTASIS_SOIL_CONTACT=0;ANASTASIS_SOIL_PARAMETER=BumpStrength;ANASTASIS_SOIL_BEFORE=0.16;ANASTASIS_SOIL_AFTER=0;ANASTASIS_SOIL_VIEWS=prairie_ground,rive_ground,prairie_eye
+# LEAFCARDS_001 : memes arbres, chene vert en lames puis en cartes (anastasis.Dressing.TreeCards 0 / 1), ciel a 11 h.
+# Capture editor (SCN seulement) ; le verdict artistique est dans la passation.
+tree-cards-capture | tools/unreal/ground-cover-capture.py | GROUND_CAPTURE_COMPLETE | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/TreeCardsEvidence/world;ANASTASIS_GROUND_STATES=nocards,cards,nocards2;ANASTASIS_GROUND_VIEWS=lisiere_eye,sousbois_eye,riviere_eye,aerien
 # Default-off soil pilot: completion is technical, not an artistic verdict.
 
 player-pie | tools/unreal/player-pie.py | PLAYER_PIE PASS | PLAYER_PIE FAIL|PLAYER_PIE_TIMEOUT|PLAYER_PIE CHECK FAIL | 600 | ANASTASIS_PLAYER_PIE_OUT=@Saved/PlayerEvidence/pie
@@ -55,10 +58,6 @@ weather-contract | tools/unreal/weather-contract.py | WEATHER_CONTRACT PASS | WE
 weather-reference | tools/unreal/weather-reference.py | SKY_CAPTURE_COMPLETE | SKY_CAPTURE_FAIL|SKY_CAPTURE_TIMEOUT|SKY_SHOT_MISSING|Traceback | 900 | ANASTASIS_SKY_OUT=@Saved/SkyEvidence/weather-reference
 settlement-site-pie | tools/unreal/settlement-site-pie.py | SETTLEMENT_SITE_PIE PASS | SETTLEMENT_SITE_PIE FAIL|SETTLEMENT_SITE_CHECK FAIL | 420 | -
 gather-deliver-pie | tools/unreal/gather-deliver-pie.py | GATHER_DELIVER PASS | GATHER_DELIVER FAIL|Traceback | 600 | ANASTASIS_GATHER_OUT=@Saved/SliceEvidence/gather-deliver-route-cost
-
-# LEAFCARDS_001 : memes arbres, chene vert en lames puis en cartes (anastasis.Dressing.TreeCards 0 / 1), ciel a 11 h.
-# Capture editor (SCN seulement) ; le verdict artistique est dans la passation.
-tree-cards-capture | tools/unreal/ground-cover-capture.py | GROUND_CAPTURE_COMPLETE | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/TreeCardsEvidence/world;ANASTASIS_GROUND_STATES=nocards,cards,nocards2;ANASTASIS_GROUND_VIEWS=lisiere_eye,sousbois_eye,riviere_eye,aerien
 
 # Ecotone-002 : tree identity, near-edge transect, fixed reference cameras.
 soundscape-pie | tools/unreal/soundscape-pie.py | SOUNDSCAPE_PIE PASS | SOUNDSCAPE_PIE FAIL|Traceback | 240 | -
