@@ -193,8 +193,10 @@ immobile). Le harnais n'en souffre pas : ses habitants sont lus, `deserialize` l
 Depuis lifestyle-wiring-001, un habitant qui a un mode de vie le tient jour après jour
 (`lifestyleDailyUpdate`, après la cadence) ; un habitant créé par le C++ n'en a pas, et l'`ensureLifestyle`
 de tête d'`updateNpc`, qui le tirerait dans `sim.rng`, n'est pas branché. Les autres lectures du mode de
-vie (`lifestyleBias` dans la table, `lifestyleTravelFactor`, `lifestyleIndoorDuration`, `lifestyleTarget`,
-`lifestyleNotePlaceUse`) attendent la décision et `placeMemory` (n° 1).
+vie (`lifestyleBias` dans la table, `lifestyleTravelFactor`, `lifestyleIndoorDuration`, `lifestyleTarget`)
+attendent la décision (n° 1). Depuis act-gate-001, `notePlaceUse` appelle `lifestyleNotePlaceUse` pour
+un habitant qui a un mode de vie ; pour un habitant sans, la référence en tirerait un dans le flux de
+secours : ce tirage est sauté, l'habitant reste sans mode de vie.
 
 ### n° 9 — Noûs partiel
 
@@ -453,3 +455,20 @@ habitant qui n'en a pas. Le C++ ne les tire pas : le flux se décale au premier 
 `intentExploreHint` n'est pas porté : avec une intention `explore`, la référence tirerait 1 ou 3 fois au
 lieu d'`exploreTarget`. `spatialRiskBiasMap` ne tire pas dans le scénario (0 sur un jour) et n'est pas
 évalué.
+
+### n° 26 — Mémoire des lieux sans présence au poste
+
+- **classe** : REDUIT
+- **destin** : A_FERMER
+- **fermeture** : workplace-presence-001
+- **statut** : OUVERT
+- **entree** : act-gate-001
+- **reference** : `src/sim/simulation.js` (`notePlaceUse`, branche `actor.workPresence`), `src/sim/npc.js` (`workAtWorkplaceYard`, `updateInside` : `npc.workPresence`)
+- **cpp** : `Village/AnastasisVillage.cpp`, `FVillage::NotePlaceUse`
+- **harnais** : actors, buildings
+
+`notePlaceUse` est porté, mais le bâtiment noté ne passe pas par `actor.workPresence` : dedans, sinon le
+plus proche (1,9), sinon le poste pour un geste de travail. `workAtWorkplaceYard`, qui pose
+`workPresence` et note un second geste (`dt * 0,4`) quand le fermier livre ou travaille à son propre
+poste, n'est pas porté. Un geste fait au poste mais plus près d'un autre bâtiment est donc noté sur
+l'autre, et le `laborToday` du poste en manque une part.

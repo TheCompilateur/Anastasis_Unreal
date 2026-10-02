@@ -318,7 +318,7 @@ namespace AnastasisVillage
 		}
 		if (Npc.Inside.bActive)
 		{
-			UpdateInside(Npc);
+			UpdateInside(Npc, Dt);
 			return;
 		}
 		if (Npc.Goal == GoalIdle)

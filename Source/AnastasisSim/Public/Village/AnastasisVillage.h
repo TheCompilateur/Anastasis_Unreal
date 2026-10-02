@@ -401,6 +401,13 @@ namespace AnastasisVillage
 		/** `building.stock.food` — `{physical, reserved}`, reserved <= physical. Grenier seulement. */
 		int32 FoodPhysical = 0;
 		int32 FoodReserved = 0;
+		/**
+		 * `building.laborToday` (act-gate-001) : les gestes de travail du jour notes sur ce poste
+		 * (`notePlaceUse`), remis a zero chaque jour par la production quotidienne (non portee).
+		 * `bHasLaborToday` : la cle existe (la reference ne l'ecrit qu'au premier geste).
+		 */
+		double LaborToday = 0.0;
+		bool bHasLaborToday = false;
 
 		/** Chantier : pieces posees (0..22), devis / consomme / stock du site, qui l'a ouvert. */
 		int32 PiecesPlaced = 0;
@@ -779,6 +786,32 @@ namespace AnastasisVillage
 		 * sans mode de vie, et aucun tirage pour lui en donner un (ecart n°8).
 		 */
 		TOptional<AnastasisLifestyle::FLifestyle> Lifestyle;
+
+		/**
+		 * `npc.placeMemory` (act-gate-001) : un lieu par batiment frequente, dans l'ordre de premiere
+		 * visite (`Object.values` le parcourt ainsi, et le favori garde le premier a score egal).
+		 * Tenu par `FVillage::NotePlaceUse` (`simulation.js` `notePlaceUse`).
+		 */
+		struct FPlaceEntry
+		{
+			FString BuildingId;
+			FString Type;
+			double Score = 0.0;
+			double Work = 0.0;
+			double Social = 0.0;
+			double Home = 0.0;
+			double Talk = 0.0;
+			double Drink = 0.0;
+			double Activity = 0.0;
+			double Crisis = 0.0;
+			double DecayDay = 0.0;
+			double LastDay = 0.0;
+			/** `entry.lifestyle` : points par mode de vie, ordre d'insertion. */
+			TArray<TPair<FString, double>> Lifestyle;
+		};
+		TArray<FPlaceEntry> PlaceEntries;
+		/** `placeMemory.favoriteBuildingId` ; vide = `null`. */
+		FString FavoriteBuildingId;
 
 		/** `npc.relations` (ordre d'insertion), `mind.people`, `mind.tom`, `npc.moodlets`. */
 		TArray<TPair<FString, double>> Relations;
@@ -1210,6 +1243,8 @@ namespace AnastasisVillage
 		const FBuilding* MealPlace(const FNpc& Npc) const;
 		void Act(FNpc& Npc, double Dt);
 		bool Perform(FNpc& Npc);
+		/** `waitingActivity` de la reference : le `kind` que `notePlaceUse` recoit en attendant. */
+		FString JsWaitingActivity(const FNpc& Npc) const;
 		void RedirectAfterFailure(FNpc& Npc);
 		void RedirectDomesticDoorFailure(FNpc& Npc);
 
@@ -1234,7 +1269,13 @@ namespace AnastasisVillage
 		bool PerformShelterRain(FNpc& Npc);
 		const FBuilding* BuildingNearActor(const FNpc& Npc, double Radius) const;
 		bool EnterBuilding(FNpc& Npc, const FBuilding& Building, const FString& InActivity, double Duration);
-		void UpdateInside(FNpc& Npc);
+		void UpdateInside(FNpc& Npc, double Dt);
+		/**
+		 * `notePlaceUse(actor, kind, amount)` (act-gate-001) : le batiment ou l'habitant agit
+		 * (dedans, sinon le plus proche, sinon son poste pour un geste de travail) entre dans sa
+		 * memoire des lieux ; un geste de travail compte au `laborToday` du poste.
+		 */
+		void NotePlaceUse(FNpc& Npc, const FString& Kind, double Amount);
 		bool ExitBuilding(FNpc& Npc);
 
 		bool BuildingAccessPoint(FBuilding& Building, FNpc* Actor, FPoint& Out, const FPoint* Exclude = nullptr);

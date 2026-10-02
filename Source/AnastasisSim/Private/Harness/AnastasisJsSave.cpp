@@ -446,6 +446,12 @@ namespace AnastasisJsSave
 					if (!R.Int(*Food, TEXT("physical"), W, Out.FoodPhysical) || !R.Int(*Food, TEXT("reserved"), W, Out.FoodReserved)) return false;
 				}
 			}
+			// `laborToday` (act-gate-001) : absent tant qu'aucun geste de travail n'a ete note.
+			if (B.Find(TEXT("laborToday")))
+			{
+				if (!R.OptDouble(B, TEXT("laborToday"), Where, Out.LaborToday)) return false;
+				Out.bHasLaborToday = true;
+			}
 			return true;
 		}
 
@@ -490,6 +496,7 @@ namespace AnastasisJsSave
 					Food->Set(TEXT("reserved"), Num(B.FoodReserved));
 				}
 			}
+			if (B.bHasLaborToday) Out.Set(TEXT("laborToday"), Num(B.LaborToday));
 			return Out;
 		}
 
@@ -664,6 +671,41 @@ namespace AnastasisJsSave
 				}
 				if (!R.OptInt(*Mind, TEXT("cellCount"), W, Out.CellCount)) return false;
 			}
+			// `placeMemory` (act-gate-001) : `{ buildings: { <id>: entree }, favoriteBuildingId }`.
+			if (const FValue* Places = A.Find(TEXT("placeMemory")); Places && Places->IsObject())
+			{
+				const FString W = FReader::At(Where, TEXT("placeMemory"));
+				if (!R.OptId(*Places, TEXT("favoriteBuildingId"), W, Out.FavoriteBuildingId)) return false;
+				if (const FValue* Entries = Places->Find(TEXT("buildings")); Entries && !Entries->IsNull())
+				{
+					if (!Entries->IsObject()) return R.Fail(FReader::At(W, TEXT("buildings")), TEXT("objet attendu"));
+					for (int32 K = 0; K < Entries->Keys.Num(); ++K)
+					{
+						const FValue& E = Entries->Items[K];
+						const FString WE = FReader::At(FReader::At(W, TEXT("buildings")), *Entries->Keys[K]);
+						if (!E.IsObject()) return R.Fail(WE, TEXT("objet attendu"));
+						AnastasisVillage::FNpc::FPlaceEntry& P = Out.PlaceEntries.AddDefaulted_GetRef();
+						P.BuildingId = Entries->Keys[K];
+						if (!R.OptString(E, TEXT("buildingId"), WE, P.BuildingId) || !R.OptString(E, TEXT("type"), WE, P.Type)
+							|| !R.OptDouble(E, TEXT("score"), WE, P.Score) || !R.OptDouble(E, TEXT("work"), WE, P.Work)
+							|| !R.OptDouble(E, TEXT("social"), WE, P.Social) || !R.OptDouble(E, TEXT("home"), WE, P.Home)
+							|| !R.OptDouble(E, TEXT("talk"), WE, P.Talk) || !R.OptDouble(E, TEXT("drink"), WE, P.Drink)
+							|| !R.OptDouble(E, TEXT("activity"), WE, P.Activity) || !R.OptDouble(E, TEXT("crisis"), WE, P.Crisis)
+							|| !R.OptDouble(E, TEXT("decayDay"), WE, P.DecayDay) || !R.OptDouble(E, TEXT("lastDay"), WE, P.LastDay))
+						{
+							return false;
+						}
+						if (const FValue* L = E.Find(TEXT("lifestyle")); L && L->IsObject())
+						{
+							for (int32 J = 0; J < L->Keys.Num(); ++J)
+							{
+								if (!L->Items[J].IsNumber()) return R.Fail(FReader::At(WE, TEXT("lifestyle")), TEXT("nombre attendu"));
+								P.Lifestyle.Emplace(L->Keys[J], L->Items[J].Number);
+							}
+						}
+					}
+				}
+			}
 			if (const FValue* Inside = A.Find(TEXT("inside")); Inside && !Inside->IsNull())
 			{
 				return R.Fail(FReader::At(Where, TEXT("inside")), TEXT("habitant a l'interieur : non lu par ce lecteur (inside non nul)"));
@@ -778,6 +820,41 @@ namespace AnastasisJsSave
 				// Absentes au depart et toujours vides : rien a ecrire (la reference ne les cree qu'au marquage).
 				if (Mind->Find(TEXT("cells")) || Sorted.Num() > 0) Mind->Set(TEXT("cells"), Cells);
 				if (Mind->Find(TEXT("cellCount")) || N.CellCount != 0) Mind->Set(TEXT("cellCount"), Num(N.CellCount));
+			}
+			// La memoire des lieux : une entree par batiment, dans l'ordre de premiere visite.
+			if (Out.Find(TEXT("placeMemory")) || N.PlaceEntries.Num() > 0)
+			{
+				const FValue* Old = Out.Find(TEXT("placeMemory"));
+				FValue Places = (Old && Old->IsObject()) ? *Old : FValue::MakeObject();
+				const FValue* OldEntries = Places.Find(TEXT("buildings"));
+				FValue Entries = FValue::MakeObject();
+				for (const AnastasisVillage::FNpc::FPlaceEntry& P : N.PlaceEntries)
+				{
+					const FValue* OldEntry = (OldEntries && OldEntries->IsObject()) ? OldEntries->Find(*P.BuildingId) : nullptr;
+					FValue E = (OldEntry && OldEntry->IsObject()) ? *OldEntry : FValue::MakeObject();
+					E.Set(TEXT("buildingId"), Str(P.BuildingId));
+					E.Set(TEXT("type"), Str(P.Type));
+					E.Set(TEXT("score"), Num(P.Score));
+					E.Set(TEXT("work"), Num(P.Work));
+					E.Set(TEXT("social"), Num(P.Social));
+					E.Set(TEXT("home"), Num(P.Home));
+					E.Set(TEXT("talk"), Num(P.Talk));
+					E.Set(TEXT("drink"), Num(P.Drink));
+					E.Set(TEXT("activity"), Num(P.Activity));
+					E.Set(TEXT("crisis"), Num(P.Crisis));
+					E.Set(TEXT("decayDay"), Num(P.DecayDay));
+					E.Set(TEXT("lastDay"), Num(P.LastDay));
+					if (P.Lifestyle.Num() > 0 || E.Find(TEXT("lifestyle")))
+					{
+						FValue L = FValue::MakeObject();
+						for (const TPair<FString, double>& Pair : P.Lifestyle) L.Set(Pair.Key, Num(Pair.Value));
+						E.Set(TEXT("lifestyle"), L);
+					}
+					Entries.Set(P.BuildingId, E);
+				}
+				Places.Set(TEXT("buildings"), Entries);
+				Places.Set(TEXT("favoriteBuildingId"), IdOrNull(N.FavoriteBuildingId));
+				Out.Set(TEXT("placeMemory"), Places);
 			}
 			// `inside` non nul n'est pas lu (ReadActor refuse) : un habitant lu est dehors.
 			Put(Out, TEXT("inside"), FValue(), bNew);

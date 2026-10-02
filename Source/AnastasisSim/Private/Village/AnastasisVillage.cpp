@@ -938,6 +938,129 @@ namespace AnastasisVillage
 		return Best;
 	}
 
+	namespace PlaceUse
+	{
+		// `WORK_LABOR_KINDS` (simulation.js l. 498) : activites ET buts qui comptent comme travail.
+		bool IsWorkKind(const FString& Kind)
+		{
+			static const TCHAR* const Kinds[] = {
+				TEXT("travaille"), TEXT("fabrique"), TEXT("forge"), TEXT("tanne"), TEXT("tisse"), TEXT("scie"),
+				TEXT("repare"), TEXT("chantier"), TEXT("bucher"), TEXT("recolte"), TEXT("taille"), TEXT("peche"),
+				TEXT("mene"), TEXT("build"), TEXT("craft"), TEXT("maintain"), TEXT("helpFarm"), TEXT("gatherWood"),
+				TEXT("gatherFood"), TEXT("gatherStone"), TEXT("apprentice") };
+			for (const TCHAR* K : Kinds) if (Kind.Equals(K, ESearchCase::CaseSensitive)) return true;
+			return false;
+		}
+		bool IsOneOf(const FString& Kind, std::initializer_list<const TCHAR*> List)
+		{
+			for (const TCHAR* K : List) if (Kind.Equals(K, ESearchCase::CaseSensitive)) return true;
+			return false;
+		}
+		// `BUILDINGS[type].jobs.length` : dans le catalogue de la reference, seule la maison n'a pas
+		// de metier (`catalog.js`).
+		bool TypeHasJobs(const FString& Type) { return !Type.IsEmpty() && Type != HouseType; }
+	}
+
+	void FVillage::NotePlaceUse(FNpc& Npc, const FString& Kind, double Amount)
+	{
+		const bool bWork = PlaceUse::IsWorkKind(Kind);
+		// `actor.workPresence` n'est pas porte (ecart n°26) : dedans, sinon le plus proche (1,9).
+		FBuilding* Building = Npc.Inside.bActive ? Buildings.FindById(Npc.Inside.BuildingId) : nullptr;
+		if (!Building)
+		{
+			const FBuilding* Near = BuildingNearActor(Npc, 1.9);
+			Building = Near ? Buildings.FindById(Near->Id) : nullptr;
+		}
+		FBuilding* Workplace = Npc.WorkplaceId.IsEmpty() ? nullptr : Buildings.FindById(Npc.WorkplaceId);
+		// Recolte / soins hors poste : le depot metier compte quand meme.
+		if (!Building && bWork && Workplace && Workplace->Progress >= 1.0) Building = Workplace;
+		if (!Building) return;
+
+		const double DayNow = static_cast<double>(Day());
+		FNpc::FPlaceEntry* Entry = Npc.PlaceEntries.FindByPredicate([Building](const FNpc::FPlaceEntry& E) { return E.BuildingId == Building->Id; });
+		if (!Entry)
+		{
+			Entry = &Npc.PlaceEntries.AddDefaulted_GetRef();
+			Entry->BuildingId = Building->Id;
+			Entry->Type = Building->Type;
+			Entry->DecayDay = DayNow;
+			Entry->LastDay = DayNow;
+		}
+		const double ElapsedDays = FMath::Max(0.0, DayNow - Entry->DecayDay);
+		if (ElapsedDays > 0.0)
+		{
+			const double Decay = AnastasisJs::Pow(0.76, FMath::Min(5.0, ElapsedDays));
+			Entry->Score *= Decay;
+			Entry->Work *= Decay;
+			Entry->Social *= Decay;
+			Entry->Home *= Decay;
+			Entry->Talk *= Decay;
+			Entry->Drink *= Decay;
+			Entry->Activity *= Decay;
+			Entry->Crisis *= Decay;
+			Entry->DecayDay = DayNow;
+		}
+		const double Gain = FMath::Max(0.05, Amount);
+		Entry->Score = FMath::Min(80.0, Entry->Score + Gain);
+		Entry->Activity = FMath::Min(36.0, Entry->Activity + Gain);
+		Entry->LastDay = DayNow;
+		Entry->Type = Building->Type;
+		if (bWork) Entry->Work += Gain;
+		if (PlaceUse::IsOneOf(Kind, { TEXT("socialise"), TEXT("socialize"), TEXT("visitFamily"), TEXT("play"), TEXT("relax"), TEXT("relaxe") })) Entry->Social += Gain;
+		if (PlaceUse::IsOneOf(Kind, { TEXT("socialise"), TEXT("socialize"), TEXT("talk"), TEXT("visitFamily"), TEXT("play") })) Entry->Talk += Gain;
+		if (PlaceUse::IsOneOf(Kind, { TEXT("drink"), TEXT("boit") })) Entry->Drink += Gain;
+		if (PlaceUse::IsOneOf(Kind, { TEXT("repose"), TEXT("rest"), TEXT("dort"), TEXT("relaxe"), TEXT("relax") }) || Npc.HomeId == Building->Id) Entry->Home += Gain;
+		// `(actor.morale || 100) < 18` : un moral nul compte pour 100.
+		const double Morale = Npc.Needs.Morale != 0.0 ? Npc.Needs.Morale : 100.0;
+		if (Npc.Needs.Hunger > 88.0 || Morale < 18.0) Entry->Crisis = FMath::Min(24.0, Entry->Crisis + Gain * 0.6);
+		// `lifestyleNotePlaceUse` : seulement pour un habitant qui a un mode de vie. Sans lui, la
+		// reference en tirerait un dans le flux de secours ; ceux du C++ restent sans (ecart n°8).
+		if (Npc.Lifestyle.IsSet())
+		{
+			AnastasisLifestyle::FLifestyleSubject Subject;
+			Subject.Goal = Npc.Goal;
+			Subject.JobId = Npc.JobId;
+			Subject.HomeId = Npc.HomeId;
+			Subject.Skill = Npc.Skill;
+			Subject.Energy = Npc.Needs.Energy;
+			Subject.bHasTarget = Npc.bHasTarget;
+			Subject.FavoriteBuildingId = Npc.FavoriteBuildingId;
+			AnastasisLifestyle::FPlaceUseEntry Use;
+			Use.BuildingId = Entry->BuildingId;
+			Use.Work = Entry->Work;
+			Use.Social = Entry->Social;
+			Use.Home = Entry->Home;
+			Use.Lifestyle = Entry->Lifestyle;
+			AnastasisLifestyle::LifestyleNotePlaceUse(Npc.Lifestyle, Subject, Kind, Use, Gain);
+			Entry->Work = Use.Work;
+			Entry->Social = Use.Social;
+			Entry->Home = Use.Home;
+			Entry->Lifestyle = MoveTemp(Use.Lifestyle);
+		}
+
+		// Le travail du jour alimente la production quotidienne du poste.
+		if (bWork)
+		{
+			FBuilding* Post = (Workplace && Workplace->Progress >= 1.0) ? Workplace
+				: (PlaceUse::TypeHasJobs(Building->Type) ? Building : nullptr);
+			if (Post && Post->Progress >= 1.0 && PlaceUse::TypeHasJobs(Post->Type))
+			{
+				Post->LaborToday += Gain;
+				Post->bHasLaborToday = true;
+			}
+		}
+
+		// Le favori : le meilleur score parmi les lieux vus depuis 18 jours, le premier a egalite.
+		const FNpc::FPlaceEntry* Favorite = nullptr;
+		for (const FNpc::FPlaceEntry& Remembered : Npc.PlaceEntries)
+		{
+			const double Last = Remembered.LastDay != 0.0 ? Remembered.LastDay : DayNow;
+			if (DayNow - Last > 18.0) continue;
+			if (!Favorite || Remembered.Score > Favorite->Score) Favorite = &Remembered;
+		}
+		Npc.FavoriteBuildingId = (Favorite && !Favorite->BuildingId.IsEmpty()) ? Favorite->BuildingId : Building->Id;
+	}
+
 	const FBuilding* FVillage::BuildingForIndoorAction(const FNpc& Npc, const FString& Goal) const
 	{
 		// Foyer d'abord : dormir, manger se font DANS la maison ou l'abri.
@@ -988,6 +1111,8 @@ namespace AnastasisVillage
 		Npc.Inside.ExitY = Entrance.Y;
 		Npc.bHasTarget = false;
 		ClearNavigation(Npc);
+		// `enterBuilding` : l'entree compte au lieu (`notePlaceUse(actor, activity, 0.8)`).
+		NotePlaceUse(Npc, InActivity, 0.8);
 		return true;
 	}
 
@@ -1158,11 +1283,16 @@ namespace AnastasisVillage
 		return EnterBuilding(Npc, *Building, RestActivity(bNight), Duration * AtPost);
 	}
 
-	void FVillage::UpdateInside(FNpc& Npc)
+	void FVillage::UpdateInside(FNpc& Npc, double Dt)
 	{
 		Npc.Activity = Npc.Inside.Activity;
+		// `notePlaceUse(npc, npc.activity, dt * 0.5)` a chaque tick dedans, puis, l'acte fait et
+		// AVANT la sortie, `notePlaceUse(npc, inside.goal || npc.goal, 1.2)`.
+		NotePlaceUse(Npc, Npc.Activity, Dt * 0.5);
 		if (Now < Npc.Inside.Until) return;
+		const FString InsideGoal = !Npc.Inside.Goal.IsEmpty() ? Npc.Inside.Goal : Npc.Goal;
 		const bool bWorked = Perform(Npc);
+		if (bWorked) NotePlaceUse(Npc, InsideGoal, 1.2);
 		ExitBuilding(Npc);
 		if (!bWorked)
 		{
@@ -1414,6 +1544,8 @@ namespace AnastasisVillage
 		// `holdTalkAct` : en conversation, l'habitant est fige (ni pensee, ni marche).
 		if (HoldTalk(Npc))
 		{
+			// `holdTalkAct` : la conversation compte au lieu, dedans comme dehors.
+			NotePlaceUse(Npc, Npc.Activity, Dt * 0.35);
 			return;
 		}
 		if (Npc.bTalkAnchor)
@@ -1441,7 +1573,7 @@ namespace AnastasisVillage
 					+ AnastasisWeatherBehavior::Shelter::EnergyDrainPerSec * AnastasisWeatherBehavior::Shelter::InsideRecoverFactor * Dt,
 					0.0, 100.0);
 			}
-			UpdateInside(Npc);
+			UpdateInside(Npc, Dt);
 			return;
 		}
 
@@ -1918,7 +2050,9 @@ namespace AnastasisVillage
 		Npc.DoorStuckAt = 0.0;
 		Npc.DoorApproachAt = 0.0;
 
-		if (!IsPortedGoalFor(Npc, Npc.Goal))
+		// `observer` passe par le geste generique comme dans la reference : il note le lieu, attend,
+		// puis `perform` echoue (aucun cas pour lui) et l'echec compte (act-gate-001).
+		if (!IsPortedGoalFor(Npc, Npc.Goal) && Npc.Goal != GoalObserver)
 		{
 			// But non porte : il n'accomplit rien. La reference ferait `perform`.
 			Npc.Activity = TEXT("attend");
@@ -1929,8 +2063,11 @@ namespace AnastasisVillage
 		// Sessions multi-coups hors du gate workTimer (collecte du fermier).
 		if (Npc.Goal == GoalGatherFood && IsGranaryWorker(Npc))
 		{
-			if (ProgressCraftGather(Npc) != 0)
+			const int32 Craft = ProgressCraftGather(Npc);
+			if (Craft != 0)
 			{
+				// `craft === "working"` : le geste compte au lieu (activite du profil `farm`).
+				if (Craft == 1) NotePlaceUse(Npc, TEXT("recolte"), Dt * 0.35);
 				Npc.FailedActions = 0;
 				return;
 			}
@@ -1943,6 +2080,7 @@ namespace AnastasisVillage
 			const int32 Craft = ProgressBuildWork(Npc, Dt);
 			if (Craft != 0)
 			{
+				if (Craft == 1) NotePlaceUse(Npc, TEXT("chantier"), Dt * 0.35);
 				Npc.FailedActions = 0;
 				if (Craft == 2)
 				{
@@ -1958,6 +2096,8 @@ namespace AnastasisVillage
 			return;
 		}
 		if (Npc.WorkSession.bActive) ClearWorkSession(Npc);
+		// `notePlaceUse(npc, waitingActivity(goal), dt * 0.35)`, avant le chronometre du geste.
+		NotePlaceUse(Npc, JsWaitingActivity(Npc), Dt * 0.35);
 
 		// Livrer a son propre depot : DEHORS, au seuil (`DEPOT_OUTSIDE`), jamais d'entree.
 		Npc.WorkTimer += Dt;
@@ -1973,23 +2113,57 @@ namespace AnastasisVillage
 				: Npc.Goal == GoalSocialize ? TEXT("discute")
 				: Npc.Goal == GoalRelax ? TEXT("relaxe")
 				: Npc.Goal == GoalShelterRain ? TEXT("abrite")
+				: Npc.Goal == GoalObserver ? TEXT("attend")
 				: RestActivity(IsNight());
 			return;
 		}
 		Npc.WorkTimer = 0.0;
+		const bool bHadTarget = Npc.bHasTarget;
+		const FPoint TargetBefore = Npc.Target;
+		const FString GoalBefore = Npc.Goal;
 		const bool bWorked = Perform(Npc);
+		if (bWorked) NotePlaceUse(Npc, GoalBefore, 1.0);
 		if (!bWorked)
 		{
 			Npc.Activity = TEXT("attend");
-			++Npc.FailedActions;
+			// `if (npc.failedActions >= 3) redirectAfterFailure(sim, npc)` (act-gate-001 : la porte
+			// generique le fait, comme `updateInside`).
+			if (++Npc.FailedActions >= 3) RedirectAfterFailure(Npc);
 		}
 		else
 		{
 			Npc.FailedActions = 0;
 		}
-		// `if (npc.target === target) npc.target = null;` — force une nouvelle decision.
-		Npc.bHasTarget = false;
-		ClearNavigation(Npc);
+		// `if (npc.target === target) npc.target = null;` — force une nouvelle decision, sauf si
+		// l'acte (ou le renvoi apres echec) vient de poser une autre cible.
+		const bool bSameTarget = Npc.bHasTarget == bHadTarget
+			&& (!bHadTarget || (Npc.Target.X == TargetBefore.X && Npc.Target.Y == TargetBefore.Y));
+		if (bSameTarget)
+		{
+			Npc.bHasTarget = false;
+			ClearNavigation(Npc);
+		}
+	}
+
+	FString FVillage::JsWaitingActivity(const FNpc& Npc) const
+	{
+		// `waitingActivity(sim, npc, goal)` (npc.js l. 3843), pour les buts que ce village connait.
+		// Le mot sert de `kind` a `notePlaceUse` : c'est celui de la reference, meme quand l'affichage
+		// du C++ en garde un autre (« discute », « cueille », « depose »).
+		const FString& Goal = Npc.Goal;
+		if (Goal == GoalDeliver || Goal == TEXT("sell") || Goal == TEXT("buy") || Goal == TEXT("fetchInput")) return TEXT("livre");
+		if (Goal == GoalSocialize || Goal == TEXT("visitFamily") || Goal == TEXT("aidHousehold")) return TEXT("socialise");
+		if (Goal == TEXT("confront")) return TEXT("attend");
+		if (Goal == GoalShelterRain) return TEXT("abrite");
+		if (Goal == TEXT("closeWorkplace")) return TEXT("range");
+		if (Goal == GoalRelax) return TEXT("relaxe");
+		if (Goal == TEXT("relieve")) return TEXT("besoins");
+		if (Goal == GoalDrink) return TEXT("boit");
+		if (Goal == AnastasisBuild::GoalBuild) return TEXT("chantier");
+		if (Goal == GoalGatherFood) return TEXT("recolte");
+		if (Goal == GoalRest) return RestActivity(IsNight());
+		if (Goal == GoalEat || Goal == TEXT("eatTogether")) return TEXT("mange");
+		return TEXT("attend");
 	}
 
 	bool FVillage::Perform(FNpc& Npc)
