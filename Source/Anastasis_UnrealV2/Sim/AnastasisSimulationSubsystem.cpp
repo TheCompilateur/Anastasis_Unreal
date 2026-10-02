@@ -13,6 +13,7 @@
 #include "Village/AnastasisVillagerVisual.h"
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisWorldView.h"
+#include "WorldView/AnastasisAnthropicSubsystem.h"
 
 // Default 1 since SKY_TRANSITIONS_001 (2026-09-30), the JS reference's realtime: one day = 90 s.
 // At the former default of 10, now that the sky follows the simulation, a day lasted ~12 real
@@ -127,6 +128,7 @@ void UAnastasisSimulationSubsystem::Deinitialize()
 
 void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 {
+	if (auto* Anthropic = GetWorld()->GetSubsystem<UAnastasisAnthropicSubsystem>()) Anthropic->ResetPresentation();
 	Simulation.Reset(Seed, AnastasisWorldView::ReferenceWidth, AnastasisWorldView::ReferenceHeight);
 	LoggedDay = Simulation.GetDay();
 	UE_LOG(
