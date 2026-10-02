@@ -30,6 +30,8 @@ anthropic-memory-pie | tools/unreal/anthropic-memory-pie.py | ANTHROPIC_PIE PASS
 # gather-deliver : Speed 10, delais en temps simule. PASS = recolte, retour (au plus un sac plein), le sac du
 # retour livre en entier, deuxieme voyage ; conservation champs + sacs + grenier + repas a chaque echantillon.
 gather-deliver-pie | tools/unreal/gather-deliver-pie.py | GATHER_DELIVER PASS | GATHER_DELIVER FAIL | 480 | ANASTASIS_GATHER_OUT=@Saved/SliceEvidence/gather-deliver
+# Woodland sequence: exact bank/meadow positions and bounded instance budget.
+woodland-sequence-capture | tools/unreal/ground-cover-capture.py | WOODLAND_CAPTURE PASS | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/WoodlandEvidence;ANASTASIS_GROUND_STATES=woodland_reference,woodland,woodland_reference2;ANASTASIS_GROUND_VIEWS=ecotone_open,ecotone_edge,ecotone_inside,woodland_gap,ecotone_oblique,prairie_eye
 
 # Capture editor (SCN seulement), cinq habitats et aerien, terrain echantillonne stable.
 natural-history-capture | tools/unreal/ground-cover-capture.py | NATURAL_HISTORY_CAPTURE PASS | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/NaturalHistoryEvidence;ANASTASIS_GROUND_STATES=reference,natural,reference2;ANASTASIS_GROUND_VIEWS=prairie_eye,lisiere_eye,sousbois_eye,riviere_eye,lande_eye,aerien
@@ -45,4 +47,3 @@ anthropic-paths-capture | tools/unreal/anthropic-paths-capture.py | ANTHROPIC_PA
 
 anthropic-routine-capture | tools/unreal/anthropic-paths-capture.py | ANTHROPIC_PATHS PASS | ANTHROPIC_PATHS FAIL|ANTHROPIC_PATH_CHECK FAIL | 660 | ANASTASIS_PATHS_SCENARIO=farmer
 # Woodland sequence: exact bank/meadow positions and bounded instance budget.
-woodland-sequence-capture | tools/unreal/ground-cover-capture.py | WOODLAND_CAPTURE PASS | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING | 600 | ANASTASIS_GROUND_OUT=@Saved/WoodlandEvidence;ANASTASIS_GROUND_STATES=woodland_reference,woodland,woodland_reference2;ANASTASIS_GROUND_VIEWS=ecotone_open,ecotone_edge,ecotone_inside,woodland_gap,ecotone_oblique,prairie_eye
