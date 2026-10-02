@@ -156,6 +156,8 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 		* FMath::Clamp(static_cast<double>(CVarSimTimeScale.GetValueOnGameThread()), 0.0, 1.0);
 	const double TimeBefore = Simulation.GetTime();
 	const double Multiplier = FMath::Max(1.0, AnastasisJs::NumberOr(Speed, 1.0)) * Warp;
+	// player-minimal-001 : la direction du pawn conduit le corps incarne pendant les pas de cette frame.
+	ApplyPlayerInput();
 
 	int32 Steps = 0;
 	double StepAlpha = 1.0;
@@ -188,7 +190,7 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 	}
 
 	const double Advanced = Simulation.GetTime() - TimeBefore;
-	Witness.Observe(Advanced, Multiplier, FAnastasisSimulation::DayLength);
+	ObservePlayerTime(Advanced, Multiplier);
 	if (DeltaTime > 0.0f)
 	{
 		// Lisse sur ~1 s : a vitesse lente un pas ne tombe qu'une frame sur plusieurs, la valeur brute clignoterait.
@@ -201,6 +203,7 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 		Simulation.GetVillage(), Simulation.GetWorld(), GetWorld(),
 		AnastasisPresentation::GetRegistry(), CVarVillagePortraits.GetValueOnGameThread() != 0,
 		StepAlpha, Steps > 0);
+	PlacePlayerPawn();
 	if (CVarVillageDebug.GetValueOnGameThread() != 0)
 	{
 		FAnastasisVillagePresentation::DrawDebug(GetWorld(), Simulation.GetVillage(), Simulation.GetWorld());
@@ -391,9 +394,9 @@ void UAnastasisSimulationSubsystem::DrawOverlay() const
 			Simulation.GetSeed()));
 
 	// TIME_WARP_001 : la vitesse demandee, celle obtenue (une machine chargee coupe), la duree d'un jour
-	// a ce rythme, et ce que le village voit du joueur.
+	// a ce rythme. Ce que le village voit du joueur : DrawPlayerOverlay.
 	const double Warp = static_cast<double>(CVarSimWarp.GetValueOnGameThread());
-	if (Warp != 1.0 || Witness.Presence < 0.999)
+	if (Warp != 1.0)
 	{
 		const double DaySeconds = EffectiveRate > 1e-6 ? FAnastasisSimulation::DayLength / EffectiveRate : 0.0;
 		const FString DayText = Warp <= 0.0 ? FString(TEXT("PAUSE"))
@@ -403,15 +406,14 @@ void UAnastasisSimulationSubsystem::DrawOverlay() const
 		GEngine->AddOnScreenDebugMessage(
 			0xA51A52,
 			0.0f,
-			Witness.Presence < 0.5 ? FColor::Orange : FColor::Cyan,
+			FColor::Cyan,
 			FString::Printf(
-				TEXT("TEMPS  x%g%s  %s   presence %.0f %%  oisif %.1f j"),
+				TEXT("TEMPS  x%g%s  %s"),
 				Warp,
 				bWarpBudgetCut ? TEXT(" (machine saturee)") : TEXT(""),
-				*DayText,
-				Witness.Presence * 100.0,
-				Witness.IdleDays(FAnastasisSimulation::DayLength)));
+				*DayText));
 	}
+	DrawPlayerOverlay();
 }
 
 int32 UAnastasisSimulationSubsystem::AdvanceBy(double Seconds)
@@ -423,10 +425,20 @@ int32 UAnastasisSimulationSubsystem::AdvanceBy(double Seconds)
 	const double From = Simulation.GetTime();
 	const int32 FromDay = Simulation.GetDay();
 	const double Start = FPlatformTime::Seconds();
-	const int32 Steps = AnastasisTimeWarp::Advance(Simulation, Seconds);
+	// Par tranches de 15 s simulees (90 pas) : le temoin informe le village AU FIL du saut, et chaque
+	// minuit franchi juge un joueur dont l'oisivete est a jour (player-minimal-001). Le joueur n'a rien
+	// fait de tout ce temps : multiplicateur infini.
+	int32 Steps = 0;
+	double Left = Seconds;
+	while (Left > 1e-9)
+	{
+		const double Chunk = FMath::Min(Left, FAnastasisSimulation::DayLength / 6.0);
+		const double ChunkFrom = Simulation.GetTime();
+		Steps += AnastasisTimeWarp::Advance(Simulation, Chunk);
+		ObservePlayerTime(Simulation.GetTime() - ChunkFrom, TNumericLimits<double>::Max());
+		Left -= Chunk;
+	}
 	const double WallMs = (FPlatformTime::Seconds() - Start) * 1000.0;
-	// Le joueur n'a rien fait de tout ce temps : multiplicateur infini.
-	Witness.Observe(Simulation.GetTime() - From, TNumericLimits<double>::Max(), FAnastasisSimulation::DayLength);
 	WarpPump.Reset();
 	PresentationAccumulator = 0.0;
 	LogDayIfChanged();
@@ -436,6 +448,7 @@ int32 UAnastasisSimulationSubsystem::AdvanceBy(double Seconds)
 		Simulation.GetVillage(), Simulation.GetWorld(), World,
 		AnastasisPresentation::GetRegistry(), CVarVillagePortraits.GetValueOnGameThread() != 0,
 		1.0, true);
+	PlacePlayerPawn();
 	UE_LOG(LogAnastasis_UnrealV2, Display,
 		TEXT("ANASTASIS_SIM advance from=%.4f to=%.4f day=%d->%d ticks=%d wallMs=%.1f presence=%.4f idleDays=%.3f"),
 		From, Simulation.GetTime(), FromDay, Simulation.GetDay(), Steps, WallMs,

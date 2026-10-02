@@ -219,6 +219,37 @@ namespace AnastasisVillage
 	inline const TCHAR* const GoalDeliver = AnastasisGather::GoalDeliver;
 	/** Porte pour tous (village-weather-001) : sous l'orage, lacher le travail pour un toit. */
 	inline const TCHAR* const GoalShelterRain = AnastasisWeatherBehavior::GoalShelterRain;
+	/**
+	 * `PLAYER_IDLE_GOAL` de decisionProvider.js (player-minimal-001) : l'habitant incarne sans commande
+	 * attend ; Nous ne choisit jamais pour lui. Aucun effet materiel.
+	 */
+	inline const TCHAR* const GoalIdle = TEXT("idle");
+
+	/**
+	 * player-minimal-001 -- le joueur est un habitant (reference : docs/PLAYER_AS_HABITANT.md).
+	 *
+	 * `STANDING` de life/standing.js pour la reputation. Le reste est une EXTENSION, demande
+	 * d'Alexandre (TIME_WARP_001) : un joueur qui accelere le temps ne fait rien aux yeux du village.
+	 * L'hote lui passe sa PRESENCE (1 = vu, 0 = invisible) et le temps ou il a ete oisif ; les
+	 * habitants voient une personne a presence p jusqu'a p x leur portee, plus du tout sous
+	 * MinPresenceSeen, et l'oublient sous RememberPresenceMin. L'oisivete est un acte comme les
+	 * autres : un merite negatif, permanent, comme le vol de la reference.
+	 */
+	namespace Standing
+	{
+		/** `STANDING.base`, `initStanding`. */
+		inline constexpr double Base = 50.0;
+		/** `STANDING.driftToBase` : part de l'ecart a la cible rattrapee chaque minuit. */
+		inline constexpr double DriftToBase = 0.4;
+		/** EXTENSION : merite perdu par jour oisif vu du village (`theftLoss` vaut 14). */
+		inline constexpr double IdleMeritPerDay = 4.0;
+		/** EXTENSION : sous cette presence, plus personne ne la voit. */
+		inline constexpr double MinPresenceSeen = 0.05;
+		/** EXTENSION : sous cette presence, on ne pense plus a aller la chercher. */
+		inline constexpr double RememberPresenceMin = 0.25;
+		/** EXTENSION : poids de l'ecart de reputation dans l'envie de lui parler. */
+		inline constexpr double AffinityWeight = 0.4;
+	}
 
 	/** `NPC_AI` de npc.js (chemin classique) — conserve pour `aiThinkStagger`. */
 	inline constexpr double ThinkEvery = 0.12;
@@ -653,6 +684,16 @@ namespace AnastasisVillage
 		int32 RumorsShared = 0;
 		FDecisionTrace LastDecision;
 
+		/** `npc.reputation` (`initStanding`). Hors empreinte : les actes qui la font ne sont pas portes. */
+		double Reputation = Standing::Base;
+		/**
+		 * EXTENSION (player-minimal-001) : combien le village voit cette personne, et le temps simule
+		 * ou il l'a vue ne rien faire. Seul l'habitant incarne s'en ecarte (l'hote les pose) : pour tout
+		 * autre, 1 et 0, et les regles qui les lisent rendent au bit pres ce qu'elles rendaient.
+		 */
+		double Presence = 1.0;
+		double IdleSeconds = 0.0;
+
 		/** `livingHome(npc)` = home || shelter. */
 		const FString& LivingHomeId() const { return !HomeId.IsEmpty() ? HomeId : ShelterId; }
 	};
@@ -695,6 +736,59 @@ namespace AnastasisVillage
 
 		/** `actors.splice` — decalage, l'ordre des autres survit. */
 		bool RemoveNpc(const FString& Id);
+
+		// --- Le joueur est un habitant (player-minimal-001, simulation.js « Incarnation ») ---------
+		//
+		// Une seule verite : `PlayerPersonId`. Aucun `bIsPlayer` dissemine. Vide = observateur, et
+		// alors rien de ce qui suit n'est lu : la simulation est celle d'avant, au bit pres.
+
+		/** `sim.playerPersonId` ; vide en mode observateur. */
+		const FString& GetPlayerPersonId() const { return PlayerPersonId; }
+		bool IsPlayer(const FNpc& Npc) const { return !PlayerPersonId.IsEmpty() && Npc.Id == PlayerPersonId; }
+		/** `playerActor()` : l'habitant incarne, ou nullptr. */
+		const FNpc* PlayerActor() const;
+		FNpc* PlayerActor();
+
+		/** `incarnate(personId)` : prendre la main sur un habitant vivant. Faux s'il n'existe pas. */
+		bool Incarnate(const FString& NpcId);
+		/** `release()` : rendre la main a Nous. Rend l'identifiant relache. */
+		FString Release();
+		/**
+		 * `arriveAsPlayer` : un habitant ordinaire arrive par `spawnNpc`, puis est incarne. Sans
+		 * position, `settlement + (2, 3)` comme la reference, deplace sur le premier sol libre.
+		 * `spawnNpc` ne tire ici aucun aleatoire : le flux du monde est intact sans flux joueur.
+		 * Rend l'identifiant, vide sans monde ou sans sol libre.
+		 */
+		FString ArriveAsPlayer(double InX = -1.0, double InY = -1.0);
+
+		/**
+		 * `setPlayerMovementInput(dx, dy)` : direction de marche du corps incarne, normalisee ;
+		 * (0, 0) l'arrete. Transitoire, jamais sauvegardee. Faux sans joueur ou sans direction.
+		 */
+		bool SetPlayerMovementInput(double DX, double DY);
+		FPoint GetPlayerDrive() const { return PlayerDrive; }
+
+		/**
+		 * EXTENSION (TIME_WARP_001) : l'hote dit ce que le village a vu du joueur depuis le dernier
+		 * appel -- sa presence, et le temps simule ou il n'a rien fait. Sans joueur, rien.
+		 */
+		void ObservePlayer(double Presence, double IdleSecondsDelta);
+
+		/**
+		 * EXTENSION : un habitant voit-il `Other` a la distance D, pour une portee donnee ? Presence 1 :
+		 * exactement `D <= Range`, le test d'avant. Sinon `D <= Range x presence`, et rien sous
+		 * Standing::MinPresenceSeen.
+		 */
+		static bool Sees(const FNpc& Other, double D, double Range);
+		/** EXTENSION : ce que la reputation de `Other` ajoute a l'envie de lui parler ; 0 a la base. */
+		static double ReputationAffinity(const FNpc& Other);
+
+		/**
+		 * `updateReputationDaily`, appele a minuit : `reputation += (cible - reputation) x 0,4`,
+		 * cible = `base + merite`. Le seul merite porte est l'oisivete (EXTENSION) : un habitant
+		 * jamais oisif a pour cible 50 et y reste.
+		 */
+		void UpdateReputationDaily();
 
 		/**
 		 * `assignHomeToHousehold`, branche sans famille : la maison appartient a
@@ -1019,6 +1113,14 @@ namespace AnastasisVillage
 		void BeginHaulToDepot(FNpc& Npc);
 		bool Deliver(FNpc& Npc);
 		static void ClearWorkSession(FNpc& Npc);
+
+		/** L'habitant incarne : pensee sans Nous (but `idle`), marche directe. */
+		void UpdatePlayer(FNpc& Npc, double Dt);
+		/** `drivePlayerActor` : un pas dans la direction humaine, memes collisions que MoveActor. */
+		void DrivePlayer(FNpc& Npc, double Dt);
+
+		FString PlayerPersonId;
+		FPoint PlayerDrive;
 
 		const AnastasisWorld::FWorld* World = nullptr;
 		/** Tuiles touchees par la recolte : index -> etat vivant. Ecrit seulement par TakeFromTile / DepleteTile. */

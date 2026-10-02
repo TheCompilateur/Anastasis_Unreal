@@ -8,6 +8,8 @@
 #include "Village/AnastasisVillagePresentation.h"
 #include "AnastasisSimulationSubsystem.generated.h"
 
+class APawn;
+
 /**
  * Pompe Unreal du tick de simulation. Possede FAnastasisSimulation.
  * Tick seulement dans les mondes game/PIE — pas l'editeur.
@@ -103,8 +105,30 @@ public:
 	/** Vrai si la derniere frame acceleree a ete coupee par anastasis.Sim.WarpBudgetMs. */
 	bool WasWarpBudgetCut() const { return bWarpBudgetCut; }
 
+	/**
+	 * player-minimal-001 -- direction de marche imposee par une commande (agents, preuves), en axes de
+	 * la simulation. Tant qu'elle tient, l'entree du pawn est ignoree ; (0, 0) la rend au pawn.
+	 */
+	void SetScriptedDrive(double DX, double DY);
+
+	/** Le pawn local suit-il l'habitant incarne (anastasis.Player.Pawn) ? */
+	bool IsPawnBound() const { return BoundPawn.IsValid(); }
+
 private:
 	void DrawOverlay() const;
+	/** Ligne JOUEUR de l'overlay : habitant incarne, presence, reputation, jours oisifs. */
+	void DrawPlayerOverlay() const;
+	/** Avant les pas : la direction du pawn (ou la commande) devient celle du corps incarne. */
+	void ApplyPlayerInput();
+	/**
+	 * Le temoin TIME_WARP_001 regarde l'habitant incarne, et lui seul : sans joueur il ne compte rien.
+	 * Il repart des valeurs de la personne quand on en change, et les lui reecrit apres chaque pas.
+	 */
+	void ObservePlayerTime(double SimSeconds, double Multiplier);
+	/** Apres la presentation : pawn pose sur le corps incarne, sa carte cachee (on ne se voit pas). */
+	void PlacePlayerPawn();
+	/** Le pawn retrouve sa marche Unreal. */
+	void UnbindPawn();
 	void LogDayIfChanged();
 	/**
 	 * Un scenario explicite (FirstWell, FirstHouse, FirstGranary, FirstFarmer, FoodSupply) REMPLACE le
@@ -130,6 +154,12 @@ private:
 	AnastasisTimeWarp::FWitness Witness;
 	double EffectiveRate = 0.0;
 	bool bWarpBudgetCut = false;
+
+	/** player-minimal-001. La personne que le temoin regarde ; vide sans joueur. */
+	FString WitnessPersonId;
+	TWeakObjectPtr<APawn> BoundPawn;
+	bool bScriptedDrive = false;
+	FVector2D ScriptedDrive = FVector2D::ZeroVector;
 };
 
 /**
@@ -205,4 +235,12 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetTimeWarpStatus(const UObject* WorldContextObject);
+
+	/**
+	 * player-minimal-001, en JSON : habitant incarne (vide en observateur), position, but, activite,
+	 * presence, reputation, jours oisifs, pawn lie, et combien d'habitants le voient a leur portee de
+	 * compagnon. `{}` sans hote.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetPlayerStatus(const UObject* WorldContextObject);
 };

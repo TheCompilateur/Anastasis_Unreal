@@ -90,17 +90,17 @@ Repères (tests `Anastasis.Sim.TimeWarp.Witness`) :
 | joue deux jours à ×2 | — | 1 |
 | ×64 pendant trois jours | moins visible qu'à ×4 sur la même durée | — |
 
-L'overlay PIE affiche `TEMPS ×N  1 jour = …  présence …%  oisif … j`, en orange sous 50 %.
+L'overlay PIE affiche `TEMPS ×N  1 jour = …` ; la ligne `JOUEUR` dit la présence, la réputation et
+les jours oisifs de l'habitant incarné.
+
+**Branché depuis PLAYER_MINIMAL_001** (`docs/unreal/PLAYER_MINIMAL_001.md`) : le témoin regarde
+l'habitant incarné, et lui seul — sans joueur il ne compte rien. Sa présence et ses secondes oisives
+sont écrites sur la personne ; les habitants le voient jusqu'à présence × leur portée, et ses jours
+oisifs font baisser sa réputation à chaque minuit.
 
 ## STOP — ce qui n'est pas fait, et pourquoi
 
-- **Aucun habitant ne lit encore le témoin.** `PLAYER` est NOT_IMPLEMENTED (`AGENTS.md`, pas de
-  mandat pour le commencer) : il n'y a pas de joueur dans la simulation à voir ou à ignorer. La
-  réputation de la référence (`src/life/standing.js`, `src/ai/socialCognition.js`) n'est pas portée.
-  Le témoin est le **contrat** que liront le joueur et la réputation : `Presence` pour la perception
-  (un habitant ne salue pas, ne répond pas, ne compte pas sur un joueur à 5 %), `IdleSeconds` pour
-  la perte de réputation.
-- Le témoin vit dans l'hôte, pas dans la sauvegarde : il repart de 1 à chaque PIE.
+- Le témoin vit dans l'hôte ; la présence et l'oisiveté sont sur la personne, pas dans une sauvegarde.
 - Les constantes (2 jours, 1 jour) sont un premier réglage, à rejouer quand un habitant s'en servira.
 - Les scripts de preuve existants (`*-pie.py`) ne sont pas convertis à `Advance` : chacun le sera
   dans sa propre mission, preuve refaite.

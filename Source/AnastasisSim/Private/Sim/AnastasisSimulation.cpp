@@ -121,6 +121,9 @@ void FAnastasisSimulation::OnNewDay(bool bDefer)
 	// que `assignSheltersDaily` (les sans-toit recoivent un lit). Achats de maison,
 	// agrandissements, loyers : economie, non portee.
 	Village.AssignSheltersDaily();
+	// `updateReputationDaily` (player-minimal-001) : seule l'oisivete y est portee ; un habitant
+	// jamais oisif reste a 50, au bit pres.
+	Village.UpdateReputationDaily();
 	// `enqueueDayDeferred` : les 17 travaux, ajoutes derriere un eventuel reliquat.
 	// Portes : `landRegen` (regen du sol) et `memory` (oubli). Collectif, ordres, doctrine,
 	// chapitres, chartes, sites, transports, routes, guets, vie, carrieres, fondateurs,
