@@ -22,19 +22,16 @@ double HorizonSmoothStep(double Edge0, double Edge1, double X)
  *    carte elle-meme (point haut 57 m), pour que le raccord ne change pas d'echelle. Elles
  *    s'aplatissent au-dela de 1.2 km : les anneaux y sont trop espaces pour les porter
  *    (une colline de 500 m echantillonnee tous les 300 m devient du bruit de facettes) ;
- *  - chaine lointaine : montee entre RangeStart et RangeFull, 100 a 300 m, crete de bruit
- *    "ridged". Son minimum est ce qui ferme l'horizon ; le test Horizon.Closed le mesure
- *    depuis le point le plus haut de la carte.
+ *
+ * CONTINENTAL_001 : la chaine lointaine (100 a 300 m, un bruit de crete) est remplacee par
+ * AnastasisTectonics, qui s'ajoute a ces collines : plis, failles, deux chaines de 2 a 4 km.
+ * Le minimum de cet ensemble est ce qui ferme l'horizon ; le test Horizon.Closed le mesure
+ * depuis le point le plus haut de la carte.
  */
-double FarAltitude(double TileX, double TileY, double DistTiles, uint32 Seed)
+double FarHills(double TileX, double TileY, double DistTiles, uint32 Seed)
 {
 	const double N1 = AnastasisWorldNoise::Fbm(TileX / 26.0, TileY / 26.0, static_cast<double>(Seed) + 1301.0);
-	const double N2 = AnastasisWorldNoise::Fbm(TileX / 85.0, TileY / 85.0, static_cast<double>(Seed) + 1777.0);
-	const double Hills = 0.15 + 1.1 * N1 * N1 * (1.0 - 0.7 * HorizonSmoothStep(60.0, 160.0, DistTiles));
-	const double Ridge = 1.0 - FMath::Abs(2.0 * N2 - 1.0);
-	const double Range = HorizonSmoothStep(AnastasisTerrainHorizon::RangeStartTiles, AnastasisTerrainHorizon::RangeFullTiles, DistTiles)
-		* (2.0 + 4.0 * Ridge * Ridge);
-	return Hills + Range;
+	return 0.15 + 1.1 * N1 * N1 * (1.0 - 0.7 * HorizonSmoothStep(60.0, 160.0, DistTiles));
 }
 
 /** Une teinte de sol avec ses canaux morphologiques, tels que le materiau de sol les lit. */
@@ -232,11 +229,13 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 	TArray<double>& D = Out.Distances;
 	D.Add(0.0);
 	const double Outer = OuterTiles * TileStep;
+	// Plafond angulaire (CONTINENTAL_001) : le pas radial suit la distance au centre de la carte.
+	const double StepHalfSize = FMath::Min(SX, SY);
 	double Step = FineStep;
 	while (D.Last() < Outer)
 	{
 		D.Add(FMath::Min(D.Last() + Step, Outer));
-		Step *= RingGrowth;
+		Step = FMath::Min(Step * RingGrowth, FMath::Max(FarAngularStep * (StepHalfSize + D.Last()), FineStep));
 	}
 	D.Add(Outer * 8.0);
 	const int32 Rings = D.Num();
@@ -324,6 +323,24 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 	UVMean.Init(EdgeUV);
 	Out.EdgeWater = static_cast<int32>(WetMean.Sum[P] + 0.5);
 
+	// CONTINENTAL_001 : l'eau sort de la carte du cote bas du continent. Somme des normales
+	// sortantes des colonnes mouillees du bord = sens des basses terres ; la tectonique range
+	// ses chaines a l'oppose, pour qu'une riviere ne remonte jamais vers une montagne.
+	FVector2D Outlet = FVector2D::ZeroVector;
+	for (int32 I = 0; I < P; ++I)
+	{
+		if (!EdgeWet[I])
+		{
+			continue;
+		}
+		const FVector& E = Src.Vertices[Edge[I]];
+		Outlet += FVector2D(E.X <= MinX ? -1.0 : (E.X >= MaxX ? 1.0 : 0.0), E.Y <= MinY ? -1.0 : (E.Y >= MaxY ? 1.0 : 0.0));
+	}
+	Out.Tectonics = AnastasisTectonics::MakeFrame(Outlet, Seed);
+	// Metres et kilometres de AnastasisTectonics sont a l'echelle de reference 5 : RefK les ramene
+	// a l'echelle de la carte (anastasis.WorldView.Scale), angles conserves.
+	const double RefK = AnastasisTectonics::ReferenceScale / Forge.SpatialScale;
+
 	// Nappe et lit de la rivière prolongee, par colonne : moyenne des sommets d'eau du bord
 	// dans la fenetre. Le lit reste au moins 3 m (a l'echelle 5) sous la nappe, pour que
 	// l'eau reste visible jusqu'a ce que le lit remonte. Sans eau dans la fenetre : la mer.
@@ -384,7 +401,6 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 		const int32 Stride = 1 << Out.RingLevel[K];
 		const int32 Columns = P / Stride;
 		const double Blend = HorizonSmoothStep(0.0, BlendTiles * TileStep, Dist);
-		const double Range = HorizonSmoothStep(RangeStartTiles, RangeFullTiles, Dist / TileStep);
 		// Fenetre proportionnelle a la distance au bord, pas au rang de l'anneau : une
 		// colonne de plus tous les SmoothFineStepsPerColumn pas fins. Pres du bord c'est
 		// une extrusion pure (meme pente que la derniere rangee forgee), puis le profil
@@ -416,7 +432,10 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 				const bool bSkirt = K == Rings - 1;
 				const double NDist = bSkirt ? D[K - 1] : Dist;
 				const FVector2D NoiseAt = bSkirt ? Place(E, NDist) : At;
-				const double Far = SeaZ + AltStep * FarAltitude(NoiseAt.X / TileStep - 0.5, NoiseAt.Y / TileStep - 0.5, NDist / TileStep, Seed);
+				const double TectM = AnastasisTectonics::HeightM(Out.Tectonics,
+					(NoiseAt.X - CX) / 100000.0 * RefK, (NoiseAt.Y - CY) / 100000.0 * RefK);
+				const double Far = SeaZ + AltStep * FarHills(NoiseAt.X / TileStep - 0.5, NoiseAt.Y / TileStep - 0.5, NDist / TileStep, Seed)
+					+ TectM * 100.0 / RefK;
 				const double Base = ZMean.Mean(I, R);
 				const double River = WetMean.Mean(I, R)
 					* (1.0 - HorizonSmoothStep(RiverStartTiles, RiverEndTiles, NDist / TileStep));
@@ -433,10 +452,9 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 				const double Mosaic = HorizonSmoothStep(0.38, 0.62, AnastasisWorldNoise::Fbm(
 					NoiseAt.X / TileStep / 45.0, NoiseAt.Y / TileStep / 45.0, static_cast<double>(Seed) + 2203.0));
 				const FHorizonPaletteEntry Ground = FHorizonPaletteEntry::Lerp(Lush, Dry, Mosaic);
-				const FVector2D FarUV0(FMath::Clamp(Ground.UV0.X + 0.45 * Range, 0.0, 1.0), Ground.UV0.Y * (1.0 - Range));
 				G.Colors[V] = FMath::Lerp(FLinearColor(EC.X, EC.Y, EC.Z, 0.f), Ground.Color, static_cast<float>(Blend));
 				G.Colors[V].A = 0.f;
-				G.UV0[V] = FMath::Lerp(FVector2D(EU.X, EU.Y), FarUV0, Blend);
+				G.UV0[V] = FMath::Lerp(FVector2D(EU.X, EU.Y), Ground.UV0, Blend);
 				// Worked (champs) n'a pas de sens hors de la carte : il tombe a zero ; l'humidite
 				// suit la palette.
 				G.UV1[V] = FMath::Lerp(FVector2D(EU.Z, EU.W), FVector2D(0.0, Ground.UV1.Y), Blend);
@@ -449,8 +467,14 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 	// Meme sens de face que la forge (horaire vu de dessus, dans le plan XY) : le pourtour
 	// tourne dans le sens direct et l'exterieur est a droite de la marche. Premier sommet
 	// de chaque triangle toujours sur l'anneau interieur : c'est ce qui date un triangle.
+	bool bFarMarked = false;
 	for (int32 K = 0; K < Rings - 1; ++K)
 	{
+		if (!bFarMarked && D[K] >= FarMaterialKm * 1.0e5 / RefK)
+		{
+			Out.FarTriangleStart = G.Triangles.Num() / 3;
+			bFarMarked = true;
+		}
 		const int32 In = Out.RingStart[K], Ou = Out.RingStart[K + 1];
 		const int32 CIn = P >> Out.RingLevel[K], COu = P >> Out.RingLevel[K + 1];
 		if (COu == CIn)
@@ -473,6 +497,107 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 		}
 	}
 
+	// Anneau de chaque sommet, une fois (RingOf est lineaire en nombre d'anneaux).
+	TArray<int32> VRing;
+	VRing.SetNumUninitialized(N);
+	for (int32 K = 0; K < Rings; ++K)
+	{
+		const int32 Count = P >> Out.RingLevel[K];
+		for (int32 C = 0; C < Count; ++C)
+		{
+			VRing[Out.RingStart[K] + C] = K;
+		}
+	}
+
+	// CONTINENTAL_001 : talus. Relaxation par TRIANGLE : un triangle dont le plan est plus raide que
+	// la pente limite voit ses trois hauteurs ramenees vers leur moyenne -- le gradient est lineaire
+	// en z, la pente est donc multipliee exactement par le facteur applique. (Une relaxation par
+	// arete ne suffit pas : une lame fine dont les trois aretes sont presque paralleles peut etre tres
+	// raide en travers sans qu'aucune de ses aretes le soit.) Passes de Jacobi : le resultat ne depend
+	// pas de l'ordre des triangles. Seuls les anneaux au-dela de la fin de la riviere sortante bougent ;
+	// l'anneau 0 (le raccord) et la riviere sont intacts.
+	{
+		const double FreezeDist = RiverEndTiles * TileStep;
+		const double KmToUU = 1.0e5 / RefK;
+		const double NearCap = FMath::Tan(FMath::DegreesToRadians(TalusNearDeg));
+		const double FarCap = FMath::Tan(FMath::DegreesToRadians(TalusFarDeg));
+		const int32 NumTriangles = G.Triangles.Num() / 3;
+		struct FTalusTriangle
+		{
+			int32 A, B, C;
+			double ABx, ABy, ACx, ACy, Nz, Cap;
+		};
+		TArray<FTalusTriangle> Work;
+		Work.Reserve(NumTriangles);
+		TArray<double> Z, Delta;
+		Z.SetNumUninitialized(N);
+		for (int32 V = 0; V < N; ++V)
+		{
+			Z[V] = G.Vertices[V].Z;
+		}
+		for (int32 T = 0; T < G.Triangles.Num(); T += 3)
+		{
+			const int32 A = G.Triangles[T], B = G.Triangles[T + 1], C = G.Triangles[T + 2];
+			if (D[VRing[A]] < FreezeDist && D[VRing[B]] < FreezeDist && D[VRing[C]] < FreezeDist)
+			{
+				continue;
+			}
+			FTalusTriangle W;
+			W.A = A;
+			W.B = B;
+			W.C = C;
+			W.ABx = G.Vertices[B].X - G.Vertices[A].X;
+			W.ABy = G.Vertices[B].Y - G.Vertices[A].Y;
+			W.ACx = G.Vertices[C].X - G.Vertices[A].X;
+			W.ACy = G.Vertices[C].Y - G.Vertices[A].Y;
+			W.Nz = FMath::Abs(W.ABx * W.ACy - W.ABy * W.ACx);
+			const double Reach = (D[VRing[A]] + D[VRing[B]] + D[VRing[C]]) / 3.0;
+			W.Cap = FMath::Lerp(NearCap, FarCap, HorizonSmoothStep(TalusNearKm * KmToUU, TalusFarKm * KmToUU, Reach));
+			if (W.Nz > 1.e-9)
+			{
+				Work.Add(W);
+			}
+		}
+		Delta.SetNumUninitialized(N);
+		for (int32 Pass = 0; Pass < RelaxIterations; ++Pass)
+		{
+			FMemory::Memzero(Delta.GetData(), sizeof(double) * N);
+			for (const FTalusTriangle& W : Work)
+			{
+				const double ABz = Z[W.B] - Z[W.A], ACz = Z[W.C] - Z[W.A];
+				const double Nx = W.ABy * ACz - ABz * W.ACy;
+				const double Ny = ABz * W.ACx - W.ABx * ACz;
+				const double Tan = FMath::Sqrt(Nx * Nx + Ny * Ny) / W.Nz;
+				if (Tan <= W.Cap)
+				{
+					continue;
+				}
+				// 0,12 par triangle et par passe : un sommet touche ~6 triangles, la somme reste < 1.
+				const double Pull = 0.12 * (1.0 - W.Cap / Tan);
+				const double Mean = (Z[W.A] + Z[W.B] + Z[W.C]) / 3.0;
+				for (const int32 V : {W.A, W.B, W.C})
+				{
+					if (D[VRing[V]] >= FreezeDist)
+					{
+						Delta[V] += Pull * (Mean - Z[V]);
+					}
+				}
+			}
+			for (int32 V = 0; V < N; ++V)
+			{
+				Z[V] += Delta[V];
+			}
+		}
+		MinZ = TNumericLimits<double>::Max();
+		MaxZ = TNumericLimits<double>::Lowest();
+		for (int32 V = 0; V < N; ++V)
+		{
+			G.Vertices[V].Z = Z[V];
+			MinZ = FMath::Min(MinZ, Z[V]);
+			MaxZ = FMath::Max(MaxZ, Z[V]);
+		}
+	}
+
 	// Normales : meme formule que la forge. L'anneau 0 reprend ensuite celles du bord forge,
 	// sinon l'eclairage sauterait a la couture meme avec des positions identiques.
 	G.Normals.Init(FVector::ZeroVector, N);
@@ -491,6 +616,59 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 	for (int32 I = 0; I < P; ++I)
 	{
 		G.Normals[I] = Src.Normals[Edge[I]];
+	}
+
+	// CONTINENTAL_001 : la surface des montagnes. Foret d'altitude, alpage, roche, neige --
+	// lues de l'altitude et de la pente RENDUE du sommet (la normale du maillage), pas inventees.
+	// Meme contrat que le sol de la carte : la teinte est dans la couleur du sommet, la famille
+	// de materiau (roche, litiere) dans UV0 ; l'herbe reste le reste. Les poids fondent avec le
+	// raccord (Blend) : le bord de la carte garde ses teintes.
+	{
+		const FLinearColor ForestTint(Lush.Color.R * 0.52f, Lush.Color.G * 0.58f, Lush.Color.B * 0.50f, 0.f);
+		const FLinearColor AlpineTint = FMath::Lerp(Dry.Color, FLinearColor(0.165f, 0.150f, 0.105f, 0.f), 0.45f);
+		const FLinearColor RockTint(0.205f, 0.190f, 0.175f, 0.f);
+		const FLinearColor SnowTint(0.520f, 0.540f, 0.580f, 0.f);
+		double MaxHeightM = 0.0;
+		for (int32 V = P; V < N; ++V)
+		{
+			const FVector& X = G.Vertices[V];
+			const double HeightM = (X.Z - SeaZ) / 100.0 * RefK;
+			MaxHeightM = FMath::Max(MaxHeightM, HeightM);
+			const double Blend = HorizonSmoothStep(0.0, BlendTiles * TileStep, D[VRing[V]]);
+			if (Blend <= 0.0)
+			{
+				continue;
+			}
+			const double SlopeDeg = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(static_cast<double>(G.Normals[V].Z), -1.0, 1.0)));
+			AnastasisTectonics::FSurface S = AnastasisTectonics::SurfaceAt(Out.Tectonics,
+				(X.X - CX) / 100000.0 * RefK, (X.Y - CY) / 100000.0 * RefK, HeightM, SlopeDeg);
+			S.Forest *= Blend;
+			S.Alpine *= Blend;
+			S.Rock *= Blend;
+			S.Snow *= Blend;
+			FLinearColor C = G.Colors[V];
+			C = FMath::Lerp(C, ForestTint, static_cast<float>(S.Forest));
+			C = FMath::Lerp(C, AlpineTint, static_cast<float>(S.Alpine));
+			C = FMath::Lerp(C, RockTint, static_cast<float>(S.Rock));
+			C = FMath::Lerp(C, SnowTint, static_cast<float>(S.Snow));
+			// Variation de valeur, la ou une famille de montagne s'applique (la vallee garde sa palette).
+			const double Mountain = FMath::Max(FMath::Max(S.Forest, S.Alpine), FMath::Max(S.Rock, S.Snow));
+			const float Tone = static_cast<float>(FMath::Lerp(1.0, S.Tone, Mountain));
+			C.R *= Tone;
+			C.G *= Tone;
+			C.B *= Tone;
+			C.A = 0.f;
+			G.Colors[V] = C;
+			const double Rock = FMath::Clamp(G.UV0[V].X + (1.0 - G.UV0[V].X) * S.Rock, 0.0, 1.0);
+			const double Litter = FMath::Clamp(FMath::Min(G.UV0[V].Y + 0.5 * S.Forest, 1.0 - Rock), 0.0, 1.0);
+			// Sous la neige, ni roche ni litiere : le materiau lit de l'herbe lissee, que la
+			// teinte blanche recouvre.
+			G.UV0[V] = FVector2D(Rock * (1.0 - S.Snow), Litter * (1.0 - S.Snow));
+			Out.SnowVertices += S.Snow > 0.5 ? 1 : 0;
+			Out.RockVertices += S.Rock > 0.5 ? 1 : 0;
+			Out.ForestVertices += S.Forest > 0.5 ? 1 : 0;
+		}
+		Out.MaxHeightM = MaxHeightM;
 	}
 
 	// Nappe d'eau : meme regle que Human_Geography_V2 (d'eau des qu'un sommet passe sous sa

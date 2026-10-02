@@ -6,6 +6,8 @@ Lance par capture-horizon.ps1, une fois par etat. Variables d'environnement :
   ANASTASIS_HORIZON_TAG   suffixe des images (A, B...)
   ANASTASIS_HORIZON_PRE   commandes console en plus, separees par ';' (etape brume)
   ANASTASIS_HORIZON_ATMOSPHERE  1 = appliquer le profil d'atmosphere comme en PIE
+  ANASTASIS_HORIZON_MODE  standard (les cinq vues ci-dessous) ou skyline (CONTINENTAL_001 : huit vues
+                          a hauteur d'oeil depuis le bassin, tous les 45 degres, S000..S315)
 
 Cinq cameras, calees sur la carte REELLE (bornes du composant ExperimentalTerrain, pas
 de l'acteur, que l'anneau agrandit) et sur le bassin / le point haut de la forge :
@@ -58,6 +60,18 @@ if os.environ.get('ANASTASIS_HORIZON_ATMOSPHERE', '0') == '1':
     applied = atmo.call_method('Apply')
     pockets = atmo.call_method('ApplyMist')
     unreal.log('HORIZON_ATMOSPHERE applied=%s mist_pockets=%s' % (applied, pockets))
+# ANASTASIS_HORIZON_ATMO_PROPS : diagnostic, `sky.<propriete>=<valeur>;fog.<propriete>=<valeur>` appliques apres Apply().
+# Sert a attribuer la blancheur des montagnes lointaines (perspective aerienne ou brouillard exponentiel) ; rien n'est sauve.
+for item in [x.strip() for x in os.environ.get('ANASTASIS_HORIZON_ATMO_PROPS', '').split(';') if x.strip()]:
+    target, _, assign = item.partition('.')
+    prop, _, value = assign.partition('=')
+    if target == 'sky':
+        for sky in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SkyAtmosphere):
+            sky.get_component_by_class(unreal.SkyAtmosphereComponent).set_editor_property(prop, float(value))
+    elif target == 'fog':
+        for fog in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.ExponentialHeightFog):
+            fog.get_component_by_class(unreal.ExponentialHeightFogComponent).set_editor_property(prop, float(value))
+    unreal.log('HORIZON_ATMO_PROP %s' % item)
 for fog in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.ExponentialHeightFog):
     fc = fog.get_component_by_class(unreal.ExponentialHeightFogComponent)
     unreal.log('HORIZON_FOG %s z=%.0f density=%.4f falloff=%.3f start=%.0f max_opacity=%.2f volumetric=%s' % (
@@ -116,11 +130,17 @@ far = unreal.Vector(x1 if basin.x < cx else x0, y1 if basin.y < cy else y0, basi
 e5 = unreal.Vector(basin.x, basin.y, basin.z + 15000.0)
 views.append(('H5_altitude_vers_le_coin', e5, level(look(e5, far).yaw, -4.0)))
 
+if os.environ.get('ANASTASIS_HORIZON_MODE', 'standard') == 'skyline':
+    # La ligne de crete du continent, dans toutes les directions, a 1,7 m du sol du bassin.
+    eye = unreal.Vector(basin.x, basin.y, ground(basin.x, basin.y) + 170.0)
+    views = [('S%03d' % a, eye, level(float(a), 3.0)) for a in range(0, 360, 45)]
+
 for n, l, r in views:
     unreal.log('HORIZON_VIEW %s loc=(%.0f,%.0f,%.0f) pitch=%.1f yaw=%.1f' % (n, l.x, l.y, l.z, r.pitch, r.yaw))
 
 queue = list(views)
 phase, mark, shot, first = 'aim', time.monotonic(), None, True
+gpu = []  # GPU ms de stat unit (GetFrameTimingsMs), echantillonne pendant l'attente de la vue
 
 
 def finish(msg, error=False):
@@ -134,11 +154,16 @@ def finish(msg, error=False):
 
 
 def tick(_dt):
-    global phase, mark, shot, first
+    global phase, mark, shot, first, gpu
     if phase == 'done':
         return
     redraw()
     elapsed = time.monotonic() - mark
+    if phase == 'aim' and elapsed > 2.5:
+        try:
+            gpu.append(actor.call_method('GetFrameTimingsMs').z)
+        except Exception:
+            pass
     if phase == 'aim':
         if not queue:
             finish('HORIZON_COMPLETE')
@@ -157,7 +182,10 @@ def tick(_dt):
                 finish('HORIZON_SHOT_MISSING %s' % shot, True)
             return
         if elapsed > 1.5:
-            unreal.log('HORIZON_SHOT_OK %s bytes=%d' % (os.path.basename(shot), os.path.getsize(shot)))
+            g = sorted(gpu)
+            unreal.log('HORIZON_SHOT_OK %s bytes=%d gpu_ms_p50=%.2f' % (os.path.basename(shot), os.path.getsize(shot),
+                                                                       g[len(g) // 2] if g else -1.0))
+            gpu = []
             queue.pop(0)
             first, phase, mark = False, 'aim', time.monotonic()
 

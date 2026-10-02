@@ -1,5 +1,6 @@
 #pragma once
 
+#include "WorldView/AnastasisTectonics.h"
 #include "WorldView/AnastasisTerrainForge.h"
 
 /**
@@ -21,15 +22,42 @@
  */
 namespace AnastasisTerrainHorizon
 {
-/** Anneaux bornes a ce nombre de tuiles au-dela du bord (20 km a l'echelle 5). */
-inline constexpr double OuterTiles = 1000.0;
+/**
+ * Anneaux bornes a ce nombre de tuiles au-dela du bord (60 km a l'echelle 5).
+ * CONTINENTAL_001 : 20 km fermaient l'horizon sur un plateau ; 60 km portent la seconde
+ * chaine (AnastasisTectonics) derriere la premiere.
+ */
+inline constexpr double OuterTiles = 3000.0;
 /** Raison de la suite geometrique des anneaux : le premier a le pas fin de la forge. */
 inline constexpr double RingGrowth = 1.15;
+/**
+ * CONTINENTAL_001 : le pas radial ne depasse jamais cette fraction de la distance au centre de
+ * la carte, soit une resolution ANGULAIRE constante (0,86 degre vu du centre). Sans ce plafond
+ * les anneaux lointains avaient des cellules de 1,5 x 3 km a 10 km : une montagne n'y pouvait
+ * pas etre autre chose qu'un plateau.
+ */
+inline constexpr double FarAngularStep = 0.015;
+/**
+ * CONTINENTAL_001 : talus d'eboulis. Le relief de AnastasisTectonics est une fonction ; le
+ * maillage qui le porte ne peut pas avoir de falaise de 75 degres entre deux sommets de 150 m. Apres
+ * la pose des hauteurs, des passes de relaxation (erosion thermique par triangle) ramenent chaque triangle a la pente
+ * limite : TalusNearDeg jusqu'a TalusNearKm du bord de la carte, puis TalusFarDeg a partir de
+ * TalusFarKm (kilometres a l'echelle de reference 5). Les anneaux de la riviere sortante
+ * (RiverEndTiles) ne bougent pas : leur lit doit rester sous la nappe.
+ */
+inline constexpr double TalusNearDeg = 42.0;
+inline constexpr double TalusFarDeg = 58.0;
+inline constexpr double TalusNearKm = 4.0;
+inline constexpr double TalusFarKm = 8.0;
+inline constexpr int32 RelaxIterations = 96;
+/**
+ * Au-dela de cette distance du bord (km a l'echelle 5), la surface est celle de la montagne lointaine
+ * (M_AnastasisFarTerrain : la couleur de sommet EST l'albedo) et non celle du sol de la carte, dont le
+ * materiau applique ses propres couleurs de famille et ne laisse lire ni foret, ni roche, ni neige.
+ */
+inline constexpr double FarMaterialKm = 8.0;
 /** Distance (tuiles) sur laquelle le bord forge se fond dans le relief lointain. */
 inline constexpr double BlendTiles = 30.0;
-/** Montagnes lointaines : montee entre ces deux distances (tuiles). */
-inline constexpr double RangeStartTiles = 110.0;
-inline constexpr double RangeFullTiles = 380.0;
 /**
  * L'eau qui touche le bord (rivière sortante) continue dans l'anneau, puis son lit
  * remonte entre ces deux distances (tuiles) et elle s'achève en rive naturelle.
@@ -85,6 +113,16 @@ struct FRing
 	/** Prairie verte (moitie sombre) et prairie seche (moitie claire) des donneurs. */
 	FLinearColor LushColor = FLinearColor::Black;
 	FLinearColor DryColor = FLinearColor::Black;
+	/** CONTINENTAL_001 : cadre tectonique (sens de l'eau, graine) et ce qu'il a produit. */
+	AnastasisTectonics::FTectonicFrame Tectonics;
+	/** Altitude maximale de l'anneau au-dessus de la nappe, en metres a l'echelle de reference. */
+	double MaxHeightM = 0.0;
+	/** Sommets d'anneau classes neige / roche / foret d'altitude (poids > 0,5). */
+	int32 SnowVertices = 0;
+	int32 RockVertices = 0;
+	int32 ForestVertices = 0;
+	/** Premier triangle (indice dans Geometry.Triangles / 3) des anneaux au-dela de FarMaterialKm. */
+	int32 FarTriangleStart = 0;
 };
 
 /**

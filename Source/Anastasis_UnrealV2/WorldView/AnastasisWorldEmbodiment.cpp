@@ -185,6 +185,12 @@ static TAutoConsoleVariable<int32> CVarTerrainHorizon(
     TEXT("0=nothing beyond the map edge, 1=distant terrain ring around the forged world (default); applied on embodiment."),
     ECVF_Default);
 
+// CONTINENTAL_001 : la montagne lointaine a son propre materiau (la couleur de sommet est l'albedo).
+static TAutoConsoleVariable<int32> CVarHorizonFarMaterial(
+    TEXT("anastasis.Terrain.HorizonFarMaterial"), 1,
+    TEXT("0=tout l'anneau d'horizon rendu par le sol de la carte, 1=au-dela de 8 km, M_AnastasisFarTerrain (defaut); applique a l'incarnation."),
+    ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarWorldViewSeed(
 	TEXT("anastasis.WorldView.Seed"),
 	12345,
@@ -2090,15 +2096,32 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 AnastasisTerrainHorizon::FRing Ring;
                 // Geometry, pas ForgeMesh.Geometry : c'est elle qui porte les canaux de rive
                 // (FillShorelineChannels ci-dessus), que l'anneau 0 doit reprendre.
+                const double HorizonStart = FPlatformTime::Seconds();
                 if (AnastasisTerrainHorizon::Build(ForgeMesh, Crop.Seed, Ring, &Geometry))
                 {
+                    const double HorizonBuildMs = (FPlatformTime::Seconds() - HorizonStart) * 1000.0;
                     const auto& RG = Ring.Geometry;
-                    HorizonSurface->CreateMeshSection_LinearColor(0, RG.Vertices, RG.Triangles,
+                    // CONTINENTAL_001 : les anneaux proches gardent le sol de la carte (section 0) ; au-dela de
+                    // FarMaterialKm, la montagne a son materiau (section 2, memes sommets, aucune couture).
+                    UMaterialInterface* FarMaterial = CVarHorizonFarMaterial.GetValueOnGameThread() != 0
+                        ? LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Anastasis/Materials/M_AnastasisFarTerrain.M_AnastasisFarTerrain"))
+                        : nullptr;
+                    const int32 FarSplit = FarMaterial ? FMath::Clamp(Ring.FarTriangleStart * 3, 0, RG.Triangles.Num()) : RG.Triangles.Num();
+                    TArray<int32> NearTriangles(RG.Triangles.GetData(), FarSplit);
+                    HorizonSurface->CreateMeshSection_LinearColor(0, RG.Vertices, NearTriangles,
                         RG.Normals, RG.UV0, RG.UV1, TArray<FVector2D>{}, TArray<FVector2D>{},
                         RG.Colors, TArray<FProcMeshTangent>{}, false);
                     if (SurfaceMaterial)
                     {
                         HorizonSurface->SetMaterial(0, SurfaceMaterial);
+                    }
+                    if (FarMaterial && FarSplit < RG.Triangles.Num())
+                    {
+                        TArray<int32> FarTriangles(RG.Triangles.GetData() + FarSplit, RG.Triangles.Num() - FarSplit);
+                        HorizonSurface->CreateMeshSection_LinearColor(2, RG.Vertices, FarTriangles,
+                            RG.Normals, RG.UV0, RG.UV1, TArray<FVector2D>{}, TArray<FVector2D>{},
+                            RG.Colors, TArray<FProcMeshTangent>{}, false);
+                        HorizonSurface->SetMaterial(2, FarMaterial);
                     }
                     // Section 1 : la rivière qui sort de la carte, meme nappe et meme
                     // materiau que la section 1 de la carte, qu'elle prolonge.
@@ -2118,9 +2141,10 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                     }
                     HorizonSurface->SetVisibility(true);
                     UE_LOG(LogAnastasis_UnrealV2, Display,
-                        TEXT("ANASTASIS_TERRAIN_HORIZON enabled=1 perimeter=%d rings=%d vertices=%d triangles=%d water_triangles=%d edge_water=%d outer_m=%.0f skirt_m=%.0f z=[%.0f,%.0f]"),
+                        TEXT("ANASTASIS_TERRAIN_HORIZON enabled=1 perimeter=%d rings=%d vertices=%d triangles=%d water_triangles=%d edge_water=%d outer_m=%.0f skirt_m=%.0f z=[%.0f,%.0f] build_ms=%.0f tectonic_down=(%.2f,%.2f) max_height_m=%.0f snow=%d rock=%d forest=%d"),
                         Ring.Perimeter, Ring.Rings, RG.Vertices.Num(), RG.Triangles.Num() / 3, RG.WaterTriangles.Num() / 3,
-                        Ring.EdgeWater, Ring.Distances[Ring.Rings - 2] / 100.0, Ring.Distances.Last() / 100.0, Ring.MinZ, Ring.MaxZ);
+                        Ring.EdgeWater, Ring.Distances[Ring.Rings - 2] / 100.0, Ring.Distances.Last() / 100.0, Ring.MinZ, Ring.MaxZ,
+                        HorizonBuildMs, Ring.Tectonics.Down.X, Ring.Tectonics.Down.Y, Ring.MaxHeightM, Ring.SnowVertices, Ring.RockVertices, Ring.ForestVertices);
                 }
             }
             else

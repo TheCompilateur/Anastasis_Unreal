@@ -7,7 +7,12 @@
 #
 # -Atmosphere : applique le profil DA_AnastasisAtmosphere comme le GameMode en PIE (soleil,
 # ciel, brume, exposition, poches de brume) ; sans lui, l'image est l'eclairage du niveau.
-param([string]$Label='ring', [string]$PreCmds='', [ValidateSet('AB','B')][string]$States='AB', [switch]$Atmosphere, [int]$TimeoutSec=480)
+#
+# -AtmoProps 'sky.aerial_pespective_view_distance_scale=1;fog.fog_max_opacity=0.25' : diagnostic, regle ces
+# proprietes de l'atmosphere apres Apply() (rien n'est sauve) pour attribuer le voile des montagnes lointaines.
+# -Mode skyline (CONTINENTAL_001) : huit vues a hauteur d'oeil depuis le bassin, tous les 45 degres,
+# pour juger la ligne de crete du continent dans toutes les directions (sortie S<azimut>_<A|B>.png).
+param([string]$Label='ring', [string]$PreCmds='', [ValidateSet('AB','B')][string]$States='AB', [ValidateSet('standard','skyline')][string]$Mode='standard', [switch]$Atmosphere, [string]$AtmoProps='', [int]$TimeoutSec=480)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
@@ -26,6 +31,8 @@ foreach ($state in $plan) {
  $env:ANASTASIS_HORIZON_CVAR=$state[0]
  $env:ANASTASIS_HORIZON_TAG=$state[1]
  $env:ANASTASIS_HORIZON_PRE=$PreCmds
+ $env:ANASTASIS_HORIZON_MODE=$Mode
+ $env:ANASTASIS_HORIZON_ATMO_PROPS=$AtmoProps
  $env:ANASTASIS_HORIZON_ATMOSPHERE= if ($Atmosphere) { '1' } else { '0' }
  $launchArgs=@(
   ('"'+(Join-Path $Root 'Anastasis_UnrealV2.uproject')+'"'),
@@ -49,7 +56,9 @@ foreach ($state in $plan) {
 # les plus denses (sous-bois de H2) -- comparer A et B, pas lire une valeur seule.
 Add-Type -AssemblyName System.Drawing
 $missing=0
-foreach ($view in 'H1_bassin_vers_le_bord','H2_point_haut_vers_l_exterieur','H3_bord_regard_dehors','H4_vue_generale','H5_altitude_vers_le_coin') {
+$viewNames = @('H1_bassin_vers_le_bord','H2_point_haut_vers_l_exterieur','H3_bord_regard_dehors','H4_vue_generale','H5_altitude_vers_le_coin')
+if ($Mode -eq 'skyline') { $viewNames = @(0,45,90,135,180,225,270,315 | ForEach-Object { 'S{0:000}' -f $_ }) }
+foreach ($view in $viewNames) {
  foreach ($state in $plan) {
   $shot=Join-Path $dir "$($view)_$($state[1]).png"
   if(!(Test-Path $shot)){ Write-Output "CAPTURE::MISSING $($view)_$($state[1]).png"; $missing++; continue }

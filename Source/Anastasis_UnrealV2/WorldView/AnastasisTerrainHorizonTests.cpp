@@ -288,19 +288,37 @@ bool FAnastasisTerrainHorizonGentle::RunTest(const FString&)
 		}
 	}
 	const double SeamDist = AnastasisTerrainHorizon::SeamFineSteps * AnastasisWorldView::TileWorldSize * Forge.SpatialScale / Forge.Subdiv;
+	// CONTINENTAL_001 : le champ proche (4 km, la vallee et le pied des plis) garde la regle de 45 degres.
+	// Au-dela commencent les plis raides et les chaines : un front de montagne de 3 km de denivele sur
+	// 4 km de pied est a 37 degres en moyenne. Le talus (TalusFarDeg, relaxation du maillage) borne les
+	// triangles a 58 degres (relaxation par triangle) ; MountainMaxDeg ajoute la marge de convergence.
+	const double NearDist = AnastasisTerrainHorizon::TalusNearKm * 1.e5 * Forge.SpatialScale / AnastasisTectonics::ReferenceScale;
+	// Mesure : 65,0 (talus 58 + convergence incomplete des passes de Jacobi) ; 73,5 avec un talus par arete.
+	constexpr double MountainMaxDeg = 66.0;
 	TArray<double> Slopes;
-	int32 SteepBank = 0, SteepElsewhere = 0, SteepBeyond = 0;
-	double RingMaxDeg = 0.0;
+	int32 SteepBank = 0, SteepElsewhere = 0, SteepBeyond = 0, SteepMountain = 0;
+	double RingMaxDeg = 0.0, MountainMaxSeen = 0.0;
 	for (int32 T = 0; T < G.Triangles.Num(); T += 3)
 	{
 		const double Deg = SlopeDeg(G.Vertices[G.Triangles[T]], G.Vertices[G.Triangles[T + 1]], G.Vertices[G.Triangles[T + 2]]);
 		Slopes.Add(Deg);
-		RingMaxDeg = FMath::Max(RingMaxDeg, Deg);
+		const int32 K0 = Ring.RingOf(G.Triangles[T]);
+		const bool bNear = Ring.Distances[K0] <= NearDist;
+		if (bNear)
+		{
+			RingMaxDeg = FMath::Max(RingMaxDeg, Deg);
+		}
+		else
+		{
+			MountainMaxSeen = FMath::Max(MountainMaxSeen, Deg);
+			SteepMountain += Deg > 45.0 ? 1 : 0;
+			continue;
+		}
 		if (Deg <= 45.0)
 		{
 			continue;
 		}
-		const int32 K = Ring.RingOf(G.Triangles[T]), I = Ring.VertexColumn[G.Triangles[T]];
+		const int32 K = K0, I = Ring.VertexColumn[G.Triangles[T]];
 		const bool bSeam = Ring.Distances[K + 1] <= SeamDist + 1.e-6;
 		int32& Bucket = !bSeam ? SteepBeyond : (SteepEdge[I] ? SteepBank : SteepElsewhere);
 		++Bucket;
@@ -312,10 +330,12 @@ bool FAnastasisTerrainHorizonGentle::RunTest(const FString&)
 	}
 	Slopes.Sort();
 	const double P99 = Slopes[FMath::Min(Slopes.Num() - 1, static_cast<int32>(Slopes.Num() * 0.99))];
-	TestEqual(FString::Printf(TEXT("au-dela de %.0f m du raccord, aucun triangle au-dela de 45 degres"), SeamDist / 100.0), SteepBeyond, 0);
+	TestEqual(FString::Printf(TEXT("au-dela de %.0f m du raccord et jusqu'a 4 km, aucun triangle au-dela de 45 degres"), SeamDist / 100.0), SteepBeyond, 0);
 	TestEqual(TEXT("pres du raccord, raide seulement dans le prolongement d'une berge raide du bord"), SteepElsewhere, 0);
-	TestTrue(FString::Printf(TEXT("jamais plus raide que la forge au bord (%.1f vs %.1f deg)"), RingMaxDeg, ForgeRimMaxDeg),
+	TestTrue(FString::Printf(TEXT("champ proche : jamais plus raide que la forge au bord (%.1f vs %.1f deg)"), RingMaxDeg, ForgeRimMaxDeg),
 		RingMaxDeg <= ForgeRimMaxDeg + 0.5);
+	TestTrue(FString::Printf(TEXT("chaines : aucun triangle au-dela de %.0f degres (%.1f)"), MountainMaxDeg, MountainMaxSeen),
+		MountainMaxSeen <= MountainMaxDeg);
 	const int32 Steep45 = SteepBank + SteepElsewhere + SteepBeyond;
 
 	// Determinisme : meme graine, meme anneau.
@@ -323,8 +343,8 @@ bool FAnastasisTerrainHorizonGentle::RunTest(const FString&)
 	AnastasisTerrainHorizon::Build(Forge, 12345, Again);
 	TestTrue(TEXT("deterministe"), Again.Geometry.Vertices == G.Vertices);
 
-	AddInfo(FString::Printf(TEXT("HORIZON_GENTLE triangles=%d p99_deg=%.2f max_deg=%.2f steep45=%d bank=%d elsewhere=%d beyond=%d forge_rim_max_deg=%.1f"),
-		Slopes.Num(), P99, RingMaxDeg, Steep45, SteepBank, SteepElsewhere, SteepBeyond, ForgeRimMaxDeg));
+	AddInfo(FString::Printf(TEXT("HORIZON_GENTLE triangles=%d p99_deg=%.2f near_max_deg=%.2f mountain_max_deg=%.2f steep45=%d bank=%d elsewhere=%d beyond=%d mountain_steep45=%d forge_rim_max_deg=%.1f"),
+		Slopes.Num(), P99, RingMaxDeg, MountainMaxSeen, Steep45, SteepBank, SteepElsewhere, SteepBeyond, SteepMountain, ForgeRimMaxDeg));
 	return true;
 }
 
@@ -406,9 +426,18 @@ bool FAnastasisTerrainHorizonPalette::RunTest(const FString&)
 	constexpr float Eps = 1.e-4f;
 	int32 Far = 0, Outside = 0;
 	FLinearColor FarMean(0.f, 0.f, 0.f, 0.f);
+	const double SeaLevelZ = AnastasisTerrainSurface::WaterPlaneZ;
 	for (int32 V = Ring.Perimeter; V < G.Vertices.Num(); ++V)
 	{
 		if (Ring.Distances[Ring.RingOf(V)] < BlendDist)
+		{
+			continue;
+		}
+		// CONTINENTAL_001 : au-dessus du pied des montagnes la surface n'est plus la prairie de
+		// la carte mais foret, alpage, roche et neige (AnastasisTectonics::SurfaceAt, nulle sous
+		// TreeLineLowM). Cette regle ne concerne que la vallee.
+		const double HeightM = (G.Vertices[V].Z - SeaLevelZ) / 100.0 * AnastasisTectonics::ReferenceScale / Forge.SpatialScale;
+		if (HeightM >= AnastasisTectonics::TreeLineLowM - 50.0)
 		{
 			continue;
 		}

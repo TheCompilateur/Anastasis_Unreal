@@ -108,6 +108,17 @@ static TAutoConsoleVariable<int32> CVarEyePlane(
 	TEXT("EYE_PLANE_001. 1=at eye height the first 7 m stay outside the volumetric fog, then local colour (olive, pebble, wall) falls toward the air out to about 160 m. 0=the profile's own aerial scale, fog and extinction. Read on every Apply()."),
 	ECVF_Default);
 
+// CONTINENTAL_001. L'echelle de perspective aerienne du profil (3,0, x1,15 au niveau de l'oeil) a ete choisie quand
+// le monde faisait 1,9 km : une crete a 1,5 km ne recevait presque aucune diffusion. Il y a desormais des chaines a
+// 14 et 40 km (AnastasisTectonics), et cette echelle les noie dans un blanc de craie (captures
+// Saved/HorizonEvidence : echelle 3,45 = voile uniforme, 1,7 = encore pale, 1,0 = ombres, couloirs et roche lisibles ; le brouillard
+// exponentiel n'y est pour presque rien). Plafond : on ne depasse jamais cette valeur ; 0 = aucun plafond.
+static TAutoConsoleVariable<float> CVarAerialCap(
+	TEXT("anastasis.Atmosphere.AerialCap"),
+	1.2f,
+	TEXT("CONTINENTAL_001. Plafond de l'echelle de perspective aerienne (profil x EyePlane compris) : les chaines lointaines gardent leur contraste. 0=aucun plafond. Read on every Apply()."),
+	ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarFogScattering(
 	TEXT("anastasis.Atmosphere.FogScattering"),
 	0,
@@ -915,9 +926,13 @@ void AAnastasisWorldAtmosphere::ApplyEyePlane(const UAnastasisAtmosphereProfile&
 	}
 
 	const UExponentialHeightFogComponent* FogDefault = GetDefault<UExponentialHeightFogComponent>();
-	const float Aerial = bOn
+	float Aerial = bOn
 		? FMath::Min(EyePlaneAerialCap, Profile.SkyAerialPerspectiveDistanceScale * EyePlaneAerialGain)
 		: Profile.SkyAerialPerspectiveDistanceScale;
+	if (CVarAerialCap.GetValueOnGameThread() > 0.0f)
+	{
+		Aerial = FMath::Min(Aerial, CVarAerialCap.GetValueOnGameThread());
+	}
 	const float Start = bOn ? EyePlaneStartUU : Profile.FogStartDistance;
 	const float MaxOpacity = bOn ? EyePlaneMaxOpacity : Profile.FogMaxOpacity;
 	const float Cutoff = bOn ? EyePlaneCutoffUU : FogDefault->FogCutoffDistance;
