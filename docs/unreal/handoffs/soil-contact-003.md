@@ -12,6 +12,7 @@ Worktree C:/dev/ANASTASIS_WORKTREES/soil-contact-003, branche agent/soil-contact
 - Source/Anastasis_UnrealV2/WorldView/AnastasisWorldEmbodiment.cpp (include + Apply apres PlaceRiverbank uniquement)
 - tools/soil-crusade/capture.py
 - tools/soil-crusade/README.md
+- tools/unreal/proofs.txt (soil-contact-capture)
 - docs/unreal/handoffs/soil-contact-003.md
 
 ## COMMIT
@@ -26,17 +27,14 @@ REJECT si amas decoratif, vegetation masquant tout gain, ou raccord roche/sol pl
 
 ## MEC
 Premier BUILD::PASS (141.06s). Second BUILD::PASS (33.94s), test Support compile; execution non faite.
-PROOFS: (aucune)
+PROOFS: soil-contact-capture
 
 ## SCN
 UNKNOWN : pas encore de capture. Aucun KEEP artistique revendique.
-Creneau occupe par editeur interactif canonique PID42172 (reverifie avant arret).
-Ordre coordonne : anthropic-paths-002 puis soil-contact-003. Aucun editeur lance
-par cette mission, aucun processus tiers ferme. Pas de finish ni de main avance.
-Commande preparee apres liberation confirmee (MAIN.lock libre, MAX1) :
-$env:ANASTASIS_EDITOR_MAX='1'
-$env:ANASTASIS_SOIL_CONTACT='1'
-tools/soil-crusade/capture.ps1 -Label contact-v1
+Reprise : preuve enregistree pour execution groupee, pilote DEFAULT OFF.
+La capture active temporairement SoilContact puis restaure sa CVar et la visibilite.
+Commande integrateur : editor-batch.ps1 -Proofs soil-contact-capture
+Sorties Saved/SoilEvidence/contact-batch; aucune sauvegarde d'asset.
 15 images attendues : contact_walk00..02, contact_side, contact_context, etats
 soil_before/soil_after/soil_control. Trois poses fixes ne prouvent pas le deplacement PIE.
 
@@ -54,5 +52,7 @@ Pas une reconstruction geologique, pas un transport de sediments simule.
 Exclusions : assets M/MI Ground, Ecotone, Riverbank, atmosphere et travail concurrent intacts.
 
 ## STOP
-Ne pas integrer avant observation A/B et verdict. Ne pas generaliser sur toute la carte.
+Seul le candidat DEFAULT OFF peut etre assemble pour produire la preuve.
+Ne pas activer ni generaliser avant observation A/B et verdict artistique.
+COMPLETE prouve les images produites, pas leur qualite ni la fermeture saine de l editeur.
 Pas de nouveau systeme de geologie ni de nouveau mesh. Pas de gain FPS garanti.

@@ -50,6 +50,8 @@ NO_TEXTURE = ('on_notex', 'bare_notex')
 GROUND_MI = '/Game/Anastasis/Materials/MI_AnastasisGround'
 CONTACT = os.environ.get('ANASTASIS_SOIL_CONTACT') == '1'
 SOIL_PARAMETER = os.environ.get('ANASTASIS_SOIL_PARAMETER', 'SoilHistory')
+SOIL_BEFORE = float(os.environ.get('ANASTASIS_SOIL_BEFORE', '0'))
+SOIL_AFTER = float(os.environ.get('ANASTASIS_SOIL_AFTER', '1'))
 states = [x.strip() for x in os.environ.get('ANASTASIS_GROUND_STATES', 'on,off').split(',') if x.strip()]
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
 SEED = 12345
@@ -59,12 +61,20 @@ les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 handle = None
+contact_cvar_before = None
 
 
 def finish(msg, error=False):
     (unreal.log_error if error else unreal.log)(msg)
     if handle is not None:
         unreal.unregister_slate_post_tick_callback(handle)
+    if contact_cvar_before is not None:
+        unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.SoilContact %g' % contact_cvar_before)
+        for comp in globals().get('contact_components', []):
+            comp.set_visibility(bool(contact_cvar_before), True)
+            comp.set_hidden_in_game(not bool(contact_cvar_before), True)
+    if CONTACT and not error and msg.startswith('GROUND_CAPTURE_COMPLETE'):
+        unreal.log('SOIL_CONTACT_CAPTURE COMPLETE')
     unreal.SystemLibrary.quit_editor()
 
 
@@ -89,6 +99,7 @@ try:
     found = unreal.GameplayStatics.get_all_actors_of_class(world, cls)
     actor = found[0] if len(found) > 0 else eas.spawn_actor_from_class(cls, V(0, 0, 0), unreal.Rotator(0, 0, 0))
     if CONTACT:
+        contact_cvar_before = unreal.SystemLibrary.get_console_variable_float_value('anastasis.Dressing.SoilContact')
         cmd('anastasis.Dressing.SoilContact 1')
     actor.call_method('EmbodyCanonical', args=(SEED,))
 
@@ -108,12 +119,12 @@ try:
             return
         # Material-only A/B: retain the same geometry and MIDs across all soil states.
         if state.startswith('soil_') and soil_mids:
-            value = 1.0 if state == 'soil_after' else 0.0
+            value = SOIL_AFTER if state == 'soil_after' else SOIL_BEFORE
             for mid in soil_mids:
                 mid.set_scalar_parameter_value(SOIL_PARAMETER, value)
                 get = getattr(mid, 'k2_get_scalar_parameter_value', None) or mid.get_scalar_parameter_value
                 if abs(get(SOIL_PARAMETER) - value) > 1e-4:
-                    raise RuntimeError('SoilHistory readback failed')
+                    raise RuntimeError(SOIL_PARAMETER + ' readback failed')
             unreal.log('SOIL_STATE state=%s sections=%d geometry_unchanged=1' % (state, len(soil_mids)))
             return
         # Apres CHAQUE incarnation : EmbodyCanonical repose le materiau de l'asset.
@@ -128,12 +139,12 @@ try:
                     continue
                 mid = comp.create_dynamic_material_instance(i, m)
                 if state.startswith('soil_'):
-                    value = 1.0 if state == 'soil_after' else 0.0
+                    value = SOIL_AFTER if state == 'soil_after' else SOIL_BEFORE
                     mid.set_scalar_parameter_value(SOIL_PARAMETER, value)
                     soil_mids.append(mid)
                     get = getattr(mid, 'k2_get_scalar_parameter_value', None) or mid.get_scalar_parameter_value
                     if abs(get(SOIL_PARAMETER) - value) > 1e-4:
-                        raise RuntimeError('SoilHistory parameter missing')
+                        raise RuntimeError(SOIL_PARAMETER + ' parameter readback failed')
                     n += 1
                     continue
                 mid.set_scalar_parameter_value('TexFadeStart', 0.0)

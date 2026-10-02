@@ -10,7 +10,7 @@
 
 namespace AnastasisSoilContact
 {
-static TAutoConsoleVariable<int32> Enabled(TEXT("anastasis.Dressing.SoilContact"),1,
+static TAutoConsoleVariable<int32> Enabled(TEXT("anastasis.Dressing.SoilContact"),0,
  TEXT("Bounded rock-soil-water pilot on seed12345 scale5. Decorative, no collision."));
 
 FPlan Build(const FInputs& In)

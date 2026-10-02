@@ -61,3 +61,22 @@ Disable with anastasis.Dressing.SoilContact 0 then re-embody. No collision/navig
 Existing RockSplit/Boulder/Low meshes, <=162 proposed instances over <=33m diameter,
 rejected when unsupported or deeply submerged; small detail culls by60m, source180m.
 Validation pending: neither compilation nor instance count establishes visual quality.
+
+
+Prepared diagnostic, not a material change: the capture also accepts numeric
+ANASTASIS_SOIL_BEFORE / ANASTASIS_SOIL_AFTER (defaults0/1, control repeats BEFORE).
+To isolate the procedural normal from the photographic normal in meadow/river views:
+ANASTASIS_SOIL_CONTACT=0
+ANASTASIS_SOIL_PARAMETER=BumpStrength
+ANASTASIS_SOIL_BEFORE=0.16
+ANASTASIS_SOIL_AFTER=0
+ANASTASIS_SOIL_VIEWS=prairie_eye,riviere_eye
+capture.ps1 -Label ground-normal-diagnostic
+No -Rebuild or -Deploy: transient MIDs only, no asset save. This diagnostic is not
+executed yet and does not claim that removing bump improves the ground. Run only
+in a coordinated slot; do not extend the contact slot ahead of queued agents.
+
+Contact003 now defaults OFF until image review. The registered soil-contact-capture
+job enables it temporarily, captures15images and restores its prior CVar/visibility.
+Completion is technical only. The source can be queued without shipping an active
+unreviewed composition. Do not enable the default based solely on capture COMPLETE.
