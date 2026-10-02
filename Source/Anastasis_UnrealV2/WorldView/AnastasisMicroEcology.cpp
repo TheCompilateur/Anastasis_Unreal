@@ -796,7 +796,11 @@ bool Build(const FInputs& In, const FSettings& Settings, FPlan& Out, FString& Ou
             return A.Ground.X!=B.Ground.X ? A.Ground.X<B.Ground.X : A.Ground.Y<B.Ground.Y;
         });
         const int32 Limit=FMath::Min(ForestBudget,FMath::Max(0,Settings.MaxInstances-NonForest.Num()));
-        if (Woodland.Items.Num()>Limit) Woodland.Items.SetNum(Limit);
+        if (Woodland.Items.Num()>Limit)
+        {
+            Woodland.Items.SetNum(Limit);
+            Out.bTruncated=true;
+        }
         Out.Instances=MoveTemp(NonForest);
         Out.Instances.Append(Woodland.Items);
         Out.bWoodlandSequence=true;

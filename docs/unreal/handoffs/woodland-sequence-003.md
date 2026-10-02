@@ -24,7 +24,7 @@ Voir le commit contenant cette fiche.
 
 ## MEC
 
-- Base BUILD PASS112.94s ; candidat BUILD PASS44.11s.
+- Base BUILD PASS112.94s ; candidat BUILD PASS44.11s ; signal de plafonnement corrige, dernier BUILD PASS44.67s.
 - AST capture PASS ; diff --check PASS.
 - Test ajoute Anastasis.MicroEcology.WoodlandIsolation : compile, execution QUEUED.
 - Le plan ecotone reference conserve integralement sa selection non forestiere (poses comprises). Son nombre forestier retenu borne le nouveau budget. Pas de quota riverain invente.
@@ -39,7 +39,7 @@ PROOFS: woodland-sequence-capture
 
 ## SCN
 
-UNKNOWN, pilote en attente du creneau partage.
+UNKNOWN, pilote en attente du creneau partage. Ne pas assimiler HANDOFF_READY queued a un KEEP artistique. Observer le pilote avant decision artistique ; les sessions externes eau/Sim ont retarde le creneau.
 KEEP : groupements et transition perceptibles au sol et en oblique, ouvertures conservees, aucune inflation globale ; berges/prairie positions identiques a la reference.
 REJECT : distribution illisible, tapis ou encombrement uniforme, silhouettes incoherentes, regression de cout disproportionnee.
 4 poses humaines dont ouverture locale, 1 oblique, prairie temoin ; A/B/reference2 ; deplacement camera de 10m a 1.7m, distinct d'une preuve joueur.
