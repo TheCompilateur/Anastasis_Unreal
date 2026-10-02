@@ -2,6 +2,7 @@
 
 #include "Anastasis_UnrealV2.h"
 #include "Engine/StaticMesh.h"
+#include "HAL/IConsoleManager.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/StrongObjectPtr.h"
 #include "WorldView/AnastasisPresentationRegistry.h"
@@ -9,6 +10,14 @@
 
 namespace AnastasisPresentation
 {
+// LEAFCARDS_001. Coupable pour l'A/B : meme arbre, meme place, meme taille ; seule la couronne change.
+// 0 = lames opaques (SM_Tree_HolmOak_0N, la reference), 1 = cartes de feuilles a masque alpha (Cards/SM_Tree_HolmOak_Card_0N).
+// Applique a l'incarnation, comme les autres CVars anastasis.Dressing.*.
+static TAutoConsoleVariable<int32> CVarTreeCards(
+	TEXT("anastasis.Dressing.TreeCards"), 1,
+	TEXT("0=chene vert en lames opaques (reference), 1=chene vert en cartes de feuilles a masque alpha (defaut) ; applique a l'incarnation."),
+	ECVF_Default);
+
 namespace
 {
 	/**
@@ -378,6 +387,31 @@ bool ResolvePresentation(
 
 	const FAnastasisPresentationVariant& Variant = Entry->Variants[VariantIndex];
 	UStaticMesh* Mesh = Variant.Mesh.LoadSynchronous();
+	// LEAFCARDS_001 : le chene vert en cartes, a la place de ses lames. Meme numero de forme (_01.._03),
+	// meme bois ; le materiau du feuillage (fente 0) devient celui des cartes. Sans l'asset (pas encore
+	// genere par create-tree-cards.py), l'arbre garde ses lames : la foret ne se troue pas.
+	UMaterialInterface* CardMaterial = nullptr;
+	if (Mesh && Variant.Species == EAnastasisTreeSpecies::HolmOak && CVarTreeCards.GetValueOnGameThread() != 0)
+	{
+		const FString Name = Variant.Mesh.ToSoftObjectPath().GetAssetName();
+		const FString Shape = Name.Right(2);
+		if (Name.StartsWith(TEXT("SM_Tree_HolmOak_")) && Shape.IsNumeric())
+		{
+			const FString CardPath = FString::Printf(
+				TEXT("/Game/Anastasis/Vegetation/Cards/SM_Tree_HolmOak_Card_%s.SM_Tree_HolmOak_Card_%s"), *Shape, *Shape);
+			UStaticMesh* Card = LoadObject<UStaticMesh>(nullptr, *CardPath);
+			CardMaterial = LoadObject<UMaterialInterface>(nullptr,
+				TEXT("/Game/Anastasis/Materials/M_AnastasisFoliageCard.M_AnastasisFoliageCard"));
+			if (Card && CardMaterial)
+			{
+				Mesh = Card;
+			}
+			else
+			{
+				CardMaterial = nullptr;
+			}
+		}
+	}
 	if (!Mesh && Variant.Species != EAnastasisTreeSpecies::Any)
 	{
 		// A species look that is not generated yet (create_tree_asset.py not run): the tree
@@ -400,7 +434,8 @@ bool ResolvePresentation(
 	Out.Entry = Entry;
 	Out.VariantIndex = VariantIndex;
 	Out.Mesh = Mesh;
-	Out.MaterialOverride = Variant.MaterialOverride.IsNull() ? nullptr : Variant.MaterialOverride.LoadSynchronous();
+	Out.MaterialOverride = CardMaterial ? CardMaterial
+		: (Variant.MaterialOverride.IsNull() ? nullptr : Variant.MaterialOverride.LoadSynchronous());
 	Out.AdditionalMaterials.Reset(Variant.AdditionalMaterialOverrides.Num());
 	for (const TSoftObjectPtr<UMaterialInterface>& Slot : Variant.AdditionalMaterialOverrides)
 	{

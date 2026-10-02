@@ -25,6 +25,8 @@ ANASTASIS_GROUND_STATES  etats captures, dans l'ordre, le premier doit poser l'h
                          | eco | noeco   (MICRO_ECOLOGY_001 : herbe laissee, seule la micro-ecologie change)
                          | noflowers | flowers | noflowers2   (WILDFLOWERS_001 : meme prairie, fleurs sauvages seules
                            en jeu -- anastasis.Dressing.Wildflowers 0 / 1 ; ciel epingle a 11 h)
+                         | nocards | cards | nocards2   (LEAFCARDS_001 : memes arbres, chene vert en lames puis en cartes --
+                           anastasis.Dressing.TreeCards 0 / 1 ; ciel epingle a 11 h)
 
 Etats *_notex : le sol est rendu par une instance DYNAMIQUE de MI_AnastasisGround dont le
 fondu des textures photo est ferme (TexFadeStart 0, TexFadeEnd 1). Le materiau rend alors
@@ -58,6 +60,13 @@ STATE_CMDS = {
                 'anastasis.Dressing.Wildflowers 1'),
     'noflowers2': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1',
                    'anastasis.Dressing.Wildflowers 0'),
+    # LEAFCARDS_001 : la foret, l'herbe et le sol restent ; seul le feuillage du chene vert change.
+    'nocards': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1',
+                'anastasis.Dressing.TreeCards 0'),
+    'cards': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1',
+              'anastasis.Dressing.TreeCards 1'),
+    'nocards2': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1',
+                 'anastasis.Dressing.TreeCards 0'),
     'on_notex': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     'bare': ('anastasis.Dressing.GroundCover 0', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     'bare_notex': ('anastasis.Dressing.GroundCover 0', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
@@ -83,6 +92,7 @@ ecotone_run = woodland_run or any(s.startswith('ecotone') for s in states)
 natural_run = ecotone_run or any(s in ('natural', 'reference', 'reference2') for s in states)
 original_woodland = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.WoodlandSequence')
 flower_run = any(s in ('noflowers', 'flowers', 'noflowers2') for s in states)
+cards_run = any(s in ('nocards', 'cards', 'nocards2') for s in states)
 original_ecotone = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.TreeCanopyEcotone')
 original_hour = unreal.SystemLibrary.get_console_variable_float_value('anastasis.Sky.Hour')
 original_natural = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.NaturalHistory')
@@ -116,7 +126,7 @@ try:
     def cmd(c):
         unreal.SystemLibrary.execute_console_command(world, c)
 
-    if natural_run or flower_run:
+    if natural_run or flower_run or cards_run:
         cmd('anastasis.Sky.Hour 11')
         if not woodland_run:
             cmd('anastasis.Dressing.WoodlandSequence 0')
