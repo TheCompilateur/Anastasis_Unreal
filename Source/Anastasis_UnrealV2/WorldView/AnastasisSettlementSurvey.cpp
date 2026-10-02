@@ -86,6 +86,8 @@ bool AnastasisSettlementSurvey::Read(UWorld* World, uint32 Seed, const Anastasis
     Ground.Add(Surface->GetProcMeshSection(0),Surface->GetComponentTransform());
     Water.Add(Surface->GetProcMeshSection(1),Surface->GetComponentTransform());
     Water.Add(Surface->GetProcMeshSection(2),Surface->GetComponentTransform());
+    Out.Seed=Seed; Out.SourceWorld=World->GetPathName(); Out.TerrainComponent=Surface->GetPathName();
+    const bool bWaterMeshAvailable=!Water.T.IsEmpty();
     Out.W=Sim.W; Out.H=Sim.H; Out.TileMetres=Cell/100.0; Out.Cells.SetNum(Sim.Tiles.Num());
     for(int32 I=0;I<Sim.Tiles.Num();++I)
     {
@@ -112,6 +114,12 @@ bool AnastasisSettlementSurvey::Read(UWorld* World, uint32 Seed, const Anastasis
         double WZ=0;
         C.bWater=T.Type==AnastasisWorld::ETileType::Water && Ground.Sample(X,Y,C.Height)
             && Water.Sample(X,Y,WZ) && WZ>=C.Height-1.0;
+        // Observe all centres, including visual water on semantically dry tiles.
+        // Missing ground / missing water mesh remains UNKNOWN, not agreement.
+        double CentreGround=0;
+        C.bSimWater=T.Type==AnastasisWorld::ETileType::Water;
+        C.bWaterObserved=bWaterMeshAvailable && Ground.Sample(X,Y,CentreGround);
+        C.bRenderedWater=C.bWaterObserved && Water.Sample(X,Y,WZ) && WZ>=CentreGround-1.0;
         C.bWood=T.Resource==AnastasisWorld::EResource::Wood && T.Amount>0;
         C.bFood=T.Type==AnastasisWorld::ETileType::Field && T.Resource==AnastasisWorld::EResource::Food && T.Amount>0;
     }

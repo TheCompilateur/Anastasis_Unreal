@@ -149,5 +149,32 @@ FString AnastasisSettlementSite::ToJson(const FReport& R, const FInputs& In)
     TArray<TSharedPtr<FJsonValue>> Top;
     for (const auto& C : R.Top) Top.Add(MakeShared<FJsonValueObject>(Encode(C)));
     Root->SetArrayField(TEXT("top"),Top);
+    // Partition every tile; indices are row-major, not estimated water areas.
+    auto Water = MakeShared<FJsonObject>();
+    const TCHAR* Names[] = {TEXT("both_dry"),TEXT("both_water"),TEXT("simulation_only"),TEXT("render_only"),TEXT("unknown")};
+    TArray<TSharedPtr<FJsonValue>> Groups[5];
+    const bool bShapeValid=In.W>0 && In.H>0 && In.Cells.Num()==In.W*In.H;
+    for(int32 I=0; I<In.Cells.Num(); ++I)
+    {
+        const auto& C=In.Cells[I];
+        const int32 Kind=(!bShapeValid || !C.bWaterObserved) ? 4 :
+            (C.bSimWater ? (C.bRenderedWater ? 1 : 2) : (C.bRenderedWater ? 3 : 0));
+        Groups[Kind].Add(MakeShared<FJsonValueNumber>(I));
+    }
+    for(int32 K=0;K<5;++K) Water->SetArrayField(Names[K],Groups[K]);
+    const int32 Compared=In.Cells.Num()-Groups[4].Num();
+    Water->SetStringField(TEXT("status"),Compared==0 ? TEXT("UNKNOWN") : TEXT("SAMPLED"));
+    Water->SetStringField(TEXT("agreement"),Compared==0 ? TEXT("UNKNOWN") :
+        (Groups[2].Num()+Groups[3].Num()>0 ? TEXT("MISMATCH") :
+        (Groups[4].Num()>0 ? TEXT("PARTIAL") : TEXT("AGREEMENT_AT_CENTRES"))));
+    Water->SetNumberField(TEXT("compared_cells"),Compared);
+    Water->SetNumberField(TEXT("mismatch_cells"),Groups[2].Num()+Groups[3].Num());
+    Water->SetNumberField(TEXT("width"),In.W); Water->SetNumberField(TEXT("height"),In.H);
+    Water->SetNumberField(TEXT("tile_m"),In.TileMetres); Water->SetNumberField(TEXT("seed"),In.Seed);
+    Water->SetStringField(TEXT("world"),In.SourceWorld); Water->SetStringField(TEXT("terrain"),In.TerrainComponent);
+    Water->SetStringField(TEXT("sampling"),TEXT("tile_centres; ground_section=0; visible_water_sections=1,2; water_z>=ground_z-1cm"));
+    Water->SetStringField(TEXT("scope"),TEXT("opening_snapshot; centre_samples_can_miss_narrow_rivers; not_water_area_or_discharge"));
+    Water->SetStringField(TEXT("npc_access"),TEXT("UNKNOWN: selected.water_access is a terrain-graph bank target, not an observed NPC journey"));
+    Root->SetObjectField(TEXT("water_concordance"),Water);
     FString Json; const auto Writer = TJsonWriterFactory<>::Create(&Json); FJsonSerializer::Serialize(Root, Writer); return Json;
 }

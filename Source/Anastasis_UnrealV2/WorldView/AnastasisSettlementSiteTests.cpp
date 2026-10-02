@@ -1,5 +1,7 @@
 #include "WorldView/AnastasisSettlementSite.h"
 #include "Misc/AutomationTest.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonSerializer.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 namespace AnastasisSettlementSiteTests
@@ -72,6 +74,44 @@ bool FSettlementResourceTest::RunTest(const FString&)
     TestTrue(TEXT("site follows changed geography"),A.Best.Index%In.W!=B.Best.Index%In.W);
     for(auto& C:In.Cells) C.bFood=false;
     TestFalse(TEXT("no invented farming resource"),AnastasisSettlementSite::Choose(In).Best.bEligible);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSettlementConcordanceTest,"Anastasis.SettlementSite.WaterConcordance",
+    EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FSettlementConcordanceTest::RunTest(const FString&)
+{
+    auto In=AnastasisSettlementSiteTests::Valley();
+    const auto Before=AnastasisSettlementSite::Choose(In);
+    auto Read=[&]()
+    {
+        TSharedPtr<FJsonObject> Root;
+        const auto Reader=TJsonReaderFactory<>::Create(AnastasisSettlementSite::ToJson(Before,In));
+        FJsonSerializer::Deserialize(Reader,Root);
+        return Root;
+    };
+    auto Root=Read();
+    TestTrue(TEXT("JSON parsed"),Root.IsValid());
+    if(!Root) return false;
+    auto Water=Root->GetObjectField(TEXT("water_concordance"));
+    TestEqual(TEXT("unmeasured never agreement"),Water->GetStringField(TEXT("agreement")),FString(TEXT("UNKNOWN")));
+    TestEqual(TEXT("unknown covers all cells"),Water->GetArrayField(TEXT("unknown")).Num(),In.Cells.Num());
+    for(int32 I=0;I<4;++I) In.Cells[I].bWaterObserved=true;
+    In.Cells[1].bSimWater=In.Cells[1].bRenderedWater=true;
+    In.Cells[2].bSimWater=true; In.Cells[3].bRenderedWater=true;
+    Root=Read(); Water=Root->GetObjectField(TEXT("water_concordance"));
+    TestEqual(TEXT("mismatches explicit"),Water->GetStringField(TEXT("agreement")),FString(TEXT("MISMATCH")));
+    TestEqual(TEXT("both directions counted"),Water->GetNumberField(TEXT("mismatch_cells")),2.0);
+    TestEqual(TEXT("render-only position preserved"),Water->GetArrayField(TEXT("render_only"))[0]->AsNumber(),3.0);
+    TestEqual(TEXT("semantic-only position preserved"),Water->GetArrayField(TEXT("simulation_only"))[0]->AsNumber(),2.0);
+    const auto After=AnastasisSettlementSite::Choose(In);
+    TestEqual(TEXT("diagnostic cannot change selected site"),Before.Best.Index,After.Best.Index);
+    TestEqual(TEXT("diagnostic cannot change site score"),Before.Best.Score,After.Best.Score);
+    In.Cells[2].bSimWater=false; In.Cells[3].bRenderedWater=false;
+    Root=Read();
+    TestEqual(TEXT("missing coverage is partial"),Root->GetObjectField(TEXT("water_concordance"))->GetStringField(TEXT("agreement")),FString(TEXT("PARTIAL")));
+    for(auto& C:In.Cells) C.bWaterObserved=true;
+    Root=Read();
+    TestEqual(TEXT("complete matching centres only"),Root->GetObjectField(TEXT("water_concordance"))->GetStringField(TEXT("agreement")),FString(TEXT("AGREEMENT_AT_CENTRES")));
     return true;
 }
 #endif

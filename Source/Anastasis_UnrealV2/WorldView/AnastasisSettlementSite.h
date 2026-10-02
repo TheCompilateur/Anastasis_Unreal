@@ -11,6 +11,10 @@ struct FCell
     bool bDry = false;
     bool bCenterAllowed = false;
     bool bWater = false;
+    // Read-only centre samples; never used by the selection policy.
+    bool bWaterObserved = false;
+    bool bSimWater = false;
+    bool bRenderedWater = false;
     bool bWood = false;
     bool bFood = false;
     double Height = 0.0;
@@ -22,6 +26,8 @@ struct FInputs
     int32 W = 0, H = 0;
     double TileMetres = 20.0;
     TArray<FCell> Cells;
+    uint32 Seed = 0;
+    FString SourceWorld, TerrainComponent;
 };
 struct FSettings
 {

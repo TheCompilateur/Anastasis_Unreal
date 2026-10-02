@@ -1,4 +1,4 @@
-"""Map Intelligence v1: metres, projected XY areas, explicit missing evidence.
+"""Map Intelligence v2: metres, projected XY areas, explicit missing evidence.
 
 Four-neighbour connectivity; centre samples are resolution-dependent estimates.
 No terrain or engine objects are mutated by this module.
@@ -13,7 +13,7 @@ import math
 import re
 import time
 
-VERSION = 1
+VERSION = 2
 
 @dataclass
 class Settings:
@@ -47,6 +47,7 @@ class Settings:
     terrain_component: str = 'ExperimentalTerrain'
     terrain_section: int = 0
     water_section: int = 1
+    additional_water_sections: list = field(default_factory=lambda: [2])
     weights: dict = field(default_factory=lambda: dict(flatness=1.0, continuous_area=1.0,
         water_access=1.0, connectivity=1.0, agricultural_area=1.0, terrain_isolation=1.0))
 
@@ -63,6 +64,10 @@ class Settings:
                   'max_draw_cells','max_nav_queries','max_neighborhood_visits','terrain_section','water_section'):
             if type(getattr(self, k)) is not int:
                 raise ValueError(f'{k} must be an integer')
+        if not isinstance(self.additional_water_sections, list) or any(type(v) is not int or v < 0 for v in self.additional_water_sections):
+            raise ValueError("additional_water_sections must be a list of nonnegative integers")
+        if self.terrain_section in [self.water_section, *self.additional_water_sections]:
+            raise ValueError("Ground cannot also be selected as water")
         slopes = [self.settlement_slope_deg, self.agriculture_slope_deg,
                   self.pasture_slope_deg, self.traversable_slope_deg, self.difficult_slope_deg]
         if slopes != sorted(slopes) or slopes[-1] >= 90:

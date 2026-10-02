@@ -70,7 +70,12 @@ le pas doit être petit devant les plateformes et passages recherchés.
 ## Méthodes et limites
 
 - **Source actuelle** : le composant nommé `ExperimentalTerrain`, section 0 sol,
-  section 1 eau. Ces sélecteurs sont configurables. Les sommets sont transformés
+  section 1 lacs/nappe et section 2 rubans de riviere. Ces selecteurs sont configurables.
+  `water_section=1` reste compatible avec les anciens Settings.json ;
+  `additional_water_sections=[2]` ajoute les rivieres, dedoublonne les sections et
+  ignore les sections masquees. Une liste vide permet une acquisition volontairement
+  limitee a la nappe. Chaque section declare SAMPLED, EMPTY_SECTION,
+  HIDDEN_SECTION ou ABSENT_SECTION dans la provenance. Les sommets sont transformés
   en coordonnées monde et convertis de cm en m. Interpolation barycentrique au centre
   des cellules ; pente du triangle réel, sans normale lissée. Plusieurs composants
   homonymes provoquent un refus explicite.
@@ -169,3 +174,39 @@ Références publiques Epic :
 [LandscapeProxy](https://dev.epicgames.com/documentation/unreal-engine/API/Runtime/Landscape/ALandscapeProxy).
 La méthode C++ `GetHeightAtLocation` n'étant pas exposée en Python, le chemin Landscape
 emploie la trace de composant publiquement exposée dans `PrimitiveComponent.h`.
+
+## Concordance geographique (geography-concordance-001)
+
+Format Map Intelligence v2 : les anciens rapports v1 sont INCOMPARABLES, pas une
+baseline de regression. Le changement de couverture de l'eau peut modifier les scores
+et surfaces admissibles. Les seuils agricoles restent geometriques, sans preuve de sol.
+
+La preuve de lot `geography-concordance-pie` lit aussi le diagnostic du choix initial
+`get_settlement_site_status(world).water_concordance`. Celui-ci compare, aux centres des
+tuiles de simulation, Type==Water avec le sol rendu (section 0) et l'eau visible
+(sections 1 + 2). Tolerance verticale : eau >= sol - 1 cm, identique au choix de site.
+Chaque indice row-major (x=i%width, y=i//width) appartient a une seule categorie :
+`both_dry`, `both_water`, `simulation_only`, `render_only`, `unknown`.
+Sans sol au centre ou sans maillage d'eau observable, le resultat reste UNKNOWN.
+
+Sorties du lot : `Saved/GeographyConcordanceEvidence/opening-water.json` (indices bruts,
+seed, monde PIE, composant, echelle et provenance de l'acquisition) et `opening-water.svg`
+(carte categorielle, +X a droite / +Y en bas, aucun nord geographique suppose).
+`GEOGRAPHY_CONCORDANCE INSTRUMENT_PASS` signifie seulement que la partition est complete,
+coherente et que les sections lac/riviere ont ete lues. Le champ `agreement` peut rester
+MISMATCH. Ce n'est pas un PASS hydrologique ou joueur. La carte conserve tous les ecarts.
+
+Limites : instantane d'ouverture, echantillonnage des centres (une riviere etroite peut
+passer entre eux), aucune mesure de debit ou surface inondee. `selected.water_access`
+est une berge atteignable dans le graphe du selecteur, pas un trajet PNJ observe.
+Le consommateur PNJ `FVillage::DrinkTarget` privilegie un puits puis cherche eau/berge
+semantiques ; `AtDrinkSpot` accepte aussi Shore et les puits. Type==Water ne represente
+donc pas a lui seul toute la buvabilite. Aucune regle du simulateur n'est modifiee.
+
+KEEP : lecture lac+riviere correcte sur tests controles ; partition disjointe et
+exhaustive ; diagnostic sans effet sur la selection ; preuve de lot interpretable.
+REJECT : un centre inconnu classe comme accord, une section d'eau oubliee/masquee lue,
+un verdict qui assimile acquisition et concordance, ou une selection modifiee par le diagnostic.
+NEXT apres le lot : examiner les ecarts pres du site retenu et tester un vrai trajet
+vers la source concernee. Ne pas realigner automatiquement simulation et rendu avant
+ce verdict (contrat de parite et registre ECARTS).

@@ -102,11 +102,19 @@ def _get_grid(actors,s,progress):
     g=core.Grid.covering([min(v[0] for v in used),min(v[1] for v in used),max(v[0] for v in used),max(v[1] for v in used)],s)
     core.rasterize(g,vertices,indices)
     water=[]
-    if s.water_section!=s.terrain_section and c.get_num_sections()>s.water_section:
-        wv,wi=_mesh(c,s.water_section)
-        if wi:
-            core.rasterize(g,wv,wi,water=True)
-            water=[dict(source=c.get_path_name(),section=s.water_section,triangles=len(wi)//3)]
+    # Preserve legacy water_section settings and include river ribbons by default.
+    for section in sorted(set([s.water_section, *s.additional_water_sections])):
+        entry=dict(source=c.get_path_name(),section=section,triangles=0)
+        if section >= c.get_num_sections():
+            entry['status']='ABSENT_SECTION'
+        elif not c.is_mesh_section_visible(section):
+            entry['status']='HIDDEN_SECTION'
+        else:
+            wv,wi=_mesh(c,section)
+            entry['triangles']=len(wi)//3
+            entry['status']='SAMPLED' if wi else 'EMPTY_SECTION'
+            if wi: core.rasterize(g,wv,wi,water=True)
+        water.append(entry)
     return g,[c.get_owner()],'ProceduralMesh:'+c.get_name()+':'+str(s.terrain_section),'world-space triangle centre sampling',water
 
 

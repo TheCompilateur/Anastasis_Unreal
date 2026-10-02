@@ -99,3 +99,69 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(a[0]['transform']['location_m'],[1.,2.,3.])
         actor.get_actor_location.return_value=Vector(100,200,400)
         self.assertNotEqual(a,self.editor._fingerprint([actor]))
+
+    def procedural(self, sections, hidden=()):
+        self.fake.LandscapeProxy=Landscape
+        self.fake.ProceduralMeshComponent=object
+        actor=Mock(); comp=Mock()
+        actor.get_components_by_class.return_value=[comp]
+        comp.get_name.return_value='ExperimentalTerrain'
+        comp.get_num_sections.return_value=3
+        comp.is_mesh_section_visible.side_effect=lambda section: section not in hidden
+        comp.get_path_name.return_value='Terrain.Mesh'
+        comp.get_owner.return_value=actor
+        with patch.object(self.editor,'_mesh',side_effect=lambda c,i: sections.get(i,([],[]))) as mesh:
+            result=self.editor._get_grid([actor],self.settings,self.progress)
+        return result,mesh
+
+    @staticmethod
+    def rectangle(x0,y0,x1,y1,z):
+        return ([(x0,y0,z),(x1,y0,z),(x1,y1,z),(x0,y1,z)],[0,1,2,0,2,3])
+
+    def test_river_and_lake_union_excludes_dry_habitat(self):
+        sections={0:self.rectangle(0,0,2,2,0),1:self.rectangle(0,0,1,1,1),
+                  2:self.rectangle(1,1,2,2,2)}
+        (g,_,_,_,water),_=self.procedural(sections)
+        self.assertEqual(g.water_z,[1.,None,None,2.])
+        self.assertEqual([w['section'] for w in water],[1,2])
+        report=core.analyze(g,self.settings)
+        self.assertEqual(report['cells']['category'][0],'WATER_OR_MARGIN')
+        self.assertEqual(report['cells']['category'][3],'WATER_OR_MARGIN')
+
+    def test_hidden_river_is_not_visible_water(self):
+        sections={0:self.rectangle(0,0,2,2,0),1:self.rectangle(0,0,1,1,1),
+                  2:self.rectangle(1,1,2,2,2)}
+        (g,_,_,_,water),_=self.procedural(sections,hidden=[2])
+        self.assertEqual(g.water_z,[1.,None,None,None])
+        self.assertEqual(water[1]['status'],'HIDDEN_SECTION')
+
+    def test_overlapping_sections_keep_highest_water_once(self):
+        self.settings.additional_water_sections=[2,1,2]
+        sections={0:self.rectangle(0,0,2,2,0),1:self.rectangle(0,0,2,2,1),
+                  2:self.rectangle(0,0,2,2,2)}
+        (g,_,_,_,water),mesh=self.procedural(sections)
+        self.assertEqual(g.water_z,[2.]*4)
+        self.assertEqual(mesh.call_count,3) # ground, lake, river; deduplicated
+        self.assertEqual(len(water),2)
+
+    def test_explicit_legacy_only_is_incomparable_to_union(self):
+        sections={0:self.rectangle(0,0,2,2,0),1:self.rectangle(0,0,1,1,1),
+                  2:self.rectangle(1,1,2,2,2)}
+        (g,*_),_=self.procedural(sections)
+        before=core.analyze(g,self.settings)
+        self.settings.additional_water_sections=[]
+        (g,*_),_=self.procedural(sections)
+        after=core.analyze(g,self.settings)
+        self.assertIsNone(g.water_z[3])
+        with self.assertRaisesRegex(ValueError,'INCOMPARABLE'): core.compare(before,after)
+
+    def test_empty_and_absent_water_are_reported(self):
+        self.settings.additional_water_sections=[2,3]
+        (g,_,_,_,water),_=self.procedural({0:self.rectangle(0,0,2,2,0)})
+        self.assertEqual([w['status'] for w in water],['EMPTY_SECTION','EMPTY_SECTION','ABSENT_SECTION'])
+        self.assertEqual(g.water_z,[None]*4)
+
+    def test_invalid_water_sections_rejected(self):
+        for value in ([0],[-1],[1.5],[True],'2'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                core.Settings(additional_water_sections=value).validate()
