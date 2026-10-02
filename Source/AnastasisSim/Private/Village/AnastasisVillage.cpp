@@ -2160,8 +2160,10 @@ namespace AnastasisVillage
 		// Comme la meteo et la passe collective, sur chaque ligne, plancher compris.
 		for (TPair<FString, double>& Row : Rows)
 		{
+			Trace.RowsBeforeRisk.Add(Row.Key, Row.Value);
 			Row.Value += AnastasisSpatialRisk::BiasOf(ForecastBias, Row.Key);
 			Row.Value += AnastasisSpatialRisk::BiasOf(SpatialRiskBias, Row.Key);
+			Trace.RowsAfterRisk.Add(Row.Key, Row.Value);
 		}
 		// --- fin resource-targets-001
 		// Ce que la table ecrit en passant (premiere-pensee-001) : `failureTargetBiasMap` cree

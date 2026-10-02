@@ -648,6 +648,9 @@ namespace AnastasisVillage
 		/** `survivalForecastBias` et `spatialRiskBiasMap` (resource-targets-001), but -> biais, cles a 0 comprises. */
 		TMap<FString, double> ForecastBias;
 		TMap<FString, double> SpatialRiskBias;
+		/** Chaque ligne juste avant et juste apres l'ajout des deux cartes (spatial-risk-test-001). */
+		TMap<FString, double> RowsBeforeRisk;
+		TMap<FString, double> RowsAfterRisk;
 		int32 NoiseDraws = 0;
 		/** Le bruit tire pour chaque ligne qui en a tire un (but -> valeur). */
 		TMap<FString, double> RowNoise;
