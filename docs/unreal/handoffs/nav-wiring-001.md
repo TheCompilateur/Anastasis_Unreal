@@ -70,6 +70,9 @@ Les commits de `agent/nav-wiring-001`, posés sur `agent/spatial-risk-test-001` 
   - Le leader avance de 0,0667 vers le seuil, le dernier waiter de 0,0243.
   - Le premier waiter, déjà à son point d'attente, reste sur place.
   - Pour les trois : clé de cible, version de navigation, copie du chemin.
+- MUTATION (posée, build, `Village.Navigation`, retirée) : file de porte coupée (`if (false && IsDoorLike() …)`)
+  → détectée : `le plus proche passe : attendu "leader", obtenu "solo"`, `rang du deuxieme : attendu 1, obtenu 0`,
+  `le premier waiter reste a son point d'attente` faux.
 - Harnais (endurance, 600 ticks, `compare-digests.mjs` contre la référence) : `buildings` 125, `rng` 125,
   `tileDiff` 257, `mealReservations` 320. Forage du tick 32 (`diff-states.mjs`) : tous les champs de navigation
   et le pas de npc-2 sont identiques. Restent `navigation.destBuildingId` (voir ECARTS) et les champs de la première
