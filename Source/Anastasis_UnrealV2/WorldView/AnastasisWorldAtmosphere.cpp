@@ -93,8 +93,16 @@ static TAutoConsoleVariable<float> CVarSkyCover(
     TEXT("anastasis.Sky.Cover"), -1.0f,
     TEXT("Visual cloud cover [0,1]; -1 follows simulation weather."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarWindHeading(
-    TEXT("anastasis.Sky.WindHeading"), 26.565f,
-    TEXT("Visual downwind heading in world XY degrees. The simulation has intensity, no direction."), ECVF_Default);
+    TEXT("anastasis.Sky.WindHeading"), -1.0f,
+    TEXT("Visual downwind heading in world XY degrees; negative follows the blended simulation wind direction."), ECVF_Default);
+
+// Shared by material collection, cloud motion and rain; simulation x/z maps to Unreal X/Y.
+static double VisualWindHeadingRadians(const AnastasisSkyClock::FSkyState& Sky, const bool bWeather)
+{
+    const double Pinned = CVarWindHeading.GetValueOnGameThread();
+    return Pinned >= 0.0 ? FMath::DegreesToRadians(Pinned)
+        : bWeather ? Sky.SkyWindHeading : FMath::DegreesToRadians(26.565);
+}
 
 static TAutoConsoleVariable<int32> CVarRealism(
 	TEXT("anastasis.Atmosphere.Realism"),
@@ -527,7 +535,7 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
     const float Humidity = bWeather ? float(LastSky.SkyHumidity) : 0.45f;
     const float Cover = bWeather ? float(LastSky.SkyCover) : 0.25f;
     const bool bCoupled = CVarWeatherCoupling.GetValueOnAnyThread() != 0;
-    const float Heading = FMath::DegreesToRadians(CVarWindHeading.GetValueOnAnyThread());
+    const float Heading = static_cast<float>(VisualWindHeadingRadians(LastSky, bWeather));
     // Dampness is a bounded visual readiness signal, not rain accumulation or hydrology.
     const float Dampness = FMath::Clamp((Humidity - 0.65f) / 0.35f, 0.0f, 1.0f);
     if (WeatherCollection)
@@ -541,7 +549,7 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
     // Weather must not overwrite the reversible profile contract here.
     if (bForceLog)
         UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_WEATHER coupled=%d collection=%d wind=%.3f heading=%.2f humidity=%.3f cover=%.3f dampness=%.3f"),
-            bCoupled ? 1 : 0, WeatherCollection ? 1 : 0, Wind, CVarWindHeading.GetValueOnAnyThread(), Humidity, Cover, Dampness);
+            bCoupled ? 1 : 0, WeatherCollection ? 1 : 0, Wind, FMath::RadiansToDegrees(Heading), Humidity, Cover, Dampness);
 	if (Fog)
 	{
 		if (UExponentialHeightFogComponent* FogComponent = Fog->GetComponent())
@@ -649,6 +657,13 @@ void AAnastasisWorldAtmosphere::UpdateRain(const AnastasisSkyClock::FSkyState& S
 	// Keep the simulation weather untouched, including the raw rain logged below.
 	AnastasisWeather::FWeather VisualWeather = Sky.Weather;
 	VisualWeather.Rain = Sky.SkyRain;
+	if (CVarWeatherCoupling.GetValueOnGameThread() != 0)
+	{
+		const double Heading = VisualWindHeadingRadians(Sky, bWeatherDrivesSky);
+		VisualWeather.Wind = bWeatherDrivesSky ? Sky.SkyWind : 0.3;
+		VisualWeather.DirX = FMath::Cos(Heading);
+		VisualWeather.DirZ = FMath::Sin(Heading);
+	}
 	const AnastasisRain::FRainVisual Rain = AnastasisRain::VisualFor(
 		VisualWeather, bWeatherDrivesSky, static_cast<double>(CVarSkyRain.GetValueOnGameThread()));
 	const double Amount = bEnabled ? Rain.Amount : 0.0;

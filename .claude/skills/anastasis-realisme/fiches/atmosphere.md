@@ -111,8 +111,9 @@ Seuils empiriques, posés sur les captures de `DAY_NIGHT_WEATHER_001`. Autres pr
 ## Couplage meteo de presentation (atmosphere-crusade-001)
 
 `AAnastasisWorldAtmosphere` ecrit `MPC_AnastasisWeather` : WeatherWind = direction XY / intensite Z,
-WeatherAir = humidite R / humidification visuelle G / couverture B. Le simulateur fournit l'intensite,
-pas la direction : `anastasis.Sky.WindHeading` est un choix de presentation explicite en degres monde.
+WeatherAir = humidite R / humidification visuelle G / couverture B. Le simulateur fournit intensite
+et direction : `anastasis.Sky.WindHeading -1` suit le cap simule, lisse par le plus court arc
+a minuit (weather-wind-003). Une valeur positive ou nulle impose le cap en degres monde.
 `Sky.Wind` et `Sky.Cover` epinglent la presentation (moins 1 = simulation), comme `Sky.Humidity`.
 `Atmosphere.Coupling 0` restitue la reponse anterieure des materiaux et des nuages ; 1 les couple.
 Le noeud moteur `Layout_WindControls` a ete inspecte en editeur : RGB = axes monde signes,
@@ -154,3 +155,11 @@ locales, la perspective aerienne et les valeurs exponentielles sont conservees.
 C'est un choix de rendu NON OBSERVE, pas un gain mesure. Contrairement au plafond
 exponentiel .48/.30 rejete par valley-air-001, ce multiplicateur agit sur le volume.
 Retour cible : remettre EyePlaneExtinctionGain a 3.5. Voir passation air-relief-002.
+
+## Vent commun (weather-wind-003)
+
+Pluie, collection des materiaux et nuages utilisent la meme intensite SkyWind et le meme cap.
+Sky.Wind et Sky.WindHeading s'appliquent aux trois consommateurs ; negatif rend la main a
+la meteo. Les amplitudes/frequences propres a chaque materiau restent differentes.
+Coupling0 conserve la reponse authored des materiaux/nuages et le vent brut des gouttes.
+Presentation uniquement, aucun changement AnastasisSim. Build seul ; aspect NON OBSERVE.

@@ -65,6 +65,8 @@ namespace AnastasisSkyClock
 		 */
 		double SkyHumidity = 0.0;
 		double SkyWind = 0.0;
+		/** Downwind heading in radians, blended on the shortest arc across midnight. */
+		double SkyWindHeading = 0.0;
 		double SkyCover = 0.0;
 		/** Visual rain on the same midnight blend as the clouds; never changes Weather.Rain. */
 		double SkyRain = 0.0;
@@ -149,6 +151,7 @@ namespace AnastasisSkyClock
 	{
 		double Humidity = 0.0;
 		double Wind = 0.0;
+		double WindHeading = 0.0;
 		double Cover = 0.0;
 		double Rain = 0.0;
 	};

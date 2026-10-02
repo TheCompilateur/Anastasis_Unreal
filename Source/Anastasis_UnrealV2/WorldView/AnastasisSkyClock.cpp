@@ -100,6 +100,7 @@ FSkyState Evaluate(const UAnastasisAtmosphereProfile& Profile, const double SimT
 	const FSkyWeather Sky = SkyWeatherAt(Seed, State.Day, State.DayFrac, Profile.WeatherBlendHours);
 	State.SkyHumidity = Sky.Humidity;
 	State.SkyWind = Sky.Wind;
+	State.SkyWindHeading = Sky.WindHeading;
 	State.SkyCover = Sky.Cover;
 	State.SkyRain = Sky.Rain;
 
@@ -123,6 +124,7 @@ namespace
 		FSkyWeather Out;
 		Out.Humidity = AnastasisWeather::WeatherHumidityAt(W);
 		Out.Wind = W.Wind;
+		Out.WindHeading = W.WindDir;
 		Out.Cover = W.Cover;
 		Out.Rain = W.Rain;
 		return Out;
@@ -133,6 +135,9 @@ namespace
 		FSkyWeather Out;
 		Out.Humidity = FMath::Lerp(A.Humidity, B.Humidity, Alpha);
 		Out.Wind = FMath::Lerp(A.Wind, B.Wind, Alpha);
+		// A scalar lerp of degrees would turn 359 -> 1 through 180. Use the shortest arc.
+		const double Delta = B.WindHeading - A.WindHeading;
+		Out.WindHeading = A.WindHeading + Alpha * FMath::Atan2(FMath::Sin(Delta), FMath::Cos(Delta));
 		Out.Cover = FMath::Lerp(A.Cover, B.Cover, Alpha);
 		Out.Rain = FMath::Lerp(A.Rain, B.Rain, Alpha);
 		return Out;

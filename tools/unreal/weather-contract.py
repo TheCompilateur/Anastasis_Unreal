@@ -55,7 +55,7 @@ except Exception:
     unreal.log_error('WEATHER_CONTRACT FAIL ' + traceback.format_exc())
 finally:
     for c in ['anastasis.Sky.Hour -1','anastasis.Sky.Wind -1','anastasis.Sky.Humidity -1','anastasis.Sky.Cover -1',
-              'anastasis.Sky.WindHeading 26.565','anastasis.Atmosphere.Coupling 1']:
+              'anastasis.Sky.WindHeading -1','anastasis.Atmosphere.Coupling 1']:
         command(c)
     # Only transient actors created by this synchronous contract, never original level actors.
     for spawned in list(eas.get_all_level_actors()):
