@@ -135,6 +135,19 @@ function Invoke-AnastasisEditorGated {
   $gate = New-Object System.Threading.Mutex($false, 'Global\AnastasisEditorGate')
   $gateStart = Get-Date
   $gateNote = [datetime]::MinValue
+  # File equitable (EDITOR_QUEUE_001). Sans elle, la place liberee allait a qui interrogeait au bon
+  # moment : le 2026-10-01 un lot d'integration a attendu 30 min pendant que des suites arrivees apres
+  # lui passaient. Un ticket par attente, `<priorite>-<horodatage>-<pid>` ; seul le plus ancien
+  # ticket VIVANT passe. Priorite 0 (ANASTASIS_EDITOR_PRIORITY=0) : un lot d'integration, qui sert
+  # tous les agents ; 1 sinon. Un lanceur d'une version d'avant (sans ticket) n'attend personne.
+  $queueDir = if ($env:ANASTASIS_EDITOR_QUEUE_DIR) { $env:ANASTASIS_EDITOR_QUEUE_DIR } else { 'C:\dev\ANASTASIS_WORKTREES\.editor-gate' }
+  $prio = if ($env:ANASTASIS_EDITOR_PRIORITY -eq '0') { '0' } else { '1' }
+  $ticket = $null
+  try {
+    New-Item -ItemType Directory -Force $queueDir | Out-Null
+    $ticket = Join-Path $queueDir ('{0}-{1:D19}-{2}.ticket' -f $prio, (Get-Date).ToUniversalTime().Ticks, $PID)
+    New-Item -ItemType File -Force $ticket | Out-Null
+  } catch { $ticket = $null }
   try {
     while ($true) {
       try { [void]$gate.WaitOne() } catch {
@@ -145,6 +158,17 @@ function Invoke-AnastasisEditorGated {
       }
       $load = Get-AnastasisEditorLoad
       $blocked = @()
+      if ($ticket) {
+        $ahead = 0
+        foreach ($t in @(Get-ChildItem $queueDir -Filter '*.ticket' -ErrorAction SilentlyContinue | Sort-Object Name)) {
+          if ($t.FullName -eq $ticket) { break }
+          $owner = [int]($t.BaseName.Split('-')[-1])
+          # Ticket d'un lanceur disparu (tue, machine redemarree) : retire, il ne bloque personne.
+          if (-not (Get-Process -Id $owner -ErrorAction SilentlyContinue)) { Remove-Item $t.FullName -Force -ErrorAction SilentlyContinue; continue }
+          $ahead++
+        }
+        if ($ahead -gt 0) { $blocked += "file=$ahead devant" }
+      }
       if ($load.Editors -ge $MaxEditors) { $blocked += "editeurs=$($load.Editors)/$MaxEditors (pids $($load.Pids))" }
       if ($load.Editors -gt 0) {
         if ($load.RamGB -lt $MinRamGB) { $blocked += "ram_dispo=$($load.RamGB)/$MinRamGB Go" }
@@ -169,6 +193,7 @@ function Invoke-AnastasisEditorGated {
       Start-Sleep -Seconds $PollSeconds
     }
   } finally {
+    if ($ticket) { Remove-Item -LiteralPath $ticket -Force -ErrorAction SilentlyContinue }
     $gate.Dispose()
   }
 }

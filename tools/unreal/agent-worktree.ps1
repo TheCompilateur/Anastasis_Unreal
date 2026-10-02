@@ -618,6 +618,8 @@ switch ($Command) {
       exit 1
     }
     Write-Output 'CHECKS::PASS index tools/unreal, lancements Unreal'
+    # Le lot sert tous les agents : ses editeurs passent en tete de la file de la porte memoire.
+    $env:ANASTASIS_EDITOR_PRIORITY = '0'
     Invoke-UnrealGate $integ @(Unreal-Changes $integ "$mainBefore..HEAD")
     if (-not $script:GateOk) { Write-Output 'BATCH::FAIL rien n a bouge (main intact)'; exit 1 }
 

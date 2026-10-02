@@ -204,4 +204,21 @@ Check 'S18 lot prepare sans editeur (-DryRun)' ($LASTEXITCODE -eq 0 -and $dry -m
 $bad = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $eb -Proofs 'inconnue-pie' -DryRun 2>&1 | ForEach-Object { "$_" }) -join "`n"
 Check 'S18 preuve inconnue refusee avant l editeur' ($bad -match 'absente\(s\) de proofs.txt : inconnue-pie') $bad
 
+# 19. Porte memoire equitable : un ticket plus ancien et vivant passe d'abord ; un ticket mort ne
+#     bloque personne. Capacite et memoire neutralisees, $Launch ne lance rien.
+. "$harness\editor-launch.ps1"
+$env:ANASTASIS_EDITOR_QUEUE_DIR = Join-Path $base 'gate-queue'
+New-Item -ItemType Directory -Force $env:ANASTASIS_EDITOR_QUEUE_DIR | Out-Null
+$older = Join-Path $env:ANASTASIS_EDITOR_QUEUE_DIR ('1-{0:D19}-{1}.ticket' -f 1, $PID)
+New-Item -ItemType File $older | Out-Null
+$msg = ''
+try { $null = Invoke-AnastasisEditorGated -Launch { 'lance' } -MaxEditors 99 -MinRamGB 0 -MinCommitGB 0 -TimeoutMinutes 0.04 -PollSeconds 1 6>&1 } catch { $msg = "$_" }
+Check 'S19 file : un ticket plus ancien et vivant passe d abord' ($msg -match 'EDITOR_GATE::TIMEOUT' -and $msg -match 'file=1 devant') $msg
+Remove-Item $older
+$dead = Join-Path $env:ANASTASIS_EDITOR_QUEUE_DIR ('1-{0:D19}-{1}.ticket' -f 1, 999999)
+New-Item -ItemType File $dead | Out-Null
+$got = Invoke-AnastasisEditorGated -Launch { 'lance' } -MaxEditors 99 -MinRamGB 0 -MinCommitGB 0 -TimeoutMinutes 0.04 -PollSeconds 1
+Check 'S19 file : ticket d un lanceur mort ignore et retire, pas de ticket laisse' ($got -eq 'lance' -and -not (Test-Path $dead) -and -not @(Get-ChildItem $env:ANASTASIS_EDITOR_QUEUE_DIR -Filter '*.ticket').Count) $got
+Remove-Item Env:ANASTASIS_EDITOR_QUEUE_DIR
+
 Remove-Item $base -Recurse -Force -ErrorAction SilentlyContinue
