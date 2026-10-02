@@ -83,6 +83,14 @@ avançait `main` pendant ces 25 min. Désormais :
    écartée, le lot se relance sans elle.
 4. **Personne d'autre ne déplace `main`.** Pendant un lot, `integrate` refuse (`MAIN_LOCK::TENU`). Ne
    jamais contourner par un `git merge` / `git fetch . x:main` à la main.
+   **Un seul intégrateur (Alexandre, 2026-10-01)** : une seule session, désignée par Alexandre, lance
+   `integrate` et `integrate-batch` ; aujourd'hui c'est une session Claude Code ouverte sur la racine canonique.
+   **Tout autre agent — Codex, Cursor, Claude dans un worktree — s'arrête à `HANDOFF_READY::YES`**, même si on
+   lui dit « intègre » ou « mets-le dans le jeu » : il le dit, et c'est l'intégrateur qui verse. Une mission prête
+   se voit d'elle-même dans `status` (`PRETES_POUR_LE_LOT::`) ; ce qui doit être su avant le versement (ordre,
+   dépendance entre branches, conflit connu, preuve fragile) s'écrit dans `INTEGRATION_RISK` de la fiche.
+   Deux intégrateurs se volent le verrou et la base : leurs lots se refusent l'un l'autre (`main a bougé`)
+   et chacun perd ses 20 minutes de portail.
 5. **Regarder dans l'éditeur** (MCP, capture, réglage à l'œil) reste permis, un à la fois : `anastasis-unreal.ps1 editor`,
    puis fermer. Pas pendant qu'un lot tourne (`status` → `MAIN_LOCK`).
 6. **Règle de retest (RETEST_RULE_001, adoptée par Alexandre le 2026-10-01)** : si les arbres git de `Source/`,
@@ -92,7 +100,7 @@ avançait `main` pendant ces 25 min. Désormais :
    nouveau PASS. Un seul fichier Unreal différent : portail complet (`RETEST::REQUIS` dans `integrate`). Seule
    une preuve `proved` couvre la suite ; `queued` ne couvre que le build. `integrate` rejoue désormais sur `main`
    une branche qui n'est plus en avance rapide, au lieu de la refuser, quand la règle le permet ; `-Full` la désactive.
-6. **`finish -Prove`** (suite dans ton propre éditeur) est l'exception : quand Alexandre attend un verdict
+7. **`finish -Prove`** (suite dans ton propre éditeur) est l'exception : quand Alexandre attend un verdict
    tout de suite, ou pour une mission que le lot ne peut pas juger.
 
 Chaque worktree a ses propres `Binaries/` et `Intermediate/` : le premier build y est

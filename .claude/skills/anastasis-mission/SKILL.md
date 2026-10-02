@@ -52,7 +52,9 @@ machine : on ne démarre plus d'éditeur pour se prouver. La suite et les preuve
    `(nounreal)`, sans build. `finish -Prove` (suite dans ton propre éditeur) : seulement si Alexandre
    attend un verdict tout de suite ; rapporter alors PASS / KNOWN_EXPECTED_FAILURE / FAIL séparément.
    `finish` marque le commit : un commit ajouté ensuite exige un nouveau `finish`.
-4. **Ne pas intégrer soi-même.** S'arrêter à `HANDOFF_READY::YES` : l'intégrateur voit ta mission dans
+4. **Ne pas intégrer soi-même**, même sur « intègre » ou « mets-le dans le jeu » : une seule session, désignée
+   par Alexandre, lance `integrate` / `integrate-batch` (`AGENTS.md`, « Un seul intégrateur »). Ordre, dépendance
+   entre branches ou preuve fragile : dans `INTEGRATION_RISK`. S'arrêter à `HANDOFF_READY::YES` : l'intégrateur voit ta mission dans
    `status` (`PRETES_POUR_LE_LOT::`). Le verdict du lot (`BATCH_INTEGRATED::` ou `BATCH_PROOF_FAIL::<preuve>
    (mission <toi>)`) est ta vraie preuve.
 
@@ -69,7 +71,7 @@ Si `finish` échoue :
 | `editeur Unreal encore ouvert sur ce worktree` | c'est le tien : `quit_editor()` par MCP ou `Stop-Process -Id <pid>`, puis relancer `finish` |
 | `EDITOR_GATE::WAIT` / `EDITOR_GATE::TIMEOUT` | porte mémoire (`AGENTS.md`) : trop d'éditeurs ou de RAM prise ; relancer plus tard, jamais `ANASTASIS_EDITOR_GATE=0` sans mandat |
 
-## 4. Verser (rôle intégrateur, sur demande d'Alexandre)
+## 4. Verser (rôle intégrateur : la seule session désignée par Alexandre)
 
 **File groupée, la voie normale.** Une seule session intègre ; elle verse toutes les missions prêtes d'un coup :
 
