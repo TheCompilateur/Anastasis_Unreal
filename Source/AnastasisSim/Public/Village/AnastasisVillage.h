@@ -194,6 +194,7 @@
 #include "Core/AnastasisSimBudget.h"
 #include "Core/AnastasisSpatialGrid.h"
 #include "Life/AnastasisBonds.h"
+#include "Life/AnastasisLifestyle.h"
 #include "Life/AnastasisNeeds.h"
 #include "Life/AnastasisVillageRhythm.h"
 #include "Life/AnastasisWeatherBehavior.h"
@@ -683,6 +684,13 @@ namespace AnastasisVillage
 		 */
 		TOptional<AnastasisGenome::FPhenotype> Phenotype;
 		TOptional<AnastasisConditioning::FConditioning> Conditioning;
+
+		/**
+		 * `npc.lifestyle` (lifestyle-wiring-001) : le mode de vie et son score de regularite,
+		 * tenu une fois par jour (`LifestyleDailyUpdate`). Non pose : habitant cree par le C++,
+		 * sans mode de vie, et aucun tirage pour lui en donner un (ecart n°8).
+		 */
+		TOptional<AnastasisLifestyle::FLifestyle> Lifestyle;
 
 		/** `npc.relations` (ordre d'insertion), `mind.people`, `mind.tom`, `npc.moodlets`. */
 		TArray<TPair<FString, double>> Relations;

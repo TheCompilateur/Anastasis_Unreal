@@ -369,6 +369,14 @@ en première ligne, AVANT la cadence. `lifestyleIndoorDuration` et `lifestyleNot
 (`GetAnastasisFallbackRng`), un flux global. `lifestyleTarget` rend un bâtiment ; l'appelant calcule le
 point d'accès, une fois, comme la référence.
 
+**Branché en partie par lifestyle-wiring-001.** `FNpc::Lifestyle` (`TOptional<FLifestyle>`) ; le lecteur
+lit `npc.lifestyle` avec les `??=` d'`ensureLifestyle` et le projette, et refuse un habitant sans mode de vie
+(ou d'identifiant inconnu) : `deserialize` le tirerait dans `sim.rng`. `UpdateNpc` appelle
+`LifestyleDailyUpdate` juste après la cadence, avant les besoins, pour tout habitant qui en a un. Pas
+branchés : l'`ensureLifestyle` de tête (aucun habitant C++ n'a de mode de vie, écart n° 8), `lifestyleBias`
+et les autres lectures (décision, marche, intérieur, destination, `placeMemory`). Preuve :
+`Anastasis.Sim.Village.ModeDeVie` ; au forage du tick 1, `lifestyle` est égal à la référence.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

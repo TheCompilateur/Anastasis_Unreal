@@ -547,6 +547,25 @@ namespace AnastasisJsSave
 				&& R.OptDouble(C, TEXT("recoveryConditioning"), Where, Out.RecoveryConditioning);
 		}
 
+		/**
+		 * `npc.lifestyle` : `{ id, sinceDay, rhythmScore, lastNotedDay }`, avec les `??=`
+		 * d'`ensureLifestyle` (0, 0, 1). Un mode de vie absent ou inconnu, `deserialize` le TIRE
+		 * dans `sim.rng` (`save.js`) : ce tirage a la lecture n'est pas reproduit, il est refuse.
+		 */
+		bool ReadLifestyle(FReader& R, const FValue& L, const FString& Where, AnastasisLifestyle::FLifestyle& Out)
+		{
+			if (!L.IsObject()) return R.Fail(Where, TEXT("objet attendu"));
+			if (!R.String(L, TEXT("id"), Where, Out.Id)) return false;
+			AnastasisLifestyle::ELifestyle Known;
+			if (!AnastasisLifestyle::LifestyleFromId(Out.Id, Known))
+			{
+				return R.Fail(FReader::At(Where, TEXT("id")), TEXT("mode de vie inconnu : deserialize le retirerait dans sim.rng, non reproduit"));
+			}
+			return R.OptDouble(L, TEXT("sinceDay"), Where, Out.SinceDay)
+				&& R.OptDouble(L, TEXT("rhythmScore"), Where, Out.RhythmScore)
+				&& R.OptDouble(L, TEXT("lastNotedDay"), Where, Out.LastNotedDay);
+		}
+
 		bool ReadActor(FReader& R, const FValue& A, const FString& Where, uint32 WorldSeed, AnastasisVillage::FNpc& Out)
 		{
 			if (!A.IsObject()) return R.Fail(Where, TEXT("objet attendu"));
@@ -619,6 +638,12 @@ namespace AnastasisJsSave
 			{
 				if (!ReadConditioning(R, *C, FReader::At(Where, TEXT("conditioning")), Out.Conditioning.GetValue())) return false;
 			}
+			const FValue* Lifestyle = A.Find(TEXT("lifestyle"));
+			if (!Lifestyle || Lifestyle->IsNull())
+			{
+				return R.Fail(FReader::At(Where, TEXT("lifestyle")), TEXT("absent : deserialize le tirerait dans sim.rng, non reproduit"));
+			}
+			if (!ReadLifestyle(R, *Lifestyle, FReader::At(Where, TEXT("lifestyle")), Out.Lifestyle.Emplace())) return false;
 			if (const FValue* Inside = A.Find(TEXT("inside")); Inside && !Inside->IsNull())
 			{
 				return R.Fail(FReader::At(Where, TEXT("inside")), TEXT("habitant a l'interieur : non lu par ce lecteur (inside non nul)"));
@@ -706,6 +731,18 @@ namespace AnastasisJsSave
 				Obj.Set(TEXT("fatigueAdaptation"), Num(C.FatigueAdaptation));
 				Obj.Set(TEXT("recoveryConditioning"), Num(C.RecoveryConditioning));
 				Out.Set(TEXT("conditioning"), Obj);
+			}
+			// Le mode de vie : son score et le jour note bougent une fois par jour, l'identifiant jamais.
+			if (N.Lifestyle.IsSet() && (bNew || Out.Find(TEXT("lifestyle"))))
+			{
+				const AnastasisLifestyle::FLifestyle& L = N.Lifestyle.GetValue();
+				const FValue* Old = Out.Find(TEXT("lifestyle"));
+				FValue Obj = (Old && Old->IsObject()) ? *Old : FValue::MakeObject();
+				Obj.Set(TEXT("id"), Str(L.Id));
+				Obj.Set(TEXT("sinceDay"), Num(L.SinceDay));
+				Obj.Set(TEXT("rhythmScore"), Num(L.RhythmScore));
+				Obj.Set(TEXT("lastNotedDay"), Num(L.LastNotedDay));
+				Out.Set(TEXT("lifestyle"), Obj);
 			}
 			// `inside` non nul n'est pas lu (ReadActor refuse) : un habitant lu est dehors.
 			Put(Out, TEXT("inside"), FValue(), bNew);

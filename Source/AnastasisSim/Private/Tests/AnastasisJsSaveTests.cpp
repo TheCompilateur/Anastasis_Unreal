@@ -290,6 +290,16 @@ bool FAnastasisHarnessReadTest::RunTest(const FString& Parameters)
 		AddInfo(FString::Printf(TEXT("refus attendu : %s"), *BadError));
 	}
 	{
+		// Sans mode de vie, `deserialize` en tirerait un dans `sim.rng` : non reproduit, refuse.
+		FValue Bad = *Save;
+		FValue* Actors = Bad.Find(TEXT("actors"));
+		Actors->Items[0].Set(TEXT("lifestyle"), FValue());
+		AnastasisJsSave::FState Ignored;
+		FString BadError;
+		TestFalse(TEXT("habitant sans mode de vie : refuse"), AnastasisJsSave::Read(Bad, Ignored, BadError));
+		AddInfo(FString::Printf(TEXT("refus attendu : %s"), *BadError));
+	}
+	{
 		FValue Bad = *Save;
 		FValue* Buildings = Bad.Find(TEXT("buildings"));
 		Buildings->Items[0].Set(TEXT("createdDay"), FValue::MakeNumber(1.5));

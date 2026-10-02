@@ -169,7 +169,7 @@ ni dortoir. `redirectDomesticDoorFailure` bascule sur `explore`, non porté : ic
 - **statut** : OUVERT
 - **entree** : tranches puits → grenier (first-building-001, house-rest-001, granary-eat-001)
 - **reference** : `createNpc` (âge, famille, mode de vie, `ensureGenome`, `ensureConditioning`), `jobPriority`
-- **cpp** : `Village/AnastasisVillage.cpp`, création des habitants ; `FNpc::Phenotype` / `FNpc::Conditioning` non posés
+- **cpp** : `Village/AnastasisVillage.cpp`, création des habitants ; `FNpc::Phenotype` / `FNpc::Conditioning` / `FNpc::Lifestyle` non posés
 - **harnais** : actors
 - **detail** : `Public/Village/AnastasisVillage.h`, n° 8
 
@@ -178,6 +178,11 @@ métiers du catalogue. Le rendu (`Anastasis_UnrealV2/Village`) n'a donc pas d'en
 Depuis needs-wiring-001, les besoins lisent le phénotype et le conditionnement de l'habitant ; un
 habitant créé par le C++ n'a ni génome ni conditionnement, il reste médian (facteurs 1, conditionnement
 immobile). Le harnais n'en souffre pas : ses habitants sont lus, `deserialize` les complète.
+Depuis lifestyle-wiring-001, un habitant qui a un mode de vie le tient jour après jour
+(`lifestyleDailyUpdate`, après la cadence) ; un habitant créé par le C++ n'en a pas, et l'`ensureLifestyle`
+de tête d'`updateNpc`, qui le tirerait dans `sim.rng`, n'est pas branché. Les autres lectures du mode de
+vie (`lifestyleBias` dans la table, `lifestyleTravelFactor`, `lifestyleIndoorDuration`, `lifestyleTarget`,
+`lifestyleNotePlaceUse`) attendent la décision et `placeMemory` (n° 1).
 
 ### n° 9 — Noûs partiel
 

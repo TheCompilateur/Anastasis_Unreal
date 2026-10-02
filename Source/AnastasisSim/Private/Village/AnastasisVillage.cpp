@@ -1347,6 +1347,23 @@ namespace AnastasisVillage
 			Dt = Step.Dt;
 		}
 
+		// `lifestyleDailyUpdate(sim, npc)`, juste apres la cadence et avant `tickNeeds` : une fois par
+		// jour au plus, le score de regularite suit le but du moment. L'`ensureLifestyle` de tete
+		// d'`updateNpc` ne tire que pour un habitant SANS mode de vie ; ceux du C++ n'en ont pas et
+		// n'en recoivent pas (ecart n°8) : ils ne passent pas ici.
+		if (Npc.Lifestyle.IsSet())
+		{
+			AnastasisLifestyle::FLifestyleSubject Subject;
+			Subject.Goal = Npc.Goal;
+			Subject.JobId = Npc.JobId;
+			Subject.HomeId = Npc.HomeId;
+			Subject.Skill = Npc.Skill;
+			Subject.Energy = Npc.Needs.Energy;
+			Subject.bHasTarget = Npc.bHasTarget;
+			AnastasisLifestyle::LifestyleDailyUpdate(Npc.Lifestyle, Subject, &VillageRng,
+				static_cast<double>(Day()), AnastasisRhythm::DayFracOf(Now));
+		}
+
 		// Les cinq facteurs de l'habitant, lus en tete de `tickNeeds`, AVANT la branche.
 		// Sans phenotype ni conditionnement (habitant cree par le C++), facteurs 1 : ecart n°8.
 		const AnastasisNeeds::FNeedFactors Factors = AnastasisNeeds::NeedFactorsFor(
