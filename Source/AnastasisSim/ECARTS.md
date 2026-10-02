@@ -68,7 +68,8 @@ sim-rng-001 : `goalNoise` et la table de ses 17 tirages sont portés (`Ai/Anasta
 perception-explore-001 : branchés. Chaque décision tire `exploreTarget` (préparation, ligne `explore` de
 `failureTargetBiasMap`) puis les 14 bruits et leurs 3 conditionnels, à leur place dans les sommes ;
 `Village.TiragesDecision` rejoue les décisions mesurées au tirage près. Restent le plancher 42 et
-`observer`.
+`observer`. Le bruit d'une ligne non portée est TIRÉ (l'ordre du flux en dépend) mais PAS AJOUTÉ au
+plancher : ajouté à un score inventé, il faisait gagner `observer` au hasard (`Village.Endurance`).
 
 ### n° 2 — Ni reconsidération aléatoire, ni collant de but
 
