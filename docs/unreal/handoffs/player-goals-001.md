@@ -68,7 +68,7 @@ ligne BUTS ; 0 retire l'intention.
 ## ECARTS
 
 - ouvert : n° 20 — Le joueur est un habitant : incarnation et main portées, sans flux joueur ni parole dirigée (A_TRANCHER)
-- ouvert : n° 21 — Le remède passe quand le corps parle (EXTENSION, A_TRANCHER : à trancher par Alexandre)
+- ouvert puis tranché : n° 21 — Le remède passe quand le corps parle (EXTENSION, **ASSUME** : décision d'Alexandre du 2026-10-01, « Il faut pas que le joueur meurt de soif pour une règle absurde »)
 - ouvert : n° 22 — Présence, oisiveté et réputation du joueur (EXTENSION, A_TRANCHER ; entré avec player-minimal-001 sans fiche, numéroté ici)
 - ouvert : n° 23 — Réputation : seul le mérite des bâtiments est porté (REDUIT, A_TRANCHER)
 - cités, inchangés : n° 1 (but non porté dans la table du joueur), n° 2 (collant non porté, ligne retouchée)

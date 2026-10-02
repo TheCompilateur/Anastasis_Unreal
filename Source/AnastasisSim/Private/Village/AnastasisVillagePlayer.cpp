@@ -191,7 +191,7 @@ namespace AnastasisVillage
 		}
 		const FString& Wanted = PlayerChoice.Goal;
 		// 1. Le corps passe devant. L'intention n'est pas retiree : le joueur choisit le remede.
-		//    EXTENSION (ecart n°21) : la reference teste `bodyOverrides` avant tout et refuse donc AUSSI
+		//    EXTENSION ASSUMEE par Alexandre le 2026-10-01 (ecart n°21) : la reference teste `bodyOverrides` avant tout et refuse donc AUSSI
 		//    le remede -- un joueur a soif 88 ne pourrait plus jamais boire. Son propre commentaire dit
 		//    « le joueur doit choisir le remede » : le remede du besoin qui parle passe.
 		if (BodyOverrides(Npc) && !IsRemedyFor(Npc, Wanted)) return CedePlayerGoal(PlayerDecision::RefusalBody);

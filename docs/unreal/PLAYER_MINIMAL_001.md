@@ -83,7 +83,7 @@ qui dure jusqu'à ce qu'il la retire ; elle est décidée au même point que cel
 L'intention n'est jamais remplacée par un choix de Noûs : un refus fait **attendre**. Noûs ne pense pas pour
 l'habitant incarné (ni biais, ni porte de commit). Écart assumé (EXTENSION) : la référence refuse aussi le
 remède quand le corps parle, donc un joueur à soif 88 ne pourrait plus jamais boire. Son propre commentaire
-dit « le joueur doit choisir le remède » : ici, le remède passe.
+dit « le joueur doit choisir le remède » : ici, le remède passe. **Assumé par Alexandre le 2026-10-01** (écart n° 21) : « Il faut pas que le joueur meurt de soif pour une règle absurde ».
 
 En PIE : touches **1 à 5** = les buts de la ligne `BUTS` à l'écran (dans l'ordre de la table), **0** =
 retirer l'intention ; console `Anastasis.Player.Goal <but|none>`, `Anastasis.Player.Choose <n>`.

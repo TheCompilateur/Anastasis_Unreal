@@ -374,7 +374,8 @@ référence pose sans vérifier. Les options affichées sont celles de la derni�
 ### n° 21 — Le remède passe quand le corps parle
 
 - **classe** : EXTENSION
-- **destin** : A_TRANCHER
+- **destin** : ASSUME
+- **decision** : 2026-10-01 Alexandre — « Il faut pas que le joueur meurt de soif pour une règle absurde » (session « Mécanisme d'accélération temporelle », mission player-goals-001)
 - **activation** : joueur incarné dont l'intention est `drink` (soif ≥ 88), `eat` (faim ≥ 92) ou `rest` (énergie ≤ 12) ; aucun scénario du harnais n'incarne de joueur
 - **statut** : OUVERT
 - **entree** : player-goals-001
@@ -384,7 +385,8 @@ référence pose sans vérifier. Les options affichées sont celles de la derni�
 
 La référence cède à TOUTE intention quand le corps parle, remède compris : un joueur à soif 88 ne
 pourrait plus jamais boire et finirait par mourir. Son propre commentaire dit « le joueur doit choisir
-le remède ». À trancher par Alexandre : `ASSUME` (le jeu garde ce comportement) ou corriger la référence.
+le remède ». **Assumé par Alexandre** : sur ce point, Unreal fait référence, le remède du besoin qui
+parle passe toujours. Un scénario comparatif ne doit pas incarner de joueur.
 
 ### n° 22 — Présence, oisiveté et réputation du joueur (temps accéléré)
 
