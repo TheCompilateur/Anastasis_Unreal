@@ -51,6 +51,8 @@ struct FSettings
 	bool bNaturalHistory = false;
 	/** Ecotone-002: forest communities use trees, not the mixed grass-exclusion obstacles. */
 	bool bTreeCanopyEcotone = false;
+	/** Woodland-sequence-003: clustered recruitment; non-forest selection stays reference-identical. */
+	bool bWoodlandSequence = false;
 	/** Pas des candidats de berge (uu). Un candidat par cellule, jamais un tapis. */
 	double BankCellUU = 200.0;
 	/** Hauteur au-dessus de la nappe ou la berge existe (uu). Au-dela, seulement si l'humidite de rive est forte. */
@@ -127,6 +129,7 @@ struct FSoilField
 
 struct FPlan
 {
+	bool bWoodlandSequence = false;
 	TArray<FPlacement> Instances;
 	int32 Counts[RoleCount] = {};
 	int32 PocketCells[PocketCount] = {};

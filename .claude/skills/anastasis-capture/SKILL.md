@@ -81,3 +81,7 @@ explique le choix. Prairie temoin inchangee. Seule TreeCanopyEcotone bascule ;
 NaturalHistory reste a 1. Preuve ecotone-capture au registre. PASS instrumental :
 hauteurs identiques, retour spatial temoin, inventaire non-MicroEco echantillonne
 identique. Ces echantillons ne couvrent pas chaque instance ni la marche joueur.
+
+## Woodland sequence 003
+
+Etats woodland_reference,woodland,woodland_reference2 : groupes de regeneration, adultes et herbe inchanges. Choix du bord plus dense (au moins six arbres derriere, moins de la moitie devant), quatre poses humaines dont une ouverture locale et une vue oblique. Controle des positions de TOUS les microelements de berge/prairie, du plafond total et des inventaires echantillonnes habituels. Le plan de reference ecotone determine le budget forestier ; aucune redistribution des berges autorisee.

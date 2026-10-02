@@ -470,6 +470,82 @@ static void AddForest(const FInputs& In, const FSettings& C, const FMicroCanopyI
 	}
 }
 
+// The accepted crowns provide support and shelter. Noise only breaks an eligible
+// margin into recruitment cohorts; it cannot create a forest in open meadow.
+static void AddWoodland(const FInputs& In, const FSettings& C, const FMicroCanopyIndex& Trees,
+    const FMicroCanopyIndex& Obstacles, FRow& Row)
+{
+    TSet<uint64> Visited;
+    constexpr double Step = 350.0;
+    for (const FVector& Anchor : In.TreeCanopy)
+    {
+        if (Anchor.Z < 80.0) continue;
+        const double Reach = Anchor.Z + 1400.0;
+        for (int32 GY=FMath::FloorToInt((Anchor.Y-Reach)/Step); GY<=FMath::FloorToInt((Anchor.Y+Reach)/Step); ++GY)
+        for (int32 GX=FMath::FloorToInt((Anchor.X-Reach)/Step); GX<=FMath::FloorToInt((Anchor.X+Reach)/Step); ++GX)
+        {
+            const uint64 Key = (static_cast<uint64>(static_cast<uint32>(GX)) << 32) | static_cast<uint32>(GY);
+            if (Visited.Contains(Key)) continue;
+            Visited.Add(Key);
+            const double X = (GX + 0.2 + 0.6*MicroUnit(MicroMix(In.Seed,GX,GY,201u))) * Step;
+            const double Y = (GY + 0.2 + 0.6*MicroUnit(MicroMix(In.Seed,GX,GY,203u))) * Step;
+            if (!In.Bounds.IsInside(FVector2D(X,Y)) || InClearing(In,X,Y)) continue;
+            double Z=0.0, Slope=0.0;
+            FVector Normal;
+            if (!SampleSlope(In,X,Y,C.ProbeUU,Z,Slope,Normal) || Slope>C.MaxForestSlope) continue;
+            double Above=1.0e9;
+            if (In.SampleWaterHeight)
+            {
+                double Water=0.0;
+                if (!In.SampleWaterHeight(X,Y,Water) || !FMath::IsFinite(Water)) continue;
+                Above=Z-Water;
+                if (Above<C.BankMinAboveUU || IsBank(Above,WetnessAt(In,X,Y),C)) continue;
+            }
+            const double Crown=Trees.Nearest(X,Y);
+            if (Crown<0.25 || Obstacles.Nearest(X,Y)<0.30) continue;
+            double Cover=0.0;
+            int32 Neighbors=0;
+            const FIntPoint Home(FMath::FloorToInt(X/Trees.Cell),FMath::FloorToInt(Y/Trees.Cell));
+            const int32 Search=FMath::CeilToInt(3000.0/Trees.Cell)+1;
+            for (int32 DY=-Search; DY<=Search; ++DY) for (int32 DX=-Search; DX<=Search; ++DX)
+            {
+                const TArray<int32>* Ids=Trees.Cells.Find(Home+FIntPoint(DX,DY));
+                if (!Ids) continue;
+                for (int32 I : *Ids)
+                {
+                    const FVector& Tree=(*Trees.Crowns)[I];
+                    const double D=FVector2D::Distance(FVector2D(X,Y),FVector2D(Tree.X,Tree.Y));
+                    if (D<2400.0 && Tree.Z>=80.0) ++Neighbors;
+                    Cover += MicroSmooth(1.0-D/(Tree.Z+1400.0));
+                }
+            }
+            const double Cohort=MicroCluster(In.Seed^0x7A31u,X/1800.0,Y/1800.0,211u);
+            // Gaps persist between cohorts. The same patch controls role and age.
+            if (Cohort<0.40 || Cohort>0.76) continue;
+            const int32 IX=FMath::FloorToInt(X), IY=FMath::FloorToInt(Y);
+            const double Pick=MicroUnit(MicroMix(In.Seed,IX,IY,213u));
+            FPlacement P;
+            P.Ground=FVector(X,Y,Z); P.Normal=Normal; P.SlopeDegrees=Slope; P.AboveWater=Above;
+            ERole Role;
+            if (Crown<0.92)
+            {
+                // Organic debris belongs under crowns; regeneration occupies their lit openings.
+                if (Crown>0.62 && Cohort>0.62 && Neighbors>=3) Role=ERole::UnderSapling;
+                else Role=Pick<0.20?ERole::UnderLog:Pick<0.35?ERole::UnderStump:Pick<0.80?ERole::UnderBranch:ERole::UnderRoots;
+            }
+            else
+            {
+                if (Neighbors<3 || Cover<0.35 || Obstacles.Nearest(X,Y)<1.02) continue;
+                Role=Cover>0.95 && Cohort>0.52 ? ERole::EdgeSapling : ERole::EdgeBush;
+            }
+            Arm(P,In.Seed,IX,IY,Role,EPocket::None,0.80,1.30,217u);
+            if (Role==ERole::EdgeSapling || Role==ERole::UnderSapling)
+                P.Scale=FMath::Lerp(1.3,3.6,MicroSmooth((Cohort-0.50)/0.26))*(0.90+0.20*Pick); // height in metres
+            Row.Items.Add(P);
+        }
+    }
+}
+
 static bool IsShorePocket(EPocket Pocket)
 {
 	const uint8 Value = static_cast<uint8>(Pocket);
@@ -699,6 +775,32 @@ bool Build(const FInputs& In, const FSettings& Settings, FPlan& Out, FString& Ou
 		Out.Instances = MoveTemp(Kept);
 		Out.bTruncated = true;
 	}
+    if (Settings.bWoodlandSequence && Settings.bTreeCanopyEcotone)
+    {
+        // Retain the EXACT reference selection outside forest, including its hash order.
+        // Its retained forest count is the new forest's ceiling: no stolen bank/meadow slots.
+        int32 ForestBudget=0;
+        TArray<FPlacement> NonForest;
+        for (const FPlacement& P : Out.Instances)
+        {
+            if (static_cast<uint8>(P.Role)>=static_cast<uint8>(ERole::EdgeBush)) ++ForestBudget;
+            else NonForest.Add(P);
+        }
+        Detail::FRow Woodland;
+        Detail::AddWoodland(In,Settings,TreeCrowns,Crowns,Woodland);
+        Woodland.Items.Sort([&](const FPlacement& A,const FPlacement& B)
+        {
+            const uint32 HA=Detail::MicroMix(In.Seed,FMath::FloorToInt(A.Ground.X),FMath::FloorToInt(A.Ground.Y),223u);
+            const uint32 HB=Detail::MicroMix(In.Seed,FMath::FloorToInt(B.Ground.X),FMath::FloorToInt(B.Ground.Y),223u);
+            if (HA!=HB) return HA<HB;
+            return A.Ground.X!=B.Ground.X ? A.Ground.X<B.Ground.X : A.Ground.Y<B.Ground.Y;
+        });
+        const int32 Limit=FMath::Min(ForestBudget,FMath::Max(0,Settings.MaxInstances-NonForest.Num()));
+        if (Woodland.Items.Num()>Limit) Woodland.Items.SetNum(Limit);
+        Out.Instances=MoveTemp(NonForest);
+        Out.Instances.Append(Woodland.Items);
+        Out.bWoodlandSequence=true;
+    }
 	for (const FPlacement& P : Out.Instances)
 	{
 		++Out.Counts[static_cast<int32>(P.Role)];
@@ -785,7 +887,10 @@ FEmbodyResult Embody(AActor& Owner, const FPlan& Plan, UMaterialInterface* Shape
 		const int32 Variants = FMath::Max(1, AnastasisPlaces::VariantCount(Look.Family));
 		const int32 Variant = FMath::Clamp(FMath::FloorToInt(Detail::MicroUnit(Detail::MicroMix(0xC0FFEEu,
 			FMath::FloorToInt(P.Ground.X), FMath::FloorToInt(P.Ground.Y), 5u)) * Variants), 0, Variants - 1);
-		const FString Path = AnastasisPlaces::MeshPath(Look.Family, Variant);
+		const bool bRecruit = Plan.bWoodlandSequence && (P.Role==ERole::EdgeSapling || P.Role==ERole::UnderSapling);
+        const FString Path = bRecruit
+            ? TEXT("/Game/Anastasis/Vegetation/SM_Tree_Broadleaf_Understory_01.SM_Tree_Broadleaf_Understory_01")
+            : AnastasisPlaces::MeshPath(Look.Family, Variant);
 		UStaticMesh* Mesh = Meshes.FindRef(Path);
 		if (!Mesh && !Meshes.Contains(Path))
 		{
@@ -797,7 +902,15 @@ FEmbodyResult Embody(AActor& Owner, const FPlan& Plan, UMaterialInterface* Shape
 		const FQuat Rotation(FVector::UpVector, FMath::DegreesToRadians(P.Yaw));
 		const int32 CX = FMath::FloorToInt(P.Ground.X / ChunkUU), CY = FMath::FloorToInt(P.Ground.Y / ChunkUU);
 		const uint64 Key = KeyOf(static_cast<int32>(P.Role), Variant, CX, CY);
-		Batches.FindOrAdd(Key).Add(FTransform(Rotation, P.Ground - FVector(0, 0, 6.0), FVector(P.Scale)));
+		double Scale=P.Scale;
+        FVector Ground=P.Ground-FVector(0,0,6.0);
+        if (bRecruit)
+        {
+            const FBox Bounds=Mesh->GetBoundingBox();
+            Scale=P.Scale*100.0/FMath::Max(1.0,Bounds.Max.Z-Bounds.Min.Z);
+            Ground.Z=P.Ground.Z-Bounds.Min.Z*Scale;
+        }
+        Batches.FindOrAdd(Key).Add(FTransform(Rotation,Ground,FVector(Scale)));
 		Looks.FindOrAdd(Key) = Look;
 		BatchMesh.FindOrAdd(Key) = Mesh;
 	}

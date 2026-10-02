@@ -38,6 +38,10 @@ static TAutoConsoleVariable<int32> CVarEcologicalDressing(
     TEXT("0=legacy tile dressing, 1=forest grammar on continuous terrain; applied on embodiment."), ECVF_Default);
 
 // WORLD_DRESSING_01. Coupable pour les captures A/B : meme monde, meme dressing, sans les lieux.
+static TAutoConsoleVariable<int32> CVarWoodlandSequence(
+    TEXT("anastasis.Dressing.WoodlandSequence"), 1,
+    TEXT("1=grouped forest recruitment and stable non-forest budget; 0=ecotone reference. Applied on embodiment."), ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarTreeCanopyEcotone(
 	TEXT("anastasis.Dressing.TreeCanopyEcotone"), 1,
 	TEXT("1=forest communities anchored to tree crowns only; 0=mixed obstacle reference. Applied on embodiment."), ECVF_Default);
@@ -1568,6 +1572,7 @@ void AAnastasisWorldEmbodiment::PlaceMicroEcology(const AnastasisWorldView::FWor
 	FString Error;
 	AnastasisMicroEcology::FSettings EcoSettings;
 	EcoSettings.bNaturalHistory = CVarNaturalHistory.GetValueOnGameThread() != 0;
+	EcoSettings.bWoodlandSequence = CVarWoodlandSequence.GetValueOnGameThread() != 0;
 	EcoSettings.bTreeCanopyEcotone = CVarTreeCanopyEcotone.GetValueOnGameThread() != 0;
 	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_ECOTONE trees_only=%d trees=%d obstacles=%d"),
 		EcoSettings.bTreeCanopyEcotone, TreeCanopy.Num(), Canopy.Num());

@@ -33,6 +33,9 @@ import os, time, math, json, hashlib, unreal
 
 OUT = os.environ.get('ANASTASIS_GROUND_OUT')
 STATE_CMDS = {
+    'woodland_reference': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 1', 'anastasis.Dressing.WoodlandSequence 0'),
+    'woodland': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 1', 'anastasis.Dressing.WoodlandSequence 1'),
+    'woodland_reference2': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 1', 'anastasis.Dressing.WoodlandSequence 0'),
     'ecotone_reference': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 0'),
     'ecotone': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 1'),
     'ecotone_reference2': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 0'),
@@ -66,8 +69,10 @@ les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 handle = None
-ecotone_run = any(s.startswith('ecotone') for s in states)
+woodland_run = any(s.startswith('woodland') for s in states)
+ecotone_run = woodland_run or any(s.startswith('ecotone') for s in states)
 natural_run = ecotone_run or any(s in ('natural', 'reference', 'reference2') for s in states)
+original_woodland = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.WoodlandSequence')
 original_ecotone = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.TreeCanopyEcotone')
 original_hour = unreal.SystemLibrary.get_console_variable_float_value('anastasis.Sky.Hour')
 original_natural = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.NaturalHistory')
@@ -79,6 +84,8 @@ def finish(msg, error=False):
     if natural_run:
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Sky.Hour %s' % original_hour)
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.NaturalHistory %s' % original_natural)
+    if natural_run:
+        unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.WoodlandSequence %s' % original_woodland)
     if ecotone_run:
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.TreeCanopyEcotone %s' % original_ecotone)
     (unreal.log_error if error else unreal.log)(msg)
@@ -101,6 +108,8 @@ try:
 
     if natural_run:
         cmd('anastasis.Sky.Hour 11')
+        if not woodland_run:
+            cmd('anastasis.Dressing.WoodlandSequence 0')
     for c in ('ShowFlag.Sprites 0', 'ShowFlag.Grid 0', 'viewmode lit') + STATE_CMDS[states[0]]:
         cmd(c)
     cls = unreal.load_class(None, '/Script/Anastasis_UnrealV2.AnastasisWorldEmbodiment')
@@ -154,12 +163,13 @@ try:
         if not natural_run:
             return
         actual = unreal.SystemLibrary.get_console_variable_int_value(
-            'anastasis.Dressing.TreeCanopyEcotone' if ecotone_run else 'anastasis.Dressing.NaturalHistory')
-        if actual != (1 if state in ('natural', 'ecotone') else 0):
+            'anastasis.Dressing.WoodlandSequence' if woodland_run else 'anastasis.Dressing.TreeCanopyEcotone' if ecotone_run else 'anastasis.Dressing.NaturalHistory')
+        if actual != (1 if state in ('natural', 'ecotone', 'woodland') else 0):
             raise RuntimeError('NaturalHistory switch not applied')
         counts = {}
         spatial = []
         non_micro = []
+        protected_micro = []
         for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
             count = comp.get_instance_count()
             if count:
@@ -177,12 +187,19 @@ try:
                 spatial.append(item)
                 if not comp.get_name().startswith('MicroEco_'):
                     non_micro.append(item)
+                elif woodland_run and not comp.get_name().startswith(('MicroEco_edge_', 'MicroEco_under_', 'MicroEco_log_', 'MicroEco_stump_', 'MicroEco_roots_')):
+                    positions=[]
+                    for i in range(count):
+                        got=comp.get_instance_transform(i, True)
+                        xf=got[1] if isinstance(got, tuple) else got
+                        positions.append([xf.translation.x, xf.translation.y, xf.translation.z])
+                    protected_micro.append([mesh.get_path_name(), count, sorted(positions)])
         if not any(n.startswith('GroundCover_') for n in counts):
             raise RuntimeError('no ground cover to compare')
         heights = [ground(x*T, y*T) for y in range(4, 93, 4) for x in range(4, 93, 4)]
         if any(z is None for z in heights):
             raise RuntimeError('sampled terrain missing')
-        habitat[state] = {'switch': actual, 'instances': counts, 'spatial_inventory': sorted(spatial), 'non_micro_inventory': sorted(non_micro),
+        habitat[state] = {'switch': actual, 'instances': counts, 'spatial_inventory': sorted(spatial), 'non_micro_inventory': sorted(non_micro), 'protected_micro': sorted(protected_micro),
                           'sampled_ground_sha256': hashlib.sha256(json.dumps(heights).encode()).hexdigest()}
         unreal.log('NATURAL_HISTORY_SAMPLE state=%s instances=%d ground=%s' % (
             state, sum(counts.values()), habitat[state]['sampled_ground_sha256']))
@@ -300,13 +317,13 @@ try:
                 x, y = xf.translation.x, xf.translation.y
                 trees[(round(x), round(y))] = (x, y)
         points = list(trees.values())
-        target = (28*T, 58*T)
-        candidates = sorted(points, key=lambda p: (p[0]-target[0])**2+(p[1]-target[1])**2)[:250]
+        target = (83*T, 50*T) if woodland_run else (28*T, 58*T)
+        candidates = sorted(points, key=lambda p: (p[0]-target[0])**2+(p[1]-target[1])**2)[:1200 if woodland_run else 250]
         chosen = None
         def nearby(x, y):
             return sum((px-x)**2+(py-y)**2 < 2200**2 for px, py in points)
         for x, y in candidates:
-            dx, dy = 48*T-x, 58*T-y
+            dx, dy = 48*T-x, (48 if woodland_run else 58)*T-y
             length = math.hypot(dx, dy)
             if length < 1:
                 continue
@@ -314,7 +331,7 @@ try:
             outer = (x+dx*1800, y+dy*1800)
             inner = (x-dx*1800, y-dy*1800)
             front, back = nearby(*outer), nearby(*inner)
-            if back < 3 or front >= back:
+            if (back < 6 or front > back*0.45) if woodland_run else (back < 3 or front >= back):
                 continue
             heights = [ground(x+dx*d, y+dy*d) for d in (-1800, -800, 0, 800, 1800, 3500)]
             if any(z is None for z in heights):
@@ -326,12 +343,24 @@ try:
         if chosen is None:
             raise RuntimeError('no observable near forest edge found')
         x, y, dx, dy, front, back = chosen
+        if woodland_run:
+            # Four human-height positions including a locally open pocket inside the stand.
+            gap_candidates=[]
+            for inward in (2000,3500,5000):
+                for side in (-3000,-1500,1500,3000):
+                    gx,gy=x-dx*inward-dy*side,y-dy*inward+dx*side
+                    gz=ground(gx,gy)
+                    if gz is not None:
+                        gap_candidates.append((nearby(gx,gy),inward,abs(side),gx,gy))
+            if not gap_candidates: raise RuntimeError('no observable woodland gap')
+            gap=min(gap_candidates)
+            plan.append(('woodland_gap',(gap[3]/T,gap[4]/T),170,((x-dx*1800)/T,(y-dy*1800)/T),170))
         for name, offset, lift in [('ecotone_open', 1800, 170),
                                    ('ecotone_edge', 800, 170),
-                                   ('ecotone_inside', -800, 170),
-                                   ('ecotone_oblique', 3500, 1400)]:
+                                   ('ecotone_inside', -2200 if woodland_run else -800, 170),
+                                   ('ecotone_oblique', 3500, 3500 if woodland_run else 1400)]:
             plan.append((name, ((x+dx*offset)/T, (y+dy*offset)/T), lift,
-                         ((x-dx*2200)/T, (y-dy*2200)/T), 170))
+                         ((x-dx*(4000 if woodland_run else 2200))/T, (y-dy*(4000 if woodland_run else 2200))/T), 170))
         with open(os.path.join(OUT, 'ecotone-site.json'), 'w') as f:
             json.dump({'tree_xy': [x,y], 'outward_xy': [dx,dy],
                        'front_tree_count_22m': front, 'back_tree_count_22m': back,
@@ -374,13 +403,14 @@ with open(os.path.join(OUT, 'cameras.json'), 'w') as f:
 queue = [(states[0], v) for v in views]
 state_i = 0
 phase, mark, shot, first = 'boot', time.monotonic(), None, True
+walk_done, walk_samples = False, []
 frames = []
 timings = []
 metrics = {}
 
 
 def tick(dt):
-    global phase, mark, shot, first, state_i, queue, frames, timings
+    global phase, mark, shot, first, state_i, queue, frames, timings, walk_done
     try:
         el = time.monotonic() - mark
         try:
@@ -395,6 +425,9 @@ def tick(dt):
                 phase, mark = 'aim', time.monotonic()
         elif phase == 'aim':
             if not queue:
+                if woodland_run and states[state_i]=='woodland' and not walk_done:
+                    phase,mark='walk',time.monotonic()
+                    return
                 state_i += 1
                 if state_i >= len(states):
                     with open(os.path.join(OUT, 'ground-cover.json'), 'w') as f:
@@ -405,12 +438,17 @@ def tick(dt):
                         hashes = {v['sampled_ground_sha256'] for v in habitat.values()}
                         if len(hashes) != 1:
                             raise RuntimeError('terrain samples changed between states')
-                        ref = 'ecotone_reference' if ecotone_run else 'reference'
+                        ref = 'woodland_reference' if woodland_run else 'ecotone_reference' if ecotone_run else 'reference'
                         if ref+'2' in habitat and habitat[ref]['spatial_inventory'] != habitat[ref+'2']['spatial_inventory']:
                             raise RuntimeError('reference spatial inventory not reproducible')
                         if ecotone_run and any(v['non_micro_inventory'] != habitat[ref]['non_micro_inventory'] for v in habitat.values()):
                             raise RuntimeError('ecotone changed sampled non-micro vegetation')
-                        marker = 'ECOTONE_CAPTURE' if ecotone_run else 'NATURAL_HISTORY_CAPTURE'
+                        if woodland_run:
+                            if any(v['protected_micro'] != habitat[ref]['protected_micro'] for v in habitat.values()):
+                                raise RuntimeError('woodland changed bank/meadow positions')
+                            if any(sum(v['instances'].values()) > sum(habitat[ref]['instances'].values()) for v in habitat.values()):
+                                raise RuntimeError('woodland increased instance budget')
+                        marker = 'WOODLAND_CAPTURE' if woodland_run else 'ECOTONE_CAPTURE' if ecotone_run else 'NATURAL_HISTORY_CAPTURE'
                         unreal.log(marker + ' PASS sampled_ground_unchanged=1 views=%d' % len(views))
                     finish('GROUND_CAPTURE_COMPLETE views=%d states=%d' % (len(views), len(states)))
                     return
@@ -443,6 +481,31 @@ def tick(dt):
                     os.remove(shot)
                 cmd('HighResShot 1600x900 filename="%s"' % shot)
                 phase, mark = 'wait', time.monotonic()
+        elif phase == 'walk':
+            by_name={n:(eye,tgt) for n,eye,tgt in views}
+            a,ta=by_name['ecotone_open']; b,tb=by_name['ecotone_edge']
+            u=min(1.0,el/4.0)
+            x,y=a.x+(b.x-a.x)*u,a.y+(b.y-a.y)*u
+            z=ground(x,y)
+            if z is None: raise RuntimeError('walk terrain missing')
+            eye=V(x,y,z+170)
+            target=V(ta.x+(tb.x-ta.x)*u,ta.y+(tb.y-ta.y)*u,ta.z+(tb.z-ta.z)*u)
+            ues.set_level_viewport_camera_info(eye,look(eye,target))
+            if len(walk_samples)==0 or u*12>=len(walk_samples):
+                walk_samples.append([u,x,y,z+170])
+            if u>=1:
+                with open(os.path.join(OUT,'woodland-walk.json'),'w') as f:
+                    json.dump({'eye_cm':170,'distance_xy_cm':math.hypot(b.x-a.x,b.y-a.y),'samples':walk_samples},f,indent=1)
+                shot=os.path.join(OUT,'woodland_walk_end.png').replace('\\','/')
+                if os.path.exists(shot): os.remove(shot)
+                cmd('HighResShot 1600x900 filename="%s"'%shot)
+                phase,mark='walk_shot',time.monotonic()
+        elif phase == 'walk_shot':
+            if os.path.isfile(shot) and el>1:
+                unreal.log('WOODLAND_WALK_COMPLETE eye_cm=170 samples=%d'%len(walk_samples))
+                walk_done=True
+                phase,mark='aim',time.monotonic()
+            elif el>45: raise RuntimeError('woodland walk shot missing')
         elif phase == 'wait':
             if not os.path.isfile(shot):
                 if el > 45:

@@ -399,4 +399,43 @@ bool FAnastasisEcotoneTreeIdentity::RunTest(const FString&)
 	return true;
 }
 
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisWoodlandIsolation, "Anastasis.MicroEcology.WoodlandIsolation",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisWoodlandIsolation::RunTest(const FString&)
+{
+    using namespace AnastasisMicroEcology;
+    FInputs In=AnastasisMicroEcologyTest::Channel();
+    for (int32 Y=2000;Y<23000;Y+=1500) for(int32 X=3500;X<7500;X+=1500)
+        In.TreeCanopy.Add(FVector(X,Y,500));
+    In.Canopy=In.TreeCanopy;
+    FSettings C;
+    C.bNaturalHistory=true; C.bTreeCanopyEcotone=true; C.MaxInstances=512;
+    FPlan Reference, Candidate, Repeat;
+    FString Error;
+    TestTrue(TEXT("reference builds"),Build(In,C,Reference,Error));
+    C.bWoodlandSequence=true;
+    TestTrue(TEXT("woodland builds"),Build(In,C,Candidate,Error));
+    TestTrue(TEXT("repeat builds"),Build(In,C,Repeat,Error));
+    auto Outside=[](const FPlan& P)
+    {
+        TArray<FPlacement> R;
+        for (const auto& V:P.Instances) if(static_cast<uint8>(V.Role)<static_cast<uint8>(ERole::EdgeBush)) R.Add(V);
+        return R;
+    };
+    const auto A=Outside(Reference), B=Outside(Candidate);
+    TestTrue(TEXT("test contains retained bank/meadow placements"),A.Num()>0);
+    bool Same=A.Num()==B.Num();
+    for(int32 I=0;Same && I<A.Num();++I)
+        Same=A[I].Ground.Equals(B[I].Ground,0.0) && A[I].Role==B[I].Role && A[I].Scale==B[I].Scale && A[I].Yaw==B[I].Yaw;
+    TestTrue(TEXT("all bank/meadow poses remain exactly reference-identical"),Same);
+    TestTrue(TEXT("no new total budget"),Candidate.Instances.Num()<=Reference.Instances.Num() && Candidate.Instances.Num()<=C.MaxInstances);
+    TestTrue(TEXT("forest candidates survive"),Candidate.Instances.Num()>B.Num());
+    Same=Candidate.Instances.Num()==Repeat.Instances.Num();
+    for(int32 I=0;Same && I<Candidate.Instances.Num();++I)
+        Same=Candidate.Instances[I].Ground.Equals(Repeat.Instances[I].Ground,0.0) && Candidate.Instances[I].Role==Repeat.Instances[I].Role && Candidate.Instances[I].Scale==Repeat.Instances[I].Scale;
+    TestTrue(TEXT("cohorts repeat deterministically"),Same);
+    return true;
+}
+
 #endif
