@@ -55,6 +55,7 @@ Sans objet.
 - ouvert : n° 34 — traces de repos (`maybeStampRestTrace`) non posées par `setActivity` (harnais buildings).
 - ouvert : n° 35 — le paquet de débogage Noûs `_algoDebug` n'est pas tenu (harnais actors).
 - ouvert : n° 36 — `workTimer` remis à zéro au changement de but ; la référence ne le fait pas (fermeture : worktimer-001, qui refait trois tests de scénario).
+- hérité : n° 32 (planner-module-001) et n° 33 (resource-targets-001), ouverts par les missions dont cette branche part, non encore versées ; inchangés ici.
 - modifié : n° 1 — `goalExplain` et `streetDecision` sont écrits sur la table du C++ : tant qu'une ligne reste au plancher, son rang, son score et sa cause diffèrent.
 
 ## INTEGRATION_RISK
