@@ -18,17 +18,17 @@ Unreal, il ne se traduit pas. Ce document dit, fichier par fichier, dans quel se
 
 | | fichiers | lignes | dont code | dont code a porter |
 | --- | ---: | ---: | ---: | ---: |
-| **A porter** | 164 | 52017 | 40647 | 40647 |
-| **Partiellement porte** | 33 | 28161 | 23366 | 17985 |
+| **A porter** | 163 | 51506 | 40256 | 40256 |
+| **Partiellement porte** | 33 | 28161 | 23366 | 17892 |
 | **A generer** (donnees) | 4 | 2101 | 1278 | 0 |
 | **A jeter** | 23 | 4968 | 3847 | 0 |
-| Deja porte | 9 | 1818 | 1284 | 0 |
-| **Total** | 233 | 89065 | 70422 | 58632 |
+| Deja porte | 10 | 2329 | 1675 | 0 |
+| **Total** | 233 | 89065 | 70422 | 58148 |
 
-Sur les 52017 lignes des modules a porter, 5785 sont du commentaire et
-3851 des lignes vides : **40647 lignes de code**. Les 33 modules
-partiellement portes ajoutent **17985 lignes de code** qui restent (sur 23366 ;
-5381 portees, 0 hors perimetre). Total a porter : **58632 lignes de code**.
+Sur les 51506 lignes des modules a porter, 5706 sont du commentaire et
+3813 des lignes vides : **40256 lignes de code**. Les 33 modules
+partiellement portes ajoutent **17892 lignes de code** qui restent (sur 23366 ;
+5474 portees, 0 hors perimetre). Total a porter : **58148 lignes de code**.
 12 modules a porter melangent logique et table de contenu : la table s'extrait, le selecteur se porte.
 
 ## Reste a porter, par vague
@@ -40,7 +40,7 @@ pas l'interet du gameplay. Un module partiellement porte compte pour ce qui lui 
 | --- | ---: | ---: | ---: |
 | 0 — socle deterministe | 1 | 1 | 24 |
 | 1 — generation du monde | 2 | 2 | 663 |
-| 2 — navigation | 9 | 2 | 1123 |
+| 2 — navigation | 8 | 2 | 639 |
 | 3 — budget et LOD logique | 1 | 0 | 228 |
 | 4 — etat du monde et sauvegarde | 3 | 2 | 701 |
 | 5 — boucle de simulation | 80 | 9 | 33410 |
@@ -53,7 +53,7 @@ elles deux. Elles se decoupent en chantiers, et c'est a ce grain qu'un module se
 | --- | --- | ---: | ---: | --- |
 | 0 | socle | 1 | 24 | `sim/spatialGrid.js` (24, partiel) |
 | 1 | generation du monde | 2 | 663 | `sim/worldArchetypes.js` (595, partiel) |
-| 2 | navigation | 9 | 1123 | `sim/navService.js` (391) |
+| 2 | navigation | 8 | 639 | `sim/crowdNav.js` (228) |
 | 3 | budget et LOD | 1 | 228 | `sim/logicalLod.js` (228) |
 | 4 | etat et sauvegarde | 3 | 701 | `sim/save.js` (609, partiel) |
 | 5 | noyau de boucle | 9 | 12630 | `sim/simulation.js` (6647, partiel) |
@@ -91,13 +91,13 @@ reparti entre `porte` et `reste` au prorata du code de fonctions.
 | `life/domestic.js` | Life/AnastasisNeeds, Village/AnastasisVillage | 9 / 31 | 0 | 361 | 102 | 0 | **259** | maison ; social-relax |
 | `ai/socialMemory.js` | Life/AnastasisBonds | 13 / 23 | 0 | 407 | 230 | 0 | **177** | bonds-rumors |
 | `life/needs.js` | Life/AnastasisNeeds (+ Work/AnastasisGather) | 14 / 29 | 0 | 466 | 295 | 0 | **171** | puits ; maison ; grenier ; gather-deliver ; social-relax |
-| `sim/navGrid.js` | World/AnastasisNavGrid | 9 / 19 | 0 | 364 | 196 | 0 | **168** | couche 2 (couche terrain) ; puits (seuils) |
 | `life/villageRhythm.js` | Life/AnastasisVillageRhythm, Village/AnastasisVillage | 8 / 20 | 0 | 343 | 230 | 0 | **113** | maison ; puits ; grenier ; social-relax |
 | `life/bonds.js` | Life/AnastasisBonds | 10 / 22 | 0 | 328 | 231 | 0 | **97** | bonds-rumors |
 | `life/moodlets.js` | Life/AnastasisBonds | 4 / 11 | 0 | 220 | 123 | 0 | **97** | bonds-rumors (newFriend) |
 | `sim/weather.js` | World/AnastasisWeather | 11 / 16 | 0 | 268 | 172 | 0 | **96** | env-realism-001 |
 | `ai/algorithmic/mealReservation.js` | Village/AnastasisVillage | 10 / 17 | 0 | 377 | 297 | 0 | **80** | grenier (lignes 1-377) |
 | `life/skills.js` | Work/AnastasisGather | 3 / 8 | 0 | 122 | 44 | 0 | **78** | gather-deliver |
+| `sim/navGrid.js` | World/AnastasisNavGrid, World/AnastasisNavService | 13 / 19 | 2 | 364 | 289 | 0 | **75** | couche 2 (couche terrain) ; puits (seuils) ; nav-service-001 (metriques, anneau de trace, cle de cible) |
 | `sim/fieldCrops.js` | World/AnastasisWorld, Work/AnastasisFields, Work/AnastasisGather | 8 / 14 | 0 | 120 | 52 | 0 | **68** | couche 1 ; gather-deliver-001 ; field-regrow-001 ; village-weather-001 |
 | `sim/craftToolSwitch.js` | Work/AnastasisBuild, Village/AnastasisVillage | 1 / 6 | 0 | 65 | 10 | 0 | **55** | build-001 |
 | `ai/moralPressure.js` | Work/AnastasisGather | 1 / 4 | 0 | 116 | 70 | 0 | **46** | gather-deliver ; social-relax |
@@ -230,10 +230,11 @@ reparti entre `porte` et `reste` au prorata du code de fonctions.
 - portees (6) : `hashText`, `preferredFieldPostIndex`, `fieldPostWorld`, `nearestFieldPostIndex`, `claimedFieldPosts`, `fieldWorkTarget`
 - restent (1 fonctions) : `countFieldWorkers` (3)
 
-**`sim/navGrid.js`** — World/AnastasisNavGrid. Reste 168 lignes de code sur 364 (dont 16 des 34 lignes hors fonction, au prorata).
+**`sim/navGrid.js`** — World/AnastasisNavGrid, World/AnastasisNavService. Reste 75 lignes de code sur 364 (dont 7 des 34 lignes hors fonction, au prorata).
 
-- portees (9) : `isStandingTreeTile`, `footBlockedAt`, `terrainMoveCostOf`, `rebuildMoveCosts`, `moveCostAt`, `isFreeCell`, `computeBuildingAccessPoints`, `ensureBuildingAccessPoints`, `pickBuildingAccessPoint`
-- restent (10 fonctions) : `recordNavTransition` (38), `createNavMetrics` (33), `ensureNavigation` (20), `buildingForAccessTarget` (17), `bumpNavVersion` (11), `towardSettlementDir` (10), `navTraceSnapshot` (9), `syncNavigationFromActor` (6), … et 2 autres
+- portees (13) : `isStandingTreeTile`, `footBlockedAt`, `createNavMetrics`, `recordNavTransition`, `navTraceSnapshot`, `terrainMoveCostOf`, `rebuildMoveCosts`, `moveCostAt`, `navigationTargetKey`, `isFreeCell`, `computeBuildingAccessPoints`, `ensureBuildingAccessPoints`, `pickBuildingAccessPoint`
+- reduites (2) : `ensureNavigation`, `syncNavigationFromActor`
+- restent (4 fonctions) : `buildingForAccessTarget` (17), `bumpNavVersion` (11), `towardSettlementDir` (10), `syncActorFromNavigation` (4)
 
 **`sim/npc.js`** — Village/AnastasisVillage, Work/AnastasisGather, Life/AnastasisWeatherBehavior. Reste 4507 lignes de code sur 5169 (dont 385 des 442 lignes hors fonction, au prorata).
 
@@ -296,6 +297,7 @@ C++ — ou ecartee par PORTAGE.md :
 | `ai/algorithmic/inertia.js` | Ai/AnastasisNous | 2 | — | grenier |
 | `runtime/simClock.js` | Core/AnastasisSimClock | 4 | `simSpeedRenderGate3d`, `applySimSpeedRenderGate3d` | couche 0 |
 | `sim/hydrology.js` | World/AnastasisHydrology | 13 | — | couche 1 |
+| `sim/navService.js` | World/AnastasisNavService | 22 | — | couche 2 (nav-service-001, module seul) |
 | `sim/rng.js` | Core/AnastasisRng | 4 | — | couche 0 |
 | `sim/simulationBudget.js` | Core/AnastasisSimBudget | 9 | `ema`, `resetSimulationBudgetStats`, `noteSimulationBudgetFrame`, `formatSimulationBudgetHud` | couche 3 (noyau causal) |
 | `sim/util.js` | Core/AnastasisSimMath | 9 | — | couche 0 |
@@ -367,7 +369,6 @@ importent celui-ci.
 
 | Verdict | Module | lignes | code | reste | txt | imp | Vague | Chantier | Note |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |
-| porter | `sim/navService.js` | 511 | 391 | 391 | 3 | 2 | 2 | navigation |  |
 | porter | `sim/crowdNav.js` | 280 | 228 | 228 | 3 | 1 | 2 | navigation |  |
 | porter | `sim/percolation.js` | 205 | 127 | 127 | 0 | 1 | 2 | navigation |  |
 | porter | `sim/trafficDecay.js` | 106 | 73 | 73 | 0 | 1 | 2 | navigation |  |
@@ -534,7 +535,7 @@ importent celui-ci.
 | partiel | `sim/spatialGrid.js` | 142 | 100 | 24 | 0 | 8 | 0 | socle | Core/AnastasisSpatialGrid — 6/12 fonctions portees |
 | partiel | `sim/worldArchetypes.js` | 866 | 752 | 595 | 7 | 4 | 1 | generation du monde | World/AnastasisWorldArchetype — 2/4 fonctions portees |
 | partiel | `sim/fieldCrops.js` | 155 | 120 | 68 | 0 | 11 | 1 | generation du monde | World/AnastasisWorld, Work/AnastasisFields, Work/AnastasisGather — 8/14 fonctions portees |
-| partiel | `sim/navGrid.js` | 435 | 364 | 168 | 2 | 6 | 2 | navigation | World/AnastasisNavGrid — 9/19 fonctions portees |
+| partiel | `sim/navGrid.js` | 435 | 364 | 75 | 2 | 6 | 2 | navigation | World/AnastasisNavGrid, World/AnastasisNavService — 13/19 fonctions portees |
 | partiel | `sim/pathfinding.js` | 212 | 179 | 7 | 0 | 3 | 2 | navigation | World/AnastasisPathfinding — 13/15 fonctions portees |
 | partiel | `sim/save.js` | 829 | 656 | 609 | 2 | 0 | 4 | etat et sauvegarde | Harness/AnastasisJsSave — 1/11 fonctions portees |
 | partiel | `sim/pristineWorld.js` | 56 | 39 | 9 | 0 | 2 | 4 | etat et sauvegarde | Harness/AnastasisJsSave (GenerateWorld) — 2/4 fonctions portees |
@@ -596,6 +597,7 @@ importent celui-ci.
 | porte | `sim/rng.js` | 40 | 25 | 0 | 0 | 14 | 0 | — | Core/AnastasisRng |
 | porte | `sim/hydrology.js` | 445 | 333 | 0 | 0 | 1 | 1 | — | World/AnastasisHydrology |
 | porte | `sim/world.js` | 427 | 320 | 0 | 0 | 3 | 1 | — | World/AnastasisWorld (+ WorldNoise) |
+| porte | `sim/navService.js` | 511 | 391 | 0 | 3 | 2 | 2 | — | World/AnastasisNavService |
 | porte | `sim/simulationBudget.js` | 275 | 166 | 0 | 0 | 2 | 3 | — | Core/AnastasisSimBudget |
 | porte | `ai/algorithmic/hungerUtility.js` | 245 | 204 | 0 | 2 | 4 | 6 | — | Ai/AnastasisNous |
 | porte | `ai/algorithmic/inertia.js` | 55 | 41 | 0 | 0 | 4 | 6 | — | Ai/AnastasisNous |

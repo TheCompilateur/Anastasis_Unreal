@@ -62,10 +62,17 @@ export const PORTAGE_DECLARE = [
 
   // --- Couche 2, navigation ----------------------------------------------------
   {
-    module: "src/sim/navGrid.js", cpp: "World/AnastasisNavGrid", source: "couche 2 (couche terrain) ; puits (seuils)",
-    fonctions: ["footBlockedAt"],
+    module: "src/sim/navGrid.js", cpp: "World/AnastasisNavGrid, World/AnastasisNavService",
+    source: "couche 2 (couche terrain) ; puits (seuils) ; nav-service-001 (metriques, anneau de trace, cle de cible)",
+    fonctions: ["footBlockedAt", "createNavMetrics", "recordNavTransition", "navTraceSnapshot", "navigationTargetKey"],
+    reduites: ["ensureNavigation", "syncNavigationFromActor"],
+    alias: { createNavMetrics: "FNavMetrics", navTraceSnapshot: "TraceSnapshot" },
   },
   { module: "src/sim/pathfinding.js", cpp: "World/AnastasisPathfinding", source: "couche 2", entier: true, alias: { MinHeap: "FMinHeap", constructor: "FMinHeap" } },
+  {
+    module: "src/sim/navService.js", cpp: "World/AnastasisNavService", source: "couche 2 (nav-service-001, module seul)", entier: true,
+    alias: { createNavService: "FNavService", ensureNavService: "FNavService", clonePath: "FNavCacheEntry", resolveJobActor: "FindLiveAgent" },
+  },
 
   // --- Couche 3, budget (noyau causal) ---------------------------------------
   {

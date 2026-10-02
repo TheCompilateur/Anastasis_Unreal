@@ -115,9 +115,41 @@ mordent :
 
 La première a corrigé un commentaire que j'avais écrit faux dans `AnastasisPathfinding.h`.
 
-Pas encore porté de cette couche : `navService.js` (cache et file de requêtes), `crowdNav.js`,
-les points d'accès des bâtiments (dépendent de `src/sim/urban/intent.js`, chantier urbanisme),
-les métriques et l'anneau de trace. Ils suivront leurs systèmes.
+#### Le service de navigation (mission nav-service-001) — module seul
+
+| Unreal | Source JS |
+| --- | --- |
+| `World/AnastasisNavService.h/.cpp` | `src/sim/navService.js` entier ; de `navGrid.js` : `createNavMetrics` (compteurs de navigation seuls), `recordNavTransition`, `navTraceSnapshot`, `navigationTargetKey` |
+
+**Pas branché** : le village cherche toujours ses chemins par `AnastasisPath::FindPath`. Le branchement
+(`beginNavTick` + `processNavQueue` avant et après la boucle des PNJ, `requestPath` dans la marche) est la
+mission suivante. L'acteur est vu à travers `FNavAgent` (les champs de chemin que le service écrit) et le
+monde à travers `INavServiceHost` (temps, vitesse, `navVersion`, A*, acteurs vivants, métriques).
+
+Ce qui décide, et qu'il ne faut pas « améliorer » : le cache est une `Map` JS, **ordonnée** — le garde-fou
+mémoire efface les 80 premières clés au-delà de 480, d'où `FNavCache` et pas un `TMap` ; le tri de la file est
+**stable** ; un chemin vide est rangé comme un échec par `applyPathToActor` mais servi par le cache. Détails dans
+l'en-tête de `AnastasisNavService.h`.
+
+Preuve : `Parite.NavServiceFonctions` (202 vitesses, 36 clés, 5 clés de cible, 140 priorités) et
+`Parite.NavService` — 5 scénarios, 5 473 opérations rejouées des deux côtés, SHA-1 du texte canonique de l'état
+complet du service après chacune. Vecteurs : `tools/migration/gen-nav-service-vectors.mjs -ref <clone>`.
+
+**Mutations** (posées exprès, mesurées le 2026-10-02) :
+
+| Mutation | Détectée | Ce que ça dit |
+| --- | --- | --- |
+| garde-fou : effacer les 80 **dernières** clés au lieu des 80 premières | oui (`garde-fou` #1355) | l'ordre d'insertion du cache est observable |
+| cache de zone : seuil `NAV_ZONE` (8) au lieu de `NAV_ZONE + 1` (9) | **non** | mutation équivalente : le premier nœud d'un chemin en cache est voisin de son départ, dans la même zone 8×8 que le demandeur, donc à 8 cases au plus. Le seuil 9 n'est jamais atteint par un cache rempli en jeu |
+| cache de zone : seuil 7 | oui (`garde-fou` #555) | la frontière réellement atteignable est couverte |
+
+Non mesuré : un tri **non stable** de la file. Les files des scénarios ne dépassent pas 6 jobs, et sous
+cette taille le tri d'Unreal procède par insertion, donc stable lui aussi ; la mutation serait invisible. Le
+code garde `Algo::StableSort`, qui est la seule traduction fidèle d'`Array.prototype.sort`.
+
+Pas encore porté de cette couche : `crowdNav.js`, les points d'accès des bâtiments (dépendent de
+`src/sim/urban/intent.js`, chantier urbanisme), les compteurs de `navMetrics` propres à la marche des PNJ
+(`stuck*`, `pathDoorWaits`...). Ils suivront leurs systèmes.
 
 ### Fait — couche 3, budget de simulation (noyau causal)
 
