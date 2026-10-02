@@ -447,6 +447,18 @@ Le module travaille sur une VUE (`FPlannerVillage`) et ne touche pas `FVillage` 
 décision le branchera (colony-state-001). Au tick 196 d'endurance : `build` 20, `gatherFood` 14, plancher
 `helpFarm` 28, `buildingNeedScore` 220. Écart n° 32 : départage ordinal de la corvée de bois.
 
+### Fait — la prévision de survie et le risque spatial (mission resource-targets-001)
+
+| Unreal | Source JS (`anastasis-ref-p3`) | Preuve |
+| --- | --- | --- |
+| `Ai/AnastasisSpatialRisk.h/.cpp` | `npc.js` : `survivalForecastBias` (`projectedNeedPressure`, `forecastNeedBias`, `travelPressureToTarget`), `spatialRiskBiasMap` une fois replis et cibles connus (`criticalNeedBudget`, `secondsUntilThreshold`, `secondsUntilNight`, `rainReturnBudget`, `routeSeconds`, `budgetOverrun`) | `Parite.RisqueSpatial` : 9 cas, 772 vecteurs, 5 780 valeurs au bit (fonctions non exportées relues dans `npc.js`) |
+| `Village/AnastasisVillageSpatialRisk.cpp` | replis (`forecastEatTarget`, `forecastDrinkTarget`, `forecastRestTarget`, `shelterRainAccess`) et cibles (`spatialRiskTargetForGoal`, `recallOrSearch`, `recallResource`, `farmPos`, `maintenancePos`, `workCommutePos`, `householdAidTarget`, `stableBuildingAccess`) | harnais : `buildings` ne diverge plus au tick 32 (seuil du puits filtré au même appel) |
+| `Harness/AnastasisJsSave.cpp` | `mind.spots` lus et reprojetés | `Village.TiragesDecision` |
+
+Relevé : `tools/migration/trace-spatial-risk.mjs` → `docs/migration/phase3/P3_RISQUE_SPATIAL_RELEVE.md`
+(endurance, 16 200 ticks : 381 décisions, biais non nul dans 255, une écriture de seuil, 57 tirages tous dans
+`intentExploreHint`). Écarts : n° 33 (croyances des lieux sûrs, doctrine de lisière), n° 3, 7, 24.
+
 ### L'atelier de vecteurs — déclarer au lieu d'écrire
 
 Trois modules portés, trois générateurs écrits à la main : à ce rythme, 198 modules

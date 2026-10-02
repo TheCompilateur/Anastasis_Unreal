@@ -268,8 +268,8 @@ reparti entre `porte` et `reste` au prorata du code de fonctions.
 **`sim/simulation.js`** — Village/AnastasisVillage, Sim/AnastasisSimulation, Work/AnastasisFields, Work/AnastasisBuild, Life/AnastasisWeatherBehavior. Reste 6532 lignes de code sur 7196 (dont 581 des 640 lignes hors fonction, au prorata).
 
 - portees (41) : `housePhase`, `houseCapacity`, `socialPos`, `buildingNearActor`, `buildingForIndoorAction`, `workplaceAcceptsIndoorGoal`, `enterBuilding`, `exitBuilding`, `workersAtBuilding`, `housingCapacity`, `costMultiplier`, `buildCost`, `hasSawCapacity`, `blockedAt`, `footBlockedAt`, `tileTraversalCost`, `depleteTile`, `regrowFieldTile`, `regrowFieldsDaily`, `completedBuildingEntries`, `totalBuildingValue`, `marketCaps`, `countBuildings`, `countPlannedBuildings`, `pendingHousingCapacity`, `activeConstructions`, `activeConstruction`, `constructionOpenSlots`, `siteCanPlacePiece`, `consumeSiteMaterials`, `constructionAccessPoint`, `workConstruction`, `addBuilding`, `plannedMarketPos`, `marketPos`, `drinkAccessPoint`, `accessPointNear`, `localOccupancy`, `resourceTileNear`, `randomWalkTarget`, `buildingNeedScore`
-- reduites (6) : `movementSpeedFactor`, `tick`, `enqueueDayDeferred`, `assignHomeToHousehold`, `moveActor`, `nextWaypoint`
-- restent (341 fonctions) : `resolveDailyBuildingProduction` (133), `urbanSpotScore` (115), `resetWorldBase` (97), `onNewDay` (91), `populateFoundingLife` (78), `ensureFarmFieldParcel` (78), `seedShoreTerminus` (78), `stampClearingFieldClusters` (75), … et 333 autres
+- reduites (10) : `movementSpeedFactor`, `tick`, `enqueueDayDeferred`, `workCommutePos`, `maintenancePos`, `farmPos`, `pickDailyBuilding`, `assignHomeToHousehold`, `moveActor`, `nextWaypoint`
+- restent (337 fonctions) : `resolveDailyBuildingProduction` (133), `urbanSpotScore` (115), `resetWorldBase` (97), `onNewDay` (91), `populateFoundingLife` (78), `ensureFarmFieldParcel` (78), `seedShoreTerminus` (78), `stampClearingFieldClusters` (75), … et 329 autres
 
 **`sim/spatialGrid.js`** — Core/AnastasisSpatialGrid. Reste 24 lignes de code sur 100 (dont 1 des 4 lignes hors fonction, au prorata).
 
