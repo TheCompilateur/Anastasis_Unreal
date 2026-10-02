@@ -23,11 +23,16 @@ function AW { $o = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$h
 function G { & git -C $repo @args 2>&1 | ForEach-Object { "$_" } }
 function Check($name, $cond, $detail) { Write-Output ("{0,-6} {1}" -f $(if ($cond) { 'PASS' } else { 'FAIL' }), $name); if (-not $cond -and $detail) { Write-Output "       $detail" } }
 
-# Depot : AGENTS.md + tools/unreal + le vrai hook reference-transaction.
+# Depot : AGENTS.md + tools/unreal + le vrai hook reference-transaction, et ce que lit le
+# controle des ecarts de `finish` (check-ecarts.mjs : le registre, la table des masques).
 Copy-Item "$Source\AGENTS.md" $repo
 New-Item -ItemType Directory -Force "$repo\tools\unreal", "$repo\tools\git-hooks" | Out-Null
 Copy-Item "$Source\tools\unreal\*" "$repo\tools\unreal" -Recurse
 Copy-Item "$Source\tools\git-hooks\reference-transaction" "$repo\tools\git-hooks"
+New-Item -ItemType Directory -Force "$repo\tools\migration\scenarios", "$repo\Source\AnastasisSim" | Out-Null
+Copy-Item "$Source\tools\migration\check-ecarts.mjs" "$repo\tools\migration"
+Copy-Item "$Source\tools\migration\scenarios\masks.mjs" "$repo\tools\migration\scenarios"
+Copy-Item "$Source\Source\AnastasisSim\ECARTS.md" "$repo\Source\AnastasisSim"
 G init -q -b main | Out-Null
 G config user.email bench@local | Out-Null; G config user.name bench | Out-Null
 G config core.autocrlf false | Out-Null

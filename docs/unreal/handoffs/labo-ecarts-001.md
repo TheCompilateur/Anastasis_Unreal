@@ -16,12 +16,14 @@ rumeurs). Branche partie de `agent/ecarts-protocole-001` (PR #2, non versée dan
 - `Source/AnastasisSim/ECARTS.md` : champ `jugement` (table du format, fiches n° 5 et n° 16). Aucun destin
   ni statut changé.
 - `docs/migration/PROTOCOLE_ECARTS.md` : un paragraphe de renvoi au laboratoire.
+- `tools/unreal/agent-worktree.ps1` (résolution de conflit, voir INTEGRATION_RISK) et
+  `tools/unreal/test-agent-worktree.ps1` (le dépôt jetable reçoit ce que lit `check-ecarts.mjs`).
 
 ## COMMIT
 
-BRANCH_HEAD sur `agent/labo-ecarts-001`, rebasée sur `main` (`0179c9a`) le 2026-10-01 pour versement.
+BRANCH_HEAD sur `agent/labo-ecarts-001`, rebasée sur `main` (`ce939f8`) le 2026-10-01 pour versement.
 Le lot versé contient **cinq** commits : les deux de `ecarts-protocole-001` (PR #2 : registre, contrôleur,
-protocole), puis les trois de cette mission — le laboratoire et les **prédictions seules** (`888389d`,
+protocole), puis les trois de cette mission — le laboratoire et les **prédictions seules** (`442656e`,
 `baa47e5` avant rebase, commité avant toute expérience à N répliques), les résultats, cette fiche.
 
 ## MEC
