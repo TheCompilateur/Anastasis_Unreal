@@ -99,7 +99,13 @@ def run(dt):
                 g=json.loads(DBG.get_gather_status(ues.get_game_world()))
                 s['routine_samples'].append(g)
                 total=g['field']+g['bag']+g['stock']+g['meals']
-                if 'food_initial' not in s: s['food_initial']=total
+                # La conservation ne vaut qu'a l'interieur d'un jour : a minuit (FSimulation::DayLength = 90 s)
+                # le champ repousse. La routine dure 260 s et traverse deux minuits ; la reference est reprise
+                # au changement de jour, et chaque passage est logue.
+                day=int(g['time']//90.0)
+                if s.get('food_day')!=day:
+                    if 'food_day' in s: unreal.log('ANTHROPIC_ROUTINE_DAY day=%d food=%d previous=%d'%(day,total,s['food_initial']))
+                    s['food_day']=day; s['food_initial']=total
                 if total!=s['food_initial']: check('food_conservation',False); finish('food conservation failed'); return
                 unreal.log('ANTHROPIC_ROUTINE_SAMPLE '+json.dumps(g))
             unreal.log('ANTHROPIC_PATH_SAMPLE '+json.dumps(r))
