@@ -44,6 +44,13 @@ Sans objet.
 - n° 34 OUVERT (premiere-pensee-001, A_TRANCHER), inchange.
 - n° 35 OUVERT (premiere-pensee-001, A_TRANCHER), inchange.
 - n° 36 OUVERT (premiere-pensee-001, A_TRANCHER), inchange. Les trois places en ordre numerique.
+- n° 29 MODIFIE (route-cost-001, extension mode jeu) : le seuil de blocage de la marche portee par nav-wiring-001
+  (0,05 case par pas, celui de la reference) est divise par le multiplicateur de terrain du dernier segment
+  quand il depasse 1 (`AnastasisVillageNav.cpp`, marques `ecart n°29`). Sans cela, le lot 9 du 2026-10-07 echouait :
+  `Anastasis.Sim.Village.Recolte.RouteCostDelivery`, herbe detrempee `wet-grass=nan` (le fermier, ralenti, etait
+  pris pour coince et recalculait son chemin sans fin). Apres : road=7.150 grass=8.083 wet-grass=11.767
+  reference-grass=8.050 ; `report-tests -Filter Anastasis.Sim` dans ce worktree : 158 PASS / 2 KEF / 0 FAIL.
+  Mode reference (parite JS) inchange : LastTravelCost reste 1.
 - Aucun autre ecart ouvert, modifie ou ferme.
 
 ## INTEGRATION_RISK

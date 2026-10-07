@@ -479,6 +479,8 @@ namespace AnastasisVillage
 		const double Speed = Npc.Speed * MovementSpeedFactor(Npc, &Target) * QueueSlow;
 		// Pas de marche : budget de distance, enchaine jusqu'a 8 noeuds.
 		double Budget = Speed * FMath::Max(0.0, Dt);
+		// ecart n°29 : multiplicateur de terrain du dernier segment, pour juger le blocage a la meme echelle.
+		double LastTravelCost = 1.0;
 		for (int32 Guard = 0; Guard < 8 && Budget > 1e-4; ++Guard)
 		{
 			if (Guard > 0)
@@ -498,6 +500,7 @@ namespace AnastasisVillage
 			const double TravelCost = bTerrainTravelCostEnabled
 				? AnastasisNav::MoveCostAt(Nav, NavFloor(Waypoint.X), NavFloor(Waypoint.Y)) : 1.0;
 			if (!FMath::IsFinite(TravelCost) || TravelCost <= 0.0) break;
+			LastTravelCost = TravelCost;
 			const double Step = FMath::Min(Len, Budget / TravelCost);
 			const double NextX = Npc.X + DirX * Step;
 			const double NextY = Npc.Y + DirY * Step;
@@ -528,7 +531,10 @@ namespace AnastasisVillage
 			Npc.StuckTimer = 0.0;
 			Npc.StuckTicks = 0;
 		}
-		else if (Dist(Npc.X, Npc.Y, Target.X, Target.Y) > 1.2 && Moved < 0.05)
+		// ecart n°29 : en mode jeu, un sol lourd ralentit chaque pas du meme multiplicateur ; le seuil de blocage
+		// de la reference (0.05) le suit, sinon un marcheur lent sur herbe detrempee passe pour coince et
+		// recalcule son chemin sans fin. Mode reference : LastTravelCost reste 1, calcul identique.
+		else if (Dist(Npc.X, Npc.Y, Target.X, Target.Y) > 1.2 && Moved < 0.05 / FMath::Max(1.0, LastTravelCost))
 		{
 			Npc.StuckTimer += Dt;
 			Npc.StuckTicks += 1;
