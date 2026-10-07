@@ -376,6 +376,7 @@ Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
 | `asset_agent_probe.py` | preuve PIE partagée par les missions d'asset, un bookmark par run |
 | `npc-life-pie.py` | preuve PIE du village initial sans scénario : foyer, travail alimentaire partagé, besoins, sommeil, matériaux portés du monde au chantier sec puis maison attribuée à un bâtisseur |
 | `material-courier-pie.py` | preuve PIE d'un chantier explicitement ouvert a sec : un porteur preleve bois/pierre du monde, les livre, et la maison se termine sans stock injecte |
+| `site-stock-visual-pie.py` | preuve PIE numerique sans capture : piles absentes sur chantier sec, presentes apres livraisons, reduites par consommation puis absentes a l'achevement ; aucun asset sauve ; au registre (`site-stock-visual-pie`) |
 | `first-building-pie.py` | preuve PIE du premier bâtiment : pilote `Anastasis.Village.*` en console (puits, habitants, retraits), lecture par les lignes `ANASTASIS_VILLAGE` du log |
 | `house-rest-pie.py` | preuve PIE de la maison : `Anastasis.Village.FirstHouse`, une nuit de sommeil, retrait d'un dormeur puis de la maison occupée |
 | `abandon-pie.py` | preuve PIE du vieillissement des maisons vides (ABANDON_001) : `FirstHouse 4`, `RemoveNpc` de tous, `Anastasis.Sim.Advance` 3 / 5 / 12 / 30 jours (3, 8, 20, 50 jours vides) ; lit le parametre `Neglect` du materiau dynamique pose sur le mesh et le compare a `NeglectForDays` ; temoin faux `anastasis.Village.Metabolism 2` (village qui ne vieillit pas) ; verdict `ABANDON_PIE PASS/FAIL` -> `Saved/AbandonEvidence/pie/abandon.json` ; au registre (`abandon-pie`) ; exige `M_VillageBuilding_Aged` (`create-building-aging.ps1`) ; aucun asset sauve |
@@ -472,6 +473,7 @@ se change dans le script.
 |---|---|
 | `create-refugee-props.py` | Cree quatre accessoires de refugies et leur materiau dans RefugeeProps008. |
 | `create-village-buildings.ps1` + `.py` | Forge le puits, la maison et le grenier dans VillageBuildings, meme matiere que les props. `-Rebuild` regenere. |
+| `create-site-stock.ps1` + `.py` | Forge deux petits lots de bois et pierre dans SiteStock001 avec le materiau du village ; recette deterministe, `-Rebuild` limite aux deux assets de la mission ; aucun placement manuel |
 | `capture-refugee-props.ps1` + `capture-refugee-props.py` | Capture en studio les quatre objets, sans sauvegarder de niveau. |
 
 ### Architecture du village (ARCHITECTURE_SCALE_001)

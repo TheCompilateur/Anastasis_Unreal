@@ -2,12 +2,16 @@
 
 #include "Anastasis_UnrealV2.h"
 #include "Components/PointLightComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "HAL/IConsoleManager.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
+#include "EngineUtils.h"
+#include "ProceduralMeshComponent.h"
 #include "SmartObjectComponent.h"
+#include "WorldView/AnastasisWorldEmbodiment.h"
 
 namespace
 {
@@ -21,6 +25,14 @@ namespace
 
 	/** Dans le volume de la maison : la lumiere sort par la porte (+Y d'auteur) et la fenetre, pas par les murs. */
 	const FVector HearthLocal(0.0, 0.0, 120.0);
+	const FVector WoodStockAnchor(-115.0, 170.0, 0.0);
+	const FVector StoneStockAnchor(115.0, 170.0, 0.0);
+
+	int32 VisibleStockBundles(const int32 Stock, const int32 Need)
+	{
+		if (Stock <= 0 || Need <= 0) return 0;
+		return FMath::Clamp(static_cast<int32>((3LL * Stock + Need - 1) / Need), 1, 3);
+	}
 
 	const TCHAR* BodyMeshPath(EAnastasisVillageBuildingKind Kind)
 	{
@@ -59,6 +71,17 @@ AAnastasisVillageBuilding::AAnastasisVillageBuilding()
 	Footing->SetCanEverAffectNavigation(false);
 	Footing->SetMobility(EComponentMobility::Movable);
 	Footing->SetVisibility(false);
+
+	WoodStockVisual = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("WoodStockVisual"));
+	WoodStockVisual->SetupAttachment(SmartObject);
+	WoodStockVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	WoodStockVisual->SetCanEverAffectNavigation(false);
+	WoodStockVisual->SetMobility(EComponentMobility::Movable);
+	StoneStockVisual = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("StoneStockVisual"));
+	StoneStockVisual->SetupAttachment(SmartObject);
+	StoneStockVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	StoneStockVisual->SetCanEverAffectNavigation(false);
+	StoneStockVisual->SetMobility(EComponentMobility::Movable);
 
 	Hearth = CreateDefaultSubobject<UPointLightComponent>(TEXT("Hearth"));
 	Hearth->SetupAttachment(SmartObject);
@@ -204,6 +227,57 @@ void AAnastasisVillageBuilding::SetConstructionProgress(double Progress)
 	}
 }
 
+float AAnastasisVillageBuilding::StockGroundLocalZ(const FVector& LocalAnchor) const
+{
+	UWorld* World = GetWorld();
+	if (!World) return 0.f;
+	const FVector WorldAnchor = GetActorTransform().TransformPosition(LocalAnchor);
+	for (TActorIterator<AAnastasisWorldEmbodiment> It(World); It; ++It)
+	{
+		TArray<UProceduralMeshComponent*> Surfaces;
+		It->GetComponents(Surfaces);
+		for (UProceduralMeshComponent* Surface : Surfaces)
+		{
+			if (!Surface->IsVisible() || !Surface->IsCollisionEnabled()) continue;
+			const FBox Bounds = Surface->Bounds.GetBox();
+			FHitResult Hit;
+			if (Surface->LineTraceComponent(Hit,
+				FVector(WorldAnchor.X, WorldAnchor.Y, Bounds.Max.Z + 1000.0),
+				FVector(WorldAnchor.X, WorldAnchor.Y, Bounds.Min.Z - 1000.0),
+				FCollisionQueryParams(SCENE_QUERY_STAT(SiteStockGround), true)))
+			{
+				return static_cast<float>(GetActorTransform().InverseTransformPosition(Hit.ImpactPoint).Z);
+			}
+		}
+	}
+	return 0.f;
+}
+
+void AAnastasisVillageBuilding::SetSiteStock(
+	int32 WoodStock, int32 WoodNeed, int32 StoneStock, int32 StoneNeed, bool bActiveSite)
+{
+	const int32 WoodCount = bActiveSite ? VisibleStockBundles(WoodStock, WoodNeed) : 0;
+	const int32 StoneCount = bActiveSite ? VisibleStockBundles(StoneStock, StoneNeed) : 0;
+	if (WoodCount == VisibleWoodBundles && StoneCount == VisibleStoneBundles) return;
+	VisibleWoodBundles = WoodCount;
+	VisibleStoneBundles = StoneCount;
+	const auto Place = [this](UInstancedStaticMeshComponent* Component, const int32 Count,
+		const FVector& Anchor, const float LayerHeight)
+	{
+		if (!Component) return;
+		Component->ClearInstances();
+		if (!Component->GetStaticMesh() || Count == 0) return;
+		const float GroundZ = StockGroundLocalZ(Anchor);
+		for (int32 I = 0; I < Count; ++I)
+		{
+			const FVector Position(Anchor.X, Anchor.Y, GroundZ + I * LayerHeight);
+			Component->AddInstance(FTransform(FRotator(0.f, I % 2 ? 4.f : -4.f, 0.f), Position));
+		}
+	};
+	Place(WoodStockVisual, WoodCount, WoodStockAnchor, 28.f);
+	Place(StoneStockVisual, StoneCount, StoneStockAnchor, 24.f);
+}
+
 void AAnastasisVillageBuilding::Configure(
 	EAnastasisVillageBuildingKind InKind,
 	FName InSimId,
@@ -221,6 +295,17 @@ void AAnastasisVillageBuilding::Configure(
 	{
 		Body->SetStaticMesh(Mesh);
 		Body->SetVisibility(Mesh != nullptr);
+	}
+	UStaticMesh* Timber = LoadObject<UStaticMesh>(nullptr,
+		TEXT("/Game/Anastasis/SiteStock001/SM_Site_TimberBundle_01.SM_Site_TimberBundle_01"));
+	UStaticMesh* Stone = LoadObject<UStaticMesh>(nullptr,
+		TEXT("/Game/Anastasis/SiteStock001/SM_Site_StoneBundle_01.SM_Site_StoneBundle_01"));
+	WoodStockVisual->SetStaticMesh(Timber);
+	StoneStockVisual->SetStaticMesh(Stone);
+	if (!Timber || !Stone)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Warning,
+			TEXT("ANASTASIS_VILLAGE site stock assets missing: timber=%d stone=%d"), Timber ? 1 : 0, Stone ? 1 : 0);
 	}
 	UE_LOG(
 		LogAnastasis_UnrealV2,

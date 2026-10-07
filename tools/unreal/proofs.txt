@@ -38,6 +38,8 @@ player-food-loop-pie | tools/unreal/player-food-loop-pie.py | PLAYER_FOOD_LOOP P
 villager-pie | tools/unreal/villager-pie.py | VILLAGER_PIE PASS | VILLAGER_PIE FAIL | 900 | ANASTASIS_VILLAGER_PIE_OUT=@Saved/VillagerEvidence/pie;ANASTASIS_VILLAGER_PIE_NPCS=12
 npc-life-pie | tools/unreal/npc-life-pie.py | NPC_LIFE_PIE PASS | NPC_LIFE_PIE FAIL|Traceback | 220 | -
 material-courier-pie | tools/unreal/material-courier-pie.py | MATERIAL_COURIER_PIE PASS | MATERIAL_COURIER_PIE FAIL|Traceback | 220 | -
+# site-stock-visual-001: physical instances must follow the site's wood and stone ledger, no image verdict.
+site-stock-visual-pie | tools/unreal/site-stock-visual-pie.py | SITE_STOCK_VISUAL_PIE PASS | SITE_STOCK_VISUAL_PIE FAIL|Traceback | 240 | -
 # geography-concordance-001: acquisition and partition integrity, not geographic agreement or NPC travel.
 geography-concordance-pie | tools/unreal/geography-concordance-pie.py | GEOGRAPHY_CONCORDANCE INSTRUMENT_PASS | GEOGRAPHY_CONCORDANCE FAIL|Traceback | 300 | -
 

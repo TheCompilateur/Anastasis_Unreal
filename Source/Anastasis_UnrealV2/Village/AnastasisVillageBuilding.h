@@ -11,6 +11,7 @@ class USmartObjectDefinition;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UPointLightComponent;
+class UInstancedStaticMeshComponent;
 class UStaticMeshComponent;
 
 UENUM()
@@ -66,6 +67,9 @@ public:
 	 */
 	void SetConstructionProgress(double Progress);
 
+	/** Physical stock at an unfinished site. Read-only projection of the simulation ledger. */
+	void SetSiteStock(int32 WoodStock, int32 WoodNeed, int32 StoneStock, int32 StoneNeed, bool bActiveSite);
+
 	/**
 	 * ICEBERG_001 : le foyer. 0..1 = part de la lumiere de l'atre qui sort par la porte et la
 	 * fenetre (AnastasisMetabolism::FState::Hearth). 0 = eteint, composant invisible. Un
@@ -99,6 +103,12 @@ private:
 	double PadOffset = 0.0;
 	FVector HearthAuthored = FVector(0.0, 0.0, 120.0);
 
+	UPROPERTY(VisibleAnywhere, Category = "Anastasis|Site Stock")
+	TObjectPtr<UInstancedStaticMeshComponent> WoodStockVisual;
+
+	UPROPERTY(VisibleAnywhere, Category = "Anastasis|Site Stock")
+	TObjectPtr<UInstancedStaticMeshComponent> StoneStockVisual;
+
 	/** Cree pour tout batiment, mais allume seulement pour une maison (SetHearth). */
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis")
 	TObjectPtr<UPointLightComponent> Hearth;
@@ -113,6 +123,10 @@ private:
 
 	double NeglectLevel = 0.0;
 	bool bAgedMaterialMissing = false;
+	int32 VisibleWoodBundles = -1;
+	int32 VisibleStoneBundles = -1;
+
+	float StockGroundLocalZ(const FVector& LocalAnchor) const;
 
 	UPROPERTY()
 	FName SimId;

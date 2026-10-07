@@ -306,6 +306,9 @@ int32 FAnastasisVillagePresentation::Sync(
 			if (AAnastasisVillageBuilding* Actor = Existing->Get())
 			{
 				Actor->SetConstructionProgress(Building.Progress);
+				Actor->SetSiteStock(Building.Materials.StockWood, Building.Materials.NeedWood,
+					Building.Materials.StockStone, Building.Materials.NeedStone,
+					Building.bHasMaterials && !Building.IsCompleted());
 				ApplyMetabolism(*Actor, Building);
 			}
 			continue;
@@ -342,6 +345,9 @@ int32 FAnastasisVillagePresentation::Sync(
 #endif
 		SettleArchitecture(*Actor, Village, Building.Id, Rooms.GetWorld());
 		Actor->SetConstructionProgress(Building.Progress);
+		Actor->SetSiteStock(Building.Materials.StockWood, Building.Materials.NeedWood,
+			Building.Materials.StockStone, Building.Materials.NeedStone,
+			Building.bHasMaterials && !Building.IsCompleted());
 		ApplyMetabolism(*Actor, Building);
 		Actors.Add(Building.Id, Actor);
 		++Changes;
