@@ -81,6 +81,10 @@ tools\unreal\agent-worktree.ps1 status            # PRETES_POUR_LE_LOT:: et la c
 tools\unreal\agent-worktree.ps1 integrate-batch -Missions mission-a,mission-b,mission-c
 ```
 
+Si Alexandre borne explicitement les tests, l'intégrateur peut ajouter `-TestFilter <filtre>` :
+le filtre Unreal doit sélectionner de 1 à 30 cas. Le verdict `TESTS::TARGETED_PASS`
+ne couvre que ces cas ; le build et les preuves PIE déclarées restent requis.
+
 - Le lot prend le **verrou de `main`** : pendant qu'il tourne, personne ne la déplace (`integrate` d'un
   autre refuse : `MAIN_LOCK::TENU`). Le verrou est rendu à la fin, même en échec.
 - Admises : les missions dont `finish` a passé sur leur commit actuel (`proved`, `queued` ou `nounreal`).

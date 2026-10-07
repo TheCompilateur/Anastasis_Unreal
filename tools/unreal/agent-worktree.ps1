@@ -35,11 +35,18 @@ param(
   [string]$From = 'main',
   # finish / integrate-batch : build et tests Unreal meme sans changement Unreal.
   [switch]$Full,
+  # integrate-batch : suite d'automation ciblee (1 a 30 cas) au lieu de toute la suite.
+  # Le verdict est explicitement TARGETED_PASS, jamais une preuve de suite complete.
+  [string]$TestFilter,
   # finish : lancer la suite ICI, dans un editeur a soi (l'ancien finish). Par defaut, la suite et
   # les preuves PIE attendent le lot (EDITOR_QUEUE_001) : un seul editeur pour tout le monde.
   [switch]$Prove
 )
 $ErrorActionPreference = 'Stop'
+if ($TestFilter -and $Command -ne 'integrate-batch') {
+  Write-Output 'FAIL: -TestFilter est reserve a integrate-batch'
+  exit 1
+}
 
 $Canonical = 'C:\dev\ANASTASIS_UNREAL'
 $WorktreeRoot = 'C:\dev\ANASTASIS_WORKTREES'
@@ -222,8 +229,25 @@ function Invoke-UnrealGate([string]$root, [string[]]$unreal, [bool]$runTests = $
     $script:GateOk = $true
     return
   }
-  & (Join-Path $root 'tools\unreal\report-tests.ps1')
-  if ($LASTEXITCODE -ne 0) { Write-Output 'FAIL: des tests sont en echec reel'; return }
+  if ($TestFilter) {
+    Write-Output "TEST_SCOPE::TARGETED filter=$TestFilter max_cases=30"
+    $testOut = @(& (Join-Path $root 'tools\unreal\report-tests.ps1') -Filter $TestFilter 2>&1 | ForEach-Object { "$_" })
+    $testCode = $LASTEXITCODE
+    $cases = $null
+    foreach ($line in $testOut) {
+      if ($line -match '^TOTAL\s*:\s*(\d+)') { $cases = [int]$Matches[1] }
+      if ($line -notmatch '^TESTS::PASS') { Write-Output $line }
+    }
+    if ($testCode -ne 0) { Write-Output 'FAIL: des tests cibles sont en echec reel'; return }
+    if ($null -eq $cases -or $cases -lt 1 -or $cases -gt 30) {
+      Write-Output "FAIL: suite ciblee hors limite (cas=$cases, attendu 1..30)"
+      return
+    }
+    Write-Output "TESTS::TARGETED_PASS cas=$cases filter=$TestFilter -- suite complete non executee"
+  } else {
+    & (Join-Path $root 'tools\unreal\report-tests.ps1')
+    if ($LASTEXITCODE -ne 0) { Write-Output 'FAIL: des tests sont en echec reel'; return }
+  }
   $script:GateMode = 'proved'
   $script:GateOk = $true
 }
@@ -643,6 +667,7 @@ switch ($Command) {
     #   4. main avance par avance rapide sur le sommet ; si main a bouge pendant le lot, rien
     #      ne bouge et il suffit de relancer.
     $list = @($Missions | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($TestFilter -and $TestFilter -notmatch '^[A-Za-z0-9_.+]+$') { Fail 'FAIL: -TestFilter contient des caracteres invalides' }
     if ($list.Count -eq 0) { Fail 'FAIL: -Missions mission-a,mission-b est requis' }
     foreach ($m in $list) {
       if ($m -notmatch '^[a-z0-9][a-z0-9._-]*$') { Fail "FAIL: nom de mission invalide '$m'" }
