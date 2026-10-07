@@ -143,6 +143,8 @@ private:
 	void SeedOpeningHousehold();
 	/** Un chantier initial fini par les habitants existants, sans creer de PNJ ni modifier AnastasisSim. */
 	void SeedOpeningConstruction();
+	/** Affecte des colons encore libres au grenier accessible du village initial. */
+	void SeedOpeningWorkforce();
 	/** Attribue la maison achevee a un de ses bâtisseurs capable d'en atteindre l'acces. */
 	void AssignCompletedOpeningHome();
 	bool bPendingStartVillage = false;
@@ -154,6 +156,7 @@ private:
 	FString FarmerGranaryId;
 	FString FirstSiteId;
 	FString OpeningSiteId;
+	FString OpeningWorkId;
 	FIntPoint FarmerField = FIntPoint(-1, -1);
 	int32 LoggedDay = 0;
 	/** True only after OnWorldBeginPlay. Tests ResetCanonical without the engine ticker. */

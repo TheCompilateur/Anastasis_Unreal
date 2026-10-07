@@ -174,6 +174,7 @@ void UAnastasisSimulationSubsystem::TryStartVillage(float DeltaTime)
     {
         SeedOpeningHousehold();
         if (CVarVillageOpeningConstruction.GetValueOnGameThread() != 0) SeedOpeningConstruction();
+		SeedOpeningWorkforce();
     }
     const auto* Well = Village.FindBuilding(WellId);
     if (!Well || (CVarVillageSiteSelection.GetValueOnGameThread()!=0 && (Well->X!=X || Well->Y!=Y)))
@@ -251,7 +252,7 @@ void UAnastasisSimulationSubsystem::SeedOpeningHousehold()
 		WorkId = PlaceReachable(GranaryType, Field->X, Field->Y, 4);
 		if (!WorkId.IsEmpty()) break;
 	}
-	if (!WorkId.IsEmpty()) Village.AssignWorkplace(ResidentId, AnastasisGather::JobFarmer, WorkId);
+	if (!WorkId.IsEmpty() && Village.AssignWorkplace(ResidentId, AnastasisGather::JobFarmer, WorkId)) OpeningWorkId = WorkId;
 	UE_LOG(LogAnastasis_UnrealV2, Display,
 		TEXT("ANASTASIS_VILLAGE opening household npc=%s home=%s work=%s"),
 		*ResidentId, HomeId.IsEmpty() ? TEXT("none") : *HomeId, WorkId.IsEmpty() ? TEXT("none") : *WorkId);
@@ -356,6 +357,33 @@ void UAnastasisSimulationSubsystem::AssignCompletedOpeningHome()
 	}
 }
 
+void UAnastasisSimulationSubsystem::SeedOpeningWorkforce()
+{
+	if (OpeningWorkId.IsEmpty()) return;
+	AnastasisVillage::FVillage& Village = Simulation.GetVillage();
+	const AnastasisVillage::FBuilding* Granary = Village.FindBuilding(OpeningWorkId);
+	if (!Granary) return;
+	const AnastasisPath::FWorldNavSource Nav(Village.GetNavGrid(), Simulation.GetWorld());
+	TArray<FString> Recruits;
+	for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
+	{
+		if (Npc.JobId != AnastasisGather::JobSettler) continue;
+		for (const AnastasisVillage::FPoint& Door : Granary->AccessPoints)
+		{
+			TArray<AnastasisVillage::FPoint> Path;
+			if (AnastasisPath::FindPath(Nav, { Npc.X, Npc.Y }, Door, {}, Path))
+			{
+				Recruits.Add(Npc.Id);
+				break;
+			}
+		}
+		if (Recruits.Num() == 2) break;
+	}
+	for (const FString& Id : Recruits) Village.AssignWorkplace(Id, AnastasisGather::JobFarmer, OpeningWorkId);
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE opening workforce granary=%s farmers=%s"),
+		*OpeningWorkId, Recruits.IsEmpty() ? TEXT("none") : *FString::Join(Recruits, TEXT(",")));
+}
+
 void UAnastasisSimulationSubsystem::ReplaceStartVillage()
 {
 	bPendingStartVillage = false;
@@ -385,6 +413,7 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	SettlementSiteReport = TEXT("{\"status\":\"reset\"}");
 	FirstSiteId.Reset();
 	OpeningSiteId.Reset();
+	OpeningWorkId.Reset();
 	Simulation.Reset(Seed, AnastasisWorldView::ReferenceWidth, AnastasisWorldView::ReferenceHeight);
 	Simulation.GetVillage().SetTerrainTravelCostEnabled(CVarVillageRouteCost.GetValueOnGameThread() != 0);
 	LoggedDay = Simulation.GetDay();
@@ -1632,14 +1661,22 @@ FString UAnastasisSimulationDebugLibrary::GetOpeningLifeStatus(const UObject* Wo
 	if (!Host || !Host->GetSimulation().IsRunning() || Host->GetSimulation().GetVillage().GetActors().IsEmpty()) return TEXT("{}");
 	const FAnastasisSimulation& Sim = Host->GetSimulation();
 	const AnastasisVillage::FNpc& N = Sim.GetVillage().GetActors()[0];
+	int32 Farmers = 0;
+	int32 OtherFarmerDeliveries = 0;
+	for (const AnastasisVillage::FNpc& Actor : Sim.GetVillage().GetActors())
+	{
+		if (Actor.JobId != AnastasisGather::JobFarmer) continue;
+		++Farmers;
+		if (Actor.Id != N.Id) OtherFarmerDeliveries += Actor.Deliveries;
+	}
 	return FString::Printf(
 		TEXT("{\"time\":%.3f,\"id\":\"%s\",\"home\":\"%s\",\"work\":\"%s\",\"goal\":\"%s\",\"activity\":\"%s\",")
 		TEXT("\"inside\":\"%s\",\"claimed\":%s,\"x\":%.3f,\"y\":%.3f,\"hunger\":%.2f,\"thirst\":%.2f,\"energy\":%.2f,")
-		TEXT("\"drinks\":%d,\"rests\":%d,\"deliveries\":%d,\"failed_path\":%s}"),
+		TEXT("\"drinks\":%d,\"rests\":%d,\"deliveries\":%d,\"farmers\":%d,\"otherFarmerDeliveries\":%d,\"failed_path\":%s}"),
 		Sim.GetTime(), *N.Id, *N.HomeId, *N.WorkplaceId, *N.Goal, *N.Activity, *N.Inside.BuildingId,
 		Host->GetVillagePresentation().HasInteractionClaim(N.Id) ? TEXT("true") : TEXT("false"),
 		N.X, N.Y, N.Needs.Hunger, N.Needs.Thirst, N.Needs.Energy,
-		N.DrinksTaken, N.RestsTaken, N.Deliveries, N.bPathFailed ? TEXT("true") : TEXT("false"));
+		N.DrinksTaken, N.RestsTaken, N.Deliveries, Farmers, OtherFarmerDeliveries, N.bPathFailed ? TEXT("true") : TEXT("false"));
 }
 
 FString UAnastasisSimulationDebugLibrary::GetTimeWarpStatus(const UObject* WorldContextObject)
