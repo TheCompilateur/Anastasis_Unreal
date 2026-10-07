@@ -192,3 +192,14 @@ a été lue dans le code du moteur installé ; le moteur fait foi contre les not
 - Decision locale : enveloppe de contribution aux surfaces dans le proprietaire existant,
   sans toucher aux lux atmospheriques, au bloom, a la LUT ni a la duree du jour.
   Statut artistique : CANDIDAT, voir handoffs/sky-continuity-002.md.
+
+## NOX_001 — sources officielles consultées le 2026-10-07
+
+| ID | Affirmation | Statut | Pourquoi | Règle |
+|---|---|---|---|---|
+| NOX-001-01 | Une nuit naturelle sans lune est bien moins illuminée qu'une pleine lune | `OUVERT` | NPS donne 0,8 mlux horizontal sans lune et jusqu'à environ 0,3 lux pour la pleine lune ; `anastasis.Nox.MoonFraction` permet une comparaison, sans calendrier astronomique | ECL-04, `NOX_001.md` |
+| NOX-001-02 | La sensibilité mésopique dépend de la luminance d'adaptation et du spectre | `OUVERT` | CIE 191/notes techniques ; les EV du prototype sont des hypothèses de présentation, pas un modèle CIE | ECL-01, `NOX_001.md` |
+| NOX-001-03 | Lumen transporte les émissifs, mais une petite source très intense peut devenir bruitée | `APPLIQUÉ` | Le foyer actuel a une Point Light explicite ; ne pas le remplacer par un petit émissif seul | ECL-02 |
+| NOX-001-04 | MegaLights peut simplifier plusieurs lumières, mais ses ombres dépendent de la scène RT et eau/nuages/volumes locaux ont des limites | `OUVERT` | Pas activé ; comparer seulement si plusieurs foyers deviennent un coût mesuré | PERF-01, ECL-07 |
+
+Sources : [NPS, illuminance naturelle](https://www.nps.gov/subjects/nightskies/NSQmetrics.html), [NPS, lune](https://www.nps.gov/subjects/nightskies/natural-light-in-night-sky.htm), [CIE, vision mésopique](https://files.cie.co.at/934_CIE_TN_007-2017.pdf), [Epic, Lumen](https://dev.epicgames.com/documentation/en-us/unreal-engine/lumen-global-illumination-and-reflections-in-unreal-engine), [Epic, MegaLights](https://dev.epicgames.com/documentation/en-us/unreal-engine/megalights-in-unreal-engine).

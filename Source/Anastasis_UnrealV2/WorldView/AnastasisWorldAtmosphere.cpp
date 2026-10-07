@@ -26,6 +26,7 @@
 #include "WorldView/AnastasisAtmosphereProfile.h"
 #include "WorldView/AnastasisAtmosphereResolver.h"
 #include "WorldView/AnastasisMistField.h"
+#include "WorldView/AnastasisNoxLighting.h"
 #include "WorldView/AnastasisRain.h"
 #include "WorldView/AnastasisSkyPassage.h"
 #include "WorldView/AnastasisTerrainSurface.h"
@@ -53,6 +54,15 @@ static TAutoConsoleVariable<int32> CVarSkyClock(
 static TAutoConsoleVariable<int32> CVarSkyPassage(
 	TEXT("anastasis.Sky.Passage"), 1,
 	TEXT("SKY_CONTINUITY_002. Surface sun -> atmospheric twilight -> surface moon; exposure protection at dawn. 0 restores the previous transition for A/B. No simulation clock changes."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarNoxProfile(
+	TEXT("anastasis.Nox.Profile"), 0,
+	TEXT("NOX_001 night-light trial: 0=existing sky, 1=photometric austere, 2=historical dark, 3=controlled cinematic. Day lighting unchanged."),
+	ECVF_Default);
+static TAutoConsoleVariable<float> CVarNoxMoonFraction(
+	TEXT("anastasis.Nox.MoonFraction"), 1.0f,
+	TEXT("NOX_001 observation control: 0=moonless, 1=full moon. Does not change the simulation or claim a lunar calendar."),
 	ECVF_Default);
 
 static TAutoConsoleVariable<float> CVarSkyHour(
@@ -430,6 +440,17 @@ void AAnastasisWorldAtmosphere::EndPlay(const EEndPlayReason::Type EndPlayReason
 void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Profile, const bool bForceLog, const float AdaptSeconds)
 {
 	const bool bPassage = CVarSkyPassage.GetValueOnGameThread() != 0;
+	const int32 NoxProfile = Profile.bRealismEnabled && CVarRealism.GetValueOnGameThread() != 0
+		? FMath::Clamp(CVarNoxProfile.GetValueOnGameThread(), 0, 3) : 0;
+	const float MoonCover = Profile.bWeatherDrivesSky && CVarSkyWeather.GetValueOnGameThread() != 0
+		? static_cast<float>(LastSky.SkyCover) : 0.0f;
+	const AnastasisNoxLighting::FNight NoxNight = AnastasisNoxLighting::Resolve(NoxProfile,
+		Profile.MoonIlluminanceLux, Profile.NightExposureEV100, CVarNoxMoonFraction.GetValueOnGameThread(), MoonCover);
+	if (NoxProfile != 0)
+	{
+		LastSky.ExposureEV100 = AnastasisNoxLighting::ExposureForSunElevation(
+			LastSky.ExposureEV100, NoxNight.ExposureEV100, LastSky.SunElevationDegrees);
+	}
 	// The legacy symmetric lag could retain night sensitivity after the sun had risen.
 	// Passage permits slow dark adaptation, but never that positive exposure mismatch.
 	AppliedExposureEV = (AdaptSeconds > 0.0f && bHasAppliedExposure)
@@ -470,8 +491,13 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 		Moon->SetActorRotation(LastSky.MoonRotation);
 		if (UDirectionalLightComponent* MoonComponent = Cast<UDirectionalLightComponent>(Moon->GetLightComponent()))
 		{
+			if (!FMath::IsNearlyEqual(MoonComponent->Intensity, NoxNight.MoonLux, 1e-5f))
+			{
+				MoonComponent->SetIntensity(NoxNight.MoonLux);
+			}
 			// The moon earns its shadows once the sun has set, and only while it is itself up.
-			const bool bShadows = !bSunUp && !AnastasisAtmosphere::IsBelowHorizon(LastSky.MoonRotation);
+			const bool bShadows = NoxNight.MoonLux > 1e-5f && !bSunUp
+				&& !AnastasisAtmosphere::IsBelowHorizon(LastSky.MoonRotation);
 			if ((MoonComponent->CastShadows != 0) != bShadows)
 			{
 				MoonComponent->SetCastShadows(bShadows);
@@ -480,7 +506,8 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 	}
 
 	// --- One forward light: the sun while it is up, the moon after ---------------------
-	ArbitrateDirectionalLights(LastSky.bMoonLeadsForward, LastSky.SunFogScattering);
+	ArbitrateDirectionalLights(LastSky.bMoonLeadsForward && NoxNight.MoonLux > 1e-5f,
+		LastSky.SunFogScattering);
 
 	// --- Exposure: pinned, but pinned to the hour --------------------------------------
 	if (Profile.bFixedExposure && ExposureVolume)
@@ -637,7 +664,7 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 			TEXT("ANASTASIS_SKY day=%.0f hour=%.2f phase=%s season=%s decl=%.2f sun_elev=%.2f moon_elev=%.2f ev100=%.2f ")
 			TEXT("cover=%.3f rain=%.3f snow=%.3f humidity=%.3f wind=%.3f weather=%d mist_factor=%.3f ")
 			TEXT("sky_humidity=%.3f sky_wind=%.3f sky_cover=%.3f forward_light=%s sun_fog_scatter=%.3f ")
-			TEXT("passage=%d applied_ev=%.3f exposure_lag=%.3f surface_sun=%.5f surface_moon=%.5f twilight=%.5f"),
+			TEXT("passage=%d applied_ev=%.3f exposure_lag=%.3f surface_sun=%.5f surface_moon=%.5f twilight=%.5f nox=%d moon_lux=%.6f"),
 			LastSky.Day, LastSky.Hours, *Phase, AnastasisWeather::SeasonId(LastSky.Weather.Season),
 			LastSky.DeclinationDegrees, LastSky.SunElevationDegrees,
 			AnastasisSkyClock::ElevationOf(LastSky.MoonRotation), LastSky.ExposureEV100,
@@ -646,7 +673,8 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 			LastSky.SkyHumidity, LastSky.SkyWind, LastSky.SkyCover,
 			bMoonLeadsForward ? TEXT("moon") : TEXT("sun"), LastSky.SunFogScattering,
 			bPassage ? 1 : 0, AppliedExposureEV, AppliedExposureEV - LastSky.ExposureEV100,
-			bPassage ? Relay.Sun : 1.0, bPassage ? Relay.Moon : 1.0, bPassage ? Relay.Twilight : 0.0);
+			bPassage ? Relay.Sun : 1.0, bPassage ? Relay.Moon : 1.0, bPassage ? Relay.Twilight : 0.0,
+			NoxProfile, NoxNight.MoonLux);
 	}
 }
 
@@ -866,7 +894,11 @@ void AAnastasisWorldAtmosphere::ApplyRealism(const UAnastasisAtmosphereProfile& 
 			Moon->SetActorRotation(MoonRotation);
 			if (UDirectionalLightComponent* MoonComponent = Cast<UDirectionalLightComponent>(Moon->GetLightComponent()))
 			{
-				MoonComponent->SetIntensity(Profile.MoonIlluminanceLux);
+				const AnastasisNoxLighting::FNight NoxNight = AnastasisNoxLighting::Resolve(
+					FMath::Clamp(CVarNoxProfile.GetValueOnGameThread(), 0, 3),
+					Profile.MoonIlluminanceLux, Profile.NightExposureEV100,
+					CVarNoxMoonFraction.GetValueOnGameThread(), 0.0f);
+				MoonComponent->SetIntensity(NoxNight.MoonLux);
 				MoonComponent->SetLightColor(FLinearColor::White);
 				MoonComponent->SetUseTemperature(true);
 				MoonComponent->SetTemperature(Profile.MoonTemperatureKelvin);
@@ -874,7 +906,8 @@ void AAnastasisWorldAtmosphere::ApplyRealism(const UAnastasisAtmosphereProfile& 
 				MoonComponent->SetAtmosphereSunLightIndex(1);
 				// A second shadow-casting directional light doubles the shadow cost for 0.3 lux.
 				// It only earns its shadows once the sun has set.
-				MoonComponent->SetCastShadows(AnastasisAtmosphere::IsBelowHorizon(SunRotation));
+				MoonComponent->SetCastShadows(NoxNight.MoonLux > 1e-5f
+					&& AnastasisAtmosphere::IsBelowHorizon(SunRotation));
 			}
 		}
 	}

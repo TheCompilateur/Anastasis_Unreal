@@ -1,6 +1,11 @@
 # Registre des preuves PIE rejouables en lot (EDITOR_QUEUE_001).
 # SKY_CONTINUITY_002: PASS = sampled live contracts, NOT absence of every visual flash.
 sky-passage-pie | tools/unreal/sky-passage-pie.py | SKY_PASSAGE PASS | SKY_PASSAGE FAIL|Traceback | 540 | -
+# NOX_001: same cameras for three candidate night profiles plus repeated control.
+# COMPLETE only certifies that capture reached the end; image verdict and PLY remain separate.
+nox-sky-capture | tools/unreal/nox-sky-capture.py | SKY_CAPTURE_COMPLETE | SKY_CAPTURE_FAIL|SKY_SHOT_MISSING|Traceback | 900 | -
+# Diagnostic only: how much night-sky signal survives with no moon under three exposures.
+nox-exposure-diagnostic | tools/unreal/nox-exposure-diagnostic.py | SKY_CAPTURE_COMPLETE | SKY_CAPTURE_FAIL|SKY_SHOT_MISSING|NOX_DIAGNOSTIC missing|Traceback | 420 | -
 #
 # Une mission declare les preuves de son chantier dans sa fiche de passation :
 #     PROOFS: player-pie, village-weather-pie

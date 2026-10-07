@@ -93,3 +93,7 @@ Tout l'éclairage est posé par `AAnastasisWorldAtmosphere` à partir de `DA_Ana
 - **Lumen Lite** : candidat si le budget GPU l'exige, et seulement alors (RU-002-01). Non mesuré. A/B :
   `capture-slice.ps1 -PreCmds 'r.Lumen.FinalGatherMethod 0'`, image **et** ms (ECL-07).
 - **Arbres noirs pour Lumen** : la cause n'est pas établie (`lumen-hit-lighting-001.md`).
+
+## NOX_001 : comparaison nocturne en branche
+
+`anastasis.Nox.Profile` (0 témoin, 1 photométrique austère, 2 radical historique, 3 cinématographique contrôlé) et `anastasis.Nox.MoonFraction` (0 sans lune, 1 pleine lune) sont lus par `AAnastasisWorldAtmosphere`. Le défaut reste 0 : aucune nouvelle direction artistique n'est adoptée sans A/B visuel. La lumière lunaire est atténuée à la source ; la courbe d'exposition calibrée reste exacte jusqu'à -8° solaires et seule la nuit profonde change. `docs/unreal/NOX_001.md` contient les valeurs, le protocole et les limites. La fraction n'est pas un calendrier lunaire. Ne pas confondre test de compilation, capture du ciel et lisibilité en jeu.
