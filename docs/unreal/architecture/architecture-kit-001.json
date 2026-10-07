@@ -1,0 +1,988 @@
+{
+ "version": "architecture-crusade-001-v1",
+ "convention": {
+  "human": 170.0,
+  "parcel": 2000.0,
+  "parcel_margin": 100.0,
+  "door_clear_min": 185.0,
+  "door_width_min": 85.0,
+  "ceiling_min": 225.0,
+  "pitch": [
+   22.0,
+   36.0
+  ],
+  "overhang": [
+   50.0,
+   90.0
+  ]
+ },
+ "buildings": [
+  {
+   "name": "SM_Arch_House_Poor_01",
+   "kind": "house",
+   "tier": 1,
+   "size_cm": [
+    986,
+    1161,
+    455
+   ],
+   "bounds": [
+    [
+     -445,
+     -545,
+     -20
+    ],
+    [
+     541,
+     615,
+     434
+    ]
+   ],
+   "footprint": [
+    -515,
+    -615,
+    611,
+    685
+   ],
+   "height_humans": 2.56,
+   "triangles": 23959,
+   "footing_triangles": 17454,
+   "doors": [
+    {
+     "name": "door",
+     "width": 96.0,
+     "clear": 192.0,
+     "at": [
+      102,
+      75,
+      18
+     ]
+    }
+   ],
+   "rooms": [
+    {
+     "name": "piece",
+     "use": "vie+sommeil+foyer",
+     "area_m2": 22.7,
+     "floor": 18.0,
+     "ceiling": 264.0
+    }
+   ],
+   "hearths": [
+    [
+     -60,
+     -397,
+     58
+    ]
+   ],
+   "sleep_slots": 3,
+   "storage": 2,
+   "work": [
+    {
+     "kind": "spin",
+     "at": [
+      -100,
+      -60,
+      18
+     ]
+    },
+    {
+     "kind": "chop",
+     "at": [
+      380,
+      320,
+      0
+     ]
+    }
+   ],
+   "roof": [
+    {
+     "kind": "gable",
+     "cover": "board",
+     "pitch": 32.0,
+     "ridge": 427
+    }
+   ],
+   "entry": [
+    102,
+    210,
+    0
+   ],
+   "classes": [
+    "ashlar",
+    "daub",
+    "earth",
+    "fiber",
+    "iron",
+    "plank",
+    "plaster",
+    "rubble",
+    "tile",
+    "wood"
+   ],
+   "errors": []
+  },
+  {
+   "name": "SM_Arch_House_Medium_01",
+   "kind": "house",
+   "tier": 2,
+   "size_cm": [
+    1278,
+    1696,
+    845
+   ],
+   "bounds": [
+    [
+     -609,
+     -799,
+     -30
+    ],
+    [
+     669,
+     898,
+     815
+    ]
+   ],
+   "footprint": [
+    -679,
+    -869,
+    739,
+    888
+   ],
+   "height_humans": 4.79,
+   "triangles": 89038,
+   "footing_triangles": 22566,
+   "doors": [
+    {
+     "name": "rez",
+     "width": 140.0,
+     "clear": 212.0,
+     "at": [
+      0,
+      -10,
+      14
+     ]
+    },
+    {
+     "name": "etage",
+     "width": 100.0,
+     "clear": 196,
+     "at": [
+      -290,
+      -29,
+      300
+     ]
+    },
+    {
+     "name": "gate",
+     "width": 230,
+     "clear": 205,
+     "at": [
+      -115,
+      820,
+      0
+     ]
+    }
+   ],
+   "rooms": [
+    {
+     "name": "salle",
+     "use": "vie+foyer+veillee",
+     "area_m2": 34.0,
+     "floor": 300.0,
+     "ceiling": 554.0
+    },
+    {
+     "name": "chambre",
+     "use": "sommeil",
+     "area_m2": 24.2,
+     "floor": 300.0,
+     "ceiling": 554.0
+    },
+    {
+     "name": "rez",
+     "use": "etable+reserve",
+     "area_m2": 47.0,
+     "floor": 14.0,
+     "ceiling": 278.0
+    }
+   ],
+   "hearths": [
+    [
+     -404,
+     -420,
+     340
+    ]
+   ],
+   "sleep_slots": 7,
+   "storage": 7,
+   "work": [
+    {
+     "kind": "gallery",
+     "at": [
+      0,
+      42,
+      300
+     ]
+    },
+    {
+     "kind": "stable",
+     "at": [
+      -280,
+      -520,
+      14
+     ]
+    },
+    {
+     "kind": "oven",
+     "at": [
+      -290,
+      580,
+      0
+     ]
+    },
+    {
+     "kind": "chop",
+     "at": [
+      -220,
+      490,
+      0
+     ]
+    }
+   ],
+   "roof": [
+    {
+     "kind": "hip",
+     "cover": "tile",
+     "pitch": 30.0,
+     "ridge": 799
+    }
+   ],
+   "entry": [
+    340,
+    245,
+    0
+   ],
+   "classes": [
+    "ashlar",
+    "daub",
+    "earth",
+    "fiber",
+    "iron",
+    "plank",
+    "plaster",
+    "rubble",
+    "tile",
+    "wood"
+   ],
+   "errors": []
+  },
+  {
+   "name": "SM_Arch_House_Farm_01",
+   "kind": "house",
+   "tier": 3,
+   "size_cm": [
+    1755,
+    1739,
+    839
+   ],
+   "bounds": [
+    [
+     -871,
+     -871,
+     -30
+    ],
+    [
+     884,
+     869,
+     809
+    ]
+   ],
+   "footprint": [
+    -888,
+    -888,
+    888,
+    888
+   ],
+   "height_humans": 4.76,
+   "triangles": 109434,
+   "footing_triangles": 24762,
+   "doors": [
+    {
+     "name": "rez",
+     "width": 140.0,
+     "clear": 212.0,
+     "at": [
+      -370,
+      -70,
+      14
+     ]
+    },
+    {
+     "name": "etage",
+     "width": 100.0,
+     "clear": 196,
+     "at": [
+      -610,
+      -89,
+      300
+     ]
+    },
+    {
+     "name": "grange",
+     "width": 240,
+     "clear": 255,
+     "at": [
+      230,
+      -210,
+      0
+     ]
+    },
+    {
+     "name": "gate",
+     "width": 260,
+     "clear": 215,
+     "at": [
+      60,
+      780,
+      0
+     ]
+    }
+   ],
+   "rooms": [
+    {
+     "name": "salle",
+     "use": "vie+foyer+veillee",
+     "area_m2": 29.4,
+     "floor": 300.0,
+     "ceiling": 554.0
+    },
+    {
+     "name": "chambre",
+     "use": "sommeil",
+     "area_m2": 20.9,
+     "floor": 300.0,
+     "ceiling": 554.0
+    },
+    {
+     "name": "rez",
+     "use": "reserve+reserve",
+     "area_m2": 40.0,
+     "floor": 14.0,
+     "ceiling": 278.0
+    },
+    {
+     "name": "grange",
+     "use": "etable+fenil",
+     "area_m2": 42.8,
+     "floor": 0.0,
+     "ceiling": 260
+    }
+   ],
+   "hearths": [
+    [
+     -490,
+     -650,
+     340
+    ]
+   ],
+   "sleep_slots": 6,
+   "storage": 8,
+   "work": [
+    {
+     "kind": "gallery",
+     "at": [
+      -370,
+      -18,
+      300
+     ]
+    },
+    {
+     "kind": "stable",
+     "at": [
+      100,
+      -210,
+      0
+     ]
+    },
+    {
+     "kind": "oven",
+     "at": [
+      -510,
+      600,
+      0
+     ]
+    },
+    {
+     "kind": "chop",
+     "at": [
+      -120,
+      390,
+      0
+     ]
+    }
+   ],
+   "roof": [
+    {
+     "kind": "gable",
+     "cover": "tile",
+     "pitch": 30.0,
+     "ridge": 793
+    },
+    {
+     "kind": "gable",
+     "cover": "board",
+     "pitch": 28.0,
+     "ridge": 614
+    }
+   ],
+   "entry": [
+    60,
+    640,
+    0
+   ],
+   "classes": [
+    "ashlar",
+    "daub",
+    "earth",
+    "fiber",
+    "iron",
+    "plank",
+    "plaster",
+    "rubble",
+    "tile",
+    "wood"
+   ],
+   "errors": []
+  },
+  {
+   "name": "SM_Arch_Storehouse_01",
+   "kind": "granary",
+   "tier": 1,
+   "size_cm": [
+    1654,
+    1441,
+    800
+   ],
+   "bounds": [
+    [
+     -780,
+     -728,
+     -20
+    ],
+    [
+     873,
+     713,
+     780
+    ]
+   ],
+   "footprint": [
+    -850,
+    -798,
+    888,
+    783
+   ],
+   "height_humans": 4.59,
+   "triangles": 67210,
+   "footing_triangles": 22728,
+   "doors": [
+    {
+     "name": "grenier",
+     "width": 240,
+     "clear": 260,
+     "at": [
+      -140,
+      192,
+      12
+     ]
+    }
+   ],
+   "rooms": [
+    {
+     "name": "reserve",
+     "use": "stock commun",
+     "area_m2": 66.3,
+     "floor": 12,
+     "ceiling": 300
+    }
+   ],
+   "hearths": [],
+   "sleep_slots": 0,
+   "storage": 11,
+   "work": [
+    {
+     "kind": "distribution",
+     "at": [
+      -140,
+      320,
+      0
+     ]
+    }
+   ],
+   "roof": [
+    {
+     "kind": "gable",
+     "cover": "tile",
+     "pitch": 27.0,
+     "ridge": 764
+    }
+   ],
+   "entry": [
+    -140,
+    410,
+    0
+   ],
+   "classes": [
+    "ashlar",
+    "earth",
+    "fiber",
+    "iron",
+    "plank",
+    "rubble",
+    "tile",
+    "wood"
+   ],
+   "errors": []
+  },
+  {
+   "name": "SM_Arch_Well_01",
+   "kind": "well",
+   "tier": 1,
+   "size_cm": [
+    491,
+    672,
+    402
+   ],
+   "bounds": [
+    [
+     -255,
+     -420,
+     -120
+    ],
+    [
+     236,
+     252,
+     282
+    ]
+   ],
+   "footprint": [
+    -325,
+    -490,
+    306,
+    322
+   ],
+   "height_humans": 1.66,
+   "triangles": 2738,
+   "footing_triangles": 10236,
+   "doors": [],
+   "rooms": [],
+   "hearths": [],
+   "sleep_slots": 0,
+   "storage": 0,
+   "work": [
+    {
+     "kind": "draw_water",
+     "at": [
+      0,
+      150,
+      0
+     ]
+    }
+   ],
+   "roof": [],
+   "entry": [
+    0,
+    260,
+    0
+   ],
+   "classes": [
+    "ashlar",
+    "fiber",
+    "iron",
+    "plank",
+    "plaster",
+    "rubble",
+    "tile",
+    "wood"
+   ],
+   "errors": []
+  },
+  {
+   "name": "SM_Arch_Workshop_01",
+   "kind": "workshop",
+   "tier": 1,
+   "size_cm": [
+    871,
+    726,
+    475
+   ],
+   "bounds": [
+    [
+     -435,
+     -383,
+     -15
+    ],
+    [
+     435,
+     343,
+     460
+    ]
+   ],
+   "footprint": [
+    -505,
+    -453,
+    505,
+    413
+   ],
+   "height_humans": 2.71,
+   "triangles": 31628,
+   "footing_triangles": 13800,
+   "doors": [
+    {
+     "name": "baie",
+     "width": 680.0,
+     "clear": 290,
+     "at": [
+      0,
+      260,
+      4
+     ]
+    }
+   ],
+   "rooms": [
+    {
+     "name": "atelier",
+     "use": "forge",
+     "area_m2": 40.3,
+     "floor": 4,
+     "ceiling": 300
+    }
+   ],
+   "hearths": [],
+   "sleep_slots": 0,
+   "storage": 0,
+   "work": [
+    {
+     "kind": "forge",
+     "at": [
+      -60,
+      0,
+      4
+     ]
+    }
+   ],
+   "roof": [
+    {
+     "kind": "gable",
+     "cover": "tile",
+     "pitch": 26.0,
+     "ridge": 437
+    }
+   ],
+   "entry": [
+    0,
+    460,
+    0
+   ],
+   "classes": [
+    "ashlar",
+    "earth",
+    "fiber",
+    "iron",
+    "plank",
+    "rubble",
+    "tile",
+    "wood"
+   ],
+   "errors": []
+  },
+  {
+   "name": "SM_Arch_Chapel_01",
+   "kind": "chapel",
+   "tier": 1,
+   "size_cm": [
+    1359,
+    786,
+    1055
+   ],
+   "bounds": [
+    [
+     -780,
+     -393,
+     -15
+    ],
+    [
+     579,
+     393,
+     1040
+    ]
+   ],
+   "footprint": [
+    -850,
+    -463,
+    649,
+    463
+   ],
+   "height_humans": 6.12,
+   "triangles": 54772,
+   "footing_triangles": 17634,
+   "doors": [
+    {
+     "name": "nef",
+     "width": 140,
+     "clear": 280,
+     "at": [
+      552,
+      0,
+      10
+     ]
+    }
+   ],
+   "rooms": [
+    {
+     "name": "nef",
+     "use": "culte+assemblee",
+     "area_m2": 55.1,
+     "floor": 10,
+     "ceiling": 559.0
+    }
+   ],
+   "hearths": [],
+   "sleep_slots": 0,
+   "storage": 0,
+   "work": [],
+   "roof": [
+    {
+     "kind": "gable",
+     "cover": "tile",
+     "pitch": 26.0,
+     "ridge": 721
+    }
+   ],
+   "entry": [
+    820,
+    0,
+    0
+   ],
+   "classes": [
+    "ashlar",
+    "iron",
+    "plank",
+    "plaster",
+    "rubble",
+    "tile",
+    "wood"
+   ],
+   "errors": []
+  }
+ ],
+ "kit": [
+  {
+   "name": "SM_Kit_Wall_Rubble_300",
+   "triangles": 1632,
+   "size_cm": [
+    300,
+    63,
+    300
+   ]
+  },
+  {
+   "name": "SM_Kit_Wall_Rubble_Door_300",
+   "triangles": 1242,
+   "size_cm": [
+    300,
+    115,
+    300
+   ]
+  },
+  {
+   "name": "SM_Kit_Wall_Rubble_Window_300",
+   "triangles": 1512,
+   "size_cm": [
+    300,
+    91,
+    300
+   ]
+  },
+  {
+   "name": "SM_Kit_Wall_Rubble_Corner",
+   "triangles": 3786,
+   "size_cm": [
+    334,
+    334,
+    300
+   ]
+  },
+  {
+   "name": "SM_Kit_Wall_Rubble_Plastered_300",
+   "triangles": 12,
+   "size_cm": [
+    300,
+    60,
+    300
+   ]
+  },
+  {
+   "name": "SM_Kit_Wall_Timber_300",
+   "triangles": 120,
+   "size_cm": [
+    300,
+    22,
+    260
+   ]
+  },
+  {
+   "name": "SM_Kit_Wall_Timber_Daub_Repaired_300",
+   "triangles": 120,
+   "size_cm": [
+    300,
+    22,
+    260
+   ]
+  },
+  {
+   "name": "SM_Kit_Wall_Timber_Window_300",
+   "triangles": 288,
+   "size_cm": [
+    300,
+    58,
+    260
+   ]
+  },
+  {
+   "name": "SM_Kit_Wall_Timber_Door_300",
+   "triangles": 336,
+   "size_cm": [
+    300,
+    115,
+    273
+   ]
+  },
+  {
+   "name": "SM_Kit_Wall_Plank_300",
+   "triangles": 180,
+   "size_cm": [
+    300,
+    10,
+    259
+   ]
+  },
+  {
+   "name": "SM_Kit_Wall_Drystone_300",
+   "triangles": 1824,
+   "size_cm": [
+    307,
+    63,
+    176
+   ]
+  },
+  {
+   "name": "SM_Kit_Fence_Wattle_300",
+   "triangles": 1136,
+   "size_cm": [
+    305,
+    10,
+    154
+   ]
+  },
+  {
+   "name": "SM_Kit_Roof_Tile_300",
+   "triangles": 7942,
+   "size_cm": [
+    441,
+    557,
+    188
+   ]
+  },
+  {
+   "name": "SM_Kit_Roof_Board_300",
+   "triangles": 2276,
+   "size_cm": [
+    463,
+    547,
+    192
+   ]
+  },
+  {
+   "name": "SM_Kit_Floor_Plank_300",
+   "triangles": 228,
+   "size_cm": [
+    300,
+    300,
+    22
+   ]
+  },
+  {
+   "name": "SM_Kit_Stair_Stone",
+   "triangles": 192,
+   "size_cm": [
+    114,
+    246,
+    170
+   ]
+  },
+  {
+   "name": "SM_Kit_Hearth",
+   "triangles": 188,
+   "size_cm": [
+    140,
+    94,
+    220
+   ]
+  },
+  {
+   "name": "SM_Kit_Oven",
+   "triangles": 630,
+   "size_cm": [
+    203,
+    200,
+    195
+   ]
+  },
+  {
+   "name": "SM_Kit_Gate",
+   "triangles": 3050,
+   "size_cm": [
+    401,
+    177,
+    307
+   ]
+  },
+  {
+   "name": "SM_Kit_Pithos_Group",
+   "triangles": 756,
+   "size_cm": [
+    245,
+    86,
+    126
+   ]
+  },
+  {
+   "name": "SM_Kit_Woodpile",
+   "triangles": 2972,
+   "size_cm": [
+    220,
+    80,
+    148
+   ]
+  },
+  {
+   "name": "SM_Kit_Roof_Chimney",
+   "triangles": 7416,
+   "size_cm": [
+    421,
+    437,
+    290
+   ]
+  },
+  {
+   "name": "SM_Kit_Door_Closed",
+   "triangles": 168,
+   "size_cm": [
+    168,
+    72,
+    235
+   ]
+  }
+ ]
+}

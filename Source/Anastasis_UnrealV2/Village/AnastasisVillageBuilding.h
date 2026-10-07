@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Village/AnastasisArchitecture.h"
 #include "Village/AnastasisVillageTags.h"
 #include "AnastasisVillageBuilding.generated.h"
 
@@ -35,6 +36,24 @@ public:
 	AAnastasisVillageBuilding();
 
 	void Configure(EAnastasisVillageBuildingKind InKind, FName InSimId, USmartObjectDefinition* Definition);
+
+	/**
+	 * ARCHITECTURE_SCALE_001 : pose la maisonnee a l'echelle humaine (corps + assise terrassee) d'apres son
+	 * archetype. Si les assets du generateur manquent, l'ancien mesh reste (aucune regression a vide).
+	 * Retourne vrai si le corps de l'archetype est charge.
+	 */
+	bool ApplyArchitecture(AnastasisArchitecture::EVariant InVariant);
+
+	/**
+	 * Niveau de la cour terrassee par rapport a la racine (cm) : la racine reste sur le point de la
+	 * simulation (SimToUnreal), le corps, l'assise et le foyer descendent ou montent ensemble (ARCH-10).
+	 */
+	void SetPadOffset(double OffsetCm);
+	double GetPadOffset() const { return PadOffset; }
+	bool HasArchitecture() const { return bHasArchitecture; }
+	AnastasisArchitecture::EVariant GetVariant() const { return Variant; }
+	UStaticMeshComponent* GetBody() const { return Body; }
+	UStaticMeshComponent* GetFooting() const { return Footing; }
 
 	FName GetSimId() const { return SimId; }
 	EAnastasisVillageBuildingKind GetKind() const { return Kind; }
@@ -70,6 +89,15 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis")
 	TObjectPtr<UStaticMeshComponent> Body;
+
+	/** Assise : cour de terre battue et soutenement de pierre seche. Pleine des l'ouverture du chantier. */
+	UPROPERTY(VisibleAnywhere, Category = "Anastasis")
+	TObjectPtr<UStaticMeshComponent> Footing;
+
+	AnastasisArchitecture::EVariant Variant = AnastasisArchitecture::EVariant::HousePoor;
+	bool bHasArchitecture = false;
+	double PadOffset = 0.0;
+	FVector HearthAuthored = FVector(0.0, 0.0, 120.0);
 
 	/** Cree pour tout batiment, mais allume seulement pour une maison (SetHearth). */
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis")

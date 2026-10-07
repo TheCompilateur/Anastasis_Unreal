@@ -462,6 +462,17 @@ se change dans le script.
 | `create-village-buildings.ps1` + `.py` | Forge le puits, la maison et le grenier dans VillageBuildings, meme matiere que les props. `-Rebuild` regenere. |
 | `capture-refugee-props.ps1` + `capture-refugee-props.py` | Capture en studio les quatre objets, sans sauvegarder de niveau. |
 
+### Architecture du village (ARCHITECTURE_SCALE_001)
+
+Convention d'echelle et regles chiffrees : `docs/unreal/ARCHITECTURE_SCALE_001.md`. Une tuile de simulation fait 20 m ;
+une maisonnee remplit sa parcelle (corps + assise terrassee). Catalogue fonctionnel : `Village/AnastasisArchitecture.*`.
+
+| Script | Role |
+|---|---|
+| `create-village-architecture.ps1` + `create-village-architecture.py` | **ecrit** `/Game/Anastasis/VillageArchitecture` : sept maisonnees a l'echelle humaine (`SM_Arch_*` + `_Footing` : maison pauvre, moyenne, ferme, grenier, puits, atelier, chapelle), le kit de 23 pieces (`Kit/SM_Kit_*`) et `M_AnastasisArchitecture` (classes de materiau par l'alpha du sommet, usure physique, `Neglect`) ; collision complexe (on entre) ; meshes reecrits a chaque run, `-Rebuild` regenere aussi le materiau ; sans editeur, `python create-village-architecture.py` valide l'echelle (ARCH-01..10) et ecrit `docs/unreal/architecture/architecture-kit-001.json` |
+| `architecture-preview.py` | **hors editeur** (Python systeme, Pillow + numpy) : rend chaque maisonnee en z-buffer logiciel avec des silhouettes de 170 cm (trois-quarts a hauteur d'oeil, oblique, arriere, porte, coupe) en secondes -> `Saved/ArchitecturePreview/` ; juge proportions et silhouettes, pas la matiere |
+| `architecture-pie.ps1` + `architecture-pie.py` | preuve PIE : `Anastasis.Village.Hamlet` AVANT (`anastasis.Village.Architecture 0`, anciens meshes) puis APRES, memes cameras ; chaque batiment porte son archetype et son assise, terrasse < 480 cm, deux typologies au moins ; mannequins au corps des habitants devant, dans la porte, a l'interieur ; 13 prises -> `Saved/ArchitectureEvidence/pie/` ; au registre (`architecture-pie`) ; rien n'est sauve |
+
 ### AAA visual lab
 
 | Script | Role |

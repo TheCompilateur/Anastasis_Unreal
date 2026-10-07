@@ -62,6 +62,17 @@ public:
 	 * reference, un habitant qui a un foyer va manger chez lui (HOUSE -> eat).
 	 */
 	FString SeedFirstGranary(int32 NpcCount, int32 Food, int32 TileX, int32 TileY);
+
+	/**
+	 * ARCHITECTURE_SCALE_001 (architecture-crusade-001) : un hameau pour juger l'espace bati -- un puits,
+	 * `Houses` maisons en grappe autour (une parcelle libre entre deux au plus pres), un grenier rempli,
+	 * `NpcCount` habitants, les premiers proprietaires, les autres abrites. Ne change aucune regle de la
+	 * simulation : c'est un scenario de preuve comme FirstHouse. Rend le nombre de batiments poses.
+	 */
+	int32 SeedArchitectureHamlet(int32 Houses, int32 NpcCount, int32 TileX, int32 TileY);
+
+	/** Une ligne `ANASTASIS_ARCH record` par batiment : archetype et etat vivant (AnastasisArchitecture::Describe). */
+	void LogArchitecture() const;
 	bool SeedFoodSupply();
 
 	/**

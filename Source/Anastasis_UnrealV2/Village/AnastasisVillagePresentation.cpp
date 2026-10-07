@@ -19,9 +19,25 @@
 #include "WorldView/AnastasisWorldEmbodiment.h"
 #include "EngineUtils.h"
 #include "ProceduralMeshComponent.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "HAL/IConsoleManager.h"
+#include "Village/AnastasisArchitecture.h"
 
 namespace
 {
+	TAutoConsoleVariable<int32> CVarArchitecture(
+		TEXT("anastasis.Village.Architecture"),
+		1,
+		TEXT("ARCHITECTURE_SCALE_001 : 1 = maisonnees a l'echelle humaine (corps + assise terrassee + parcelle defrichee) ; ")
+		TEXT("0 = anciens meshes de la tuile de 4 m (temoin d'A/B). Lu a la creation de chaque batiment."),
+		ECVF_Default);
+
+	TAutoConsoleVariable<float> CVarArchitectureClearMargin(
+		TEXT("anastasis.Village.ArchitectureClearMargin"),
+		120.f,
+		TEXT("ARCHITECTURE_SCALE_001 : marge (cm) autour de l'emprise d'une maisonnee ou herbe et arbres sont ecartes."),
+		ECVF_Default);
+
 	/** Le vocabulaire de la simulation vers l'enum de presentation de `main`. */
 	bool BuildingHasBody(UWorld* World, const FString& SimId)
 	{
@@ -83,29 +99,139 @@ FVector FAnastasisVillagePresentation::SimToUnreal(const AnastasisWorld::FWorld&
     FVector Position(SimX * AnastasisWorldView::TileWorldSize * Scale,
         SimY * AnastasisWorldView::TileWorldSize * Scale,
         AnastasisWorldView::AltitudeToUnreal(TileAltitude(World, SimX, SimY), Scale));
-    if (Terrain)
+    double Ground = 0.0;
+    if (Terrain && TraceGround(PresentationWorld, Position.X, Position.Y, Ground))
+    {
+        Position.Z = Ground;
+    }
+    return Position;
+}
+
+bool FAnastasisVillagePresentation::TraceGround(UWorld* PresentationWorld, const double X, const double Y, double& OutZ)
+{
+    if (!PresentationWorld)
+    {
+        return false;
+    }
+    for (TActorIterator<AAnastasisWorldEmbodiment> It(PresentationWorld); It; ++It)
     {
         // Query this world's rendered collision mesh. The Forge global cache can
         // belong to another editor/PIE world and is not a safe village anchor.
         TArray<UProceduralMeshComponent*> Surfaces;
-        Terrain->GetComponents(Surfaces);
+        It->GetComponents(Surfaces);
         for (UProceduralMeshComponent* Surface : Surfaces)
         {
             if (!Surface->IsVisible() || !Surface->IsCollisionEnabled()) continue;
             const FBox Bounds = Surface->Bounds.GetBox();
             FHitResult Hit;
             if (Surface->LineTraceComponent(Hit,
-                FVector(Position.X, Position.Y, Bounds.Max.Z + 1000),
-                FVector(Position.X, Position.Y, Bounds.Min.Z - 1000),
+                FVector(X, Y, Bounds.Max.Z + 1000),
+                FVector(X, Y, Bounds.Min.Z - 1000),
                 FCollisionQueryParams(SCENE_QUERY_STAT(VillageGround), true)))
             {
-                Position.Z = Hit.ImpactPoint.Z;
-                break;
+                OutZ = Hit.ImpactPoint.Z;
+                return true;
+            }
+        }
+        break;
+    }
+    return false;
+}
+
+int32 FAnastasisVillagePresentation::SettleArchitecture(AAnastasisVillageBuilding& Actor,
+    const AnastasisVillage::FVillage& Village, const FString& BuildingId, UWorld* PresentationWorld)
+{
+    const AnastasisVillage::FBuilding* Building = Village.FindBuilding(BuildingId);
+    AnastasisArchitecture::EVariant Variant;
+    if (!Building || CVarArchitecture.GetValueOnGameThread() == 0
+        || !AnastasisArchitecture::ChooseVariant(Building->Type, Building->HousePhase, Building->Id, Variant)
+        || !Actor.ApplyArchitecture(Variant))
+    {
+        return -1;
+    }
+    const AnastasisArchitecture::FArchetype& A = AnastasisArchitecture::Get(Variant);
+    const FTransform Xf = Actor.GetActorTransform();
+
+    // ARCH-10 : la cour se pose a la mediane du terrain sous l'emprise. Aval : terrasse sur soutenement ;
+    // amont : l'assise s'enterre. Jamais posee sur le seul point central.
+    TArray<double> Heights;
+    for (const FVector2D& L : AnastasisArchitecture::FootprintSamples(A, 5))
+    {
+        const FVector W = Xf.TransformPosition(FVector(L.X, L.Y, 0.0));
+        double Z = 0.0;
+        if (TraceGround(PresentationWorld, W.X, W.Y, Z))
+        {
+            Heights.Add(Z);
+        }
+    }
+    double Pad = Xf.GetLocation().Z;
+    double Lo = Pad;
+    double Hi = Pad;
+    if (Heights.Num() > 0)
+    {
+        Pad = AnastasisArchitecture::PadLevel(Heights);
+        Lo = FMath::Min(Heights);
+        Hi = FMath::Max(Heights);
+    }
+    Actor.SetPadOffset(Pad - Xf.GetLocation().Z);
+
+    // La parcelle defrichee : rien ne pousse dans la cour ni a travers un toit.
+    const double Margin = FMath::Max(0.f, CVarArchitectureClearMargin.GetValueOnGameThread());
+    const FBox2D Zone(A.Footprint.Min - FVector2D(Margin), A.Footprint.Max + FVector2D(Margin));
+    FBox WorldBox(ForceInit);
+    const FVector2D Corners[4] = {Zone.Min, Zone.Max, FVector2D(Zone.Min.X, Zone.Max.Y), FVector2D(Zone.Max.X, Zone.Min.Y)};
+    for (const FVector2D& Corner : Corners)
+    {
+        WorldBox += Xf.TransformPosition(FVector(Corner.X, Corner.Y, 0.0));
+    }
+    WorldBox.Min.Z = -1.0e9;
+    WorldBox.Max.Z = 1.0e9;
+    int32 Cleared = 0;
+    int32 Components = 0;
+    for (TActorIterator<AActor> It(PresentationWorld); It; ++It)
+    {
+        if (It->IsA<AAnastasisVillageBuilding>() || It->IsA<AAnastasisVillagerVisual>())
+        {
+            continue;
+        }
+        TArray<UHierarchicalInstancedStaticMeshComponent*> Hisms;
+        It->GetComponents(Hisms);
+        for (UHierarchicalInstancedStaticMeshComponent* Hism : Hisms)
+        {
+            if (!Hism || Hism->GetInstanceCount() == 0 || !Hism->Bounds.GetBox().Intersect(WorldBox))
+            {
+                continue;
+            }
+            int32 Here = 0;
+            for (int32 I = 0; I < Hism->GetInstanceCount(); ++I)
+            {
+                FTransform T;
+                if (!Hism->GetInstanceTransform(I, T, true) || T.GetScale3D().IsNearlyZero(1.e-4))
+                {
+                    continue;
+                }
+                const FVector L = Xf.InverseTransformPosition(T.GetLocation());
+                if (Zone.IsInside(FVector2D(L.X, L.Y)))
+                {
+                    T.SetScale3D(FVector::ZeroVector);
+                    Hism->UpdateInstanceTransform(I, T, true, false, true);
+                    ++Here;
+                }
+            }
+            if (Here > 0)
+            {
+                Hism->MarkRenderStateDirty();
+                Cleared += Here;
+                ++Components;
             }
         }
     }
-    return Position;
+    UE_LOG(LogAnastasis_UnrealV2, Display,
+        TEXT("ANASTASIS_ARCH settle %s archetype=%s pad=%.0f ground=[%.0f..%.0f] samples=%d offset=%.0f cleared=%d hism=%d"),
+        *BuildingId, A.Id, Pad, Lo, Hi, Heights.Num(), Pad - Xf.GetLocation().Z, Cleared, Components);
+    return Cleared;
 }
+
 
 int32 FAnastasisVillagePresentation::Sync(
 	const AnastasisVillage::FVillage& Village,
@@ -214,6 +340,7 @@ int32 FAnastasisVillagePresentation::Sync(
 #if WITH_EDITOR
 		Actor->SetActorLabel(FString::Printf(TEXT("SimBuilding_%s_%s"), *Building.Type, *Building.Id));
 #endif
+		SettleArchitecture(*Actor, Village, Building.Id, Rooms.GetWorld());
 		Actor->SetConstructionProgress(Building.Progress);
 		ApplyMetabolism(*Actor, Building);
 		Actors.Add(Building.Id, Actor);

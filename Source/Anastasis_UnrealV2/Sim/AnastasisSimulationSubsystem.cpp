@@ -10,6 +10,8 @@
 #include "HAL/PlatformTime.h"
 #include "Core/AnastasisSimClock.h"
 #include "Village/AnastasisVillage.h"
+#include "Village/AnastasisArchitecture.h"
+#include "Village/AnastasisVillageBuilding.h"
 #include "Village/AnastasisVillageInteractionSubsystem.h"
 #include "Village/AnastasisVillagerVisual.h"
 #include "WorldView/AnastasisPresentationResolver.h"
@@ -975,6 +977,150 @@ FString UAnastasisSimulationSubsystem::SeedFirstHouse(int32 NpcCount, int32 Tile
 	return Owned;
 }
 
+int32 UAnastasisSimulationSubsystem::SeedArchitectureHamlet(int32 Houses, int32 NpcCount, int32 TileX, int32 TileY)
+{
+	ReplaceStartVillage();
+	if (!Simulation.IsRunning())
+	{
+		return 0;
+	}
+	// Un hameau remplace TOUT village precedent (scenario compris) : rejoue deux fois, il retombe sur les
+	// memes ids et les memes cases -- l'A/B avant / apres se fait aux memes cameras.
+	if (Simulation.GetVillage().GetBuildings().Num() > 0 || Simulation.GetVillage().GetActors().Num() > 0)
+	{
+		UWorld* World = GetWorld();
+		VillagePresentation.Clear(World ? World->GetSubsystem<UAnastasisVillageInteractionSubsystem>() : nullptr);
+		ResetCanonical(Simulation.GetSeed());
+	}
+	AnastasisVillage::FVillage& Village = Simulation.GetVillage();
+	const AnastasisNav::FNavGrid& Nav = Village.GetNavGrid();
+	auto FreeAround = [&](int32 X, int32 Y)
+	{
+		int32 Count = 0;
+		for (int32 DY = -1; DY <= 1; ++DY)
+		{
+			for (int32 DX = -1; DX <= 1; ++DX)
+			{
+				if ((DX || DY) && !Village.IsFootBlocked(X + DX + 0.5, Y + DY + 0.5)) ++Count;
+			}
+		}
+		return Count;
+	};
+	// Parcelles voisines permises : chaque maisonnee garde sa ruelle de 2 m (ARCH-09) et une case d'acces libre.
+	auto Place = [&](const TCHAR* Type, int32 CX, int32 CY, int32& OutX, int32& OutY)
+	{
+		for (int32 Radius = 0; Radius <= 12; ++Radius)
+		{
+			for (int32 DY = -Radius; DY <= Radius; ++DY)
+			{
+				for (int32 DX = -Radius; DX <= Radius; ++DX)
+				{
+					if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) != Radius) continue;
+					const int32 X = CX + DX;
+					const int32 Y = CY + DY;
+					if (X < 2 || Y < 2 || X > Nav.W - 3 || Y > Nav.H - 3) continue;
+					if (Village.IsFootBlocked(X + 0.5, Y + 0.5) || FreeAround(X, Y) < 4) continue;
+					const FString Id = Village.AddBuilding(Type, X, Y, 1.0, Simulation.GetDay());
+					if (!Id.IsEmpty())
+					{
+						OutX = X;
+						OutY = Y;
+						return Id;
+					}
+				}
+			}
+		}
+		return FString();
+	};
+	int32 WX = TileX;
+	int32 WY = TileY;
+	const FString Well = Place(AnastasisVillage::WellType, TileX, TileY, WX, WY);
+	if (Well.IsEmpty())
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_ARCH hamlet: no free tile near (%d,%d)"), TileX, TileY);
+		return 0;
+	}
+	// Grappe irreguliere autour du puits : pas une grille, pas un cercle parfait.
+	static const FIntPoint Offsets[] = {{1, 1}, {-1, 1}, {2, 0}, {-1, -1}, {1, -2}, {-2, 0}, {2, 2}, {-2, 2}, {3, -1}, {0, 3}};
+	TArray<FString> HouseIds;
+	for (int32 K = 0; K < FMath::Clamp(Houses, 1, UE_ARRAY_COUNT(Offsets)); ++K)
+	{
+		int32 X = 0;
+		int32 Y = 0;
+		const FString Id = Place(AnastasisVillage::HouseType, WX + Offsets[K].X, WY + Offsets[K].Y, X, Y);
+		if (!Id.IsEmpty()) HouseIds.Add(Id);
+	}
+	int32 GX = 0;
+	int32 GY = 0;
+	const FString Granary = Place(AnastasisVillage::GranaryType, WX + 2, WY - 2, GX, GY);
+	if (!Granary.IsEmpty())
+	{
+		Village.CreditFood(Granary, 40);
+	}
+	for (int32 K = 0; K < NpcCount; ++K)
+	{
+		const double Angle = 2.0 * UE_DOUBLE_PI * K / FMath::Max(1, NpcCount);
+		const int32 CX = WX + FMath::RoundToInt32(2.5 * FMath::Cos(Angle));
+		const int32 CY = WY + FMath::RoundToInt32(2.5 * FMath::Sin(Angle));
+		bool bPlaced = false;
+		for (int32 R = 0; R <= 6 && !bPlaced; ++R)
+		{
+			for (int32 DY = -R; DY <= R && !bPlaced; ++DY)
+			{
+				for (int32 DX = -R; DX <= R && !bPlaced; ++DX)
+				{
+					const int32 X = CX + DX;
+					const int32 Y = CY + DY;
+					if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) != R || !Nav.IsInBounds(X, Y)) continue;
+					if (Village.IsFootBlocked(X + 0.5, Y + 0.5)) continue;
+					AnastasisNeeds::FNeeds Needs;
+					Needs.Hunger = 10.0 + 5.0 * (K % 4);
+					Needs.Energy = 70.0;
+					Needs.Social = 70.0;
+					Needs.Leisure = 70.0;
+					Needs.Hygiene = 60.0;
+					Needs.Thirst = 10.0 + 6.0 * (K % 5);
+					Needs.Health = 90.0;
+					Needs.Morale = 55.0;
+					const FString Id = Village.SpawnNpc(X + 0.5, Y + 0.5, Needs, 4.0);
+					if (HouseIds.IsValidIndex(K))
+					{
+						Village.AssignHome(Id, HouseIds[K]);
+					}
+					bPlaced = true;
+				}
+			}
+		}
+	}
+	const int32 Sheltered = Village.AssignSheltersDaily();
+	SyncVillagePresentation();
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_ARCH hamlet well=%s at (%d,%d) houses=%d granary=%s inhabitants=%d sheltered=%d"),
+		*Well, WX, WY, HouseIds.Num(), Granary.IsEmpty() ? TEXT("-") : *Granary, Village.GetActors().Num(), Sheltered);
+	FAnastasisVillagePresentation::LogStatus(Village, Simulation.GetTime());
+	LogArchitecture();
+	return 1 + HouseIds.Num() + (Granary.IsEmpty() ? 0 : 1);
+}
+
+void UAnastasisSimulationSubsystem::LogArchitecture() const
+{
+	const AnastasisVillage::FVillage& Village = Simulation.GetVillage();
+	for (const AnastasisVillage::FBuilding& B : Village.GetBuildings())
+	{
+		AnastasisArchitecture::EVariant Variant;
+		if (!AnastasisArchitecture::ChooseVariant(B.Type, B.HousePhase, B.Id, Variant)) continue;
+		const AnastasisArchitecture::FBuildingRecord Record = AnastasisArchitecture::Describe(Village, B, Variant, Simulation.GetDay());
+		FString Where = TEXT("-");
+		if (const AAnastasisVillageBuilding* Actor = VillagePresentation.FindActor(B.Id))
+		{
+			const FVector L = Actor->GetActorLocation();
+			Where = FString::Printf(TEXT("(%.0f,%.0f,%.0f) yaw=%.0f pad=%.0f arch=%d"), L.X, L.Y, L.Z,
+				Actor->GetActorRotation().Yaw, Actor->GetPadOffset(), Actor->HasArchitecture() ? 1 : 0);
+		}
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("%s at=%s"), *AnastasisArchitecture::ToLogLine(Record), *Where);
+	}
+}
+
 FString UAnastasisSimulationSubsystem::SeedFirstGranary(int32 NpcCount, int32 Food, int32 TileX, int32 TileY)
 {
 	ReplaceStartVillage();
@@ -1116,6 +1262,33 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVillageFirstGranary(
 			const int32 X = Args.IsValidIndex(2) ? FCString::Atoi(*Args[2]) : FMath::FloorToInt32(Settlement.X);
 			const int32 Y = Args.IsValidIndex(3) ? FCString::Atoi(*Args[3]) : FMath::FloorToInt32(Settlement.Y);
 			Host->SeedFirstGranary(Count, Food, X, Y);
+		}
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVillageHamlet(
+	TEXT("Anastasis.Village.Hamlet"),
+	TEXT("Anastasis.Village.Hamlet [Houses=6] [NpcCount=10] [TileX] [TileY] - ARCHITECTURE_SCALE_001 : un puits, des maisons en grappe, un grenier et leurs habitants (remplace le village)."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		if (UAnastasisSimulationSubsystem* Host = VillageHost(World))
+		{
+			const AnastasisVillage::FPoint Settlement = Host->GetSimulation().GetVillage().GetSettlement();
+			const int32 Houses = Args.IsValidIndex(0) ? FCString::Atoi(*Args[0]) : 6;
+			const int32 Count = Args.IsValidIndex(1) ? FCString::Atoi(*Args[1]) : 10;
+			const int32 X = Args.IsValidIndex(2) ? FCString::Atoi(*Args[2]) : FMath::FloorToInt32(Settlement.X);
+			const int32 Y = Args.IsValidIndex(3) ? FCString::Atoi(*Args[3]) : FMath::FloorToInt32(Settlement.Y);
+			Host->SeedArchitectureHamlet(Houses, Count, X, Y);
+		}
+	}));
+
+static FAutoConsoleCommandWithWorld CmdAnastasisVillageArchitectureReport(
+	TEXT("Anastasis.Village.ArchitectureReport"),
+	TEXT("ARCHITECTURE_SCALE_001 : journalise la fiche de chaque batiment (archetype, capacite, occupants, stockage, etat, age, assise) -- lignes ANASTASIS_ARCH record."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		if (UAnastasisSimulationSubsystem* Host = VillageHost(World))
+		{
+			Host->LogArchitecture();
 		}
 	}));
 

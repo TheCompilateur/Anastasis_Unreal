@@ -6,6 +6,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "HAL/IConsoleManager.h"
 #include "Engine/StaticMesh.h"
+#include "Materials/MaterialInterface.h"
 #include "SmartObjectComponent.h"
 
 namespace
@@ -50,6 +51,15 @@ AAnastasisVillageBuilding::AAnastasisVillageBuilding()
 	Body->SetCanEverAffectNavigation(false);
 	Body->SetMobility(EComponentMobility::Movable);
 
+	Footing = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Footing"));
+	Footing->SetupAttachment(SmartObject);
+	Footing->SetCollisionProfileName(TEXT("BlockAll"));
+	Footing->SetGenerateOverlapEvents(false);
+	Footing->SetCastShadow(true);
+	Footing->SetCanEverAffectNavigation(false);
+	Footing->SetMobility(EComponentMobility::Movable);
+	Footing->SetVisibility(false);
+
 	Hearth = CreateDefaultSubobject<UPointLightComponent>(TEXT("Hearth"));
 	Hearth->SetupAttachment(SmartObject);
 	Hearth->SetRelativeLocation(HearthLocal);
@@ -91,7 +101,12 @@ void AAnastasisVillageBuilding::SetNeglect(const double Level)
 		{
 			return;
 		}
-		UMaterialInterface* Aged = LoadObject<UMaterialInterface>(
+		// ARCHITECTURE_SCALE_001 : M_AnastasisArchitecture porte deja `Neglect` (meme sens, meme courbe) ;
+		// l'ancien materiau d'usure ne sert qu'aux anciens meshes.
+		UMaterialInterface* Current = Body->GetMaterial(0);
+		float Probe = 0.f;
+		const bool bOwnNeglect = Current && Current->GetScalarParameterValue(FHashedMaterialParameterInfo(TEXT("Neglect")), Probe);
+		UMaterialInterface* Aged = bOwnNeglect ? Current : LoadObject<UMaterialInterface>(
 			nullptr, TEXT("/Game/Anastasis/VillageBuildings/M_VillageBuilding_Aged.M_VillageBuilding_Aged"));
 		if (!Aged)
 		{
@@ -130,6 +145,51 @@ void AAnastasisVillageBuilding::SetHearth(const double Level)
 bool AAnastasisVillageBuilding::HasBody() const
 {
 	return Body && Body->GetStaticMesh() != nullptr;
+}
+
+bool AAnastasisVillageBuilding::ApplyArchitecture(AnastasisArchitecture::EVariant InVariant)
+{
+	const AnastasisArchitecture::FArchetype& A = AnastasisArchitecture::Get(InVariant);
+	UStaticMesh* BodyMesh = LoadObject<UStaticMesh>(nullptr, A.BodyMesh);
+	UStaticMesh* FootMesh = LoadObject<UStaticMesh>(nullptr, A.FootingMesh);
+	if (!BodyMesh || !Body)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Warning,
+			TEXT("ANASTASIS_ARCH %s: archetype %s absent (%s) -- ancien mesh garde, lancer create-village-architecture.ps1"),
+			*SimId.ToString(), A.Id, A.BodyMesh);
+		return false;
+	}
+	Variant = InVariant;
+	bHasArchitecture = true;
+	if (AgedMaterial)
+	{
+		Body->SetMaterial(0, nullptr);
+	}
+	OriginalMaterial = nullptr;
+	AgedMaterial = nullptr;
+	NeglectLevel = 0.0;
+	Body->SetStaticMesh(BodyMesh);
+	Body->SetVisibility(true);
+	if (Footing)
+	{
+		Footing->SetStaticMesh(FootMesh);
+		Footing->SetVisibility(FootMesh != nullptr);
+	}
+	// Le foyer dans l'atre, 60 cm au-dessus de la sole : la lumiere sort par la porte, les fenetres, la galerie.
+	HearthAuthored = A.bHasHearth ? A.HearthLocal + FVector(0.0, 60.0, 40.0) : HearthLocal;
+	SetPadOffset(PadOffset);
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_ARCH %s archetype=%s tier=%d body=%s footing=%d"),
+		*SimId.ToString(), A.Id, A.Tier, *BodyMesh->GetName(), FootMesh ? 1 : 0);
+	return true;
+}
+
+void AAnastasisVillageBuilding::SetPadOffset(const double OffsetCm)
+{
+	PadOffset = OffsetCm;
+	const FVector Offset(0.0, 0.0, PadOffset);
+	if (Body) Body->SetRelativeLocation(Offset);
+	if (Footing) Footing->SetRelativeLocation(Offset);
+	if (Hearth) Hearth->SetRelativeLocation(HearthAuthored + Offset);
 }
 
 void AAnastasisVillageBuilding::SetConstructionProgress(double Progress)

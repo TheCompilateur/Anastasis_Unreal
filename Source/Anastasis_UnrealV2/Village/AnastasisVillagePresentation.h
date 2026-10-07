@@ -33,6 +33,18 @@ public:
 	/** Simulation (tuiles, continu) -> Unreal (cm). Z = surface rendue si PresentationWorld est fourni, altitude semantique sinon. */
 	static FVector SimToUnreal(const AnastasisWorld::FWorld& World, double SimX, double SimY, UWorld* PresentationWorld = nullptr);
 
+	/** Altitude (cm) de la surface rendue du terrain en (X, Y) Unreal ; faux hors maillage ou sans terrain. */
+	static bool TraceGround(UWorld* PresentationWorld, double X, double Y, double& OutZ);
+
+	/**
+	 * ARCHITECTURE_SCALE_001 : pose un batiment a l'echelle humaine. Typologie (AnastasisArchitecture::ChooseVariant),
+	 * cour terrassee a la mediane du terrain sous l'emprise (ARCH-10), puis la parcelle defrichee : les instances
+	 * d'herbe, de sous-bois et d'arbres dont le pied tombe dans l'emprise passent a l'echelle zero (indices
+	 * inchanges, rien n'est detruit). Rend le nombre d'instances ecartees ; -1 si l'archetype n'est pas charge.
+	 */
+	static int32 SettleArchitecture(AAnastasisVillageBuilding& Actor, const AnastasisVillage::FVillage& Village,
+		const FString& BuildingId, UWorld* PresentationWorld);
+
 	/**
 	 * Aligne les acteurs sur les enregistrements. Rend le nombre d'acteurs crees + detruits.
 	 * ICEBERG_001 : `Daylight` (0 nuit, 1 plein jour : celui du ciel que le joueur voit), `Day` (jour de la simulation) et `Mode`
