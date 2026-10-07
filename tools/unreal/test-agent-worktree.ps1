@@ -213,6 +213,11 @@ $dry = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $eb -Proofs $
 Check 'S18 lot prepare sans editeur (-DryRun)' ($LASTEXITCODE -eq 0 -and $dry -match "EDITOR_BATCH::DRYRUN $($registered.Count) preuve") $dry
 $bad = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $eb -Proofs 'inconnue-pie' -DryRun 2>&1 | ForEach-Object { "$_" }) -join "`n"
 Check 'S18 preuve inconnue refusee avant l editeur' ($bad -match 'absente\(s\) de proofs.txt : inconnue-pie') $bad
+# EDITOR_BATCH_SPLIT_001 : PIE et premiere capture dans un editeur, chaque capture de plus dans le sien.
+$split = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $eb -Proofs 'wildflowers-capture,village-weather-pie,ecotone-capture' -DryRun 2>&1 | ForEach-Object { "$_" }) -join "`n"
+Check 'S18 deux captures : deux editeurs, la PIE avec la premiere capture' ($LASTEXITCODE -eq 0 -and $split -match 'EDITOR_BATCH::EDITEURS 2 : village-weather-pie\+wildflowers-capture \| ecotone-capture') $split
+$one = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $eb -Proofs 'village-weather-pie,wildflowers-capture' -DryRun 2>&1 | ForEach-Object { "$_" }) -join "`n"
+Check 'S18 une seule capture : un seul editeur' ($LASTEXITCODE -eq 0 -and $one -notmatch 'EDITOR_BATCH::EDITEURS') $one
 
 # 19. Porte memoire equitable : un ticket plus ancien et vivant passe d'abord ; un ticket mort ne
 #     bloque personne. Capacite et memoire neutralisees, $Launch ne lance rien.

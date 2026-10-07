@@ -146,3 +146,14 @@ de vegetation du lot visuel a plante dans PythonScriptPlugin. Cette partition es
 un contournement borne de cette transition, pas une correction du crash de fermeture.
 Tous les criteres PASS/FAIL restent appliques ; le journal `EDITOR_BATCH_ORDER` donne
 l'ordre reel. Une capture COMPLETE ne prouve toujours pas une fermeture saine.
+
+Depuis editor-batch-split-001 (2026-10-07), `editor-batch.ps1` va plus loin : les preuves PIE et
+la premiere capture partagent un editeur, chaque capture supplementaire en a un neuf
+(`EDITOR_BATCH::EDITEURS n` en `-DryRun`). Le lot 7 du 2026-10-07 avait perdu
+tree-cards-capture, morte a son demarrage dans python311.dll juste apres
+riparian-transition-capture, dans le meme editeur.
+
+**Une ligne de preuve s'ecrit en une fois.** `tools/unreal/proofs.txt` se fusionne par union :
+une mission qui ajoute sa ligne puis la modifie dans un commit suivant la retrouve en DOUBLE
+au lot des que le contexte voisin a bouge sur main (`proofs.txt du lot inscrit deux fois`).
+Regrouper ces commits (une ligne, sa forme finale) avant `finish`.
