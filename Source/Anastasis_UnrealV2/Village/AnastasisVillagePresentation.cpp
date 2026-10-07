@@ -153,6 +153,14 @@ int32 FAnastasisVillagePresentation::Sync(
 		}
 		if (Actor)
 		{
+			for (auto Use = InteractionUses.CreateIterator(); Use; ++Use)
+			{
+				if (Use.Value().BuildingId == It.Key())
+				{
+					if (Use.Value().Claim.IsValid()) Rooms.Release(Use.Value().Claim);
+					Use.RemoveCurrent();
+				}
+			}
 			Rooms.DestroyBuilding(Actor);
 		}
 		UE_LOG(
@@ -222,6 +230,60 @@ int32 FAnastasisVillagePresentation::Sync(
 			*Location.ToCompactString());
 	}
 	return Changes;
+}
+
+void FAnastasisVillagePresentation::SyncInteractions(
+	const AnastasisVillage::FVillage& Village,
+	UAnastasisVillageInteractionSubsystem& Rooms)
+{
+	UWorld* World = Rooms.GetWorld();
+	if (!World) return;
+	const double Now = World->GetTimeSeconds();
+	TSet<FString> Current;
+	for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
+	{
+		if (!Npc.Inside.bActive) continue;
+		const FString& BuildingId = Npc.Inside.BuildingId;
+		AAnastasisVillageBuilding* Building = FindActor(BuildingId);
+		if (!Building) continue;
+		Current.Add(Npc.Id);
+		FInteractionUse& Use = InteractionUses.FindOrAdd(Npc.Id);
+		if (Use.BuildingId != BuildingId)
+		{
+			if (Use.Claim.IsValid()) Rooms.Release(Use.Claim);
+			Use = FInteractionUse();
+			Use.BuildingId = BuildingId;
+		}
+		if (Use.Claim.IsValid() || Now < Use.NextAttemptAt) continue;
+		Use.NextAttemptAt = Now + 2.0;
+		const FAnastasisVillageQueryResult Point = Rooms.FindNearestInteraction(
+			Rooms.ActivityTagFor(Building->GetKind()), Building->GetActorLocation(), 500.0f, FName(*BuildingId));
+		if (!Point.IsValid()) continue;
+		const FSmartObjectClaimHandle Claim = Rooms.Claim(Point.Request.SlotHandle);
+		if (!Claim.IsValid()) continue;
+		if (!Rooms.Use(Claim))
+		{
+			Rooms.Release(Claim);
+			continue;
+		}
+		Use.Claim = Claim;
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE interaction npc=%s building=%s activity=%s claimed"),
+			*Npc.Id, *BuildingId, *Npc.Activity);
+	}
+	for (auto It = InteractionUses.CreateIterator(); It; ++It)
+	{
+		if (Current.Contains(It.Key())) continue;
+		if (It.Value().Claim.IsValid()) Rooms.Release(It.Value().Claim);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE interaction npc=%s building=%s released"),
+			*It.Key(), *It.Value().BuildingId);
+		It.RemoveCurrent();
+	}
+}
+
+bool FAnastasisVillagePresentation::HasInteractionClaim(const FString& NpcId) const
+{
+	const FInteractionUse* Use = InteractionUses.Find(NpcId);
+	return Use && Use->Claim.IsValid();
 }
 
 int32 FAnastasisVillagePresentation::SyncVillagers(
@@ -358,6 +420,14 @@ AAnastasisVillagerVisual* FAnastasisVillagePresentation::FindVillager(const FStr
 
 void FAnastasisVillagePresentation::Clear(UAnastasisVillageInteractionSubsystem* Rooms)
 {
+	if (Rooms)
+	{
+		for (const TPair<FString, FInteractionUse>& Use : InteractionUses)
+		{
+			if (Use.Value.Claim.IsValid()) Rooms->Release(Use.Value.Claim);
+		}
+	}
+	InteractionUses.Reset();
 	for (const TPair<FString, TWeakObjectPtr<AAnastasisVillagerVisual>>& Pair : Villagers)
 	{
 		if (AAnastasisVillagerVisual* Actor = Pair.Value.Get())
@@ -512,7 +582,7 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 			World,
 			Pos + FVector(0, 0, Tile * 0.3),
 			FString::Printf(
-				TEXT("%s %s/%s%s faim=%.1f soif=%.1f energie=%.1f%s"),
+				TEXT("%s %s/%s%s faim=%.1f soif=%.1f energie=%.1f%s | choix=%s phase=%s porte=%s nav=%s"),
 				*Npc.Id,
 				*Npc.Goal,
 				*Npc.Activity,
@@ -520,7 +590,11 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 				Npc.Needs.Hunger,
 				Npc.Needs.Thirst,
 				Npc.Needs.Energy,
-				Npc.DestBuildingId.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" -> %s"), *Npc.DestBuildingId)),
+				Npc.DestBuildingId.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" -> %s"), *Npc.DestBuildingId),
+				*Npc.LastDecision.Winner,
+				*Npc.LastDecision.Phase,
+				*Npc.LastDecision.CommitGate,
+				Npc.bPathFailed ? TEXT("echec") : Npc.bHasTarget ? TEXT("trajet") : TEXT("libre")),
 			nullptr,
 			Color,
 			0.f);

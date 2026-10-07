@@ -141,7 +141,8 @@ bool UAnastasisVillageInteractionSubsystem::DestroyBuilding(AAnastasisVillageBui
 FAnastasisVillageQueryResult UAnastasisVillageInteractionSubsystem::FindNearestInteraction(
 	FGameplayTag ActivityTag,
 	const FVector& Origin,
-	float Radius) const
+	float Radius,
+	FName RequiredSimId) const
 {
 	FAnastasisVillageQueryResult Best;
 	UWorld* World = GetWorld();
@@ -184,6 +185,10 @@ FAnastasisVillageQueryResult UAnastasisVillageInteractionSubsystem::FindNearestI
 			? Cast<AAnastasisVillageBuilding>(Component->GetOwner())
 			: nullptr;
 		if (!Building)
+		{
+			continue;
+		}
+		if (!RequiredSimId.IsNone() && Building->GetSimId() != RequiredSimId)
 		{
 			continue;
 		}

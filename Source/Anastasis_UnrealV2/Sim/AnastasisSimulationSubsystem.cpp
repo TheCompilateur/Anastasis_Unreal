@@ -165,6 +165,7 @@ void UAnastasisSimulationSubsystem::TryStartVillage(float DeltaTime)
     if (Count <= 0) return;
     const FString WellId = SeedFirstWell(Count, X, Y);
     bStartVillage = !WellId.IsEmpty();
+    if (bStartVillage) SeedOpeningHousehold();
     const auto* Well = Village.FindBuilding(WellId);
     if (!Well || (CVarVillageSiteSelection.GetValueOnGameThread()!=0 && (Well->X!=X || Well->Y!=Y)))
     {
@@ -173,6 +174,78 @@ void UAnastasisSimulationSubsystem::TryStartVillage(float DeltaTime)
     }
     UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE start village: %s + %d inhabitants site=(%d,%d)"),
         *WellId, Village.GetActors().Num(), X, Y);
+}
+
+void UAnastasisSimulationSubsystem::SeedOpeningHousehold()
+{
+	using namespace AnastasisVillage;
+	FVillage& Village = Simulation.GetVillage();
+	const AnastasisWorld::FWorld& World = Simulation.GetWorld();
+	if (Village.GetActors().IsEmpty()) return;
+	const FNpc& Resident = Village.GetActors()[0];
+	const FPoint Origin{ Resident.X, Resident.Y };
+	const AnastasisPath::FWorldNavSource Nav(Village.GetNavGrid(), World);
+	auto Reachable = [&](const FBuilding& Building)
+	{
+		for (const FPoint& Door : Building.AccessPoints)
+		{
+			TArray<FPoint> Path;
+			if (AnastasisPath::FindPath(Nav, Origin, Door, {}, Path)) return true;
+		}
+		return false;
+	};
+	auto PlaceReachable = [&](const FString& Type, int32 CX, int32 CY, int32 RadiusMax)
+	{
+		for (int32 R = 1; R <= RadiusMax; ++R)
+		for (int32 DY = -R; DY <= R; ++DY)
+		for (int32 DX = -R; DX <= R; ++DX)
+		{
+			if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) != R) continue;
+			const int32 X = CX + DX, Y = CY + DY;
+			if (X < 2 || Y < 2 || X >= World.W - 2 || Y >= World.H - 2
+				|| Village.IsFootBlocked(X + 0.5, Y + 0.5)) continue;
+			const FString Id = Village.AddBuilding(Type, X, Y, 1.0, Simulation.GetDay());
+			if (Id.IsEmpty()) continue;
+			if (const FBuilding* Building = Village.FindBuilding(Id))
+			{
+				if (Reachable(*Building)) return Id;
+			}
+			Village.RemoveBuilding(Id);
+		}
+		return FString();
+	};
+	const FString ResidentId = Resident.Id;
+	const FString HomeId = PlaceReachable(HouseType, FMath::FloorToInt32(Origin.X), FMath::FloorToInt32(Origin.Y), 5);
+	if (!HomeId.IsEmpty()) Village.AssignHome(ResidentId, HomeId);
+
+	// Le poste doit desservir une vraie nourriture du monde, comme FirstFarmer.
+	FString WorkId;
+	TArray<const AnastasisWorld::FTile*> Fields;
+	for (const AnastasisWorld::FTile& Tile : World.Tiles)
+	{
+		const AnastasisWorld::FTile Live = Village.LiveTileAt(Tile.X, Tile.Y);
+		if (Live.Resource == AnastasisWorld::EResource::Food && Live.Amount > 0) Fields.Add(&Tile);
+	}
+	Fields.Sort([&](const AnastasisWorld::FTile& A, const AnastasisWorld::FTile& B)
+	{
+		const auto Distance = [&](const AnastasisWorld::FTile& T)
+		{
+			return FMath::Abs(T.X - FMath::FloorToInt32(Origin.X))
+				+ FMath::Abs(T.Y - FMath::FloorToInt32(Origin.Y));
+		};
+		return Distance(A) < Distance(B);
+	});
+	for (const AnastasisWorld::FTile* Field : Fields)
+	{
+		TArray<FPoint> Path;
+		if (!AnastasisPath::FindPath(Nav, Origin, { Field->X + 0.5, Field->Y + 0.5 }, {}, Path)) continue;
+		WorkId = PlaceReachable(GranaryType, Field->X, Field->Y, 4);
+		if (!WorkId.IsEmpty()) break;
+	}
+	if (!WorkId.IsEmpty()) Village.AssignWorkplace(ResidentId, AnastasisGather::JobFarmer, WorkId);
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_VILLAGE opening household npc=%s home=%s work=%s"),
+		*ResidentId, HomeId.IsEmpty() ? TEXT("none") : *HomeId, WorkId.IsEmpty() ? TEXT("none") : *WorkId);
 }
 
 void UAnastasisSimulationSubsystem::ReplaceStartVillage()
@@ -312,10 +385,12 @@ int32 UAnastasisSimulationSubsystem::SyncVillagePresentation()
 	const double Daylight = (Atmosphere.IsValid() && Atmosphere->IsSkyClockActive())
 		? Atmosphere->GetLastSkyState().Daylight
 		: 1.0;
-	return VillagePresentation.Sync(
+	const int32 Changes = VillagePresentation.Sync(
 		Simulation.GetVillage(), Simulation.GetWorld(), *Rooms, Daylight,
 		AnastasisMetabolism::ModeFromInt(CVarVillageMetabolism.GetValueOnGameThread()),
 		1 + static_cast<int32>(FMath::FloorToDouble(Simulation.GetTime() / AnastasisSkyClock::DayLengthSeconds)));
+	VillagePresentation.SyncInteractions(Simulation.GetVillage(), *Rooms);
+	return Changes;
 }
 
 FString UAnastasisSimulationSubsystem::SeedFirstWell(int32 NpcCount, int32 TileX, int32 TileY)
@@ -1434,6 +1509,23 @@ FString UAnastasisSimulationDebugLibrary::GetVillagerCards(const UObject* WorldC
 	}
 	return FString::Printf(TEXT("{\"npcs\":%d,\"cards\":%d,\"villagers\":[%s]}"),
 		V.GetActors().Num(), Host->GetVillagePresentation().NumVillagers(), *FString::Join(Rows, TEXT(",")));
+}
+
+FString UAnastasisSimulationDebugLibrary::GetOpeningLifeStatus(const UObject* WorldContextObject)
+{
+	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	const UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+	if (!Host || !Host->GetSimulation().IsRunning() || Host->GetSimulation().GetVillage().GetActors().IsEmpty()) return TEXT("{}");
+	const FAnastasisSimulation& Sim = Host->GetSimulation();
+	const AnastasisVillage::FNpc& N = Sim.GetVillage().GetActors()[0];
+	return FString::Printf(
+		TEXT("{\"time\":%.3f,\"id\":\"%s\",\"home\":\"%s\",\"work\":\"%s\",\"goal\":\"%s\",\"activity\":\"%s\",")
+		TEXT("\"inside\":\"%s\",\"claimed\":%s,\"x\":%.3f,\"y\":%.3f,\"hunger\":%.2f,\"thirst\":%.2f,\"energy\":%.2f,")
+		TEXT("\"drinks\":%d,\"rests\":%d,\"deliveries\":%d,\"failed_path\":%s}"),
+		Sim.GetTime(), *N.Id, *N.HomeId, *N.WorkplaceId, *N.Goal, *N.Activity, *N.Inside.BuildingId,
+		Host->GetVillagePresentation().HasInteractionClaim(N.Id) ? TEXT("true") : TEXT("false"),
+		N.X, N.Y, N.Needs.Hunger, N.Needs.Thirst, N.Needs.Energy,
+		N.DrinksTaken, N.RestsTaken, N.Deliveries, N.bPathFailed ? TEXT("true") : TEXT("false"));
 }
 
 FString UAnastasisSimulationDebugLibrary::GetTimeWarpStatus(const UObject* WorldContextObject)

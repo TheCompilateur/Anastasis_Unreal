@@ -139,6 +139,8 @@ private:
 	 */
 	void ReplaceStartVillage();
 	void TryStartVillage(float DeltaTime);
+	/** Equipe un habitant du village initial d'un foyer et d'un travail reels. */
+	void SeedOpeningHousehold();
 	bool bPendingStartVillage = false;
 	double StartVillageWait = 0.0;
 	FString SettlementSiteReport = TEXT("{\"status\":\"not_started\"}");
@@ -242,6 +244,10 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetVillagerCards(const UObject* WorldContextObject);
+
+	/** Premier habitant du village initial : etat simule et usage Smart Object, pour une preuve PIE. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetOpeningLifeStatus(const UObject* WorldContextObject);
 
 	/**
 	 * TIME_WARP_001, en JSON : temps et jour simules, Warp / Speed / TimeScale demandes, acceleration

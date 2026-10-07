@@ -18,6 +18,7 @@ sky-passage-pie | tools/unreal/sky-passage-pie.py | SKY_PASSAGE PASS | SKY_PASSA
 
 player-pie | tools/unreal/player-pie.py | PLAYER_PIE PASS | PLAYER_PIE FAIL|PLAYER_PIE_TIMEOUT|PLAYER_PIE CHECK FAIL | 600 | ANASTASIS_PLAYER_PIE_OUT=@Saved/PlayerEvidence/pie
 villager-pie | tools/unreal/villager-pie.py | VILLAGER_PIE PASS | VILLAGER_PIE FAIL | 900 | ANASTASIS_VILLAGER_PIE_OUT=@Saved/VillagerEvidence/pie;ANASTASIS_VILLAGER_PIE_NPCS=12
+npc-life-pie | tools/unreal/npc-life-pie.py | NPC_LIFE_PIE PASS | NPC_LIFE_PIE FAIL|Traceback | 150 | -
 # geography-concordance-001: acquisition and partition integrity, not geographic agreement or NPC travel.
 geography-concordance-pie | tools/unreal/geography-concordance-pie.py | GEOGRAPHY_CONCORDANCE INSTRUMENT_PASS | GEOGRAPHY_CONCORDANCE FAIL|Traceback | 300 | -
 

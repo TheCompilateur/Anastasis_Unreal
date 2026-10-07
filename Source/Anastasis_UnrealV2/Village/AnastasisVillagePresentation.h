@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "UObject/WeakObjectPtrTemplates.h"
 #include "Village/AnastasisBuildingMetabolism.h"
+#include "SmartObjectTypes.h"
+#include "SmartObjectRuntime.h"
 
 class AAnastasisVillageBuilding;
 class AAnastasisVillagerVisual;
@@ -47,6 +49,9 @@ public:
 
 	/** Detruit tous les acteurs refletes. */
 	void Clear(UAnastasisVillageInteractionSubsystem* Rooms);
+	/** Miroir des usages interieurs : claim/use a l'entree, release a la sortie. */
+	void SyncInteractions(const AnastasisVillage::FVillage& Village, UAnastasisVillageInteractionSubsystem& Rooms);
+	bool HasInteractionClaim(const FString& NpcId) const;
 
 	AAnastasisVillageBuilding* FindActor(const FString& SimId) const;
 	int32 Num() const { return Actors.Num(); }
@@ -94,6 +99,13 @@ private:
 	/** Position simulee avant le dernier pas, et courante (tuiles), pour l'interpolation. */
 	struct FVillagerTrack { FVector2D Prev = FVector2D::ZeroVector; FVector2D Curr = FVector2D::ZeroVector; };
 	TMap<FString, FVillagerTrack> VillagerTracks;
+	struct FInteractionUse
+	{
+		FString BuildingId;
+		FSmartObjectClaimHandle Claim;
+		double NextAttemptAt = 0.0;
+	};
+	TMap<FString, FInteractionUse> InteractionUses;
 	bool bWarnedNoLooks = false;
 	bool bWarnedNoBody = false;
 };

@@ -51,7 +51,8 @@ public:
 	FAnastasisVillageQueryResult FindNearestInteraction(
 		FGameplayTag ActivityTag,
 		const FVector& Origin,
-		float Radius) const;
+		float Radius,
+		FName RequiredSimId = NAME_None) const;
 
 	FSmartObjectClaimHandle Claim(const FSmartObjectSlotHandle& SlotHandle);
 	bool Release(const FSmartObjectClaimHandle& ClaimHandle);
