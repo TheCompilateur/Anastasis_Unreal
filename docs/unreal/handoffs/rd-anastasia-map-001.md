@@ -19,7 +19,8 @@ Voir le commit de cette fiche.
 - `Anastasis_UnrealV2.uproject`, `WorldView`, `AnastasisSimulationSubsystem`, `AnastasisSoundscapeSubsystem` et les procédures de performance lus sur la base Git indiquée dans le dossier.
 - Sources Epic 5.8 vérifiées pour PSO, Mass, StateTree, AI Perception et passe personnalisée ; les renvois numériques sans URL du PDF ne sont pas promus en preuve primaire.
 - Aucun code Unreal modifié ; build et suite non nécessaires pour la validité d'une décision documentaire.
-- `git diff --check` : à renseigner après la dernière mise à jour.
+- Capture de contrôle tentée sur la racine canonique à `e681e629` : arrêt du seul éditeur de cette capture après le démarrage d'un nouveau lot ; `CAPTURE::FAIL` (5 images absentes). Ce run n'est pas une preuve de scène.
+- `git diff --cached --check` : PASS après indexation des deux fichiers possédés.
 
 ## PROOFS
 
@@ -27,7 +28,7 @@ PROOFS: (aucune)
 
 ## SCN
 
-Le rapport identifie la carte Git, sa génération et les représentations utilisées. Inspection vivante de la scène : à compléter après libération du lot et de l'éditeur.
+Le rapport identifie la carte Git, sa génération et les représentations utilisées. Inspection vivante de la scène : `UNKNOWN`. La capture interrompue ne soutient aucun verdict visuel ; Alexandre a ensuite demandé de laisser la capture de côté.
 
 ## PLY
 
@@ -40,7 +41,7 @@ AUCUN : `Source/AnastasisSim` inchangé.
 ## INTEGRATION_RISK
 
 - Documentation seule ; aucun effet sur le rendu, la simulation, les binaires ni la map.
-- La base de travail a été ouverte pendant le lot `pie-advance-001,soil-matrix-004,crossing-site-001,lived-paths-001`. Recaler le dossier sur le `main` résultant et mettre à jour son SHA avant `finish`.
+- Base de référence figée : dernier `main` intégré `e681e629`. Un nouveau lot peut déplacer `main` avant le versement ; la conclusion historique du dossier reste bornée à ce SHA et doit être réévaluée si le niveau, la configuration PSO ou les consommateurs pertinents changent.
 - Les propositions de branches parallèles ne sont pas des dépendances de cette mission.
 
 ## STOP
