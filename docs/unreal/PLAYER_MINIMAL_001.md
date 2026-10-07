@@ -120,6 +120,14 @@ aucun autre humain n'y réagit, aucune obligation ni relation ne pèse sur le ch
 et son stock fini ne démontrent pas une économie de village durable. Les touches sont des
 `DebugExecBindings` PIE et ne définissent pas les contrôles d'un build Shipping.
 
+Premier run PIE du 2026-10-07 : récolte et livraison passaient, mais `eat` restait sans repas
+pendant 90 secondes simulées. La réservation recevait une source vide pour un joueur sans
+décision Noûs. Le correctif (écart n°39) reprend la source de ses croyances, puis laisse
+`ReserveMeal` vérifier le stock et réserver. Reprise sur le même script : **PASS**, source
+initiale 19, sac 2, grenier 2, puis grenier 1 après un repas ; faim 16,37 → 11,30.
+Ce verdict porte sur les commandes et l'état runtime du worktree, pas sur les touches ou la
+lisibilité visuelle.
+
 ### Porte de décision pour la première scène sociale
 
 Le banc précédent vérifie une chaîne de matière. La prochaine unité de gameplay doit être

@@ -655,3 +655,21 @@ qui voyage à part, plus vite, en se déformant. Le village ne lit que son expos
 effet local branché : un groupe de migrants arrivé au village devient des habitants par `spawnNpc`, comme
 `arriveAsPlayer`. Aucun tirage aléatoire : le flux `sim.rng` n'est jamais lu. À trancher : garder ce monde
 extérieur comme extension Unreal, ou le porter un jour dans la référence JS.
+
+### n° 39 — Réservation d'un repas choisi par un joueur sans décision Noûs
+
+- **classe** : SUBSTITUT
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : player-food-loop-001
+- **reference** : `src/sim/npc.js` (`algoOn = !playerControlled`), `src/ai/algorithmic/runtime.js` (`onAlgorithmicGoalCommitted`), `src/ai/algorithmic/mealReservation.js` (`reserveMeal`)
+- **cpp** : `Village/AnastasisVillage.cpp` (`OnAlgorithmicGoalCommitted`)
+- **harnais** : actors
+
+La référence ne calcule pas de décision Noûs pour un joueur incarné, puis cherche malgré tout
+la source du repas dans les métadonnées de cette décision. Un joueur fraîchement arrivé peut
+donc choisir `eat`, mais la réservation échoue avec `no_known_source` même s'il connaît un grenier
+approvisionné. Le C++ prend l'identifiant de la meilleure source dans les **croyances de ce même
+habitant**, via `PerceiveFoodContext` ; `ReserveMeal` garde toutes ses validations physiques.
+Cette correction de jouabilité diverge de la référence JS et reste à trancher par Alexandre.
+Les scénarios actuels du harnais n'incarnent pas de joueur.

@@ -3973,8 +3973,13 @@ namespace AnastasisVillage
 		const bool bWasEat = Previous == TEXT("eat") || Previous == TEXT("eatTogether");
 		if (bEatGoals)
 		{
-			const AnastasisNous::FDecision* D = Npc.bHasAlgoDecision ? &Npc.AlgoDecision : nullptr;
-			const FString SourceBuildingId = D ? AnastasisNous::DecisionSourceBuildingId(*D) : FString();
+			// ecart n°39 : le fournisseur humain choisit le but, pas la source du repas. Il n'a pas de decision
+			// Noûs dont lire les metadonnees ; la reservation lit donc ses propres croyances,
+			// comme le contexte alimentaire fourni au decideur autonome.
+			const bool bPlayer = IsPlayer(Npc);
+			const AnastasisNous::FDecision* D = !bPlayer && Npc.bHasAlgoDecision ? &Npc.AlgoDecision : nullptr;
+			const FString SourceBuildingId = bPlayer ? PerceiveFoodContext(Npc).BestSourceBuildingId
+				: D ? AnastasisNous::DecisionSourceBuildingId(*D) : FString();
 			// `metadata.travelSeconds ?? expectedDuration ?? null` : le trajet du candidat
 			// (seek_food : distance / vitesse ; eat : 0), sinon sa duree attendue.
 			double Travel = NAN;
