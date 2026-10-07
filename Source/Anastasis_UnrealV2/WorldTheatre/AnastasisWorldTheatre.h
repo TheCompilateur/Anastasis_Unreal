@@ -81,6 +81,8 @@ struct FPlan
 	TArray<FMass> Masses;
 	TArray<FSilhouetteSpec> Silhouettes;
 	TArray<FThreatSite> ThreatSites;
+	/** Point du village d'ou les signes de menace sont vus (placement des sites, taille des lueurs). */
+	FVector2D ThreatEye = FVector2D::ZeroVector;
 };
 
 /** Le plan versionne, ecrit par l'analyse. */

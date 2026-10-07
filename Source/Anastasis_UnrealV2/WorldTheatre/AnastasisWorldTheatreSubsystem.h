@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Kismet/BlueprintFunctionLibrary.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "WorldTheatre/AnastasisWorldTheatre.h"
 #include "AnastasisWorldTheatreSubsystem.generated.h"
@@ -71,6 +72,9 @@ private:
 public:
 	/** Journalise la carte de menace et chaque signe (preuve PIE : lignes WORLD_THREAT). */
 	void LogThreat() const;
+	/** Meme etat en JSON, lu par la preuve PIE (world-theatre-threat-pie.py). */
+	UFUNCTION(BlueprintCallable, Category = "Anastasis|WorldTheatre")
+	FString GetThreatStatusJson() const;
 
 private:
 
@@ -111,4 +115,16 @@ private:
 	int32 PendingPolls = 0;
 	int32 BuiltEnabled = -1;
 	float PollClock = 0.0f;
+};
+
+/** Acces Python / Blueprint au theatre (le sous-systeme de monde n'est pas joignable directement depuis Python ici). */
+UCLASS()
+class UAnastasisWorldTheatreLibrary : public UBlueprintFunctionLibrary
+{
+	GENERATED_BODY()
+
+public:
+	/** Etat de la carte de menace et des signes, en JSON (vide si pas de theatre dans ce monde). */
+	UFUNCTION(BlueprintCallable, Category = "Anastasis|WorldTheatre", meta = (WorldContext = "WorldContextObject"))
+	static FString GetThreatStatus(const UObject* WorldContextObject);
 };

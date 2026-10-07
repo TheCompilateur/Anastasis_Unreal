@@ -153,3 +153,33 @@ forestières, se lit encore en frise dentelée. Effet de bord mesuré : la satur
 
 **Pas encore fait (v2.1 → v2.2)** : variation dans le lointain (ombres de nuages, volumes de brouillard sombres par
 secteur), nuit, et tout ce qui lie la menace à la simulation.
+
+## v2.2 — la menace, lue dans la simulation (world-theatre-threat-001)
+
+**Règle cardinale** : aucune menace n'est inventée (PONT-HIS-02). La seule source est le monde extérieur simulé
+(geopolitical-world-001, `geo-pontos-1204.json`) : insécurité (raids, enlèvements, bandes) et troupes, qui voyagent
+de nœud en nœud par les routes du scénario, et nouvelles qui voyagent deux fois plus vite. Sans scénario chargé
+(`Anastasis.Geo.Load`), rien ne s'allume. Dans la carte, rien ne simule d'ennemi (`bDangerNear` toujours faux, le
+« risque spatial » mesure la faim et la nuit) : la menace est donc lointaine par construction.
+
+**Ce que l'œil peut voir** : seuls les voisins du village (un jour de route : Parcharia, Matzouka). Paipert et
+Cheriana, à trois jours et plus, ne se voient pas ; leur danger se montre en arrivant chez un voisin.
+
+| Signe | Source simulée | Où |
+|---|---|---|
+| Fumée, étape 0 | pression vraie au-dessus de sa base chez le voisin | 10 km, source cachée derrière une crête |
+| Fumée, étapes 1 → 2 | pression en route vers le village, qui se rapproche | 5 km puis 2,75 km |
+| Fumée proche + effroi | exposition du village (ce qui l'a atteint) | 2,75 km ; le lointain s'assombrit (v2.1) |
+| Feux de signaux (fumée claire le jour) | **nouvelle** de raid en route vers le village, du plus loin au plus près | chaîne de 4 collines à portée de vue, 8,5 → 13 km |
+
+Caps des voisins (**hypothèse de conception**, accordée à la vallée mesurée, X = nord) : Parcharia 108° (la seconde
+chaîne à l'est-sud-est, ~21 km, 7°, des pâturages « au-dessus des vallées ») ; Matzouka 40° (derrière la muraille).
+
+**1204, ce qui est porté et ce qui ne l'est pas** (brief `docs/historicity/briefs/world-theatre-threat-001.json`) :
+la frontière d'été aux pâturages, le no man's land de Cheriana et la rupture de 1204 sont dans le scénario ; la
+pression turkmène systématique **n'est pas attestée pour 1204-1225** (HIS-04 : surtout après 1277 ; HIS-06 : paix
+relative Konya-Nicée) : la couche n'en pose aucune, et la preuve injecte un raid **sans acteur attribué**. Les feux
+de signaux sont une **analogie** avec la chaîne byzantine du IXe siècle (HIS-07), jamais un fait local.
+
+**Mesuré sur le scénario réel** (test `ThreatNewsBeforeRaid`, raid injecté à Paipert) : nouvelle en route vers le
+village au jour 2, raid en route au jour 3, ressenti au village au jour 4. Les feux ont un jour d'avance.

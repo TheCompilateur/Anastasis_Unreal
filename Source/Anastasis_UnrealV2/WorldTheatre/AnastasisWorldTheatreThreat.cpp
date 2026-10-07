@@ -87,11 +87,16 @@ FSignals Evaluate(const FThreatMap& Map, const TArray<FThreatSite>& Sites, const
 	{
 		if (S.Sign == EThreatSign::Beacon) ChainLength.FindOrAdd(S.NodeId) = FMath::Max(ChainLength.FindRef(S.NodeId), S.Stage + 1);
 	}
-	// Le voisin d'ou vient le danger arrive : celui qui porte le plus d'exces ou de pression en route.
+	// Le voisin d'ou vient le danger arrive : celui qui porte le plus d'exces ou de pression en route, parmi les noeuds
+	// QUI ONT DES SITES (les voisins visibles). Preuve PIE du 2026-10-07 : Paipert (exces 0,75, sans site, a trois jours)
+	// l'emportait, et a l'arrivee les feux s'eteignaient et la fumee proche ne prenait pas.
+	TSet<FString> Visible;
+	for (const FThreatSite& S : Sites) Visible.Add(S.NodeId);
 	FString Source;
 	double SourceWeight = 0.0;
 	for (const TPair<FString, double>& N : Map.NodeExcess)
 	{
+		if (!Visible.Contains(N.Key)) continue;
 		double W = N.Value;
 		for (const FTransit& T : Map.PressureToVillage) if (T.FromNode == N.Key) W = NoisyOr(W, T.Magnitude);
 		if (W > SourceWeight) { SourceWeight = W; Source = N.Key; }

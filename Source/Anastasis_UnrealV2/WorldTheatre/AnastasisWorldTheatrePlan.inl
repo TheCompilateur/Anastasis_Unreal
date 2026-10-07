@@ -85,6 +85,8 @@
   M.Colour = FLinearColor(0.0350f, 0.0600f, 0.0300f);
   M.Outline = { FVector2D(937000, 537000), FVector2D(961000, 541000), FVector2D(965000, 561000), FVector2D(929000, 581000), FVector2D(909000, 585000), FVector2D(905000, 569000), FVector2D(929000, 541000), FVector2D(937000, 541000) };
   P.Masses.Add(MoveTemp(M)); }
+// Point du village d ou les signes de menace sont vus.
+P.ThreatEye = FVector2D(160000, 72000);
 // parcharia : fumee etape 0 a 10.00 km, cap +0.0 deg, source cachee derriere une crete depuis le village
 { FThreatSite T; T.Id = TEXT("parcharia_smoke_0"); T.NodeId = TEXT("parcharia"); T.Sign = EThreatSign::Smoke; T.Stage = 0; T.Location = FVector2D(-149017, 1023057); T.Height = 90000; P.ThreatSites.Add(T); }
 // parcharia : fumee etape 1 a 5.00 km, cap +0.0 deg, source cachee derriere une crete depuis le village

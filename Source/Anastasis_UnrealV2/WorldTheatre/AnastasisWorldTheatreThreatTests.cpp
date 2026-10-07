@@ -86,6 +86,8 @@ bool FAnastasisWorldTheatreThreatRules::RunTest(const FString&)
 	TestTrue(TEXT("raid on the road, second half: the smoke comes near"), Out.Site[2] > 0.99f && Out.Site[1] == 0.0f);
 
 	FThreatMap Arrived = Burning;
+	// Un noeud lointain sans site (Paipert, a trois jours) brule plus fort que le voisin : il ne doit pas voler la source.
+	Arrived.NodeExcess.Add(TEXT("paipert"), 0.75);
 	Arrived.VillageExcess = 0.4;
 	Out = Evaluate(Arrived, S);
 	TestEqual(TEXT("exposure at the village: full dread"), Out.Dread, 1.0f);

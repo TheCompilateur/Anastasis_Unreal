@@ -1,0 +1,28 @@
+{
+  "mission": "world-theatre-threat-001",
+  "target_period": "1204-1225",
+  "setting": "arriere_pays_pontique_fictif",
+  "model_ids": ["PONT-HIS-02", "PONT-GEO-01", "PONT-HIS-01"],
+  "claim": "Au-dela de la carte, des fumees et des feux de signaux montrent l'insecurite et les troupes que le monde exterieur simule (geo-pontos-1204.json) fait peser sur les voisins du village et faire route vers lui ; aucun signe ne s'allume sans pression simulee au-dessus de sa base.",
+  "basis": "hypothese_de_conception",
+  "source_ids": ["HIS-04", "HIS-05", "HIS-06", "HIS-07"],
+  "inference": "Le scenario porte une frontiere d'ete aux paturages (Parcharia, influence turkmene) et un no man's land (Cheriana) ; HIS-05 situe Matzouka, Chaldia, Cheriana et les cols. La mission en tire seulement des CAPS (Parcharia a l'est-sud-est sur la seconde chaine, Matzouka derriere la muraille du nord-est) : hypothese de conception, aucune geographie reelle imposee. Les feux de signaux sont une ANALOGIE avec la chaine byzantine du IXe siecle (HIS-07), jamais attestee pour cette vallee. La pression turkmene systematique n'est pas attestee pour 1204-1225 (HIS-04, surtout apres 1277 ; HIS-06 : paix relative Konya-Nicee) : la mission ne pose aucun raid turc, elle montre ce que le scenario simule.",
+  "current": "Avant la mission (2026-10-07) : aucun signe lointain ; le monde exterieur simule n'est lu que par la migration ; danger, effroi et menace absents du monde rendu.",
+  "target": "Une nouvelle de raid en route vers le village allume une chaine de feux du plus loin au plus pres (fumee claire le jour) ; la pression elle-meme se montre en fumee chez le voisin puis de plus en plus pres ; l'exposition du village assombrit le lointain.",
+  "causal_effect": "Choc du monde exterieur -> pression et nouvelle en route (routes du scenario) -> feux puis fumees le long du cap du voisin -> exposition du village -> effroi (lointain assombri). Aucun effet sur la simulation ni sur les habitants.",
+  "owner_paths": [
+    "Source/Anastasis_UnrealV2/WorldTheatre/AnastasisWorldTheatreThreat.h",
+    "Source/Anastasis_UnrealV2/WorldTheatre/AnastasisWorldTheatreThreat.cpp",
+    "tools/unreal/world-theatre-threat-pie.py",
+    "tools/unreal/world-theatre-threat-material.py"
+  ],
+  "evidence_plan": {
+    "mec": "Tests Anastasis.WorldTheatre.ThreatRules et ThreatNewsBeforeRaid (scenario reel : la nouvelle precede le raid d'au moins un jour) ; preuve PIE world-theatre-threat-pie (calme sans signe, feux avant fumee, fumee, effroi, menace 0 rien de visible).",
+    "scn": "Images menace 1 / 0 depuis le village vers Parcharia, a chaque point de la chronologie (22 h et 11 h), Saved/WorldTheatreEvidence/threat/.",
+    "ply": "UNKNOWN : aucun joueur ne regarde les feux ni n'agit sur l'alerte ; la simulation ne fait pas encore reagir les habitants a l'insecurite (bDangerNear toujours faux)."
+  },
+  "verdict": "PROPOSE",
+  "evidence_paths": [
+    "docs/unreal/world-theatre-001/WORLD_THEATRE_001.md"
+  ]
+}

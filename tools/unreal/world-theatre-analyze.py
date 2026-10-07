@@ -587,7 +587,7 @@ def main():
         bz = float(world.height(np.array([village[0]]), np.array([village[1]]))[0])
         threats, treport = compose_threat(world_canopy, world, near, nf, (village[0], village[1], bz + 170.0), THREAT_ANCHORS, THREAT_RULES)
         report['threat_sites'] = treport
-        plan = {'masses': masses, 'silhouettes': silhouettes, 'threats': threats}
+        plan = {'masses': masses, 'silhouettes': silhouettes, 'threats': threats, 'threat_eye': (village[0], village[1])}
         with open(os.path.join(out, 'plan.json'), 'w', encoding='utf-8') as f:
             json.dump(plan, f, indent=1)
         if a.emit_plan:
@@ -814,6 +814,9 @@ def emit_plan(plan, path, source):
         lines.append('// %s' % s_.get('why', ''))
         lines.append('{ FSilhouetteSpec S; S.Id = TEXT("%s"); S.Kind = ESilhouette::%s; S.Location = %s; S.Yaw = %.1f; S.Scale = %.2f; P.Silhouettes.Add(S); }'
                      % (s_['id'], s_['kind'], v2(s_['xy']), s_.get('yaw', 0.0), s_.get('scale', 1.0)))
+    if plan.get('threat_eye'):
+        lines.append('// Point du village d ou les signes de menace sont vus.')
+        lines.append('P.ThreatEye = %s;' % v2(plan['threat_eye']))
     for t in plan.get('threats', []):
         lines.append('// %s' % t.get('why', ''))
         lines.append('{ FThreatSite T; T.Id = TEXT("%s"); T.NodeId = TEXT("%s"); T.Sign = EThreatSign::%s; T.Stage = %d; T.Location = %s; '

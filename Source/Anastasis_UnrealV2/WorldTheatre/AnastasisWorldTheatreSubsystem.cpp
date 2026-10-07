@@ -7,6 +7,7 @@
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
 #include "Engine/DirectionalLight.h"
+#include "Engine/Engine.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformTime.h"
@@ -87,6 +88,12 @@ FAutoConsoleCommandWithWorld CmdTheatreRebuild(
 TAutoConsoleVariable<int32> CVarTheatreThreat(
 	TEXT("anastasis.Theatre.Threat"), 0,
 	TEXT("WORLD_THEATRE v2.2 : 1=fumees et feux de signaux pilotes par le monde exterieur simule (Anastasis.Geo.Load requis), 0=aucun (defaut). A chaud."), ECVF_Default);
+TAutoConsoleVariable<float> CVarTheatreThreatFireGain(
+	TEXT("anastasis.Theatre.Threat.FireGain"), 40.0f,
+	TEXT("Gain du foyer des feux de signaux (compense par l'adaptation d'exposition si le materiau la porte)."), ECVF_Default);
+TAutoConsoleVariable<float> CVarTheatreThreatGlow(
+	TEXT("anastasis.Theatre.Threat.Glow"), 0.6f,
+	TEXT("Lueur rouge au pied des fumees d'incendie, la nuit (run 2 : 6 donnait des colonnes blanches)."), ECVF_Default);
 TAutoConsoleVariable<float> CVarTheatreThreatDread(
 	TEXT("anastasis.Theatre.Threat.Dread"), 0.25f,
 	TEXT("Assombrissement du lointain ajoute au plein de l'effroi du village (avec anastasis.Theatre.Light 1)."), ECVF_Default);
@@ -382,7 +389,7 @@ bool UAnastasisWorldTheatreSubsystem::BuildThreatSigns()
 			if (Smoke)
 			{
 				Main = UMaterialInstanceDynamic::Create(Smoke, HostActor);
-				// Fumee d'incendie : brun-gris sombre.
+				// Fumee d'incendie : brun-gris sombre ; la nuit, lueur rouge au pied (parametre Glow).
 				Main->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.10f, 0.09f, 0.08f));
 				Main->SetScalarParameterValue(TEXT("Seed"), float(K) * 7.31f);
 				Proc->SetMaterial(0, Main);
@@ -390,7 +397,11 @@ bool UAnastasisWorldTheatreSubsystem::BuildThreatSigns()
 		}
 		else
 		{
-			const AnastasisWorldTheatre::FMeshData F = AnastasisWorldTheatreThreat::BuildFire(S.Height * 1.4);
+			// Une lueur doit couvrir au moins ~0,35 deg vue du village (un foyer de 8 m a 10 km est sous le pixel) : le quad
+			// grandit avec la distance, le materiau garde un coeur minuscule et un halo doux.
+			const FVector2D Eye = AnastasisWorldTheatre::CanonicalPlan().ThreatEye;
+			const double Glow = FMath::Max(S.Height * 1.4, FVector2D::Distance(S.Location, Eye) * FMath::Tan(FMath::DegreesToRadians(0.35)));
+			const AnastasisWorldTheatre::FMeshData F = AnastasisWorldTheatreThreat::BuildFire(Glow);
 			Proc->CreateMeshSection_LinearColor(0, F.Vertices, F.Triangles, F.Normals, F.UVs, F.Colours, TArray<FProcMeshTangent>(), false);
 			// Le jour, un feu de veille se lit a sa fumee claire, mince et haute.
 			const AnastasisWorldTheatre::FMeshData D = AnastasisWorldTheatreThreat::BuildSmokeColumn(16000.0, Lean, 400.0, 3500.0);
@@ -455,11 +466,20 @@ void UAnastasisWorldTheatreSubsystem::UpdateThreat()
 		P->SetVisibility(I > 0.01f);
 		if (Sites[K].Sign == AnastasisWorldTheatre::EThreatSign::Smoke)
 		{
-			if (ThreatMain[K]) ThreatMain[K]->SetScalarParameterValue(TEXT("Opacity"), 0.85f * I);
+			if (ThreatMain[K])
+			{
+				// La nuit, la fumee se devine (moins dense) et rougeoie a son pied ; le jour, elle se voit.
+				ThreatMain[K]->SetScalarParameterValue(TEXT("Opacity"), 0.85f * I * (1.0f - 0.55f * Night));
+				ThreatMain[K]->SetScalarParameterValue(TEXT("Glow"), CVarTheatreThreatGlow.GetValueOnGameThread() * I * Night);
+			}
 		}
 		else
 		{
-			if (ThreatMain[K]) ThreatMain[K]->SetScalarParameterValue(TEXT("Intensity"), I * Night);
+			if (ThreatMain[K])
+			{
+				ThreatMain[K]->SetScalarParameterValue(TEXT("Intensity"), I * Night);
+				ThreatMain[K]->SetScalarParameterValue(TEXT("Gain"), CVarTheatreThreatFireGain.GetValueOnGameThread());
+			}
 			if (ThreatDay[K]) ThreatDay[K]->SetScalarParameterValue(TEXT("Opacity"), 0.6f * I * (1.0f - Night));
 		}
 	}
@@ -471,6 +491,32 @@ void UAnastasisWorldTheatreSubsystem::UpdateThreat()
 		LoggedThreat = State;
 		LogThreat();
 	}
+}
+
+FString UAnastasisWorldTheatreLibrary::GetThreatStatus(const UObject* WorldContextObject)
+{
+	UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	const UAnastasisWorldTheatreSubsystem* Sub = World ? World->GetSubsystem<UAnastasisWorldTheatreSubsystem>() : nullptr;
+	return Sub ? Sub->GetThreatStatusJson() : FString();
+}
+
+FString UAnastasisWorldTheatreSubsystem::GetThreatStatusJson() const
+{
+	const TArray<AnastasisWorldTheatre::FThreatSite>& Sites = AnastasisWorldTheatre::CanonicalPlan().ThreatSites;
+	FString SitesJson;
+	int32 Visible = 0;
+	for (int32 K = 0; K < Sites.Num(); ++K)
+	{
+		const float I = ThreatIntensity.IsValidIndex(K) ? ThreatIntensity[K] : 0.0f;
+		const bool bVisible = ThreatMeshes.IsValidIndex(K) && IsValid(ThreatMeshes[K]) && ThreatMeshes[K]->IsVisible();
+		Visible += bVisible ? 1 : 0;
+		SitesJson += FString::Printf(TEXT("%s{\"id\":\"%s\",\"node\":\"%s\",\"sign\":\"%s\",\"stage\":%d,\"intensity\":%.4f,\"visible\":%s}"),
+			K ? TEXT(",") : TEXT(""), Sites[K].Id, Sites[K].NodeId,
+			Sites[K].Sign == AnastasisWorldTheatre::EThreatSign::Smoke ? TEXT("smoke") : TEXT("beacon"), Sites[K].Stage, I, bVisible ? TEXT("true") : TEXT("false"));
+	}
+	return FString::Printf(TEXT("{\"on\":%d,\"loaded\":%s,\"day\":%.4f,\"village_excess\":%.4f,\"dread\":%.4f,\"sun\":%.2f,\"visible\":%d,\"sites\":[%s]}"),
+		CVarTheatreThreat.GetValueOnGameThread(), bThreatLoaded ? TEXT("true") : TEXT("false"), ThreatDay_, ThreatVillageExcess, Dread,
+		SunElevationDeg, Visible, *SitesJson);
 }
 
 void UAnastasisWorldTheatreSubsystem::LogThreat() const
