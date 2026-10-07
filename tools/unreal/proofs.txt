@@ -77,3 +77,4 @@ geo-remote-crisis-pie | tools/unreal/geo-remote-crisis-pie.py | GEO_PIE PASS | G
 world-theatre-read | tools/unreal/world-theatre-read.py | WORLD_THEATRE_READ_PIE PASS | WORLD_THEATRE_READ_PIE FAIL|WORLD_THEATRE_READ FAIL|Traceback | 420 | ANASTASIS_THEATRE_OUT=@Saved/WorldTheatreEvidence/read
 # WORLD_THEATRE_001 : vistas canoniques en PIE, anastasis.Theatre 0 / 1 / 0 (temoin) aux memes cameras, ciel a 11 h, simulation gelee ; COMPLETE = images ecrites, pas un verdict artistique.
 world-theatre-capture | tools/unreal/world-theatre-capture.py | WORLD_THEATRE_CAPTURE COMPLETE | WORLD_THEATRE_CAPTURE FAIL|Traceback | 900 | ANASTASIS_THEATRE_OUT=@Saved/WorldTheatreEvidence/capture
+places-lifecycle | tools/unreal/places-lifecycle.py | PLACES_LIFECYCLE COMPLETE | PLACES_LIFECYCLE FAIL|Traceback | 420 | ANASTASIS_PLACES_LIFECYCLE_OUT=@Saved/PlacesLifecycleEvidence

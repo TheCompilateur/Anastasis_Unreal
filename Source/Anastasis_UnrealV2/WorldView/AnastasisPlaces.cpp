@@ -1119,16 +1119,23 @@ FString AnastasisPlaces::MeshPath(EFamily Family, int32 Variant)
 AnastasisPlaces::FEmbodyResult AnastasisPlaces::Embody(AActor& Owner, const AnastasisPlaces::FPlan& Plan, const AnastasisPlaces::FInputs& In,
 	UMaterialInterface* ShapeMaterial, TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>>& Components)
 {
-	// Composants REUTILISES d'une incarnation a l'autre, retrouves par nom. Detruire puis
+	// Composants REUTILISES d'une incarnation a l'autre, retrouves par mesh. Le nom passe
+	// par MakeUniqueObjectName et peut recevoir un suffixe : le rechercher par nom de base
+	// recreait les HISM a chaque incarnation. Detruire puis
 	// recreer un HISM du meme nom remplace l'objet en place pendant que son arbre asynchrone
 	// se construit encore : assertion InstanceReorderTable, editeur tue (vu le 2026-09-29).
 	// Meme regle que GetOrCreateDressingMesh : on vide, on ne detruit pas.
-	TMap<FName, UHierarchicalInstancedStaticMeshComponent*> Existing;
+	TMap<UStaticMesh*, UHierarchicalInstancedStaticMeshComponent*> Existing;
 	for (UHierarchicalInstancedStaticMeshComponent* C : Components)
 	{
 		if (!IsValid(C)) continue;
 		C->ClearInstances();
-		Existing.Add(C->GetFName(), C);
+		if (UStaticMesh* Mesh = C->GetStaticMesh())
+		{
+			// Components only contains Places meshes; retain the first usable component
+			// if an older session already accumulated duplicates.
+			if (!Existing.Contains(Mesh)) Existing.Add(Mesh, C);
+		}
 	}
 	Components.RemoveAll([](const TObjectPtr<UHierarchicalInstancedStaticMeshComponent>& C) { return !IsValid(C); });
 	AnastasisPlaces::FEmbodyResult Result;
@@ -1159,7 +1166,7 @@ AnastasisPlaces::FEmbodyResult AnastasisPlaces::Embody(AActor& Owner, const Anas
 			{
 				const FSpec& Sp = Spec(P.Family);
 				const FName Name(*FString::Printf(TEXT("Place_%s_%d"), FamilyName(P.Family), P.Variant));
-				if (UHierarchicalInstancedStaticMeshComponent** Reused = Existing.Find(Name))
+				if (UHierarchicalInstancedStaticMeshComponent** Reused = Existing.Find(Mesh))
 				{
 					Made = *Reused;
 				}
