@@ -18,6 +18,8 @@ phase = 0
 rows = []
 build_rows = []
 builder_positions = []
+saw_material_carry = False
+initial_site_dry = False
 handle = None
 
 
@@ -28,7 +30,7 @@ def finish(ok, reason):
 
 
 def tick(_dt):
-    global phase, last_sample
+    global phase, last_sample, saw_material_carry, initial_site_dry
     now = time.monotonic()
     if now - started > 180:
         finish(False, 'timeout life=%s build=%s' %
@@ -59,6 +61,9 @@ def tick(_dt):
         return
     rows.append(row)
     build_rows.append(build)
+    if len(rows) == 1:
+        initial_site_dry = build.get('site') and build.get('stockWood') == 0 and build.get('stockStone') == 0
+    saw_material_carry |= build.get('carry', 0) > 0
     builders = [c for c in cards.get('villagers', []) if c.get('job') == 'builder']
     if builders:
         builder_positions.append({c['npc']: (c['x'], c['y']) for c in builders})
@@ -77,10 +82,11 @@ def tick(_dt):
                          if id in builder_positions[0]))
     owned_home = build.get('completed') and build.get('owner') and build.get('ownerHome') == build.get('id')
     shared_work = row.get('farmers', 0) >= 2 and row.get('otherFarmerDeliveries', 0) > 0
-    if moved and drank and worked and slept and claimed and len(goals) >= 3 and built and builder_moved and owned_home and shared_work:
-        finish(True, 'id=%s home=%s work=%s drinks=%d deliveries=%d rests=%d site_pieces=%d builders=%d owner=%s owner_rests=%d farmers=%d other_deliveries=%d' %
+    real_materials = saw_material_carry and build.get('materialsDelivered', 0) >= 32
+    if moved and drank and worked and slept and claimed and len(goals) >= 3 and built and builder_moved and owned_home and shared_work and real_materials:
+        finish(True, 'id=%s home=%s work=%s drinks=%d deliveries=%d rests=%d site_pieces=%d builders=%d owner=%s owner_rests=%d farmers=%d other_deliveries=%d materials_delivered=%d' %
                (row['id'], row['home'], row['work'], row['drinks'], row['deliveries'], row['rests'],
-                build['pieces'], len(builders), build['owner'], build['ownerRests'], row['farmers'], row['otherFarmerDeliveries']))
+                build['pieces'], len(builders), build['owner'], build['ownerRests'], row['farmers'], row['otherFarmerDeliveries'], build['materialsDelivered']))
 
 
 handle = unreal.register_slate_post_tick_callback(tick)

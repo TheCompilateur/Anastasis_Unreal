@@ -167,6 +167,7 @@ namespace AnastasisVillage
 		AnastasisNav::InitFromWorld(Nav, InWorld);
 		AnastasisNav::RebuildMoveCosts(Nav, InWorld);
 		bTerrainTravelCostEnabled = false;
+		MaterialCourierId.Reset();
 		NavVersion = 0;
 		Settlement = { InWorld.W * 0.5, InWorld.H * 0.5 };
 		NextBuildingId = 0;
@@ -1686,6 +1687,9 @@ namespace AnastasisVillage
 			UpdateInside(Npc, Dt);
 			return;
 		}
+		// Extension de portage materiel (ecart n°18), inactive dans le harnais JS.
+		// La faim/soif/fatigue critiques gardent la decision ordinaire prioritaire.
+		if (Npc.Id == MaterialCourierId && !NeedsCritical(Npc.Needs) && ProgressMaterialCourier(Npc, Dt)) return;
 
 		// `syncVillagePhase` : la bascule de phase force une pensee. La phase est PERSONNELLE
 		// (`villagePhaseFor`, reconsider-001) : le mode de vie decale l'horloge ; sans mode de vie

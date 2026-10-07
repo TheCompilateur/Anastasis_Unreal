@@ -221,6 +221,7 @@
 #include "World/AnastasisEntityTable.h"
 #include "World/AnastasisNavGrid.h"
 #include "World/AnastasisPathfinding.h"
+#include "World/AnastasisWorld.h"
 
 namespace AnastasisWorld { struct FWorld; }
 
@@ -748,6 +749,12 @@ namespace AnastasisVillage
 
 		/** `npc.inventory.food`. */
 		int32 InventoryFood = 0;
+		/** Extension opt-in de portage materiel : charge conservee entre source et chantier. ecart n°18. */
+		int32 MaterialCarry = 0;
+		AnastasisWorld::EResource MaterialResource = AnastasisWorld::EResource::None;
+		int32 MaterialSourceIndex = INDEX_NONE;
+		double MaterialRetryAt = 0.0;
+		int32 MaterialsDelivered = 0;
 		int32 GatheredFood = 0;
 		int32 DeliveredFood = 0;
 		int32 FoodSourceIndex = INDEX_NONE;
@@ -944,6 +951,9 @@ namespace AnastasisVillage
 		/** RouteCost-001: optional Unreal gameplay extension. JS parity harness keeps the reference's uniform travel time. */
 		void SetTerrainTravelCostEnabled(bool bEnabled) { bTerrainTravelCostEnabled = bEnabled; }
 		bool IsTerrainTravelCostEnabled() const { return bTerrainTravelCostEnabled; }
+		/** Extension ecart n°18 : un porteur explicite travaille sur les chantiers secs. Vide = inactif. */
+		void SetMaterialCourier(const FString& NpcId) { MaterialCourierId = NpcId; }
+		const FString& GetMaterialCourier() const { return MaterialCourierId; }
 
 		/**
 		 * `settlement.marketDx/marketDy` (build-decision-001) : le site reserve au marche, relatif au
@@ -1331,6 +1341,7 @@ namespace AnastasisVillage
 
 	private:
 		void UpdateNpc(FNpc& Npc, double Dt);
+		bool ProgressMaterialCourier(FNpc& Npc, double Dt);
 		void ChooseGoal(FNpc& Npc);
 		/**
 		 * La passe collective de fin d'`adultScores` (npc.js l. 1205-1258) : urgence collective, plancher
@@ -1647,6 +1658,7 @@ namespace AnastasisVillage
 		FAnastasisRng VillageRng = FAnastasisRng(0x6a09e667u);
 		AnastasisNav::FNavGrid Nav;
 		bool bTerrainTravelCostEnabled = false;
+		FString MaterialCourierId;
 		int32 NavVersion = 0;
 		FPoint Settlement;
 		TOptional<double> MarketDx;

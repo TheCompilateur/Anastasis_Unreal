@@ -387,6 +387,16 @@ resource-targets-001 : le biais de la prévision de survie est porté, y compris
 C'est l'hôte qui ouvre un chantier (`OpenSite`), pas un choix collectif des habitants ; un chantier à
 sec attend, le bois et la pierre ne se récoltent pas encore.
 
+Extension opt-in `SetMaterialCourier` (npc-life-bridge-001, A_TRANCHER) : un porteur nommé peut
+retirer du bois ou de la pierre d'une tuile vivante accessible, porter jusqu'au seuil d'un chantier
+sec et créditer son stock. Le mode est désactivé par défaut, donc le harnais de parité ne change pas.
+L'hôte l'active pour le premier bâtisseur du scénario explicite `FirstSite ... Delivered=0` et
+pour le premier chantier sec du village initial. Le scénario `Delivered=1` garde son devis livré.
+Ce n'est pas encore `gatherWood` / `gatherStone` de la référence : pas de camp, de stock collectif,
+de demandes de livraison, de salaire ni d'ouverture autonome ; un seul porteur explicite, charge
+conservée si le chantier disparaît. Le test `Village.Chantier.PorteurMateriaux` vérifie les transferts
+et la conservation sur un monde contrôlé.
+
 ### n° 19 — Circuit vivrier food-supply : une extension opt-in
 
 - **classe** : EXTENSION

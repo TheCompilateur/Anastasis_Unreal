@@ -279,9 +279,8 @@ void UAnastasisSimulationSubsystem::SeedOpeningConstruction()
 		if (X < 2 || Y < 2 || X >= World.W - 2 || Y >= World.H - 2
 			|| Village.LiveTileAt(X, Y).Resource != AnastasisWorld::EResource::None
 			|| Village.IsFootBlocked(X + 0.5, Y + 0.5)) continue;
-		// Materiaux livres au depart : condition initiale explicite. Le transport autonome
-		// n'est pas porte ; ne pas presenter cette reserve comme une livraison de PNJ.
-		const FString SiteId = Village.OpenSite(HouseType, X, Y, true);
+		// Chantier reellement sec : un porteur retire bois et pierre du terrain vivant.
+		const FString SiteId = Village.OpenSite(HouseType, X, Y, false);
 		if (SiteId.IsEmpty()) continue;
 		const FBuilding* Site = Village.FindBuilding(SiteId);
 		TArray<FString> ReachableBuilders;
@@ -310,9 +309,10 @@ void UAnastasisSimulationSubsystem::SeedOpeningConstruction()
 		FirstSiteId = SiteId;
 		OpeningSiteId = SiteId;
 		for (const FString& BuilderId : ReachableBuilders) Village.SetJob(BuilderId, AnastasisBuild::JobBuilder);
+		Village.SetMaterialCourier(ReachableBuilders[0]);
 		UE_LOG(LogAnastasis_UnrealV2, Display,
-			TEXT("ANASTASIS_VILLAGE opening construction site=%s tile=(%d,%d) builders=%s stock=%d wood %d stone"),
-			*SiteId, X, Y, *FString::Join(ReachableBuilders, TEXT(",")), Site->Materials.StockWood, Site->Materials.StockStone);
+			TEXT("ANASTASIS_VILLAGE opening construction site=%s tile=(%d,%d) builders=%s courier=%s stock=%d wood %d stone"),
+			*SiteId, X, Y, *FString::Join(ReachableBuilders, TEXT(",")), *ReachableBuilders[0], Site->Materials.StockWood, Site->Materials.StockStone);
 		return;
 	}
 	UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VILLAGE opening construction unavailable: no reachable site for any settler"));
@@ -1478,6 +1478,7 @@ FString UAnastasisSimulationSubsystem::SeedFirstSite(const FString& Type, int32 
 					continue;
 				}
 				const FPoint Start = Building->AccessPoints[0];
+				FString CourierId;
 				for (int32 K = 0; K < FMath::Max(1, BuilderCount); ++K)
 				{
 					AnastasisNeeds::FNeeds N;
@@ -1491,12 +1492,14 @@ FString UAnastasisSimulationSubsystem::SeedFirstSite(const FString& Type, int32 
 					N.Morale = 60.0;
 					const FString Id = V.SpawnNpc(Start.X, Start.Y, N);
 					V.SetJob(Id, AnastasisBuild::JobBuilder);
+					if (!bDelivered && CourierId.IsEmpty()) CourierId = Id;
 				}
+				if (!CourierId.IsEmpty()) V.SetMaterialCourier(CourierId);
 				FirstSiteId = Site;
 				SyncVillagePresentation();
 				UE_LOG(LogAnastasis_UnrealV2, Display,
-					TEXT("ANASTASIS_VILLAGE first site %s type=%s at (%d,%d) delivered=%d wood=%d stone=%d builders=%d"),
-					*Site, *Type, X, Y, bDelivered ? 1 : 0, Building->Materials.NeedWood, Building->Materials.NeedStone, FMath::Max(1, BuilderCount));
+					TEXT("ANASTASIS_VILLAGE first site %s type=%s at (%d,%d) delivered=%d wood=%d stone=%d builders=%d courier=%s"),
+					*Site, *Type, X, Y, bDelivered ? 1 : 0, Building->Materials.NeedWood, Building->Materials.NeedStone, FMath::Max(1, BuilderCount), CourierId.IsEmpty() ? TEXT("none") : *CourierId);
 				FAnastasisVillagePresentation::LogStatus(V, Simulation.GetTime());
 				return Site;
 			}
@@ -1602,14 +1605,18 @@ FString UAnastasisSimulationDebugLibrary::GetBuildStatus(const UObject* WorldCon
 	const FVector N = Builder ? FAnastasisVillagePresentation::SimToUnreal(W, Builder->X, Builder->Y, PresentationWorld) : S;
 	const AnastasisBuild::FSiteMaterials& M = Site->Materials;
 	const AnastasisVillage::FNpc* Owner = Site->Owner.IsEmpty() ? nullptr : V.FindNpc(Site->Owner);
+	const AnastasisVillage::FNpc* Courier = V.GetMaterialCourier().IsEmpty() ? nullptr : V.FindNpc(V.GetMaterialCourier());
 	return FString::Printf(
 		TEXT("{\"site\":true,\"time\":%.4f,\"type\":\"%s\",\"progress\":%.4f,\"pieces\":%d,\"completed\":%s,")
 		TEXT("\"id\":\"%s\",\"owner\":\"%s\",\"ownerHome\":\"%s\",\"ownerRests\":%d,")
+		TEXT("\"courier\":\"%s\",\"carry\":%d,\"materialsDelivered\":%d,\"sourceIndex\":%d,")
 		TEXT("\"needWood\":%d,\"needStone\":%d,\"consumedWood\":%d,\"consumedStone\":%d,\"stockWood\":%d,\"stockStone\":%d,")
 		TEXT("\"workers\":%d,\"byNpcs\":%d,\"building\":%d,\"goal\":\"%s\",\"activity\":\"%s\",\"session\":%s,")
 		TEXT("\"sx\":%.1f,\"sy\":%.1f,\"sz\":%.1f,\"nx\":%.1f,\"ny\":%.1f,\"nz\":%.1f}"),
 		Sim.GetTime(), *Site->Type, Site->Progress, Site->PiecesPlaced, Site->Progress >= 1.0 ? TEXT("true") : TEXT("false"),
 		*Site->Id, *Site->Owner, Owner ? *Owner->HomeId : TEXT(""), Owner ? Owner->RestsTaken : 0,
+		Courier ? *Courier->Id : TEXT(""), Courier ? Courier->MaterialCarry : 0,
+		Courier ? Courier->MaterialsDelivered : 0, Courier ? Courier->MaterialSourceIndex : INDEX_NONE,
 		M.NeedWood, M.NeedStone, M.ConsumedWood, M.ConsumedStone, M.StockWood, M.StockStone,
 		Site->Workers.Num(), ByNpcs, Building,
 		Builder ? *Builder->Goal : TEXT(""), Builder ? *Builder->Activity : TEXT(""),
