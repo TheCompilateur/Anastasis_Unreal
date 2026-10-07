@@ -6,6 +6,8 @@ sky-passage-pie | tools/unreal/sky-passage-pie.py | SKY_PASSAGE PASS | SKY_PASSA
 nox-sky-capture | tools/unreal/nox-sky-capture.py | SKY_CAPTURE_COMPLETE | SKY_CAPTURE_FAIL|SKY_SHOT_MISSING|Traceback | 900 | -
 # Diagnostic only: how much night-sky signal survives with no moon under three exposures.
 nox-exposure-diagnostic | tools/unreal/nox-exposure-diagnostic.py | SKY_CAPTURE_COMPLETE | SKY_CAPTURE_FAIL|SKY_SHOT_MISSING|NOX_DIAGNOSTIC missing|Traceback | 420 | -
+# NOX_002: HDR SceneColor probe of the moonless Sky Light; completion is instrumental.
+nox-skylight-probe | tools/unreal/nox-skylight-probe.py | SKY_CAPTURE_COMPLETE | SKY_CAPTURE_FAIL|SKY_SHOT_MISSING|SKY_CAPTURE_TIMEOUT|NOX_SKYLIGHT expected|NOX_SKYLIGHT cannot|Traceback | 540 | -
 #
 # Une mission declare les preuves de son chantier dans sa fiche de passation :
 #     PROOFS: player-pie, village-weather-pie
