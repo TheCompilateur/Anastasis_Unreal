@@ -15,6 +15,8 @@ struct FCell
     bool bWaterObserved = false;
     bool bSimWater = false;
     bool bRenderedWater = false;
+    /** Rendered-mesh slope at the centre (degrees); < 0 = not observed. Observation only. */
+    double RenderedSlope = -1.0;
     bool bWood = false;
     bool bFood = false;
     double Height = 0.0;
@@ -28,6 +30,8 @@ struct FInputs
     TArray<FCell> Cells;
     uint32 Seed = 0;
     FString SourceWorld, TerrainComponent;
+    /** What the selection fields were read from: `simulation` (SITE_FROM_SIM_001) or `rendered_relief`. */
+    FString SelectionSource = TEXT("rendered_relief");
 };
 struct FSettings
 {

@@ -138,11 +138,29 @@ FString AnastasisSettlementSite::ToJson(const FReport& R, const FInputs& In)
         O->SetNumberField(TEXT("slope_deg"), C.Slope); O->SetNumberField(TEXT("area_m2"), C.AreaM2);
         O->SetNumberField(TEXT("water_m"), C.WaterM); O->SetNumberField(TEXT("food_m"), C.FoodM); O->SetNumberField(TEXT("wood_m"), C.WoodM);
         O->SetNumberField(TEXT("water_access"), C.WaterAccess); O->SetNumberField(TEXT("food_access"), C.FoodAccess); O->SetNumberField(TEXT("wood_access"), C.WoodAccess);
+        // Observations only (SITE_FROM_SIM_001): what the player sees at the chosen tile and at its water.
+        O->SetNumberField(TEXT("rendered_slope_deg"), In.Cells.IsValidIndex(C.Index) ? In.Cells[C.Index].RenderedSlope : -1.0);
+        int32 WaterSeen = -1; // -1 unobserved, 0 no rendered water beside the access tile, 1 rendered water
+        if (In.Cells.IsValidIndex(C.WaterAccess) && In.W > 0)
+        {
+            const int32 AX = C.WaterAccess % In.W, AY = C.WaterAccess / In.W;
+            const int32 Offsets[5][2] = { {0,0}, {1,0}, {-1,0}, {0,1}, {0,-1} };
+            for (const auto& D : Offsets)
+            {
+                const int32 X = AX + D[0], Y = AY + D[1];
+                if (X < 0 || Y < 0 || X >= In.W || Y >= In.H) continue;
+                const auto& N = In.Cells[Y * In.W + X];
+                if (!N.bWaterObserved) continue;
+                WaterSeen = FMath::Max(WaterSeen, N.bRenderedWater ? 1 : 0);
+            }
+        }
+        O->SetNumberField(TEXT("water_access_rendered"), WaterSeen);
         return O;
     };
     auto Root = MakeShared<FJsonObject>();
     Root->SetStringField(TEXT("status"), R.Best.bEligible ? TEXT("selected") : TEXT("unavailable"));
     Root->SetStringField(TEXT("error"),R.Error);
+    Root->SetStringField(TEXT("selection_source"),In.SelectionSource);
     Root->SetNumberField(TEXT("surveyed"),R.Surveyed); Root->SetNumberField(TEXT("eligible_count"),R.Eligible);
     Root->SetNumberField(TEXT("width"),In.W); Root->SetNumberField(TEXT("tile_m"),In.TileMetres);
     Root->SetObjectField(TEXT("selected"),Encode(R.Best)); Root->SetObjectField(TEXT("legacy"),Encode(R.Legacy));

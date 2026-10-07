@@ -1,4 +1,8 @@
 #include "WorldView/AnastasisSettlementSite.h"
+#include "WorldView/AnastasisSettlementSurvey.h"
+#include "WorldView/AnastasisWorldView.h"
+#include "Sim/AnastasisSimulation.h"
+#include "HAL/IConsoleManager.h"
 #include "Misc/AutomationTest.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
@@ -112,6 +116,86 @@ bool FSettlementConcordanceTest::RunTest(const FString&)
     for(auto& C:In.Cells) C.bWaterObserved=true;
     Root=Read();
     TestEqual(TEXT("complete matching centres only"),Root->GetObjectField(TEXT("water_concordance"))->GetStringField(TEXT("agreement")),FString(TEXT("AGREEMENT_AT_CENTRES")));
+    return true;
+}
+
+// SITE_FROM_SIM_001 -- the opening site from the simulation's own tiles, on the canonical world.
+// GEO_MEASURE_001 measured the rendered survey moving the village 0.5-0.7 km under render CVars.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSettlementFromSimulationTest,"Anastasis.SettlementSite.FromSimulation",
+    EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FSettlementFromSimulationTest::RunTest(const FString&)
+{
+    FAnastasisSimulation Sim;
+    Sim.Reset(AnastasisWorldView::ReferenceSeed, AnastasisWorldView::ReferenceWidth, AnastasisWorldView::ReferenceHeight);
+    auto ReadSim=[&]()
+    {
+        AnastasisSettlementSite::FInputs In;
+        AnastasisSettlementSurvey::ReadSimulation(Sim.GetSeed(), Sim.GetWorld(), Sim.GetVillage(), In);
+        return In;
+    };
+    const auto In=ReadSim();
+    TestEqual(TEXT("selection source"),In.SelectionSource,FString(TEXT("simulation")));
+    TestEqual(TEXT("every tile surveyed"),In.Cells.Num(),Sim.GetWorld().Tiles.Num());
+    TestEqual(TEXT("canonical 20 m tile"),In.TileMetres,20.0);
+    // Calibration sweep, reported (not asserted): what the relief factor does to the choice.
+    for(const double Relief : {1.0, 1.5, 2.0, 2.5, 3.0, 3.6})
+    {
+        AnastasisSettlementSite::FInputs S;
+        AnastasisSettlementSurvey::ReadSimulation(Sim.GetSeed(), Sim.GetWorld(), Sim.GetVillage(), S, Relief);
+        TArray<double> Slopes;
+        for(const auto& C : S.Cells) if(C.bDry) Slopes.Add(C.Slope);
+        Slopes.Sort();
+        const auto R=AnastasisSettlementSite::Choose(S);
+        AddInfo(FString::Printf(TEXT("SITE_FROM_SIM_SWEEP relief=%.1f land_slope_p50=%.2f p90=%.2f eligible=%d site=(%d,%d) score=%.2f water_m=%.0f error=%s"),
+            Relief, Slopes.IsEmpty() ? -1.0 : Slopes[Slopes.Num()/2], Slopes.IsEmpty() ? -1.0 : Slopes[Slopes.Num()*9/10],
+            R.Eligible, R.Best.Index<0 ? -1 : R.Best.Index%S.W, R.Best.Index<0 ? -1 : R.Best.Index/S.W, R.Best.Score, R.Best.WaterM, *R.Error));
+    }
+    const auto A=AnastasisSettlementSite::Choose(In);
+    if(!TestTrue(TEXT("an eligible site on the canonical world"),A.Best.bEligible)) { AddInfo(A.Error); return false; }
+    const auto& T=Sim.GetWorld().Tiles[A.Best.Index];
+    TestTrue(TEXT("site is dry land"),T.Type!=AnastasisWorld::ETileType::Water);
+    TestTrue(TEXT("gentle site"),A.Best.Slope<=8.0);
+    TestTrue(TEXT("water within reach"),A.Best.WaterM>=0 && A.Best.WaterM<=300);
+    AddInfo(FString::Printf(TEXT("SITE_FROM_SIM site=(%d,%d) score=%.2f eligible=%d slope=%.2f water=%.0f food=%.0f wood=%.0f"),
+        A.Best.Index%In.W, A.Best.Index/In.W, A.Best.Score, A.Eligible, A.Best.Slope, A.Best.WaterM, A.Best.FoodM, A.Best.WoodM));
+
+    // The render CVars that moved the village in GEO_MEASURE_001 must be invisible here.
+    struct FCVar { const TCHAR* Name; int32 Old; };
+    TArray<FCVar> Changed;
+    for(const TCHAR* Name : {TEXT("anastasis.Terrain.Drainage"), TEXT("anastasis.Terrain.HumanGeography"), TEXT("anastasis.Terrain.Forge")})
+    {
+        if(IConsoleVariable* Var=IConsoleManager::Get().FindConsoleVariable(Name)) { Changed.Add({Name,Var->GetInt()}); Var->Set(0,ECVF_SetByCode); }
+    }
+    const auto B=AnastasisSettlementSite::Choose(ReadSim());
+    for(const FCVar& C : Changed) IConsoleManager::Get().FindConsoleVariable(C.Name)->Set(C.Old,ECVF_SetByCode);
+    TestEqual(TEXT("render CVars cannot move the simulated site"),B.Best.Index,A.Best.Index);
+    TestEqual(TEXT("... nor its score"),B.Best.Score,A.Best.Score);
+
+    // The rendered observation is reported, it never chooses.
+    AnastasisSettlementSite::FInputs Rendered=In;
+    Rendered.SelectionSource=TEXT("rendered_relief");
+    for(auto& C : Rendered.Cells) { C.bWaterObserved=true; C.bRenderedWater=true; C.RenderedSlope=45.0; C.Slope=45.0; C.bCenterAllowed=false; }
+    auto Merged=In;
+    AnastasisSettlementSurvey::MergeRenderObservation(Rendered,Merged);
+    const auto M=AnastasisSettlementSite::Choose(Merged);
+    TestEqual(TEXT("observation cannot move the site"),M.Best.Index,A.Best.Index);
+    TestEqual(TEXT("observation copied"),Merged.Cells[A.Best.Index].RenderedSlope,45.0);
+    TestEqual(TEXT("selection source kept"),Merged.SelectionSource,FString(TEXT("simulation")));
+
+    // anastasis.Village.SiteSource 0 hands back the rendered inputs untouched (A/B and rollback).
+    IConsoleVariable* Source=IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Village.SiteSource"));
+    if(TestNotNull(TEXT("SiteSource CVar registered"),Source))
+    {
+        const int32 Old=Source->GetInt();
+        Source->Set(0,ECVF_SetByCode);
+        const auto Legacy=AnastasisSettlementSurvey::SiteInputs(Rendered,true,Sim.GetSeed(),Sim.GetWorld(),Sim.GetVillage());
+        Source->Set(1,ECVF_SetByCode);
+        const auto Current=AnastasisSettlementSurvey::SiteInputs(Rendered,true,Sim.GetSeed(),Sim.GetWorld(),Sim.GetVillage());
+        Source->Set(Old,ECVF_SetByCode);
+        TestEqual(TEXT("SiteSource 0 = rendered relief"),Legacy.SelectionSource,FString(TEXT("rendered_relief")));
+        TestEqual(TEXT("SiteSource 1 = simulation"),Current.SelectionSource,FString(TEXT("simulation")));
+        TestEqual(TEXT("SiteSource 1 chooses the simulated site"),AnastasisSettlementSite::Choose(Current).Best.Index,A.Best.Index);
+    }
     return true;
 }
 #endif

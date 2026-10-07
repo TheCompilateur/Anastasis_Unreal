@@ -47,7 +47,8 @@ FString UAnastasisTerrainAccessProbe::Begin(const UObject* C)
  if(!V.GetActors().IsEmpty() || !V.GetBuildings().IsEmpty()) return AccessError(TEXT("requires_empty_village"));
  AnastasisSettlementSite::FInputs In; FString Why;
  if(!AnastasisSettlementSurvey::Read(H->GetWorld(),S.GetSeed(),W,V,In,Why)) return AccessError(Why);
- const auto Site=AnastasisSettlementSite::Choose(In);
+ // SITE_FROM_SIM_001 : the same inputs as the opening village, not a re-choice on the rendered relief.
+ const auto Site=AnastasisSettlementSite::Choose(AnastasisSettlementSurvey::SiteInputs(In,true,S.GetSeed(),W,V));
  if(!Site.Best.bEligible) return AccessError(TEXT("no_eligible_site"));
  const FString Granary=H->SeedFirstFarmer(1,Site.Best.Index%W.W,Site.Best.Index/W.W);
  if(Granary.IsEmpty() || V.GetActors().Num()!=1) return AccessError(TEXT("farmer_fixture_failed"));

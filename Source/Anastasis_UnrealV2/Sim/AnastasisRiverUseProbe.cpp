@@ -34,7 +34,9 @@ FString UAnastasisRiverUseProbe::Describe(const UObject* Object)
     O->SetNumberField(TEXT("seed"),S.GetSeed()); O->SetNumberField(TEXT("width"),W.W); O->SetNumberField(TEXT("height"),W.H);
     O->SetNumberField(TEXT("tile_m"),In.TileMetres); O->SetStringField(TEXT("world"),H->GetWorld()->GetPathName());
     TSharedPtr<FJsonObject> Site;
-    FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(AnastasisSettlementSite::ToJson(AnastasisSettlementSite::Choose(In),In)),Site);
+    // SITE_FROM_SIM_001 : the same inputs as the opening village, not a re-choice on the rendered relief.
+    const auto SiteIn=AnastasisSettlementSurvey::SiteInputs(In,true,S.GetSeed(),W,V);
+    FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(AnastasisSettlementSite::ToJson(AnastasisSettlementSite::Choose(SiteIn),SiteIn)),Site);
     if(!Site) return RiverProbeError(TEXT("invalid_site_report"));
     O->SetObjectField(TEXT("site"),Site);
     TArray<TSharedPtr<FJsonValue>> Cells;

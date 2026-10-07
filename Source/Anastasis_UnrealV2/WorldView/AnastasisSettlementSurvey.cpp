@@ -4,6 +4,7 @@
 #include "Village/AnastasisVillage.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "HAL/IConsoleManager.h"
 #include "ProceduralMeshComponent.h"
 
 namespace AnastasisSettlementSurveyPrivate
@@ -108,6 +109,7 @@ bool AnastasisSettlementSurvey::Read(UWorld* World, uint32 Seed, const Anastasis
         for(int32 V=0;V<3;++V) for(int32 U=0;U<2;++U) DX=FMath::Max(DX,FMath::Abs(H[V*3+U+1]-H[V*3+U])/(Cell*0.4));
         for(int32 V=0;V<2;++V) for(int32 U=0;U<3;++U) DY=FMath::Max(DY,FMath::Abs(H[(V+1)*3+U]-H[V*3+U])/(Cell*0.4));
         C.Slope=Complete ? FMath::RadiansToDegrees(FMath::Atan(FMath::Sqrt(DX*DX+DY*DY))) : 90.0;
+        C.RenderedSlope=Complete ? C.Slope : -1.0;
         C.Fertility=T.Fertility;
         C.bCenterAllowed=(T.Type==AnastasisWorld::ETileType::Grass || T.Type==AnastasisWorld::ETileType::Scrub)
             && T.Wetness<0.6 && Freeboard>=100.0;
@@ -124,4 +126,84 @@ bool AnastasisSettlementSurvey::Read(UWorld* World, uint32 Seed, const Anastasis
         C.bFood=T.Type==AnastasisWorld::ETileType::Field && T.Resource==AnastasisWorld::EResource::Food && T.Amount>0;
     }
     return true;
+}
+
+void AnastasisSettlementSurvey::ReadSimulation(uint32 Seed, const AnastasisWorld::FWorld& Sim,
+    const AnastasisVillage::FVillage& Village, AnastasisSettlementSite::FInputs& Out, double Relief)
+{
+    using AnastasisWorld::ETileType;
+    Out = {};
+    Out.Seed=Seed; Out.W=Sim.W; Out.H=Sim.H;
+    Out.SelectionSource=TEXT("simulation");
+    Out.SourceWorld=TEXT("simulation"); Out.TerrainComponent=TEXT("simulation_tiles");
+    const double Cell=AnastasisWorldView::TileWorldSize*CanonicalSpatialScale;
+    Out.TileMetres=Cell/100.0;
+    Out.Cells.SetNum(Sim.Tiles.Num());
+    if (Sim.W<=0 || Sim.H<=0 || Sim.Tiles.Num()!=Sim.W*Sim.H) return;
+    // Land above sea scaled by `Relief` (1 = the simulation's own relief, the default); the sea stays put.
+    auto PolicyHeight=[&](int32 X,int32 Y)
+    {
+        const double Alt=Sim.Tiles[Y*Sim.W+X].Alt;
+        const double Above=Alt-AnastasisWorld::SeaLevel;
+        return AnastasisWorldView::AltitudeToUnreal(AnastasisWorld::SeaLevel+(Above>0.0 ? Above*Relief : Above), CanonicalSpatialScale);
+    };
+    auto IsWater=[&](int32 X,int32 Y)
+    {
+        return X>=0 && Y>=0 && X<Sim.W && Y<Sim.H && Sim.Tiles[Y*Sim.W+X].Type==ETileType::Water;
+    };
+    for(int32 I=0;I<Sim.Tiles.Num();++I)
+    {
+        const auto& T=Sim.Tiles[I]; auto& C=Out.Cells[I];
+        const int32 X=I%Sim.W, Y=I/Sim.W;
+        const bool bWater=T.Type==ETileType::Water;
+        C.bSurveyed=true;
+        C.Height=PolicyHeight(X,Y);
+        C.bWalkable=!Village.IsFootBlocked(X+0.5,Y+0.5);
+        C.bDry=!bWater;
+        // Steepest neighbour step per axis, like the rendered survey's sample grid.
+        double DX=0,DY=0;
+        if (X>0) DX=FMath::Max(DX,FMath::Abs(C.Height-PolicyHeight(X-1,Y))/Cell);
+        if (X+1<Sim.W) DX=FMath::Max(DX,FMath::Abs(PolicyHeight(X+1,Y)-C.Height)/Cell);
+        if (Y>0) DY=FMath::Max(DY,FMath::Abs(C.Height-PolicyHeight(X,Y-1))/Cell);
+        if (Y+1<Sim.H) DY=FMath::Max(DY,FMath::Abs(PolicyHeight(X,Y+1)-C.Height)/Cell);
+        C.Slope=FMath::RadiansToDegrees(FMath::Atan(FMath::Sqrt(DX*DX+DY*DY)));
+        C.Fertility=T.Fertility;
+        // The rendered survey wanted 1 m of freeboard; on tiles, a centre is not a shore tile.
+        const bool bShore=IsWater(X-1,Y)||IsWater(X+1,Y)||IsWater(X,Y-1)||IsWater(X,Y+1);
+        C.bCenterAllowed=(T.Type==ETileType::Grass || T.Type==ETileType::Scrub) && T.Wetness<0.6 && !bWater && !bShore;
+        C.bWater=bWater;
+        C.bSimWater=bWater;
+        C.bWood=T.Resource==AnastasisWorld::EResource::Wood && T.Amount>0;
+        C.bFood=T.Type==ETileType::Field && T.Resource==AnastasisWorld::EResource::Food && T.Amount>0;
+    }
+}
+
+void AnastasisSettlementSurvey::MergeRenderObservation(const AnastasisSettlementSite::FInputs& Rendered,
+    AnastasisSettlementSite::FInputs& Out)
+{
+    if (Rendered.W!=Out.W || Rendered.H!=Out.H || Rendered.Cells.Num()!=Out.Cells.Num()) return;
+    Out.SourceWorld=Rendered.SourceWorld; Out.TerrainComponent=Rendered.TerrainComponent;
+    for(int32 I=0;I<Out.Cells.Num();++I)
+    {
+        const auto& R=Rendered.Cells[I]; auto& C=Out.Cells[I];
+        C.bWaterObserved=R.bWaterObserved;
+        C.bRenderedWater=R.bRenderedWater;
+        C.RenderedSlope=R.RenderedSlope;
+    }
+}
+
+bool AnastasisSettlementSurvey::SiteFromSimulation()
+{
+    const IConsoleVariable* Var=IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Village.SiteSource"));
+    return !Var || Var->GetInt()!=0;
+}
+
+AnastasisSettlementSite::FInputs AnastasisSettlementSurvey::SiteInputs(const AnastasisSettlementSite::FInputs& Rendered,
+    bool bRenderedOk, uint32 Seed, const AnastasisWorld::FWorld& Sim, const AnastasisVillage::FVillage& Village)
+{
+    if (!SiteFromSimulation()) return Rendered;
+    AnastasisSettlementSite::FInputs In;
+    ReadSimulation(Seed, Sim, Village, In);
+    if (bRenderedOk) MergeRenderObservation(Rendered, In);
+    return In;
 }

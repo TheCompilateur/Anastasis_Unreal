@@ -96,7 +96,14 @@ static TAutoConsoleVariable<int32> CVarVillageOpeningConstruction(
 
 static TAutoConsoleVariable<int32> CVarVillageSiteSelection(
     TEXT("anastasis.Village.SiteSelection"), 1,
-    TEXT("1 selects the opening village from this world rendered terrain and navigable resource access. 0 retains legacy centre placement for comparison. Explicit scenarios and saves are not relocated."), ECVF_Default);
+    TEXT("1 selects the opening village from terrain and navigable resource access (source: anastasis.Village.SiteSource). 0 retains legacy centre placement for comparison. Explicit scenarios and saves are not relocated."), ECVF_Default);
+
+// SITE_FROM_SIM_001 -- GEO_MEASURE_001 measured the rendered-mesh survey moving the opening village by
+// 0.5 to 0.7 km when a RENDER CVar changed (Drainage 0, HumanGeography 0). The simulation now chooses from
+// its own tiles; the rendered survey is kept as an observation (water concordance, rendered slope).
+static TAutoConsoleVariable<int32> CVarVillageSiteSource(
+    TEXT("anastasis.Village.SiteSource"), 1,
+    TEXT("Opening site read from: 1 = the simulation's tiles (default; render CVars cannot move the village, the rendered survey is only reported), 0 = the rendered relief (previous behaviour, for A/B)."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarVillageRoadEvolution(
 	TEXT("anastasis.Village.RoadEvolution"),
@@ -181,18 +188,28 @@ void UAnastasisSimulationSubsystem::TryStartVillage(float DeltaTime)
     int32 X = FMath::FloorToInt32(Village.GetSettlement().X), Y = FMath::FloorToInt32(Village.GetSettlement().Y);
     if (CVarVillageSiteSelection.GetValueOnGameThread() != 0)
     {
-        AnastasisSettlementSite::FInputs In;
+        AnastasisSettlementSite::FInputs Rendered;
         FString Error;
         const double Began = FPlatformTime::Seconds();
-        if (!AnastasisSettlementSurvey::Read(GetWorld(), Simulation.GetSeed(), Simulation.GetWorld(), Village, In, Error))
+        const bool bFromSimulation = AnastasisSettlementSurvey::SiteFromSimulation();
+        const bool bRendered = AnastasisSettlementSurvey::Read(GetWorld(), Simulation.GetSeed(), Simulation.GetWorld(), Village, Rendered, Error);
+        if (!bRendered)
         {
+            // The rendered survey is awaited for 10 s either way (its observation feeds the water concordance).
             StartVillageWait += DeltaTime;
             if (StartVillageWait < 10.0 && Error == TEXT("terrain_not_ready")) return;
-            bPendingStartVillage = false;
-            SettlementSiteReport = FString::Printf(TEXT("{\"status\":\"unavailable\",\"error\":\"%s\"}"), *Error);
-            UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("SETTLEMENT_SITE %s"), *SettlementSiteReport);
-            return;
+            if (!bFromSimulation)
+            {
+                bPendingStartVillage = false;
+                SettlementSiteReport = FString::Printf(TEXT("{\"status\":\"unavailable\",\"error\":\"%s\"}"), *Error);
+                UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("SETTLEMENT_SITE %s"), *SettlementSiteReport);
+                return;
+            }
+            // From the simulation, a late or missing terrain no longer leaves the world without a village.
+            UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("SETTLEMENT_SITE rendered survey unavailable (%s): choosing from the simulation, without observation"), *Error);
         }
+        const AnastasisSettlementSite::FInputs In = AnastasisSettlementSurvey::SiteInputs(
+            Rendered, bRendered, Simulation.GetSeed(), Simulation.GetWorld(), Village);
         const auto Report = AnastasisSettlementSite::Choose(In);
         SettlementSiteReport = AnastasisSettlementSite::ToJson(Report, In);
         UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("SETTLEMENT_SITE survey_ms=%.3f %s"),
