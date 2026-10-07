@@ -350,4 +350,46 @@ $null = NewMission 'c24' @({ param($w) Set-Content "$w\doc-c24.md" 'c24' })
 $null = AW finish -Mission c24
 $r = AW integrate-batch -Missions 'c24'
 Check 'S27 lot : la mise a jour du canonique est tentee apres versement' ($r.Code -eq 0 -and $r.Out -match 'BATCH_INTEGRATED::c24' -and $r.Out -match 'CANONICAL_BUILD::SKIP \(ANASTASIS_CANONICAL_BUILD=0\)') $r.Out
+# --- RELAY_ADMISSION_001 ------------------------------------------------------------------
+# 28. Relais declare (RELAIS:) : une mission qui rejoue les commits d'autres missions n'est admise
+#     que si son PROOFS: reprend toutes leurs preuves ; sans RELAIS:, la garde des heritees refuse.
+G checkout -q -f main | Out-Null; G clean -fdq | Out-Null
+$null = NewMission 'ra-a' @({ param($w) Set-Content "$w\doc-ra-a.md" 'a' })
+$null = NewMission 'ra-b' @({ param($w) Add-Content "$w\docs\unreal\handoffs\ra-b.md" 'PROOFS: village-weather-pie'; Set-Content "$w\doc-ra-b.md" 'b' })
+$null = NewMission 'ra-r1' @({ param($w)
+  Copy-Item (Join-Path $wtRoot 'ra-a\docs\unreal\handoffs\ra-a.md'), (Join-Path $wtRoot 'ra-b\docs\unreal\handoffs\ra-b.md') "$w\docs\unreal\handoffs\"
+  Set-Content "$w\doc-ra-a.md" 'a'; Set-Content "$w\doc-ra-b.md" 'b'
+  Add-Content "$w\docs\unreal\handoffs\ra-r1.md" "RELAIS: ra-a, ra-b`nPROOFS: (aucune)" })
+$null = AW finish -Mission ra-r1
+$mainAvant = (G rev-parse main)
+$r = AW integrate-batch -Missions 'ra-r1'
+Check 'S28 relais qui ne reprend pas les preuves portees : refuse, main intacte' ($r.Code -ne 0 -and $r.Out -match 'BATCH_REJECTED::ra-r1 : relais incomplet[^\n]*ra-b \(preuves non reprises : village-weather-pie\)' -and (G rev-parse main) -eq $mainAvant) $r.Out
+$null = NewMission 'ra-r3' @({ param($w)
+  Copy-Item (Join-Path $wtRoot 'ra-b\docs\unreal\handoffs\ra-b.md') "$w\docs\unreal\handoffs\"
+  Set-Content "$w\doc-ra-b.md" 'b'
+  Add-Content "$w\docs\unreal\handoffs\ra-r3.md" 'PROOFS: (aucune)' })
+$null = AW finish -Mission ra-r3
+$r = AW integrate-batch -Missions 'ra-r3'
+Check 'S28 sans RELAIS: la garde des missions heritees refuse toujours' ($r.Code -ne 0 -and $r.Out -match 'BATCH_REJECTED::ra-r3 : commits de mission\(s\) heritee\(s\) non versees avant elle : ra-b' -and (G rev-parse main) -eq $mainAvant) $r.Out
+$null = NewMission 'ra-r2' @({ param($w)
+  Copy-Item (Join-Path $wtRoot 'ra-a\docs\unreal\handoffs\ra-a.md') "$w\docs\unreal\handoffs\"
+  Set-Content "$w\doc-ra-a.md" 'a'
+  Add-Content "$w\docs\unreal\handoffs\ra-r2.md" "RELAIS: ra-a`nPROOFS: (aucune)" })
+$null = AW finish -Mission ra-r2
+$r = AW integrate-batch -Missions 'ra-r2'
+Check 'S28 relais declare, preuves reprises : la mission portee est admise et versee' ($r.Code -eq 0 -and $r.Out -match 'RELAY_ADMITTED::ra-r2 porte ra-a \(preuves : aucune\)' -and $r.Out -match 'BATCH_INTEGRATED::ra-r2' -and (G show 'main:doc-ra-a.md') -eq 'a') $r.Out
+
+# 29. prune par contenu : une copie versee dont l'union de proofs.txt a retouche le diff n'est plus
+#     reconnue par git cherry ; rejouee sur main elle ne change rien, prune la supprime.
+$null = NewMission 'pz' @({ param($w) Add-Content "$w\tools\unreal\proofs.txt" 'banc-pz | tools/unreal/smoke-pie.py | PZ PASS | PZ FAIL | 60 | -' })
+$null = AW finish -Mission pz
+AdvanceMain 'd29' { param($w) Add-Content "$w\tools\unreal\proofs.txt" 'banc-d29 | tools/unreal/smoke-pie.py | D PASS | D FAIL | 60 | -' }
+$r1 = AW integrate-batch -Missions 'pz'
+$cherryPlus = @(G cherry main agent/pz | Where-Object { $_ -like '+ *' }).Count
+$r = AW prune -Mission pz
+Check 'S29 copie retouchee par l union : prune la reconnait par contenu' ($r1.Code -eq 0 -and $cherryPlus -gt 0 -and $r.Code -eq 0 -and $r.Out -match 'PRUNE::PAR_CONTENU' -and -not (G rev-parse --verify --quiet agent/pz)) ("cherry+=$cherryPlus`n" + $r1.Out + "`n" + $r.Out)
+$null = NewMission 'pz2' @({ param($w) Set-Content "$w\doc-pz2.md" 'pas verse' })
+$r = AW prune -Mission pz2
+Check 'S29 prune refuse toujours une branche non versee' ($r.Code -ne 0 -and $r.Out -match 'absents de main' -and (G rev-parse --verify --quiet agent/pz2)) $r.Out
+
 Remove-Item $base -Recurse -Force -ErrorAction SilentlyContinue

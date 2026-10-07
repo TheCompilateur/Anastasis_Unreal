@@ -140,6 +140,19 @@ function Get-DeclaredProofs([string]$repo, [string]$rev, [string]$m) {
   }
   return @($names | Select-Object -Unique)
 }
+# RELAY_ADMISSION_001 : une mission de relais rejoue sur main les commits de missions dont l'agent
+# est absent. Sa fiche les nomme (`RELAIS: a, b`) ; le lot ne les admet par elle que si toutes leurs
+# preuves declarees figurent dans son propre `PROOFS:` -- la garde des missions heritees reste entiere.
+function Get-DeclaredRelay([string]$repo, [string]$rev, [string]$m) {
+  $text = (Invoke-Git -C $repo show "$($rev):docs/unreal/handoffs/$m.md").Out
+  $names = @()
+  foreach ($line in $text) {
+    if ($line -match '^\s*RELAIS\s*:\s*(.+)$') {
+      $names += @($Matches[1] -split ',' | ForEach-Object { $_.Trim().Trim('`') } | Where-Object { $_ -match '^[a-z0-9][a-z0-9._-]*$' })
+    }
+  }
+  return @($names | Select-Object -Unique)
+}
 function Get-RegisteredProofs([string]$root) {
   $file = Join-Path $root 'tools\unreal\proofs.txt'
   if (-not (Test-Path $file)) { return @() }
@@ -840,6 +853,27 @@ switch ($Command) {
         continue
       }
       $inherited = @($inherited | Sort-Object -Unique)
+      # Relais declare : chaque mission heritee nommee dans RELAIS: est admise par la mission
+      # qui la porte, si ses preuves sont reprises dans le PROOFS: du relais ($owner les recueille).
+      if ($inherited.Count -gt 0) {
+        $relayList = @(Get-DeclaredRelay $Canonical $b $m)
+        $relayProofs = @(Get-DeclaredProofs $Canonical $b $m)
+        $kept = @(); $uncovered = @()
+        foreach ($i in $inherited) {
+          if ($relayList -notcontains $i) { $kept += $i; continue }
+          # La fiche de la mission portee, telle que le relais la verse ; a defaut, celle de sa branche.
+          $theirs = @(Get-DeclaredProofs $Canonical $b $i)
+          if ($theirs.Count -eq 0 -and (Invoke-Git -C $Canonical rev-parse --verify --quiet (Branch-Of $i)).Code -eq 0) { $theirs = @(Get-DeclaredProofs $Canonical (Branch-Of $i) $i) }
+          $miss = @($theirs | Where-Object { $relayProofs -notcontains $_ })
+          if ($miss.Count -gt 0) { $uncovered += "$i (preuves non reprises : $($miss -join ', '))" }
+          else { Write-Output "RELAY_ADMITTED::$m porte $i (preuves : $(if ($theirs.Count) { $theirs -join ', ' } else { 'aucune' }))" }
+        }
+        if ($uncovered.Count -gt 0) {
+          $rejected += "$m : relais incomplet, PROOFS: ne reprend pas les preuves de $($uncovered -join ' ; ')"
+          continue
+        }
+        $inherited = $kept
+      }
       if ($inherited.Count -gt 0) {
         $rejected += "$m : commits de mission(s) heritee(s) non versees avant elle : $($inherited -join ', ')"
         continue
@@ -959,7 +993,16 @@ switch ($Command) {
     # Par CONTENU (`git cherry`) : integrate-batch verse des copies des commits de la
     # branche, pas les commits eux-memes ; une copie dans main vaut versement.
     $outside = @((Invoke-Git -C $Canonical cherry main $branch).Out | Where-Object { $_ -like '+ *' }).Count
-    if ($outside -gt 0) { Fail "FAIL: $outside commit(s) de $branch absents de main : integrer d abord" }
+    if ($outside -gt 0) {
+      # Un lot peut verser une copie au diff retouche (union de proofs.txt, contexte deplace) :
+      # `cherry` ne la reconnait plus. Si rejouer la branche sur main ne change rien, elle y est.
+      $pv = @(Get-StackPreview $Canonical 'main' @($Mission))[0]
+      if ($pv -and $pv.New -eq 0 -and $pv.Conflicts.Count -eq 0) {
+        Write-Output "PRUNE::PAR_CONTENU ($outside commit(s) non reconnus par git cherry ; rejoues sur main, ils ne changent rien)"
+      } else {
+        Fail "FAIL: $outside commit(s) de $branch absents de main : integrer d abord"
+      }
+    }
     if (Test-Path -LiteralPath $path) {
       $dirty = @((Invoke-Git -C $path status --porcelain --untracked-files=all).Out)
       if ($dirty.Count -gt 0) {
