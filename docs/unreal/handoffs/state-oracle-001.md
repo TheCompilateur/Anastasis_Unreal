@@ -34,7 +34,16 @@ Constat de départ (IRON_CRUSADE_001, `Anastasis.Iron.Empreinte.AveugleAuxEcritu
 
 ## COMMIT
 
-PENDING — rien n'est commité (consigne d'Alexandre : pas de commit sans son accord).
+Commité le 2026-10-07 avec l'accord d'Alexandre, sur `main` = `25ebf1fe`, après rebase. Deux commits :
+- le chantier lui-même ;
+- `Geo` dans l'empreinte de la simulation.
+
+Rebase : `geopolitical-world-001` a été versé entre-temps. Il ajoute à `FAnastasisSimulation` le champ
+`Geo` (le monde extérieur, écart n°38).
+- Conflit textuel dans `AnastasisSimulation.h`, résolu en gardant les deux blocs.
+- Le garde-fou a ensuite refusé `FAnastasisSimulation.Geo`, ni lu ni classé : premier cas réel attrapé.
+- Il est maintenant lu par `IsLoaded()` et `FGeoWorld::Digest()`, qui hache `SaveState()`, c'est-à-dire
+  tout l'état vivant.
 
 ## MEC
 
@@ -112,4 +121,9 @@ de jeu dans la référence JS. `Digest()`, la projection de parité, n'a pas cha
   - Un état caché ailleurs (une variable statique, l'hôte Unreal) n'est pas couvert. L'état de l'hôte
     (`OpeningSiteId`, etc.) relève de C3.
   - `FAnastasisRng` n'est lu que par `GetState()`. Un champ ajouté à ce type ne serait pas vu.
-- Le test d'expérience `Anastasis.Iron.*` reste dans le worktree `iron-crusade-001`. Il n'est pas versé ici.
+- Le test d'expérience `Anastasis.Iron.*` vit dans la mission `iron-crusade-001`, versée séparément.
+- Les 7 tests ciblés ont tourné **avant** le rebase sur `25ebf1fe`. Après le rebase, seuls le build
+  (`finish`) et le garde-fou ont été rejoués ; la suite du lot juge l'arbre rebasé.
+- Aucun test ne fait encore varier `Geo` : sa lecture repose sur `FGeoWorld::Digest`, déjà testé par
+  `Anastasis.Sim.Geo.*`. Un test qui charge un scénario dans deux simulations puis compare leur
+  `StateDigest` serait l'étape suivante.

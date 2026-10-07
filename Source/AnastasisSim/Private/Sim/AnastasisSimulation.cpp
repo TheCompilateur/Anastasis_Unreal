@@ -170,6 +170,10 @@ uint64 FAnastasisSimulation::StateDigest() const
 	Out.Key(TEXT("accumulator")).Number(Accumulator);
 	Out.Key(TEXT("world")).String(AnastasisDigest::ToHex(WorldHash.Hash));
 	Out.Key(TEXT("village")).String(AnastasisDigest::ToHex(Village.StateDigest()));
+	// Le monde exterieur (geopolitical-world-001) : tout son etat vivant passe par SaveState, que son
+	// Digest hache ; le scenario charge n'y est pas, il se recharge depuis sa source.
+	Out.Key(TEXT("geoLoaded")).Bool(Geo.IsLoaded());
+	Out.Key(TEXT("geo")).String(AnastasisDigest::ToHex(Geo.Digest()));
 	Out.EndObject();
 	return Out.Digest();
 }
