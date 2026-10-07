@@ -11,8 +11,9 @@ $env:ANASTASIS_COSMIC_REBUILD = if ($Rebuild) { '1' } else { '0' }
 $script = (Join-Path $PSScriptRoot 'cosmic-sky-material.py').Replace('\', '/')
 $argsList = @(
   ('"' + (Join-Path $root 'Anastasis_UnrealV2.uproject') + '"'),
-  '/Engine/Maps/Entry', '-unattended', '-nosound', '-nosplash', '-NoLiveCoding',
-  ('-abslog="' + $log + '"'), ('-ExecCmds="py ' + $script + '"')
+  '-run=pythonscript', ('-script="' + $script + '"'),
+  '-unattended', '-nopause', '-nosound', '-nosplash', '-NoLiveCoding',
+  ('-abslog="' + $log + '"')
 )
 $p = Start-AnastasisEditor 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe' $argsList
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue

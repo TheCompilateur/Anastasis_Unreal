@@ -198,7 +198,11 @@ def create_material(moon, panorama):
     if not all(wiring.values()):
         raise RuntimeError('material graph incomplete: ' + repr(wiring))
     unreal.log('COSMIC_MATERIAL_COMPILE ' + MAT)
-    mel.recompile_material(mat)
+    errors = list(mel.recompile_material(mat) or [])
+    if errors:
+        for error in errors:
+            unreal.log_error('COSMIC_MATERIAL_COMPILE_ERROR ' + str(error))
+        raise RuntimeError('sky material shader failed with %d error(s)' % len(errors))
     unreal.EditorAssetLibrary.save_asset(MAT)
     unreal.log('COSMIC_MATERIAL_SAVED ' + MAT)
 
@@ -209,5 +213,3 @@ try:
     unreal.log('COSMIC_MATERIAL_DONE')
 except Exception:
     unreal.log_error('COSMIC_MATERIAL_FAIL ' + traceback.format_exc())
-finally:
-    unreal.SystemLibrary.quit_editor()

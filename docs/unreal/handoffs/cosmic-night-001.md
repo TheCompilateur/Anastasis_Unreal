@@ -17,13 +17,14 @@ version de carte.
 
 ## COMMIT
 
-PENDING
+Le commit exact de passation est le `HEAD` marqué par `agent-worktree.ps1 finish`
+dans `C:\dev\ANASTASIS_WORKTREES\.handoff\cosmic-night-001.txt`.
 
 ## MEC
 
-- BUILD: UNKNOWN
-- TESTS: UNKNOWN
-- MATERIAL: UNKNOWN
+- BUILD: PASS (`anastasis-unreal.ps1 build`, 2026-10-07, `Result: Succeeded`, 19 actions, 108,01 s, sur la branche rebasée sur `main=f64aeac8`)
+- TESTS: QUEUED — `cosmic-night-pie` et `sky-clock-pie` au lot ; aucun verdict PIE local.
+- MATERIAL: PASS technique (`cosmic-sky-material.ps1 -Rebuild`, commande Python headless, 2026-10-07). Les trois `.uasset` sont sauvés ; `recompile_material` n'a retourné aucune erreur, `COSMIC_MATERIAL_DONE` est présent et le processus a quitté avec le code 0. Deux essais précédents via l'éditeur avaient sauvé les assets puis planté à la fermeture (`ModeManagerInteractiveToolsContext`) ; le lanceur vérifie désormais le code de sortie. Ceci ne juge pas l'image rendue.
 - COMMANDS: `tools/unreal/anastasis-unreal.ps1 build`, `tools/unreal/cosmic-sky-material.ps1`
 
 ## PROOFS
