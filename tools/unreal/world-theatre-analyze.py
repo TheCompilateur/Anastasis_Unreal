@@ -16,6 +16,7 @@ Noms des structures (le jour ou une couche les consomme, ce sont ceux du C++) :
   FWorldPerceptualSample  une cellule : altitude, pente, courbure, relief local (TPI), eau, densites
   FHorizonSignature       par vista : angle d'elevation et distance de l'horizon par azimut, plans de silhouette
   FWorldVista             camera, FOV, plans, repere dominant, vides, bruit visuel
+Axes : X = nord, Y = est (ciel du projet, AnastasisAtmosphereResolver) ; yaw UE 0 = nord, 90 = est.
   FLandmarkRelation       repere x vista : visible, angle, part du champ, concurrence
 """
 import argparse, csv, json, math, os, re, sys
@@ -1034,9 +1035,9 @@ def compose_masses(near, nz, nf, water, inside, placed, meta, village_xy, rules)
     X = near.ox + (ii * k + 0.5 * k) * near.cell
     Y = near.oy + (jj * k + 0.5 * k) * near.cell
     gy, gx = np.gradient(z, near.cell * k)
-    # Face nord : le sol monte vers +Y (gy > 0), donc il regarde vers -Y... ici +Y est le nord de la carte :
-    # un versant qui descend vers +Y (gy < 0) regarde le nord, plus frais et humide.
-    north = np.clip(-gy / np.maximum(np.hypot(gx, gy), 1e-9), -1, 1) * np.clip(slope / 10.0, 0, 1)
+    # Face nord (ECO-01 : versants nord humides). Axes du ciel du projet (AnastasisAtmosphereResolver) : X = nord,
+    # Y = est. Un versant qui descend vers +X (dz/dx < 0) regarde le nord. (Runs 1-3 : +Y pris pour le nord, corrige.)
+    north = np.clip(-gx / np.maximum(np.hypot(gx, gy), 1e-9), -1, 1) * np.clip(slope / 10.0, 0, 1)
     mp = meta['map']
     zero = np.zeros_like(X)
     dist_map_m = np.hypot(np.maximum.reduce([mp['min'][0] - X, X - mp['max'][0], zero]),

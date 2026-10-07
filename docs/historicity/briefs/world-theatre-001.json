@@ -1,0 +1,30 @@
+{
+  "mission": "world-theatre-001",
+  "target_period": "1204-1225",
+  "setting": "arriere_pays_pontique_fictif",
+  "model_ids": ["PONT-GEO-01", "PONT-ECO-01", "PONT-HIS-01"],
+  "claim": "Au-dela de la carte jouable, le pied de la chaine principale porte des masses forestieres placees par versant, creux et exposition nord, tandis que l'ouverture de la vallee reste sans foret ; aucun repere humain n'est pose tant qu'il ne se lit pas depuis une vue canonique.",
+  "basis": "analogie_regionale",
+  "source_ids": ["ECO-01", "GEO-01", "HIS-01"],
+  "inference": "ECO-01 donne un contraste versants nord humides / versants sud xerophiles et un etagement forestier dans le nord-est anatolien moderne ; la mission en tire une regle de placement (versant, creux, face nord) pour une vallee fictive, sans pretendre a l'etat forestier de 1204. GEO-01 justifie une vallee encaissee sous une chaine proche ; le trace reel n'existe pas. La tour de guet abandonnee est une hypothese de conception (zone exposee, sans garnison) que HIS-01 ne soutient pas : elle n'est PAS posee, faute de lisibilite mesuree.",
+  "current": "Releve PIE du 2026-10-07 (Saved/WorldTheatreEvidence/read) : 0 arbre au-dela du bord de la carte (49,8 arbres/ha dans la bande interieure de 200 m), avant-pays uniforme de 1 a 9 km, sol qui monte avec le rayon dans 16 secteurs sur 24.",
+  "target": "Trois plans lisibles depuis le village et l'approche : fond ouvert, ceinture forestiere au pied de la chaine, montagnes ; l'ouverture sud-ouest de la vallee laissee vide.",
+  "causal_effect": "Relief et exposition -> couvert forestier lointain -> lecture des plans et de l'ouverture de la vallee depuis l'habitat ; aucun effet sur l'eau, les trajets ou la simulation.",
+  "owner_paths": [
+    "Source/Anastasis_UnrealV2/WorldTheatre/",
+    "tools/unreal/world-theatre-read.py",
+    "tools/unreal/world-theatre-analyze.py",
+    "tools/unreal/world-theatre-capture.py",
+    "docs/unreal/world-theatre-001/"
+  ],
+  "evidence_plan": {
+    "mec": "Releve PIE (world-theatre-read), signatures mesurees et plan genere (world-theatre-analyze.py --compose) ; tests Anastasis.WorldTheatre.*.",
+    "scn": "Neuf vistas canoniques en PIE, anastasis.Theatre 0 / 1 / 0 aux memes cameras, ciel a 11 h, simulation gelee (world-theatre-capture).",
+    "ply": "UNKNOWN : aucune marche joueur ; la couche est hors de la zone jouable, sans collision, et ne peut pas etre atteinte."
+  },
+  "verdict": "PROPOSE",
+  "evidence_paths": [
+    "docs/unreal/world-theatre-001/WORLD_THEATRE_001.md",
+    "docs/unreal/world-theatre-001/vistas.json"
+  ]
+}

@@ -1,5 +1,5 @@
 {
- "comment": "WORLD_THEATRE_001 -- vistas canoniques. Positions en uu (carte 1000..191000), eye_m = hauteur de l'oeil au-dessus du sol rendu ; z est resolu par world-theatre-analyze.py --resolve-vistas sur le releve. yaw UE (0 = +X, 90 = +Y). La chaine principale est au nord-est (yaw ~45), l'axe de la vallee NO-SE (yaw 135 / -45), les collines basses au sud-ouest (yaw 225).",
+ "comment": "WORLD_THEATRE_001 -- vistas canoniques. Positions en uu (carte 1000..191000), eye_m = hauteur de l'oeil au-dessus du sol rendu ; z est resolu par world-theatre-analyze.py --resolve-vistas sur le releve. Axes du ciel du projet : X = nord, Y = est ; yaw UE 0 = nord, 90 = est, 180 = sud, -90 = ouest. La muraille principale est au nord-est (yaw 17..78, 10-12 km), une seconde chaine a l'est-sud-est (~21 km), la vallee s'ouvre au sud-ouest / sud (yaw -164..-103, 22-38 km).",
  "vistas": [
   {
    "id": "V1_village_chaine",
@@ -24,8 +24,8 @@
    "z": 3771.7
   },
   {
-   "id": "V3_point_haut_amont",
-   "role": "full reveal : du point haut, la carte et la vallee amont d'un seul regard",
+   "id": "V3_point_haut_sud_est",
+   "role": "full reveal : du point haut (bord ouest), la carte d'un seul regard vers le sud-est",
    "x": 132000,
    "y": 18000,
    "eye_m": 1.7,
@@ -46,8 +46,8 @@
    "z": 1052.4
   },
   {
-   "id": "V5_bord_nord_avant_pays",
-   "role": "continuation : au bord nord, regard dehors sur l'avant-pays et la chaine a 10 km (H3)",
+   "id": "V5_bord_est_avant_pays",
+   "role": "continuation : au bord est, regard dehors sur l'avant-pays et la muraille a 10 km (H3)",
    "x": 64000,
    "y": 187000,
    "eye_m": 1.7,
@@ -68,8 +68,8 @@
    "z": 2955.8
   },
   {
-   "id": "V7_foret_sud_dehors",
-   "role": "enclosed forest -> release : de la foret du bord sud vers les collines a 22 km",
+   "id": "V7_foret_ouest_dehors",
+   "role": "enclosed forest -> release : de la foret du bord ouest vers le sud-sud-ouest, collines a 22 km",
    "x": 88000,
    "y": 4000,
    "eye_m": 1.7,
@@ -90,8 +90,8 @@
    "z": 93180.8
   },
   {
-   "id": "V9_village_vigla",
-   "role": "landmark anchoring : du village, la bosse qui ferme le sud-sud-est et ce qui s'y tient",
+   "id": "V9_village_bosse",
+   "role": "landmark anchoring : du village, la bosse qui ferme l'ouest-nord-ouest et ce qui s'y tiendrait",
    "x": 160000,
    "y": 72000,
    "eye_m": 1.7,

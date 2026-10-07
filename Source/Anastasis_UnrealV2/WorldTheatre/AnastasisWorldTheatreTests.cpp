@@ -69,7 +69,10 @@ bool FAnastasisWorldTheatreMass::RunTest(const FString&)
 		MaxZ = FMath::Max(MaxZ, V.Z);
 		MinZ = FMath::Min(MinZ, V.Z);
 		// Seule la lisiere (un pas de grille au plus) deborde du contour, et elle y est enterree.
-		if (!PointInPolygon(M.Outline, FVector2D(V.X, V.Y)) && V.Z > 1000.0) bInsideOutline = false;
+		// Un noeud POSE SUR le contour (X = 0 d'un carre qui commence a 0) est ambigu entre balayage et rayon : on
+		// ne juge que les noeuds franchement dehors.
+		const FVector2D P(V.X, V.Y);
+		if (!PointInPolygon(M.Outline, P) && DistanceToOutline(M.Outline, P) > 1.0 && V.Z > 1000.0) bInsideOutline = false;
 	}
 	TestTrue(TEXT("canopy never exceeds height x max grain"), MaxZ <= 1000.0 + 1600.0 * 1.16 + 1.0);
 	TestTrue(TEXT("canopy rises well above the ground"), MaxZ > 1000.0 + 1600.0 * 0.7);
