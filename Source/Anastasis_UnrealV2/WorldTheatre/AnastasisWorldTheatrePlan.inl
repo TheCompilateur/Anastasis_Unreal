@@ -89,5 +89,3 @@
   M.Colour = FLinearColor(0.0350f, 0.0600f, 0.0300f);
   M.Outline = { FVector2D(933000, 537000), FVector2D(961000, 537000), FVector2D(969000, 545000), FVector2D(965000, 565000), FVector2D(937000, 577000), FVector2D(921000, 585000), FVector2D(909000, 581000), FVector2D(913000, 557000), FVector2D(933000, 541000) };
   P.Masses.Add(MoveTemp(M)); }
-// tour de guet abandonnee (hypothese de conception, PONT-HIS-01 : poste sur une bosse qui commande l approche ; zone de depart exposee, sans garnison) ; seul repere humain, choisi parmi 1137 bosses pour se decouper sur le ciel : V1_village_chaine ciel 0.74 deg, haut 0.62 deg; V2_village_ouverture ciel 0.74 deg, haut 0.62 deg; V6_approche_village ciel 0.65 deg, haut 0.55 deg ; cadre : V9_village_vigla
-{ FSilhouetteSpec S; S.Id = TEXT("vigla_01"); S.Kind = ESilhouette::RuinedTower; S.Location = FVector2D(216000, -54000); S.Yaw = 20.0; S.Scale = 1.00; P.Silhouettes.Add(S); }

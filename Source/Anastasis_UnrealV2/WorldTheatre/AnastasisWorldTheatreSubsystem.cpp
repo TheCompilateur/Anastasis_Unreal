@@ -16,7 +16,7 @@ namespace
 {
 TAutoConsoleVariable<int32> CVarTheatre(
 	TEXT("anastasis.Theatre"), 0,
-	TEXT("WORLD_THEATRE_001 : 1=couche de mise en scene (masses lointaines, silhouettes, traces) drapee sur le sol rendu, ")
+	TEXT("WORLD_THEATRE_001 : 1=couche de mise en scene (masses lointaines, silhouettes) drapee sur le sol rendu, ")
 	TEXT("0=aucune (defaut tant que le verdict visuel n'est pas rendu). A chaud."), ECVF_Default);
 TAutoConsoleVariable<int32> CVarTheatreInAutomation(
 	TEXT("anastasis.Theatre.InAutomation"), 0,
@@ -243,9 +243,9 @@ bool UAnastasisWorldTheatreSubsystem::Rebuild()
 	LastReport = Built.Report;
 	if (!EnsureActor()) { UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("WORLD_THEATRE no host actor")); return false; }
 	UMaterialInterface* Mat = ResolveMaterial();
-	const AnastasisWorldTheatre::FMeshData* Sections[3] = { &Built.Masses, &Built.Silhouettes, &Built.Traces };
+	const AnastasisWorldTheatre::FMeshData* Sections[2] = { &Built.Masses, &Built.Silhouettes };
 	int32 Tris = 0;
-	for (int32 S = 0; S < 3; ++S)
+	for (int32 S = 0; S < 2; ++S)
 	{
 		const AnastasisWorldTheatre::FMeshData& D = *Sections[S];
 		if (D.Triangles.Num() == 0) continue;
@@ -257,17 +257,17 @@ bool UAnastasisWorldTheatreSubsystem::Rebuild()
 	bBuilt = Tris > 0;
 	for (const FString& R : LastReport.Rejected) UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("WORLD_THEATRE reject %s"), *R);
 	UE_LOG(LogAnastasis_UnrealV2, Display,
-		TEXT("WORLD_THEATRE built masses=%d (%.0f ha) silhouettes=%d traces=%d rejected=%d triangles=%d %.2fs"),
-		LastReport.MassesBuilt, LastReport.MassHectares, LastReport.SilhouettesBuilt, LastReport.TracesBuilt,
+		TEXT("WORLD_THEATRE built masses=%d (%.0f ha) silhouettes=%d rejected=%d triangles=%d %.2fs"),
+		LastReport.MassesBuilt, LastReport.MassHectares, LastReport.SilhouettesBuilt,
 		LastReport.Rejected.Num(), Tris, FPlatformTime::Seconds() - T0);
 	return bBuilt;
 }
 
 void UAnastasisWorldTheatreSubsystem::LogStatus() const
 {
-	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("WORLD_THEATRE status enabled=%d built=%d masses=%d (%.0f ha) silhouettes=%d traces=%d rejected=%d"),
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("WORLD_THEATRE status enabled=%d built=%d masses=%d (%.0f ha) silhouettes=%d rejected=%d"),
 		CVarTheatre.GetValueOnGameThread(), bBuilt ? 1 : 0, LastReport.MassesBuilt, LastReport.MassHectares,
-		LastReport.SilhouettesBuilt, LastReport.TracesBuilt, LastReport.Rejected.Num());
+		LastReport.SilhouettesBuilt, LastReport.Rejected.Num());
 	for (const FString& R : LastReport.Rejected) UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("WORLD_THEATRE reject %s"), *R);
 }
 

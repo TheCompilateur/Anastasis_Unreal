@@ -14,7 +14,7 @@
  * Ce que la couche porte, et ce qu'elle ne pretend jamais etre :
  *  - des MASSES (foret lointaine) : une enveloppe de canopee, pas des arbres ;
  *  - des SILHOUETTES (tour, chapelle, hameau) : des volumes lus a 1-8 km, sans collision ni interieur ;
- *  - des TRACES (chemin lointain) : un ruban pale sur le sol.
+ *    l'analyse n'en pose une que si elle se lit (>= 0,35 deg depuis une vista canonique).
  * Aucun element n'a de collision, de navigation ni d'effet sur la simulation.
  */
 namespace AnastasisWorldTheatre
@@ -54,19 +54,10 @@ struct FSilhouetteSpec
 	double MaxSlopeDeg = 14.0;
 };
 
-struct FTrace
-{
-	const TCHAR* Id = TEXT("");
-	TArray<FVector2D> Points;
-	double Width = 450.0;
-	FLinearColor Colour = FLinearColor(0.42f, 0.36f, 0.26f);
-};
-
 struct FPlan
 {
 	TArray<FMass> Masses;
 	TArray<FSilhouetteSpec> Silhouettes;
-	TArray<FTrace> Traces;
 };
 
 /** Le plan versionne, ecrit par l'analyse. */
@@ -90,7 +81,6 @@ struct FBuildReport
 {
 	int32 MassesBuilt = 0;
 	int32 SilhouettesBuilt = 0;
-	int32 TracesBuilt = 0;
 	/** "id: raison" pour chaque element refuse. */
 	TArray<FString> Rejected;
 	/** Surface couverte par les masses (ha). */
@@ -101,7 +91,6 @@ struct FBuilt
 {
 	FMeshData Masses;
 	FMeshData Silhouettes;
-	FMeshData Traces;
 	FBuildReport Report;
 };
 
@@ -118,5 +107,4 @@ FBuilt Build(const FPlan& Plan, const FGroundSampler& Ground);
 /** Une masse seule (tests). False et Why si elle ne tient pas sur le sol. */
 bool BuildMass(const FMass& Mass, const FGroundSampler& Ground, FMeshData& Out, double& OutHectares, FString& Why);
 bool BuildSilhouette(const FSilhouetteSpec& Spec, const FGroundSampler& Ground, FMeshData& Out, FString& Why);
-bool BuildTrace(const FTrace& Trace, const FGroundSampler& Ground, FMeshData& Out, FString& Why);
 }

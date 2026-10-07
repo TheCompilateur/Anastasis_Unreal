@@ -18,7 +18,7 @@ Noms des structures (le jour ou une couche les consomme, ce sont ceux du C++) :
   FWorldVista             camera, FOV, plans, repere dominant, vides, bruit visuel
   FLandmarkRelation       repere x vista : visible, angle, part du champ, concurrence
 """
-import argparse, csv, json, math, os, sys
+import argparse, csv, json, math, os, re, sys
 
 import numpy as np
 from PIL import Image, ImageDraw
@@ -535,18 +535,46 @@ def main():
             d.line((vx, vy, ex, ey), fill=(255, 0, 0), width=2)
             d.text((vx + 3, vy + 3), v['id'][:2], fill=(255, 0, 0))
         img.save(os.path.join(out, 'map_plan.png'))
-        eyes = [(v['id'], (v['x'], v['y'], v['z'])) for v in vistas if v['id'][:2] in ('V1', 'V2', 'V6')]
-        lm, n_cand = place_landmark(world, near, nz, nf, water_near, meta, eyes, vistas, LANDMARK_RULES)
+        # Run 3 : depuis le village, aucune bosse a moins de 3,5 km ne depasse la canopee de la carte. Le repere
+        # sera donc REVELE : lisible sur le ciel depuis le point haut (V3) et le bord nord (V5), cache du village.
+        eyes = [(v['id'], (v['x'], v['y'], v['z'])) for v in vistas if v['id'][:2] in ('V3', 'V5')]
+        hidden_from = [(v['id'], (v['x'], v['y'], v['z'])) for v in vistas if v['id'][:2] in ('V1', 'V2', 'V6', 'V9')]
+        # Run 2 : la tour placee sur le seul relief etait cachee par les arbres de la carte. La ligne de vue et
+        # le fond de ciel se calculent sur la CANOPEE reelle : sol + hauteur de chaque arbre et arbuste releves.
+        canopy = nz.copy()
+        for f, m_, x, y, zz, hh, rr in placed:
+            if f not in ('tree', 'shrub', 'building', 'ruin'):
+                continue
+            ci, cj = near.ij(x, y)
+            r_cells = max(0, int(rr / near.cell))
+            for dj in range(-r_cells, r_cells + 1):
+                for di in range(-r_cells, r_cells + 1):
+                    ii_, jj_ = int(round(ci)) + di, int(round(cj)) + dj
+                    if 0 <= ii_ < near.w and 0 <= jj_ < near.h:
+                        canopy[jj_, ii_] = max(canopy[jj_, ii_], zz + hh)
+        world_canopy = World(near, far, canopy, fz)
+        lm, n_cand = place_landmark(world_canopy, near, nz, nf, water_near, meta, eyes, vistas, LANDMARK_RULES, hidden_from, cover)
         report['landmark_search'] = {'candidates': n_cand, 'top': [{'score': round(t[0], 3), 'x': t[1], 'y': t[2], 'z': t[3],
                                                                        'from': t[4], 'framed_in': t[5]} for t in lm]}
         silhouettes = []
+        # Un repere n'est pose que s'il se LIT : au moins LANDMARK_RULES['min_angular_height_deg'] depuis une vista.
+        best_h = 0.0
         if lm:
+            for _, txt in lm[0][4]:
+                mh = re.search(r'haut ([0-9.]+) deg', str(txt))
+                if mh:
+                    best_h = max(best_h, float(mh.group(1)))
+        report['landmark_search']['best_angular_height_deg'] = best_h
+        readable = bool(lm) and best_h >= LANDMARK_RULES['min_angular_height_deg']
+        report['landmark_search']['verdict'] = 'pose' if readable else 'refuse : illisible (%.2f deg < %.2f)' % (
+            best_h, LANDMARK_RULES['min_angular_height_deg'])
+        if readable:
             sc, x, y, gz, detail, framed = lm[0]
             silhouettes.append({'id': 'vigla_01', 'kind': 'RuinedTower', 'xy': (x, y), 'yaw': 20.0, 'scale': 1.0,
                                 'why': 'tour de guet abandonnee (hypothese de conception, PONT-HIS-01 : poste sur une bosse qui commande '
-                                       'l approche ; zone de depart exposee, sans garnison) ; seul repere humain, choisi parmi %d bosses '
-                                       'pour se decouper sur le ciel : %s ; cadre : %s' % (n_cand, '; '.join('%s %s' % d for d in detail), ', '.join(framed) or 'aucun')})
-        plan = {'masses': masses, 'silhouettes': silhouettes, 'traces': []}
+                                       'l approche ; zone de depart exposee, sans garnison) ; seul repere humain, revele et non visible : '
+                                       'choisi parmi %d bosses pour se decouper sur le ciel au-dessus de la canopee : %s ; cadre : %s' % (n_cand, '; '.join('%s %s' % d for d in detail), ', '.join(framed) or 'aucun')})
+        plan = {'masses': masses, 'silhouettes': silhouettes}
         with open(os.path.join(out, 'plan.json'), 'w', encoding='utf-8') as f:
             json.dump(plan, f, indent=1)
         if a.emit_plan:
@@ -753,7 +781,7 @@ def save_maps(out, near, far, nz, fz, nf, ff, water, inside, placed, dmap, meta)
 
 
 def emit_plan(plan, path, source):
-    """Ecrit AnastasisWorldTheatrePlan.inl depuis un plan {masses, silhouettes, traces} (coordonnees en uu)."""
+    """Ecrit AnastasisWorldTheatrePlan.inl depuis un plan {masses, silhouettes} (coordonnees en uu)."""
     def v2(p):
         return 'FVector2D(%.0f, %.0f)' % (p[0], p[1])
     lines = ['// WORLD_THEATRE_001 -- plan de mise en scene. GENERE par tools/unreal/world-theatre-analyze.py --emit-plan ;',
@@ -773,11 +801,6 @@ def emit_plan(plan, path, source):
         lines.append('// %s' % s_.get('why', ''))
         lines.append('{ FSilhouetteSpec S; S.Id = TEXT("%s"); S.Kind = ESilhouette::%s; S.Location = %s; S.Yaw = %.1f; S.Scale = %.2f; P.Silhouettes.Add(S); }'
                      % (s_['id'], s_['kind'], v2(s_['xy']), s_.get('yaw', 0.0), s_.get('scale', 1.0)))
-    for t in plan.get('traces', []):
-        lines.append('// %s' % t.get('why', ''))
-        lines.append('{ FTrace T; T.Id = TEXT("%s"); T.Width = %.0f;' % (t['id'], t.get('width', 450)))
-        lines.append('  T.Points = { %s };' % ', '.join(v2(p) for p in t['points']))
-        lines.append('  P.Traces.Add(MoveTemp(T)); }')
     with open(path, 'w', encoding='utf-8', newline='\r\n') as f:
         f.write('\n'.join(lines) + '\n')
 
@@ -905,7 +928,7 @@ MASS_RULES = {
 }
 
 
-def place_landmark(world, near, nz, nf, water, meta, eyes, vistas, rules):
+def place_landmark(world, near, nz, nf, water, meta, eyes, vistas, rules, hidden_from=(), cover=None):
     """Un seul repere humain, la ou il se decoupe sur le ciel : depuis chaque oeil (village, approche), le sommet
     de la tour (sol + hauteur) doit etre visible ET au-dessus de tout le relief qui le suit sur le meme rayon.
     Score = somme sur les yeux de la hauteur angulaire (deg) x (1 + marge sur l'horizon, deg), bonus s'il tombe
@@ -946,13 +969,35 @@ def place_landmark(world, near, nz, nf, water, meta, eyes, vistas, rules):
             zz = world.height(e[0] + ux * far_d, e[1] + uy * far_d) - far_d ** 2 / (2 * 6.371e8)
             beyond = float(np.max(np.degrees(np.arctan2(zz - e[2], far_d)))) if len(far_d) else -90.0
             margin = ang_top - beyond
-            if margin <= 0:
+            if margin > 0:
+                tot += ang_h * (1.0 + min(margin, 2.0))
+                detail.append((name, 'ciel %.2f deg, haut %.2f deg' % (margin, ang_h)))
+                continue
+            # Pas de ciel derriere : le fond est le premier relief que le rayon touche au-dela de la tour, a la
+            # hauteur de son milieu. Une tour de pierre claire se lit sur une masse sombre du theatre.
+            if cover is None or len(far_d) == 0:
                 detail.append((name, 'sur fond de relief'))
                 continue
-            tot += ang_h * (1.0 + min(margin, 2.0))
-            detail.append((name, 'ciel %.2f deg, haut %.2f deg' % (margin, ang_h)))
+            ang_mid = math.degrees(math.atan2(gz + top_h * 0.5 - e[2], d))
+            hit = np.nonzero(np.degrees(np.arctan2(zz - e[2], far_d)) >= ang_mid)[0]
+            if not len(hit):
+                detail.append((name, 'sur fond de relief'))
+                continue
+            bx, by = e[0] + ux * far_d[hit[0]], e[1] + uy * far_d[hit[0]]
+            bi, bj = near.ij(bx, by)
+            bi, bj = int(round(bi)), int(round(bj))
+            if 0 <= bi < near.w and 0 <= bj < near.h and cover[bj, bi] > 0:
+                tot += 0.8 * ang_h
+                detail.append((name, 'sur fond de foret a %.1f km, haut %.2f deg' % (far_d[hit[0]] / 1e5, ang_h)))
+            else:
+                detail.append((name, 'sur fond de relief nu'))
         if tot <= 0:
             continue
+        # Revele, pas simplement visible : bonus si la tour reste cachee depuis le village (on la decouvre en montant).
+        hidden = [n for n, e in hidden_from if not visible(world, e, x, y, gz + top_h, steps=300)]
+        if hidden_from and len(hidden) == len(hidden_from):
+            tot *= 1.0 + rules['concealment_bonus']
+            detail.append(('cache depuis', ','.join(hidden)))
         framed = []
         for v in vistas:
             p = project((v['x'], v['y'], v['z']), v['yaw'], v.get('pitch', 0), v.get('fov', 75), 1166, 856, x, y, gz + top_h)
@@ -968,6 +1013,9 @@ LANDMARK_RULES = {
     'landmark_min_m': 600.0,     # hors de la carte, mais assez pres pour qu'une tour de 15 m se lise (> 6 px a 2 km)
     'landmark_max_m': 3500.0,
     'landmark_height_uu': 1500.0,
+    'concealment_bonus': 0.5,
+    # 0,35 deg = 5 px a 1166 px / 75 deg, 9 px a 1920 : en dessous, une tour de 15 m n'est qu'une poussiere.
+    'min_angular_height_deg': 0.35,
 }
 
 

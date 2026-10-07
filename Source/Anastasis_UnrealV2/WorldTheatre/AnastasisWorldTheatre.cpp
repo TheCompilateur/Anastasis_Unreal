@@ -54,9 +54,8 @@ double CrownGrain(int32 I, int32 J)
  * Ton d'un peuplement : valeur lisse sur un reseau de 160 m (age, essence, eclaircie), 0,82 a 1,14.
  * La canopee d'un versant n'est pas d'une seule valeur a 5 km ; ce n'est pas une forme, c'est une matiere.
  */
-double StandTone(double X, double Y)
+double StandToneAt(double X, double Y, double Lattice)
 {
-	constexpr double Lattice = 16000.0;
 	const double FX = X / Lattice, FY = Y / Lattice;
 	const int32 I = FMath::FloorToInt32(FX), J = FMath::FloorToInt32(FY);
 	const double TX = FMath::SmoothStep(0.0, 1.0, FX - I), TY = FMath::SmoothStep(0.0, 1.0, FY - J);
@@ -64,6 +63,8 @@ double StandTone(double X, double Y)
 	const double V = FMath::Lerp(FMath::Lerp(H(I, J), H(I + 1, J), TX), FMath::Lerp(H(I, J + 1), H(I + 1, J + 1), TX), TY);
 	return 0.82 + (V - 0.72) / 0.44 * 0.32;
 }
+
+double StandTone(double X, double Y) { return StandToneAt(X, Y, 16000.0); }
 
 void RecomputeNormals(FMeshData& M, int32 FirstVertex)
 {
@@ -242,7 +243,10 @@ bool BuildMass(const FMass& Mass, const FGroundSampler& Ground, FMeshData& Out, 
 			if (!In[K]) continue;
 			if (Wz > G - 50.0) { ++Wet; continue; }
 			++Inside;
-			Weight[K] = FMath::SmoothStep(0.0, 1.0, Dist[K] * MassCell / FMath::Max(Mass.EdgeRamp, 1.0));
+			// Lisiere dechiquetee a l'echelle d'un bouquet (80 m) : un contour lisse de 40 m se lit comme du papier
+			// decoupe a 5 km (run 2, V1). Le recul va de 0 a 2 cellules ; la forme de la masse ne change pas.
+			const double Ragged = 2.0 * MassCell * (StandToneAt((GI0 + I) * MassCell, (GJ0 + J) * MassCell, 8000.0) - 0.82) / 0.32;
+			Weight[K] = FMath::SmoothStep(0.0, 1.0, (Dist[K] * MassCell - Ragged) / FMath::Max(Mass.EdgeRamp, 1.0));
 		}
 	}
 	if (Inside < 6) { Why = FString::Printf(TEXT("%d noeud(s) de sol sec dans le contour (%d sous l'eau)"), Inside, Wet); return false; }
@@ -357,48 +361,6 @@ bool BuildSilhouette(const FSilhouetteSpec& Spec, const FGroundSampler& Ground, 
 	return true;
 }
 
-bool BuildTrace(const FTrace& Trace, const FGroundSampler& Ground, FMeshData& Out, FString& Why)
-{
-	if (Trace.Points.Num() < 2) { Why = TEXT("moins de 2 points"); return false; }
-	constexpr double Step = 1000.0;
-	constexpr double Lift = 25.0;
-	TArray<FVector2D> P;
-	for (int32 K = 0; K + 1 < Trace.Points.Num(); ++K)
-	{
-		const FVector2D A = Trace.Points[K], B = Trace.Points[K + 1];
-		const int32 N = FMath::Max(1, FMath::CeilToInt32(FVector2D::Distance(A, B) / Step));
-		for (int32 S = 0; S < N; ++S) P.Add(FMath::Lerp(A, B, double(S) / N));
-	}
-	P.Add(Trace.Points.Last());
-	int32 Segments = 0;
-	int32 Prev = INDEX_NONE;
-	const double Half = Trace.Width * 0.5;
-	for (int32 K = 0; K < P.Num(); ++K)
-	{
-		const FVector2D Dir = (P[FMath::Min(K + 1, P.Num() - 1)] - P[FMath::Max(K - 1, 0)]).GetSafeNormal();
-		const FVector2D N(-Dir.Y, Dir.X);
-		const FVector2D L = P[K] + N * Half, R = P[K] - N * Half;
-		double GL = 0, WL = 0, GR = 0, WR = 0;
-		// Un gue : le ruban s'interrompt sur l'eau et reprend sur l'autre rive.
-		if (!Ground(L.X, L.Y, GL, WL) || !Ground(R.X, R.Y, GR, WR) || WL > GL - 30.0 || WR > GR - 30.0) { Prev = INDEX_NONE; continue; }
-		const int32 Base = Out.Vertices.Num();
-		Out.Vertices.Add(FVector(L.X, L.Y, GL + Lift));
-		Out.Vertices.Add(FVector(R.X, R.Y, GR + Lift));
-		Out.Normals.Add(FVector::UpVector);
-		Out.Normals.Add(FVector::UpVector);
-		Out.Colours.Add(Trace.Colour);
-		Out.Colours.Add(Trace.Colour);
-		if (Prev != INDEX_NONE)
-		{
-			Out.Triangles.Append({ Prev, Base + 1, Prev + 1, Prev, Base, Base + 1 });
-			++Segments;
-		}
-		Prev = Base;
-	}
-	if (Segments == 0) { Why = TEXT("aucun segment sur sol sec"); return false; }
-	return true;
-}
-
 FBuilt Build(const FPlan& Plan, const FGroundSampler& Ground)
 {
 	FBuilt B;
@@ -414,12 +376,6 @@ FBuilt Build(const FPlan& Plan, const FGroundSampler& Ground)
 		FString Why;
 		if (BuildSilhouette(S, Ground, B.Silhouettes, Why)) ++B.Report.SilhouettesBuilt;
 		else B.Report.Rejected.Add(FString::Printf(TEXT("%s: %s"), S.Id, *Why));
-	}
-	for (const FTrace& T : Plan.Traces)
-	{
-		FString Why;
-		if (BuildTrace(T, Ground, B.Traces, Why)) ++B.Report.TracesBuilt;
-		else B.Report.Rejected.Add(FString::Printf(TEXT("%s: %s"), T.Id, *Why));
 	}
 	return B;
 }

@@ -89,9 +89,9 @@ bool FAnastasisWorldTheatreMass::RunTest(const FString&)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisWorldTheatreSilhouetteTrace, "Anastasis.WorldTheatre.SilhouetteTrace",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisWorldTheatreSilhouette, "Anastasis.WorldTheatre.Silhouette",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-bool FAnastasisWorldTheatreSilhouetteTrace::RunTest(const FString&)
+bool FAnastasisWorldTheatreSilhouette::RunTest(const FString&)
 {
 	using namespace AnastasisWorldTheatre;
 	FString Why;
@@ -119,14 +119,6 @@ bool FAnastasisWorldTheatreSilhouetteTrace::RunTest(const FString&)
 		BuildSilhouette(FSilhouetteSpec{ TEXT("c"), ESilhouette::Chapel }, AnastasisWorldTheatreTestSupport::Slope30(), Steep, Why));
 	TestTrue(TEXT("refusal names the slope"), Why.Contains(TEXT("pente")));
 
-	FTrace Road;
-	Road.Id = TEXT("road");
-	Road.Points = { {4.0e6, 0}, {6.0e6, 0} }; // traverse le lac a partir de X = 5 km... de 50 km
-	FMeshData R;
-	TestTrue(TEXT("the road is built on dry ground"), BuildTrace(Road, AnastasisWorldTheatreTestSupport::FlatGroundWithLake(), R, Why));
-	bool bDry = true;
-	for (const FVector& V : R.Vertices) bDry &= V.X <= 5.0e6;
-	TestTrue(TEXT("the road stops at the water"), bDry);
 	return true;
 }
 
@@ -137,12 +129,10 @@ bool FAnastasisWorldTheatrePlanBuilds::RunTest(const FString&)
 	using namespace AnastasisWorldTheatre;
 	const FPlan& Plan = CanonicalPlan();
 	for (const FMass& M : Plan.Masses) TestTrue(*FString::Printf(TEXT("mass %s has an outline"), M.Id), M.Outline.Num() >= 3);
-	for (const FTrace& T : Plan.Traces) TestTrue(*FString::Printf(TEXT("trace %s has a path"), T.Id), T.Points.Num() >= 2);
 	TSet<FString> Ids;
 	bool bUnique = true;
 	for (const FMass& M : Plan.Masses) { bool bDup = false; Ids.Add(M.Id, &bDup); bUnique &= !bDup; }
 	for (const FSilhouetteSpec& S : Plan.Silhouettes) { bool bDup = false; Ids.Add(S.Id, &bDup); bUnique &= !bDup; }
-	for (const FTrace& T : Plan.Traces) { bool bDup = false; Ids.Add(T.Id, &bDup); bUnique &= !bDup; }
 	TestTrue(TEXT("every plan element has a unique id"), bUnique);
 	return true;
 }
