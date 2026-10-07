@@ -6,6 +6,7 @@
 #include "WorldView/AnastasisWorldView.h"
 #include "WorldView/AnastasisEcologicalDressing.h"
 #include "WorldView/AnastasisPlaces.h"
+#include "WorldView/AnastasisForestUse.h"
 #include "AnastasisWorldEmbodiment.generated.h"
 
 class UHierarchicalInstancedStaticMeshComponent;
@@ -25,6 +26,9 @@ public:
 	AAnastasisWorldEmbodiment();
 
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
+	UFUNCTION(BlueprintPure, Category="Anastasis|Ecology")
+	FString GetForestUseReport() const;
 
     /** Forest grammar only; mesh references stay in the presentation registry. */
     UPROPERTY(EditAnywhere, Category="Anastasis|Ecology")
@@ -101,6 +105,9 @@ public:
 	FVector GetFrameTimingsMs() const;
 
 protected:
+    AnastasisForestUse::FBinding ForestUse;
+    double ForestUseMs = 0.0;
+    bool bForestUseMatched = false;
 	/** Lieux composes (AnastasisPlaces) : un HISM par piece, transitoires, rebatis a chaque incarnation. */
 	UPROPERTY()
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> PlaceMeshes;

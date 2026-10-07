@@ -302,7 +302,8 @@ namespace
 
 AAnastasisWorldEmbodiment::AAnastasisWorldEmbodiment()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.TickInterval = 1.0f;
 
 	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	SetRootComponent(Root);
@@ -479,6 +480,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	uint32 Seed, const AnastasisWorldView::FWorldVisualSnapshot* SurfaceCrop,
     const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource)
 {
+    ForestUse.Reset(); // Clear bindings before any indices are reused below.
 	for (UHierarchicalInstancedStaticMeshComponent* Mesh : DressingMeshes)
 	{
 		if (Mesh)
@@ -582,7 +584,9 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 		double WaterZ = AnastasisTerrainSurface::WaterPlaneZ;
 		if (Snapshot.bHumanGeography && AnastasisTerrainForge::SampleActiveWater(Placed.X, Placed.Y, WaterZ) && GroundZ <= WaterZ + 25.0) continue;
 		InstanceTransform.SetLocation(FVector(Placed.X, Placed.Y, GroundZ + PivotLift));
-		Mesh->AddInstance(InstanceTransform, false);
+		const int32 TreeIndex = Mesh->AddInstance(InstanceTransform, false);
+        if (SourceTile.Type == AnastasisWorld::ETileType::Forest)
+            ForestUse.Add(Mesh, TreeIndex, SourceTile.SourceIndex, Seed ^ uint32(SourceTile.SourceIndex));
 		++DressingInstanceCount;
 	}
     // Couronnes reellement posees (X, Y, rayon) : la prairie s'arrete ou commence le sous-bois.
@@ -654,6 +658,8 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
             int32 RealHeightTrees = 0;
             struct FHeld
             {
+                int32 SourceIndex = INDEX_NONE;
+                uint32 VisualSeed = 0;
                 FTransform Pose;
                 UHierarchicalInstancedStaticMeshComponent* Mass = nullptr;
                 EAnastasisTreeSpecies Species = EAnastasisTreeSpecies::Any;
@@ -732,6 +738,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 if (bMacro) Pose.SetRotation(FRotator(0.0, Pose.Rotator().Yaw, 0.0).Quaternion());
                 Pose.SetLocation(FVector(P.Ground.X, P.Ground.Y, GroundZ - MinZ * Pose.GetScale3D().Z));
                 FHeld Tree;
+                Tree.SourceIndex = P.SourceIndex; Tree.VisualSeed = P.VisualSeed;
                 Tree.Pose = Pose;
                 Tree.Mass = M;
                 Tree.Species = Species;
@@ -855,6 +862,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                         Pose.SetScale3D(FVector(Scale * Tree.Crown, Scale * Tree.Crown, Scale));
                         Pose.SetLocation(FVector(Tree.Ground.X, Tree.Ground.Y, Tree.GroundZ - Bounds.Min.Z * Scale));
                         const int32 Instance = Slot->AddInstance(Pose, false);
+                        ForestUse.Add(Slot, Instance, Tree.SourceIndex, Tree.VisualSeed);
                         if (Instance != INDEX_NONE)
                         {
                             Slot->SetCustomDataValue(Instance, 0, static_cast<float>(Tree.Dryness), false);
@@ -897,6 +905,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                                 Shell.GroundZ + Shell.BaseCm - ShellBounds.Min.Z * Tall);
                             const double Yaw = FMath::Frac(FMath::Sin(Shell.Center.X * 0.0123 + Shell.Center.Y * 0.0457) * 43758.5453) * 360.0;
                             const int32 Instance = Chunk->AddInstance(FTransform(FRotator(0.0, Yaw, 0.0), Location, FVector(Wide, Wide, Tall)), false);
+                            ForestUse.AddShell(Chunk, Instance, Shell.Center, Shell.RadiusCm);
                             // Custom data 0 is the crown's site dryness: left at zero, every shell
                             // took the lushest green of the vegetation material, brighter than any tree under it.
                             if (Instance != INDEX_NONE) Chunk->SetCustomDataValue(Instance, 0, static_cast<float>(Shell.Dryness), false);
@@ -921,6 +930,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 if (HeroAt.IsValidIndex(Index) && HeroAt[Index] != INDEX_NONE) continue;
                 const FHeld& Tree = Held[Index];
                 const int32 Instance = Tree.Mass->AddInstance(Tree.Pose, false);
+                ForestUse.Add(Tree.Mass, Instance, Tree.SourceIndex, Tree.VisualSeed);
                 if (Instance != INDEX_NONE && Tree.Mass->NumCustomDataFloats >= 2)
                 {
                     Tree.Mass->SetCustomDataValue(Instance, 0, static_cast<float>(Tree.Dryness), false);
