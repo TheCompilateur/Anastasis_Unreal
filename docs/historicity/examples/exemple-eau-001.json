@@ -1,0 +1,21 @@
+{
+  "mission": "exemple-eau-001",
+  "target_period": "1204-1225",
+  "setting": "arriere_pays_pontique_fictif",
+  "model_ids": ["PONT-GEO-01", "PONT-GEO-02"],
+  "claim": "Un chemin de rive peut relier un habitat fictif à une eau accessible.",
+  "basis": "hypothese_de_conception",
+  "source_ids": ["GEO-01"],
+  "inference": "La source indique un relief régional, pas le chemin ni la qualité de l'eau de cette map.",
+  "current": "UNKNOWN : aucun trajet observé pour cette mission fictive.",
+  "target": "Un chemin et un accès à l'eau lisibles dans un même secteur.",
+  "causal_effect": "Le relief contraint le chemin; le chemin donne accès à la rive; un usage PNJ reste à prouver.",
+  "owner_paths": ["docs/historicity/examples/exemple-eau-001.json"],
+  "evidence_plan": {
+    "mec": "Carte du relief et du réseau hydrographique.",
+    "scn": "Captures aux mêmes coordonnées en vue aérienne et à 1,7 m.",
+    "ply": "UNKNOWN tant qu'aucun trajet interactif n'a été observé."
+  },
+  "verdict": "PROPOSE",
+  "evidence_paths": []
+}

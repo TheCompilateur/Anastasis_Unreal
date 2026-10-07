@@ -236,6 +236,7 @@ l'ordre et les décisions ; les règles restent ici, les pièges dans `docs/unre
 | `anastasis-editeur-mcp` | avant tout appel `mcp__unreal__*` : bon port, bon éditeur, bon groupe d'outils |
 | `anastasis-capture` | quand le verdict est une image : A/B à une seule variable, regarder, mesurer (`compare.py`) |
 | `anastasis-realisme` | avant toute mission visuelle (« plus réaliste », réglage de rendu, matériau, décor) et avant d'appliquer une recommandation tirée d'une recherche ou d'un tutoriel : comment Unreal fait, ce que le projet a décidé, comment le prouver |
+| `anastasis-historicite` | avant toute revendication geographique ou historique sur la vallee pontique fictive post-1204 : modele causal, sources, hypotheses et brief verifiable |
 
 Une procédure qui change (nouveau portail, nouveau script) se corrige dans son skill, dans le même commit.
 

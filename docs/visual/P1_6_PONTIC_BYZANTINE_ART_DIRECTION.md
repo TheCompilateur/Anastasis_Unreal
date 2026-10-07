@@ -79,3 +79,6 @@ used as the player surface. Fixed seed/camera/time captures are mandatory for
 comparison. Runtime proof is required; package or headless success is not a
 visual verdict.
 
+## Historical interpretation
+
+The selected setting is a fictional Pontic hinterland valley with water; it does not require a visible coast or correspondence to a real map. Apply `docs/historicity/MODELE.md` and its source limits before calling a feature historically faithful. A drier inland microregion is possible only when its water, exposure and vegetation form a coherent system; this is not a silent replacement of the humid Pontic visual pillar.

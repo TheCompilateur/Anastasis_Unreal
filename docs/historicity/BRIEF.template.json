@@ -1,0 +1,21 @@
+{
+  "mission": "<mission>",
+  "target_period": "1204-1225",
+  "setting": "arriere_pays_pontique_fictif",
+  "model_ids": ["PONT-GEO-01"],
+  "claim": "<affirmation bornée>",
+  "basis": "hypothese_de_conception",
+  "source_ids": ["GEO-01"],
+  "inference": "<ce que la source ne dit pas et que la mission suppose>",
+  "current": "<état observé, avec chemin de preuve ou UNKNOWN>",
+  "target": "<état recherché>",
+  "causal_effect": "<lien observable avec eau, trajet, travail, usage ou joueur>",
+  "owner_paths": ["<chemin appartenant à la mission>"],
+  "evidence_plan": {
+    "mec": "<mesure ou vérification>",
+    "scn": "<vues aérienne et à hauteur humaine, ou UNKNOWN justifié>",
+    "ply": "<trajet/interactions du joueur, ou UNKNOWN justifié>"
+  },
+  "verdict": "PROPOSE",
+  "evidence_paths": []
+}
