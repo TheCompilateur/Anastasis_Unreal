@@ -114,13 +114,20 @@ def create():
             options.enable_recompute_normals = False
             options.enable_recompute_tangents = True
             options.enable_nanite = False
+            options.enable_collision = False
             asset, outcome = u.GeometryScript_NewAssetUtils.create_new_static_mesh_asset_from_mesh(dynamic, path, options)
             assert asset, str(outcome)
             asset.set_material(0, material)
             eal.set_metadata_tag(asset, 'Recipe', VERSION)
             eal.set_metadata_tag(asset, 'GeometrySHA256', expected[name]['sha256'])
             assert eal.save_asset(path)
-        u.log('SITE_STOCK_ASSET ' + json.dumps(dict(name=name, path=path, **expected[name])))
+        bounds = asset.get_bounding_box()
+        actual_size = [round(getattr(bounds.max, axis) - getattr(bounds.min, axis), 2)
+                       for axis in ('x', 'y', 'z')]
+        assert all(abs(a - b) < .5 for a, b in zip(actual_size, expected[name]['size_cm'])), (name, actual_size)
+        assert asset.get_num_triangles(0) == len(tris), name
+        u.log('SITE_STOCK_ASSET ' + json.dumps(dict(name=name, path=path, actual_size_cm=actual_size,
+                                                     **expected[name])))
     u.log('SITE_STOCK_ASSETS COMPLETE assets=2')
 
 

@@ -8,10 +8,8 @@
 #include "HAL/IConsoleManager.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
-#include "EngineUtils.h"
-#include "ProceduralMeshComponent.h"
 #include "SmartObjectComponent.h"
-#include "WorldView/AnastasisWorldEmbodiment.h"
+#include "Village/AnastasisVillagePresentation.h"
 
 namespace
 {
@@ -229,24 +227,10 @@ float AAnastasisVillageBuilding::StockGroundLocalZ(const FVector& LocalAnchor) c
 	UWorld* World = GetWorld();
 	if (!World) return 0.f;
 	const FVector WorldAnchor = GetActorTransform().TransformPosition(LocalAnchor);
-	for (TActorIterator<AAnastasisWorldEmbodiment> It(World); It; ++It)
-	{
-		TArray<UProceduralMeshComponent*> Surfaces;
-		It->GetComponents(Surfaces);
-		for (UProceduralMeshComponent* Surface : Surfaces)
-		{
-			if (!Surface->IsVisible() || !Surface->IsCollisionEnabled()) continue;
-			const FBox Bounds = Surface->Bounds.GetBox();
-			FHitResult Hit;
-			if (Surface->LineTraceComponent(Hit,
-				FVector(WorldAnchor.X, WorldAnchor.Y, Bounds.Max.Z + 1000.0),
-				FVector(WorldAnchor.X, WorldAnchor.Y, Bounds.Min.Z - 1000.0),
-				FCollisionQueryParams(SCENE_QUERY_STAT(SiteStockGround), true)))
-			{
-				return static_cast<float>(GetActorTransform().InverseTransformPosition(Hit.ImpactPoint).Z);
-			}
-		}
-	}
+	double GroundZ = 0.0;
+	if (FAnastasisVillagePresentation::TraceGround(World, WorldAnchor.X, WorldAnchor.Y, GroundZ))
+		return static_cast<float>(GetActorTransform().InverseTransformPosition(
+			FVector(WorldAnchor.X, WorldAnchor.Y, GroundZ)).Z);
 	return 0.f;
 }
 
@@ -258,18 +242,26 @@ void AAnastasisVillageBuilding::SetSiteStock(
 	if (WoodCount == VisibleWoodBundles && StoneCount == VisibleStoneBundles) return;
 	VisibleWoodBundles = WoodCount;
 	VisibleStoneBundles = StoneCount;
-	// Align with the actual body, including a later architecture archetype. +Y is the
-	// authored entry side; the two small stores flank its central approach.
+	// +Y is the authored entry side. Keep the approach free and place the two
+	// material groups outside the actual footing, on opposite sides of the entry.
+	float EntryX = 0.f;
 	float Side = 150.f;
 	float Front = 220.f;
-	if (Body && Body->GetStaticMesh())
+	if (bHasArchitecture)
+	{
+		const AnastasisArchitecture::FArchetype& A = AnastasisArchitecture::Get(Variant);
+		EntryX = static_cast<float>(A.EntryLocal.X);
+		Side = 250.f;
+		Front = static_cast<float>(A.Footprint.Max.Y + 70.0);
+	}
+	else if (Body && Body->GetStaticMesh())
 	{
 		const FBox Bounds = Body->GetStaticMesh()->GetBoundingBox();
 		Side = FMath::Clamp(static_cast<float>(Bounds.GetExtent().X * .4), 150.f, 250.f);
 		Front = static_cast<float>(Bounds.Max.Y + 90.0);
 	}
-	const FVector WoodStockAnchor(-Side, Front, 0.f);
-	const FVector StoneStockAnchor(Side, Front, 0.f);
+	const FVector WoodStockAnchor(EntryX - Side, Front, 0.f);
+	const FVector StoneStockAnchor(EntryX + Side, Front, 0.f);
 	const auto Place = [this](UInstancedStaticMeshComponent* Component, const int32 Count,
 		const FVector& Anchor, const float LayerHeight)
 	{

@@ -133,4 +133,13 @@ def tick(_dt):
         finish(False, str(exc))
 
 
-handle = unreal.register_slate_post_tick_callback(tick)
+def guarded_tick(dt):
+    try:
+        tick(dt)
+    except Exception as exc:
+        import traceback
+        unreal.log_error(traceback.format_exc())
+        finish(False, str(exc))
+
+
+handle = unreal.register_slate_post_tick_callback(guarded_tick)
