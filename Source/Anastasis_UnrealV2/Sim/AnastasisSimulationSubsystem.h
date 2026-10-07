@@ -142,6 +142,14 @@ private:
 	/** Le pawn retrouve sa marche Unreal. */
 	void UnbindPawn();
 	void LogDayIfChanged();
+public:
+	/**
+	 * geopolitical-world-001 (ecart n°38) -- ce que le monde exterieur a produit depuis le dernier
+	 * appel, une ligne ANASTASIS_GEO par evenement. Appele a chaque pas de l'hote et apres chaque
+	 * commande Anastasis.Geo.*.
+	 */
+	void LogGeoEvents();
+private:
 	/**
 	 * Un scenario explicite (FirstWell, FirstHouse, FirstGranary, FirstFarmer, FoodSupply) REMPLACE le
 	 * village du lancement : simulation remise a zero sur la meme graine, acteurs de presentation
@@ -283,4 +291,15 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetPlayerStatus(const UObject* WorldContextObject);
+
+	/**
+	 * geopolitical-world-001, en JSON : scenario, jour, verite par noeud, exposition du village, savoir
+	 * du village, groupes d'arrivants, paquets en route ; plus `actors` (habitants simules). `{}` sans hote.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetGeoStatus(const UObject* WorldContextObject);
+
+	/** geopolitical-world-001 : `Anastasis.Geo.Trace` en texte (arrivees, routes, cause, source). Vide sans hote. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetGeoTrace(const UObject* WorldContextObject, const FString& NodeId, const FString& Pressure);
 };

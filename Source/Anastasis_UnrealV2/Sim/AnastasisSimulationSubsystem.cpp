@@ -667,6 +667,8 @@ void UAnastasisSimulationSubsystem::LogStatus() const
 
 void UAnastasisSimulationSubsystem::LogDayIfChanged()
 {
+	// geopolitical-world-001 : les evenements du monde exterieur, meme sans changement de jour.
+	LogGeoEvents();
 	if (Simulation.GetDay() == LoggedDay)
 	{
 		return;

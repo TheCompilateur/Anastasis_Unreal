@@ -23,6 +23,8 @@ void FAnastasisSimulation::Reset(uint32 SeedValue, int32 Width, int32 Height)
 	// `readSimWeather` lit `sim.seed` : les habitants voient le ciel que le rendu montre.
 	Village.SetWeatherSeed(Seed);
 	Accumulator = 0.0;
+	// ecart n°38 : un monde neuf n'a pas de dehors tant qu'un hote n'en charge pas.
+	Geo.Unload();
 }
 
 void FAnastasisSimulation::ResetFromWorld(uint32 SeedValue, AnastasisWorld::FWorld&& InWorld, double InTime, int32 InDay)
@@ -40,6 +42,8 @@ void FAnastasisSimulation::ResetFromWorld(uint32 SeedValue, AnastasisWorld::FWor
 	Village.SetRngSeed(Seed);
 	Village.SetWeatherSeed(Seed);
 	Accumulator = 0.0;
+	// ecart n°38 : un monde neuf n'a pas de dehors tant qu'un hote n'en charge pas.
+	Geo.Unload();
 }
 
 void FAnastasisSimulation::Tick(double Dt)
@@ -99,6 +103,24 @@ double FAnastasisSimulation::DayFrac() const
 	return FMath::Fmod(Time, DayLength) / DayLength;
 }
 
+int32 FAnastasisSimulation::AdmitGeoMigration()
+{
+	// ecart n°38 : l'adaptateur local. Le monde exterieur cree le groupe, le village l'instancie ;
+	// ensuite ces habitants sont des habitants comme les autres.
+	int32 Created = 0;
+	for (const int32 BatchIndex : Geo.PendingMigration())
+	{
+		const AnastasisGeo::FMigrationBatch& Batch = Geo.GetMigrationBatches()[BatchIndex];
+		const double Angle = GeoArrivalAngleStep * static_cast<double>(BatchIndex);
+		const TArray<FString> Ids = Village.IsBound()
+			? Village.AdmitExternalArrivals(Batch.Persons, GeoArrivalRadius, Angle)
+			: TArray<FString>();
+		Created += Ids.Num();
+		Geo.RecordAdmission(BatchIndex, Ids);
+	}
+	return Created;
+}
+
 uint64 FAnastasisSimulation::TileFingerprint() const
 {
 	uint64 Hash = 14695981039346656037ull;
@@ -124,6 +146,13 @@ void FAnastasisSimulation::OnNewDay(bool bDefer)
 	// `updateReputationDaily` (player-minimal-001) : seule l'oisivete y est portee ; un habitant
 	// jamais oisif reste a 50, au bit pres.
 	Village.UpdateReputationDaily();
+	// ecart n°38 (geopolitical-world-001) : le monde exterieur, s'il est charge, avance jusqu'a ce
+	// jour, puis ses groupes d'arrivants deviennent des habitants. Decharge : rien, au bit pres.
+	if (Geo.IsLoaded())
+	{
+		Geo.AdvanceToDay(Day);
+		AdmitGeoMigration();
+	}
 	// `enqueueDayDeferred` : les 17 travaux, ajoutes derriere un eventuel reliquat.
 	// Portes : `landRegen` (regen du sol) et `memory` (oubli). Collectif, ordres, doctrine,
 	// chapitres, chartes, sites, transports, routes, guets, vie, carrieres, fondateurs,

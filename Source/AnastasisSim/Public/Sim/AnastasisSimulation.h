@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Geo/AnastasisGeo.h"
 #include "Village/AnastasisVillage.h"
 #include "World/AnastasisWorld.h"
 
@@ -93,6 +94,26 @@ public:
 	/** Empreinte du terrain fige : type + bits d'altitude, dans l'ordre des tuiles. */
 	uint64 TileFingerprint() const;
 
+	/**
+	 * EXTENSION — ecart n°38 (geopolitical-world-001). Le monde exterieur : vide tant qu'un hote n'a
+	 * pas charge de scenario (`GetGeo().Load`). Il avance a chaque minuit, sur le jour de cette
+	 * simulation ; Reset et ResetFromWorld le dechargent. Aucun scenario du harnais ne le charge.
+	 */
+	AnastasisGeo::FGeoWorld& GetGeo() { return Geo; }
+	const AnastasisGeo::FGeoWorld& GetGeo() const { return Geo; }
+
+	/**
+	 * L'adaptateur local du monde exterieur : chaque groupe d'arrivants en attente devient des
+	 * habitants (`FVillage::AdmitExternalArrivals`), et le monde exterieur en garde la trace. Appele
+	 * a minuit ; un hote l'appelle aussi apres une injection. Rend le nombre d'habitants crees.
+	 */
+	int32 AdmitGeoMigration();
+
+	/** Rayon (cases) de l'anneau ou se posent les arrivants du dehors. */
+	static constexpr double GeoArrivalRadius = 7.0;
+	/** Pas d'angle entre deux groupes successifs (rad) : deux groupes n'arrivent pas au meme endroit. */
+	static constexpr double GeoArrivalAngleStep = 2.399963229728653;
+
 private:
 	void OnNewDay(bool bDefer);
 	void ProcessDayDeferred(int32 MaxJobs);
@@ -113,6 +134,8 @@ private:
 	AnastasisWorld::FWorld World;
 	/** Pointe sur `World` : l'hote n'est ni copie ni deplace (voir les declarations supprimees). */
 	AnastasisVillage::FVillage Village;
+	/** ecart n°38 : le monde exterieur, decharge par defaut. */
+	AnastasisGeo::FGeoWorld Geo;
 
 public:
 	FAnastasisSimulation(const FAnastasisSimulation&) = delete;

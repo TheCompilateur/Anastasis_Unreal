@@ -71,3 +71,5 @@ village-fabric-pie | tools/unreal/village-fabric-pie.py | VILLAGE_FABRIC PASS | 
 village-fabric-capture | tools/unreal/village-fabric-capture.py | VILLAGE_FABRIC_CAPTURE COMPLETE | VILLAGE_FABRIC_CAPTURE FAIL|Traceback | 540 | -
 # architecture-crusade-001 : hameau AVANT (anciens meshes) / APRES (maisonnees a l'echelle humaine), assises, 13 prises.
 architecture-pie | tools/unreal/architecture-pie.py | ARCH_PIE PASS | ARCH_PIE FAIL|Traceback | 900 | ANASTASIS_ARCH_OUT=@Saved/ArchitectureEvidence/pie
+# geo-remote-crisis : crise lointaine a Konya ; PASS = nouvelle, puis penurie, puis arrivants admis, trace et sauvegarde a chaud (geopolitical-world-001).
+geo-remote-crisis-pie | tools/unreal/geo-remote-crisis-pie.py | GEO_PIE PASS | GEO_PIE FAIL|GEO_PIE_TIMEOUT|Traceback | 720 | ANASTASIS_GEO_PIE_OUT=@Saved/GeoEvidence/pie

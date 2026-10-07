@@ -992,6 +992,15 @@ namespace AnastasisVillage
 		/** `actors.splice` — decalage, l'ordre des autres survit. */
 		bool RemoveNpc(const FString& Id);
 
+		/**
+		 * EXTENSION — ecart n°38 (geopolitical-world-001). Un groupe venu du dehors arrive au village :
+		 * `Count` habitants ordinaires (`spawnNpc`, besoins par defaut d'un arrivant), poses sur le
+		 * premier sol libre d'un anneau a `Radius` cases du camp, a partir de l'angle `StartAngle` (rad).
+		 * Aucun tirage : la position ne depend que du terrain et des arguments. Rend les identifiants
+		 * crees (moins que `Count` si le sol libre manque, vide sans monde).
+		 */
+		TArray<FString> AdmitExternalArrivals(int32 Count, double Radius, double StartAngle);
+
 		// --- Le joueur est un habitant (player-minimal-001, simulation.js « Incarnation ») ---------
 		//
 		// Une seule verite : `PlayerPersonId`. Aucun `bIsPlayer` dissemine. Vide = observateur, et

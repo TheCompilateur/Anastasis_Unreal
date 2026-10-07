@@ -623,3 +623,22 @@ relevé, les deux croyances répondent toujours (381 décisions sur 381) : les d
 diffèrent dès que la croyance n'est pas le repli du C++. Ce repli appelle aussi `buildingAccessPoint`, ce
 que la croyance ne fait pas : seuils filtrés et destination posée en plus. La doctrine de lisière est
 lue comme fausse ; elle ne l'est jamais devenue dans le relevé.
+
+### n° 38 — Monde extérieur : la géopolitique comme pression qui se propage jusqu'au village
+
+- **classe** : EXTENSION
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : geopolitical-world-001
+- **activation** : hôte seulement — `FAnastasisSimulation::GetGeo().Load(scenario)`, appelé par la commande Unreal `Anastasis.Geo.Load` ; défaut : déchargé. Aucun scénario du harnais ne charge de monde extérieur ; déchargé, `OnNewDay` ne fait rien de plus, au bit près (`Anastasis.Sim.Geo.CalmeSansEffet`).
+- **reference** : aucune — demande d'Alexandre du 2026-10-07 (mission ANASTASIS_GEOPOLITICAL_WORLD_V1). Le plus proche dans la référence : `src/life/historicalRumors.js` (nouvelles datées sans effet mécanique) et `maybeImmigrate` de `src/sim/simulation.js` (arrivées sans cause), tous deux non portés.
+- **cpp** : `Geo/AnastasisGeo.{h,cpp}` (module pur), `Sim/AnastasisSimulation.cpp` (`OnNewDay`, `AdmitGeoMigration`, `Reset`), `Village/AnastasisVillageGeo.cpp` (`AdmitExternalArrivals`)
+- **harnais** : aucune
+- **detail** : `docs/unreal/GEOPOLITICAL_WORLD_001.md`
+
+Un scénario JSON (lieux, routes, acteurs, chocs, chacun avec sa provenance) décrit le monde autour du village.
+Un choc émet des paquets de pression qui voyagent de nœud en nœud, avec délai et atténuation, et une nouvelle
+qui voyage à part, plus vite, en se déformant. Le village ne lit que son exposition et son savoir. Le seul
+effet local branché : un groupe de migrants arrivé au village devient des habitants par `spawnNpc`, comme
+`arriveAsPlayer`. Aucun tirage aléatoire : le flux `sim.rng` n'est jamais lu. À trancher : garder ce monde
+extérieur comme extension Unreal, ou le porter un jour dans la référence JS.
