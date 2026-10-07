@@ -24,7 +24,9 @@ passe de (74 ; 36) à (39 ; 42).
 
 ## COMMIT
 
-Commité le 2026-10-07 sur `main` = `3f945847`, avec le commit de `geo-measure-001` cherry-pické dessous.
+Commité le 2026-10-07, puis rebasé sans conflit sur `main` = `0c06f5ad`, avec le commit de `geo-measure-001` cherry-pické dessous.
+
+Tests et preuves ont tourné sur la base `3f945847`. `main` a apporté depuis du C++ de simulation (`relay-sim-chain-001` : seuil de blocage à l'échelle du coût de terrain), qui peut changer `bWalkable`, donc le site. Les 6 preuves déclarées et la suite du lot jugent l'arbre rebasé.
 
 ## MEC
 
