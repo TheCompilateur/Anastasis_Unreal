@@ -486,6 +486,8 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
     const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource)
 {
     ForestUse.Reset(); // Clear bindings before any indices are reused below.
+	RainTreeCrowns.Reset();
+	RainTreeBins.Reset();
 	for (UHierarchicalInstancedStaticMeshComponent* Mesh : DressingMeshes)
 	{
 		if (Mesh)
@@ -596,6 +598,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 	}
     // Couronnes reellement posees (X, Y, rayon) : la prairie s'arrete ou commence le sous-bois.
     TArray<FVector> Canopy;
+    TArray<FVector> RenderedTreeCrowns;
     if (bEcology)
     {
         AnastasisEcologicalDressing::FPlan ForestPlan;
@@ -876,6 +879,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                         HeroAt[Hero.Index] = Instance;
                         Canopy.Add(FVector(Tree.Ground.X, Tree.Ground.Y,
                             FVector2D(Bounds.GetExtent().X, Bounds.GetExtent().Y).GetMax() * Pose.GetScale3D().X));
+                        if (Instance != INDEX_NONE) RenderedTreeCrowns.Add(Canopy.Last());
                         ++HeroPlaced;
                         ++DressingInstanceCount;
                     }
@@ -943,6 +947,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 }
                 Canopy.Add(FVector(Tree.Ground.X, Tree.Ground.Y,
                     FVector2D(Tree.MassBounds.GetExtent().X, Tree.MassBounds.GetExtent().Y).GetMax() * Tree.Pose.GetScale3D().X));
+                if (Instance != INDEX_NONE) RenderedTreeCrowns.Add(Canopy.Last());
                 ++DressingInstanceCount;
             }
             for (UHierarchicalInstancedStaticMeshComponent* Mesh : HeroCanopyMeshes)
@@ -1018,6 +1023,22 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
 		SurfaceCrop ? TEXT("surface") : TEXT("slab"), DressingInstanceCount, UngroundedTiles);
 	// Les troncs, avant que le maquis n'ajoute buissons et rochers a Canopy.
 	const TArray<FVector> Trunks = Canopy;
+	RainTreeCrowns = MoveTemp(RenderedTreeCrowns);
+	for (int32 CrownIndex = 0; CrownIndex < RainTreeCrowns.Num(); ++CrownIndex)
+	{
+		const FVector& Crown = RainTreeCrowns[CrownIndex];
+		const double Radius = Crown.Z * 0.7; // outer mesh bounds include sparse branch tips
+		if (!FMath::IsFinite(Radius) || Radius <= 0.0) continue;
+		const int32 MinX = FMath::FloorToInt((Crown.X - Radius) / 400.0);
+		const int32 MaxX = FMath::FloorToInt((Crown.X + Radius) / 400.0);
+		const int32 MinY = FMath::FloorToInt((Crown.Y - Radius) / 400.0);
+		const int32 MaxY = FMath::FloorToInt((Crown.Y + Radius) / 400.0);
+		for (int32 Y = MinY; Y <= MaxY; ++Y)
+			for (int32 X = MinX; X <= MaxX; ++X)
+				RainTreeBins.FindOrAdd(FIntPoint(X, Y)).Add(CrownIndex);
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_CANOPY_RAIN rendered_crowns=%d bins=%d"),
+		RainTreeCrowns.Num(), RainTreeBins.Num());
 	PlaceUnderstory(CanonicalSource, Canopy, bEcology);
 	PlaceTrunkContact(CanonicalSource, Trunks, bEcology);
 	PlaceGroundCover(CanonicalSource, Places, Canopy, bEcology);
@@ -2374,6 +2395,33 @@ void AAnastasisWorldEmbodiment::ShowLegacyDebug()
 {
 	CVarTerrainSurface->Set(0, ECVF_SetByCode);
 	EmbodyCanonical(static_cast<int32>(AnastasisWorldView::ReferenceSeed));
+}
+
+FVector AAnastasisWorldEmbodiment::GetRainCanopySampleTiles() const
+{
+	const double Cell = AnastasisWorldView::TileWorldSize * Snapshot.SpatialScale;
+	if (RainTreeCrowns.IsEmpty() || Cell <= 0.0) return FVector(-1.0, -1.0, -1.0);
+	for (const FVector& Crown : RainTreeCrowns)
+		if (Crown.Z > 0.0) return FVector(Crown.X / Cell, Crown.Y / Cell, Crown.Z * 0.7 / Cell);
+	return FVector(-1.0, -1.0, -1.0);
+}
+
+double AAnastasisWorldEmbodiment::RainCanopyCoverAt(double WorldX, double WorldY) const
+{
+	if (!FMath::IsFinite(WorldX) || !FMath::IsFinite(WorldY)) return 0.0;
+	const TArray<int32>* Bin = RainTreeBins.Find(FIntPoint(FMath::FloorToInt(WorldX / 400.0),
+		FMath::FloorToInt(WorldY / 400.0)));
+	if (!Bin) return 0.0;
+	double Cover = 0.0;
+	for (int32 Index : *Bin)
+	{
+		const FVector& Crown = RainTreeCrowns[Index];
+		const double Radius = Crown.Z * 0.7;
+		const double Dist = FVector2D::Distance(FVector2D(WorldX, WorldY), FVector2D(Crown.X, Crown.Y));
+		if (Dist < Radius)
+			Cover = FMath::Max(Cover, FMath::Clamp((Radius - Dist) / (Radius * 0.4), 0.0, 1.0));
+	}
+	return Cover;
 }
 
 int32 AAnastasisWorldEmbodiment::GetInstanceCount() const

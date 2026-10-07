@@ -80,6 +80,11 @@ public:
 
 	const AnastasisWorldView::FPlan& GetPlan() const { return Plan; }
 	const AnastasisWorldView::FWorldVisualSnapshot& GetSnapshot() const { return Snapshot; }
+	/** Coverage from crowns actually instanced in the current embodiment, in world centimetres. */
+	double RainCanopyCoverAt(double WorldX, double WorldY) const;
+	/** Read-only proof sample: X/Y in simulation tiles, Z = crown radius in tiles; negative when absent. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Metrology")
+	FVector GetRainCanopySampleTiles() const;
 	/** True once EmbodyCrop has built a flat sea-level water section (ANASTASIS_TERRAIN surface mode). */
 	bool HasWaterSurface() const { return bWaterSurfaceBuilt; }
 	/** The actually rendered/collidable footprint (see ActiveFootprintBounds below) — not Plan, which can be larger. */
@@ -128,6 +133,9 @@ protected:
 	/** Huit heros a taille reelle, plus une enveloppe de canopee par massif. Transitoires. */
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> HeroCanopyMeshes;
+	/** Transient spatial index of the actual tree crowns; shrubs and distant shell proxies are excluded. */
+	TArray<FVector> RainTreeCrowns;
+	TMap<FIntPoint, TArray<int32>> RainTreeBins;
 	/** FOREST_TERRAIN_P3 : maquis, ronces et rochers ; un HISM par mesh, transitoires, vides puis reremplis. */
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> UnderstoryMeshes;

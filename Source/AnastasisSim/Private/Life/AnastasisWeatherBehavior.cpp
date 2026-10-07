@@ -143,15 +143,18 @@ double ShelterRainDuration(const double Rain)
 }
 
 void ApplyRainExposure(const double Rain, const bool bInside, const FString& Goal, const double Dt,
-	double& InOutEnergy, double& InOutHealth)
+	double& InOutEnergy, double& InOutHealth, const double CanopyCover)
 {
 	if (!(Dt > 0.0)) return;
 	if (Rain < Shelter::RainHeavy) return;
 	if (bInside || Goal == GoalShelterRain) return;
-	InOutEnergy = Clamp100(InOutEnergy - Shelter::EnergyDrainPerSec * Rain * Dt);
+	// ecart n°41: partial interception beneath an actually embodied crown. Heavy rain
+	// still reaches the ground, and the original thresholds remain unchanged.
+	const double ShelterFraction = 0.20 * FMath::Clamp(FMath::IsFinite(CanopyCover) ? CanopyCover : 0.0, 0.0, 1.0);
+	InOutEnergy = Clamp100(InOutEnergy - Shelter::EnergyDrainPerSec * Rain * Dt * (1.0 - ShelterFraction));
 	if (Rain >= Shelter::HealthDrainRain)
 	{
-		InOutHealth = Clamp100(InOutHealth - Shelter::HealthDrainPerSec * Dt);
+		InOutHealth = Clamp100(InOutHealth - Shelter::HealthDrainPerSec * Dt * (1.0 - ShelterFraction));
 	}
 }
 

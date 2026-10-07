@@ -1667,8 +1667,11 @@ namespace AnastasisVillage
 				AnastasisRhythm::IsWorkGoal(Npc.Goal), Npc.Goal == GoalRest);
 		}
 		// `applyRainExposure`, juste apres `tickNeeds` : dehors sous l'orage, l'energie fond.
+		// ecart n°41: the Unreal host may supply coverage from the current rendered crowns.
+		const double CanopyCover = RainCanopyCover && TickWeather.Rain >= AnastasisWeatherBehavior::Shelter::RainHeavy
+			&& !Npc.Inside.bActive ? RainCanopyCover(Npc.X, Npc.Y) : 0.0;
 		AnastasisWeatherBehavior::ApplyRainExposure(TickWeather.Rain, Npc.Inside.bActive, Npc.Goal, Dt,
-			Npc.Needs.Energy, Npc.Needs.Health);
+			Npc.Needs.Energy, Npc.Needs.Health, CanopyCover);
 
 		// `holdTalkAct` : en conversation, l'habitant est fige (ni pensee, ni marche).
 		if (HoldTalk(Npc))

@@ -156,6 +156,11 @@ bool FAnastasisWeatherBehaviorFormulasTest::RunTest(const FString&)
 		double E3 = 1.0, H3 = 0.1;
 		B::ApplyRainExposure(1.0, false, TEXT("explore"), 10.0, E3, H3);
 		TestTrue(TEXT("clamped at 0"), E3 == 0.0 && H3 == 0.0);
+		double OpenE = 70.0, OpenH = 90.0, CrownE = OpenE, CrownH = OpenH;
+		B::ApplyRainExposure(0.9, false, TEXT("gatherFood"), 2.0, OpenE, OpenH);
+		B::ApplyRainExposure(0.9, false, TEXT("gatherFood"), 2.0, CrownE, CrownH, 1.0);
+		TestTrue(TEXT("crown reduces but does not cancel exposure"),
+			CrownE > OpenE && CrownE < 70.0 && CrownH > OpenH && CrownH < 90.0);
 	}
 
 	// Bloc pluie de movementSpeedFactor.

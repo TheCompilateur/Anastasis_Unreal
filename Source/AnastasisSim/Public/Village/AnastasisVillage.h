@@ -1066,6 +1066,9 @@ namespace AnastasisVillage
 		FPoint GetSettlement() const { return Settlement; }
 		/** RouteCost-001: optional Unreal gameplay extension. JS parity harness keeps the reference's uniform travel time. */
 		void SetTerrainTravelCostEnabled(bool bEnabled) { bTerrainTravelCostEnabled = bEnabled; }
+		/** Host-only coverage from actually embodied crowns; unset in portable parity runs. */
+		void SetRainCanopyCover(TFunction<double(double, double)> InCover) { RainCanopyCover = MoveTemp(InCover); }
+		double GetRainCanopyCover(double X, double Y) const { return RainCanopyCover ? RainCanopyCover(X, Y) : 0.0; }
 		bool IsTerrainTravelCostEnabled() const { return bTerrainTravelCostEnabled; }
 		/** Extension ecart n°18 : un porteur explicite travaille sur les chantiers secs. Vide = inactif. */
 		void SetMaterialCourier(const FString& NpcId) { MaterialCourierId = NpcId; }
@@ -1843,6 +1846,7 @@ namespace AnastasisVillage
 		AnastasisNav::FNavGrid Nav;
 		bool bTerrainTravelCostEnabled = false;
 		FString MaterialCourierId;
+		TFunction<double(double, double)> RainCanopyCover;
 		int32 NavVersion = 0;
 		/** `sim.navService` (nav-wiring-001). */
 		AnastasisNavService::FNavService NavService;

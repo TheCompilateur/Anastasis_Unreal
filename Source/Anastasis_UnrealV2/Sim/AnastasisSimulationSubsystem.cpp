@@ -16,6 +16,7 @@
 #include "Village/AnastasisVillagerVisual.h"
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisWorldView.h"
+#include "WorldView/AnastasisWorldEmbodiment.h"
 #include "WorldView/AnastasisAnthropicSubsystem.h"
 #include "WorldView/AnastasisWorldAtmosphere.h"
 #include "Village/AnastasisBuildingMetabolism.h"
@@ -100,6 +101,11 @@ static TAutoConsoleVariable<int32> CVarSimOverlay(
 	TEXT("anastasis.Sim.Overlay"),
 	1,
 	TEXT("1 = draw day/time overlay in PIE. 0 = log only."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarVillageCanopyRain(
+	TEXT("anastasis.Village.CanopyRain"), 1,
+	TEXT("1 = embodied tree crowns partly intercept rain exposure for villagers; 0 = reference exposure at every outdoor position."),
 	ECVF_Default);
 
 namespace
@@ -413,6 +419,7 @@ void UAnastasisSimulationSubsystem::Deinitialize()
 
 void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 {
+	RainCanopyActor.Reset();
 	if (auto* Anthropic = GetWorld()->GetSubsystem<UAnastasisAnthropicSubsystem>()) Anthropic->ResetPresentation();
 	bPendingStartVillage = false;
 	StartVillageWait = 0.0;
@@ -438,6 +445,7 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 {
 	TryStartVillage(DeltaTime);
+	BindRainCanopy();
 	if (!Simulation.IsRunning())
 	{
 		return;
@@ -508,6 +516,32 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 		FAnastasisVillagePresentation::DrawDebug(GetWorld(), Simulation.GetVillage(), Simulation.GetWorld());
 	}
 	DrawOverlay();
+}
+
+void UAnastasisSimulationSubsystem::BindRainCanopy()
+{
+	if (RainCanopyActor.IsValid()) return;
+	for (TActorIterator<AAnastasisWorldEmbodiment> It(GetWorld()); It; ++It)
+	{
+		AAnastasisWorldEmbodiment* Actor = *It;
+		const auto& Source = Actor->GetSnapshot();
+		if (Source.Seed != Simulation.GetSeed() || Source.SourceW != Simulation.GetWorld().W
+			|| Source.SourceH != Simulation.GetWorld().H || Source.SpatialScale <= 0.0) continue;
+		RainCanopyActor = Actor;
+		const TWeakObjectPtr<AAnastasisWorldEmbodiment> WeakActor(Actor);
+		const uint32 Seed = Source.Seed;
+		const int32 Width = Source.SourceW, Height = Source.SourceH;
+		Simulation.GetVillage().SetRainCanopyCover([WeakActor, Seed, Width, Height](double X, double Y)
+		{
+			if (CVarVillageCanopyRain.GetValueOnGameThread() == 0 || !WeakActor.IsValid()) return 0.0;
+			const auto& Current = WeakActor->GetSnapshot();
+			if (Current.Seed != Seed || Current.SourceW != Width || Current.SourceH != Height
+				|| Current.SpatialScale <= 0.0) return 0.0;
+			const double Cell = AnastasisWorldView::TileWorldSize * Current.SpatialScale;
+			return WeakActor->RainCanopyCoverAt(X * Cell, Y * Cell);
+		});
+		return;
+	}
 }
 
 int32 UAnastasisSimulationSubsystem::SyncVillagePresentation()
@@ -1368,6 +1402,12 @@ double UAnastasisSimulationDebugLibrary::GetSimulationTime(const UObject* WorldC
 {
 	const FAnastasisSimulation* Sim = DebugSimulation(WorldContextObject);
 	return Sim ? Sim->GetTime() : -1.0;
+}
+
+double UAnastasisSimulationDebugLibrary::GetRainCanopyCover(const UObject* WorldContextObject, double SimX, double SimY)
+{
+	const FAnastasisSimulation* Sim = DebugSimulation(WorldContextObject);
+	return Sim ? Sim->GetVillage().GetRainCanopyCover(SimX, SimY) : 0.0;
 }
 
 FString UAnastasisSimulationDebugLibrary::GetVillagePhase(const UObject* WorldContextObject)

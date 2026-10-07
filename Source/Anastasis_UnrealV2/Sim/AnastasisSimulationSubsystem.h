@@ -9,6 +9,7 @@
 #include "AnastasisSimulationSubsystem.generated.h"
 
 class APawn;
+class AAnastasisWorldEmbodiment;
 
 /**
  * Pompe Unreal du tick de simulation. Possede FAnastasisSimulation.
@@ -158,6 +159,7 @@ private:
 	 */
 	void ReplaceStartVillage();
 	void TryStartVillage(float DeltaTime);
+	void BindRainCanopy();
 	/** Equipe un habitant du village initial d'un foyer et d'un travail reels. */
 	void SeedOpeningHousehold();
 	/** Un chantier initial fini par les habitants existants, sans creer de PNJ ni modifier AnastasisSim. */
@@ -171,6 +173,7 @@ private:
 	FString SettlementSiteReport = TEXT("{\"status\":\"not_started\"}");
 
 	FAnastasisSimulation Simulation;
+	TWeakObjectPtr<AAnastasisWorldEmbodiment> RainCanopyActor;
 	FAnastasisVillagePresentation VillagePresentation;
 	FString FarmerGranaryId;
 	FString FirstSiteId;
@@ -210,6 +213,9 @@ public:
 	/** Temps de simulation (s) de l'hote de ce monde, -1 sans hote. */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static double GetSimulationTime(const UObject* WorldContextObject);
+	/** Host-bound crown coverage at a simulation position; read-only, 0 without embodiment. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static double GetRainCanopyCover(const UObject* WorldContextObject, double SimX, double SimY);
 
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetSettlementSiteStatus(const UObject* WorldContextObject);

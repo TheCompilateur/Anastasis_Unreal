@@ -114,7 +114,7 @@ namespace AnastasisWeatherBehavior
 
 	/** `applyRainExposure` : dehors sous l'orage, l'energie fond ; au-dela de 0,7 la sante aussi. */
 	ANASTASISSIM_API void ApplyRainExposure(double Rain, bool bInside, const FString& Goal, double Dt,
-		double& InOutEnergy, double& InOutHealth);
+		double& InOutEnergy, double& InOutHealth, double CanopyCover = 0.0);
 
 	/**
 	 * Le bloc pluie de `movementSpeedFactor`, SEUL (le reste du facteur n'est pas porte) :

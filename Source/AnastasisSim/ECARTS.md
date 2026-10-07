@@ -768,3 +768,16 @@ approvisionné. Le C++ prend l'identifiant de la meilleure source dans les **cro
 habitant**, via `PerceiveFoodContext` ; `ReserveMeal` garde toutes ses validations physiques.
 Cette correction de jouabilité diverge de la référence JS et reste à trancher par Alexandre.
 Les scénarios actuels du harnais n'incarnent pas de joueur.
+
+### n° 41 — Interception partielle de la pluie par une couronne incarnée
+
+- **classe** : EXTENSION
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : canopy-rain-shelter-001
+- **activation** : uniquement dans l'hôte Unreal, lorsque la couronne est effectivement incarnée et `anastasis.Village.CanopyRain=1` ; défaut 1. Le village C++ seul reçoit une couverture nulle et conserve la parité.
+- **reference** : `src/sim/npc.js` (`applyRainExposure`) n'a pas de couverture d'arbre.
+- **cpp** : `Life/AnastasisWeatherBehavior.cpp` (`ApplyRainExposure`), `Village/AnastasisVillage.cpp` (lecture de couverture) ; hôte `AnastasisWorldEmbodiment.cpp` et `AnastasisSimulationSubsystem.cpp`.
+- **harnais** : actors
+
+La couverture géométrique d'une couronne réellement posée réduit au plus de 20 % la perte d'énergie et de santé due à la pluie. Les seuils de l'orage et la décision de chercher un bâtiment restent ceux de la référence ; un arbre ne devient pas un toit. Le facteur 20 % est un paramètre de jeu borné, pas une mesure validée pour ces essences. À trancher : garder cette extension dans le jeu ou porter une couverture du couvert arboré dans la référence JS.
