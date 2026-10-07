@@ -88,6 +88,17 @@
    "pitch": -20,
    "fov": 75,
    "z": 93180.8
+  },
+  {
+   "id": "V9_village_vigla",
+   "role": "landmark anchoring : du village, la bosse qui ferme le sud-sud-est et ce qui s'y tient",
+   "x": 160000,
+   "y": 72000,
+   "eye_m": 1.7,
+   "yaw": -66,
+   "pitch": 1.5,
+   "fov": 75,
+   "z": 3985.4
   }
  ]
 }

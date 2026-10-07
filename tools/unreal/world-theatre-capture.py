@@ -2,14 +2,14 @@
 
 Le monde du jeu (incarnation de BeginPlay, village de depart), simulation gelee (anastasis.Sim.TimeScale 0),
 ciel epingle (anastasis.Sky.Day / Hour / Humidity), exposition du profil d'atmosphere du jeu, aucune lumiere
-ajoutee. Pour chaque vista (tools/unreal/world-theatre-vistas.json : position, cap, inclinaison, FOV), une image
+ajoutee. Pour chaque vista (docs/unreal/world-theatre-001/vistas.json : position, cap, inclinaison, FOV), une image
 par etat de la couche : `anastasis.Theatre` 0, 1, puis 0 (temoin : meme camera, meme etat que le premier ;
 l'ecart off/off2 mesure le bruit de capture). Images par `Shot` (la vue affichee, TSR compris).
 
 Sortie : ANASTASIS_THEATRE_OUT/<vista>_<etat>.png et capture.json (cameras, etats, rapport de la couche).
 Variables :
   ANASTASIS_THEATRE_OUT     dossier (obligatoire)
-  ANASTASIS_THEATRE_VISTAS  fichier de vistas (defaut tools/unreal/world-theatre-vistas.json)
+  ANASTASIS_THEATRE_VISTAS  fichier de vistas (defaut docs/unreal/world-theatre-001/vistas.json)
   ANASTASIS_THEATRE_ONLY    ids de vistas separes par ',' (defaut : toutes)
   ANASTASIS_THEATRE_STATES  etats separes par ',' parmi off,on,off2 (defaut off,on,off2)
   ANASTASIS_THEATRE_HOUR    heure du ciel (defaut 11 : lumiere neutre, ni rasante ni zenithale)
@@ -21,13 +21,13 @@ import json, os, pathlib, time, unreal
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
 ROOT = pathlib.Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()))
 OUT = pathlib.Path(os.environ.get('ANASTASIS_THEATRE_OUT', ''))
-VISTAS = pathlib.Path(os.environ.get('ANASTASIS_THEATRE_VISTAS') or (ROOT / 'tools' / 'unreal' / 'world-theatre-vistas.json'))
+VISTAS = pathlib.Path(os.environ.get('ANASTASIS_THEATRE_VISTAS') or (ROOT / 'docs' / 'unreal' / 'world-theatre-001' / 'vistas.json'))
 ONLY = [v for v in os.environ.get('ANASTASIS_THEATRE_ONLY', '').split(',') if v]
 STATES = [s for s in os.environ.get('ANASTASIS_THEATRE_STATES', 'off,on,off2').split(',') if s]
 HOUR = os.environ.get('ANASTASIS_THEATRE_HOUR', '11')
 SHOTS_DIR = ROOT / 'Saved' / 'Screenshots'
 CAMERA_LABEL = 'WorldTheatreProofCamera'
-SETTLE_FIRST_S = 10.0
+SETTLE_FIRST_S = 16.0
 SETTLE_S = 4.0  # couche rebatie (sondage 0,5 s x 3) + historique TSR
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -130,6 +130,11 @@ def tick(_dt):
             st['current_state'] = state
             settle = SETTLE_S + 4.0
         cam = st['camera']
+        # Le premier Shot du run 1 sortait de la camera de l'editeur : le PIE n'avait pas encore applique la
+        # cible de vue. On la reimpose a chaque prise.
+        pc = unreal.GameplayStatics.get_player_controller(world, 0)
+        if pc:
+            pc.set_view_target_with_blend(cam, 0.0)
         cam.set_actor_location(V(v['x'], v['y'], v['z']), False, True)
         cam.set_actor_rotation(unreal.Rotator(roll=0.0, pitch=v.get('pitch', 0.0), yaw=v['yaw']), True)
         comp = cam.get_component_by_class(unreal.CameraComponent)

@@ -103,6 +103,17 @@ bool FAnastasisWorldTheatreSilhouetteTrace::RunTest(const FString&)
 	double Top = -1e30;
 	for (const FVector& V : Out.Vertices) Top = FMath::Max(Top, V.Z);
 	TestEqual(TEXT("tower top = ground + 14 m + 3 m roof"), Top, 1000.0 + 1700.0, 1.0);
+	FSilhouetteSpec Ruin;
+	Ruin.Id = TEXT("ruin");
+	Ruin.Kind = ESilhouette::RuinedTower;
+	FMeshData RuinMesh;
+	TestTrue(TEXT("a ruined tower stands on flat ground"), BuildSilhouette(Ruin, AnastasisWorldTheatreTestSupport::FlatGroundWithLake(), RuinMesh, Why));
+	TSet<int32> Tops;
+	for (const FVector& V : RuinMesh.Vertices) if (V.Z > 1000.0 + 900.0) Tops.Add(FMath::RoundToInt32(V.Z));
+	TestEqual(TEXT("a broken top has several heights (no roof)"), Tops.Num(), 4);
+	double RuinTop = -1e30;
+	for (const FVector& V : RuinMesh.Vertices) RuinTop = FMath::Max(RuinTop, V.Z);
+	TestEqual(TEXT("ruined tower top = ground + 15 m"), RuinTop, 1000.0 + 1500.0, 1.0);
 	FMeshData Steep;
 	TestFalse(TEXT("a chapel is refused on a 30 deg slope"),
 		BuildSilhouette(FSilhouetteSpec{ TEXT("c"), ESilhouette::Chapel }, AnastasisWorldTheatreTestSupport::Slope30(), Steep, Why));

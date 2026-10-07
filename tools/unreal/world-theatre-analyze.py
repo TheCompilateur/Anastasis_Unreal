@@ -9,7 +9,7 @@ Sortie (dans --out, defaut <releve>/analysis) :
 Rien n'est ecrit dans le projet.
 
 Usage : python tools/unreal/world-theatre-analyze.py <dossier du releve> [--out <dossier>] [--vistas <json>]
-  --vistas : fichier de vistas canoniques (world-theatre-vistas.json) ; sans lui, les candidats sont
+  --vistas : fichier de vistas canoniques (docs/unreal/world-theatre-001/vistas.json) ; sans lui, les candidats sont
              seulement proposes (perception.json -> vista_candidates).
 
 Noms des structures (le jour ou une couche les consomme, ce sont ceux du C++) :
@@ -535,7 +535,18 @@ def main():
             d.line((vx, vy, ex, ey), fill=(255, 0, 0), width=2)
             d.text((vx + 3, vy + 3), v['id'][:2], fill=(255, 0, 0))
         img.save(os.path.join(out, 'map_plan.png'))
-        plan = {'masses': masses, 'silhouettes': [], 'traces': []}
+        eyes = [(v['id'], (v['x'], v['y'], v['z'])) for v in vistas if v['id'][:2] in ('V1', 'V2', 'V6')]
+        lm, n_cand = place_landmark(world, near, nz, nf, water_near, meta, eyes, vistas, LANDMARK_RULES)
+        report['landmark_search'] = {'candidates': n_cand, 'top': [{'score': round(t[0], 3), 'x': t[1], 'y': t[2], 'z': t[3],
+                                                                       'from': t[4], 'framed_in': t[5]} for t in lm]}
+        silhouettes = []
+        if lm:
+            sc, x, y, gz, detail, framed = lm[0]
+            silhouettes.append({'id': 'vigla_01', 'kind': 'RuinedTower', 'xy': (x, y), 'yaw': 20.0, 'scale': 1.0,
+                                'why': 'tour de guet abandonnee (hypothese de conception, PONT-HIS-01 : poste sur une bosse qui commande '
+                                       'l approche ; zone de depart exposee, sans garnison) ; seul repere humain, choisi parmi %d bosses '
+                                       'pour se decouper sur le ciel : %s ; cadre : %s' % (n_cand, '; '.join('%s %s' % d for d in detail), ', '.join(framed) or 'aucun')})
+        plan = {'masses': masses, 'silhouettes': silhouettes, 'traces': []}
         with open(os.path.join(out, 'plan.json'), 'w', encoding='utf-8') as f:
             json.dump(plan, f, indent=1)
         if a.emit_plan:
@@ -872,7 +883,10 @@ def simplify(points, tol):
 MASS_RULES = {
     'seam_min_trees_ha': 25.0,    # bord boise : plus de 25 arbres / ha dans la bande interieure de 200 m
     'seam_reach_m': 700.0,         # la foret de bord s'eteint sur ~700 m si le relief ne la porte pas
-    'seam_weight': 0.9,
+    # Run 1 (2026-10-07) : une masse a moins de 1,5 km se lit comme une bache verte (V5, a 400 m) ; la
+    # continuite proche releve des vraies instances, pas d'une enveloppe. Couture coupee, portee minimale 2,5 km.
+    'seam_weight': 0.0,
+    'min_reach_m': 2500.0,
     'max_reach_m': 9000.0,         # au-dela, la perspective aerienne (autre proprietaire) efface tout
     'village_clearing_m': 1500.0,  # terroir du village : champs et paturages, pas de foret
     'massing_m': 160.0,            # une masse se decide a 160 m, pas a l'arbre
@@ -888,6 +902,72 @@ MASS_RULES = {
     'range_azimuth_deg': 45.0,
     'forest_half_cone_deg': 75.0,
     'open_half_cone_deg': 115.0,
+}
+
+
+def place_landmark(world, near, nz, nf, water, meta, eyes, vistas, rules):
+    """Un seul repere humain, la ou il se decoupe sur le ciel : depuis chaque oeil (village, approche), le sommet
+    de la tour (sol + hauteur) doit etre visible ET au-dessus de tout le relief qui le suit sur le meme rayon.
+    Score = somme sur les yeux de la hauteur angulaire (deg) x (1 + marge sur l'horizon, deg), bonus s'il tombe
+    dans le cadre d'une vista canonique. Candidats : bosses (TPI 300 m > 2 m), pente faible, sec, hors carte."""
+    mp = meta['map']
+    k = 5  # 100 m
+    z = nz[::k, ::k]
+    h, w = z.shape
+    ii, jj = np.meshgrid(np.arange(w), np.arange(h))
+    X = near.ox + (ii * k + 0.5 * k) * near.cell
+    Y = near.oy + (jj * k + 0.5 * k) * near.cell
+    zero = np.zeros_like(X)
+    dmap = np.hypot(np.maximum.reduce([mp['min'][0] - X, X - mp['max'][0], zero]),
+                    np.maximum.reduce([mp['min'][1] - Y, Y - mp['max'][1], zero])) / UU_PER_M
+    cand = ((dmap >= rules['landmark_min_m']) & (dmap <= rules['landmark_max_m']) & (nf['tpi_small'][::k, ::k] > 2.0)
+            & (nf['slope'][::k, ::k] < 10.0) & (~water[::k, ::k][:h, :w]))
+    js, is_ = np.nonzero(cand)
+    top_h = rules['landmark_height_uu']
+    dist = ray_distances()
+    best = None
+    scored = []
+    for j, i in zip(js, is_):
+        x, y = float(X[j, i]), float(Y[j, i])
+        gz = float(z[j, i])
+        tot, detail = 0.0, []
+        for name, e in eyes:
+            d = math.hypot(x - e[0], y - e[1])
+            if d < 30000:
+                continue
+            if not visible(world, e, x, y, gz + top_h, steps=300):
+                detail.append((name, 'cache'))
+                continue
+            ang_top = math.degrees(math.atan2(gz + top_h - e[2], d))
+            ang_h = math.degrees(math.atan2(top_h, d))
+            # relief au-dela de la tour, sur le meme rayon : la tour doit le depasser (silhouette sur le ciel)
+            far_d = dist[dist > d + 2000]
+            ux, uy = (x - e[0]) / d, (y - e[1]) / d
+            zz = world.height(e[0] + ux * far_d, e[1] + uy * far_d) - far_d ** 2 / (2 * 6.371e8)
+            beyond = float(np.max(np.degrees(np.arctan2(zz - e[2], far_d)))) if len(far_d) else -90.0
+            margin = ang_top - beyond
+            if margin <= 0:
+                detail.append((name, 'sur fond de relief'))
+                continue
+            tot += ang_h * (1.0 + min(margin, 2.0))
+            detail.append((name, 'ciel %.2f deg, haut %.2f deg' % (margin, ang_h)))
+        if tot <= 0:
+            continue
+        framed = []
+        for v in vistas:
+            p = project((v['x'], v['y'], v['z']), v['yaw'], v.get('pitch', 0), v.get('fov', 75), 1166, 856, x, y, gz + top_h)
+            if p and 40 <= p[0] < 1126 and 40 <= p[1] < 816:
+                framed.append(v['id'])
+        score = tot * (1.5 if framed else 1.0)
+        scored.append((score, x, y, gz, detail, framed))
+    scored.sort(key=lambda t: -t[0])
+    return scored[:5], int(cand.sum())
+
+
+LANDMARK_RULES = {
+    'landmark_min_m': 600.0,     # hors de la carte, mais assez pres pour qu'une tour de 15 m se lise (> 6 px a 2 km)
+    'landmark_max_m': 3500.0,
+    'landmark_height_uu': 1500.0,
 }
 
 
@@ -954,7 +1034,7 @@ def compose_masses(near, nz, nf, water, inside, placed, meta, village_xy, rules)
     w_dir = np.clip((rules['open_half_cone_deg'] - off) / (rules['open_half_cone_deg'] - rules['forest_half_cone_deg']), 0, 1)
     # La couture ne depend pas de la direction : la foret de la carte continue la ou elle touche le bord.
     apt = np.maximum(apt * w_dir - (1 - w_dir) * 0.5, rules['seam_weight'] * seam - 0.2 * fond)
-    allowed = (~ins) & (dist_map_m <= rules['max_reach_m']) & (~wet) & (dist_village_m > rules['village_clearing_m'])
+    allowed = (~ins) & (dist_map_m >= rules['min_reach_m']) & (dist_map_m <= rules['max_reach_m']) & (~wet) & (dist_village_m > rules['village_clearing_m'])
     apt = np.where(allowed, apt, 0.0)
     rad = max(1, int(round(rules['massing_m'] / (cell_m * k))))
     # Flou normalise sur la seule zone permise : la carte (exclue) ne tire pas la lisiere vers le bas.

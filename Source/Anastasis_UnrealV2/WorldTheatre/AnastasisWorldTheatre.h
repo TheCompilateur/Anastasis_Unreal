@@ -22,6 +22,8 @@ namespace AnastasisWorldTheatre
 enum class ESilhouette : uint8
 {
 	Tower,
+	/** Tour de guet abandonnee : fut sans toit, sommet rompu (zone de depart exposee, sans garnison). */
+	RuinedTower,
 	Chapel,
 	Hamlet,
 };

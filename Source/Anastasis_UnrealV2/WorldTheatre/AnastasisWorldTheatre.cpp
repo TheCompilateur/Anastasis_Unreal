@@ -50,6 +50,21 @@ double CrownGrain(int32 I, int32 J)
 	return 0.72 + 0.44 * (H & 0xFFFF) / 65535.0;
 }
 
+/**
+ * Ton d'un peuplement : valeur lisse sur un reseau de 160 m (age, essence, eclaircie), 0,82 a 1,14.
+ * La canopee d'un versant n'est pas d'une seule valeur a 5 km ; ce n'est pas une forme, c'est une matiere.
+ */
+double StandTone(double X, double Y)
+{
+	constexpr double Lattice = 16000.0;
+	const double FX = X / Lattice, FY = Y / Lattice;
+	const int32 I = FMath::FloorToInt32(FX), J = FMath::FloorToInt32(FY);
+	const double TX = FMath::SmoothStep(0.0, 1.0, FX - I), TY = FMath::SmoothStep(0.0, 1.0, FY - J);
+	auto H = [](int32 A, int32 B) { return CrownGrain(A * 7 + 3, B * 13 + 5); };
+	const double V = FMath::Lerp(FMath::Lerp(H(I, J), H(I + 1, J), TX), FMath::Lerp(H(I, J + 1), H(I + 1, J + 1), TX), TY);
+	return 0.82 + (V - 0.72) / 0.44 * 0.32;
+}
+
 void RecomputeNormals(FMeshData& M, int32 FirstVertex)
 {
 	for (int32 V = FirstVertex; V < M.Vertices.Num(); ++V) M.Normals[V] = FVector::ZeroVector;
@@ -254,7 +269,8 @@ bool BuildMass(const FMass& Mass, const FGroundSampler& Ground, FMeshData& Out, 
 			Out.Vertices.Add(FVector((GI0 + I) * MassCell, (GJ0 + J) * MassCell, Top));
 			Out.Normals.Add(FVector::UpVector);
 			// Valeur par couronne (+-18 %) : une canopee n'est pas un aplat ; la lisiere, eclairee de cote, un peu plus claire.
-			const float V = static_cast<float>((0.82 + 0.4 * (Grain - 0.72)) * (1.0 + 0.15 * (1.0 - Wt)));
+			const float V = static_cast<float>((0.82 + 0.4 * (Grain - 0.72)) * (1.0 + 0.15 * (1.0 - Wt))
+				* StandTone((GI0 + I) * MassCell, (GJ0 + J) * MassCell));
 			Out.Colours.Add(FLinearColor(Mass.Colour.R * V, Mass.Colour.G * V, Mass.Colour.B * V, 1.0f));
 		}
 	}
@@ -278,8 +294,9 @@ bool BuildMass(const FMass& Mass, const FGroundSampler& Ground, FMeshData& Out, 
 
 bool BuildSilhouette(const FSilhouetteSpec& Spec, const FGroundSampler& Ground, FMeshData& Out, FString& Why)
 {
-	// Emprise de reference (uu) : tour 5 m, chapelle 13 x 7 m, hameau 40 x 30 m.
-	const double Half = (Spec.Kind == ESilhouette::Tower ? 300.0 : Spec.Kind == ESilhouette::Chapel ? 700.0 : 2200.0) * Spec.Scale;
+	// Emprise de reference (uu) : tour 5 m (6 m ruinee), chapelle 13 x 7 m, hameau 40 x 30 m.
+	const double Half = (Spec.Kind == ESilhouette::Tower ? 300.0 : Spec.Kind == ESilhouette::RuinedTower ? 350.0
+		: Spec.Kind == ESilhouette::Chapel ? 700.0 : 2200.0) * Spec.Scale;
 	const FVector2D Fwd(FMath::Cos(FMath::DegreesToRadians(Spec.Yaw)), FMath::Sin(FMath::DegreesToRadians(Spec.Yaw)));
 	const FVector2D Right(-Fwd.Y, Fwd.X);
 	double MinZ = TNumericLimits<double>::Max(), MaxZ = -TNumericLimits<double>::Max();
@@ -304,6 +321,19 @@ bool BuildSilhouette(const FSilhouetteSpec& Spec, const FGroundSampler& Ground, 
 	case ESilhouette::Tower:
 		AddTower(Out, Base, 500.0 * S, 1400.0 * S, 300.0 * S, Sink, Stone, StoneDark);
 		break;
+	case ESilhouette::RuinedTower:
+	{
+		// Fut de 6 m, 15 m sur trois cotes ; un angle effondre a 10 m, un pan a 12,5 m : un sommet rompu se lit
+		// a 2 km par son profil irregulier, la ou une tour entiere aurait un toit.
+		const double Side = 600.0 * S, Q = Side * 0.25;
+		const struct { double X, Y, H; } Piers[4] = { {-Q, -Q, 1500.0}, {Q, -Q, 1250.0}, {Q, Q, 1000.0}, {-Q, Q, 1450.0} };
+		for (const auto& Pier : Piers)
+		{
+			AddGabledBox(Out, FTransform(FRotator(0, Spec.Yaw, 0), Base.TransformPosition(FVector(Pier.X, Pier.Y, 0))),
+				Side * 0.5, Side * 0.5, Pier.H * S, 0.0, Sink, Stone, StoneDark);
+		}
+		break;
+	}
 	case ESilhouette::Chapel:
 		AddGabledBox(Out, Base, 1200.0 * S, 650.0 * S, 600.0 * S, 300.0 * S, Sink, Stone, Tile);
 		// Clocher-mur sur le pignon ouest : la marque qui distingue une chapelle d'une grange.
