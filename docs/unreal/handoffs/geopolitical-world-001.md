@@ -64,7 +64,7 @@ UNKNOWN : le joueur ne choisit rien face au monde exterieur en V1.
 
 ## ECARTS
 
-- n° 38 OUVERT (EXTENSION, A_TRANCHER) : monde exterieur, hote seulement. Decharge, `OnNewDay` est inchange au bit pres (`Anastasis.Sim.Geo.CalmeSansEffet` : empreinte du village et etat du flux `sim.rng` identiques avec un monde exterieur charge mais calme). Aucun tirage aleatoire nouveau. n° 34 a 37 sont pris par d'autres branches (premiere-pensee-001, soil water budget).
+- n° 38 OUVERT (EXTENSION, A_TRANCHER) : monde exterieur, hote seulement. Decharge, `OnNewDay` est inchange au bit pres (`Anastasis.Sim.Geo.CalmeSansEffet` : empreinte du village et etat du flux `sim.rng` identiques avec un monde exterieur charge mais calme). Aucun tirage aleatoire nouveau. Les quatre numeros precedant 38 sont reserves par d'autres branches non versees (premiere-pensee-001, soil water budget).
 
 ## INTEGRATION_RISK
 
