@@ -307,6 +307,7 @@ void UAnastasisSimulationSubsystem::SeedOpeningConstruction()
 			continue;
 		}
 		FirstSiteId = SiteId;
+		OpeningSiteId = SiteId;
 		for (const FString& BuilderId : ReachableBuilders) Village.SetJob(BuilderId, AnastasisBuild::JobBuilder);
 		UE_LOG(LogAnastasis_UnrealV2, Display,
 			TEXT("ANASTASIS_VILLAGE opening construction site=%s tile=(%d,%d) builders=%s stock=%d wood %d stone"),
@@ -314,6 +315,45 @@ void UAnastasisSimulationSubsystem::SeedOpeningConstruction()
 		return;
 	}
 	UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VILLAGE opening construction unavailable: no reachable site for any settler"));
+}
+
+void UAnastasisSimulationSubsystem::AssignCompletedOpeningHome()
+{
+	if (OpeningSiteId.IsEmpty()) return;
+	AnastasisVillage::FVillage& Village = Simulation.GetVillage();
+	const AnastasisVillage::FBuilding* House = Village.FindBuilding(OpeningSiteId);
+	if (!House)
+	{
+		OpeningSiteId.Reset();
+		return;
+	}
+	if (!House->IsCompleted()) return;
+	const FString HouseId = OpeningSiteId;
+	OpeningSiteId.Reset(); // Un seul essai apres l'achevement, aucun pathfinding par frame.
+	const AnastasisPath::FWorldNavSource Nav(Village.GetNavGrid(), Simulation.GetWorld());
+	FString BestId;
+	int32 BestLength = MAX_int32;
+	for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
+	{
+		if (Npc.JobId != AnastasisBuild::JobBuilder || !Npc.HomeId.IsEmpty()) continue;
+		for (const AnastasisVillage::FPoint& Door : House->AccessPoints)
+		{
+			TArray<AnastasisVillage::FPoint> Path;
+			if (AnastasisPath::FindPath(Nav, { Npc.X, Npc.Y }, Door, {}, Path) && Path.Num() < BestLength)
+			{
+				BestId = Npc.Id;
+				BestLength = Path.Num();
+			}
+		}
+	}
+	if (!BestId.IsEmpty() && Village.AssignHome(BestId, HouseId))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE opening home assigned npc=%s home=%s"), *BestId, *HouseId);
+	}
+	else
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VILLAGE opening home unassigned site=%s: no reachable homeless builder"), *HouseId);
+	}
 }
 
 void UAnastasisSimulationSubsystem::ReplaceStartVillage()
@@ -343,6 +383,8 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	bPendingStartVillage = false;
 	StartVillageWait = 0.0;
 	SettlementSiteReport = TEXT("{\"status\":\"reset\"}");
+	FirstSiteId.Reset();
+	OpeningSiteId.Reset();
 	Simulation.Reset(Seed, AnastasisWorldView::ReferenceWidth, AnastasisWorldView::ReferenceHeight);
 	Simulation.GetVillage().SetTerrainTravelCostEnabled(CVarVillageRouteCost.GetValueOnGameThread() != 0);
 	LoggedDay = Simulation.GetDay();
@@ -417,6 +459,7 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 		EffectiveRate += (Advanced / static_cast<double>(DeltaTime) - EffectiveRate) * Alpha;
 	}
 	LogDayIfChanged();
+	AssignCompletedOpeningHome();
 	SyncVillagePresentation();
 	VillagePresentation.SyncVillagers(
 		Simulation.GetVillage(), Simulation.GetWorld(), GetWorld(),
@@ -1529,12 +1572,15 @@ FString UAnastasisSimulationDebugLibrary::GetBuildStatus(const UObject* WorldCon
 	const FVector S = FAnastasisVillagePresentation::SimToUnreal(W, Site->X + 0.5, Site->Y + 0.5, PresentationWorld);
 	const FVector N = Builder ? FAnastasisVillagePresentation::SimToUnreal(W, Builder->X, Builder->Y, PresentationWorld) : S;
 	const AnastasisBuild::FSiteMaterials& M = Site->Materials;
+	const AnastasisVillage::FNpc* Owner = Site->Owner.IsEmpty() ? nullptr : V.FindNpc(Site->Owner);
 	return FString::Printf(
 		TEXT("{\"site\":true,\"time\":%.4f,\"type\":\"%s\",\"progress\":%.4f,\"pieces\":%d,\"completed\":%s,")
+		TEXT("\"id\":\"%s\",\"owner\":\"%s\",\"ownerHome\":\"%s\",\"ownerRests\":%d,")
 		TEXT("\"needWood\":%d,\"needStone\":%d,\"consumedWood\":%d,\"consumedStone\":%d,\"stockWood\":%d,\"stockStone\":%d,")
 		TEXT("\"workers\":%d,\"byNpcs\":%d,\"building\":%d,\"goal\":\"%s\",\"activity\":\"%s\",\"session\":%s,")
 		TEXT("\"sx\":%.1f,\"sy\":%.1f,\"sz\":%.1f,\"nx\":%.1f,\"ny\":%.1f,\"nz\":%.1f}"),
 		Sim.GetTime(), *Site->Type, Site->Progress, Site->PiecesPlaced, Site->Progress >= 1.0 ? TEXT("true") : TEXT("false"),
+		*Site->Id, *Site->Owner, Owner ? *Owner->HomeId : TEXT(""), Owner ? Owner->RestsTaken : 0,
 		M.NeedWood, M.NeedStone, M.ConsumedWood, M.ConsumedStone, M.StockWood, M.StockStone,
 		Site->Workers.Num(), ByNpcs, Building,
 		Builder ? *Builder->Goal : TEXT(""), Builder ? *Builder->Activity : TEXT(""),

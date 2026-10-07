@@ -75,10 +75,11 @@ def tick(_dt):
                      any(abs(pos[0] - builder_positions[0][id][0]) + abs(pos[1] - builder_positions[0][id][1]) > 100
                          for sample in builder_positions[1:] for id, pos in sample.items()
                          if id in builder_positions[0]))
-    if moved and drank and worked and slept and claimed and len(goals) >= 3 and built and builder_moved and build.get('completed'):
-        finish(True, 'id=%s home=%s work=%s drinks=%d deliveries=%d rests=%d site_pieces=%d builders=%d' %
+    owned_home = build.get('completed') and build.get('owner') and build.get('ownerHome') == build.get('id')
+    if moved and drank and worked and slept and claimed and len(goals) >= 3 and built and builder_moved and owned_home:
+        finish(True, 'id=%s home=%s work=%s drinks=%d deliveries=%d rests=%d site_pieces=%d builders=%d owner=%s owner_rests=%d' %
                (row['id'], row['home'], row['work'], row['drinks'], row['deliveries'], row['rests'],
-                build['pieces'], len(builders)))
+                build['pieces'], len(builders), build['owner'], build['ownerRests']))
 
 
 handle = unreal.register_slate_post_tick_callback(tick)

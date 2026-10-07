@@ -143,6 +143,8 @@ private:
 	void SeedOpeningHousehold();
 	/** Un chantier initial fini par les habitants existants, sans creer de PNJ ni modifier AnastasisSim. */
 	void SeedOpeningConstruction();
+	/** Attribue la maison achevee a un de ses bâtisseurs capable d'en atteindre l'acces. */
+	void AssignCompletedOpeningHome();
 	bool bPendingStartVillage = false;
 	double StartVillageWait = 0.0;
 	FString SettlementSiteReport = TEXT("{\"status\":\"not_started\"}");
@@ -151,6 +153,7 @@ private:
 	FAnastasisVillagePresentation VillagePresentation;
 	FString FarmerGranaryId;
 	FString FirstSiteId;
+	FString OpeningSiteId;
 	FIntPoint FarmerField = FIntPoint(-1, -1);
 	int32 LoggedDay = 0;
 	/** True only after OnWorldBeginPlay. Tests ResetCanonical without the engine ticker. */
