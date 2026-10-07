@@ -19,6 +19,11 @@ struct FSample
     double RoadWeight = 0;
 };
 FSample Evaluate(double X, double Y, double OriginalHeight);
+/** Initial worldgen land use only. Field tiles carry the crop tone; all other valley
+ * ground stays alluvium. No claim about later harvest/regrowth: the snapshot is static.
+ * X/Y are source tile coordinates, as in Evaluate.
+ */
+FLinearColor ValleyLandUseToneAt(const AnastasisWorldView::FWorldVisualSnapshot& Snapshot, double X, double Y);
 /** Authored river centrelines, upstream first: XY in the same tile coordinates as Evaluate,
  * Z = water height in metres of the unscaled relief. Read by HYDRO_NETWORK_001. */
 TArray<TArray<FVector>> AuthoredRivers();

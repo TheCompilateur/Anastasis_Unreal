@@ -1,4 +1,10 @@
 #include "WorldView/AnastasisHumanGeography.h"
+#include "HAL/IConsoleManager.h"
+
+static TAutoConsoleVariable<int32> CVarFieldTruth(
+    TEXT("anastasis.Terrain.FieldTruth"), 1,
+    TEXT("1=field tones only on generated Field tiles; 0=legacy sinusoidal valley parcel tint (A/B reference)."),
+    ECVF_Default);
 
 namespace
 {
@@ -120,6 +126,25 @@ AnastasisHumanGeography::FSample AnastasisHumanGeography::Evaluate(double X,doub
     return Out;
 }
 
+FLinearColor AnastasisHumanGeography::ValleyLandUseToneAt(
+    const AnastasisWorldView::FWorldVisualSnapshot& S, double X, double Y)
+{
+    // The previous sinusoidal "parcels" had no simulation authority. Keep the
+    // general alluvium continuous; only an actual Field tile reads as worked land.
+    const FLinearColor Alluvium(0.127f, 0.148f, 0.075f, 0.0f);
+    if (!FMath::IsFinite(X) || !FMath::IsFinite(Y)) return Alluvium;
+    const AnastasisWorldView::FVisualTile* Tile =
+        AnastasisWorldView::FindTile(S, FMath::FloorToInt(X), FMath::FloorToInt(Y));
+    if (!Tile || Tile->Type != AnastasisWorld::ETileType::Field) return Alluvium;
+    switch (Tile->CropId)
+    {
+    case AnastasisWorld::ECropId::Grain:  return FLinearColor(0.160f, 0.151f, 0.084f, 0.0f);
+    case AnastasisWorld::ECropId::Greens: return FLinearColor(0.105f, 0.143f, 0.071f, 0.0f);
+    case AnastasisWorld::ECropId::Fruit:  return FLinearColor(0.126f, 0.134f, 0.074f, 0.0f);
+    case AnastasisWorld::ECropId::Fallow: return FLinearColor(0.135f, 0.112f, 0.069f, 0.0f);
+    default:                             return FLinearColor(0.133f, 0.130f, 0.074f, 0.0f);
+    }
+}
 void AnastasisHumanGeography::Apply(const AnastasisWorldView::FWorldVisualSnapshot& S,
     AnastasisTerrainSurface::FGeometry& G,int32 W,int32 H)
 {
@@ -138,13 +163,22 @@ void AnastasisHumanGeography::Apply(const AnastasisWorldView::FWorldVisualSnapsh
         if(V.ValleyWeight>0 && V.Height>V.WaterHeight)
         {
             const float Blend=static_cast<float>(V.ValleyWeight);
-            // FOREST_TERRAIN_P4 : plus une couleur unique (0.31, 0.40, 0.19), 2.5 fois plus claire
-            // que toute herbe calibree et identique sur tout le fond : une prairie alluviale a
-            // l'albedo du sol, qui alterne pres et chaumes paille par parcelles de 100 a 200 m.
-            const double TX=P.X/(AnastasisWorldView::TileWorldSize*Scale), TY=P.Y/(AnastasisWorldView::TileWorldSize*Scale);
-            const float Parcel=static_cast<float>(0.5+0.5*FMath::Sin(TX*0.9+1.3*FMath::Sin(TY*0.7))*FMath::Sin(TY*1.1+0.3*TX));
-            const FLinearColor Alluvium=FMath::Lerp(FLinearColor(0.120f,0.150f,0.068f,0.0f),FLinearColor(0.165f,0.152f,0.085f,0.0f),Parcel);
-            G.Colors[I]=FMath::Lerp(G.Colors[I],Alluvium,Blend);
+            // FIELD_TRUTH_001: alluvium is geological, not a fictitious parcel.
+            // Only worldgen Field tiles may carry a crop tone in this static snapshot.
+            const double TX=P.X/(AnastasisWorldView::TileWorldSize*Scale);
+            const double TY=P.Y/(AnastasisWorldView::TileWorldSize*Scale);
+            FLinearColor LandUse;
+            if(CVarFieldTruth.GetValueOnAnyThread() != 0)
+            {
+                LandUse=ValleyLandUseToneAt(S,TX,TY);
+            }
+            else
+            {
+                // Frozen reference for a same-binary A/B; never a source of land-use truth.
+                const float Parcel=static_cast<float>(0.5+0.5*FMath::Sin(TX*0.9+1.3*FMath::Sin(TY*0.7))*FMath::Sin(TY*1.1+0.3*TX));
+                LandUse=FMath::Lerp(FLinearColor(0.120f,0.150f,0.068f,0.0f),FLinearColor(0.165f,0.152f,0.085f,0.0f),Parcel);
+            }
+            G.Colors[I]=FMath::Lerp(G.Colors[I],LandUse,Blend);
             G.UV0[I]*=(1.0-Blend);
             G.UV1[I].X=FMath::Lerp(G.UV1[I].X,0.15,static_cast<double>(Blend));
         }

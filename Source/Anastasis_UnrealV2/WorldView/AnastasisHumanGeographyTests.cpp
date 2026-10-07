@@ -60,6 +60,48 @@ double LargestGentlePatch(const AnastasisTerrainForge::FMesh& M,double X0,double
 }
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHumanGeographyFieldTruth,
+    "Anastasis.Terrain.HumanGeography.FieldTruth",
+    EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FHumanGeographyFieldTruth::RunTest(const FString&)
+{
+    using namespace AnastasisWorldView;
+    FWorldVisualSnapshot S;
+    S.SourceW=4; S.SourceH=4; S.W=4; S.H=4;
+    S.Tiles.SetNum(16);
+    for(int32 Y=0;Y<4;++Y) for(int32 X=0;X<4;++X)
+    {
+        FVisualTile& T=S.Tiles[Y*4+X];
+        T.X=X; T.Y=Y; T.SourceIndex=Y*4+X;
+        T.Type=AnastasisWorld::ETileType::Grass;
+    }
+    const FLinearColor Alluvium=AnastasisHumanGeography::ValleyLandUseToneAt(S,0.5,0.5);
+    TestTrue(TEXT("no fictitious parcels across non-field alluvium"),
+        Alluvium.Equals(AnastasisHumanGeography::ValleyLandUseToneAt(S,3.5,3.5)));
+    FVisualTile& Field=S.Tiles[1*4+2];
+    Field.Type=AnastasisWorld::ETileType::Field;
+    Field.Resource=AnastasisWorld::EResource::Food;
+    Field.CropId=AnastasisWorld::ECropId::Grain;
+    Field.Amount=30;
+    const FLinearColor Grain=AnastasisHumanGeography::ValleyLandUseToneAt(S,2.5,1.5);
+    TestFalse(TEXT("only a real field gets a worked-land tone"),Grain.Equals(Alluvium));
+    TestTrue(TEXT("neighboring non-field remains alluvium"),
+        AnastasisHumanGeography::ValleyLandUseToneAt(S,1.5,1.5).Equals(Alluvium));
+    Field.Amount=1;
+    TestTrue(TEXT("static worldgen snapshot does not pretend to show harvest"),
+        Grain.Equals(AnastasisHumanGeography::ValleyLandUseToneAt(S,2.5,1.5)));
+    Field.CropId=AnastasisWorld::ECropId::Fallow;
+    TestFalse(TEXT("fallow is visually distinct from initial grain"),
+        Grain.Equals(AnastasisHumanGeography::ValleyLandUseToneAt(S,2.5,1.5)));
+    const FWorldVisualSnapshot Crop=CropSnapshot(S,2,1,2,2);
+    TestTrue(TEXT("crop origin preserves source-tile coordinate authority"),
+        AnastasisHumanGeography::ValleyLandUseToneAt(S,2.5,1.5).Equals(
+            AnastasisHumanGeography::ValleyLandUseToneAt(Crop,2.5,1.5)));
+    Field.Type=AnastasisWorld::ETileType::Grass;
+    TestTrue(TEXT("without Field type, crop metadata cannot invent a parcel"),
+        AnastasisHumanGeography::ValleyLandUseToneAt(S,2.5,1.5).Equals(Alluvium));
+    return true;
+}
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FHumanGeographyScale,"Anastasis.Terrain.HumanGeography.ScaleAndSampler",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FHumanGeographyScale::RunTest(const FString&)
 {
