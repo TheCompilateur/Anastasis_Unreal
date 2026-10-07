@@ -42,6 +42,7 @@ UNKNOWN — aucun joueur libre n'a encore contemplé la nuit dans cette mission.
 ## INTEGRATION_RISK
 
 - `AnastasisWorldAtmosphere.h/.cpp` sont des fichiers chauds : rebaser sur le `main` le plus récent après le lot en cours.
+- `nox-001` travaille en parallèle sur la lumière lunaire dans ce même `.cpp`. Le dôme suit déjà son contrôle optionnel `MoonFraction` quand le profil NOX est actif ; vérifier l'empilement une fois NOX versé. Sans NOX, la lune reste pleine.
 - La création des trois `.uasset` et leur compilation de matériau sont requises ; la preuve visuelle est reportée sur demande d'Alexandre.
 - `sky-clock-pie` vérifie la traversée du cycle et ses phases ; il ne juge ni la beauté ni la lisibilité des météores.
 

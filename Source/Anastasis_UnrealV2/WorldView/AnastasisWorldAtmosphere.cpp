@@ -531,8 +531,21 @@ void AAnastasisWorldAtmosphere::UpdateCosmicSky(const bool bForceLog)
 	const float Intensity = FMath::Clamp(CVarCosmicIntensity.GetValueOnGameThread(), 0.0f, 3.0f);
 	const FVector MoonDir = -LastSky.MoonRotation.Vector();
 	const float MoonRise = FMath::Clamp(static_cast<float>(AnastasisSkyClock::ElevationOf(LastSky.MoonRotation) / 6.0), 0.0f, 1.0f);
+	// If NOX's opt-in moonless night is present, the painted moon must agree with
+	// its physical moonlight. Without NOX (or with profile 0), keep the full moon.
+	float MoonFraction = 1.0f;
+	if (IConsoleVariable* NoxProfile = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Nox.Profile")))
+	{
+		if (NoxProfile->GetInt() > 0)
+		{
+			if (IConsoleVariable* NoxMoon = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Nox.MoonFraction")))
+			{
+				MoonFraction = FMath::Clamp(NoxMoon->GetFloat(), 0.0f, 1.0f);
+			}
+		}
+	}
 	CosmicSkyInstance->SetScalarParameterValue(TEXT("NightStrength"), Night.Visibility * Intensity);
-	CosmicSkyInstance->SetScalarParameterValue(TEXT("MoonStrength"), Night.Visibility * MoonRise * Intensity);
+	CosmicSkyInstance->SetScalarParameterValue(TEXT("MoonStrength"), Night.Visibility * MoonRise * MoonFraction * Intensity);
 	CosmicSkyInstance->SetVectorParameterValue(TEXT("MoonDir"), FLinearColor(MoonDir.X, MoonDir.Y, MoonDir.Z, 0));
 	CosmicSkyInstance->SetScalarParameterValue(TEXT("SkyRotation"), static_cast<float>(
 		2.0 * UE_DOUBLE_PI * (LastSky.Hours / 24.0 + (LastSky.Day - 1.0) / 120.0)));
