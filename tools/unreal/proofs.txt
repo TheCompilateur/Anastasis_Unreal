@@ -83,3 +83,5 @@ world-theatre-read | tools/unreal/world-theatre-read.py | WORLD_THEATRE_READ_PIE
 world-theatre-capture | tools/unreal/world-theatre-capture.py | WORLD_THEATRE_CAPTURE COMPLETE | WORLD_THEATRE_CAPTURE FAIL|Traceback | 900 | ANASTASIS_THEATRE_OUT=@Saved/WorldTheatreEvidence/capture
 places-lifecycle | tools/unreal/places-lifecycle.py | PLACES_LIFECYCLE COMPLETE | PLACES_LIFECYCLE FAIL|Traceback | 420 | ANASTASIS_PLACES_LIFECYCLE_OUT=@Saved/PlacesLifecycleEvidence
 
+# WORLD_THEATRE v2.1 : lumiere de distance, memes vistas, 11 h et 19 h : sonde de profondeur, masses, lumiere (deux reglages), temoin ; mesure par world-theatre-analyze.py --luminance.
+world-theatre-light-capture | tools/unreal/world-theatre-capture.py | WORLD_THEATRE_CAPTURE COMPLETE | WORLD_THEATRE_CAPTURE FAIL|Traceback | 1800 | ANASTASIS_THEATRE_OUT=@Saved/WorldTheatreEvidence/light;ANASTASIS_THEATRE_STATES=depth,masses,light,light_strong,masses2;ANASTASIS_THEATRE_HOURS=11,19

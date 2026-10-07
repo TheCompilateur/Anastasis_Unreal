@@ -114,3 +114,42 @@ les côtés), derrière une CVar du propriétaire. Aucune mutation n'est faite p
 
 Rien ne streame : la couche est un seul `ProceduralMeshComponent` résident, la composition survit à tout
 déplacement du joueur. Coût mesuré au chargement : 4,2 s (relevé + drapage) en PIE, 113 340 triangles (run 1).
+
+## v2.1 — la lumière : le lointain cesse d'être la chose la plus claire (world-theatre-light-001)
+
+**Constat mesuré, sur la profondeur vraie** (sonde `M_WorldTheatreDepthProbe`, validée contre la géométrie :
+rapport médian 0,89–1,08 sur le terrain lointain, ciel concordant à 96–99 %). Avant v2.1, le lointain est plus
+clair que le plan moyen : ×2,74 du village vers la chaîne (V1, horizon ×4,6), ×1,45 vers l'ouverture (V2).
+
+**Moyen** : `M_WorldTheatreDistance`, post-traitement avant tonemapper, non borné, priorité basse, posé sur
+l'acteur du théâtre. Au-delà de `Start` km, perte de valeur (`Darken`), de saturation (`Desaturate`) et de chaleur
+(teinte 0,86 / 0,94 / 1,06) jusqu'à `Full` km. Le ciel ne suit que dans sa **bande basse** (0 à 12° au-dessus de
+l'horizon, à 70 %) ; le zénith reste intact. Aucun réglage d'atmosphère d'un autre propriétaire n'est touché.
+CVars `anastasis.Theatre.Light` (0 par défaut) et `anastasis.Theatre.Light.*` (Start, Full, Darken, Desaturate,
+Cool, Sky, Horizon), à chaud.
+
+**Itération** : le premier réglage laissait le ciel intact. À 19 h, la chaîne assombrie se découpait alors dans une
+brume du soir restée claire (papier découpé). La bande basse du ciel suit désormais le lointain.
+
+**Mesure, 11 h** (`--luminance`, horizon / plan moyen, luminance médiane ; run final, bande de ciel comprise) :
+
+| Vista | avant | **défaut (0,45)** | fort (0,60) |
+|---|---|---|---|
+| V1 village → chaîne | 4,43 | **2,35** | 1,74 |
+| V2 village → ouverture | 1,60 | **0,83** | 0,58 |
+| V3 point haut | 1,05 | **0,53** | 0,36 |
+| V5 bord est | 1,26 | **0,59** | 0,40 |
+| V6 approche | 1,22 | **0,58** | 0,39 |
+
+Ciel médian inchangé (0,182 → 0,183) ; témoin (masses2 / masses) identique à 0,001 près. Le plan moyen de V1 est fait
+des arbres sombres de la carte : le rapport y reste > 1 ; l'image montre une chaîne passée du blanc craie au gris
+ardoise. **19 h** : scène très sombre (luminances 0,003–0,02), rapports instables et une valeur incohérente
+(V2 « défaut » plus sombre que « fort ») : aucun chiffre revendiqué au crépuscule, verdict à l'image seulement.
+
+**Lecture** : en assombrissant, la couche **rend le relief** que la brume blanche effaçait (crêtes, ravines de la
+muraille, V5 / V6). À 19 h, la chaîne sort de la brume comme une masse sombre ; sa base, la lisière des masses
+forestières, se lit encore en frise dentelée. Effet de bord mesuré : la saturation du lointain monte légèrement
+à 11 h (0,29 → 0,32 en V1), la teinte froide l'emportant sur la désaturation ; à l'œil, le lointain se lit ardoise.
+
+**Pas encore fait (v2.1 → v2.2)** : variation dans le lointain (ombres de nuages, volumes de brouillard sombres par
+secteur), nuit, et tout ce qui lie la menace à la simulation.

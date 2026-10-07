@@ -11,7 +11,12 @@ Variables :
   ANASTASIS_THEATRE_OUT     dossier (obligatoire)
   ANASTASIS_THEATRE_VISTAS  fichier de vistas (defaut docs/unreal/world-theatre-001/vistas.json)
   ANASTASIS_THEATRE_ONLY    ids de vistas separes par ',' (defaut : toutes)
-  ANASTASIS_THEATRE_STATES  etats separes par ',' parmi off,on,off2 (defaut off,on,off2)
+  ANASTASIS_THEATRE_STATES  etats separes par ',' (defaut off,on,off2). Etats connus :
+                            off / off2 : rien ; on : masses ; masses / masses2 : masses seules (v2.1) ;
+                            light : masses + lumiere de distance ; light_soft / light_strong : reglages voisins ;
+                            depth : sonde de profondeur (gris, mesure).
+                            Etat libre : nom:cmd1|cmd2 (ex. dark60:anastasis.Theatre 1|anastasis.Theatre.Light 1|
+                            anastasis.Theatre.Light.Darken 0.6) -- chaque etat repart de off.
   ANASTASIS_THEATRE_HOUR    heure du ciel (defaut 11 : lumiere neutre, ni rasante ni zenithale)
 Verdict : WORLD_THEATRE_CAPTURE COMPLETE (toutes les images ecrites) ou FAIL <raison>. Technique, pas artistique.
 Rien n'est sauve.
@@ -25,6 +30,9 @@ VISTAS = pathlib.Path(os.environ.get('ANASTASIS_THEATRE_VISTAS') or (ROOT / 'doc
 ONLY = [v for v in os.environ.get('ANASTASIS_THEATRE_ONLY', '').split(',') if v]
 STATES = [s for s in os.environ.get('ANASTASIS_THEATRE_STATES', 'off,on,off2').split(',') if s]
 HOUR = os.environ.get('ANASTASIS_THEATRE_HOUR', '11')
+# Plusieurs heures dans le meme editeur : '11,19'. Avec plus d'une heure, les images portent le suffixe _h<heure>
+# (sauf la sonde de profondeur, qui ne depend pas de l'heure : prise a la premiere seulement).
+HOURS = [h for h in os.environ.get('ANASTASIS_THEATRE_HOURS', HOUR).split(',') if h]
 SHOTS_DIR = ROOT / 'Saved' / 'Screenshots'
 CAMERA_LABEL = 'WorldTheatreProofCamera'
 SETTLE_FIRST_S = 16.0
@@ -69,8 +77,33 @@ def cmd(world, c):
     unreal.SystemLibrary.execute_console_command(world, c)
 
 
+RESET = ['anastasis.Theatre 0', 'anastasis.Theatre.Light 0', 'anastasis.Theatre.DepthProbe 0']
+KNOWN = {
+    'off': [], 'off2': [],
+    'on': ['anastasis.Theatre 1'],
+    'masses': ['anastasis.Theatre 1'], 'masses2': ['anastasis.Theatre 1'],
+    'light': ['anastasis.Theatre 1', 'anastasis.Theatre.Light 1'],
+    'depth': ['anastasis.Theatre 1', 'anastasis.Theatre.DepthProbe 1'],
+    # Reglages voisins, pour choisir sur image et sur mesure dans le meme editeur.
+    'light_soft': ['anastasis.Theatre 1', 'anastasis.Theatre.Light 1', 'anastasis.Theatre.Light.Darken 0.30',
+                   'anastasis.Theatre.Light.Desaturate 0.30', 'anastasis.Theatre.Light.Start 2.0'],
+    'light_strong': ['anastasis.Theatre 1', 'anastasis.Theatre.Light 1', 'anastasis.Theatre.Light.Darken 0.60',
+                     'anastasis.Theatre.Light.Desaturate 0.60', 'anastasis.Theatre.Light.Start 1.0'],
+}
+# Chaque etat repart des reglages par defaut de la lumiere.
+RESET += ['anastasis.Theatre.Light.Darken 0.45', 'anastasis.Theatre.Light.Desaturate 0.45',
+          'anastasis.Theatre.Light.Start 1.5', 'anastasis.Theatre.Light.Full 9', 'anastasis.Theatre.Light.Cool 1',
+          'anastasis.Theatre.Light.Sky 0.7', 'anastasis.Theatre.Light.Horizon 12']
+
+
+def state_name(state):
+    return state.split(':', 1)[0]
+
+
 def state_cmds(state):
-    return ['anastasis.Theatre %d' % (1 if state == 'on' else 0)]
+    if ':' in state:
+        return RESET + [c.strip() for c in state.split(':', 1)[1].split('|') if c.strip()]
+    return RESET + KNOWN[state]
 
 
 def tick(_dt):
@@ -82,7 +115,7 @@ def tick(_dt):
     phase = st['phase']
     if phase == 'boot':
         if el > 3:
-            for c in ('anastasis.Sky.Day 1', 'anastasis.Sky.Hour ' + HOUR, 'anastasis.Sky.Humidity 0', 'anastasis.Theatre 0'):
+            for c in ('anastasis.Sky.Day 1', 'anastasis.Sky.Hour ' + HOURS[0], 'anastasis.Sky.Humidity 0', 'anastasis.Theatre 0'):
                 cmd(None, c)
             les.editor_request_begin_play()
             st['phase'], st['mark'] = 'pie', now
@@ -112,7 +145,9 @@ def tick(_dt):
         if pc:
             pc.set_view_target_with_blend(cam, 0.0)
         # Etat d'abord, vistas ensuite : la couche ne se rebatit qu'une fois par etat.
-        st['queue'] = [(s, v) for s in STATES for v in vistas]
+        st['queue'] = [(h, s, v) for h in HOURS for s in STATES for v in vistas
+                       if not (state_name(s) == 'depth' and h != HOURS[0])]
+        st['current_hour'] = HOURS[0]
         st['current_state'] = None
         report['vistas'] = {v['id']: v for v in vistas}
         st['phase'], st['mark'] = 'next', now
@@ -122,8 +157,13 @@ def tick(_dt):
             cmd(world, 'anastasis.Theatre.Status')
             finish(True, 'images=%d' % len(report['shots']))
             return
-        state, v = st['queue'][0]
+        hour, state, v = st['queue'][0]
         settle = SETTLE_S
+        if hour != st['current_hour']:
+            cmd(world, 'anastasis.Sky.Hour ' + hour)
+            st['current_hour'] = hour
+            st['current_state'] = None
+            settle = SETTLE_S + 8.0
         if state != st['current_state']:
             for c in state_cmds(state):
                 cmd(world, c)
@@ -157,16 +197,17 @@ def tick(_dt):
             if now - st['fired_at'] > 20:
                 finish(False, 'Shot sans fichier')
             return
-        state, v = st['queue'][0]
-        dst = OUT / ('%s_%s.png' % (v['id'], state))
+        hour, state, v = st['queue'][0]
+        suffix = '' if len(HOURS) == 1 or state_name(state) == 'depth' else '_h' + hour
+        dst = OUT / ('%s_%s%s.png' % (v['id'], state_name(state), suffix))
         try:
             if dst.exists():
                 dst.unlink()
             fresh[-1].replace(dst)
         except OSError:
             return
-        report['shots']['%s_%s' % (v['id'], state)] = str(dst)
-        log('SHOT %s %s' % (v['id'], state))
+        report['shots'][dst.stem] = {'file': str(dst), 'cmds': state_cmds(state), 'hour': hour}
+        log('SHOT %s %s h%s' % (v['id'], state_name(state), hour))
         st['queue'].pop(0)
         st['phase'], st['mark'] = 'next', now
 

@@ -8,6 +8,8 @@
 class AActor;
 class AAnastasisWorldEmbodiment;
 class UMaterialInterface;
+class UMaterialInstanceDynamic;
+class UPostProcessComponent;
 class UProceduralMeshComponent;
 
 /**
@@ -21,6 +23,10 @@ class UProceduralMeshComponent;
  * `anastasis.Theatre 0` retire la couche en entier (A/B propre, a chaud) ; 1 la rebatit.
  * Le niveau n'est pas World Partition et le monde est transitoire : la Data Layer native ne s'applique pas,
  * la CVar en tient lieu (meme role : une couche qu'on allume ou coupe d'un geste).
+ *
+ * v2.1, la lumiere (`anastasis.Theatre.Light 0/1`, independante des masses) : un post-traitement non borne pose sur
+ * le meme acteur assombrit, desature et refroidit ce qui est loin (M_WorldTheatreDistance) ; le village reste la
+ * poche de lumiere. `anastasis.Theatre.DepthProbe 1` ecrit la profondeur en gris (instrument de mesure).
  *
  * Commandes : `anastasis.Theatre.Read <dossier>` (releve pour l'analyse), `anastasis.Theatre.Rebuild`,
  * `anastasis.Theatre.Status`.
@@ -52,6 +58,8 @@ private:
 	uint64 EmbodimentSignature(const AAnastasisWorldEmbodiment& Embodiment) const;
 	AActor* EnsureActor();
 	UMaterialInterface* ResolveMaterial();
+	/** v2.1 : pose ou retire le post-traitement de distance et la sonde, et y recopie les CVars. */
+	void UpdateLight();
 
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> HostActor;
@@ -59,6 +67,13 @@ private:
 	TObjectPtr<UProceduralMeshComponent> Mesh;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInterface> Material;
+	UPROPERTY(Transient)
+	TObjectPtr<UPostProcessComponent> LightVolume;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> DistanceMaterial;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> ProbeMaterial;
+	int32 LoggedLight = -1;
 
 	AnastasisWorldTheatre::FBuildReport LastReport;
 	bool bBuilt = false;

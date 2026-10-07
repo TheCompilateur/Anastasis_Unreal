@@ -379,12 +379,21 @@ def main():
     ap.add_argument('--resolve-vistas', action='store_true', help='ecrit z (sol rendu + eye_m) dans le fichier de vistas')
     ap.add_argument('--compose', action='store_true', help='plan de masses de l avant-pays + apercu logiciel des vistas apres')
     ap.add_argument('--emit-plan', help='ecrit le plan C++ (AnastasisWorldTheatrePlan.inl) a ce chemin')
+    ap.add_argument('--luminance', help='dossier de captures (<vista>_<etat>.png) : luminance par plan de distance')
     a = ap.parse_args()
     out = a.out or os.path.join(a.reading, 'analysis')
     os.makedirs(out, exist_ok=True)
     meta, near, far, placed = load(a.reading)
     nz, fz = fill_nan(near.ground), fill_nan(far.ground)
     world = World(near, far, nz, fz)
+    if a.luminance:
+        with open(a.vistas, encoding='utf-8') as f:
+            lv = json.load(f)['vistas']
+        res = luminance_by_plane(a.luminance, lv, canopy_world(near, far, nz, fz, placed))
+        with open(os.path.join(a.luminance, 'luminance.json'), 'w', encoding='utf-8') as f:
+            json.dump(res, f, indent=1)
+        print_luminance(res)
+        return
     mp = meta['map']
     map_min, map_max = mp['min'], mp['max']
     map_area_m2 = (map_max[0] - map_min[0]) * (map_max[1] - map_min[1]) / UU_PER_M ** 2
@@ -1119,6 +1128,90 @@ def compose_masses(near, nz, nf, water, inside, placed, meta, village_xy, rules)
     stats = {'allowed_ha': float(allowed.sum() * cell_ha), 'forest_ha': float(sum(m['ha'] for m in masses)),
              'components': len(sizes) - 1, 'kept': len(masses), 'seam_trees_per_ha_by_side_S_N_W_E': seam_report}
     return masses, stats, (apt_s, mask, lab, k)
+
+
+# ---------------------------------------------------------------- lumiere (v2.1) : la valeur par plan de distance
+
+def canopy_world(near, far, nz, fz, placed):
+    """Relief + hauteur des objets poses (arbres, arbustes, batiments, ruines) : ce qui arrete vraiment le regard."""
+    canopy = nz.copy()
+    for f, m_, x, y, zz, hh, rr in placed:
+        if f not in ('tree', 'shrub', 'building', 'ruin'):
+            continue
+        ci, cj = near.ij(x, y)
+        r_cells = max(0, int(rr / near.cell))
+        for dj in range(-r_cells, r_cells + 1):
+            for di in range(-r_cells, r_cells + 1):
+                ii_, jj_ = int(round(ci)) + di, int(round(cj)) + dj
+                if 0 <= ii_ < near.w and 0 <= jj_ < near.h:
+                    canopy[jj_, ii_] = max(canopy[jj_, ii_], zz + hh)
+    return World(near, far, canopy, fz)
+
+
+def srgb_to_linear(c):
+    c = c / 255.0
+    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+
+
+# Plans de lecture de la lumiere : PROCHE < 60 m, MOYEN 60 m - 1 km, LOIN 1 - 8 km, HORIZON > 8 km, CIEL.
+def luminance_by_plane(folder, vistas, world):
+    """Pour chaque image <vista>_<etat>.png : luminance relative (sRGB linearise, Rec.709) mediane par plan,
+    saturation mediane, rapport bleu/rouge (froideur). La profondeur vient du rendu logiciel de la MEME camera
+    (relief + canopee releves) : approximative aux bords d'un plan, robuste en mediane."""
+    out = {}
+    for v in vistas:
+        files = sorted(f for f in os.listdir(folder) if f.startswith(v['id'] + '_') and f.endswith('.png'))
+        if not files:
+            continue
+        img0 = Image.open(os.path.join(folder, files[0]))
+        W, H = img0.size
+        probe = os.path.join(folder, v['id'] + '_depth.png')
+        if os.path.exists(probe):
+            # Sonde M_WorldTheatreDepthProbe : gris = (log2(metres) + 1) / 18, ecrit apres le tonemapper. Profondeur VRAIE
+            # du pixel, feuillage compris. >= 0,995 : au-dela de 120 km, c'est le ciel.
+            g = np.asarray(Image.open(probe).convert('L')).astype(float) / 255.0
+            dmap = np.where(g >= 0.995, np.inf, 2.0 ** (g * 18.0 - 1.0))
+            source = 'sonde'
+        else:
+            _, dmap = render_vista(world, (v['x'], v['y'], v['z']), v['yaw'], v.get('pitch', 0.0), v.get('fov', 75.0), W // 2, H // 2)
+            dmap = np.kron(dmap, np.ones((2, 2)))[:H, :W]
+            if dmap.shape != (H, W):
+                dmap = np.pad(dmap, ((0, H - dmap.shape[0]), (0, W - dmap.shape[1])), mode='edge')
+            source = 'logiciel'
+        masks = {name: (dmap >= lo) & (dmap < hi) for name, lo, hi in BANDS}
+        masks['sky'] = ~np.isfinite(dmap)
+        out[v['id']] = {'_depth': source}
+        for f in files:
+            state = f[len(v['id']) + 1:-4]
+            if state == 'depth':
+                continue
+            rgb = srgb_to_linear(np.asarray(Image.open(os.path.join(folder, f)).convert('RGB')).astype(float))
+            Y = 0.2126 * rgb[..., 0] + 0.7152 * rgb[..., 1] + 0.0722 * rgb[..., 2]
+            mx, mn = rgb.max(-1), rgb.min(-1)
+            sat = np.where(mx > 1e-4, (mx - mn) / np.maximum(mx, 1e-4), 0)
+            row = {}
+            for name, m in masks.items():
+                if m.mean() < 0.005:
+                    continue
+                row[name] = {'share': round(float(m.mean()), 3), 'Y': round(float(np.median(Y[m])), 4),
+                             'sat': round(float(np.median(sat[m])), 3),
+                             'cool': round(float(rgb[..., 2][m].mean() / max(rgb[..., 0][m].mean(), 1e-4)), 3)}
+            ref = row.get('mid') or row.get('near')
+            for name in ('far', 'extreme'):
+                if name in row and ref:
+                    row[name]['vs_mid'] = round(row[name]['Y'] / max(ref['Y'], 1e-4), 2)
+            out[v['id']][state] = row
+    return out
+
+
+def print_luminance(res):
+    for vid, states in res.items():
+        for state, row in states.items():
+            if state.startswith('_'):
+                continue
+            cells = ['%s Y=%.3f s=%.2f c=%.2f%s' % (k, r['Y'], r['sat'], r['cool'], (' x%.2f' % r['vs_mid']) if 'vs_mid' in r else '')
+                     for k, r in row.items()]
+            print('%-24s %-5s %s' % (vid, state, ' | '.join(cells)))
 
 
 if __name__ == '__main__':
