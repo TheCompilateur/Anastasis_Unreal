@@ -33,6 +33,7 @@ Pas de PCG, de Procedural Foliage, de Foliage Tool, de Landscape Grass, de Speed
 | Vent | WPO pilote par `MPC_AnastasisWeather`, direction monde et fronts communs herbe/couronnes ; troncs fixes ; reponse historique par `Atmosphere.Coupling 0`, sans `WindDirectionalSource` | `handoffs/atmosphere-crusade-001.md` |
 | Herbe | `SM_Grass_*` + `M_AnastasisGrass` ; environ 988 000 touffes en 683 HISM sur des tuiles de 160 m ; proche 40 → 55 m avec ombres, lointain 70 → 105 m ; +1,5 à 2 ms | `GROUND_COVER_001.md`, `handoffs/ground-cover-001.md` |
 | Sous-bois, rives | `AnastasisUnderstory` (maquis, ronces, roches), `AnastasisMicroEcology`, rive (`anastasis.Dressing.Riverbank`) | `MICRO_ECOLOGY_001.md`, `RIVERBANK_LIFE_001.md` |
+| Microvie de rive | Quatre meshes regenerables (mousse, prele, tussilage, grenouille immobile), dont trois selectionnes dans les poches de berge mesurees ; CVar `anastasis.Dressing.PonticWaterMicro` | `create-pontic-water-micro.py`, `AnastasisPonticWaterMicro.cpp` |
 
 CVars (1 par défaut) : `anastasis.Dressing.Ecology`, `.MacroForest`, `.TreeSpecies`, `.GroundCover`,
 `.Understory`, `.MicroEcology`, `.Riverbank`. Leurs variantes `*.InAutomation` sont à 0 : un million de

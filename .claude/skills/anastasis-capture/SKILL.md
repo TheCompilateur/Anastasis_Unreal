@@ -82,6 +82,16 @@ NaturalHistory reste a 1. Preuve ecotone-capture au registre. PASS instrumental 
 hauteurs identiques, retour spatial temoin, inventaire non-MicroEco echantillonne
 identique. Ces echantillons ne couvrent pas chaque instance ni la marche joueur.
 
+## Microvie pontique de berge (pontic-water-micro-001)
+
+`ground-cover-capture.py` avec `ANASTASIS_GROUND_STATES=micro_on,micro_off,micro_on2`
+ne bascule que `anastasis.Dressing.PonticWaterMicro`. Les quatre poses proches sont
+elues sur des instances reelles de mousse, prele, tussilage et grenouille, puis figees
+pour l'A/B/A. Le script compare l'inventaire spatial des trois meshes de berge et
+verifie le mesh de mousse remplace au pied du tronc. `PONTIC_MICRO_CAPTURE PASS`
+est instrumental : inspecter les images et le GPU par vue pour le jugement SCN.
+La grenouille est immobile, sans comportement joueur ou PNJ ; aucune preuve PLY.
+
 ## Woodland sequence 003
 
 Etats woodland_reference,woodland,woodland_reference2 : groupes de regeneration, adultes et herbe inchanges. Choix du bord plus dense (au moins six arbres derriere, moins de la moitie devant), quatre poses humaines dont une ouverture locale et une vue oblique. Controle des positions de TOUS les microelements de berge/prairie, du plafond total et des inventaires echantillonnes habituels. Le plan de reference ecotone determine le budget forestier ; aucune redistribution des berges autorisee.

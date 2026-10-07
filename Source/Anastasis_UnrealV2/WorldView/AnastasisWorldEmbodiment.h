@@ -142,6 +142,9 @@ protected:
 		const AnastasisPlaces::FPlan& Places, const TArray<FVector>& Canopy, const TArray<FVector>& TreeCanopy, bool bEnabled);
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> MicroEcologyMeshes;
+	/** Visual-only moss/plant/frog pilot selected from measured bank pockets. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> PonticWaterMicroMeshes;
 	/** RIVERBANK_LIFE_001 : un HISM par famille de rive et tuile, vides puis reremplis a chaque incarnation. */
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> RiverbankMeshes;

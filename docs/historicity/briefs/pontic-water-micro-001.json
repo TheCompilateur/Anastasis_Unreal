@@ -1,0 +1,21 @@
+{
+  "mission": "pontic-water-micro-001",
+  "target_period": "1204-1225",
+  "setting": "arriere_pays_pontique_fictif",
+  "model_ids": ["PONT-ECO-01"],
+  "claim": "Quatre petites silhouettes visuelles peuvent rendre lisible le gradient du pied de tronc ombrage a la berge humide, sans pretendre reconstruire la faune et la flore de 1204.",
+  "basis": "analogie_regionale",
+  "source_ids": ["ECO-01", "ECO-03", "ECO-04", "ECO-05"],
+  "inference": "Les releves modernes soutiennent des familles de milieux et la plausibilite des formes, mais le choix des sites, les densites et la grenouille immobile sont des decisions de presentation.",
+  "current": "La mousse de pied de tronc reutilise le mesh de laiche; la micro-ecologie de berge pose galets, touffes et roseaux sans ces trois silhouettes propres.",
+  "target": "Mousse propre au pied de certains troncs, prele en poche vegetale humide, tussilage feuillu sur berge brute et grenouille rare a moins de 90 cm de l'eau rendue.",
+  "causal_effect": "Leur repartition doit laisser lire ombre, ruissellement et rive depuis une camera de 1,7 m; aucune interaction du joueur n'est revendiquee.",
+  "owner_paths": ["Source/Anastasis_UnrealV2/WorldView/AnastasisPonticWaterMicro.cpp", "tools/unreal/create-pontic-water-micro.py", "Content/Anastasis/PonticMicro/"],
+  "evidence_plan": {
+    "mec": "Build, test de selection d'habitat, compteur des instances et inventaire deterministe A/B/A.",
+    "scn": "Quatre vues proches a 1,7 m et deux contextes de rive et sous-bois, images comparees et cout GPU par vue.",
+    "ply": "UNKNOWN : pas de trajet joueur ni de reponse animale au joueur dans cette mission."
+  },
+  "verdict": "PROPOSE",
+  "evidence_paths": []
+}

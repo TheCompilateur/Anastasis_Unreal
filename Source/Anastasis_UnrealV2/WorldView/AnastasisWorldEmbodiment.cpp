@@ -14,6 +14,7 @@
 #include "WorldView/AnastasisUnderstory.h"
 #include "WorldView/AnastasisTrunkContact.h"
 #include "WorldView/AnastasisMicroEcology.h"
+#include "WorldView/AnastasisPonticWaterMicro.h"
 #include "WorldView/AnastasisRiverbank.h"
 #include "WorldView/AnastasisSoilContact.h"
 
@@ -124,6 +125,10 @@ static TAutoConsoleVariable<int32> CVarTrunkContact(
 static TAutoConsoleVariable<int32> CVarMicroEcology(
 	TEXT("anastasis.Dressing.MicroEcology"), 1,
 	TEXT("0=pas de micro-ecologie, 1=berges en poches, lisiere et sous-bois (defaut) ; applique a l'incarnation."), ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarPonticWaterMicro(
+	TEXT("anastasis.Dressing.PonticWaterMicro"), 1,
+	TEXT("0=reference, 1=moss, horsetail, coltsfoot and sparse resting frogs on measured bank habitat; applied on embodiment."), ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarMicroEcologySoil(
 	TEXT("anastasis.MicroEcology.Soil"), 1,
@@ -1255,9 +1260,12 @@ void AAnastasisWorldEmbodiment::PlaceTrunkContact(const AnastasisWorldView::FWor
 		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_TRUNK_CONTACT rejected=%s"), *Error);
 		return;
 	}
+	const bool bPonticMoss = CVarPonticWaterMicro.GetValueOnGameThread() != 0;
 	const TCHAR* Paths[2] = {
 		TEXT("/Game/Anastasis/GroundCover/SM_Grass_MeadowShort_01.SM_Grass_MeadowShort_01"),
-		TEXT("/Game/Anastasis/GroundCover/SM_Grass_Sedge_01.SM_Grass_Sedge_01"),
+		bPonticMoss
+			? TEXT("/Game/Anastasis/PonticMicro/SM_Pontic_Moss_01.SM_Pontic_Moss_01")
+			: TEXT("/Game/Anastasis/GroundCover/SM_Grass_Sedge_01.SM_Grass_Sedge_01"),
 	};
 	UHierarchicalInstancedStaticMeshComponent* ByKind[2] = {nullptr, nullptr};
 	double MeshRadius[2] = {20.0, 20.0};
@@ -1270,7 +1278,8 @@ void AAnastasisWorldEmbodiment::PlaceTrunkContact(const AnastasisWorldView::FWor
 		if (!Mesh) { ++Missing; continue; }
 		const FBox Bounds = Mesh->GetBoundingBox();
 		MeshRadius[Kind] = FVector2D(Bounds.GetExtent().X, Bounds.GetExtent().Y).GetMax();
-		const FName Name = Kind == 0 ? TEXT("TrunkContact_Litter") : TEXT("TrunkContact_Moss");
+		const FName Name = Kind == 0 ? TEXT("TrunkContact_Litter")
+			: bPonticMoss ? TEXT("TrunkContact_Moss_Pontic") : TEXT("TrunkContact_Moss_Legacy");
 		UHierarchicalInstancedStaticMeshComponent* Hism = Existing.FindRef(Name);
 		if (!Hism)
 		{
@@ -1310,12 +1319,16 @@ void AAnastasisWorldEmbodiment::PlaceTrunkContact(const AnastasisWorldView::FWor
 			: FVector::UpVector;
 		const FVector Up = FMath::Lerp(FVector::UpVector, Normal.Z < 0.0 ? -Normal : Normal, 0.85).GetSafeNormal();
 		const double Residual = FMath::Acos(FMath::Clamp(FVector::DotProduct(Up, Normal.Z < 0.0 ? -Normal : Normal), -1.0, 1.0));
-		const double Sink = 3.0 + MeshRadius[Patch.Kind] * Patch.ScaleXY * FMath::Tan(Residual);
+		// The dedicated moss mesh is a low 10 cm cushion; the legacy sedge was crushed vertically.
+		const bool bDedicatedMoss = Patch.Kind == 1 && bPonticMoss;
+		const double ScaleXY = Patch.ScaleXY * (bDedicatedMoss ? 2.0 : 1.0);
+		const double ScaleZ = Patch.ScaleZ * (bDedicatedMoss ? 5.0 : 1.0);
+		const double Sink = 3.0 + MeshRadius[Patch.Kind] * ScaleXY * FMath::Tan(Residual);
 		const FQuat Rotation = FQuat::FindBetweenNormals(FVector::UpVector, Up)
 			* FQuat(FVector::UpVector, FMath::DegreesToRadians(Patch.YawDegrees));
 		Hism->AddInstance(FTransform(Rotation,
 			FVector(Patch.Position.X, Patch.Position.Y, Z - Sink),
-			FVector(Patch.ScaleXY, Patch.ScaleXY, Patch.ScaleZ)), false);
+			FVector(ScaleXY, ScaleXY, ScaleZ)), false);
 		++Placed;
 	}
 	for (UHierarchicalInstancedStaticMeshComponent* M : TrunkContactMeshes)
@@ -1602,6 +1615,7 @@ void AAnastasisWorldEmbodiment::PlaceMicroEcology(const AnastasisWorldView::FWor
 	const bool bAutomation = GIsAutomationTesting && CVarMicroEcologyInAutomation.GetValueOnGameThread() == 0;
 	if (!bEnabled || CVarMicroEcology.GetValueOnGameThread() == 0 || bAutomation)
 	{
+		AnastasisPonticWaterMicro::Embody(*this, nullptr, PonticWaterMicroMeshes);
 		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_MICRO_ECOLOGY enabled=0 ecology=%d automation=%d"), bEnabled, bAutomation);
 		return;
 	}
@@ -1635,11 +1649,27 @@ void AAnastasisWorldEmbodiment::PlaceMicroEcology(const AnastasisWorldView::FWor
 		EcoSettings.bTreeCanopyEcotone, TreeCanopy.Num(), Canopy.Num());
 	if (!AnastasisMicroEcology::Build(In, EcoSettings, Eco, Error))
 	{
+		AnastasisPonticWaterMicro::Embody(*this, nullptr, PonticWaterMicroMeshes);
 		UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_MICRO_ECOLOGY rejected=%s"), *Error);
 		return;
 	}
 	const double PlanMs = (FPlatformTime::Seconds() - Start) * 1000.0;
 	const AnastasisMicroEcology::FEmbodyResult Embodied = AnastasisMicroEcology::Embody(*this, Eco, BaseShapeMaterial, MicroEcologyMeshes);
+	if (CVarPonticWaterMicro.GetValueOnGameThread() != 0)
+	{
+		AnastasisPonticWaterMicro::FPlan Micro;
+		AnastasisPonticWaterMicro::Build(Eco, In, CanonicalSource.Seed, Micro);
+		const AnastasisPonticWaterMicro::FEmbodyResult Life =
+			AnastasisPonticWaterMicro::Embody(*this, &Micro, PonticWaterMicroMeshes);
+		UE_LOG(LogAnastasis_UnrealV2, Display,
+			TEXT("ANASTASIS_PONTIC_WATER_MICRO enabled=1 horsetail=%d coltsfoot=%d frog=%d placed=%d components=%d missing_meshes=%d"),
+			Micro.Counts[0], Micro.Counts[1], Micro.Counts[2], Life.Instances, Life.Components, Life.MissingMeshes);
+	}
+	else
+	{
+		AnastasisPonticWaterMicro::Embody(*this, nullptr, PonticWaterMicroMeshes);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PONTIC_WATER_MICRO enabled=0"));
+	}
 	int32 Tinted = 0;
 	if (CVarMicroEcologySoil.GetValueOnGameThread() != 0)
 	{

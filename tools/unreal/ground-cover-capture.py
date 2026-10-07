@@ -37,6 +37,9 @@ import os, time, math, json, hashlib, unreal
 
 OUT = os.environ.get('ANASTASIS_GROUND_OUT')
 STATE_CMDS = {
+    'micro_on': ('anastasis.Dressing.PonticWaterMicro 1',),
+    'micro_off': ('anastasis.Dressing.PonticWaterMicro 0',),
+    'micro_on2': ('anastasis.Dressing.PonticWaterMicro 1',),
     'woodland_reference': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 1', 'anastasis.Dressing.WoodlandSequence 0'),
     'woodland': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 1', 'anastasis.Dressing.WoodlandSequence 1'),
     'woodland_reference2': ('anastasis.Dressing.NaturalHistory 1', 'anastasis.Dressing.TreeCanopyEcotone 1', 'anastasis.Dressing.WoodlandSequence 0'),
@@ -98,6 +101,8 @@ natural_run = riparian_run or ecotone_run or any(s in ('natural', 'reference', '
 original_woodland = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.WoodlandSequence')
 flower_run = any(s in ('noflowers', 'flowers', 'noflowers2') for s in states)
 cards_run = any(s in ('nocards', 'cards', 'nocards2') for s in states)
+micro_run = any(s in ('micro_on', 'micro_off', 'micro_on2') for s in states)
+original_micro = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.PonticWaterMicro')
 original_ecotone = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.TreeCanopyEcotone')
 original_hour = unreal.SystemLibrary.get_console_variable_float_value('anastasis.Sky.Hour')
 original_natural = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.NaturalHistory')
@@ -108,8 +113,11 @@ habitat = {}
 def finish(msg, error=False):
     if riparian_run:
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.RiparianTransition %s' % original_riparian)
-    if natural_run:
+    if natural_run or micro_run:
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Sky.Hour %s' % original_hour)
+    if micro_run:
+        unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.PonticWaterMicro %s' % original_micro)
+    if natural_run:
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.NaturalHistory %s' % original_natural)
     if natural_run:
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.WoodlandSequence %s' % original_woodland)
@@ -133,7 +141,7 @@ try:
     def cmd(c):
         unreal.SystemLibrary.execute_console_command(world, c)
 
-    if natural_run or flower_run or cards_run:
+    if natural_run or flower_run or cards_run or micro_run:
         cmd('anastasis.Sky.Hour 11')
         if not woodland_run:
             cmd('anastasis.Dressing.WoodlandSequence 0')
@@ -234,6 +242,40 @@ try:
             state, sum(counts.values()), habitat[state]['sampled_ground_sha256']))
 
     record_habitat(states[0])
+    micro_inventory = {}
+    def record_micro(state):
+        if not micro_run:
+            return
+        items = []
+        bank_components = 0
+        moss_mesh = None
+        moss_count = 0
+        for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
+            name = comp.get_name()
+            count = comp.get_instance_count()
+            mesh = comp.get_editor_property('static_mesh')
+            if name.startswith('TrunkContact_Moss'):
+                if count:
+                    if moss_mesh is not None:
+                        raise RuntimeError('multiple populated moss components')
+                    moss_mesh = mesh.get_name() if mesh else None
+                    moss_count = count
+            if name.startswith('MicroEco_bank_Pontic_'):
+                bank_components += 1
+            if name.startswith('MicroEco_bank_Pontic_') and count:
+                if mesh is None:
+                    raise RuntimeError('Pontic bank component missing mesh')
+                positions = []
+                for i in range(count):
+                    got = comp.get_instance_transform(i, True)
+                    xf = got[1] if isinstance(got, tuple) else got
+                    positions.append([round(xf.translation.x, 2), round(xf.translation.y, 2), round(xf.translation.z, 2)])
+                items.append([mesh.get_name(), sorted(positions)])
+        micro_inventory[state] = {'bank': sorted(items), 'bank_components': bank_components,
+                                  'moss_mesh': moss_mesh, 'moss_count': moss_count}
+        unreal.log('PONTIC_MICRO_SAMPLE state=%s bank_components=%d moss=%s count=%d' % (
+            state, len(items), moss_mesh, moss_count))
+    record_micro(states[0])
 
     def at(tx, ty, lift):
         x, y = tx * T, ty * T
@@ -333,6 +375,65 @@ try:
         plan.append(('sousbois_eye', (fern[0] - dx / d * 0.4, fern[1] - dy / d * 0.4), 170, (fern[0] + dx / d * 0.6, fern[1] + dy / d * 0.6), 40))
     unreal.log('GROUND_CAPTURE_SOUSBOIS %s' % (('tile=%.1f,%.1f' % fern) if fern else 'NONE'))
 
+    if micro_run:
+        # Elect a real instance, then keep its camera fixed through on/off/on.
+        tree_points = []
+        for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
+            mesh = comp.get_editor_property('static_mesh')
+            if mesh is None or not mesh.get_name().startswith('SM_Tree_'):
+                continue
+            for i in range(comp.get_instance_count()):
+                got = comp.get_instance_transform(i, True)
+                xf = got[1] if isinstance(got, tuple) else got
+                tree_points.append((xf.translation.x, xf.translation.y))
+        targets = (('micro_moss', 'TrunkContact_Moss'),
+                   ('micro_horsetail', 'MicroEco_bank_Pontic_Horsetail_'),
+                   ('micro_coltsfoot', 'MicroEco_bank_Pontic_Coltsfoot_'),
+                   ('micro_frog', 'MicroEco_bank_Pontic_Frog_'))
+        for label, prefix in targets:
+            candidates = []
+            for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
+                if not comp.get_name().startswith(prefix):
+                    continue
+                for i in range(comp.get_instance_count()):
+                    got = comp.get_instance_transform(i, True)
+                    xf = got[1] if isinstance(got, tuple) else got
+                    x, y = xf.translation.x, xf.translation.y
+                    if 8*T < x < 88*T and 8*T < y < 88*T:
+                        candidates.append((math.hypot(x-50*T, y-56*T), x, y, xf.translation.z))
+            if not candidates:
+                raise RuntimeError('%s has no placed instance' % label)
+            chosen_eye = None
+            for _, x, y, target_z in sorted(candidates)[:120]:
+                if label == 'micro_moss' and tree_points:
+                    tx, ty = min(tree_points, key=lambda p: (p[0]-x)**2 + (p[1]-y)**2)
+                    dist = math.hypot(x-tx, y-ty)
+                    if dist < 90 or dist > 180:
+                        continue
+                    ux, uy = (x-tx)/dist, (y-ty)/dist
+                    eye_x, eye_y = x+ux*240, y+uy*240
+                    eye_z = ground(eye_x, eye_y)
+                    if eye_z is not None and abs(eye_z-target_z) < 110:
+                        chosen_eye = (eye_x, eye_y, eye_z)
+                        break
+                    continue
+                for radius in (120, 200, 300):
+                    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1), (-0.7, -0.7), (0.7, 0.7)):
+                        eye_x, eye_y = x+dx*radius, y+dy*radius
+                        eye_z = ground(eye_x, eye_y)
+                        if eye_z is not None and abs(eye_z-target_z) < 110:
+                            chosen_eye = (eye_x, eye_y, eye_z)
+                            break
+                    if chosen_eye is not None:
+                        break
+                if chosen_eye is not None:
+                    break
+            if chosen_eye is None:
+                raise RuntimeError('%s has no nearby human-height pose' % label)
+            plan.append((label, (chosen_eye[0]/T, chosen_eye[1]/T, chosen_eye[2]+170), 0,
+                         (x/T, y/T, target_z + (8 if label in ('micro_moss', 'micro_frog') else 22)), 0))
+            unreal.log('PONTIC_MICRO_SITE %s x=%.1f y=%.1f' % (label, x, y))
+
     if ecotone_run:
         # Actual tree on the open side of a stand; all poses chosen once from the reference.
         trees = {}
@@ -404,7 +505,8 @@ try:
             raise RuntimeError('requested ecological view missing: %s' % (wanted - {p[0] for p in plan}))
     views = []
     for name, eye_t, lift, tgt_t, tlift in plan:
-        eye, tgt = at(eye_t[0], eye_t[1], lift), at(tgt_t[0], tgt_t[1], tlift)
+        eye = V(eye_t[0]*T, eye_t[1]*T, eye_t[2]) if len(eye_t) == 3 else at(eye_t[0], eye_t[1], lift)
+        tgt = V(tgt_t[0]*T, tgt_t[1]*T, tgt_t[2]) if len(tgt_t) == 3 else at(tgt_t[0], tgt_t[1], tlift)
         if eye is None or tgt is None:
             unreal.log_warning('GROUND_CAPTURE_SKIP %s sol absent' % name)
             continue
@@ -486,6 +588,17 @@ def tick(dt):
                                 raise RuntimeError('riparian transition had no observable placement effect')
                         marker = 'WOODLAND_CAPTURE' if woodland_run else 'RIPARIAN_CAPTURE' if riparian_run else 'ECOTONE_CAPTURE' if ecotone_run else 'NATURAL_HISTORY_CAPTURE'
                         unreal.log(marker + ' PASS sampled_ground_unchanged=1 views=%d' % len(views))
+                    if micro_run:
+                        with open(os.path.join(OUT, 'micro-inventory.json'), 'w') as f:
+                            json.dump(micro_inventory, f, indent=1)
+                        on, off, repeat = (micro_inventory[s] for s in ('micro_on', 'micro_off', 'micro_on2'))
+                        names = {item[0] for item in on['bank']}
+                        if not all('SM_Pontic_' + suffix + '_01' in names for suffix in ('Horsetail', 'Coltsfoot', 'Frog')):
+                            raise RuntimeError('one or more bank assets absent from scene')
+                        if on != repeat or off['bank'] or on['moss_mesh'] != 'SM_Pontic_Moss_01' \
+                                or off['moss_mesh'] != 'SM_Grass_Sedge_01' or on['moss_count'] <= 0:
+                            raise RuntimeError('Pontic micro on/off/on inventory invalid')
+                        unreal.log('PONTIC_MICRO_CAPTURE PASS bank_types=3 moss_count=%d views=%d' % (on['moss_count'], len(views)))
                     finish('GROUND_CAPTURE_COMPLETE views=%d states=%d' % (len(views), len(states)))
                     return
                 for c in STATE_CMDS[states[state_i]]:
@@ -493,6 +606,7 @@ def tick(dt):
                 actor.call_method('EmbodyCanonical', args=(SEED,))
                 texture_state(states[state_i])
                 record_habitat(states[state_i])
+                record_micro(states[state_i])
                 queue = [(states[state_i], v) for v in views]
                 first, mark, frames, timings = True, time.monotonic(), [], []
                 return
