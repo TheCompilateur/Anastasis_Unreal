@@ -102,3 +102,20 @@ du joueur compte.
 - Le mode visuel `PLAYER` du GameMode, et un pawn propre au jeu : le pawn est celui du template.
 - Le témoin vit dans l'hôte ; la présence et l'oisiveté sont sur la personne, pas dans l'empreinte
   (`Digest`) ni dans une sauvegarde.
+
+## Banc d'épreuve alimentaire du joueur (player-food-loop-001)
+
+En PIE, **F6** (`Anastasis.Player.FoodLoop`) remplace le village d'ouverture par le scénario fini
+`SeedFoodSupply` déjà existant et incarne son unique habitant. Une source générée contient une quantité
+finie, le grenier commence vide. **F7** pose `gatherFood`, **F8** pose `deliver`, **F9** pose `eat` :
+ce sont trois intentions humaines distinctes. Une action terminée n'enchaîne pas la suivante à la place
+du joueur. L'overlay montre les portions au champ, dans le sac et au grenier, le nombre de repas et la
+faim. `get_player_status` expose ces mêmes quantités pour la preuve.
+
+`player-food-loop-pie` contrôle la prise, le trajet avec charge, le dépôt, le repas, la baisse de faim
+et la conservation `champ + sac + grenier + repas = stock initial` à chaque échantillon. Il pilote les
+commandes que F6–F9 déclenchent ; cela reste une preuve runtime, pas un essai manuel des touches ni un
+verdict sur la lisibilité de l'image. Ce banc ne constitue pas une boucle de scène complète :
+aucun autre humain n'y réagit, aucune obligation ni relation ne pèse sur le choix. Le scénario remplace le village d'ouverture : son unique habitant
+et son stock fini ne démontrent pas une économie de village durable. Les touches sont des
+`DebugExecBindings` PIE et ne définissent pas les contrôles d'un build Shipping.

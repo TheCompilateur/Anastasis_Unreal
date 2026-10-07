@@ -214,6 +214,17 @@ void UAnastasisSimulationSubsystem::DrawPlayerOverlay() const
 		0.0f,
 		Refusal ? FColor::Orange : FColor::Cyan,
 		TEXT("BUTS") + Options + TEXT("  0 rien") + Intent);
+	if (!Village.GetFoodSources().IsEmpty())
+	{
+		int32 Remaining = 0;
+		int32 Stock = 0;
+		for (const AnastasisVillage::FFoodSource& Source : Village.GetFoodSources()) Remaining += Source.Remaining;
+		for (const AnastasisVillage::FBuilding& Building : Village.GetBuildings()) Stock += Building.FoodPhysical;
+		GEngine->AddOnScreenDebugMessage(
+			0xA51A55, 0.0f, FColor::Green,
+			FString::Printf(TEXT("F7 recolter  F8 livrer  F9 manger | champ %d  sac %d  grenier %d  repas %d  faim %.0f"),
+				Remaining, Player->InventoryFood, Stock, Player->MealsTaken, Player->Needs.Hunger));
+	}
 }
 
 namespace
@@ -247,6 +258,26 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisPlayerArrive(
 			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER arrive %s at (%.2f,%.2f), %d inhabitants"),
 				Id.IsEmpty() ? TEXT("refused") : *Id, Player ? Player->X : -1.0, Player ? Player->Y : -1.0, Village.GetActors().Num());
 		}
+	}));
+
+// First playable material loop: one finite generated source, an empty depot, then the player's hand.
+// The existing village scenario owns all resource setup; incarnation only changes who decides for its inhabitant.
+static FAutoConsoleCommandWithWorld CmdAnastasisPlayerFoodLoop(
+	TEXT("Anastasis.Player.FoodLoop"),
+	TEXT("PIE food loop: replace the opening village with a finite source and empty granary, then incarnate its inhabitant. F7 gather, F8 deliver, F9 eat."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		UAnastasisSimulationSubsystem* Host = PlayerHost(World);
+		if (!Host || !Host->SeedFoodSupply()) return;
+		AnastasisVillage::FVillage& Village = Host->GetSimulation().GetVillage();
+		const TArray<AnastasisVillage::FNpc>& Actors = Village.GetActors();
+		if (Actors.IsEmpty() || !Village.Incarnate(Actors[0].Id))
+		{
+			UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_PLAYER food loop: scenario has no incarnatable inhabitant"));
+			return;
+		}
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER food loop: incarnated %s; finite source, empty granary"),
+			*Actors[0].Id);
 	}));
 
 static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisPlayerIncarnate(
@@ -351,6 +382,10 @@ FString UAnastasisSimulationDebugLibrary::GetPlayerStatus(const UObject* WorldCo
 	// player-goals-001 : l'intention, le dernier refus et la table du joueur.
 	const AnastasisVillage::FPlayerGoalChoice* Choice = Village.GetPlayerGoalChoice();
 	const AnastasisVillage::FPlayerRefusal* Refusal = Village.GetPlayerRefusal();
+	int32 FoodRemaining = 0;
+	int32 FoodStock = 0;
+	for (const AnastasisVillage::FFoodSource& Source : Village.GetFoodSources()) FoodRemaining += Source.Remaining;
+	for (const AnastasisVillage::FBuilding& Building : Village.GetBuildings()) FoodStock += Building.FoodPhysical;
 	TArray<FString> Options;
 	for (const AnastasisVillage::FPlayerGoalOption& O : Village.GetPlayerGoalOptions())
 	{
@@ -358,12 +393,14 @@ FString UAnastasisSimulationDebugLibrary::GetPlayerStatus(const UObject* WorldCo
 	}
 	return FString::Printf(
 		TEXT("{\"player\":\"%s\",\"x\":%.4f,\"y\":%.4f,\"goal\":\"%s\",\"activity\":\"%s\",\"presence\":%.4f,\"reputation\":%.4f,")
-		TEXT("\"idleDays\":%.4f,\"thirst\":%.2f,\"drinks\":%d,\"meals\":%d,\"pawn\":%s,\"seenBy\":%d,\"npcs\":%d,")
+		TEXT("\"idleDays\":%.4f,\"thirst\":%.2f,\"hunger\":%.2f,\"drinks\":%d,\"meals\":%d,\"pawn\":%s,\"seenBy\":%d,\"npcs\":%d,")
+		TEXT("\"bag\":%d,\"gathered\":%d,\"delivered\":%d,\"foodRemaining\":%d,\"foodStock\":%d,")
 		TEXT("\"choice\":\"%s\",\"holds\":%d,\"yields\":%d,\"refusal\":\"%s\",\"options\":[%s],")
 		TEXT("\"ux\":%.1f,\"uy\":%.1f,\"uz\":%.1f}"),
 		*Player->Id, Player->X, Player->Y, *Player->Goal, *Player->Activity, Player->Presence, Player->Reputation,
-		Player->IdleSeconds / FAnastasisSimulation::DayLength, Player->Needs.Thirst, Player->DrinksTaken, Player->MealsTaken,
+		Player->IdleSeconds / FAnastasisSimulation::DayLength, Player->Needs.Thirst, Player->Needs.Hunger, Player->DrinksTaken, Player->MealsTaken,
 		Host->IsPawnBound() ? TEXT("true") : TEXT("false"), CountSeers(Village, *Player), Village.GetActors().Num(),
+		Player->InventoryFood, Player->GatheredFood, Player->DeliveredFood, FoodRemaining, FoodStock,
 		Choice ? *Choice->Goal : TEXT(""), Choice ? Choice->Holds : 0, Choice ? Choice->Yields : 0,
 		Refusal ? *Refusal->Reason : TEXT(""), *FString::Join(Options, TEXT(",")),
 		Body.X, Body.Y, Body.Z);
