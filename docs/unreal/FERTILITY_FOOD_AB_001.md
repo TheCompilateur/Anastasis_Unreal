@@ -7,7 +7,12 @@ Experience de simulation C++ uniquement. Aucun mecanisme de production change.
 - Automation : `Anastasis.Sim.Village.Fertilite.AlimentationAB` et `PlafondTemoin`.
 - Monde plat 32 x 32, un champ (8,11), stock initial 4, culture Grain.
 - Graine 12345 ; debut jour 1 a t=37.8 ; 64800 ticks a 1/60, soit 12 jours de duree.
-- Grenier (16,11), puits (16,18), maison (23,11) ; 3 habitants, un fermier.
+- Grenier (16,11), puits (16,18), sans maison ; 3 habitants, un fermier.
+- La maison de la premiere fixture permettait la branche `eat` en interieur :
+  la faim baissait sans portion prelevee (`Anastasis.Sim.Village.Granary` couvre ce
+  comportement). Le premier run donnait +12 de repousse, +12 livraisons, 0 repas
+  dans les deux bras : chaine non atteinte, pas un effet alimentaire positif.
+  Retirer uniquement la maison laisse le grenier comme source du repas confirme.
 - Bras A fertilite 0.75 ; B 1.30 ; repetition A2 0.75. Rien d'autre ne change.
 - Vrai FAnastasisSimulation::Tick : meteo, decisions autonomes, horloge, repousse de minuit,
   recolte, transport et repas. Aucun besoin reinitialise, aucun objectif force, aucun stock injecte.
@@ -53,4 +58,11 @@ Ce n'est ni une preuve de la carte jouee, ni de navigation physique, ni une mesu
 de fertilite pedologique, ni une demonstration generale sur plusieurs graines/saisons.
 L'experience couvre seulement le printemps et le sous-ensemble de simulation porte.
 La suite Anastasis du lot execute ces tests ; aucune nouvelle preuve PIE ni editeur autonome.
-Etat initial de livraison : execution QUEUED, effet UNKNOWN jusqu'au rapport brut du lot.
+Run cible local du 2026-10-07 apres retrait de la maison : 2 PASS, 0 FAIL ;
+A/A2 identiques, A = 16 repousse / 12 livraisons / 12 repas, B = 28 / 18 / 18.
+`effect=MORE_REGROWTH_DELIVERY_AND_MEALS`, deltas +12 / +6 / +6.
+La faim critique augmente toutefois de 618 personnes-ticks dans B (3150 -> 3768) ;
+le mecanisme qui produit cette difference n'est pas isole. Le fermier accumule
+30136 vs 32537 ticks avec un besoin critique. Ce resultat ne prouve pas une
+amelioration de la sante ou de la survie du village. Le lot doit rejouer la
+suite sur son propre arbre avant tout claim d'integration.

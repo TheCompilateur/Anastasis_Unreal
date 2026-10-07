@@ -70,8 +70,9 @@ namespace AnastasisFertilityFoodTest
   auto& V = Sim.GetVillage();
   const FString Granary = V.AddBuilding(GranaryType, 16, 11);
   const FString Well = V.AddBuilding(WellType, 16, 18);
-  const FString House = V.AddBuilding(HouseType, 23, 11);
-  if (!Test.TestTrue(TEXT("fixture: three buildings"), !Granary.IsEmpty() && !Well.IsEmpty() && !House.IsEmpty())) return R;
+  // A nearby house can lower hunger through indoor eat without consuming a portion.
+  // Keep this fixture focused on the physical granary -> confirmed meal chain.
+  if (!Test.TestTrue(TEXT("fixture: granary and well"), !Granary.IsEmpty() && !Well.IsEmpty())) return R;
   const auto* Depot = V.FindBuilding(Granary);
   if (!Test.TestTrue(TEXT("fixture: granary door"), Depot && Depot->AccessPoints.Num() > 0)) return R;
   const FPoint Door = Depot->AccessPoints[0];
@@ -113,8 +114,8 @@ namespace AnastasisFertilityFoodTest
     const FString Row = FString::Printf(TEXT("tick=%d day=%d regrown=%lld field=%d inventory=%d stored=%d gathered=%d delivered=%d meals=%d empty_ticks=%lld full_ticks=%lld hungry_person_ticks=%lld critical_farmer_ticks=%lld"),
      I + 1, Sim.GetDay(), S.Regrown, S.Field, S.Inventory, S.Stored, S.Gathered, S.Delivered, S.Meals,
      R.EmptyTicks, R.FullTicks, R.HungryPersonTicks, R.CriticalFarmerTicks);
-    R.Rows.Add(Row);
-    Test.AddInfo(FString::Printf(TEXT("FERTILITY_AB_SAMPLE arm=%s fertility=%.2f %s"), Arm, Fertility, *Row));
+   R.Rows.Add(Row);
+   Test.AddInfo(FString::Printf(TEXT("FERTILITY_AB_SAMPLE arm=%s fertility=%.2f %s"), Arm, Fertility, *Row));
     PreviousDay = Sim.GetDay();
    }
   }
