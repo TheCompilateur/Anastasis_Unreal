@@ -36,13 +36,16 @@ namespace AnastasisVillagerLooks
 
 	TArray<int32> VillagePool(const TArray<FAnastasisVillagerLook>& Looks, FName Job)
 	{
+		// Le catalogue visuel n'a pas encore de portraits "builder". Garder les
+		// batisseurs visibles avec les portraits sobres de settler, sans changer leur metier simule.
+		const FName LookJob = Job == FName(TEXT("builder")) ? FName(TEXT("settler")) : Job;
 		// One queue per category, each in CRC order of its ids: stable on the id, not on the asset
 		// order, so re-importing in another order changes nobody's face.
 		TSortedMap<uint8, TArray<int32>> Queues;
 		for (int32 Index = 0; Index < Looks.Num(); ++Index)
 		{
 			const FAnastasisVillagerLook& Look = Looks[Index];
-			if (IsAssignableInVillage(Look.Category) && Look.bInGame && Look.Jobs.Contains(Job) && !Look.Portrait.IsNull())
+			if (IsAssignableInVillage(Look.Category) && Look.bInGame && Look.Jobs.Contains(LookJob) && !Look.Portrait.IsNull())
 			{
 				Queues.FindOrAdd(static_cast<uint8>(Looks[Index].Category)).Add(Index);
 			}

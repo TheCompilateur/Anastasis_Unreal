@@ -16,6 +16,8 @@ started = time.monotonic()
 last_sample = 0.0
 phase = 0
 rows = []
+build_rows = []
+builder_positions = []
 handle = None
 
 
@@ -28,8 +30,9 @@ def finish(ok, reason):
 def tick(_dt):
     global phase, last_sample
     now = time.monotonic()
-    if now - started > 110:
-        finish(False, 'timeout last=' + (json.dumps(rows[-1]) if rows else 'none'))
+    if now - started > 180:
+        finish(False, 'timeout life=%s build=%s' %
+               (json.dumps(rows[-1]) if rows else 'none', json.dumps(build_rows[-1]) if build_rows else 'none'))
         return
     if phase == 0 and now - started > 3:
         phase = 1
@@ -48,22 +51,34 @@ def tick(_dt):
     if not world:
         return
     row = json.loads(dbg.get_opening_life_status(world) or '{}')
+    build = json.loads(dbg.get_build_status(world) or '{}')
+    cards = json.loads(dbg.get_villager_cards(world) or '{}')
     if not row or not row.get('home') or not row.get('work'):
         if now - started > 25:
             finish(False, 'no_home_or_work ' + json.dumps(row))
         return
     rows.append(row)
+    build_rows.append(build)
+    builders = [c for c in cards.get('villagers', []) if c.get('job') == 'builder']
+    if builders:
+        builder_positions.append({c['npc']: (c['x'], c['y']) for c in builders})
     if len(rows) % 20 == 0:
-        unreal.log('NPC_LIFE_SAMPLE ' + json.dumps(row))
+        unreal.log('NPC_LIFE_SAMPLE ' + json.dumps({'life': row, 'build': build, 'builders': builders}))
     goals = {r['goal'] for r in rows}
     moved = any(abs(r['x'] - rows[0]['x']) + abs(r['y'] - rows[0]['y']) > 1.0 for r in rows)
     drank = any(r['drinks'] > rows[0]['drinks'] for r in rows)
     worked = any(r['deliveries'] > rows[0]['deliveries'] for r in rows)
     slept = any(r['rests'] > rows[0]['rests'] for r in rows)
     claimed = any(r['claimed'] for r in rows)
-    if moved and drank and worked and slept and claimed and len(goals) >= 3:
-        finish(True, 'id=%s home=%s work=%s goals=%s drinks=%d deliveries=%d rests=%d claimed=1' %
-               (row['id'], row['home'], row['work'], ','.join(sorted(goals)), row['drinks'], row['deliveries'], row['rests']))
+    built = any(b.get('pieces', 0) > 0 and b.get('workers', 0) > 0 for b in build_rows)
+    builder_moved = (len(builder_positions) > 1 and
+                     any(abs(pos[0] - builder_positions[0][id][0]) + abs(pos[1] - builder_positions[0][id][1]) > 100
+                         for sample in builder_positions[1:] for id, pos in sample.items()
+                         if id in builder_positions[0]))
+    if moved and drank and worked and slept and claimed and len(goals) >= 3 and built and builder_moved and build.get('completed'):
+        finish(True, 'id=%s home=%s work=%s drinks=%d deliveries=%d rests=%d site_pieces=%d builders=%d' %
+               (row['id'], row['home'], row['work'], row['drinks'], row['deliveries'], row['rests'],
+                build['pieces'], len(builders)))
 
 
 handle = unreal.register_slate_post_tick_callback(tick)

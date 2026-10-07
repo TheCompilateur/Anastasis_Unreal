@@ -85,7 +85,11 @@ def check(c, label):
         errs.append('habitant sans carte')
     if len(set(looks)) != len(looks) and len(looks) <= 24:
         errs.append('portraits en double: %s' % sorted(looks))
-    wrong = ['%s(%s)=%s' % (x['npc'], x['job'], x['look']) for x in v if x['look'] and x['job'] not in JOBS.get(x['look'], set())]
+    # Aucun portrait builder n'existe encore : le pont de presentation emploie
+    # explicitement le pool settler pour ce metier, sans changer le job simule.
+    wrong = ['%s(%s)=%s' % (x['npc'], x['job'], x['look']) for x in v
+             if x['look'] and x['job'] not in JOBS.get(x['look'], set())
+             and not (x['job'] == 'builder' and 'settler' in JOBS.get(x['look'], set()))]
     if wrong:
         errs.append('portrait d un autre metier, assis ou enfant: %s' % wrong)
     if any(x['hidden'] != x['inside'] for x in v):

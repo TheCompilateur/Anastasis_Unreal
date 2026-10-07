@@ -178,8 +178,11 @@ bool FAnastasisVillagerLookPoolTest::RunTest(const FString&)
 	}
 	const TArray<int32> FarmerPool = VillagePool(ByJob, Farmer);
 	const TArray<int32> SettlerPool = VillagePool(ByJob, Settler);
+	const TArray<int32> BuilderPool = VillagePool(ByJob, FName(TEXT("builder")));
 	TestEqual(TEXT("pool fermier : les quatre portraits du metier"), FarmerPool.Num(), 4);
 	TestEqual(TEXT("pool sans-metier : 24 - 4 fermiers - 1 garde"), SettlerPool.Num(), 19);
+	TestEqual(TEXT("batisseur sans portrait propre : pool settler visible"), BuilderPool.Num(), SettlerPool.Num());
+	TestEqual(TEXT("batisseur conserve son visage de settler"), PickLook(BuilderPool, TEXT("npc-1")), PickLook(SettlerPool, TEXT("npc-1")));
 	for (int32 Index : FarmerPool)
 	{
 		TestTrue(TEXT("un fermier porte un portrait de fermier"), Farmers.Contains(ByJob[Index].LookId));

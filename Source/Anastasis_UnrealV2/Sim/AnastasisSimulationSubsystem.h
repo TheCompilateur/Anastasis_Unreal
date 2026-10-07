@@ -141,6 +141,8 @@ private:
 	void TryStartVillage(float DeltaTime);
 	/** Equipe un habitant du village initial d'un foyer et d'un travail reels. */
 	void SeedOpeningHousehold();
+	/** Un chantier initial fini par les habitants existants, sans creer de PNJ ni modifier AnastasisSim. */
+	void SeedOpeningConstruction();
 	bool bPendingStartVillage = false;
 	double StartVillageWait = 0.0;
 	FString SettlementSiteReport = TEXT("{\"status\":\"not_started\"}");

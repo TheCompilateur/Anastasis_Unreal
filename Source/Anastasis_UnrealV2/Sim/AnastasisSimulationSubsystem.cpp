@@ -77,6 +77,11 @@ static TAutoConsoleVariable<int32> CVarVillageStartVillagers(
 	TEXT("Inhabitants placed around the first well when play begins (VILLAGER_PNG_001), so the game does not open on an empty world. 0 = empty village. The first explicit scenario command (FirstWell, FirstHouse, FirstGranary, FirstFarmer, FoodSupply) replaces this village."),
 	ECVF_Default);
 
+static TAutoConsoleVariable<int32> CVarVillageOpeningConstruction(
+	TEXT("anastasis.Village.OpeningConstruction"), 1,
+	TEXT("1 = give the initial village one funded house site and two existing builders. 0 = keep the initial village without a site for A/B."),
+	ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarVillageSiteSelection(
     TEXT("anastasis.Village.SiteSelection"), 1,
     TEXT("1 selects the opening village from this world rendered terrain and navigable resource access. 0 retains legacy centre placement for comparison. Explicit scenarios and saves are not relocated."), ECVF_Default);
@@ -165,7 +170,11 @@ void UAnastasisSimulationSubsystem::TryStartVillage(float DeltaTime)
     if (Count <= 0) return;
     const FString WellId = SeedFirstWell(Count, X, Y);
     bStartVillage = !WellId.IsEmpty();
-    if (bStartVillage) SeedOpeningHousehold();
+    if (bStartVillage)
+    {
+        SeedOpeningHousehold();
+        if (CVarVillageOpeningConstruction.GetValueOnGameThread() != 0) SeedOpeningConstruction();
+    }
     const auto* Well = Village.FindBuilding(WellId);
     if (!Well || (CVarVillageSiteSelection.GetValueOnGameThread()!=0 && (Well->X!=X || Well->Y!=Y)))
     {
@@ -246,6 +255,65 @@ void UAnastasisSimulationSubsystem::SeedOpeningHousehold()
 	UE_LOG(LogAnastasis_UnrealV2, Display,
 		TEXT("ANASTASIS_VILLAGE opening household npc=%s home=%s work=%s"),
 		*ResidentId, HomeId.IsEmpty() ? TEXT("none") : *HomeId, WorkId.IsEmpty() ? TEXT("none") : *WorkId);
+}
+
+void UAnastasisSimulationSubsystem::SeedOpeningConstruction()
+{
+	using namespace AnastasisVillage;
+	FVillage& Village = Simulation.GetVillage();
+	const AnastasisWorld::FWorld& World = Simulation.GetWorld();
+	if (Village.GetActors().Num() < 2) return;
+	const AnastasisPath::FWorldNavSource Nav(Village.GetNavGrid(), World);
+	// Les habitants initiaux peuvent etre sur des ilots de navigation differents.
+	// Chercher autour de chacun, puis choisir les ouvriers qui atteignent vraiment l'acces.
+	for (int32 Anchor = 1; Anchor < Village.GetActors().Num(); ++Anchor)
+	for (int32 R = 2; R <= 5; ++R)
+	for (int32 DY = -R; DY <= R; ++DY)
+	for (int32 DX = -R; DX <= R; ++DX)
+	{
+		if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) != R) continue;
+		const FNpc& AnchorNpc = Village.GetActors()[Anchor];
+		const int32 X = FMath::FloorToInt32(AnchorNpc.X) + DX;
+		const int32 Y = FMath::FloorToInt32(AnchorNpc.Y) + DY;
+		if (X < 2 || Y < 2 || X >= World.W - 2 || Y >= World.H - 2
+			|| Village.LiveTileAt(X, Y).Resource != AnastasisWorld::EResource::None
+			|| Village.IsFootBlocked(X + 0.5, Y + 0.5)) continue;
+		// Materiaux livres au depart : condition initiale explicite. Le transport autonome
+		// n'est pas porte ; ne pas presenter cette reserve comme une livraison de PNJ.
+		const FString SiteId = Village.OpenSite(HouseType, X, Y, true);
+		if (SiteId.IsEmpty()) continue;
+		const FBuilding* Site = Village.FindBuilding(SiteId);
+		TArray<FString> ReachableBuilders;
+		if (Site)
+		{
+			for (int32 N = 1; N < Village.GetActors().Num(); ++N)
+			{
+				const FNpc& Builder = Village.GetActors()[N];
+				for (const FPoint& Door : Site->AccessPoints)
+				{
+					TArray<FPoint> Path;
+					if (AnastasisPath::FindPath(Nav, { Builder.X, Builder.Y }, Door, {}, Path))
+					{
+						ReachableBuilders.Add(Builder.Id);
+						break;
+					}
+				}
+				if (ReachableBuilders.Num() == 2) break;
+			}
+		}
+		if (ReachableBuilders.IsEmpty())
+		{
+			Village.RemoveBuilding(SiteId);
+			continue;
+		}
+		FirstSiteId = SiteId;
+		for (const FString& BuilderId : ReachableBuilders) Village.SetJob(BuilderId, AnastasisBuild::JobBuilder);
+		UE_LOG(LogAnastasis_UnrealV2, Display,
+			TEXT("ANASTASIS_VILLAGE opening construction site=%s tile=(%d,%d) builders=%s stock=%d wood %d stone"),
+			*SiteId, X, Y, *FString::Join(ReachableBuilders, TEXT(",")), Site->Materials.StockWood, Site->Materials.StockStone);
+		return;
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VILLAGE opening construction unavailable: no reachable site for any settler"));
 }
 
 void UAnastasisSimulationSubsystem::ReplaceStartVillage()
