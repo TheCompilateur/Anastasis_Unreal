@@ -11,13 +11,14 @@ $env:ANASTASIS_COSMIC_REBUILD = if ($Rebuild) { '1' } else { '0' }
 $script = (Join-Path $PSScriptRoot 'cosmic-sky-material.py').Replace('\', '/')
 $argsList = @(
   ('"' + (Join-Path $root 'Anastasis_UnrealV2.uproject') + '"'),
-  '/Engine/Maps/Entry', '-nullrhi', '-unattended', '-nosound', '-nosplash', '-NoLiveCoding',
+  '/Engine/Maps/Entry', '-unattended', '-nosound', '-nosplash', '-NoLiveCoding',
   ('-abslog="' + $log + '"'), ('-ExecCmds="py ' + $script + '"')
 )
 $p = Start-AnastasisEditor 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe' $argsList
 $p | Wait-Process -Timeout $TimeoutSec -ErrorAction SilentlyContinue
 $p.Refresh()
 if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force; throw 'COSMIC_MATERIAL::FAIL editor timeout' }
+if ($p.ExitCode -ne 0) { throw ('COSMIC_MATERIAL::FAIL editor exit code ' + $p.ExitCode + '; inspect ' + $log) }
 if (-not (Select-String -LiteralPath $log -Pattern 'COSMIC_MATERIAL_DONE' -Quiet)) { throw 'COSMIC_MATERIAL::FAIL incomplete run' }
 if (Select-String -LiteralPath $log -Pattern 'COSMIC_MATERIAL_FAIL|Failed to compile|\[SM[56]\].*error' -Quiet) {
   throw ('COSMIC_MATERIAL::FAIL see ' + $log)
