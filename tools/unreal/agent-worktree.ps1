@@ -706,6 +706,42 @@ switch ($Command) {
       # empilee sur une autre du lot ne repasse pas les commits de sa base.
       $commits = @((Invoke-Git -C $integ cherry HEAD $b).Out | Where-Object { $_ -like '+ *' } | ForEach-Object { $_.Substring(2).Trim() })
       if ($commits.Count -eq 0) { Write-Output "NOTHING_TO_INTEGRATE::$b"; continue }
+      # Une branche empilee peut apporter les commits (et la fiche) d'une autre mission.
+      # Sans ce controle, ses preuves PIE ne sont pas ajoutees a $owner plus bas.
+      $changed = Invoke-Git -C $integ log --format= --name-only --no-walk @commits
+      if ($changed.Code -ne 0) {
+        $rejected += "$m : provenance des commits impossible a lire"
+        continue
+      }
+      $alreadyApplied = @($applied | ForEach-Object { $_.Mission })
+      $inherited = @($changed.Out | ForEach-Object {
+        if ($_ -match '^docs/unreal/handoffs/([a-z0-9][a-z0-9._-]*)\.md$') { $Matches[1] }
+      } | Where-Object { $_ -ne $m -and $alreadyApplied -notcontains $_ })
+      # La fiche d'un ancetre peut deja etre sur main par contenu alors que son code manque
+      # encore. Rechercher aussi les branches ancetres dont au moins un commit reste a verser.
+      $ancestors = Invoke-Git -C $integ branch --merged $b --format='%(refname:short)' 'agent/*'
+      if ($ancestors.Code -ne 0) {
+        $rejected += "$m : ascendance des missions impossible a lire"
+        continue
+      }
+      $ancestryOk = $true
+      foreach ($ancestor in $ancestors.Out) {
+        if ($ancestor -eq $b -or $ancestor -notmatch '^agent/([a-z0-9][a-z0-9._-]*)$') { continue }
+        $other = $Matches[1]
+        if ($alreadyApplied -contains $other) { continue }
+        $pending = Invoke-Git -C $integ cherry HEAD $ancestor
+        if ($pending.Code -ne 0) { $ancestryOk = $false; break }
+        if (@($pending.Out | Where-Object { $_ -like '+ *' }).Count -gt 0) { $inherited += $other }
+      }
+      if (-not $ancestryOk) {
+        $rejected += "$m : commits des missions ancetres impossibles a comparer"
+        continue
+      }
+      $inherited = @($inherited | Sort-Object -Unique)
+      if ($inherited.Count -gt 0) {
+        $rejected += "$m : commits de mission(s) heritee(s) non versees avant elle : $($inherited -join ', ')"
+        continue
+      }
       $p = Invoke-Git -C $integ cherry-pick @commits
       if ($p.Code -ne 0) {
         $null = Invoke-Git -C $integ cherry-pick --abort

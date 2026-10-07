@@ -89,6 +89,9 @@ ne couvre que ces cas ; le build et les preuves PIE déclarées restent requis.
   autre refuse : `MAIN_LOCK::TENU`). Le verrou est rendu à la fin, même en échec.
 - Admises : les missions dont `finish` a passé sur leur commit actuel (`proved`, `queued` ou `nounreal`).
   Les autres sont listées (`BATCH_REJECTED::`) ; une mission en conflit est écartée, les autres passent.
+- Une branche qui apporte encore des commits d'une mission ancêtre est écartée si cette mission n'a pas été
+  versée avant elle dans le lot. Nommer l'ancêtre avant la descendante : sa fiche déjà présente sur `main`
+  ne prouve pas que son code ni ses preuves PIE y sont passés.
 - Un seul portail dans `ANASTASIS_WORKTREES\_integration` (binaires conservés, build incrémental) : build +
   suite si le lot touche Unreal, puis **toutes les preuves PIE déclarées (`PROOFS:`) dans un seul
   éditeur** (`editor-batch.ps1`).

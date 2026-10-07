@@ -8,8 +8,8 @@
 # Usage : tools\unreal\test-agent-worktree.ps1   (teste la racine qui contient ce script)
 param([string]$Source = ([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')))
 $ErrorActionPreference = 'Continue'
-$base = Join-Path ([IO.Path]::GetTempPath()) 'anastasis-test-agent-worktree'
-if (Test-Path $base) { Remove-Item $base -Recurse -Force }
+# Plusieurs agents peuvent lancer ce banc en meme temps : chaque run possede son depot jetable.
+$base = Join-Path ([IO.Path]::GetTempPath()) ('anastasis-test-agent-worktree-{0}-{1}' -f $PID, [guid]::NewGuid().ToString('N'))
 $repo = Join-Path $base 'canon'; $wtRoot = Join-Path $base 'worktrees'; $harness = Join-Path $base 'harness'
 New-Item -ItemType Directory -Force $repo, $wtRoot, $harness | Out-Null
 
@@ -28,6 +28,9 @@ function Check($name, $cond, $detail) { Write-Output ("{0,-6} {1}" -f $(if ($con
 Copy-Item "$Source\AGENTS.md" $repo
 New-Item -ItemType Directory -Force "$repo\tools\unreal", "$repo\tools\git-hooks" | Out-Null
 Copy-Item "$Source\tools\unreal\*" "$repo\tools\unreal" -Recurse
+# Le registre des preuves reference aussi ce script hors de tools/unreal.
+New-Item -ItemType Directory -Force "$repo\tools\soil-crusade" | Out-Null
+Copy-Item "$Source\tools\soil-crusade\capture.py" "$repo\tools\soil-crusade"
 Copy-Item "$Source\tools\git-hooks\reference-transaction" "$repo\tools\git-hooks"
 New-Item -ItemType Directory -Force "$repo\tools\migration\scenarios", "$repo\Source\AnastasisSim" | Out-Null
 Copy-Item "$Source\tools\migration\check-ecarts.mjs" "$repo\tools\migration"
@@ -268,5 +271,38 @@ Check 'S21 lot, Source/ change depuis la preuve : portail rejoue (build tente), 
 & git -C $wr1 rebase -q main 2>&1 | Out-Null
 $r = AW finish -Mission r1
 Check 'S21 finish apres rebase, Source/ change : build tente, pas de HANDOFF_READY' ($r.Code -ne 0 -and $r.Out -match 'UNREAL_CHANGE::OUI' -and $r.Out -notmatch 'RETEST::SKIP|HANDOFF_READY::YES' -and (Get-Content (Join-Path $wtRoot '.handoff\r1.txt') -Raw).Trim() -eq "$new1 proved") $r.Out
+
+# 22. Une branche empilee ne doit pas verser une mission ancetre sans inscrire sa preuve.
+$null = NewMission 'stack-a' @({ param($w) Set-Content "$w\doc-stack-a.md" 'a' })
+$null = AW finish -Mission stack-a
+G branch agent/stack-b agent/stack-a | Out-Null
+$stackB = Join-Path $wtRoot 'stack-b'
+G worktree add -q $stackB agent/stack-b | Out-Null
+Set-Content "$stackB\docs\unreal\handoffs\stack-b.md" "# HANDOFF: stack-b`nPROOFS: (aucune)"
+Set-Content "$stackB\doc-stack-b.md" 'b'
+& git -C $stackB add -A 2>&1 | Out-Null; & git -C $stackB commit -q -m stack-b 2>&1 | Out-Null
+$null = AW finish -Mission stack-b
+$mainAvant = (G rev-parse main)
+$r = AW integrate-batch -Missions 'stack-b'
+Check 'S22 branche empilee seule refusee, main intacte' ($r.Code -ne 0 -and $r.Out -match 'BATCH_REJECTED::stack-b : commits de mission\(s\) heritee\(s\) non versees avant elle : stack-a' -and (G rev-parse main) -eq $mainAvant) $r.Out
+$r = AW integrate-batch -Missions 'stack-a,stack-b'
+Check 'S22 ancetre puis descendante admises' ($r.Code -eq 0 -and $r.Out -match 'BATCH_INTEGRATED::stack-a, stack-b' -and (G show 'main:doc-stack-a.md') -eq 'a' -and (G show 'main:doc-stack-b.md') -eq 'b') $r.Out
+
+# 23. La fiche de l'ancetre peut etre deja sur main alors que son commit de code manque.
+$null = NewMission 'partial-a' @({ param($w) Set-Content "$w\doc-partial-a.md" 'code-a' })
+G branch agent/partial-b agent/partial-a | Out-Null
+$partialB = Join-Path $wtRoot 'partial-b'
+G worktree add -q $partialB agent/partial-b | Out-Null
+Set-Content "$partialB\docs\unreal\handoffs\partial-b.md" "# HANDOFF: partial-b`nPROOFS: (aucune)"
+Set-Content "$partialB\doc-partial-b.md" 'code-b'
+& git -C $partialB add -A 2>&1 | Out-Null; & git -C $partialB commit -q -m partial-b 2>&1 | Out-Null
+$null = AW finish -Mission partial-b
+$docOnly = (G rev-parse 'agent/partial-a~1')
+$env:ANASTASIS_INTEGRATION = '1'
+G cherry-pick $docOnly | Out-Null
+Remove-Item Env:ANASTASIS_INTEGRATION
+$mainAvant = (G rev-parse main)
+$r = AW integrate-batch -Missions 'partial-b'
+Check 'S23 fiche ancetre deja sur main : code herite refuse' ($r.Code -ne 0 -and $r.Out -match 'BATCH_REJECTED::partial-b : commits de mission\(s\) heritee\(s\) non versees avant elle : partial-a' -and (G rev-parse main) -eq $mainAvant) $r.Out
 
 Remove-Item $base -Recurse -Force -ErrorAction SilentlyContinue
