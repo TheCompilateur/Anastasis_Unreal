@@ -11,6 +11,8 @@ chaque apport. Les branches d'origine ne sont pas touchees ; leurs commits sont 
 3. riparian-transition-004 -- 0b2bed56, 8c4183ba (apres leafcards : meme script de capture).
 4. soil-water-budget-001 -- ecf2c8da (ecart n° 37).
 
+RELAIS: weather-wind-003, tree-leafcards-001, riparian-transition-004, soil-water-budget-001
+
 ## FILES_OWNED
 
 Ceux des quatre missions, plus les resolutions :
