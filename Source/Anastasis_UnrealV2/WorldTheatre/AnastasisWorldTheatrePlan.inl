@@ -85,3 +85,31 @@
   M.Colour = FLinearColor(0.0350f, 0.0600f, 0.0300f);
   M.Outline = { FVector2D(937000, 537000), FVector2D(961000, 541000), FVector2D(965000, 561000), FVector2D(929000, 581000), FVector2D(909000, 585000), FVector2D(905000, 569000), FVector2D(929000, 541000), FVector2D(937000, 541000) };
   P.Masses.Add(MoveTemp(M)); }
+// parcharia : fumee etape 0 a 10.00 km, cap +0.0 deg, source cachee derriere une crete depuis le village
+{ FThreatSite T; T.Id = TEXT("parcharia_smoke_0"); T.NodeId = TEXT("parcharia"); T.Sign = EThreatSign::Smoke; T.Stage = 0; T.Location = FVector2D(-149017, 1023057); T.Height = 90000; P.ThreatSites.Add(T); }
+// parcharia : fumee etape 1 a 5.00 km, cap +0.0 deg, source cachee derriere une crete depuis le village
+{ FThreatSite T; T.Id = TEXT("parcharia_smoke_1"); T.NodeId = TEXT("parcharia"); T.Sign = EThreatSign::Smoke; T.Stage = 1; T.Location = FVector2D(5492, 547528); T.Height = 60000; P.ThreatSites.Add(T); }
+// parcharia : fumee etape 2 a 2.75 km, cap -2.5 deg, source cachee derriere une crete depuis le village
+{ FThreatSite T; T.Id = TEXT("parcharia_smoke_2"); T.NodeId = TEXT("parcharia"); T.Sign = EThreatSign::Smoke; T.Stage = 2; T.Location = FVector2D(86509, 336998); T.Height = 35000; P.ThreatSites.Add(T); }
+// parcharia : feu de signaux 1/4 a 13.00 km, cap -7.5 deg, bosse +21 m, a portee de vue du village
+{ FThreatSite T; T.Id = TEXT("parcharia_beacon_0"); T.NodeId = TEXT("parcharia"); T.Sign = EThreatSign::Beacon; T.Stage = 0; T.Location = FVector2D(-76906, 1350231); T.Height = 600; P.ThreatSites.Add(T); }
+// parcharia : feu de signaux 2/4 a 11.50 km, cap +0.0 deg, bosse +47 m, a portee de vue du village
+{ FThreatSite T; T.Id = TEXT("parcharia_beacon_1"); T.NodeId = TEXT("parcharia"); T.Sign = EThreatSign::Beacon; T.Stage = 1; T.Location = FVector2D(-195370, 1165715); T.Height = 600; P.ThreatSites.Add(T); }
+// parcharia : feu de signaux 3/4 a 10.00 km, cap -5.0 deg, bosse +14 m, a portee de vue du village
+{ FThreatSite T; T.Id = TEXT("parcharia_beacon_2"); T.NodeId = TEXT("parcharia"); T.Sign = EThreatSign::Beacon; T.Stage = 2; T.Location = FVector2D(-64951, 1046370); T.Height = 600; P.ThreatSites.Add(T); }
+// parcharia : feu de signaux 4/4 a 8.50 km, cap -25.0 deg, bosse +59 m, a portee de vue du village
+{ FThreatSite T; T.Id = TEXT("parcharia_beacon_3"); T.NodeId = TEXT("parcharia"); T.Sign = EThreatSign::Beacon; T.Stage = 3; T.Location = FVector2D(263589, 915664); T.Height = 600; P.ThreatSites.Add(T); }
+// matzouka : fumee etape 0 a 10.25 km, cap +0.0 deg, source cachee derriere une crete depuis le village
+{ FThreatSite T; T.Id = TEXT("matzouka_smoke_0"); T.NodeId = TEXT("matzouka"); T.Sign = EThreatSign::Smoke; T.Stage = 0; T.Location = FVector2D(945196, 730857); T.Height = 90000; P.ThreatSites.Add(T); }
+// matzouka : fumee etape 1 a 5.00 km, cap +0.0 deg, source cachee derriere une crete depuis le village
+{ FThreatSite T; T.Id = TEXT("matzouka_smoke_1"); T.NodeId = TEXT("matzouka"); T.Sign = EThreatSign::Smoke; T.Stage = 1; T.Location = FVector2D(543022, 393394); T.Height = 60000; P.ThreatSites.Add(T); }
+// matzouka : fumee etape 2 a 4.25 km, cap +7.5 deg, source cachee derriere une crete depuis le village
+{ FThreatSite T; T.Id = TEXT("matzouka_smoke_2"); T.NodeId = TEXT("matzouka"); T.Sign = EThreatSign::Smoke; T.Stage = 2; T.Location = FVector2D(447126, 385343); T.Height = 35000; P.ThreatSites.Add(T); }
+// matzouka : feu de signaux 1/4 a 12.50 km, cap -25.0 deg, bosse +124 m, a portee de vue du village
+{ FThreatSite T; T.Id = TEXT("matzouka_beacon_0"); T.NodeId = TEXT("matzouka"); T.Sign = EThreatSign::Beacon; T.Stage = 0; T.Location = FVector2D(1367407, 395524); T.Height = 600; P.ThreatSites.Add(T); }
+// matzouka : feu de signaux 2/4 a 11.00 km, cap -7.5 deg, bosse +131 m, a portee de vue du village
+{ FThreatSite T; T.Id = TEXT("matzouka_beacon_1"); T.NodeId = TEXT("matzouka"); T.Sign = EThreatSign::Beacon; T.Stage = 1; T.Location = FVector2D(1087731, 663030); T.Height = 600; P.ThreatSites.Add(T); }
+// matzouka : feu de signaux 3/4 a 9.50 km, cap -5.0 deg, bosse +48 m, a portee de vue du village
+{ FThreatSite T; T.Id = TEXT("matzouka_beacon_2"); T.NodeId = TEXT("matzouka"); T.Sign = EThreatSign::Beacon; T.Stage = 2; T.Location = FVector2D(938194, 616898); T.Height = 600; P.ThreatSites.Add(T); }
+// matzouka : feu de signaux 4/4 a 8.00 km, cap +5.0 deg, bosse +8 m, a portee de vue du village
+{ FThreatSite T; T.Id = TEXT("matzouka_beacon_3"); T.NodeId = TEXT("matzouka"); T.Sign = EThreatSign::Beacon; T.Stage = 3; T.Location = FVector2D(725685, 637685); T.Height = 600; P.ThreatSites.Add(T); }

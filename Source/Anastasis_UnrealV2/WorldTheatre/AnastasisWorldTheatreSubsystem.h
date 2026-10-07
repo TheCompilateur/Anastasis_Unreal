@@ -28,6 +28,9 @@ class UProceduralMeshComponent;
  * le meme acteur assombrit, desature et refroidit ce qui est loin (M_WorldTheatreDistance) ; le village reste la
  * poche de lumiere. `anastasis.Theatre.DepthProbe 1` ecrit la profondeur en gris (instrument de mesure).
  *
+ * v2.2, la menace (`anastasis.Theatre.Threat 0/1`) : fumees et feux de signaux places par l'analyse, allumes par le
+ * monde exterieur simule (AnastasisWorldTheatreThreat) ; l'effroi du village assombrit davantage le lointain.
+ *
  * Commandes : `anastasis.Theatre.Read <dossier>` (releve pour l'analyse), `anastasis.Theatre.Rebuild`,
  * `anastasis.Theatre.Status`.
  */
@@ -60,6 +63,16 @@ private:
 	UMaterialInterface* ResolveMaterial();
 	/** v2.1 : pose ou retire le post-traitement de distance et la sonde, et y recopie les CVars. */
 	void UpdateLight();
+	/** v2.2 : lit la carte de menace et allume, eteint, dose chaque signe. */
+	void UpdateThreat();
+	bool BuildThreatSigns();
+	float ReadSunElevationDeg() const;
+
+public:
+	/** Journalise la carte de menace et chaque signe (preuve PIE : lignes WORLD_THREAT). */
+	void LogThreat() const;
+
+private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> HostActor;
@@ -74,6 +87,22 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> ProbeMaterial;
 	int32 LoggedLight = -1;
+
+	/** Un composant par site de menace (meme ordre que CanonicalPlan().ThreatSites). */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UProceduralMeshComponent>> ThreatMeshes;
+	/** Section 0 de chaque site (fumee ou feu), section 1 des feux (fumee claire du jour). */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> ThreatMain;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> ThreatDay;
+	TArray<float> ThreatIntensity;
+	float Dread = 0.0f;
+	float SunElevationDeg = 45.0f;
+	bool bThreatLoaded = false;
+	double ThreatDay_ = 0.0;
+	double ThreatVillageExcess = 0.0;
+	int32 LoggedThreat = -1;
 
 	AnastasisWorldTheatre::FBuildReport LastReport;
 	bool bBuilt = false;

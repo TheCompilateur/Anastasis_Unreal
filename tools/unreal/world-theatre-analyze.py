@@ -584,7 +584,10 @@ def main():
                                 'why': 'tour de guet abandonnee (hypothese de conception, PONT-HIS-01 : poste sur une bosse qui commande '
                                        'l approche ; zone de depart exposee, sans garnison) ; seul repere humain, revele et non visible : '
                                        'choisi parmi %d bosses pour se decouper sur le ciel au-dessus de la canopee : %s ; cadre : %s' % (n_cand, '; '.join('%s %s' % d for d in detail), ', '.join(framed) or 'aucun')})
-        plan = {'masses': masses, 'silhouettes': silhouettes}
+        bz = float(world.height(np.array([village[0]]), np.array([village[1]]))[0])
+        threats, treport = compose_threat(world_canopy, world, near, nf, (village[0], village[1], bz + 170.0), THREAT_ANCHORS, THREAT_RULES)
+        report['threat_sites'] = treport
+        plan = {'masses': masses, 'silhouettes': silhouettes, 'threats': threats}
         with open(os.path.join(out, 'plan.json'), 'w', encoding='utf-8') as f:
             json.dump(plan, f, indent=1)
         if a.emit_plan:
@@ -811,6 +814,10 @@ def emit_plan(plan, path, source):
         lines.append('// %s' % s_.get('why', ''))
         lines.append('{ FSilhouetteSpec S; S.Id = TEXT("%s"); S.Kind = ESilhouette::%s; S.Location = %s; S.Yaw = %.1f; S.Scale = %.2f; P.Silhouettes.Add(S); }'
                      % (s_['id'], s_['kind'], v2(s_['xy']), s_.get('yaw', 0.0), s_.get('scale', 1.0)))
+    for t in plan.get('threats', []):
+        lines.append('// %s' % t.get('why', ''))
+        lines.append('{ FThreatSite T; T.Id = TEXT("%s"); T.NodeId = TEXT("%s"); T.Sign = EThreatSign::%s; T.Stage = %d; T.Location = %s; '
+                     'T.Height = %.0f; P.ThreatSites.Add(T); }' % (t['id'], t['node'], t['sign'], t['stage'], v2(t['xy']), t['height']))
     with open(path, 'w', encoding='utf-8', newline='\r\n') as f:
         f.write('\n'.join(lines) + '\n')
 
@@ -1017,6 +1024,98 @@ def place_landmark(world, near, nz, nf, water, meta, eyes, vistas, rules, hidden
         scored.append((score, x, y, gz, detail, framed))
     scored.sort(key=lambda t: -t[0])
     return scored[:5], int(cand.sum())
+
+
+# ---------------------------------------------------------------- menace (v2.2) : ou la simulation se montre
+
+# Les noeuds du monde exterieur (geo-pontos-1204.json) n'ont pas de coordonnees. Seuls les VOISINS du village (un jour
+# de route) peuvent se voir : au-dela, leur danger ne se montre qu'en arrivant chez un voisin. Le cap de chaque voisin
+# est une HYPOTHESE DE CONCEPTION, accordee a la vallee mesuree (X = nord, Y = est ; yaw 0 = nord, 90 = est).
+THREAT_ANCHORS = [
+    {'node': 'parcharia', 'bearing': 108.0,
+     'why': 'Parcharia, paturages d ete au-dessus des vallees (scenario : yayla, frontiere, influence turkmene) : la seconde '
+            'chaine a l est-sud-est, a ~21 km et 7 deg (horizon mesure) ; la route village-parcharia porte toute l insecurite'},
+    {'node': 'matzouka', 'bearing': 40.0,
+     'why': 'Matzouka, bandon des monasteres, et Trebizonde au-dela : derriere la muraille du nord-est (10-12 km), cote '
+            'protection ; rare source de menace (insecurite de base 0,05)'},
+]
+
+THREAT_RULES = {
+    'cone_deg': 25.0,
+    # Fumee : trois etapes le long du cap. 0 = chez le voisin (sa pression vraie), 1 et 2 = la pression en route vers le village.
+    'smoke_bands_km': [(10.0, 16.0), (5.0, 9.0), (2.5, 4.5)],
+    'smoke_height_uu': [90000.0, 60000.0, 35000.0],
+    # Feux de signaux : une chaine de collines a portee de vue du village, du plus loin au plus pres.
+    'beacon_range_km': (1.5, 13.0),
+    'beacon_count': 4,
+    'beacon_spacing_km': 1.5,
+    'beacon_fire_uu': 600.0,
+}
+
+
+def compose_threat(world_canopy, world, near, nf, eye, anchors, rules):
+    """Sites des signes de menace, par voisin : fumees (source cachee derriere une crete, colonne qui la depasse) et chaine
+    de feux de signaux (collines a portee de vue du village, sur la canopee reelle). Rien n'est tire au hasard : chaque site
+    est le meilleur candidat mesure de sa bande."""
+    sites, report = [], {}
+    for an in anchors:
+        node, brg = an['node'], an['bearing']
+        rep_n = {'bearing': brg, 'smoke': [], 'beacons': []}
+        for stage, (lo, hi) in enumerate(rules['smoke_bands_km']):
+            H = rules['smoke_height_uu'][stage]
+            best = None
+            for dkm in np.arange(lo, hi + 1e-6, 0.25):
+                for off in np.arange(-rules['cone_deg'] * 0.6, rules['cone_deg'] * 0.6 + 1e-6, 2.5):
+                    a = math.radians(brg + off)
+                    x, y = eye[0] + math.cos(a) * dkm * 1e5, eye[1] + math.sin(a) * dkm * 1e5
+                    gz = float(world.height(np.array([x]), np.array([y]))[0])
+                    base_seen = visible(world_canopy, eye, x, y, gz + 1000.0, steps=250)
+                    top_seen = visible(world_canopy, eye, x, y, gz + 0.5 * H, steps=250)
+                    if not top_seen:
+                        continue
+                    # Prefere : source cachee (on voit la fumee, pas le feu), au plus pres du cap.
+                    score = (2.0 if not base_seen else 1.0) - abs(off) / 60.0
+                    if best is None or score > best[0]:
+                        best = (score, x, y, gz, dkm, off, base_seen)
+            if best:
+                sc, x, y, gz, dkm, off, base_seen = best
+                sites.append({'id': '%s_smoke_%d' % (node, stage), 'node': node, 'sign': 'Smoke', 'stage': stage, 'xy': (x, y),
+                              'height': H,
+                              'why': '%s : fumee etape %d a %.2f km, cap %+.1f deg, source %s depuis le village' % (
+                                  node, stage, dkm, off, 'visible' if base_seen else 'cachee derriere une crete')})
+                rep_n['smoke'].append({'stage': stage, 'km': float(dkm), 'off': float(off), 'source_hidden': not base_seen})
+            else:
+                rep_n['smoke'].append({'stage': stage, 'verdict': 'aucun site dont la colonne se voit'})
+        cands = []
+        lo, hi = rules['beacon_range_km']
+        for dkm in np.arange(lo, hi + 1e-6, 0.25):
+            for off in np.arange(-rules['cone_deg'], rules['cone_deg'] + 1e-6, 2.5):
+                a = math.radians(brg + off)
+                x, y = eye[0] + math.cos(a) * dkm * 1e5, eye[1] + math.sin(a) * dkm * 1e5
+                if not near.contains(x, y):
+                    continue
+                i, j = near.ij(x, y)
+                tpi = float(nf['tpi_small'][int(round(j)), int(round(i))])
+                if tpi < 2.0:
+                    continue
+                gz = float(world.height(np.array([x]), np.array([y]))[0])
+                if visible(world_canopy, eye, x, y, gz + rules['beacon_fire_uu'], steps=250):
+                    cands.append((float(dkm), float(off), x, y, tpi))
+        chain = []
+        for c in sorted(cands, key=lambda c: (-c[0], abs(c[1]) - c[4] * 0.2)):
+            if len(chain) >= rules['beacon_count']:
+                break
+            if all(abs(c[0] - k[0]) >= rules['beacon_spacing_km'] for k in chain):
+                chain.append(c)
+        for k, (dkm, off, x, y, tpi) in enumerate(chain):
+            sites.append({'id': '%s_beacon_%d' % (node, k), 'node': node, 'sign': 'Beacon', 'stage': k, 'xy': (x, y),
+                          'height': rules['beacon_fire_uu'],
+                          'why': '%s : feu de signaux %d/%d a %.2f km, cap %+.1f deg, bosse +%.0f m, a portee de vue du village' % (
+                              node, k + 1, len(chain), dkm, off, tpi)})
+            rep_n['beacons'].append({'k': k, 'km': dkm, 'off': off, 'tpi_m': tpi})
+        rep_n['beacon_candidates'] = len(cands)
+        report[node] = rep_n
+    return sites, report
 
 
 LANDMARK_RULES = {

@@ -2,16 +2,20 @@
 
 #include "Anastasis_UnrealV2.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Components/DirectionalLightComponent.h"
 #include "Components/PostProcessComponent.h"
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
+#include "Engine/DirectionalLight.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformTime.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
+#include "Sim/AnastasisSimulationSubsystem.h"
 #include "WorldTheatre/AnastasisWorldReading.h"
+#include "WorldTheatre/AnastasisWorldTheatreThreat.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
 
 namespace
@@ -79,6 +83,25 @@ FAutoConsoleCommandWithWorld CmdTheatreRebuild(
 	{
 		if (UAnastasisWorldTheatreSubsystem* Sub = TheatreOf(World)) Sub->Rebuild();
 	}));
+// v2.2 -- la menace lue dans la simulation.
+TAutoConsoleVariable<int32> CVarTheatreThreat(
+	TEXT("anastasis.Theatre.Threat"), 0,
+	TEXT("WORLD_THEATRE v2.2 : 1=fumees et feux de signaux pilotes par le monde exterieur simule (Anastasis.Geo.Load requis), 0=aucun (defaut). A chaud."), ECVF_Default);
+TAutoConsoleVariable<float> CVarTheatreThreatDread(
+	TEXT("anastasis.Theatre.Threat.Dread"), 0.25f,
+	TEXT("Assombrissement du lointain ajoute au plein de l'effroi du village (avec anastasis.Theatre.Light 1)."), ECVF_Default);
+
+FAutoConsoleCommandWithWorld CmdTheatreThreatStatus(
+	TEXT("anastasis.Theatre.Threat.Status"),
+	TEXT("Journalise la carte de menace (monde exterieur simule) et l'intensite de chaque fumee et feu de signaux."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		if (UAnastasisWorldTheatreSubsystem* Sub = TheatreOf(World)) Sub->LogThreat();
+	}));
+
+constexpr const TCHAR* SmokeMaterialPath = TEXT("/Game/WorldTheatre/M_WorldTheatreSmoke.M_WorldTheatreSmoke");
+constexpr const TCHAR* FireMaterialPath = TEXT("/Game/WorldTheatre/M_WorldTheatreFire.M_WorldTheatreFire");
+
 FAutoConsoleCommandWithWorld CmdTheatreStatus(
 	TEXT("anastasis.Theatre.Status"),
 	TEXT("Journalise ce que la couche de mise en scene a pose et ce qu'elle a refuse."),
@@ -171,6 +194,7 @@ void UAnastasisWorldTheatreSubsystem::Tick(float DeltaTime)
 	PollClock += DeltaTime;
 	if (PollClock < 0.5f) return;
 	PollClock = 0.0f;
+	UpdateThreat();
 	UpdateLight();
 	const int32 Enabled = CVarTheatre.GetValueOnGameThread() != 0 ? 1 : 0;
 	if (Enabled != BuiltEnabled)
@@ -274,7 +298,9 @@ void UAnastasisWorldTheatreSubsystem::UpdateLight()
 		const float Cool = FMath::Clamp(CVarTheatreLightCool.GetValueOnGameThread(), 0.0f, 1.0f);
 		DistanceMaterial->SetScalarParameterValue(TEXT("Start"), CVarTheatreLightStart.GetValueOnGameThread());
 		DistanceMaterial->SetScalarParameterValue(TEXT("Full"), FMath::Max(CVarTheatreLightFull.GetValueOnGameThread(), CVarTheatreLightStart.GetValueOnGameThread() + 0.1f));
-		DistanceMaterial->SetScalarParameterValue(TEXT("Darken"), FMath::Clamp(CVarTheatreLightDarken.GetValueOnGameThread(), 0.0f, 0.95f));
+		// v2.2 : l'effroi du village (exposition simulee) assombrit davantage ce qui est loin.
+		const float DreadDarken = CVarTheatreThreat.GetValueOnGameThread() != 0 ? Dread * CVarTheatreThreatDread.GetValueOnGameThread() : 0.0f;
+		DistanceMaterial->SetScalarParameterValue(TEXT("Darken"), FMath::Clamp(CVarTheatreLightDarken.GetValueOnGameThread() + DreadDarken, 0.0f, 0.95f));
 		DistanceMaterial->SetScalarParameterValue(TEXT("Desaturate"), FMath::Clamp(CVarTheatreLightDesaturate.GetValueOnGameThread(), 0.0f, 1.0f));
 		DistanceMaterial->SetScalarParameterValue(TEXT("SkyCut"), 2.0e7f);
 		DistanceMaterial->SetScalarParameterValue(TEXT("SkyAmount"), FMath::Clamp(CVarTheatreLightSky.GetValueOnGameThread(), 0.0f, 1.0f));
@@ -289,6 +315,178 @@ void UAnastasisWorldTheatreSubsystem::UpdateLight()
 			bLight ? 1 : 0, bProbe ? 1 : 0, CVarTheatreLightStart.GetValueOnGameThread(), CVarTheatreLightFull.GetValueOnGameThread(),
 			CVarTheatreLightDarken.GetValueOnGameThread(), CVarTheatreLightDesaturate.GetValueOnGameThread(),
 			CVarTheatreLightCool.GetValueOnGameThread(), CVarTheatreLightSky.GetValueOnGameThread());
+	}
+}
+
+float UAnastasisWorldTheatreSubsystem::ReadSunElevationDeg() const
+{
+	// Le soleil est la lumiere directionnelle la plus forte (l'atmosphere du jeu la tourne avec l'heure du ciel).
+	const UDirectionalLightComponent* Sun = nullptr;
+	if (UWorld* World = GetWorld())
+	{
+		for (TActorIterator<ADirectionalLight> It(World); It; ++It)
+		{
+			const UDirectionalLightComponent* L = Cast<UDirectionalLightComponent>(It->GetLightComponent());
+			if (L && L->IsVisible() && (!Sun || L->Intensity > Sun->Intensity)) Sun = L;
+		}
+	}
+	if (!Sun) return 45.0f;
+	return FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(-Sun->GetForwardVector().Z, -1.0, 1.0)));
+}
+
+bool UAnastasisWorldTheatreSubsystem::BuildThreatSigns()
+{
+	const TArray<AnastasisWorldTheatre::FThreatSite>& Sites = AnastasisWorldTheatre::CanonicalPlan().ThreatSites;
+	if (Sites.Num() == 0 || !EnsureActor()) return false;
+	AnastasisWorldReading::FReading Reading;
+	FString Why;
+	AnastasisWorldReading::FReadOptions Options = ReadOptions();
+	Options.bPlaced = false;
+	if (!AnastasisWorldReading::Read(GetWorld(), Options, Reading, Why))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("WORLD_THREAT build skipped: %s"), *Why);
+		return false;
+	}
+	UMaterialInterface* Smoke = LoadObject<UMaterialInterface>(nullptr, SmokeMaterialPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	UMaterialInterface* Fire = LoadObject<UMaterialInterface>(nullptr, FireMaterialPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	// Vent dominant de nord-ouest (hypothese de conception) : les colonnes se couchent vers le sud-est (X = nord, Y = est).
+	const FVector2D Lean = FVector2D(-0.7071, 0.7071) * 0.35;
+	int32 Placed = 0;
+	for (int32 K = 0; K < Sites.Num(); ++K)
+	{
+		const AnastasisWorldTheatre::FThreatSite& S = Sites[K];
+		double G = 0.0;
+		if (!SampleRaster(Reading.Near, Reading.Near.Ground, S.Location.X, S.Location.Y, G)
+			&& !SampleRaster(Reading.Far, Reading.Far.Ground, S.Location.X, S.Location.Y, G))
+		{
+			ThreatMeshes.Add(nullptr);
+			ThreatMain.Add(nullptr);
+			ThreatDay.Add(nullptr);
+			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("WORLD_THREAT reject %s: hors du sol releve"), S.Id);
+			continue;
+		}
+		UProceduralMeshComponent* Proc = NewObject<UProceduralMeshComponent>(HostActor, *FString::Printf(TEXT("Threat_%s"), S.Id), RF_Transient);
+		Proc->SetupAttachment(HostActor->GetRootComponent());
+		Proc->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Proc->SetCanEverAffectNavigation(false);
+		Proc->SetCastShadow(false);
+		Proc->bUseAsyncCooking = false;
+		Proc->SetWorldLocation(FVector(S.Location.X, S.Location.Y, G));
+		Proc->RegisterComponent();
+		UMaterialInstanceDynamic* Main = nullptr;
+		UMaterialInstanceDynamic* Day = nullptr;
+		if (S.Sign == AnastasisWorldTheatre::EThreatSign::Smoke)
+		{
+			const AnastasisWorldTheatre::FMeshData M = AnastasisWorldTheatreThreat::BuildSmokeColumn(S.Height, Lean, S.Height * 0.03, S.Height * 0.28);
+			Proc->CreateMeshSection_LinearColor(0, M.Vertices, M.Triangles, M.Normals, M.UVs, M.Colours, TArray<FProcMeshTangent>(), false);
+			if (Smoke)
+			{
+				Main = UMaterialInstanceDynamic::Create(Smoke, HostActor);
+				// Fumee d'incendie : brun-gris sombre.
+				Main->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.10f, 0.09f, 0.08f));
+				Main->SetScalarParameterValue(TEXT("Seed"), float(K) * 7.31f);
+				Proc->SetMaterial(0, Main);
+			}
+		}
+		else
+		{
+			const AnastasisWorldTheatre::FMeshData F = AnastasisWorldTheatreThreat::BuildFire(S.Height * 1.4);
+			Proc->CreateMeshSection_LinearColor(0, F.Vertices, F.Triangles, F.Normals, F.UVs, F.Colours, TArray<FProcMeshTangent>(), false);
+			// Le jour, un feu de veille se lit a sa fumee claire, mince et haute.
+			const AnastasisWorldTheatre::FMeshData D = AnastasisWorldTheatreThreat::BuildSmokeColumn(16000.0, Lean, 400.0, 3500.0);
+			Proc->CreateMeshSection_LinearColor(1, D.Vertices, D.Triangles, D.Normals, D.UVs, D.Colours, TArray<FProcMeshTangent>(), false);
+			if (Fire)
+			{
+				Main = UMaterialInstanceDynamic::Create(Fire, HostActor);
+				Main->SetScalarParameterValue(TEXT("Seed"), float(K) * 3.17f);
+				Proc->SetMaterial(0, Main);
+			}
+			if (Smoke)
+			{
+				Day = UMaterialInstanceDynamic::Create(Smoke, HostActor);
+				Day->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.55f, 0.55f, 0.53f));
+				Day->SetScalarParameterValue(TEXT("Seed"), float(K) * 5.03f);
+				Proc->SetMaterial(1, Day);
+			}
+		}
+		Proc->SetVisibility(false);
+		ThreatMeshes.Add(Proc);
+		ThreatMain.Add(Main);
+		ThreatDay.Add(Day);
+		++Placed;
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("WORLD_THREAT signs placed=%d of %d smoke_material=%s fire_material=%s"), Placed, Sites.Num(),
+		Smoke ? TEXT("ok") : TEXT("ABSENT"), Fire ? TEXT("ok") : TEXT("ABSENT"));
+	return Placed > 0;
+}
+
+void UAnastasisWorldTheatreSubsystem::UpdateThreat()
+{
+	const bool bOn = CVarTheatreThreat.GetValueOnGameThread() != 0;
+	if (!bOn)
+	{
+		Dread = 0.0f;
+		for (UProceduralMeshComponent* P : ThreatMeshes) if (IsValid(P)) P->SetVisibility(false);
+		return;
+	}
+	if (ThreatMeshes.Num() == 0 && !BuildThreatSigns()) return;
+	const UAnastasisSimulationSubsystem* Sim = GetWorld() ? GetWorld()->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+	AnastasisWorldTheatreThreat::FThreatMap Map;
+	if (Sim)
+	{
+		const FAnastasisSimulation& S = Sim->GetSimulation();
+		AnastasisWorldTheatreThreat::ReadThreatMap(S.GetGeo(), 1.0 + S.GetTime() / FAnastasisSimulation::DayLength, Map);
+	}
+	const TArray<AnastasisWorldTheatre::FThreatSite>& Sites = AnastasisWorldTheatre::CanonicalPlan().ThreatSites;
+	const AnastasisWorldTheatreThreat::FSignals Signals = AnastasisWorldTheatreThreat::Evaluate(Map, Sites);
+	bThreatLoaded = Map.bLoaded;
+	ThreatDay_ = Map.DayFloat;
+	ThreatVillageExcess = Map.VillageExcess;
+	Dread = Signals.Dread;
+	ThreatIntensity = Signals.Site;
+	SunElevationDeg = ReadSunElevationDeg();
+	// Nuit : le feu ; jour : la fumee claire. Entre les deux (crepuscule, soleil entre -6 et +4 deg), les deux se melent.
+	const float Night = FMath::Clamp((4.0f - SunElevationDeg) / 10.0f, 0.0f, 1.0f);
+	for (int32 K = 0; K < Sites.Num() && K < ThreatMeshes.Num(); ++K)
+	{
+		UProceduralMeshComponent* P = ThreatMeshes[K];
+		if (!IsValid(P)) continue;
+		const float I = ThreatIntensity.IsValidIndex(K) ? ThreatIntensity[K] : 0.0f;
+		P->SetVisibility(I > 0.01f);
+		if (Sites[K].Sign == AnastasisWorldTheatre::EThreatSign::Smoke)
+		{
+			if (ThreatMain[K]) ThreatMain[K]->SetScalarParameterValue(TEXT("Opacity"), 0.85f * I);
+		}
+		else
+		{
+			if (ThreatMain[K]) ThreatMain[K]->SetScalarParameterValue(TEXT("Intensity"), I * Night);
+			if (ThreatDay[K]) ThreatDay[K]->SetScalarParameterValue(TEXT("Opacity"), 0.6f * I * (1.0f - Night));
+		}
+	}
+	int32 Lit = 0;
+	for (const float I : ThreatIntensity) Lit += I > 0.01f ? 1 : 0;
+	const int32 State = (bThreatLoaded ? 1000 : 0) + Lit;
+	if (State != LoggedThreat)
+	{
+		LoggedThreat = State;
+		LogThreat();
+	}
+}
+
+void UAnastasisWorldTheatreSubsystem::LogThreat() const
+{
+	const TArray<AnastasisWorldTheatre::FThreatSite>& Sites = AnastasisWorldTheatre::CanonicalPlan().ThreatSites;
+	int32 Lit = 0;
+	for (const float I : ThreatIntensity) Lit += I > 0.01f ? 1 : 0;
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("WORLD_THREAT status on=%d loaded=%d day=%.3f village_excess=%.3f dread=%.3f sun=%.1f lit=%d/%d"),
+		CVarTheatreThreat.GetValueOnGameThread(), bThreatLoaded ? 1 : 0, ThreatDay_, ThreatVillageExcess, Dread, SunElevationDeg, Lit, Sites.Num());
+	for (int32 K = 0; K < Sites.Num(); ++K)
+	{
+		const float I = ThreatIntensity.IsValidIndex(K) ? ThreatIntensity[K] : 0.0f;
+		const bool bVisible = ThreatMeshes.IsValidIndex(K) && IsValid(ThreatMeshes[K]) && ThreatMeshes[K]->IsVisible();
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("WORLD_THREAT site %s node=%s sign=%s stage=%d intensity=%.3f visible=%d"),
+			Sites[K].Id, Sites[K].NodeId, Sites[K].Sign == AnastasisWorldTheatre::EThreatSign::Smoke ? TEXT("smoke") : TEXT("beacon"),
+			Sites[K].Stage, I, bVisible ? 1 : 0);
 	}
 }
 

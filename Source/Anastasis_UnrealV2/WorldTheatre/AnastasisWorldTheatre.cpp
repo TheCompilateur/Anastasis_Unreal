@@ -8,6 +8,7 @@ void FMeshData::Append(const FMeshData& Other)
 	Vertices.Append(Other.Vertices);
 	Normals.Append(Other.Normals);
 	Colours.Append(Other.Colours);
+	if (Other.UVs.Num() == Other.Vertices.Num() && UVs.Num() == Base) UVs.Append(Other.UVs);
 	Triangles.Reserve(Triangles.Num() + Other.Triangles.Num());
 	for (const int32 T : Other.Triangles) Triangles.Add(Base + T);
 }

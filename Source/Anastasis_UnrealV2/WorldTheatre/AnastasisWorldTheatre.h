@@ -54,10 +54,33 @@ struct FSilhouetteSpec
 	double MaxSlopeDeg = 14.0;
 };
 
+/** v2.2 : un signe de menace lointain. Le site est place par l'analyse ; son intensite vient du monde exterieur simule. */
+enum class EThreatSign : uint8
+{
+	/** Colonne de fumee : un evenement physique (insecurite ou troupes vraies, chez un voisin ou en route). */
+	Smoke,
+	/** Feu de signaux (fumee claire le jour) : une NOUVELLE en route vers le village. */
+	Beacon,
+};
+
+struct FThreatSite
+{
+	const TCHAR* Id = TEXT("");
+	/** Noeud voisin du monde exterieur (geo-pontos-1204.json) dont ce site montre l'etat. */
+	const TCHAR* NodeId = TEXT("");
+	EThreatSign Sign = EThreatSign::Smoke;
+	/** Fumee : 0 = chez le voisin, 1 = a mi-chemin, 2 = pres du village. Feu : rang dans la chaine, 0 = le plus loin. */
+	int32 Stage = 0;
+	FVector2D Location = FVector2D::ZeroVector;
+	/** Fumee : hauteur de la colonne ; feu : hauteur du foyer au-dessus du sol (uu). */
+	double Height = 0.0;
+};
+
 struct FPlan
 {
 	TArray<FMass> Masses;
 	TArray<FSilhouetteSpec> Silhouettes;
+	TArray<FThreatSite> ThreatSites;
 };
 
 /** Le plan versionne, ecrit par l'analyse. */
@@ -72,6 +95,8 @@ struct FMeshData
 	TArray<int32> Triangles;
 	TArray<FVector> Normals;
 	TArray<FLinearColor> Colours;
+	/** Facultatif (fumee, feu) : vide ou un par sommet. */
+	TArray<FVector2D> UVs;
 
 	int32 TriangleCount() const { return Triangles.Num() / 3; }
 	void Append(const FMeshData& Other);
