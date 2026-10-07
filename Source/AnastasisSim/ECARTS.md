@@ -624,11 +624,16 @@ diffèrent dès que la croyance n'est pas le repli du C++. Ce repli appelle auss
 que la croyance ne fait pas : seuils filtrés et destination posée en plus. La doctrine de lisière est
 lue comme fausse ; elle ne l'est jamais devenue dans le relevé.
 
+<<<<<<< HEAD
 ### n° 38 — Monde extérieur : la géopolitique comme pression qui se propage jusqu'au village
+=======
+### n° 37 — Réserve d'eau expérimentale des champs
+>>>>>>> 0f60f9da (feat(sim): add opt-in field soil water budget)
 
 - **classe** : EXTENSION
 - **destin** : A_TRANCHER
 - **statut** : OUVERT
+<<<<<<< HEAD
 - **entree** : geopolitical-world-001
 - **activation** : hôte seulement — `FAnastasisSimulation::GetGeo().Load(scenario)`, appelé par la commande Unreal `Anastasis.Geo.Load` ; défaut : déchargé. Aucun scénario du harnais ne charge de monde extérieur ; déchargé, `OnNewDay` ne fait rien de plus, au bit près (`Anastasis.Sim.Geo.CalmeSansEffet`).
 - **reference** : aucune — demande d'Alexandre du 2026-10-07 (mission ANASTASIS_GEOPOLITICAL_WORLD_V1). Le plus proche dans la référence : `src/life/historicalRumors.js` (nouvelles datées sans effet mécanique) et `maybeImmigrate` de `src/sim/simulation.js` (arrivées sans cause), tous deux non portés.
@@ -642,3 +647,12 @@ qui voyage à part, plus vite, en se déformant. Le village ne lit que son expos
 effet local branché : un groupe de migrants arrivé au village devient des habitants par `spawnNpc`, comme
 `arriveAsPlayer`. Aucun tirage aléatoire : le flux `sim.rng` n'est jamais lu. À trancher : garder ce monde
 extérieur comme extension Unreal, ou le porter un jour dans la référence JS.
+=======
+- **entree** : soil-water-budget-001
+- **activation** : `anastasis.Village.SoilWaterBudget=1` dans l'hôte Unreal ; défaut 0, comme `FVillage` seul.
+- **reference** : `src/sim/simulation.js` (`regrowFieldsDaily`) et `src/sim/weather.js` (`weatherAt`) ne font pas évoluer une réserve d'eau de champ.
+- **cpp** : `World/AnastasisSoilWater.h`, `Village/AnastasisVillage.cpp` (`RegrowFieldsDaily`), `Public/Village/AnastasisVillage.h` ; hôte `AnastasisSimulationSubsystem.cpp`.
+- **harnais** : tileDiff, actors
+
+Un réservoir indiciel par champ reçoit la pluie normalisée du jour précédent et perd évaporation, drainage et débordement. Sa réponse modifie la fertilité effective lors de la repousse, sans réécrire la fertilité générée. Aucun tirage supplémentaire. Les coefficients sont des paramètres de jeu, non des millimètres observés. À 0, l'ancien chemin reste identique. À 1, l'état n'est pas encore sérialisé dans les sauvegardes JS, et le rendu du sol n'en lit pas encore la valeur ; cette version est expérimentale et ne constitue pas une preuve de carte ni de bénéfice villageois.
+>>>>>>> 0f60f9da (feat(sim): add opt-in field soil water budget)

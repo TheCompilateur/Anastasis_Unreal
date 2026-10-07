@@ -207,6 +207,7 @@
 #include "Life/AnastasisWorkShift.h"
 #include "Ai/AnastasisNous.h"
 #include "World/AnastasisExplore.h"
+#include "World/AnastasisSoilWater.h"
 #include "Core/AnastasisRng.h"
 #include "Core/AnastasisSimBudget.h"
 #include "Core/AnastasisSpatialGrid.h"
@@ -1135,6 +1136,13 @@ namespace AnastasisVillage
 		 * Rend le nombre de tuiles qui ont repousse.
 		 */
 		int32 RegrowFieldsDaily(int32 Day);
+		/** Experimental field reservoir (ecart n°37). Off by default for JS parity. */
+		void SetSoilWaterEnabled(bool bEnabled)
+		{
+			if (bSoilWaterEnabled != bEnabled) { bSoilWaterEnabled = bEnabled; SoilWaterByTile.Reset(); }
+		}
+		bool IsSoilWaterEnabled() const { return bSoilWaterEnabled; }
+		bool GetSoilWaterAt(int32 TileX, int32 TileY, double& OutStored) const;
 
 		/** Une mort, telle que le village la retient (hors empreinte). */
 		struct FDeath
@@ -1659,6 +1667,8 @@ namespace AnastasisVillage
 		const AnastasisWorld::FWorld* World = nullptr;
 		/** Tuiles touchees par la recolte : index -> etat vivant. Ecrit seulement par TakeFromTile / DepleteTile. */
 		TMap<int32, AnastasisWorld::FTile> LiveTiles;
+		TMap<int32, double> SoilWaterByTile;
+		bool bSoilWaterEnabled = false;
 		int64 RegrownFood = 0;
 		/** `sim.spatial` : reconstruite une fois par tick, au debut de la boucle des habitants. */
 		AnastasisSpatialGrid::FGrid Grid;

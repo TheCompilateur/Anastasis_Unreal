@@ -6,6 +6,7 @@
 #include "Core/AnastasisSimMath.h"
 #include "Core/AnastasisStateDigest.h"
 #include "World/AnastasisWorld.h"
+#include "World/AnastasisWeather.h"
 #include "Work/AnastasisFields.h"
 
 namespace AnastasisVillage
@@ -176,6 +177,8 @@ namespace AnastasisVillage
 		FoodSources.Reset();
 		MealReservations.Reset();
 		LiveTiles.Reset();
+		SoilWaterByTile.Reset();
+		bSoilWaterEnabled = false;
 		RegrownFood = 0;
 		MealSeq = 0;
 		ReservationSweepAt = 0.0;
@@ -3069,6 +3072,21 @@ namespace AnastasisVillage
 		}
 		Writer.EndArray();
 
+		if (bSoilWaterEnabled)
+		{
+			TArray<int32> SoilKeys;
+			SoilWaterByTile.GetKeys(SoilKeys);
+			SoilKeys.Sort();
+			Writer.Key(TEXT("soilWater")).BeginArray(SoilKeys.Num());
+			for (int32 Index : SoilKeys)
+			{
+				Writer.BeginObject();
+				Writer.Key(TEXT("index")).Number(Index);
+				Writer.Key(TEXT("stored")).Number(SoilWaterByTile.FindChecked(Index));
+				Writer.EndObject();
+			}
+			Writer.EndArray();
+		}
 		Writer.Key(TEXT("mealReservations")).BeginArray(MealReservations.Num());
 		for (const FMealReservation& R : MealReservations)
 		{
@@ -4770,10 +4788,25 @@ namespace AnastasisVillage
 	}
 
 	// --- Repousse des champs (simulation.js regrowFieldsDaily) -------------------
+	bool FVillage::GetSoilWaterAt(int32 TileX, int32 TileY, double& OutStored) const
+	{
+		if (!bSoilWaterEnabled || !World || TileX < 0 || TileY < 0 || TileX >= World->W || TileY >= World->H) return false;
+		const double* Stored = SoilWaterByTile.Find(TileY * World->W + TileX);
+		if (!Stored) return false;
+		OutStored = *Stored;
+		return true;
+	}
 
 	int32 FVillage::RegrowFieldsDaily(int32 Day)
 	{
 		if (!World) return 0;
+		// ecart n°37: opt-in reservoir driven by the previous day's weather index.
+		const double PreviousRain = bSoilWaterEnabled && bForcedWeather ? ForcedWeather.Rain
+			: bSoilWaterEnabled && bWeatherSeeded
+				? AnastasisWeather::WeatherAt(WeatherSeed, FMath::Max(1, Day - 1)).Rain : 0.0;
+		const AnastasisWeather::ESeason Season = AnastasisWeather::FieldSeasonFromDay(Day);
+		const double EvaporationIndex = Season == AnastasisWeather::ESeason::Summer ? 1.0
+			: Season == AnastasisWeather::ESeason::Winter ? 0.35 : 0.70;
 		int32 Grown = 0;
 		for (int32 Index = 0; Index < World->Tiles.Num(); ++Index)
 		{
@@ -4781,8 +4814,21 @@ namespace AnastasisVillage
 			if (FoodSources.ContainsByPredicate([&](const FFoodSource& S) { return S.TileIndex == Index; })) continue;
 			AnastasisWorld::FTile Tile = LiveTile(Index);
 			const int32 Before = Tile.Resource == AnastasisWorld::EResource::Food ? Tile.Amount : 0;
+			const double BaseFertility = Tile.Fertility;
+			if (bSoilWaterEnabled && Tile.Type == AnastasisWorld::ETileType::Field)
+			{
+				const double Initial = SoilWaterByTile.Contains(Index) ? SoilWaterByTile[Index] : Tile.Wetness;
+				const AnastasisSoilWater::FStep Step = AnastasisSoilWater::Advance(Initial, PreviousRain, EvaporationIndex);
+				if (Step.bValid)
+				{
+					SoilWaterByTile.Add(Index, Step.After);
+					Tile.Fertility = (BaseFertility != 0.0 ? BaseFertility : 1.0)
+						* AnastasisSoilWater::GrowthFactor(Step.After);
+				}
+			}
 			if (AnastasisFields::RegrowTileDaily(Tile, Day))
 			{
+				Tile.Fertility = BaseFertility;
 				RegrownFood += Tile.Amount - Before;
 				LiveTiles.Add(Index, Tile);
 				++Grown;

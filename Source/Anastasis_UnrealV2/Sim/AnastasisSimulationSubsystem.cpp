@@ -92,6 +92,10 @@ static TAutoConsoleVariable<int32> CVarVillageRouteCost(
 	TEXT("anastasis.Village.RouteCost"), 1,
 	TEXT("1 = PNJ travel time pays the existing nav-grid terrain cost (road faster, wet grass slower). 0 = JS-reference uniform travel time. Does not alter path selection or player input."), ECVF_Default);
 
+static TAutoConsoleVariable<int32> CVarSoilWaterBudget(
+	TEXT("anastasis.Village.SoilWaterBudget"), 0,
+	TEXT("Experimental field reservoir: 1 couples previous-day rain index to field regrowth; 0 keeps JS-reference fertility. Reset the world between A/B runs."), ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarSimOverlay(
 	TEXT("anastasis.Sim.Overlay"),
 	1,
@@ -418,6 +422,7 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	OpeningWorkId.Reset();
 	Simulation.Reset(Seed, AnastasisWorldView::ReferenceWidth, AnastasisWorldView::ReferenceHeight);
 	Simulation.GetVillage().SetTerrainTravelCostEnabled(CVarVillageRouteCost.GetValueOnGameThread() != 0);
+	Simulation.GetVillage().SetSoilWaterEnabled(CVarSoilWaterBudget.GetValueOnGameThread() != 0);
 	LoggedDay = Simulation.GetDay();
 	UE_LOG(
 		LogAnastasis_UnrealV2,
@@ -447,6 +452,7 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 		* FMath::Clamp(static_cast<double>(CVarSimTimeScale.GetValueOnGameThread()), 0.0, 1.0);
 	const double TimeBefore = Simulation.GetTime();
 	Simulation.GetVillage().SetTerrainTravelCostEnabled(CVarVillageRouteCost.GetValueOnGameThread() != 0);
+	Simulation.GetVillage().SetSoilWaterEnabled(CVarSoilWaterBudget.GetValueOnGameThread() != 0);
 	const double Multiplier = FMath::Max(1.0, AnastasisJs::NumberOr(Speed, 1.0)) * Warp;
 	// player-minimal-001 : la direction du pawn conduit le corps incarne pendant les pas de cette frame.
 	ApplyPlayerInput();
@@ -739,6 +745,7 @@ int32 UAnastasisSimulationSubsystem::AdvanceBy(double Seconds)
 	}
 	const double From = Simulation.GetTime();
 	Simulation.GetVillage().SetTerrainTravelCostEnabled(CVarVillageRouteCost.GetValueOnGameThread() != 0);
+	Simulation.GetVillage().SetSoilWaterEnabled(CVarSoilWaterBudget.GetValueOnGameThread() != 0);
 	const int32 FromDay = Simulation.GetDay();
 	const double Start = FPlatformTime::Seconds();
 	// Par tranches de 15 s simulees (90 pas) : le temoin informe le village AU FIL du saut, et chaque
