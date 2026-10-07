@@ -88,3 +88,4 @@ places-lifecycle | tools/unreal/places-lifecycle.py | PLACES_LIFECYCLE COMPLETE 
 world-theatre-light-capture | tools/unreal/world-theatre-capture.py | WORLD_THEATRE_CAPTURE COMPLETE | WORLD_THEATRE_CAPTURE FAIL|Traceback | 1800 | ANASTASIS_THEATRE_OUT=@Saved/WorldTheatreEvidence/light;ANASTASIS_THEATRE_STATES=depth,masses,light,light_strong,masses2;ANASTASIS_THEATRE_HOURS=11,19
 # WORLD_THEATRE v2.2 : menace lue dans le monde exterieur simule (raid injecte a Paipert) ; PASS = calme sans signe, feux avant fumee, fumee, effroi, menace 0 rien de visible.
 world-theatre-threat-pie | tools/unreal/world-theatre-threat-pie.py | WORLD_THREAT_PIE PASS | WORLD_THREAT_PIE FAIL|Traceback | 1500 | ANASTASIS_THREAT_OUT=@Saved/WorldTheatreEvidence/threat
+settlement-sensitivity-pie | tools/unreal/settlement-sensitivity-pie.py | SETTLEMENT_SENSITIVITY INSTRUMENT_PASS | SETTLEMENT_SENSITIVITY FAIL|Traceback | 1100 | -
