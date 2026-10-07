@@ -24,6 +24,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 NODATA = -1.0e29
+FAR_HALF_M = 75000.0
 UU_PER_M = 100.0
 # Plans de distance (metres) : NEAR < 60, MID < 1000, FAR < 8000, EXTREME au-dela. Un plan = un role.
 BANDS = [('near', 0.0, 60.0), ('mid', 60.0, 1000.0), ('far', 1000.0, 8000.0), ('extreme', 8000.0, 1.0e9)]
@@ -43,6 +44,16 @@ class Raster:
         self.ground = np.where(self.valid, g, np.nan).astype(np.float64)
         self.water = np.where(wt > NODATA, wt, np.nan).astype(np.float64)
 
+    def crop(self, cx, cy, half):
+        """Garde le carre de demi-cote half (uu) autour de (cx, cy) : au-dela de l'anneau (60 km), des jupes
+        etirees jusqu'a l'horizon de la planete remplissent la grille sans rien porter de lisible."""
+        i0, j0 = [max(0, int(v)) for v in self.ij(cx - half, cy - half)]
+        i1, j1 = [int(v) + 1 for v in self.ij(cx + half, cy + half)]
+        i1, j1 = min(self.w, i1), min(self.h, j1)
+        self.ground, self.water, self.valid = (a[j0:j1, i0:i1] for a in (self.ground, self.water, self.valid))
+        self.ox, self.oy = self.ox + i0 * self.cell, self.oy + j0 * self.cell
+        self.h, self.w = self.ground.shape
+
     def xy(self, i, j):
         return self.ox + (i + 0.5) * self.cell, self.oy + (j + 0.5) * self.cell
 
@@ -59,6 +70,8 @@ def load(folder):
         meta = json.load(f)
     near = Raster(meta['near'], folder)
     far = Raster(meta['far'], folder)
+    mp = meta['map']
+    far.crop((mp['min'][0] + mp['max'][0]) / 2, (mp['min'][1] + mp['max'][1]) / 2, FAR_HALF_M * UU_PER_M)
     placed = []
     with open(os.path.join(folder, 'placed.csv'), encoding='utf-8') as f:
         for row in csv.DictReader(f):
@@ -159,7 +172,7 @@ def clark_evans(points, area_m2):
     for idx, (x, y) in enumerate(p):
         cx, cy = int(x // cell), int(y // cell)
         best = 1e18
-        for ring in range(1, 4):
+        for ring in range(1, 200):
             for dx in range(-ring, ring + 1):
                 for dy in range(-ring, ring + 1):
                     for o in keys.get((cx + dx, cy + dy), ()):
@@ -198,8 +211,20 @@ def largest_empty_disc_m(occupied, cell_m, inside, max_cells=60):
 class World:
     """Relief combine : grille proche (fine) la ou elle existe, lointaine ailleurs."""
 
-    def __init__(self, near, far, near_z, far_z):
+    def __init__(self, near, far, near_z, far_z, cover=None):
         self.near, self.far, self.nz, self.fz = near, far, near_z, far_z
+        # cover : grille proche, 1 = masse du theatre (apercu logiciel du plan), None = monde tel quel
+        self.cover = cover
+
+    def cover_at(self, x, y):
+        if self.cover is None:
+            return None
+        i, j = self.near.ij(x, y)
+        i, j = np.round(i).astype(int), np.round(j).astype(int)
+        ok = (i >= 0) & (j >= 0) & (i < self.near.w) & (j < self.near.h)
+        out = np.zeros(x.shape, bool)
+        out[ok] = self.cover[j[ok], i[ok]] > 0
+        return out
 
     def height(self, x, y):
         """x, y : tableaux (uu). Bilineaire sur la grille la plus fine qui couvre le point."""
@@ -287,6 +312,9 @@ def render_vista(world, eye, yaw, pitch, fov, width=640, height=360, placed_xy=N
     ys = eye[1] + np.sin(az)[:, None] * dist[None, :]
     z = world.height(xs.ravel(), ys.ravel()).reshape(xs.shape)
     z = z - (dist[None, :] ** 2) / (2 * 6.371e8)
+    cov = world.cover_at(xs.ravel(), ys.ravel())
+    cov = cov.reshape(xs.shape) if cov is not None else np.zeros(xs.shape, bool)
+    forest = np.array((44, 66, 38)) / 255.0
     # Ligne ecran du point (pitch compris), distance projetee sur l'axe de visee.
     depth = dist[None, :] * cosc[:, None]
     ang = np.arctan2(z - eye[2], dist[None, :]) - math.radians(pitch)
@@ -305,7 +333,7 @@ def render_vista(world, eye, yaw, pitch, fov, width=640, height=360, placed_xy=N
         for k in range(len(dist)):
             top = int(max(0, math.floor(r[k])))
             if top < ybuf:
-                col = colours[min(band_idx[k], 3)] * shade[c, k]
+                col = (forest if cov[c, k] else colours[min(band_idx[k], 3)]) * shade[c, k]
                 # Brume : melange vers le ciel avec la distance (lecture des plans, pas une atmosphere).
                 fog = 1.0 - math.exp(-dist[k] / UU_PER_M / 30000.0)
                 col = col * (1 - fog) + img[0, 0] * fog
@@ -347,6 +375,9 @@ def main():
     ap.add_argument('reading')
     ap.add_argument('--out')
     ap.add_argument('--vistas')
+    ap.add_argument('--resolve-vistas', action='store_true', help='ecrit z (sol rendu + eye_m) dans le fichier de vistas')
+    ap.add_argument('--compose', action='store_true', help='plan de masses de l avant-pays + apercu logiciel des vistas apres')
+    ap.add_argument('--emit-plan', help='ecrit le plan C++ (AnastasisWorldTheatrePlan.inl) a ce chemin')
     a = ap.parse_args()
     out = a.out or os.path.join(a.reading, 'analysis')
     os.makedirs(out, exist_ok=True)
@@ -437,14 +468,160 @@ def main():
     vistas = []
     if a.vistas:
         with open(a.vistas, encoding='utf-8') as f:
-            vistas = json.load(f)['vistas']
+            vdoc = json.load(f)
+        vistas = vdoc['vistas']
+        for v in vistas:
+            if 'eye_m' in v:
+                g = float(world.height(np.array([float(v['x'])]), np.array([float(v['y'])]))[0])
+                v['z'] = round(g + v['eye_m'] * UU_PER_M, 1)
+        if a.resolve_vistas:
+            with open(a.vistas, 'w', encoding='utf-8') as f:
+                json.dump(vdoc, f, indent=1, ensure_ascii=False)
     report['vista_candidates'] = propose_candidates(meta, near, nz, nf, inside, water_near, placed)
     report['vistas'] = []
     for v in vistas:
         report['vistas'].append(evaluate_vista(out, world, v, placed, meta))
+
+    # -- diagnostic anti-generatif (PHASE 3)
+    report['variant_balance'] = variant_balance(placed)
+    mc = {}
+    for f, m, *_ in placed:
+        mc[m] = mc.get(m, 0) + 1
+    report['mesh_counts'] = dict(sorted(mc.items(), key=lambda kv: -kv[1]))
+    report['concentricity'] = {'near_1_12km': concentricity(near, nz, meta, 1, 12), 'far_12_60km': concentricity(far, fz, meta, 12, 60)}
+    report['diagnostic'] = diagnose(report)
+
+    # -- composition : plan de masses, apercu logiciel des vistas APRES, plan C++ genere
+    if a.compose:
+        b = [(x, y) for f, m, x, y, z, h, r in placed if f == 'building']
+        village = (float(np.mean([p[0] for p in b])), float(np.mean([p[1] for p in b]))) if b else \
+            ((mp['min'][0] + mp['max'][0]) / 2, (mp['min'][1] + mp['max'][1]) / 2)
+        masses, stats, (apt_s, mask, lab, k) = compose_masses(near, nz, nf, water_near, inside, placed, meta, village, MASS_RULES)
+        report['composition'] = {'rules': MASS_RULES, 'stats': stats,
+                                 'masses': [{kk: m[kk] for kk in ('id', 'ha', 'centre', 'why')} for m in masses]}
+        # Couverture et canopee sur la grille proche (apercu) : le masque de 40 m, remonte a 20 m.
+        # (le contour est la verite du plan ; ce masque n'en est que l'approximation pour l'apercu)
+        cover = np.zeros_like(nz)
+        sizes = np.bincount(lab.ravel())
+        cell_ha = (near.cell * k / UU_PER_M) ** 2 / 1e4
+        big = [c for c in np.argsort(-sizes) if c > 0 and sizes[c] * cell_ha >= MASS_RULES['min_mass_ha']][:MASS_RULES['max_masses']]
+        sel = np.isin(lab, big)
+        up = np.kron(sel.astype(float), np.ones((k, k)))[:nz.shape[0], :nz.shape[1]]
+        cover[:up.shape[0], :up.shape[1]] = up
+        ramp = np.clip(blur(cover, 1) * 1.6 - 0.3, 0, 1)
+        nz_after = nz + ramp * MASS_RULES['canopy_uu']
+        world_after = World(near, far, nz_after, fz, cover=cover)
+        report['vistas_after'] = [evaluate_vista(out, world_after, dict(v, id=v['id'] + '_after'), placed, meta) for v in vistas]
+        # Carte du plan : relief ombre, masses, carte.
+        hs = hillshade(nz, near.cell)
+        rgb = np.stack([hs * 0.85 + 0.1] * 3, -1)
+        rgb[cover > 0] = rgb[cover > 0] * np.array([0.35, 0.55, 0.3])
+        rgb[water_near] = (0.2, 0.35, 0.7)
+        rgb[inside] = rgb[inside] * np.array([1.0, 0.85, 0.85])
+        img = Image.fromarray((np.clip(rgb, 0, 1)[::-1] * 255).astype(np.uint8))
+        d = ImageDraw.Draw(img)
+        for m in masses:
+            pts = [((x - near.ox) / near.cell, near.h - 1 - (y - near.oy) / near.cell) for x, y in m['outline']]
+            d.line(pts + [pts[0]], fill=(20, 60, 10), width=2)
+            for h_ in m.get('holes', []):
+                hp = [((x - near.ox) / near.cell, near.h - 1 - (y - near.oy) / near.cell) for x, y in h_]
+                d.line(hp + [hp[0]], fill=(200, 200, 60), width=1)
+            cx, cy = (m['centre'][0] - near.ox) / near.cell, near.h - 1 - (m['centre'][1] - near.oy) / near.cell
+            d.text((cx, cy), m['id'][-2:], fill=(255, 255, 255))
+        for v in vistas:
+            vx, vy = (v['x'] - near.ox) / near.cell, near.h - 1 - (v['y'] - near.oy) / near.cell
+            ex = vx + 60 * math.cos(math.radians(v['yaw']))
+            ey = vy - 60 * math.sin(math.radians(v['yaw']))
+            d.line((vx, vy, ex, ey), fill=(255, 0, 0), width=2)
+            d.text((vx + 3, vy + 3), v['id'][:2], fill=(255, 0, 0))
+        img.save(os.path.join(out, 'map_plan.png'))
+        plan = {'masses': masses, 'silhouettes': [], 'traces': []}
+        with open(os.path.join(out, 'plan.json'), 'w', encoding='utf-8') as f:
+            json.dump(plan, f, indent=1)
+        if a.emit_plan:
+            emit_plan(plan, a.emit_plan, '%s, regles %s' % (os.path.basename(os.path.abspath(a.reading)), json.dumps(MASS_RULES)))
     with open(os.path.join(out, 'perception.json'), 'w', encoding='utf-8') as f:
         json.dump(report, f, indent=1)
     print('WORLD_THEATRE_ANALYZE OK out=%s vistas=%d' % (out, len(report['vistas'])))
+
+
+def concentricity(r, z, meta, lo_km, hi_km):
+    """Le relief autour de la carte est-il organise PAR la carte ? Part de variance de l'altitude expliquee par
+    le rayon seul (anneaux de 250 m), profil radial moyen, et nombre de secteurs de 15 deg ou l'altitude monte
+    avec le rayon : une cuvette centree sur la zone jouable fait monter le sol dans toutes les directions."""
+    mp = meta['map']
+    cx, cy = (mp['min'][0] + mp['max'][0]) / 2, (mp['min'][1] + mp['max'][1]) / 2
+    ii, jj = np.meshgrid(np.arange(r.w), np.arange(r.h))
+    X, Y = r.ox + (ii + .5) * r.cell, r.oy + (jj + .5) * r.cell
+    R = np.hypot(X - cx, Y - cy) / UU_PER_M / 1000
+    A = np.degrees(np.arctan2(Y - cy, X - cx))
+    m = (R >= lo_km) & (R < hi_km)
+    zz = z[m] / UU_PER_M
+    rr = R[m]
+    rb = np.floor(rr * 4).astype(int)
+    ab = np.floor((A[m] + 180) / 15).astype(int) % 24
+    mr = np.bincount(rb, zz) / np.maximum(np.bincount(rb), 1)
+    rising = 0
+    for s in range(24):
+        sel = ab == s
+        if sel.sum() > 10:
+            rising += int(np.corrcoef(rr[sel], zz[sel])[0, 1] > 0.5)
+    step = max(1, int(round((hi_km - lo_km) * 4 / 12)))
+    return {'r2_radius': float(1 - (zz - mr[rb]).var() / zz.var()),
+            'sectors_rising_with_radius': '%d/24' % rising,
+            'radial_profile_m': [[k / 4, round(float(mr[k]), 1)] for k in range(int(lo_km * 4), int(hi_km * 4), step)]}
+
+
+def variant_balance(placed):
+    """Variantes d'un meme maillage (SM_X_01/02/03) tirees a parts egales : une rotation, pas un choix."""
+    counts = {}
+    for f, m, *_ in placed:
+        base = m.rsplit('_', 1)[0] if m[-2:].isdigit() else m
+        counts.setdefault(base, {}).setdefault(m, 0)
+        counts[base][m] += 1
+    out = {}
+    for base, c in counts.items():
+        if len(c) >= 2 and sum(c.values()) >= 300:
+            v = sorted(c.values())
+            out[base] = {'variants': len(v), 'total': sum(v), 'max_over_min': round(v[-1] / max(v[0], 1), 3)}
+    return out
+
+
+def diagnose(report):
+    """PHASE 3 -- signatures d'un monde genere, chacune mesuree, avec son seuil. Rien n'est corrige ici."""
+    d = []
+
+    def add(key, value, threshold, present, evidence):
+        d.append({'signature': key, 'value': value, 'threshold': threshold, 'present': bool(present), 'evidence': evidence})
+    dist = report['distribution']
+    ns = report['negative_space']
+    add('densite_partout', ns['largest_empty_disc_m'], 'plus grand disque vide < 150 m', ns['largest_empty_disc_m'] < 150,
+        'part de la carte a plus de 60 m de tout objet : %.1f %%' % (100 * ns['map_fraction_over_60m_from_object']))
+    rock = dist.get('rock', {})
+    add('distribution_uniforme_rochers', rock.get('empty_quadrats_160m'), 'quadrats de 160 m sans rocher < 5 %',
+        (rock.get('empty_quadrats_160m') if rock.get('empty_quadrats_160m') is not None else 1) < 0.05,
+        '%d rochers dans la carte' % rock.get('in_map', 0))
+    vb = report.get('variant_balance', {})
+    rot = {b: v for b, v in vb.items() if v['max_over_min'] < 1.05}
+    add('repetition_de_frequence', len(rot), 'familles a variantes equitirees (max/min < 1,05)', len(rot) >= 2,
+        ', '.join('%s x%d (%d, %.3f)' % (b, v['variants'], v['total'], v['max_over_min'])
+                  for b, v in sorted(rot.items(), key=lambda kv: -kv[1]['total'])[:6]))
+    ruin = dist.get('ruin', {})
+    add('reperes_concurrents', ruin.get('empty_quadrats_400m'), 'ruines dans > 90 % des quadrats de 400 m',
+        (ruin.get('empty_quadrats_400m') if ruin.get('empty_quadrats_400m') is not None else 1) < 0.10,
+        '%d ruines dans la carte, dont %d du meme maillage generique' % (ruin.get('in_map', 0), report.get('mesh_counts', {}).get('SM_Ruin_Generic_01', 0)))
+    seam = report['seam']
+    add('foret_coupee_au_bord', [round(seam['trees_per_ha_inner_200m'], 1), round(seam['trees_per_ha_outer_200m'], 1)],
+        'arbres/ha dehors < 10 % de dedans', seam['trees_per_ha_outer_200m'] < 0.1 * seam['trees_per_ha_inner_200m'],
+        'bande de 200 m de part et d autre du bord de la carte')
+    con = report.get('concentricity', {}).get('near_1_12km', {})
+    add('monde_centre_sur_la_carte', con.get('sectors_rising_with_radius'), 'le sol monte avec le rayon dans >= 20 secteurs sur 24',
+        int(str(con.get('sectors_rising_with_radius', '0/24')).split('/')[0]) >= 20,
+        'profil radial (km, m) : %s' % con.get('radial_profile_m'))
+    closed = [v['id'] for v in report.get('vistas', []) if v['horizon']['horizon_band'] in ('near', 'mid')]
+    add('horizon_accidentel', closed, 'vista canonique dont l horizon median est a moins de 1 km', bool(closed),
+        'horizons medians par vista : %s' % {v['id']: v['horizon']['horizon_band'] for v in report.get('vistas', [])})
+    return d
 
 
 def propose_candidates(meta, near, nz, nf, inside, water, placed):
@@ -562,6 +739,257 @@ def save_maps(out, near, far, nz, fz, nf, ff, water, inside, placed, dmap, meta)
     dm = dmap.copy()
     dm[~inside[:dm.shape[0], :dm.shape[1]]] = 0
     Image.fromarray((to_img(dm, 0, 200) * 255).astype(np.uint8)[::-1]).save(os.path.join(out, 'map_near_negative_space.png'))
+
+
+def emit_plan(plan, path, source):
+    """Ecrit AnastasisWorldTheatrePlan.inl depuis un plan {masses, silhouettes, traces} (coordonnees en uu)."""
+    def v2(p):
+        return 'FVector2D(%.0f, %.0f)' % (p[0], p[1])
+    lines = ['// WORLD_THEATRE_001 -- plan de mise en scene. GENERE par tools/unreal/world-theatre-analyze.py --emit-plan ;',
+             '// ne pas retoucher a la main : changer la regle dans l analyse, puis regenerer.',
+             '// Inclus dans le corps de AnastasisWorldTheatre::CanonicalPlan() : la variable P (FPlan) est en portee.',
+             '// Source : %s' % source]
+    for m in plan.get('masses', []):
+        lines.append('// %s' % m.get('why', ''))
+        lines.append('{ FMass M; M.Id = TEXT("%s"); M.CanopyHeight = %.0f; M.EdgeRamp = %.0f;' % (m['id'], m['canopy'], m.get('edge_ramp', 2500)))
+        c = m.get('colour', (0.035, 0.06, 0.03))
+        lines.append('  M.Colour = FLinearColor(%.4ff, %.4ff, %.4ff);' % tuple(c))
+        lines.append('  M.Outline = { %s };' % ', '.join(v2(p) for p in m['outline']))
+        for h_ in m.get('holes', []):
+            lines.append('  M.Holes.Add({ %s });' % ', '.join(v2(p) for p in h_))
+        lines.append('  P.Masses.Add(MoveTemp(M)); }')
+    for s_ in plan.get('silhouettes', []):
+        lines.append('// %s' % s_.get('why', ''))
+        lines.append('{ FSilhouetteSpec S; S.Id = TEXT("%s"); S.Kind = ESilhouette::%s; S.Location = %s; S.Yaw = %.1f; S.Scale = %.2f; P.Silhouettes.Add(S); }'
+                     % (s_['id'], s_['kind'], v2(s_['xy']), s_.get('yaw', 0.0), s_.get('scale', 1.0)))
+    for t in plan.get('traces', []):
+        lines.append('// %s' % t.get('why', ''))
+        lines.append('{ FTrace T; T.Id = TEXT("%s"); T.Width = %.0f;' % (t['id'], t.get('width', 450)))
+        lines.append('  T.Points = { %s };' % ', '.join(v2(p) for p in t['points']))
+        lines.append('  P.Traces.Add(MoveTemp(T)); }')
+    with open(path, 'w', encoding='utf-8', newline='\r\n') as f:
+        f.write('\n'.join(lines) + '\n')
+
+
+# ---------------------------------------------------------------- composition (PHASE 4) : plan de masses
+
+def components(mask):
+    """Composantes 4-connexes d'un masque booleen : (etiquettes, tailles)."""
+    h, w = mask.shape
+    lab = np.zeros((h, w), np.int32)
+    sizes = [0]
+    n = 0
+    for j0, i0 in zip(*np.nonzero(mask)):
+        if lab[j0, i0]:
+            continue
+        n += 1
+        stack = [(j0, i0)]
+        lab[j0, i0] = n
+        c = 0
+        while stack:
+            j, i = stack.pop()
+            c += 1
+            for jj, ii in ((j - 1, i), (j + 1, i), (j, i - 1), (j, i + 1)):
+                if 0 <= jj < h and 0 <= ii < w and mask[jj, ii] and not lab[jj, ii]:
+                    lab[jj, ii] = n
+                    stack.append((jj, ii))
+        sizes.append(c)
+    return lab, sizes
+
+
+def trace_loops(mask):
+    """Contours d'une composante : aretes de cellules orientees (interieur a gauche), suivies en tournant a
+    gauche aux pincements -- chaque boucle reste simple. Renvoie (contour exterieur, [trous]) en coins (i, j).
+    Exterieur = la boucle d'aire signee la plus grande ; les autres boucles sont des clairieres."""
+    m = np.pad(mask, 1)
+    out = {}
+    for j, i in zip(*np.nonzero(mask)):
+        if not m[j, i + 1]:
+            out.setdefault((i, j), []).append((i + 1, j))
+        if not m[j + 1, i + 2]:
+            out.setdefault((i + 1, j), []).append((i + 1, j + 1))
+        if not m[j + 2, i + 1]:
+            out.setdefault((i + 1, j + 1), []).append((i, j + 1))
+        if not m[j + 1, i]:
+            out.setdefault((i, j + 1), []).append((i, j))
+    loops = []
+    while out:
+        start = next(iter(out))
+        loop, p, d = [start], start, None
+        while True:
+            cands = out.get(p)
+            if not cands:
+                break
+            if d is None or len(cands) == 1:
+                q = cands[0]
+            else:
+                # tourner a gauche (produit vectoriel positif), sinon tout droit, sinon a droite
+                def turn(c):
+                    e = (c[0] - p[0], c[1] - p[1])
+                    return -(d[0] * e[1] - d[1] * e[0])
+                q = min(cands, key=turn)
+            cands.remove(q)
+            if not cands:
+                del out[p]
+            d = (q[0] - p[0], q[1] - p[1])
+            p = q
+            if p == start:
+                break
+            loop.append(p)
+        if len(loop) >= 4:
+            loops.append(loop)
+    if not loops:
+        return [], []
+
+    def area(lp):
+        a = np.array(lp, float)
+        return 0.5 * float(np.sum(a[:, 0] * np.roll(a[:, 1], -1) - np.roll(a[:, 0], -1) * a[:, 1]))
+    loops.sort(key=lambda lp: -abs(area(lp)))
+    return loops[0], loops[1:]
+
+
+def simplify(points, tol):
+    """Douglas-Peucker sur une boucle fermee (tol en cellules)."""
+    if len(points) < 8:
+        return points
+    pts = np.array(points, float)
+
+    def dp(a, b):
+        if b <= a + 1:
+            return [a]
+        seg = pts[b] - pts[a]
+        L = np.hypot(*seg) or 1e-9
+        d = np.abs(seg[0] * (pts[a + 1:b, 1] - pts[a, 1]) - seg[1] * (pts[a + 1:b, 0] - pts[a, 0])) / L
+        k = int(np.argmax(d))
+        if d[k] > tol:
+            return dp(a, a + 1 + k) + dp(a + 1 + k, b)
+        return [a]
+    half = len(pts) // 2
+    keep = dp(0, half) + dp(half, len(pts) - 1) + [len(pts) - 1]
+    return [tuple(pts[k]) for k in sorted(set(keep))]
+
+
+MASS_RULES = {
+    'seam_min_trees_ha': 25.0,    # bord boise : plus de 25 arbres / ha dans la bande interieure de 200 m
+    'seam_reach_m': 700.0,         # la foret de bord s'eteint sur ~700 m si le relief ne la porte pas
+    'seam_weight': 0.9,
+    'max_reach_m': 9000.0,         # au-dela, la perspective aerienne (autre proprietaire) efface tout
+    'village_clearing_m': 1500.0,  # terroir du village : champs et paturages, pas de foret
+    'massing_m': 160.0,            # une masse se decide a 160 m, pas a l'arbre
+    'threshold': 0.18,
+    'min_mass_ha': 15.0,
+    'max_masses': 14,
+    'canopy_uu': 2000.0,
+    'edge_ramp_uu': 3000.0,
+    # Asymetrie voulue : le relief de l'anneau monte autour de la carte dans TOUTES les directions (cuvette) ;
+    # une regle purement topographique dessinerait une couronne de foret centree sur la carte. La foret tient
+    # le pied de la chaine (nord-est, ou la pente mene vraiment a la montagne) ; le sud-ouest, ou la vallee
+    # s'ouvre a 22-38 km, reste ouvert : c'est le vide qui fait lire l'ouverture.
+    'range_azimuth_deg': 45.0,
+    'forest_half_cone_deg': 75.0,
+    'open_half_cone_deg': 115.0,
+}
+
+
+def compose_masses(near, nz, nf, water, inside, placed, meta, village_xy, rules):
+    """Masses forestieres de l'avant-pays : aptitude mesuree -> composantes -> hierarchie -> contours."""
+    cell_m = near.cell / UU_PER_M
+    k = 2  # grille de 40 m
+    z = nz[::k, ::k]
+    h, w = z.shape
+    slope = nf['slope'][::k, ::k]
+    tpi_s = nf['tpi_small'][::k, ::k]
+    tpi_l = nf['tpi_large'][::k, ::k]
+    wet = water[::k, ::k][:h, :w]
+    ins = inside[::k, ::k][:h, :w]
+    ii, jj = np.meshgrid(np.arange(w), np.arange(h))
+    X = near.ox + (ii * k + 0.5 * k) * near.cell
+    Y = near.oy + (jj * k + 0.5 * k) * near.cell
+    gy, gx = np.gradient(z, near.cell * k)
+    # Face nord : le sol monte vers +Y (gy > 0), donc il regarde vers -Y... ici +Y est le nord de la carte :
+    # un versant qui descend vers +Y (gy < 0) regarde le nord, plus frais et humide.
+    north = np.clip(-gy / np.maximum(np.hypot(gx, gy), 1e-9), -1, 1) * np.clip(slope / 10.0, 0, 1)
+    mp = meta['map']
+    zero = np.zeros_like(X)
+    dist_map_m = np.hypot(np.maximum.reduce([mp['min'][0] - X, X - mp['max'][0], zero]),
+                          np.maximum.reduce([mp['min'][1] - Y, Y - mp['max'][1], zero])) / UU_PER_M
+    dist_village_m = np.hypot(X - village_xy[0], Y - village_xy[1]) / UU_PER_M
+    # Aptitude forestiere (PONT-ECO-01) : versant, creux humide, face nord ; pas le fond plat, pas la crete.
+    versant = np.clip((slope - 3.0) / 6.0, 0, 1) * np.clip((32.0 - slope) / 8.0, 0, 1)
+    creux = np.clip(-tpi_s / 6.0, 0, 1) * np.clip(slope / 4.0, 0, 1)
+    crete = np.clip((tpi_s - 4.0) / 6.0, 0, 1)
+    fond = np.clip((3.0 - slope) / 2.0, 0, 1) * np.clip(-tpi_l / 8.0, 0, 1)
+    apt = 0.55 * versant + 0.35 * creux + 0.25 * north - 0.8 * crete - 0.7 * fond
+    # Couture : la foret de la carte continue la ou la carte est boisee jusqu'au bord.
+    trees = np.array([(x, y) for f, m_, x, y, zz, hh, rr in placed if f == 'tree'])
+    seam = np.zeros_like(apt)
+    seam_report = []
+    if len(trees):
+        band = 200.0 * UU_PER_M
+        bins = np.arange(mp['min'][0], mp['max'][0] + 12000.0, 12000.0)
+        for side in range(4):
+            if side == 0:
+                sel = trees[:, 1] < mp['min'][1] + band; along = trees[sel, 0]
+            elif side == 1:
+                sel = trees[:, 1] > mp['max'][1] - band; along = trees[sel, 0]
+            elif side == 2:
+                sel = trees[:, 0] < mp['min'][0] + band; along = trees[sel, 1]
+            else:
+                sel = trees[:, 0] > mp['max'][0] - band; along = trees[sel, 1]
+            hist, _ = np.histogram(along, bins=bins)
+            dens = hist / (120.0 * 200.0 / 1e4)  # arbres / ha
+            wooded = np.clip((dens - rules['seam_min_trees_ha']) / 30.0, 0, 1)
+            seam_report.append([round(float(d), 1) for d in dens])
+            if side in (0, 1):
+                idx = np.clip(((X - bins[0]) / 12000.0).astype(int), 0, len(wooded) - 1)
+                on_side = (Y < mp['min'][1]) if side == 0 else (Y > mp['max'][1])
+                within = (X >= mp['min'][0]) & (X <= mp['max'][0])
+            else:
+                idx = np.clip(((Y - bins[0]) / 12000.0).astype(int), 0, len(wooded) - 1)
+                on_side = (X < mp['min'][0]) if side == 2 else (X > mp['max'][0])
+                within = (Y >= mp['min'][1]) & (Y <= mp['max'][1])
+            seam = np.maximum(seam, np.where(on_side & within, wooded[idx] * np.exp(-dist_map_m / rules['seam_reach_m']), 0))
+    az = np.degrees(np.arctan2(Y - (mp['min'][1] + mp['max'][1]) / 2, X - (mp['min'][0] + mp['max'][0]) / 2))
+    off = np.abs((az - rules['range_azimuth_deg'] + 180.0) % 360.0 - 180.0)
+    w_dir = np.clip((rules['open_half_cone_deg'] - off) / (rules['open_half_cone_deg'] - rules['forest_half_cone_deg']), 0, 1)
+    # La couture ne depend pas de la direction : la foret de la carte continue la ou elle touche le bord.
+    apt = np.maximum(apt * w_dir - (1 - w_dir) * 0.5, rules['seam_weight'] * seam - 0.2 * fond)
+    allowed = (~ins) & (dist_map_m <= rules['max_reach_m']) & (~wet) & (dist_village_m > rules['village_clearing_m'])
+    apt = np.where(allowed, apt, 0.0)
+    rad = max(1, int(round(rules['massing_m'] / (cell_m * k))))
+    # Flou normalise sur la seule zone permise : la carte (exclue) ne tire pas la lisiere vers le bas.
+    apt_s = blur(apt, rad) / np.maximum(blur(allowed.astype(float), rad), 1e-6)
+    mask = (apt_s > rules['threshold']) & allowed
+    lab, sizes = components(mask)
+    cell_ha = (cell_m * k) ** 2 / 1e4
+    order = sorted(range(1, len(sizes)), key=lambda c: -sizes[c])
+    masses = []
+    for c in order:
+        ha = sizes[c] * cell_ha
+        if ha < rules['min_mass_ha'] or len(masses) >= rules['max_masses']:
+            break
+        comp = lab == c
+        loop, holes = trace_loops(comp)
+        if len(loop) < 4:
+            continue
+        to_uu = lambda lp: [(near.ox + p[0] * k * near.cell, near.oy + p[1] * k * near.cell) for p in simplify(lp, 1.2)]
+        outline = to_uu(loop)
+        # Clairieres de plus d'un hectare : la masse garde ses vides (cretes nues, combes ouvertes).
+        hole_list = [to_uu(h) for h in holes if len(h) >= 4 and abs(0.5 * sum(h[n][0] * h[(n + 1) % len(h)][1] - h[(n + 1) % len(h)][0] * h[n][1]
+                                                                     for n in range(len(h)))) * (cell_m * k) ** 2 >= 1e4]
+        cy, cx = np.argwhere(comp).mean(0)
+        reasons = ['versant %.0f%%' % (100 * np.mean(versant[comp] > 0.5)),
+                   'creux %.0f%%' % (100 * np.mean(creux[comp] > 0.3)),
+                   'face nord %.0f%%' % (100 * np.mean(north[comp] > 0.3)),
+                   'couture %.0f%%' % (100 * np.mean(seam[comp] > 0.3)),
+                   'a %.1f km de la carte' % float(np.median(dist_map_m[comp]) / 1000.0)]
+        masses.append({'id': 'mass_%02d' % (len(masses) + 1), 'ha': round(ha, 1), 'outline': outline, 'holes': hole_list,
+                       'canopy': rules['canopy_uu'], 'edge_ramp': rules['edge_ramp_uu'],
+                       'centre': (float(near.ox + (cx * k + 0.5 * k) * near.cell), float(near.oy + (cy * k + 0.5 * k) * near.cell)),
+                       'why': 'masse %d (%.0f ha) : %s' % (len(masses) + 1, ha, ', '.join(reasons))})
+    stats = {'allowed_ha': float(allowed.sum() * cell_ha), 'forest_ha': float(sum(m['ha'] for m in masses)),
+             'components': len(sizes) - 1, 'kept': len(masses), 'seam_trees_per_ha_by_side_S_N_W_E': seam_report}
+    return masses, stats, (apt_s, mask, lab, k)
 
 
 if __name__ == '__main__':

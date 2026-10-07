@@ -63,6 +63,15 @@ constexpr const TCHAR* MaterialPath = TEXT("/Game/WorldTheatre/M_WorldTheatreMas
 /** Repli : le materiau des montagnes lointaines (couleur de sommet = albedo), lu sans etre modifie. */
 constexpr const TCHAR* FallbackMaterialPath = TEXT("/Game/Anastasis/Materials/M_AnastasisFarTerrain.M_AnastasisFarTerrain");
 
+AnastasisWorldReading::FReadOptions ReadOptions()
+{
+	AnastasisWorldReading::FReadOptions O;
+	O.NearCellUu = CVarTheatreNearCell.GetValueOnGameThread();
+	O.NearMarginUu = CVarTheatreNearMargin.GetValueOnGameThread();
+	O.FarCellUu = CVarTheatreFarCell.GetValueOnGameThread();
+	return O;
+}
+
 /** Echantillonneur bilineaire sur le releve : grille proche, sinon lointaine. */
 bool SampleRaster(const AnastasisWorldReading::FRaster& R, const TArray<float>& Layer, double X, double Y, double& Out)
 {
@@ -211,8 +220,9 @@ bool UAnastasisWorldTheatreSubsystem::Rebuild()
 	Clear();
 	AnastasisWorldReading::FReading Reading;
 	FString Why;
-	if (!AnastasisWorldReading::Read(GetWorld(), CVarTheatreNearCell.GetValueOnGameThread(),
-		CVarTheatreNearMargin.GetValueOnGameThread(), CVarTheatreFarCell.GetValueOnGameThread(), Reading, Why))
+	AnastasisWorldReading::FReadOptions Options = ReadOptions();
+	Options.bPlaced = false;
+	if (!AnastasisWorldReading::Read(GetWorld(), Options, Reading, Why))
 	{
 		UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("WORLD_THEATRE rebuild skipped: %s"), *Why);
 		return false;
@@ -266,8 +276,7 @@ bool UAnastasisWorldTheatreSubsystem::ReadAndDump(const FString& Dir)
 	const double T0 = FPlatformTime::Seconds();
 	AnastasisWorldReading::FReading Reading;
 	FString Why;
-	const bool bRead = AnastasisWorldReading::Read(GetWorld(), CVarTheatreNearCell.GetValueOnGameThread(),
-		CVarTheatreNearMargin.GetValueOnGameThread(), CVarTheatreFarCell.GetValueOnGameThread(), Reading, Why);
+	const bool bRead = AnastasisWorldReading::Read(GetWorld(), ReadOptions(), Reading, Why);
 	if (!bRead || !AnastasisWorldReading::Dump(Reading, Dir, Why))
 	{
 		UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("WORLD_THEATRE_READ FAIL %s"), *Why);

@@ -84,11 +84,23 @@ struct FReading
 	int32 WaterTriangles = 0;
 };
 
-/**
- * Releve le monde courant. False (et Why) si aucune incarnation complete n'est presente.
- * NearMarginUu : avant-pays couvert par la grille proche au-dela de la carte.
- */
-bool Read(UWorld* World, double NearCellUu, double NearMarginUu, double FarCellUu, FReading& Out, FString& Why);
+struct FReadOptions
+{
+	double NearCellUu = 2000.0;
+	/** Avant-pays couvert par la grille proche au-dela de la carte. */
+	double NearMarginUu = 1200000.0;
+	double FarCellUu = 20000.0;
+	/**
+	 * Demi-cote (uu) de la grille lointaine autour de la carte. Au-dela de l'anneau (60 km), des jupes etirees
+	 * jusqu'a l'horizon de la planete rempliraient une grille de 960 km sans rien porter de lisible.
+	 */
+	double FarHalfUu = 7500000.0;
+	/** Relever aussi les objets poses (1,3 million d'instances avec l'herbe : ~15 s). Inutile pour draper. */
+	bool bPlaced = true;
+};
+
+/** Releve le monde courant. False (et Why) si aucune incarnation complete n'est presente. */
+bool Read(UWorld* World, const FReadOptions& Options, FReading& Out, FString& Why);
 
 /**
  * Ecrit le releve dans Dir : reading.json (meta, familles), near_ground.f32, near_water.f32,

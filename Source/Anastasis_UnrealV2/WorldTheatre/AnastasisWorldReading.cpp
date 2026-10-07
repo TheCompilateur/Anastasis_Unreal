@@ -142,8 +142,9 @@ void AddPlaced(FReading& Out, const UStaticMesh* Mesh, const FTransform& T)
 }
 }
 
-bool Read(UWorld* World, double NearCellUu, double NearMarginUu, double FarCellUu, FReading& Out, FString& Why)
+bool Read(UWorld* World, const FReadOptions& Options, FReading& Out, FString& Why)
 {
+	const double NearCellUu = Options.NearCellUu, NearMarginUu = Options.NearMarginUu, FarCellUu = Options.FarCellUu;
 	Out = FReading();
 	if (!World) { Why = TEXT("pas de monde"); return false; }
 	AAnastasisWorldEmbodiment* Embodiment = nullptr;
@@ -176,6 +177,11 @@ bool Read(UWorld* World, double NearCellUu, double NearMarginUu, double FarCellU
 			if (B.IsValid) Whole += B;
 		}
 	}
+	{
+		const FVector C = Out.MapFootprint.GetCenter();
+		const FBox Cap(FVector(C.X - Options.FarHalfUu, C.Y - Options.FarHalfUu, -1.0e9), FVector(C.X + Options.FarHalfUu, C.Y + Options.FarHalfUu, 1.0e9));
+		Whole = FBox(FVector::Max(Whole.Min, Cap.Min), FVector::Min(Whole.Max, Cap.Max));
+	}
 	Out.Seed = Embodiment->GetSnapshot().Seed;
 	Out.Basin = Embodiment->GetTerrainForgeBasin();
 	Out.Landmark = Embodiment->GetTerrainForgeLandmark();
@@ -206,6 +212,7 @@ bool Read(UWorld* World, double NearCellUu, double NearMarginUu, double FarCellU
 	}
 
 	// Ce qui est pose : tous les acteurs du monde, instances comprises. L'herbe est comptee, pas listee.
+	if (!Options.bPlaced) return true;
 	for (TActorIterator<AActor> It(World); It; ++It)
 	{
 		TArray<UStaticMeshComponent*> Meshes;

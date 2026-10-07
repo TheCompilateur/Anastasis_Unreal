@@ -141,33 +141,93 @@ bool BuildMass(const FMass& Mass, const FGroundSampler& Ground, FMeshData& Out, 
 	if (Mass.Outline.Num() < 3) { Why = TEXT("contour de moins de 3 points"); return false; }
 	FBox2D Box(ForceInit);
 	for (const FVector2D& P : Mass.Outline) Box += P;
-	Box = Box.ExpandBy(MassCell);
-	const int32 W = FMath::CeilToInt32(Box.GetSize().X / MassCell) + 1;
-	const int32 H = FMath::CeilToInt32(Box.GetSize().Y / MassCell) + 1;
-	if (W * H > 400000) { Why = FString::Printf(TEXT("masse trop grande (%d x %d cellules)"), W, H); return false; }
+	Box = Box.ExpandBy(2.0 * MassCell);
 	// Indices de grille absolus : le grain d'une couronne ne depend que de sa position monde.
 	const int32 GI0 = FMath::FloorToInt32(Box.Min.X / MassCell), GJ0 = FMath::FloorToInt32(Box.Min.Y / MassCell);
+	const int32 W = FMath::CeilToInt32(Box.Max.X / MassCell) - GI0 + 1;
+	const int32 H = FMath::CeilToInt32(Box.Max.Y / MassCell) - GJ0 + 1;
+	if (int64(W) * H > 2000000) { Why = FString::Printf(TEXT("masse trop grande (%d x %d cellules)"), W, H); return false; }
+
+	// Interieur par balayage pair-impair (contour + clairieres) : une ligne de noeuds = une liste de croisements.
+	TArray<uint8> In;
+	In.Init(0, W * H);
+	TArray<const TArray<FVector2D>*> Rings;
+	Rings.Add(&Mass.Outline);
+	for (const TArray<FVector2D>& Hole : Mass.Holes) if (Hole.Num() >= 3) Rings.Add(&Hole);
+	TArray<double> Cross;
+	for (int32 J = 0; J < H; ++J)
+	{
+		const double Y = (GJ0 + J) * MassCell;
+		Cross.Reset();
+		for (const TArray<FVector2D>* Ring : Rings)
+		{
+			const TArray<FVector2D>& R = *Ring;
+			for (int32 A = 0, B = R.Num() - 1; A < R.Num(); B = A++)
+			{
+				if ((R[A].Y > Y) != (R[B].Y > Y)) Cross.Add(R[A].X + (Y - R[A].Y) * (R[B].X - R[A].X) / (R[B].Y - R[A].Y));
+			}
+		}
+		Cross.Sort();
+		for (int32 K = 0; K + 1 < Cross.Num(); K += 2)
+		{
+			const int32 I0 = FMath::Max(0, FMath::CeilToInt32(Cross[K] / MassCell) - GI0);
+			const int32 I1 = FMath::Min(W - 1, FMath::FloorToInt32(Cross[K + 1] / MassCell) - GI0);
+			for (int32 I = I0; I <= I1; ++I) In[J * W + I] = 1;
+		}
+	}
+	// Distance a la lisiere (chanfrein 3-4, en cellules) : la canopee monte sur EdgeRamp depuis le bord.
+	TArray<float> Dist;
+	Dist.Init(0.0f, W * H);
+	for (int32 K = 0; K < W * H; ++K) Dist[K] = In[K] ? 1.0e9f : 0.0f;
+	auto Relax = [&Dist, W](int32 K, int32 N, float Cost) { if (Dist[N] + Cost < Dist[K]) Dist[K] = Dist[N] + Cost; };
+	for (int32 J = 0; J < H; ++J)
+		for (int32 I = 0; I < W; ++I)
+		{
+			const int32 K = J * W + I;
+			if (!In[K]) continue;
+			if (I > 0) Relax(K, K - 1, 1.0f);
+			if (J > 0) { Relax(K, K - W, 1.0f); if (I > 0) Relax(K, K - W - 1, 1.4142f); if (I + 1 < W) Relax(K, K - W + 1, 1.4142f); }
+		}
+	for (int32 J = H - 1; J >= 0; --J)
+		for (int32 I = W - 1; I >= 0; --I)
+		{
+			const int32 K = J * W + I;
+			if (!In[K]) continue;
+			if (I + 1 < W) Relax(K, K + 1, 1.0f);
+			if (J + 1 < H) { Relax(K, K + W, 1.0f); if (I + 1 < W) Relax(K, K + W + 1, 1.4142f); if (I > 0) Relax(K, K + W - 1, 1.4142f); }
+		}
+
 	TArray<int32> Node;
 	Node.Init(INDEX_NONE, W * H);
 	TArray<double> Weight;
 	Weight.Init(0.0, W * H);
 	TArray<double> Z;
 	Z.Init(0.0, W * H);
+	TArray<uint8> HasGround;
+	HasGround.Init(0, W * H);
 	int32 Inside = 0, Wet = 0;
 	for (int32 J = 0; J < H; ++J)
 	{
 		for (int32 I = 0; I < W; ++I)
 		{
-			const FVector2D P((GI0 + I) * MassCell, (GJ0 + J) * MassCell);
-			double G = 0.0, Wz = 0.0;
-			if (!Ground(P.X, P.Y, G, Wz)) continue;
 			const int32 K = J * W + I;
+			// Seuls les noeuds de la masse et leur voisinage immediat portent un sommet.
+			bool bNear = false;
+			for (int32 DJ = -1; DJ <= 1 && !bNear; ++DJ)
+				for (int32 DI = -1; DI <= 1 && !bNear; ++DI)
+				{
+					const int32 II = I + DI, JJ = J + DJ;
+					bNear = II >= 0 && JJ >= 0 && II < W && JJ < H && In[JJ * W + II];
+				}
+			if (!bNear) continue;
+			double G = 0.0, Wz = 0.0;
+			if (!Ground((GI0 + I) * MassCell, (GJ0 + J) * MassCell, G, Wz)) continue;
 			Z[K] = G;
-			Node[K] = 0;
-			if (!PointInPolygon(Mass.Outline, P)) continue;
+			HasGround[K] = 1;
+			if (!In[K]) continue;
 			if (Wz > G - 50.0) { ++Wet; continue; }
 			++Inside;
-			Weight[K] = FMath::SmoothStep(0.0, 1.0, DistanceToOutline(Mass.Outline, P) / FMath::Max(Mass.EdgeRamp, 1.0));
+			Weight[K] = FMath::SmoothStep(0.0, 1.0, Dist[K] * MassCell / FMath::Max(Mass.EdgeRamp, 1.0));
 		}
 	}
 	if (Inside < 6) { Why = FString::Printf(TEXT("%d noeud(s) de sol sec dans le contour (%d sous l'eau)"), Inside, Wet); return false; }
@@ -178,8 +238,7 @@ bool BuildMass(const FMass& Mass, const FGroundSampler& Ground, FMeshData& Out, 
 		for (int32 I = 0; I < W; ++I)
 		{
 			const int32 K = J * W + I;
-			if (Node[K] == INDEX_NONE) continue;
-			// Seuls les noeuds d'un quad qui touche la masse servent ; les autres sont ecartes plus bas.
+			if (!HasGround[K]) continue;
 			bool bUsed = false;
 			for (int32 DJ = -1; DJ <= 1 && !bUsed; ++DJ)
 				for (int32 DI = -1; DI <= 1 && !bUsed; ++DI)
@@ -187,7 +246,7 @@ bool BuildMass(const FMass& Mass, const FGroundSampler& Ground, FMeshData& Out, 
 					const int32 II = I + DI, JJ = J + DJ;
 					bUsed = II >= 0 && JJ >= 0 && II < W && JJ < H && Weight[JJ * W + II] > 0.0;
 				}
-			if (!bUsed) { Node[K] = INDEX_NONE; continue; }
+			if (!bUsed) continue;
 			const double Grain = CrownGrain(GI0 + I, GJ0 + J);
 			const double Wt = Weight[K];
 			const double Top = Z[K] + Mass.CanopyHeight * Wt * Grain - Sink * (1.0 - Wt);

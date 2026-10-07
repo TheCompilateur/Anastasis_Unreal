@@ -1,0 +1,93 @@
+{
+ "comment": "WORLD_THEATRE_001 -- vistas canoniques. Positions en uu (carte 1000..191000), eye_m = hauteur de l'oeil au-dessus du sol rendu ; z est resolu par world-theatre-analyze.py --resolve-vistas sur le releve. yaw UE (0 = +X, 90 = +Y). La chaine principale est au nord-est (yaw ~45), l'axe de la vallee NO-SE (yaw 135 / -45), les collines basses au sud-ouest (yaw 225).",
+ "vistas": [
+  {
+   "id": "V1_village_chaine",
+   "role": "enclosure + horizon framing : depuis le village, la chaine ferme le monde",
+   "x": 152000,
+   "y": 70000,
+   "eye_m": 1.7,
+   "yaw": 45,
+   "pitch": 1.5,
+   "fov": 75,
+   "z": 3771.7
+  },
+  {
+   "id": "V2_village_ouverture",
+   "role": "release / valley opening : depuis le village, la vallee s'ouvre au sud-ouest (horizon a 29 km)",
+   "x": 152000,
+   "y": 70000,
+   "eye_m": 1.7,
+   "yaw": -135,
+   "pitch": 1.0,
+   "fov": 75,
+   "z": 3771.7
+  },
+  {
+   "id": "V3_point_haut_amont",
+   "role": "full reveal : du point haut, la carte et la vallee amont d'un seul regard",
+   "x": 132000,
+   "y": 18000,
+   "eye_m": 1.7,
+   "yaw": 135,
+   "pitch": -1.5,
+   "fov": 75,
+   "z": 6730.7
+  },
+  {
+   "id": "V4_bassin_sud_ouest",
+   "role": "exposed basin / negative space : le fond du bassin vers les collines basses",
+   "x": 106000,
+   "y": 106000,
+   "eye_m": 1.7,
+   "yaw": 225,
+   "pitch": 1.0,
+   "fov": 75,
+   "z": 1052.4
+  },
+  {
+   "id": "V5_bord_nord_avant_pays",
+   "role": "continuation : au bord nord, regard dehors sur l'avant-pays et la chaine a 10 km (H3)",
+   "x": 64000,
+   "y": 187000,
+   "eye_m": 1.7,
+   "yaw": 80,
+   "pitch": 2.0,
+   "fov": 75,
+   "z": 3827.8
+  },
+  {
+   "id": "V6_approche_village",
+   "role": "settlement approach / partial reveal : on arrive au village par l'ouest",
+   "x": 110000,
+   "y": 60000,
+   "eye_m": 1.7,
+   "yaw": 13,
+   "pitch": 0.5,
+   "fov": 75,
+   "z": 2955.8
+  },
+  {
+   "id": "V7_foret_sud_dehors",
+   "role": "enclosed forest -> release : de la foret du bord sud vers les collines a 22 km",
+   "x": 88000,
+   "y": 4000,
+   "eye_m": 1.7,
+   "yaw": -150,
+   "pitch": 1.0,
+   "fov": 75,
+   "z": 3648.8
+  },
+  {
+   "id": "V8_vue_generale",
+   "role": "macro reading : la carte dans son pays (H4)",
+   "x": -80000,
+   "y": -80000,
+   "eye_m": 900.0,
+   "yaw": 45,
+   "pitch": -20,
+   "fov": 75,
+   "z": 93180.8
+  }
+ ]
+}

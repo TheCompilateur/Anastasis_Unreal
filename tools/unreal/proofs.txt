@@ -75,3 +75,5 @@ architecture-pie | tools/unreal/architecture-pie.py | ARCH_PIE PASS | ARCH_PIE F
 geo-remote-crisis-pie | tools/unreal/geo-remote-crisis-pie.py | GEO_PIE PASS | GEO_PIE FAIL|GEO_PIE_TIMEOUT|Traceback | 720 | ANASTASIS_GEO_PIE_OUT=@Saved/GeoEvidence/pie
 # WORLD_THEATRE_001 : releve du monde execute en PIE (sol et eau rendus, objets poses) ; instrument, pas un verdict visuel.
 world-theatre-read | tools/unreal/world-theatre-read.py | WORLD_THEATRE_READ_PIE PASS | WORLD_THEATRE_READ_PIE FAIL|WORLD_THEATRE_READ FAIL|Traceback | 420 | ANASTASIS_THEATRE_OUT=@Saved/WorldTheatreEvidence/read
+# WORLD_THEATRE_001 : vistas canoniques en PIE, anastasis.Theatre 0 / 1 / 0 (temoin) aux memes cameras, ciel a 11 h, simulation gelee ; COMPLETE = images ecrites, pas un verdict artistique.
+world-theatre-capture | tools/unreal/world-theatre-capture.py | WORLD_THEATRE_CAPTURE COMPLETE | WORLD_THEATRE_CAPTURE FAIL|Traceback | 900 | ANASTASIS_THEATRE_OUT=@Saved/WorldTheatreEvidence/capture

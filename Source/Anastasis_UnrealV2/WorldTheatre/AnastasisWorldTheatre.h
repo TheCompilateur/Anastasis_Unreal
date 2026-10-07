@@ -31,6 +31,8 @@ struct FMass
 {
 	const TCHAR* Id = TEXT("");
 	TArray<FVector2D> Outline;
+	/** Clairieres (cretes nues, combes ouvertes) : contours fermes a l'interieur du contour. Regle pair-impair. */
+	TArray<TArray<FVector2D>> Holes;
 	double CanopyHeight = 1600.0;
 	/** Distance (uu) sur laquelle la lisiere monte du sol a la canopee : un bord de couronnes, pas un mur. */
 	double EdgeRamp = 2500.0;
