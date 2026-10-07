@@ -518,9 +518,11 @@ void AAnastasisWorldAtmosphere::UpdateCosmicSky(const bool bForceLog)
 	}
 	CosmicDome->SetVisibility(true);
 
+	const float RainPin = CVarSkyRain.GetValueOnGameThread();
+	const double VisibleRain = RainPin >= 0.0f ? FMath::Clamp(static_cast<double>(RainPin), 0.0, 1.0) : LastSky.SkyRain;
 	const AnastasisCosmicNight::FInstant Night = AnastasisCosmicNight::Evaluate(
 		LastSkySeed, static_cast<int32>(LastSky.Day), LastSky.Hours, LastSky.SunElevationDegrees,
-		LastSky.SkyCover, LastSky.SkyRain, CVarCosmicEvent.GetValueOnGameThread());
+		LastSky.SkyCover, VisibleRain, CVarCosmicEvent.GetValueOnGameThread());
 	const float Intensity = FMath::Clamp(CVarCosmicIntensity.GetValueOnGameThread(), 0.0f, 3.0f);
 	const FVector MoonDir = -LastSky.MoonRotation.Vector();
 	const float MoonRise = FMath::Clamp(static_cast<float>(AnastasisSkyClock::ElevationOf(LastSky.MoonRotation) / 6.0), 0.0f, 1.0f);

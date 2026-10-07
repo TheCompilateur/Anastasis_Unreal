@@ -12,7 +12,7 @@ version de carte.
 - `ArtSource/Celestial/moon_lavender.png`, `cosmic_river.png`
 - `Content/Anastasis/Celestial/T_MoonLavender.uasset`, `T_CosmicRiver.uasset`, `M_AnastasisCosmicSky.uasset` (à créer par Unreal)
 - `Source/Anastasis_UnrealV2/WorldView/AnastasisCosmicNight.h/.cpp`, `AnastasisCosmicNightTests.cpp`, `AnastasisWorldAtmosphere.h/.cpp`
-- `tools/unreal/cosmic-sky-material.ps1/.py`, `capture-sky.ps1/.py`
+- `tools/unreal/cosmic-sky-material.ps1/.py`, `capture-sky.ps1/.py`, `cosmic-night-pie.py`, `proofs.txt`
 - `docs/unreal/COSMIC_NIGHT_001.md`, `AGENTS.md`, cette fiche
 
 ## COMMIT
@@ -28,7 +28,7 @@ PENDING
 
 ## PROOFS
 
-PROOFS: sky-clock-pie
+PROOFS: cosmic-night-pie, sky-clock-pie
 
 ## SCN
 

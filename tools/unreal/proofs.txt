@@ -8,6 +8,8 @@ nox-sky-capture | tools/unreal/nox-sky-capture.py | SKY_CAPTURE_COMPLETE | SKY_C
 nox-exposure-diagnostic | tools/unreal/nox-exposure-diagnostic.py | SKY_CAPTURE_COMPLETE | SKY_CAPTURE_FAIL|SKY_SHOT_MISSING|NOX_DIAGNOSTIC missing|Traceback | 420 | -
 # NOX_002: HDR SceneColor probe of the moonless Sky Light; completion is instrumental.
 nox-skylight-probe | tools/unreal/nox-skylight-probe.py | SKY_CAPTURE_COMPLETE | SKY_CAPTURE_FAIL|SKY_SHOT_MISSING|SKY_CAPTURE_TIMEOUT|NOX_SKYLIGHT expected|NOX_SKYLIGHT cannot|Traceback | 540 | -
+# COSMIC_NIGHT_001: PIE material wiring and event concealment; visual beauty is judged from A/B/A captures.
+cosmic-night-pie | tools/unreal/cosmic-night-pie.py | COSMIC_NIGHT_PIE PASS | COSMIC_NIGHT_PIE FAIL|Traceback | 160 | -
 #
 # Une mission declare les preuves de son chantier dans sa fiche de passation :
 #     PROOFS: player-pie, village-weather-pie
