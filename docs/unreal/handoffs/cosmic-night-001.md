@@ -32,7 +32,8 @@ PROOFS: cosmic-night-pie, sky-clock-pie
 
 ## SCN
 
-UNKNOWN — captures A/B/A sur la carte principale et essai de la seconde carte attendus.
+UNKNOWN — captures dispensées par Alexandre le 2026-10-07. La preuve PIE est
+instrumentale et ne tranche pas la qualité de l'image.
 
 ## PLY
 
@@ -41,7 +42,7 @@ UNKNOWN — aucun joueur libre n'a encore contemplé la nuit dans cette mission.
 ## INTEGRATION_RISK
 
 - `AnastasisWorldAtmosphere.h/.cpp` sont des fichiers chauds : rebaser sur le `main` le plus récent après le lot en cours.
-- La création des trois `.uasset` et leur compilation de matériau doivent précéder la preuve visuelle.
+- La création des trois `.uasset` et leur compilation de matériau sont requises ; la preuve visuelle est reportée sur demande d'Alexandre.
 - `sky-clock-pie` vérifie la traversée du cycle et ses phases ; il ne juge ni la beauté ni la lisibilité des météores.
 
 ## STOP

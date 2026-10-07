@@ -44,6 +44,6 @@ tirage de la nuit. Ce sont des valeurs de départ, pas encore un équilibre de j
 
 Un build et les tests du calendrier prouveront les règles, pas la beauté. Le
 matériau compilé prouvera son chargement, pas sa lisibilité depuis le joueur.
-Il faut regarder, sur une capture fraîche de `main`, la hauteur d'œil, la lune,
-la rivière stellaire et les nuages dans les états A/B/A. La seconde map peut
-être passée à `capture-sky.ps1 -Level` sans modifier le ciel.
+Alexandre a dispensé cette mission des captures le 2026-10-07. Le verdict
+artistique reste donc ouvert. Si on le reprend, `capture-sky.ps1 -Level` peut
+tester la carte courante et une seconde carte sans modifier le ciel.
