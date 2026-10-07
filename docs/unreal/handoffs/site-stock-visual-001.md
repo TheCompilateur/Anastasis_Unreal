@@ -18,20 +18,21 @@ Faire apparaitre les livraisons de bois et de pierre au chantier effectivement o
 - `AGENTS.md` (index des outils)
 - cette fiche
 
-Dependance lue, non possedee : `M_AnastasisArchitecture`, les archetypes et `TraceGround` de `architecture-crusade-001`, desormais integres a `main` (base `25ebf1fe`).
+Dependance lue, non possedee : `M_AnastasisArchitecture`, les archetypes et `TraceGround` de `architecture-crusade-001`, deja integres a `main` (base de validation `f64aeac8`).
 
 ## COMMIT
 
-PENDING
+Voir `git log` de la branche `agent/site-stock-visual-001` ; `finish` marque le commit final.
 
 ## MEC
 
-- BUILD: PENDING
-- TESTS: PENDING
+- BUILD: PASS sur `main` `f64aeac8` + branche `agent/site-stock-visual-001` : 18 actions, `Result: Succeeded`, `BUILD::PASS` (2026-10-07).
+- TESTS: preuve PIE locale `PROOF::PASS site-stock-visual-pie` (81,0 s) ; suite `Anastasis` complete reservee au lot d'integration.
 - COMMANDS:
   - `py -3 tools/unreal/create-site-stock.py` : GEOMETRY PASS ; bois 94 x 43.52 x 33.39 cm, 204 triangles ; pierre 78 x 57 x 27 cm, 96 triangles.
-  - `tools/unreal/create-site-stock.ps1` : PENDING
-  - `tools/unreal/anastasis-unreal.ps1 build` : PENDING
+  - `tools/unreal/create-site-stock.ps1` : `SITE_STOCK::PASS`, deux assets reels, tailles et nombres de triangles relus en editeur ; log local `Saved/SiteStockEvidence/create-site-stock.log`.
+  - `tools/unreal/anastasis-unreal.ps1 build` : `BUILD::PASS` ; compilation des deux modules et lien Editor.
+  - `tools/unreal/editor-batch.ps1 -Proofs site-stock-visual-pie` : `EDITOR_BATCH::PASS 1/1` ; log local `Saved/EditorBatch/20261007-180246/editor-batch.log`.
 
 ## PROOFS
 
@@ -39,11 +40,11 @@ PROOFS: site-stock-visual-pie
 
 ## SCN
 
-UNKNOWN : Alexandre a demande de laisser faire la capture. Les deux assets sont des meshes de production, sans image A/B revendiquee.
+PIE numerique : le chantier actuel sur `Lvl_AnastasisSlice` charge les deux meshes, sans collision, avec 0/0 instance a sec, 1/1 apres une livraison de chaque materiau, 3/3 au stock plein, puis une diminution observee (bois 18, pierre 4 -> instances 3, 2) et 0/0 a l'achevement. `SITE_STOCK_VISUAL_PIE PASS` est une preuve de projection de la simulation, pas un verdict de qualite visuelle. Alexandre a demande de laisser faire la capture : aucune image A/B revendiquee.
 
 ## PLY
 
-UNKNOWN : la preuve PIE numerique est en attente du lot ; le comptage d'instances lie au stock ne prouve pas encore la lisibilite pour le joueur.
+UNKNOWN : la preuve PIE numerique ne mesure ni lisibilite a hauteur humaine, ni comprehension du stock par le joueur. Elle doit etre rejouee au lot sur l'arbre integre.
 
 ## ECARTS
 
