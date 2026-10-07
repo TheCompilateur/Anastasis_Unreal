@@ -1,0 +1,26 @@
+{
+  "mission": "geopolitical-world-001",
+  "target_period": "1204-1225",
+  "setting": "arriere_pays_pontique_fictif",
+  "model_ids": ["PONT-HIS-02"],
+  "claim": "Le monde exterieur d'un village fictif hors faction se modelise comme des pressions qui l'atteignent avec retard par des routes, la nouvelle d'un evenement precedant ses effets materiels ; les acteurs grecs, latins et turcs sont distincts et ne possedent pas les noeuds.",
+  "basis": "hypothese_de_conception",
+  "source_ids": ["HIS-03", "HIS-04", "HIS-05", "HIS-06"],
+  "inference": "Les sources attestent les lieux, les routes, les acteurs, la prise de Constantinople en 1204, la paix relative Konya-Nicee et des accommodements grecs-turcs ; elles ne donnent ni durees de trajet en jours, ni intensites, ni fuite de gens de Constantinople jusqu'au Pont. Ces valeurs sont des abstractions marquees ABSTRACTION ou PLAUSIBLE dans le scenario.",
+  "current": "Avant la mission : aucun monde exterieur dans le C++ (ni puissance, ni rumeur, ni arrivee causee) ; le village est une vallee fermee.",
+  "target": "Un scenario de donnees sourcees, une propagation deterministe avec delai, une nouvelle separee de la verite, et une arrivee de migrants devenus habitants, tracable jusqu'a sa cause.",
+  "causal_effect": "Une crise lointaine devient d'abord une nouvelle au village, puis une penurie exposee, puis un groupe d'arrivants qui deviennent des habitants de la simulation.",
+  "owner_paths": [
+    "Content/Anastasis/Scenario/geo-pontos-1204.json",
+    "Source/AnastasisSim/Public/Geo/AnastasisGeo.h",
+    "Source/AnastasisSim/Private/Geo/AnastasisGeo.cpp",
+    "docs/unreal/GEOPOLITICAL_WORLD_001.md"
+  ],
+  "evidence_plan": {
+    "mec": "Tests Anastasis.Sim.Geo.* (delais, attenuation, cycles, determinisme, sauvegarde, validation, arrivants) et preuve PIE geo-remote-crisis-pie (chronologie observee).",
+    "scn": "UNKNOWN : aucune scene visuelle revendiquee ; les arrivants sont des habitants ordinaires sans mise en scene propre.",
+    "ply": "UNKNOWN : le joueur ne choisit encore rien face au monde exterieur ; aucun parcours humain observe."
+  },
+  "verdict": "PROPOSE",
+  "evidence_paths": []
+}
