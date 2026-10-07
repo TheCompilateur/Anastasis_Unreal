@@ -22,7 +22,7 @@ if (-not (Select-String -LiteralPath $log -Pattern 'COSMIC_MATERIAL_DONE' -Quiet
 if (Select-String -LiteralPath $log -Pattern 'COSMIC_MATERIAL_FAIL|Failed to compile|\[SM[56]\].*error' -Quiet) {
   throw ('COSMIC_MATERIAL::FAIL see ' + $log)
 }
-foreach ($asset in @('Content\Anastasis\Celestial\T_MoonLavender.uasset', 'Content\Anastasis\Celestial\M_AnastasisCosmicSky.uasset')) {
+foreach ($asset in @('Content\Anastasis\Celestial\T_MoonLavender.uasset', 'Content\Anastasis\Celestial\T_CosmicRiver.uasset', 'Content\Anastasis\Celestial\M_AnastasisCosmicSky.uasset')) {
   if (-not (Test-Path (Join-Path $root $asset))) { throw ('COSMIC_MATERIAL::FAIL missing ' + $asset) }
 }
 Write-Output 'COSMIC_MATERIAL::PASS'

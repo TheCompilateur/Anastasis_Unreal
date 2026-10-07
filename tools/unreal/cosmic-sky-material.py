@@ -10,8 +10,10 @@ import unreal
 
 PKG = '/Game/Anastasis/Celestial'
 TEX = PKG + '/T_MoonLavender'
+SKY_TEX = PKG + '/T_CosmicRiver'
 MAT = PKG + '/M_AnastasisCosmicSky'
 SOURCE = os.path.join(unreal.Paths.project_dir(), 'ArtSource', 'Celestial', 'moon_lavender.png')
+SKY_SOURCE = os.path.join(unreal.Paths.project_dir(), 'ArtSource', 'Celestial', 'cosmic_river.png')
 REBUILD = os.environ.get('ANASTASIS_COSMIC_REBUILD') == '1'
 mel = unreal.MaterialEditingLibrary
 
@@ -30,6 +32,8 @@ float river = (0.23*halo + 0.82*core) * saturate(grains) * (1.0-0.78*lanes);
 float3 galaxy = river * float3(0.0011, 0.0008, 0.0021);
 
 float2 suv = float2(atan2(r.y,r.x)/6.2831853+0.5, asin(clamp(r.z,-1.0,1.0))/3.14159265+0.5);
+float3 panorama = Texture2DSample(SkyTex, SkyTexSampler, suv).rgb;
+float seam = smoothstep(0.0,0.065,suv.x) * (1.0-smoothstep(0.935,1.0,suv.x));
 float2 grid = suv * float2(500.0, 250.0);
 float2 cell = floor(grid), f = frac(grid);
 cell.x = fmod(cell.x, 500.0);
@@ -82,7 +86,7 @@ float wave = abs(dot(r,normalize(float3(-0.26,0.41,0.87)))
 float veil = exp(-pow(wave/0.035,2.0)) * (0.55+0.45*sin(az*19.0+r.z*45.0));
 float3 strange = max(veil,0.0) * VeilStrength * float3(0.0018,0.0008,0.0045);
 
-return (galaxy + stars)*NightStrength + moon + meteor + strange;
+return (panorama*0.15*seam + galaxy + stars)*NightStrength + moon + meteor + strange;
 '''
 
 
@@ -114,32 +118,33 @@ def vector(mat, name, rgba, y):
     return node
 
 
-def create_texture():
-    if not os.path.isfile(SOURCE):
-        raise RuntimeError('missing lunar art source: ' + SOURCE)
-    if unreal.EditorAssetLibrary.does_asset_exist(TEX) and not REBUILD:
-        unreal.log('COSMIC_TEXTURE_PRESENT ' + TEX)
-        return unreal.load_asset(TEX)
+def create_texture(path, asset_name):
+    dest = PKG + '/' + asset_name
+    if not os.path.isfile(path):
+        raise RuntimeError('missing art source: ' + path)
+    if unreal.EditorAssetLibrary.does_asset_exist(dest) and not REBUILD:
+        unreal.log('COSMIC_TEXTURE_PRESENT ' + dest)
+        return unreal.load_asset(dest)
     task = unreal.AssetImportTask()
-    task.set_editor_property('filename', SOURCE)
+    task.set_editor_property('filename', path)
     task.set_editor_property('destination_path', PKG)
-    task.set_editor_property('destination_name', 'T_MoonLavender')
+    task.set_editor_property('destination_name', asset_name)
     task.set_editor_property('replace_existing', True)
     task.set_editor_property('automated', True)
     task.set_editor_property('save', False)
     unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
-    tex = unreal.load_asset(TEX)
+    tex = unreal.load_asset(dest)
     if tex is None:
         raise RuntimeError('moon import failed')
     tex.set_editor_property('srgb', True)
     tex.set_editor_property('compression_settings', unreal.TextureCompressionSettings.TC_BC7)
     tex.set_editor_property('lod_group', unreal.TextureGroup.TEXTUREGROUP_SKYBOX)
-    unreal.EditorAssetLibrary.save_asset(TEX)
-    unreal.log('COSMIC_TEXTURE_SAVED ' + TEX)
+    unreal.EditorAssetLibrary.save_asset(dest)
+    unreal.log('COSMIC_TEXTURE_SAVED ' + dest)
     return tex
 
 
-def create_material(tex):
+def create_material(moon, panorama):
     if unreal.EditorAssetLibrary.does_asset_exist(MAT):
         if not REBUILD:
             unreal.log('COSMIC_MATERIAL_PRESENT ' + MAT)
@@ -161,10 +166,14 @@ def create_material(tex):
     cam = mel.create_material_expression(mat, unreal.MaterialExpressionCameraVectorWS, -1000, -110)
     moon_tex = mel.create_material_expression(mat, unreal.MaterialExpressionTextureObjectParameter, -1000, 0)
     moon_tex.set_editor_property('parameter_name', 'MoonTex')
-    moon_tex.set_editor_property('texture', tex)
+    moon_tex.set_editor_property('texture', moon)
+    sky_tex = mel.create_material_expression(mat, unreal.MaterialExpressionTextureObjectParameter, -1000, -10)
+    sky_tex.set_editor_property('parameter_name', 'SkyTex')
+    sky_tex.set_editor_property('texture', panorama)
     nodes = {
         'CamVec': cam,
         'MoonTex': moon_tex,
+        'SkyTex': sky_tex,
         'MoonDir': vector(mat, 'MoonDir', (0,0,1,0), 100),
         'NightStrength': scalar(mat, 'NightStrength', 0, 200),
         'MoonStrength': scalar(mat, 'MoonStrength', 0, 290),
@@ -195,7 +204,8 @@ def create_material(tex):
 
 
 try:
-    create_material(create_texture())
+    create_material(create_texture(SOURCE, 'T_MoonLavender'),
+                    create_texture(SKY_SOURCE, 'T_CosmicRiver'))
     unreal.log('COSMIC_MATERIAL_DONE')
 except Exception:
     unreal.log_error('COSMIC_MATERIAL_FAIL ' + traceback.format_exc())

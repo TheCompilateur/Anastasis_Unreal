@@ -17,9 +17,10 @@ pour un clic ni une réaction à la caméra : il appartient au calendrier du mon
 - `AAnastasisWorldAtmosphere` est le seul propriétaire du dôme transitoire et
   du matériau dynamique. Il peut apparaître dans toute carte qui incarne le
   monde : aucun nom de `.umap` n'est codé dans le rendu.
-- `ArtSource/Celestial/moon_lavender.png` est un asset original généré pour
-  cette direction. `tools/unreal/cosmic-sky-material.py` importe ce disque et
-  construit la galaxie, les étoiles, météores et voiles dans un matériau Unreal.
+- `ArtSource/Celestial/moon_lavender.png` et `cosmic_river.png` sont des assets
+  originaux générés pour cette direction. `tools/unreal/cosmic-sky-material.py`
+  les importe ; la rivière panoramique se mêle à des étoiles, météores et
+  voiles procéduraux dans un matériau Unreal.
 
 ## Calendrier initial
 
