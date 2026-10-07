@@ -119,3 +119,40 @@ verdict sur la lisibilité de l'image. Ce banc ne constitue pas une boucle de sc
 aucun autre humain n'y réagit, aucune obligation ni relation ne pèse sur le choix. Le scénario remplace le village d'ouverture : son unique habitant
 et son stock fini ne démontrent pas une économie de village durable. Les touches sont des
 `DebugExecBindings` PIE et ne définissent pas les contrôles d'un build Shipping.
+
+### Porte de décision pour la première scène sociale
+
+Le banc précédent vérifie une chaîne de matière. La prochaine unité de gameplay doit être
+une **décision avec un autre habitant** : un voisin a faim, voit le grenier vide, et le joueur
+peut y apporter une portion. Le voisin décide et mange selon les règles ordinaires du village ;
+aucune récompense ni commande spéciale ne lui est attribuée parce que le joueur a livré.
+
+Avant d'ajouter ce voisin, rejouer `player-food-loop-pie`. **KEEP** du banc matériel seulement
+si la récolte, le transport, le dépôt, le repas et la conservation passent en PIE ; sinon
+corriger ce chemin et ne pas empiler une seconde causalité sur un chemin inconnu.
+
+Pour la scène sociale, comparer deux exécutions depuis la même graine et le même état initial :
+
+| Bras | Intervention unique | Mesure au même temps simulé |
+|---|---|---|
+| A | Le joueur attend. | Portion disponible, repas et faim du voisin. |
+| B | Le joueur cueille et livre au grenier. | Mêmes valeurs, avec l'heure du dépôt, de la réservation et du repas. |
+
+Le voisin doit commencer **hors de perception de la source** mais à portée du grenier. Le
+scénario actuel place source et grenier à quatre cases environ, pour une perception de sept :
+poser simplement le voisin au seuil ne l'isolerait pas de la source. Sa position et ses
+croyances doivent donc être relevées dans les deux bras ; s'il découvre la source dans A,
+le test ne peut pas attribuer son repas au joueur. Les deux bras gardent Noûs actif et les
+mêmes besoins, météo, chemins et rythme. À chaque échantillon :
+`source restante + sacs + stock physique + repas = source initiale`.
+
+**KEEP social** si le voisin ne mange pas dans A, mange après le dépôt dans B, que sa faim
+baisse, et que le journal relie sans saut source → sac du joueur → grenier → repas du voisin.
+**REJECT** si les deux bras aboutissent au même repas, si le voisin cueille seul, si un stock
+est injecté, si la conservation échoue, ou si la seule différence observée est un compteur
+global. Un verdict inconnu reste `UNKNOWN`.
+
+Même un KEEP social reste `[MEC]` tant que la scène n'est pas jouée au clavier, à hauteur
+d'humain, avec le voisin visible, une intention et sa conséquence compréhensibles sans
+console ni JSON. La boucle canonique de trente minutes exige encore une obligation, un
+arbitrage de temps et une trace qui persiste au jour suivant.

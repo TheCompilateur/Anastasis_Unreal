@@ -61,6 +61,18 @@ existent déjà pour les habitants autonomes.
 - Les touches F6 à F9 sont des `DebugExecBindings` PIE, absents en Shipping.
 - Le script PIE nouveau doit être mis au point dans l'éditeur avant le lot ; un build ne prouve pas son verdict.
 - La machine enchaînait les builds globaux pendant l'essai ; le lot devra exécuter le script pour la première fois.
+- Nouvelle tentative le 2026-10-07 : `editor-batch` est resté à `EDITOR_GATE::WAIT`, derrière deux
+  autres éditeurs et sous le seuil RAM. Arrêt de notre attente avant création de notre éditeur ;
+  le statut PIE demeure `UNKNOWN`.
+
+## NEXT — décision avant extension
+
+Exécuter d'abord `player-food-loop-pie` sur ce commit. La fiche `PLAYER_MINIMAL_001.md`
+fixe ensuite un A/B à état initial identique : attente du joueur contre récolte et dépôt,
+avec repas et faim d'un voisin mesurés individuellement. Le voisin doit voir le grenier
+mais ignorer la source au départ. La portée actuelle de perception (7 cases) et la distance
+source–grenier (~4) rendent un simple second acteur au seuil non discriminant. Ne pas coder
+ce scénario tant que la chaîne matérielle de base n'a pas un verdict runtime.
 
 ## STOP
 
