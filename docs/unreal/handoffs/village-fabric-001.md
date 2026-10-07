@@ -19,9 +19,9 @@ simulation. Détail : `docs/unreal/VILLAGE_FABRIC_001.md`.
 - `Source/Anastasis_UnrealV2/Village/AnastasisVillageFabricActor.{h,cpp}` (géométrie, défrichement réversible)
 - `Source/Anastasis_UnrealV2/Village/AnastasisVillageFabricSubsystem.{h,cpp}` (mise à jour, CVars, commandes, lecteur Python)
 - `Source/Anastasis_UnrealV2/Village/AnastasisVillageFabricTests.cpp`
-- `tools/unreal/village-fabric-pie.py`
+- `tools/unreal/village-fabric-pie.py`, `tools/unreal/village-fabric-capture.py`
 - `docs/unreal/VILLAGE_FABRIC_001.md`, cette fiche
-- `AGENTS.md` (une ligne d'index), `tools/unreal/proofs.txt` (deux lignes en fin)
+- `AGENTS.md` (deux lignes d'index), `tools/unreal/proofs.txt` (trois lignes en fin)
 
 ## COMMIT
 
@@ -29,14 +29,20 @@ PENDING
 
 ## MEC
 
-- BUILD: PASS (`anastasis-unreal.ps1 build`, worktree, adaptatif puis unity après commit, voir ci-dessous)
-- TESTS: QUEUED -- `Anastasis.Village.Fabric.{Flat,Determinism,Slope,EdgeCases}` pas encore joués (aucun éditeur
-  ouvert à la demande d'architecture-crusade-001 pendant sa preuve)
-- PIE: QUEUED -- `village-fabric-pie`
-
+- BUILD: PASS (`anastasis-unreal.ps1 build`, worktree ; adaptatif, et unity sur l'arbre commite 2cef02d)
+- TESTS: PASS 4/4, joues dans un editeur de ce worktree (`Automation RunTests Anastasis.Village.Fabric`) :
+  `Flat`, `Determinism`, `Slope`, `EdgeCases` = Success. Aucun KNOWN_EXPECTED_FAILURE. Suite complete
+  `Anastasis` NON jouee ici : elle attend le lot.
+  - Slope (pente 30 %) : `laneGrade=0.120 fallGrade=0.300 maxGrade=0.254 steps=38m/105m walls=13 wallMax=288cm intrusions=0`
+- PIE `village-fabric-pie` : un premier run reel a tout valide sauf le compte defriche (747 puis 753 : l'herbe
+  change entre deux passages). Il a aussi montre un repli qui posait le puits a 600 m des maisons (500 m de
+  calade, grammaire 350 a 570 ms). Corriges : tolerance de 5 %, portee `MaxReachCells` = 8, repli en hameau
+  autour du puits du lancement. Le run corrige n'a PAS ete rejoue (file d'editeurs saturee, arret a la demande
+  d'Alexandre) : il attend le lot, `TESTS::QUEUED`.
+- Captures `village-fabric-capture` : script pret, annule a la demande d'Alexandre. Aucune image produite.
 ## PROOFS
 
-PROOFS: village-fabric-pie
+PROOFS: village-fabric-pie, village-fabric-capture
 
 ## SCN
 

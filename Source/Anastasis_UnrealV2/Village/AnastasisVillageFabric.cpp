@@ -4,8 +4,6 @@ namespace AnastasisVillageFabric
 {
 	namespace
 	{
-		constexpr double Sqrt2 = 1.4142135623730951;
-
 		/** Un batiment pose : centre monde, axe d'acces (+Y local), corps ou disque du puits. */
 		struct FBody
 		{
@@ -41,7 +39,23 @@ namespace AnastasisVillageFabric
 			int32 W = 0;
 			int32 H = 0;
 			TArray<double> Z;
+			TBitArray<> HasZ;
 			TBitArray<> Free;
+
+			/** Pente propre du terrain au noeud (differences centrees, sur les voisins qui ont un sol). */
+			double Fall(int32 Idx) const
+			{
+				const int32 I = Idx % W;
+				const int32 J = Idx / W;
+				const auto Slope = [&](int32 DI, int32 DJ)
+				{
+					const int32 A = Inside(I - DI, J - DJ) && HasZ[Index(I - DI, J - DJ)] ? Index(I - DI, J - DJ) : Idx;
+					const int32 B = Inside(I + DI, J + DJ) && HasZ[Index(I + DI, J + DJ)] ? Index(I + DI, J + DJ) : Idx;
+					const int32 Span = (A != Idx) + (B != Idx);
+					return Span > 0 ? (Z[B] - Z[A]) / (Span * Step) : 0.0;
+				};
+				return FVector2D(Slope(1, 0), Slope(0, 1)).Size();
+			}
 
 			int32 Index(int32 I, int32 J) const { return J * W + I; }
 			bool Inside(int32 I, int32 J) const { return I >= 0 && J >= 0 && I < W && J < H; }
@@ -164,8 +178,6 @@ namespace AnastasisVillageFabric
 
 		// --- Les corps --------------------------------------------------------------------------
 		TArray<FBody> Bodies;
-		FIntPoint MinCell(MAX_int32, MAX_int32);
-		FIntPoint MaxCell(MIN_int32, MIN_int32);
 		for (const FPlot& Plot : Plots)
 		{
 			FBody Body;
@@ -178,8 +190,6 @@ namespace AnastasisVillageFabric
 				Body.Front = Dir.GetSafeNormal();
 			}
 			Bodies.Add(Body);
-			MinCell = FIntPoint(FMath::Min(MinCell.X, Plot.Cell.X), FMath::Min(MinCell.Y, Plot.Cell.Y));
-			MaxCell = FIntPoint(FMath::Max(MaxCell.X, Plot.Cell.X), FMath::Max(MaxCell.Y, Plot.Cell.Y));
 		}
 
 		// La placette : le premier puits. Sans puits, la maisonnee la plus centrale sert de racine.
@@ -204,6 +214,37 @@ namespace AnastasisVillageFabric
 			}
 		}
 
+		// Un village ne pave pas une demi-lieue : au-dela de MaxReachCells de la racine, une maison est un
+		// ecart (elle aura son sentier de terre, pas une calade), et elle ne fait pas grossir la grille.
+		{
+			const FIntPoint HubCell = Bodies[Hub].Plot->Cell;
+			TArray<FBody> Kept;
+			int32 KeptHub = INDEX_NONE;
+			for (int32 I = 0; I < Bodies.Num(); ++I)
+			{
+				const FIntPoint D = Bodies[I].Plot->Cell - HubCell;
+				if (FMath::Max(FMath::Abs(D.X), FMath::Abs(D.Y)) > P.MaxReachCells)
+				{
+					++Out.Report.Remote;
+					continue;
+				}
+				if (I == Hub)
+				{
+					KeptHub = Kept.Num();
+				}
+				Kept.Add(Bodies[I]);
+			}
+			Bodies = MoveTemp(Kept);
+			Hub = KeptHub;
+		}
+		FIntPoint MinCell(MAX_int32, MAX_int32);
+		FIntPoint MaxCell(MIN_int32, MIN_int32);
+		for (const FBody& B : Bodies)
+		{
+			MinCell = FIntPoint(FMath::Min(MinCell.X, B.Plot->Cell.X), FMath::Min(MinCell.Y, B.Plot->Cell.Y));
+			MaxCell = FIntPoint(FMath::Max(MaxCell.X, B.Plot->Cell.X), FMath::Max(MaxCell.Y, B.Plot->Cell.Y));
+		}
+
 		// --- La grille --------------------------------------------------------------------------
 		FGrid Grid;
 		Grid.Step = P.GridCm;
@@ -213,6 +254,7 @@ namespace AnastasisVillageFabric
 		const int32 N = Grid.W * Grid.H;
 		Grid.Z.SetNumZeroed(N);
 		Grid.Free.Init(true, N);
+		Grid.HasZ.Init(false, N);
 		for (int32 Idx = 0; Idx < N; ++Idx)
 		{
 			const FVector2D C = Grid.At(Idx);
@@ -223,6 +265,7 @@ namespace AnastasisVillageFabric
 				continue;
 			}
 			Grid.Z[Idx] = Z;
+			Grid.HasZ[Idx] = true;
 			for (const FBody& B : Bodies)
 			{
 				const bool bBlocked = B.bWell
@@ -326,8 +369,11 @@ namespace AnastasisVillageFabric
 		}
 
 		// --- L'arbre des ruelles : chaque fois, le seuil le moins couteux rejoint le reseau --------
-		const int32 DI8[8] = { 1, -1, 0, 0, 1, 1, -1, -1 };
-		const int32 DJ8[8] = { 0, 0, 1, -1, 1, -1, 1, -1 };
+		// Quatre cardinales, quatre diagonales, huit sauts de cavalier : sur une pente, le cavalier donne une
+		// rampe a pente / sqrt(5), la ou la diagonale seule forcerait l'escalier (pente / sqrt(2)).
+		const int32 DIR = 16;
+		const int32 DI8[DIR] = { 1, -1, 0, 0, 1, 1, -1, -1, 2, 2, -2, -2, 1, 1, -1, -1 };
+		const int32 DJ8[DIR] = { 0, 0, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 2, -2, 2, -2 };
 		TArray<double> Dist;
 		TArray<int32> Came;
 		TArray<TArray<int32>> LanePaths;
@@ -360,7 +406,7 @@ namespace AnastasisVillageFabric
 				}
 				const int32 CI = Top.Value % Grid.W;
 				const int32 CJ = Top.Value / Grid.W;
-				for (int32 K = 0; K < 8; ++K)
+				for (int32 K = 0; K < DIR; ++K)
 				{
 					const int32 NI = CI + DI8[K];
 					const int32 NJ = CJ + DJ8[K];
@@ -373,12 +419,19 @@ namespace AnastasisVillageFabric
 					{
 						continue;
 					}
-					const bool bDiagonal = K >= 4;
-					if (bDiagonal && (!Grid.Free[Grid.Index(NI, CJ)] || !Grid.Free[Grid.Index(CI, NJ)]))
+					// Pas d'angle rogne sur un mur : toutes les cases que le pas effleure doivent etre libres.
+					const int32 SI = FMath::Sign(DI8[K]);
+					const int32 SJ = FMath::Sign(DJ8[K]);
+					if (K >= 4 && (!Grid.Free[Grid.Index(CI + SI, CJ)] || !Grid.Free[Grid.Index(CI, CJ + SJ)]
+						|| !Grid.Free[Grid.Index(CI + SI, CJ + SJ)]))
 					{
-						continue; // pas d'angle rogne sur un mur
+						continue;
 					}
-					const double Len = P.GridCm * (bDiagonal ? Sqrt2 : 1.0);
+					if (K >= 8 && !Grid.Free[Grid.Index(NI - SI * (FMath::Abs(DI8[K]) == 2), NJ - SJ * (FMath::Abs(DJ8[K]) == 2))])
+					{
+						continue;
+					}
+					const double Len = P.GridCm * FMath::Sqrt(static_cast<double>(DI8[K] * DI8[K] + DJ8[K] * DJ8[K]));
 					const double Grade = FMath::Abs(Grid.Z[Next] - Grid.Z[Top.Value]) / Len;
 					double Cost = Len * (1.0 + P.SlopeWeight * Grade * Grade);
 					if (Grade > P.MaxGrade)
@@ -415,6 +468,22 @@ namespace AnastasisVillageFabric
 			TArray<int32> Path;
 			for (int32 Idx = Doors[Pick].Node; Idx != INDEX_NONE; Idx = Came[Idx])
 			{
+				// Un saut de cavalier enjambe une case : on la compte dans la ruelle (chaussee continue, arbre sans trou).
+				if (Path.Num() > 0)
+				{
+					const int32 LastI = Path.Last() % Grid.W;
+					const int32 LastJ = Path.Last() / Grid.W;
+					const int32 DI = Idx % Grid.W - LastI;
+					const int32 DJ = Idx / Grid.W - LastJ;
+					if (FMath::Abs(DI) == 2 || FMath::Abs(DJ) == 2)
+					{
+						const int32 Mid = Grid.Index(LastI + (FMath::Abs(DI) == 2 ? DI / 2 : DI), LastJ + (FMath::Abs(DJ) == 2 ? DJ / 2 : DJ));
+						if (TreeParent[Mid] == INDEX_NONE - 1 && Mid != Idx)
+						{
+							Path.Add(Mid);
+						}
+					}
+				}
 				Path.Add(Idx);
 				if (TreeParent[Idx] != INDEX_NONE - 1)
 				{
@@ -443,7 +512,7 @@ namespace AnastasisVillageFabric
 
 		// --- Ruelles rendues --------------------------------------------------------------------
 		double GradeWeighted = 0.0;
-		double StraightWeighted = 0.0;
+		double FallWeighted = 0.0;
 		for (int32 L = 0; L < LanePaths.Num(); ++L)
 		{
 			const TArray<int32>& Path = LanePaths[L];
@@ -490,12 +559,13 @@ namespace AnastasisVillageFabric
 			if (Lane.LengthCm > 0.0)
 			{
 				Lane.MeanGrade /= Lane.LengthCm;
-				const FVector A = Lane.Points[0].Position;
-				const FVector B = Lane.Points.Last().Position;
-				const double Flat = FVector2D::Distance(FVector2D(A), FVector2D(B));
-				Lane.StraightGrade = Flat > 1.0 ? FMath::Abs(B.Z - A.Z) / Flat : 0.0;
+				for (const int32 Idx : Path)
+				{
+					Lane.FallGrade += Grid.Fall(Idx);
+				}
+				Lane.FallGrade /= Path.Num();
 				GradeWeighted += Lane.MeanGrade * Lane.LengthCm;
-				StraightWeighted += Lane.StraightGrade * Lane.LengthCm;
+				FallWeighted += Lane.FallGrade * Lane.LengthCm;
 				Out.Report.LaneLengthCm += Lane.LengthCm;
 			}
 
@@ -534,7 +604,7 @@ namespace AnastasisVillageFabric
 		if (Out.Report.LaneLengthCm > 0.0)
 		{
 			Out.Report.LaneMeanGrade = GradeWeighted / Out.Report.LaneLengthCm;
-			Out.Report.StraightMeanGrade = StraightWeighted / Out.Report.LaneLengthCm;
+			Out.Report.FallMeanGrade = FallWeighted / Out.Report.LaneLengthCm;
 		}
 
 		// L'herbe dans l'emprise d'une maison est defrichee par l'architecture : pas de chaussee a nous la.
@@ -715,9 +785,9 @@ namespace AnastasisVillageFabric
 	FString ToLogLine(const FReport& R)
 	{
 		return FString::Printf(
-			TEXT("ANASTASIS_FABRIC report plots=%d doors=%d connected=%d lanes=%d laneLength=%.0fm steps=%.0fm laneGrade=%.3f straightGrade=%.3f maxGrade=%.3f walls=%d wallLength=%.0fm wallMax=%.0fcm intrusions=%d signature=%08x"),
-			R.Plots, R.Doors, R.ConnectedDoors, R.Lanes, R.LaneLengthCm / 100.0, R.StepLengthCm / 100.0,
-			R.LaneMeanGrade, R.StraightMeanGrade, R.LaneMaxGrade, R.Walls, R.WallLengthCm / 100.0,
+			TEXT("ANASTASIS_FABRIC report plots=%d remote=%d doors=%d connected=%d lanes=%d laneLength=%.0fm steps=%.0fm laneGrade=%.3f fallGrade=%.3f maxGrade=%.3f walls=%d wallLength=%.0fm wallMax=%.0fcm intrusions=%d signature=%08x"),
+			R.Plots, R.Remote, R.Doors, R.ConnectedDoors, R.Lanes, R.LaneLengthCm / 100.0, R.StepLengthCm / 100.0,
+			R.LaneMeanGrade, R.FallMeanGrade, R.LaneMaxGrade, R.Walls, R.WallLengthCm / 100.0,
 			R.WallMaxHeightCm, R.BodyIntrusions, R.Signature);
 	}
 
@@ -730,12 +800,12 @@ namespace AnastasisVillageFabric
 			const FVector A = L.Points.Num() ? L.Points[0].Position : FVector::ZeroVector;
 			const FVector B = L.Points.Num() ? L.Points.Last().Position : FVector::ZeroVector;
 			Lanes.Add(FString::Printf(
-				TEXT("{\"from\":\"%s\",\"width\":%.0f,\"usage\":%d,\"length\":%.0f,\"grade\":%.4f,\"straight\":%.4f,\"a\":[%.0f,%.0f,%.0f],\"b\":[%.0f,%.0f,%.0f]}"),
-				*L.FromId, L.WidthCm, L.Usage, L.LengthCm, L.MeanGrade, L.StraightGrade, A.X, A.Y, A.Z, B.X, B.Y, B.Z));
+				TEXT("{\"from\":\"%s\",\"width\":%.0f,\"usage\":%d,\"length\":%.0f,\"grade\":%.4f,\"fall\":%.4f,\"a\":[%.0f,%.0f,%.0f],\"b\":[%.0f,%.0f,%.0f]}"),
+				*L.FromId, L.WidthCm, L.Usage, L.LengthCm, L.MeanGrade, L.FallGrade, A.X, A.Y, A.Z, B.X, B.Y, B.Z));
 		}
 		return FString::Printf(
-			TEXT("{\"plots\":%d,\"doors\":%d,\"connected\":%d,\"lanes\":%d,\"laneLength\":%.0f,\"stepLength\":%.0f,\"laneGrade\":%.4f,\"straightGrade\":%.4f,\"maxGrade\":%.4f,\"walls\":%d,\"wallLength\":%.0f,\"wallMax\":%.0f,\"intrusions\":%d,\"signature\":\"%08x\",\"plaza\":{\"valid\":%s,\"well\":\"%s\",\"centre\":[%.0f,%.0f,%.0f],\"radius\":%.0f,\"tree\":%s,\"treeSpot\":[%.0f,%.0f,%.0f]},\"laneList\":[%s]}"),
-			R.Plots, R.Doors, R.ConnectedDoors, R.Lanes, R.LaneLengthCm, R.StepLengthCm, R.LaneMeanGrade, R.StraightMeanGrade,
+			TEXT("{\"plots\":%d,\"remote\":%d,\"doors\":%d,\"connected\":%d,\"lanes\":%d,\"laneLength\":%.0f,\"stepLength\":%.0f,\"laneGrade\":%.4f,\"fallGrade\":%.4f,\"maxGrade\":%.4f,\"walls\":%d,\"wallLength\":%.0f,\"wallMax\":%.0f,\"intrusions\":%d,\"signature\":\"%08x\",\"plaza\":{\"valid\":%s,\"well\":\"%s\",\"centre\":[%.0f,%.0f,%.0f],\"radius\":%.0f,\"tree\":%s,\"treeSpot\":[%.0f,%.0f,%.0f]},\"laneList\":[%s]}"),
+			R.Plots, R.Remote, R.Doors, R.ConnectedDoors, R.Lanes, R.LaneLengthCm, R.StepLengthCm, R.LaneMeanGrade, R.FallMeanGrade,
 			R.LaneMaxGrade, R.Walls, R.WallLengthCm, R.WallMaxHeightCm, R.BodyIntrusions, R.Signature,
 			F.Plaza.bValid ? TEXT("true") : TEXT("false"), *F.Plaza.WellId, F.Plaza.Centre.X, F.Plaza.Centre.Y, F.Plaza.Centre.Z,
 			F.Plaza.RadiusCm, F.Plaza.bHasTree ? TEXT("true") : TEXT("false"), F.Plaza.TreeSpot.X, F.Plaza.TreeSpot.Y, F.Plaza.TreeSpot.Z,

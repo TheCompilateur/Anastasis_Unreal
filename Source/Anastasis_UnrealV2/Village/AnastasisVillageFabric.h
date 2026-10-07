@@ -52,13 +52,16 @@ namespace AnastasisVillageFabric
 		double StepGrade = 0.16;
 		/**
 		 * Poids de la pente dans le cout : cout = longueur * (1 + SlopeWeight * pente^2). Pour gagner une
-		 * hauteur donnee, la pente la moins couteuse vaut 1 / sqrt(SlopeWeight) : 40 donne 16 %, la pente
-		 * d'un sentier muletier, egale a StepGrade. Plus raide que cela, la ruelle prend des lacets.
+		 * hauteur donnee, la pente la moins couteuse vaut 1 / sqrt(SlopeWeight) : 50 donne 14 %, la pente
+		 * d'un sentier muletier, juste sous StepGrade (une rampe en lacets ne bascule pas en marches a
+		 * chaque metre). Plus raide que cela, la ruelle prend des lacets.
 		 */
-		double SlopeWeight = 40.0;
+		double SlopeWeight = 50.0;
 		/** Au-dela, le pas coute VeryStepCost fois plus : on ne grimpe droit que faute de mieux. */
 		double MaxGrade = 0.5;
 		double VeryStepCost = 12.0;
+		/** Portee de la calade : au-dela (en cases, distance de Tchebychev a la racine), une maison est un ecart. */
+		int32 MaxReachCells = 8;
 		/** Cases de marge autour du hameau pour laisser les ruelles contourner. */
 		int32 MarginCells = 1;
 		/** Denivele minimal qui merite un mur de terrasse, et hauteur maximale d'un mur. */
@@ -89,9 +92,9 @@ namespace AnastasisVillageFabric
 		/** Nombre de seuils servis par le troncon le plus charge (1 = desserte). */
 		int32 Usage = 1;
 		double LengthCm = 0.0;
-		/** Pente moyenne de la ruelle, et pente de la ligne droite seuil -> jonction. */
+		/** Pente moyenne de la ruelle, et pente propre du terrain (ligne de plus grande pente) sous elle. */
 		double MeanGrade = 0.0;
-		double StraightGrade = 0.0;
+		double FallGrade = 0.0;
 	};
 
 	struct FWallRun
@@ -124,14 +127,16 @@ namespace AnastasisVillageFabric
 	struct FReport
 	{
 		int32 Plots = 0;
+		/** Batiments hors de portee de la placette : ni ruelle ni mur. */
+		int32 Remote = 0;
 		int32 Doors = 0;
 		int32 ConnectedDoors = 0;
 		int32 Lanes = 0;
 		double LaneLengthCm = 0.0;
 		double StepLengthCm = 0.0;
-		/** Moyennes ponderees par la longueur. Le tissu suit les courbes si LaneMeanGrade < StraightMeanGrade. */
+		/** Moyennes ponderees par la longueur. Le tissu suit les courbes si LaneMeanGrade < FallMeanGrade. */
 		double LaneMeanGrade = 0.0;
-		double StraightMeanGrade = 0.0;
+		double FallMeanGrade = 0.0;
 		double LaneMaxGrade = 0.0;
 		int32 Walls = 0;
 		double WallLengthCm = 0.0;

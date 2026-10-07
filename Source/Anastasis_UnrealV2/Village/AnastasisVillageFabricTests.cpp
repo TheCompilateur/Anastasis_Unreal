@@ -97,8 +97,8 @@ bool FAnastasisVillageFabricDeterminismTest::RunTest(const FString&)
 }
 
 /**
- * Pente de 30 % : la ruelle ne monte pas droit, elle prend des lacets (pente moyenne nettement sous celle
- * de la ligne droite) ; la terrasse se tient par un soutenement aval qui regarde l'aval, et un deblai amont.
+ * Pente de 30 % : la ruelle ne monte pas droit, elle prend des lacets (pente moyenne nettement sous la
+ * pente propre du terrain qu'elle traverse) ; la terrasse se tient par un soutenement aval qui regarde l'aval, et un deblai amont.
  */
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FAnastasisVillageFabricSlopeTest,
@@ -119,7 +119,8 @@ bool FAnastasisVillageFabricSlopeTest::RunTest(const FString&)
 	AddInfo(ToLogLine(R));
 	TestEqual(TEXT("tous relies"), R.ConnectedDoors, R.Doors);
 	TestEqual(TEXT("aucune chaussee sur un corps"), R.BodyIntrusions, 0);
-	TestTrue(TEXT("la ruelle suit les courbes"), R.LaneMeanGrade < R.StraightMeanGrade * 0.85);
+	TestTrue(TEXT("le terrain sous la ruelle est bien a 30 %"), FMath::IsNearlyEqual(R.FallMeanGrade, 0.30, 0.02));
+	TestTrue(TEXT("la ruelle suit les courbes"), R.LaneMeanGrade < R.FallMeanGrade * 0.6);
 	TestTrue(TEXT("plus d'un sentier droit"), R.LaneLengthCm > 0.0);
 	bool bRetainingDownhill = false;
 	bool bCutUphill = false;
@@ -152,6 +153,12 @@ bool FAnastasisVillageFabricEdgeCasesTest::RunTest(const FString&)
 	const auto Holed = [](double X, double Y, double& Z) { Z = 0.0; return X < 11.5 * Cell; };
 	const FFabric Hole = Build(Hamlet(), Cell, Holed);
 	TestTrue(TEXT("seuil hors relief : non relie, compte"), Hole.Report.ConnectedDoors < Hole.Report.Doors);
+
+	TArray<FPlot> Far = Hamlet();
+	Far.Add(Plot(TEXT("b-9"), TEXT("house"), 40, 10, 10, 10));
+	const FFabric Reach = Build(Far, Cell, Flat);
+	TestEqual(TEXT("ecart lointain hors calade"), Reach.Report.Remote, 1);
+	TestEqual(TEXT("ecart : le hameau garde ses ruelles"), Reach.Report.Signature, Build(Hamlet(), Cell, Flat).Report.Signature);
 
 	const FFabric Empty = Build({}, Cell, Flat);
 	TestEqual(TEXT("vide"), Empty.Report.Lanes, 0);

@@ -17,9 +17,11 @@ Quatre règles en sortent, toutes visibles dans le code (`Village/AnastasisVilla
 
 | Règle | Où |
 |---|---|
-| **La pente coûte au carré.** Le coût d'un pas vaut `longueur × (1 + k·pente²)`. Pour gagner une hauteur donnée, la pente la moins coûteuse vaut `1/√k`. Avec `k = 40`, elle tombe sur 16 %, la pente d'un sentier muletier. Plus raide, la ruelle prend des lacets ; au-delà de `StepGrade` (16 %), la calade devient escalier (contremarches ≤ 18 cm). | `FParams::SlopeWeight`, `StepGrade` |
+| **La pente coûte au carré.** Le coût d'un pas vaut `longueur × (1 + k·pente²)`. Pour gagner une hauteur donnée, la pente la moins coûteuse vaut `1/√k`. Avec `k = 50`, elle tombe sur 14 %, la pente d'un sentier muletier. Plus raide, la ruelle prend des lacets ; au-delà de `StepGrade` (16 %), la calade devient escalier (contremarches ≤ 18 cm). L'écart entre 14 et 16 % évite qu'une rampe en lacets bascule en marches à chaque mètre. | `FParams::SlopeWeight`, `StepGrade` |
 | **Le réseau est un arbre qui pousse depuis la placette.** À chaque tour, le seuil le moins coûteux rejoint le réseau déjà tracé, pas forcément la placette. Les troncs communs s'élargissent avec le nombre de seuils servis (150 → 240 cm). | boucle Dijkstra multi-source, `Usage` |
 | **La terrasse se tient par la pierre sèche.** On prend le niveau de l'assise (la médiane de 25 sondages, la même que l'architecture). Là où le bord de la plate-forme domine le sol de plus de 45 cm, on pose un mur de soutènement aval, qui regarde l'aval. Là où le talus domine, on pose un mur de déblai amont, qui regarde la maison. Le mur s'ouvre au seuil. | `FWallRun` |
+| **Le routage suit 16 directions.** Aux 8 voisines s'ajoutent 8 sauts de cavalier. Sur une pente, la diagonale seule monte à pente/√2 et forçait l'escalier ; le cavalier monte à pente/√5. Sur 30 %, la ruelle passe de 16 % de pente moyenne et 59 m de marches sur 79 m, à 12 % et 38 m de marches sur 105 m. | `DI8`/`DJ8` |
+| **La calade a une portée.** Au-delà de 8 cases (160 m) de la placette, une maison est un écart : ni ruelle ni mur, et elle ne fait pas grossir la grille. Avant cette règle, un puits à 600 m des maisons donnait 500 m de calade et 570 ms de grammaire. | `MaxReachCells`, `remote` |
 | **La placette a son platane.** Il est posé sur le bord le plus plat, hors chaussée, hors parcelle. | `FPlaza::TreeSpot` |
 
 ## Durabilité
@@ -53,7 +55,7 @@ Quatre règles en sortent, toutes visibles dans le code (`Village/AnastasisVilla
 
 - Tests `Anastasis.Village.Fabric.{Flat,Determinism,Slope,EdgeCases}` : grammaire pure, relief analytique.
   Ils vérifient la connexion de tous les seuils, l'absence de chaussée sur un corps, l'invariance à
-  l'ordre, et que sur 30 % la ruelle suit les courbes (pente moyenne < 0,85 × la ligne droite). Ils
+  l'ordre, et que sur 30 % la ruelle suit les courbes (pente moyenne < 0,6 × la pente propre du terrain qu'elle traverse, `fallGrade`). Ils
   vérifient aussi l'orientation des soutènements et des déblais, et les cas sans puits ou avec un trou
   dans le relief.
 - `village-fabric-pie` (registre) : PIE réel, instrumental (voir l'en-tête du script). **Ce n'est pas un

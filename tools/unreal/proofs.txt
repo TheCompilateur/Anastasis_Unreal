@@ -64,3 +64,4 @@ anthropic-routine-capture | tools/unreal/anthropic-paths-capture.py | ANTHROPIC_
 soil-contact-capture | tools/soil-crusade/capture.py | SOIL_CONTACT_CAPTURE COMPLETE | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING|Traceback | 600 | ANASTASIS_GROUND_OUT=@Saved/SoilEvidence/contact-batch;ANASTASIS_GROUND_STATES=soil_before,soil_after,soil_control;ANASTASIS_SOIL_CONTACT=1;ANASTASIS_SOIL_VIEWS=contact_walk00,contact_walk01,contact_walk02,contact_side,contact_context
 # VILLAGE_FABRIC_001: instrumental (ruelles reliees, aucune sur un corps, determinisme, A/B defrichement) ; pas un verdict visuel.
 village-fabric-pie | tools/unreal/village-fabric-pie.py | VILLAGE_FABRIC PASS | VILLAGE_FABRIC FAIL|Traceback | 420 | -
+village-fabric-capture | tools/unreal/village-fabric-capture.py | VILLAGE_FABRIC_CAPTURE COMPLETE | VILLAGE_FABRIC_CAPTURE FAIL|Traceback | 540 | -
