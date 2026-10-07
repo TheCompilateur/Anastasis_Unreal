@@ -53,7 +53,7 @@ Cycle de vie, un outil unique : `tools\unreal\agent-worktree.ps1`
 | Commande | Rôle |
 |---|---|
 | `create -Mission <m>` | branche + worktree depuis `main`, port MCP du worktree enregistré |
-| `status` | tous les worktrees : modifications, avance/retard sur `main`, branches non intégrées, **verrou de `main`**, **missions prêtes pour le lot** et la commande `integrate-batch` à lancer |
+| `status` | tous les worktrees : modifications, avance/retard sur `main`, branches non intégrées, **verrou de `main`**, **missions prêtes pour le lot** et la commande `integrate-batch` à lancer. Le lot est **simulé d'avance** (`git merge-tree`, sans éditeur, ~1 s par commit) : `PRETES_POUR_LE_LOT::` ne garde que ce qui s'empile proprement sur `main` ; `LOT_SUIVANT::` = propre seule mais en conflit avec une mission du lot ; `A_REBASER::` = en conflit avec `main`, fichiers nommés (l'agent rebase puis `finish`) ; `DEJA_DANS_MAIN::` = versée par contenu (`prune`) |
 | `finish -Mission <m>` | portail de fin : index `tools/unreal/` à jour, aucun Unreal lancé hors `Start-AnastasisEditor`, aucun éditeur encore ouvert sur le worktree, preuves déclarées (`PROOFS:` de la fiche) présentes au registre, **build seul** si la branche touche `Source/`, `Config/`, `Content/`, `Plugins/` ou le `.uproject` — **pas d'éditeur : la suite et les preuves PIE attendent le lot** (`TESTS::QUEUED`) ; `-Prove` lance la suite ici (ancien finish), `-Full` force build + suite même sans changement Unreal ; refuse de passer la main si du travail n'est pas commité ; marque le commit (`ANASTASIS_WORKTREES\.handoff\<m>.txt` : `<sha> proved|queued|nounreal`) |
 | `mcp -Mission <m>` | (ré)enregistre le port MCP d'un worktree existant côté Claude Code |
 | `integrate -Mission <m>` | rôle intégrateur, **une mission déjà prouvée** (`proved` / `nounreal`) : prend le verrou de `main`, avance rapide de **`main`** (jamais de la branche extraite du canonique), après avoir rejoué index et lancements Unreal sur l'arbre versé ; canonique hors `main` → copie de travail intacte. Refuse une mission `queued` (elle passe par le lot) et refuse pendant un lot (`MAIN_LOCK::TENU`). Si `main` a avancé : rejoue la branche sur `main` et la verse si la règle de retest le permet (point 6 ci-dessous), sinon `RETEST::REQUIS` |
@@ -125,6 +125,15 @@ C:\dev\ANASTASIS_UNREAL
 ```
 
 **C'est la seule racine de développement autorisée.** Toute autre copie est un artefact mort.
+
+**La racine canonique est toujours à jour, binaires compris (règle absolue d'Alexandre, 2026-10-07,
+CANONICAL_FRESH_001).** Les lots compilent dans le worktree d'intégration ; sans recompilation du canonique,
+l'éditeur d'Alexandre a chargé des DLL du 2 octobre alors que `main` était du 7. Donc :
+- `integrate` et `integrate-batch` recompilent le canonique après chaque avance de `main` qui le rend
+  périmé (`CANONICAL_BUILD::PASS`). Éditeur ouvert sur le canonique : `CANONICAL_BUILD::DIFFERE` avec son pid —
+  le dire à Alexandre, recompiler dès qu'il l'a fermé. `CANONICAL_BUILD::FAIL` se traite avant tout autre lot.
+- `status` affiche `CANONICAL_BINAIRES::A_JOUR` ou `PERIMES` ; `PERIMES` se corrige tout de suite par
+  `tools\unreal\anastasis-unreal.ps1 build` dans la racine, éditeur fermé.
 
 Ne jamais ouvrir, lire, builder ni modifier les copies sous
 `C:\Users\alex_\OneDrive\Documents\Unreal Projects\` :

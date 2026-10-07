@@ -2,5 +2,11 @@
 *.umap filter=lfs diff=lfs merge=lfs -text
 *.png filter=lfs diff=lfs merge=lfs -text
 
+# Registre des preuves PIE : chaque mission y ajoute sa ligne, presque toujours en fin de fichier.
+# Fusion par union (rebase, cherry-pick du lot, merge-tree de status) : les deux lignes restent.
+# Une ligne modifiee des deux cotes reste en deux versions : finish et integrate-batch refusent un
+# nom inscrit deux fois (INTEGRATION_SPEED_001).
+tools/unreal/proofs.txt merge=union
+
 # Les hooks sont du shell : jamais de CRLF, quelle que soit la machine ou core.autocrlf.
 tools/git-hooks/* text eol=lf

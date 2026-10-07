@@ -146,6 +146,12 @@ function Get-RegisteredProofs([string]$root) {
   return @(Get-Content $file -Encoding UTF8 | Where-Object { $_.Trim() -and -not $_.TrimStart().StartsWith('#') } |
     ForEach-Object { ($_ -split '\s\|\s')[0].Trim() })
 }
+# proofs.txt se fusionne par union (.gitattributes, INTEGRATION_SPEED_001) : deux missions qui
+# ajoutent chacune une ligne ne se heurtent plus. Le prix : une ligne modifiee des deux cotes reste
+# en deux versions. Un nom inscrit deux fois se voit ici, au finish et au lot.
+function Get-DuplicateProofs([string]$root) {
+  return @(Get-RegisteredProofs $root | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
+}
 
 # Un changement « Unreal » : ce que le build ou la suite d'automation peuvent juger. Une
 # branche qui ne touche que docs/, tools/migration/ ou des scripts n'a rien a leur montrer,
@@ -181,6 +187,35 @@ function Test-SameUnrealTrees([string]$repo, [string]$proved, [string]$rev) {
 function Write-RetestSkip([string]$proved, [string]$mode, [string]$who) {
   Write-Output "RETEST::SKIP (arbres Unreal identiques a $($proved.Substring(0, 7))$who)"
   Write-Output "BUILD::SKIP  TESTS::SKIP  -- preuve reprise du commit $($proved.Substring(0, 7)) ($mode), rien n a ete rejoue : ce n est pas un nouveau PASS"
+}
+
+# INTEGRATION_SPEED_001. Le lot sans le lot : empile dans l'ordre, sur des commits flottants
+# (`git merge-tree` + `commit-tree`, ni copie de travail ni verrou), les commits que chaque branche
+# apporte par contenu -- exactement ce que fait le cherry-pick d'integrate-batch. Une mission en
+# conflit est ecartee et ne compte pas pour la suivante, comme au lot. ~1 s par commit : le 2026-10-07,
+# quatre missions annoncees pretes ont ete ecartees du lot pour conflit apres 25 min de portail.
+function Get-StackPreview([string]$repo, [string]$base, [string[]]$missions) {
+  $cur = (Invoke-Git -C $repo rev-parse $base).Out[0]
+  $res = @()
+  foreach ($m in $missions) {
+    $commits = @((Invoke-Git -C $repo cherry $cur (Branch-Of $m)).Out | Where-Object { $_ -like '+ *' } | ForEach-Object { $_.Substring(2).Trim() })
+    $tip = $cur
+    $conflicts = @()
+    foreach ($c in $commits) {
+      $mt = Invoke-Git -C $repo merge-tree --write-tree --name-only --no-messages "--merge-base=$c^" $tip $c
+      if ($mt.Code -ne 0) { $conflicts = @($mt.Out | Select-Object -Skip 1 | Where-Object { $_ } | Select-Object -Unique); break }
+      $tip = (Invoke-Git -C $repo commit-tree $mt.Out[0] -p $tip -m preview).Out[0]
+    }
+    $new = $commits.Count
+    if ($conflicts.Count -eq 0) {
+      # Versee par un lot dont l'empilement a retouche le diff : `cherry` ne la reconnait plus, mais
+      # rejouee elle ne change rien. Elle est dans main, par contenu.
+      if ($new -gt 0 -and (Invoke-Git -C $repo rev-parse "$tip^{tree}").Out[0] -eq (Invoke-Git -C $repo rev-parse "$cur^{tree}").Out[0]) { $new = 0 }
+      $cur = $tip
+    }
+    $res += [PSCustomObject]@{ Mission = $m; New = $new; Conflicts = $conflicts }
+  }
+  return $res
 }
 
 # Dossier du worktree d'integration : _integration par defaut. ANASTASIS_INTEGRATION_DIR le deplace
@@ -255,6 +290,44 @@ function Invoke-UnrealGate([string]$root, [string[]]$unreal, [bool]$runTests = $
 # Deplace refs/heads/main, et elle seule, par avance rapide vers $rev (integrate et
 # integrate-batch). Ne touche la copie de travail du canonique que s'il est sur main.
 # Ecrit son compte rendu et pose $script:MoveOk.
+# CANONICAL_FRESH_001 (regle absolue d'Alexandre, 2026-10-07) : la racine canonique est toujours a
+# jour, binaires compris. Les lots compilent dans le worktree d'integration ; sans ceci, l'editeur
+# d'Alexandre ouvert sur le canonique chargeait des DLL du 2026-10-02 alors que main etait du 7.
+# Perime = la DLL de jeu est plus ancienne que le dernier commit de main qui touche Source/,
+# Plugins/ ou le .uproject (date de commit : celle du versement).
+function Test-CanonicalBinaries {
+  $dll = Join-Path $Canonical 'Binaries\Win64\UnrealEditor-Anastasis_UnrealV2.dll'
+  # '--' entre quotes : nu, PowerShell l'avale comme fin des parametres de Invoke-Git.
+  $last = (Invoke-Git -C $Canonical log -1 --format=%ct main '--' Source Plugins '*.uproject').Out | Where-Object { $_ -match '^\d+$' } | Select-Object -First 1
+  if (-not $last) { return [PSCustomObject]@{ Stale = $false; Why = 'aucun commit Unreal' } }
+  $lastUtc = [DateTimeOffset]::FromUnixTimeSeconds([int64]$last).UtcDateTime
+  if (-not (Test-Path $dll)) { return [PSCustomObject]@{ Stale = $true; Why = 'DLL absente' } }
+  $built = (Get-Item $dll).LastWriteTimeUtc
+  if ($built -lt $lastUtc) { return [PSCustomObject]@{ Stale = $true; Why = "DLL du $($built.ToLocalTime().ToString('yyyy-MM-dd HH:mm')), main Unreal du $($lastUtc.ToLocalTime().ToString('yyyy-MM-dd HH:mm'))" } }
+  return [PSCustomObject]@{ Stale = $false; Why = "DLL du $($built.ToLocalTime().ToString('yyyy-MM-dd HH:mm'))" }
+}
+# Apres chaque deplacement de main : recompile le canonique s'il est perime. Jamais sous un editeur
+# ouvert sur le canonique (Live Coding tient les DLL) : on le dit, avec le pid, et le prochain
+# versement ou `status` le rappelle. ANASTASIS_CANONICAL_BUILD=0 : banc d'essai seulement.
+function Update-CanonicalBuild {
+  if ($env:ANASTASIS_CANONICAL_BUILD -eq '0') { Write-Output 'CANONICAL_BUILD::SKIP (ANASTASIS_CANONICAL_BUILD=0)'; return }
+  if ((Invoke-Git -C $Canonical branch --show-current).Out[0] -ne 'main') { Write-Output 'CANONICAL_BUILD::SKIP (canonique hors main : sa copie de travail n a pas bouge)'; return }
+  $state = Test-CanonicalBinaries
+  if (-not $state.Stale) { Write-Output "CANONICAL_BUILD::A_JOUR ($($state.Why))"; return }
+  $uproject = Join-Path $Canonical 'Anastasis_UnrealV2.uproject'
+  $open = @(Get-CimInstance Win32_Process -Filter "Name like 'UnrealEditor%'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($uproject) })
+  if ($open.Count -gt 0) {
+    Write-Output "CANONICAL_BUILD::DIFFERE editeur ouvert sur le canonique (pid $(($open | ForEach-Object { $_.ProcessId }) -join ', ')) -- $($state.Why). Le fermer puis : tools\unreal\anastasis-unreal.ps1 build"
+    return
+  }
+  $out = @(& (Join-Path $Canonical 'tools\unreal\anastasis-unreal.ps1') build 2>&1 | ForEach-Object { "$_" })
+  if ($LASTEXITCODE -eq 0) { Write-Output "CANONICAL_BUILD::PASS ($($state.Why) -> recompile)" }
+  else {
+    $out | Select-Object -Last 15 | ForEach-Object { Write-Output "    $_" }
+    Write-Output 'CANONICAL_BUILD::FAIL main a avance mais le canonique ne compile pas : a traiter avant tout autre lot'
+  }
+}
+
 function Move-Main([string]$rev) {
   $script:MoveOk = $false
   $current = (Invoke-Git -C $Canonical branch --show-current).Out[0]
@@ -426,6 +499,8 @@ switch ($Command) {
     }
     $rows | Format-Table -AutoSize
     Write-Output "MAIN_HEAD::$mainHead"
+    $cb = Test-CanonicalBinaries
+    Write-Output ('CANONICAL_BINAIRES::' + $(if ($cb.Stale) { "PERIMES ($($cb.Why)) -- tools\unreal\anastasis-unreal.ps1 build dans la racine, editeur ferme" } else { "A_JOUR ($($cb.Why))" }))
     $unmerged = @(& git -C $Canonical branch --no-merged main --list 'agent/*')
     if ($unmerged.Count -gt 0) {
       Write-Output 'BRANCHES_NON_INTEGREES::'
@@ -440,14 +515,34 @@ switch ($Command) {
     foreach ($r in $rows) {
       if ($r.Ahead -eq '0' -or -not $r.Branch.StartsWith('agent/')) { continue }
       $mk = Read-HandoffMarker $r.Mission
-      if ($mk -and $mk.Sha -eq (& git -C $Canonical rev-parse $r.Branch).Trim()) { $readyRows += $r.Mission + " ($($mk.Mode))" }
+      if ($mk -and $mk.Sha -eq (& git -C $Canonical rev-parse $r.Branch).Trim()) { $readyRows += [PSCustomObject]@{ Mission = $r.Mission; Mode = $mk.Mode } }
     }
+    # INTEGRATION_SPEED_001 : n'annoncer pour le lot que ce qui s'y empilera vraiment. Une mission
+    # en conflit avec une autre du lot, mais propre seule sur main, attend le lot suivant ; en
+    # conflit avec main, son agent rebase. Deja dans main par contenu : prune.
+    $clean = @(); $next = @(); $rebase = @(); $done = @()
     if ($readyRows.Count -gt 0) {
-      Write-Output ('PRETES_POUR_LE_LOT::' + ($readyRows -join ', '))
-      Write-Output ('    tools\unreal\agent-worktree.ps1 integrate-batch -Missions ' + (($readyRows | ForEach-Object { ($_ -split ' ')[0] }) -join ','))
+      foreach ($p in (Get-StackPreview $Canonical 'main' @($readyRows | ForEach-Object { $_.Mission }))) {
+        $mode = ($readyRows | Where-Object { $_.Mission -eq $p.Mission } | Select-Object -First 1).Mode
+        if ($p.New -eq 0) { $done += $p.Mission }
+        elseif ($p.Conflicts.Count -eq 0) { $clean += "$($p.Mission) ($mode)" }
+        elseif ((Get-StackPreview $Canonical 'main' @($p.Mission))[0].Conflicts.Count -eq 0) { $next += $p.Mission }
+        else { $rebase += "$($p.Mission) ($($p.Conflicts -join ' '))" }
+      }
+    }
+    if ($clean.Count -gt 0) {
+      Write-Output ('PRETES_POUR_LE_LOT::' + ($clean -join ', '))
+      Write-Output ('    tools\unreal\agent-worktree.ps1 integrate-batch -Missions ' + (($clean | ForEach-Object { ($_ -split ' ')[0] }) -join ','))
     } else {
       Write-Output 'PRETES_POUR_LE_LOT::aucune'
     }
+    if ($next.Count -gt 0) { Write-Output ('LOT_SUIVANT::' + ($next -join ', ') + ' (propres seules sur main, en conflit avec une mission du lot)') }
+    if ($rebase.Count -gt 0) {
+      Write-Output 'A_REBASER:: (en conflit avec main : dans le worktree, git rebase main puis finish)'
+      $rebase | ForEach-Object { Write-Output "    $_" }
+    }
+    if ($done.Count -gt 0) { Write-Output ('DEJA_DANS_MAIN::' + ($done -join ', ') + ' (prune)') }
+    exit 0
   }
 
   'finish' {
@@ -492,6 +587,12 @@ switch ($Command) {
     if ($unknownProofs.Count -gt 0) {
       Write-Output ('FAIL: preuve(s) declaree(s) absente(s) de tools/unreal/proofs.txt : ' + ($unknownProofs -join ', '))
       Write-Output '    Inscrire la preuve au registre (nom | script | reussite | echec | delai | variables), ou la retirer de PROOFS:'
+      exit 1
+    }
+    $dup = @(Get-DuplicateProofs $path)
+    if ($dup.Count -gt 0) {
+      Write-Output ('FAIL: tools/unreal/proofs.txt inscrit deux fois : ' + ($dup -join ', '))
+      Write-Output '    La fusion par union (.gitattributes) garde les deux versions d une ligne modifiee des deux cotes : n en garder qu une.'
       exit 1
     }
     Write-Output ('PROOFS::' + $(if ($declared.Count) { $declared -join ', ' } else { '(aucune)' }))
@@ -648,6 +749,7 @@ switch ($Command) {
     $mainAfter = (Invoke-Git -C $Canonical rev-parse main).Out[0]
     Write-Output "MAIN_AFTER::$mainAfter"
     Write-Output "INTEGRATED::$branch ($ahead commit(s)$(if ($target -ne $branch) { ', rejoues sur main' }))"
+    Update-CanonicalBuild
     Write-Output 'Ensuite : git push origin main (le pre-push compile le canonique), puis'
     Write-Output "          tools\unreal\agent-worktree.ps1 prune -Mission $Mission"
   }
@@ -769,6 +871,8 @@ switch ($Command) {
       $raw | ForEach-Object { Write-Output "    $_" }
       exit 1
     }
+    $dup = @(Get-DuplicateProofs $integ)
+    if ($dup.Count -gt 0) { Write-Output ('FAIL: tools/unreal/proofs.txt du lot inscrit deux fois : ' + ($dup -join ', ') + ' (union des deux versions d une ligne : rien n a bouge, main intacte)'); exit 1 }
     Write-Output 'CHECKS::PASS index tools/unreal, lancements Unreal'
     # Le lot sert tous les agents : ses editeurs passent en tete de la file de la porte memoire.
     $env:ANASTASIS_EDITOR_PRIORITY = '0'
@@ -839,6 +943,7 @@ switch ($Command) {
     $mainAfter = (Invoke-Git -C $Canonical rev-parse main).Out[0]
     Write-Output "MAIN_AFTER::$mainAfter"
     Write-Output ('BATCH_INTEGRATED::' + (($applied | ForEach-Object { $_.Mission }) -join ', '))
+    Update-CanonicalBuild
     Write-Output 'Ensuite : git push origin main, puis pour chaque mission versee :'
     $applied | ForEach-Object { Write-Output "          tools\unreal\agent-worktree.ps1 prune -Mission $($_.Mission)" }
   }

@@ -19,7 +19,9 @@ Copy-Item "$Source\tools\unreal\mcp-port.ps1", "$Source\tools\unreal\tools-index
   Replace("`$Canonical = 'C:\dev\ANASTASIS_UNREAL'", "`$Canonical = '$repo'").
   Replace("`$WorktreeRoot = 'C:\dev\ANASTASIS_WORKTREES'", "`$WorktreeRoot = '$wtRoot'") |
   Set-Content "$harness\agent-worktree.ps1" -Encoding UTF8
-function AW { $o = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$harness\agent-worktree.ps1" @args 2>&1 | ForEach-Object { "$_" }; [PSCustomObject]@{ Code = $LASTEXITCODE; Out = ($o -join "`n") } }
+# Le depot jetable n'a ni moteur ni binaires : pas de recompilation du canonique apres versement.
+$env:ANASTASIS_CANONICAL_BUILD = '0'
+function AW {$o = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$harness\agent-worktree.ps1" @args 2>&1 | ForEach-Object { "$_" }; [PSCustomObject]@{ Code = $LASTEXITCODE; Out = ($o -join "`n") } }
 function G { & git -C $repo @args 2>&1 | ForEach-Object { "$_" } }
 function Check($name, $cond, $detail) { Write-Output ("{0,-6} {1}" -f $(if ($cond) { 'PASS' } else { 'FAIL' }), $name); if (-not $cond -and $detail) { Write-Output "       $detail" } }
 
@@ -305,4 +307,47 @@ $mainAvant = (G rev-parse main)
 $r = AW integrate-batch -Missions 'partial-b'
 Check 'S23 fiche ancetre deja sur main : code herite refuse' ($r.Code -ne 0 -and $r.Out -match 'BATCH_REJECTED::partial-b : commits de mission\(s\) heritee\(s\) non versees avant elle : partial-a' -and (G rev-parse main) -eq $mainAvant) $r.Out
 
+# --- INTEGRATION_SPEED_001 ----------------------------------------------------------------
+# 25. status simule le lot avant qu'on le lance : k1 propre ; k3 propre seule mais en conflit
+#     avec k1 (lot suivant) ; k2 en conflit avec main (a rebaser) ; k4 deja versee (prune).
+G checkout -q -f main | Out-Null; G clean -fdq | Out-Null
+$null = NewMission 'k2' @({ param($w) Set-Content "$w\doc-d20.md" 'k2' })
+AdvanceMain 'd23' { param($w) Set-Content "$w\doc-d20.md" 'd23' }
+$null = NewMission 'k1' @({ param($w) Set-Content "$w\doc-k.md" 'k1' })
+$null = NewMission 'k3' @({ param($w) Set-Content "$w\doc-k.md" 'k3' })
+$null = NewMission 'k4' @({ param($w) Set-Content "$w\doc-k4.md" 'k4' })
+foreach ($k in 'k1', 'k2', 'k3', 'k4') { $null = AW finish -Mission $k }
+$null = AW integrate-batch -Missions 'k4'
+$mainAvant = (G rev-parse main)
+$r = AW status
+Check 'S25 status : code 0, main intacte, rien d ecrit' ($r.Code -eq 0 -and (G rev-parse main) -eq $mainAvant -and -not (G status --porcelain)) $r.Out
+Check 'S25 status : k1 prete, dans la commande ; k3 k2 k4 hors de la commande' ($r.Out -match 'PRETES_POUR_LE_LOT::.*k1 \(nounreal\)' -and $r.Out -match 'integrate-batch -Missions [^\n]*k1' -and $r.Out -notmatch 'integrate-batch -Missions [^\n]*k[234]') $r.Out
+Check 'S25 status : k3 au lot suivant (conflit avec k1 seulement)' ($r.Out -match 'LOT_SUIVANT::[^\n]*k3') $r.Out
+Check 'S25 status : k2 a rebaser, fichier en conflit nomme' ($r.Out -match '(?m)^\s+k2 \(doc-d20\.md\)') $r.Out
+Check 'S25 status : k4 deja dans main' ($r.Out -match 'DEJA_DANS_MAIN::[^\n]*k4') $r.Out
+
+# 26. proofs.txt fusionne par union : deux missions qui ajoutent chacune leur ligne passent ensemble ;
+#     un nom inscrit deux fois (ligne modifiee des deux cotes) est refuse par finish.
+G checkout -q -f main | Out-Null; G clean -fdq | Out-Null
+AdvanceMain 'ga23' { param($w) Set-Content "$w\.gitattributes" 'tools/unreal/proofs.txt merge=union' }
+$null = NewMission 'pu1' @({ param($w) Add-Content "$w\tools\unreal\proofs.txt" 'banc-u1 | tools/unreal/smoke-pie.py | U1 PASS | U1 FAIL | 60 | -' })
+$null = NewMission 'pu2' @({ param($w) Add-Content "$w\tools\unreal\proofs.txt" 'banc-u2 | tools/unreal/smoke-pie.py | U2 PASS | U2 FAIL | 60 | -' })
+foreach ($u in 'pu1', 'pu2') { $null = AW finish -Mission $u }
+$r = AW status
+Check 'S26 status : pu1 et pu2 annoncees ensemble (union)' ($r.Out -match 'integrate-batch -Missions [^\n]*pu1[^\n]*pu2') $r.Out
+$r = AW integrate-batch -Missions 'pu1,pu2'
+$reg = (G show 'main:tools/unreal/proofs.txt') -join "`n"
+Check 'S26 lot : pu1 et pu2 versees, les deux lignes dans main' ($r.Code -eq 0 -and $r.Out -match 'BATCH_INTEGRATED::pu1, pu2' -and $reg -match 'banc-u1' -and $reg -match 'banc-u2') $r.Out
+$null = NewMission 'pu3' @({ param($w) Add-Content "$w\tools\unreal\proofs.txt" 'banc-u1 | tools/unreal/smoke-pie.py | U1 PASS | U1 FAIL | 90 | -' })
+$r = AW finish -Mission pu3
+Check 'S26 nom inscrit deux fois : finish refuse' ($r.Code -ne 0 -and $r.Out -match 'proofs.txt inscrit deux fois : banc-u1' -and -not (Test-Path (Join-Path $wtRoot '.handoff\pu3.txt'))) $r.Out
+
+# 27. CANONICAL_FRESH_001 : un versement appelle la mise a jour des binaires du canonique (sautee ici) ;
+#     status dit si les binaires du canonique sont perimes (ce depot a du Source/ et aucune DLL).
+$r = AW status
+Check 'S27 status : binaires du canonique annonces perimes (DLL absente)' ($r.Out -match 'CANONICAL_BINAIRES::PERIMES \(DLL absente\)') $r.Out
+$null = NewMission 'c24' @({ param($w) Set-Content "$w\doc-c24.md" 'c24' })
+$null = AW finish -Mission c24
+$r = AW integrate-batch -Missions 'c24'
+Check 'S27 lot : la mise a jour du canonique est tentee apres versement' ($r.Code -eq 0 -and $r.Out -match 'BATCH_INTEGRATED::c24' -and $r.Out -match 'CANONICAL_BUILD::SKIP \(ANASTASIS_CANONICAL_BUILD=0\)') $r.Out
 Remove-Item $base -Recurse -Force -ErrorAction SilentlyContinue
