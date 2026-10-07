@@ -45,10 +45,11 @@ anastasis.Theatre.Read  ──►  relevé  ──►  world-theatre-analyze.py 
 - Carte jouable 1,9 km × 1,9 km, relief 70 m, pente p50 5,9°, p95 22,8° ; eau 9,6 % de la carte.
 - Anneau d'horizon : relief 3 855 m, jusqu'à 60 km. 103 227 objets posés relevés (11 096 arbres, 27 227
   arbustes, 42 911 rochers, 18 130 roseaux, 416 ruines, 4 bâtiments), 1,2 million d'instances d'herbe ignorées.
+- **Axes** : ceux du ciel du projet (`AnastasisAtmosphereResolver`) — X = nord, Y = est ; yaw 0 = nord, 90 = est.
 - **Géographie réelle** (horizon mesuré dans toutes les directions, de partout dans la carte) : une **muraille
-  au nord-est** à 10–12 km, 10–14° au-dessus de l'œil ; une seconde chaîne au nord / nord-ouest à ~21 km ;
-  **la vallée s'ouvre au sud-ouest / sud / ouest** sur 22–38 km (horizon à ~2°). Les bords ouest et sud,
-  regard dehors, sont fermés à 100–600 m par une remontée juste hors de la carte.
+  au nord-est** à 10–12 km, 10–14° au-dessus de l'œil ; une seconde chaîne à l'est-sud-est à ~21 km ;
+  **la vallée s'ouvre au sud-ouest / sud** sur 22–38 km (horizon à ~2°). Plusieurs bords, regard dehors, sont
+  fermés à 100–600 m par une remontée juste hors de la carte.
 
 ## Phase 3 — diagnostic anti-génératif (mesuré, seuils posés avant la mesure)
 
@@ -76,13 +77,13 @@ dessinerait une **couronne de forêt centrée sur la carte** — vérifié et re
 |---|---|
 | V1 village → chaîne | enclosure, cadrage de l'horizon |
 | V2 village → ouverture | release, ouverture de la vallée (horizon 29 km) |
-| V3 point haut → amont | full reveal |
+| V3 point haut → sud-est | full reveal |
 | V4 bassin → sud-ouest | fond exposé, vide |
-| V5 bord nord → avant-pays | continuation au-delà de la carte (H3) |
+| V5 bord est → avant-pays | continuation au-delà de la carte (H3) |
 | V6 approche du village | settlement approach, partial reveal |
-| V7 forêt sud → dehors | enclosed forest → release |
+| V7 forêt du bord ouest → dehors | enclosed forest → release |
 | V8 vue générale | lecture macro (H4) |
-| V9 village → vigla | landmark anchoring |
+| V9 village → bosse ouest-nord-ouest | landmark anchoring (repère refusé, voir Phase 4) |
 
 ## Phase 4 — la couche
 
@@ -97,7 +98,7 @@ guet abandonnée, placée par calcul là où elle se découpe sur le ciel depuis
 ## Phase 5 — exception terrain (proposition, rien livré)
 
 Deux constats relèvent du relief, propriétaire `AnastasisTerrainHorizon` / forge :
-1. la remontée à 100–600 m hors des bords ouest et sud ferme la vue dehors (V5 initial, bord ouest) ;
+1. la remontée à 100–600 m hors de plusieurs bords ferme la vue dehors (mesure d'horizon par azimut) ;
 2. la cuvette en anneau à 4–8 km (le sol monte avec le rayon dans 16 secteurs sur 24).
 Proposition : orienter la remontée de l'anneau par la tectonique (ouvrir le sud-ouest au lieu de relever tous
 les côtés), derrière une CVar du propriétaire. Aucune mutation n'est faite par cette mission.
