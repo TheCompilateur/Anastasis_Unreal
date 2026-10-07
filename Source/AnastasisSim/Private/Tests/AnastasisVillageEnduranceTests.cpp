@@ -291,6 +291,8 @@ bool FAnastasisRegrowHostTest::RunTest(const FString&)
 	TestEqual(TEXT("portions creees = gain des champs (personne ne cueille)"),
 		static_cast<int64>(FieldFood(A.GetVillage(), A.GetWorld()) - FieldsBefore), A.GetVillage().GetRegrownFood());
 	TestTrue(TEXT("deterministe"), A.GetVillage().Digest() == B.GetVillage().Digest());
+	// STATE_ORACLE_001 : horloge, file de minuit, monde et village entier.
+	TestTrue(TEXT("deterministe, etat complet"), A.StateDigest() == B.StateDigest());
 	AddInfo(FString::Printf(TEXT("3 jours : %d repousses, %lld portions ; champs %d -> %d"),
 		Grown, A.GetVillage().GetRegrownFood(), FieldsBefore, FieldFood(A.GetVillage(), A.GetWorld())));
 	return true;

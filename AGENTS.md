@@ -214,6 +214,19 @@ ou évolution voulue. Donc, dans `Source/AnastasisSim/` :
 `docs/migration/PROTOCOLE_ECARTS.md`. Avant d'enquêter sur une divergence du harnais :
 `node tools/migration/check-ecarts.mjs -section <section>`.
 
+### Deux empreintes : parité ≠ égalité d'état (STATE_ORACLE_001)
+
+`FVillage::Digest()` est la **projection de parité JS** : périmètre figé, une partie de l'état seulement
+(ni `sim.rng`, ni la météo, ni la vitesse, ni le joueur). Deux villages d'empreinte égale peuvent avoir
+des futurs différents (IRON_CRUSADE_001 : une écriture invisible dans `Speed` ou `sim.rng` diverge en
+8 à 9 s simulées). Pour « est-ce le même état ? » ou « quelque chose a-t-il écrit ? », un test lit
+`FAnastasisSimulation::StateDigest()` ou `FVillage::StateDigest()`.
+
+Un champ ajouté à une structure d'état (`FNpc`, `FBuilding`, `FVillage`, `FAnastasisSimulation`, et les
+types qu'ils portent) se lit dans son `HashState` (`Private/Village/AnastasisVillageStateDigest.cpp`), ou
+se classe dans `tools/migration/state-fields.json` (`cache:`, `derive:`, `pointeur:`, `observation:`,
+`lacune:`). `finish` le contrôle (`node tools/migration/check-state-fields.mjs`, `-liste` pour le détail).
+
 ## Interdit
 
 Ne pas lire, modifier ni générer dans `Intermediate/`, `Saved/` (logs en lecture seule), `DerivedDataCache/`, `Binaries/`.

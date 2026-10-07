@@ -75,8 +75,11 @@ bool FMortalityDailyTest::RunTest(const FString&)
 	}
 
 	const uint64 Before = V.Digest();
+	const uint64 StateBefore = V.StateDigest();
 	TestEqual(TEXT("personne ne meurt en bonne sante"), V.UpdateMortalityDaily(), 0);
 	TestEqual(TEXT("l'empreinte ne bouge pas"), V.Digest(), Before);
+	// STATE_ORACLE_001 : Digest() ne lit ni les liens, ni le registre des morts ; l'etat complet, si.
+	TestEqual(TEXT("l'etat complet ne bouge pas"), V.StateDigest(), StateBefore);
 
 	V.FindNpcMutable(A)->Needs.Health = 0.0;
 	V.FindNpcMutable(A)->Needs.Thirst = 95.0;

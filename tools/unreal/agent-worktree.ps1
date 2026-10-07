@@ -617,6 +617,11 @@ switch ($Command) {
     }
     & node (Join-Path $path 'tools\migration\check-ecarts.mjs') -base main -handoff $handoff
     if ($LASTEXITCODE -ne 0) { Fail 'FAIL: protocole des ecarts -- voir docs\migration\PROTOCOLE_ECARTS.md' }
+    # STATE_ORACLE_001 : un champ d'etat de la simulation est lu par StateDigest (l'oracle des tests
+    # de determinisme et de non-ecriture) ou classe dans tools\migration\state-fields.json. Quelques ms.
+    # -base main : seul ce que la branche ajoute echoue ; un champ deja verse par une autre sort en WARN.
+    & node (Join-Path $path 'tools\migration\check-state-fields.mjs') -base main
+    if ($LASTEXITCODE -ne 0) { Fail 'FAIL: champs d etat non lus par StateDigest -- voir tools\migration\check-state-fields.mjs' }
     # Build seulement si la branche change quelque chose qu'il juge ; la suite, seulement avec
     # -Prove ou -Full (EDITOR_QUEUE_001 : sinon elle attend le lot, un editeur pour tous).
     $mb = (Invoke-Git -C $path merge-base main HEAD).Out[0]

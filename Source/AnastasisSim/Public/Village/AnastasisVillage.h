@@ -1467,8 +1467,19 @@ namespace AnastasisVillage
 		 */
 		TArray<FString> UsersOf(const FString& BuildingId) const;
 
-		/** Projection canonique (FStateWriter) : batiments puis acteurs, dans l'ordre. */
+		/**
+		 * Projection canonique de PARITE JS (FStateWriter) : batiments puis acteurs, dans l'ordre. Perimetre
+		 * fige, une partie de l'etat seulement : ce n'est pas un oracle d'egalite d'etat. Pour savoir si deux
+		 * villages sont le meme, ou si quelque chose a ecrit dedans : StateDigest().
+		 */
 		uint64 Digest() const;
+
+		/**
+		 * STATE_ORACLE_001 -- empreinte d'ETAT : tout ce qui decide du futur du village (sim.rng, meteo, joueur,
+		 * compteurs, memoire, liens...). Oracle des tests de determinisme et de non-ecriture ; ni parite, ni
+		 * format de sauvegarde. Ce qui n'y entre pas est classe dans tools/migration/state-fields.json.
+		 */
+		uint64 StateDigest() const;
 
 	private:
 		void UpdateNpc(FNpc& Npc, double Dt);

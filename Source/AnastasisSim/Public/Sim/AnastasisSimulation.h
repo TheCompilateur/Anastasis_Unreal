@@ -114,6 +114,12 @@ public:
 	/** Pas d'angle entre deux groupes successifs (rad) : deux groupes n'arrivent pas au meme endroit. */
 	static constexpr double GeoArrivalAngleStep = 2.399963229728653;
 
+	/**
+	 * STATE_ORACLE_001 -- empreinte d'ETAT de la simulation : horloge, file de minuit, monde entier et
+	 * FVillage::StateDigest(). L'oracle des tests de determinisme ; pas la parite JS.
+	 */
+	uint64 StateDigest() const;
+
 private:
 	void OnNewDay(bool bDefer);
 	void ProcessDayDeferred(int32 MaxJobs);

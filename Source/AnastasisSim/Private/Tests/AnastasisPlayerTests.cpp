@@ -101,6 +101,8 @@ bool FAnastasisPlayerObserverTest::RunTest(const FString&)
 		Run(Touched, T2, 10.0);
 	}
 	TestTrue(TEXT("observer mode: same digest as a village with no player API touched"), Plain.Digest() == Touched.Digest());
+	// STATE_ORACLE_001 : Digest() ne lit ni Reputation, ni Presence, ni IdleSeconds, ni l'etat du joueur.
+	TestTrue(TEXT("observer mode: same full state as a village with no player API touched"), Plain.StateDigest() == Touched.StateDigest());
 	TestTrue(TEXT("observer mode: no player"), Touched.GetPlayerPersonId().IsEmpty() && Touched.PlayerActor() == nullptr);
 	for (const FNpc& Npc : Touched.GetActors())
 	{

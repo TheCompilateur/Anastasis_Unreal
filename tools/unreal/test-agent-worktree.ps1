@@ -36,6 +36,8 @@ Copy-Item "$Source\tools\soil-crusade\capture.py" "$repo\tools\soil-crusade"
 Copy-Item "$Source\tools\git-hooks\reference-transaction" "$repo\tools\git-hooks"
 New-Item -ItemType Directory -Force "$repo\tools\migration\scenarios", "$repo\Source\AnastasisSim" | Out-Null
 Copy-Item "$Source\tools\migration\check-ecarts.mjs" "$repo\tools\migration"
+# Sans son registre, check-state-fields.mjs sort STATE_FIELDS::SKIP : finish passe comme avant.
+Copy-Item "$Source\tools\migration\check-state-fields.mjs" "$repo\tools\migration"
 Copy-Item "$Source\tools\migration\scenarios\masks.mjs" "$repo\tools\migration\scenarios"
 Copy-Item "$Source\Source\AnastasisSim\ECARTS.md" "$repo\Source\AnastasisSim"
 G init -q -b main | Out-Null

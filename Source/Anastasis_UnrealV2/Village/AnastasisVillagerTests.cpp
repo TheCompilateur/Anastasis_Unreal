@@ -256,11 +256,14 @@ bool FAnastasisVillagerPresentationTest::RunTest(const FString&)
 		return false;
 	}
 	const FString DigestBefore = AnastasisDigest::ToHex(Village.Digest());
+	const uint64 StateBefore = Sim.StateDigest();
 
 	FAnastasisVillagePresentation Presentation;
 	TestEqual(TEXT("trois cartes creees"), Presentation.SyncVillagers(Village, Sim.GetWorld(), World, *Registry, true), 3);
 	TestEqual(TEXT("second Sync : rien a creer"), Presentation.SyncVillagers(Village, Sim.GetWorld(), World, *Registry, true), 0);
 	TestEqual(TEXT("la presentation n'ecrit pas dans la simulation"), AnastasisDigest::ToHex(Village.Digest()), DigestBefore);
+	// STATE_ORACLE_001 : Digest() est la projection JS, aveugle a sim.rng, a la vitesse, a la memoire, au joueur.
+	TestEqual(TEXT("la presentation n'ecrit pas dans l'etat complet de la simulation"), Sim.StateDigest(), StateBefore);
 
 	TSet<FName> Faces;
 	for (const FString& Id : Ids)

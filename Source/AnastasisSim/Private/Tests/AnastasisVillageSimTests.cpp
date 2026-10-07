@@ -543,6 +543,8 @@ bool FAnastasisVillageWellCrowdTest::RunTest(const FString&)
 	Run(Twin, TA, 45.0, [] { return false; });
 	Run(Again, TB, 45.0, [] { return false; });
 	TestTrue(TEXT("empreinte deterministe"), Twin.Digest() == Again.Digest());
+	// STATE_ORACLE_001 : la projection JS ne lit qu'une partie de l'etat ; l'egalite d'etat se juge ici.
+	TestTrue(TEXT("etat complet deterministe"), Twin.StateDigest() == Again.StateDigest());
 	return true;
 }
 

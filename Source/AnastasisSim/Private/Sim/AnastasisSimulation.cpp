@@ -2,6 +2,7 @@
 
 #include "Core/AnastasisJsNumeric.h"
 #include "Core/AnastasisSimClock.h"
+#include "Core/AnastasisStateDigest.h"
 
 FAnastasisSimulation::FAnastasisSimulation() = default;
 
@@ -134,6 +135,43 @@ uint64 FAnastasisSimulation::TileFingerprint() const
 		Hash *= 1099511628211ull;
 	}
 	return Hash;
+}
+
+uint64 FAnastasisSimulation::StateDigest() const
+{
+	// Le monde ne change pas apres la generation (seul le harnais le reecrit) ; il entre quand meme,
+	// en entier, par une empreinte d'octets : une ecriture dans une tuile se verrait.
+	AnastasisDigest::FFnv1a64 WorldHash;
+	const auto Mix = [&WorldHash](const auto& Value)
+	{
+		WorldHash.Bytes(reinterpret_cast<const uint8*>(&Value), static_cast<int32>(sizeof(Value)));
+	};
+	Mix(World.W);
+	Mix(World.H);
+	for (const AnastasisWorld::FTile& Tile : World.Tiles)
+	{
+		Mix(Tile.X); Mix(Tile.Y); Mix(Tile.Type); Mix(Tile.Resource); Mix(Tile.Amount); Mix(Tile.Alt);
+		Mix(Tile.Shade); Mix(Tile.Shore); Mix(Tile.Wetness); Mix(Tile.FlowX); Mix(Tile.FlowZ); Mix(Tile.FlowAmt);
+		Mix(Tile.CropId); Mix(Tile.Fertility); Mix(Tile.ForestMargin); Mix(Tile.bHasForestMargin);
+	}
+
+	AnastasisDigest::FStateWriter Out;
+	Out.BeginObject();
+	Out.Key(TEXT("bootDeferred")).Bool(bBootDeferred);
+	Out.Key(TEXT("seed")).Number(Seed);
+	Out.Key(TEXT("time")).Number(Time);
+	Out.Key(TEXT("day")).Number(Day);
+	Out.Key(TEXT("newDayCount")).Number(NewDayCount);
+	Out.Key(TEXT("deferredRemaining")).Number(DeferredRemaining);
+	Out.Key(TEXT("deferredJobs")).BeginArray(DeferredJobs.Num());
+	for (const int32 Job : DeferredJobs) Out.Number(Job);
+	Out.EndArray();
+	Out.Key(TEXT("lastRegrownFields")).Number(LastRegrownFields);
+	Out.Key(TEXT("accumulator")).Number(Accumulator);
+	Out.Key(TEXT("world")).String(AnastasisDigest::ToHex(WorldHash.Hash));
+	Out.Key(TEXT("village")).String(AnastasisDigest::ToHex(Village.StateDigest()));
+	Out.EndObject();
+	return Out.Digest();
 }
 
 void FAnastasisSimulation::OnNewDay(bool bDefer)
