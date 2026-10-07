@@ -8,7 +8,8 @@
 #     coucher 18 h) -- 06 09 12 16 18 20 00 03 -- sous trois humidites epinglees du ciel
 #     (anastasis.Sky.Humidity 0 / 0.5 / 1 : sec, humide, sature), 24 etats. Remplace -States.
 #     Puis : python tools\unreal\atmosphere-metrics.py Saved\SkyEvidence\<Label>
-param([string]$Label='latest', [string]$States='1|0', [string]$PreCmds='', [string]$Views='', [int]$TimeoutSec=1500, [string]$Preset='')
+param([string]$Label='latest', [string]$States='1|0', [string]$PreCmds='', [string]$Views='', [int]$TimeoutSec=1500, [string]$Preset='',
+      [string]$Level='/Game/Anastasis/Maps/Lvl_AnastasisSlice')
 $ErrorActionPreference='Stop'
 if ($Preset -eq 'cycle') {
   $cycle = @()
@@ -31,6 +32,7 @@ if(Test-Path $log){Remove-Item $log}
 $env:ANASTASIS_SKY_OUT=$dir
 $env:ANASTASIS_SKY_STATES=$States
 $env:ANASTASIS_SKY_VIEWS=$Views
+$env:ANASTASIS_SKY_LEVEL=$Level
 $py=(Join-Path $Root 'tools\unreal\capture-sky.py').Replace('\','/')
 $exec = if ($PreCmds) { $PreCmds + ',py ' + $py } else { 'py ' + $py }
 $launchArgs=@(

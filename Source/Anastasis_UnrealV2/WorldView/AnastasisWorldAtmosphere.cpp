@@ -7,6 +7,7 @@
 #include "Components/LocalFogVolumeComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/ExponentialHeightFog.h"
 #include "Engine/LocalFogVolume.h"
@@ -15,6 +16,7 @@
 #include "Engine/SkyLight.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -25,6 +27,7 @@
 #include "Sim/AnastasisSimulationSubsystem.h"
 #include "WorldView/AnastasisAtmosphereProfile.h"
 #include "WorldView/AnastasisAtmosphereResolver.h"
+#include "WorldView/AnastasisCosmicNight.h"
 #include "WorldView/AnastasisMistField.h"
 #include "WorldView/AnastasisNoxLighting.h"
 #include "WorldView/AnastasisRain.h"
@@ -161,6 +164,19 @@ static TAutoConsoleVariable<float> CVarSkyRain(
 	TEXT("RAIN_001. Pins the rain the SKY shows [0,1] for captures; -1 follows the simulation's weather. Never moves the simulation."),
 	ECVF_Default);
 
+static TAutoConsoleVariable<int32> CVarCosmicSky(
+	TEXT("anastasis.Sky.Cosmic"), 1,
+	TEXT("COSMIC_NIGHT_001. 1=the authored stars, galaxy, lavender moon and night events; 0=previous sky. Map-independent."),
+	ECVF_Default);
+static TAutoConsoleVariable<int32> CVarCosmicEvent(
+	TEXT("anastasis.Sky.CosmicEvent"), -1,
+	TEXT("-1=seeded night calendar, 0=ordinary, 1=meteor night, 2=rare veil. Capture pin only; never changes simulation."),
+	ECVF_Default);
+static TAutoConsoleVariable<float> CVarCosmicIntensity(
+	TEXT("anastasis.Sky.CosmicIntensity"), 1.0f,
+	TEXT("Bounded intensity of the night art, for visual A/B. Does not change exposure."),
+	ECVF_Default);
+
 const FName AAnastasisWorldAtmosphere::MoonTag(TEXT("AnastasisMoon"));
 const FName AAnastasisWorldAtmosphere::RealismCloudTag(TEXT("AnastasisRealismCloud"));
 
@@ -241,6 +257,12 @@ AAnastasisWorldAtmosphere::AAnastasisWorldAtmosphere()
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	CosmicDome = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CosmicDome"));
+	CosmicDome->SetupAttachment(RootComponent);
+	CosmicDome->SetMobility(EComponentMobility::Movable);
+	CosmicDome->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	CosmicDome->SetCastShadow(false);
+	CosmicDome->SetVisibility(false);
 }
 
 template <typename ActorType>
@@ -290,6 +312,7 @@ void AAnastasisWorldAtmosphere::DestroySpawnedActors()
 		Cloud->Destroy();
 	}
 	Cloud = nullptr;
+	CosmicDome->SetVisibility(false);
 }
 
 bool AAnastasisWorldAtmosphere::IsEnabledByCVar()
@@ -344,6 +367,7 @@ void AAnastasisWorldAtmosphere::Tick(const float DeltaSeconds)
 	if (!bSkyClockActive)
 	{
 		RestorePassage();
+		CosmicDome->SetVisibility(false);
 		return;
 	}
 	const UAnastasisAtmosphereProfile& Profile = AnastasisAtmosphere::GetProfile();
@@ -352,11 +376,13 @@ void AAnastasisWorldAtmosphere::Tick(const float DeltaSeconds)
 	if (!Profile.bEnabled || !Profile.bSkyFollowsSimulation || !IsSkyClockEnabledByCVar())
 	{
 		RestorePassage();
+		CosmicDome->SetVisibility(false);
 		return;
 	}
 	uint32 Seed = 0;
 	const double SimTime = ResolveSkySimTime(Seed);
 	LastSky = AnastasisSkyClock::Evaluate(Profile, SimTime, Seed);
+	LastSkySeed = Seed;
 	ApplySkyPins(LastSky);
 	UpdateSky(Profile, /*bForceLog*/ false, DeltaSeconds);
 }
@@ -434,7 +460,89 @@ void AAnastasisWorldAtmosphere::RestorePassage()
 void AAnastasisWorldAtmosphere::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	RestorePassage();
+	CosmicSkyInstance = nullptr;
 	Super::EndPlay(EndPlayReason);
+}
+
+double AAnastasisWorldAtmosphere::GetFirstCosmicMeteorHour(const int32 EveningDay) const
+{
+	for (int32 I = 2100; I <= 2900; ++I)
+	{
+		const double UnwrappedHours = I / 100.0;
+		const bool bAfterMidnight = UnwrappedHours >= 24.0;
+		const double Hours = bAfterMidnight ? UnwrappedHours - 24.0 : UnwrappedHours;
+		const int32 Day = EveningDay + (bAfterMidnight ? 1 : 0);
+		const AnastasisCosmicNight::FInstant Sample = AnastasisCosmicNight::Evaluate(
+			LastSkySeed, Day, Hours, -20.0, 0.0, 0.0, CVarCosmicEvent.GetValueOnGameThread());
+		if (Sample.MeteorStrength > 0.2f)
+		{
+			return Hours;
+		}
+	}
+	return -1.0;
+}
+
+void AAnastasisWorldAtmosphere::UpdateCosmicSky(const bool bForceLog)
+{
+	if (!bRealismApplied || CVarCosmicSky.GetValueOnGameThread() == 0)
+	{
+		CosmicDome->SetVisibility(false);
+		return;
+	}
+	if (!CosmicSkyInstance)
+	{
+		UStaticMesh* Mesh = CosmicDomeMesh.LoadSynchronous();
+		UMaterialInterface* Base = CosmicSkyBaseMaterial.LoadSynchronous();
+		if (!Mesh || !Base)
+		{
+			if (!bCosmicAssetsMissingLogged)
+			{
+				bCosmicAssetsMissingLogged = true;
+				UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_COSMIC_SKY assets_missing mesh=%d material=%d"), Mesh ? 1 : 0, Base ? 1 : 0);
+			}
+			CosmicDome->SetVisibility(false);
+			return;
+		}
+		CosmicDome->SetStaticMesh(Mesh);
+		const float Radius = FMath::Max(1.0f, static_cast<float>(Mesh->GetBounds().SphereRadius));
+		CosmicDome->SetRelativeScale3D(FVector(1000000.0f / Radius)); // 10 km: behind the managed cloud layer.
+		CosmicSkyInstance = UMaterialInstanceDynamic::Create(Base, this);
+		CosmicDome->SetMaterial(0, CosmicSkyInstance);
+	}
+	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+	{
+		FVector Eye;
+		FRotator Facing;
+		PC->GetPlayerViewPoint(Eye, Facing);
+		CosmicDome->SetWorldLocation(Eye);
+	}
+	CosmicDome->SetVisibility(true);
+
+	const AnastasisCosmicNight::FInstant Night = AnastasisCosmicNight::Evaluate(
+		LastSkySeed, static_cast<int32>(LastSky.Day), LastSky.Hours, LastSky.SunElevationDegrees,
+		LastSky.SkyCover, LastSky.SkyRain, CVarCosmicEvent.GetValueOnGameThread());
+	const float Intensity = FMath::Clamp(CVarCosmicIntensity.GetValueOnGameThread(), 0.0f, 3.0f);
+	const FVector MoonDir = -LastSky.MoonRotation.Vector();
+	const float MoonRise = FMath::Clamp(static_cast<float>(AnastasisSkyClock::ElevationOf(LastSky.MoonRotation) / 6.0), 0.0f, 1.0f);
+	CosmicSkyInstance->SetScalarParameterValue(TEXT("NightStrength"), Night.Visibility * Intensity);
+	CosmicSkyInstance->SetScalarParameterValue(TEXT("MoonStrength"), Night.Visibility * MoonRise * Intensity);
+	CosmicSkyInstance->SetVectorParameterValue(TEXT("MoonDir"), FLinearColor(MoonDir.X, MoonDir.Y, MoonDir.Z, 0));
+	CosmicSkyInstance->SetScalarParameterValue(TEXT("SkyRotation"), static_cast<float>(
+		2.0 * UE_DOUBLE_PI * (LastSky.Hours / 24.0 + (LastSky.Day - 1.0) / 120.0)));
+	CosmicSkyInstance->SetScalarParameterValue(TEXT("MeteorStrength"), Night.MeteorStrength * Intensity);
+	CosmicSkyInstance->SetScalarParameterValue(TEXT("MeteorPhase"), Night.MeteorPhase);
+	CosmicSkyInstance->SetVectorParameterValue(TEXT("MeteorStart"), FLinearColor(Night.MeteorStart.X, Night.MeteorStart.Y, Night.MeteorStart.Z, 0));
+	CosmicSkyInstance->SetVectorParameterValue(TEXT("MeteorEnd"), FLinearColor(Night.MeteorEnd.X, Night.MeteorEnd.Y, Night.MeteorEnd.Z, 0));
+	CosmicSkyInstance->SetScalarParameterValue(TEXT("VeilStrength"), Night.VeilStrength * Intensity);
+	if (bForceLog || Night.Night.EveningDay != LastCosmicEvening)
+	{
+		LastCosmicEvening = Night.Night.EveningDay;
+		const TCHAR* Kind = Night.Night.Kind == AnastasisCosmicNight::EKind::Meteors ? TEXT("meteors")
+			: Night.Night.Kind == AnastasisCosmicNight::EKind::Veil ? TEXT("veil") : TEXT("ordinary");
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_COSMIC_SKY day=%d kind=%s meteors=%d visibility=%.3f veil=%.3f"),
+			Night.Night.EveningDay, Kind, Night.Night.MeteorCount,
+			Night.Visibility, Night.VeilStrength);
+	}
 }
 
 void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Profile, const bool bForceLog, const float AdaptSeconds)
@@ -655,6 +763,7 @@ void AAnastasisWorldAtmosphere::UpdateSky(const UAnastasisAtmosphereProfile& Pro
 	}
 
 	UpdateRain(LastSky, bWeather);
+	UpdateCosmicSky(bForceLog);
 
 	const FString Phase = LastSky.VillagePhase;
 	if (bForceLog || Phase != LastLoggedPhase)
@@ -1035,6 +1144,7 @@ bool AAnastasisWorldAtmosphere::Apply()
 		// authored with, and says so.
 		LastSummary = FString::Printf(TEXT("ANASTASIS_ATMOSPHERE applied=0 profile=%s reason=profile_disabled"), Source);
 		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("%s"), *LastSummary);
+		CosmicDome->SetVisibility(false);
 		return false;
 	}
 
@@ -1052,6 +1162,7 @@ bool AAnastasisWorldAtmosphere::Apply()
 		uint32 Seed = 0;
 		const double SimTime = ResolveSkySimTime(Seed);
 		LastSky = AnastasisSkyClock::Evaluate(Profile, SimTime, Seed);
+		LastSkySeed = Seed;
 		ApplySkyPins(LastSky);
 	}
 	const FRotator SunRotation = bSkyClockActive ? LastSky.SunRotation : AnastasisAtmosphere::ResolveSunRotation(Profile);
@@ -1208,6 +1319,10 @@ bool AAnastasisWorldAtmosphere::Apply()
 			CloudComponent->SetMaterial(Cast<UMaterialInterface>(Profile.CloudMaterial.TryLoad()));
 		}
 		CloudMaterialInstance = nullptr;
+	}
+	if (!bSkyClockActive)
+	{
+		CosmicDome->SetVisibility(false);
 	}
 
 	LastSummary = FString::Printf(

@@ -31,11 +31,12 @@ def parse_state(s):
     return (label.strip(), [c.strip() for c in cvars.split(';') if c.strip()])
 
 
-# ANASTASIS_SKY_VIEWS : sous-ensemble de vues (ov_sw,valley_long,ridge_long,sun_ridge), vide = toutes.
+# ANASTASIS_SKY_VIEWS : sous-ensemble (ov_sw,valley_long,ridge_long,sun_ridge,
+# night_zenith,moon_ridge). Les deux dernieres sont opt-in pour le ciel cosmique.
 # Un balayage fin d'heures n'a pas besoin des quatre vues a chaque etat.
 ONLY = [v.strip() for v in os.environ.get('ANASTASIS_SKY_VIEWS', '').split(',') if v.strip()]
 STATES = [parse_state(s.strip()) for s in os.environ.get('ANASTASIS_SKY_STATES', '1|0').split('|') if s.strip()]
-LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
+LEVEL = os.environ.get('ANASTASIS_SKY_LEVEL', '/Game/Anastasis/Maps/Lvl_AnastasisSlice')
 SEED = 12345
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
@@ -151,11 +152,24 @@ report = {'level': LEVEL, 'seed': SEED, 'world_uu': W, 'low': low, 'high': high,
 
 def apply_state(state):
     label, cvars = state
+    auto_meteor = '@meteor' in cvars
     for c in cvars:
-        cmd(c)
+        if c != '@meteor':
+            cmd(c)
+    meteor_hour = None
+    if auto_meteor:
+        cmd('anastasis.Sky.CosmicEvent 1')
+        cmd('anastasis.Sky.Day 1')
+        cmd('anastasis.Sky.Hour 23')
+        atm.call_method('Apply')
+        meteor_hour = atm.call_method('GetFirstCosmicMeteorHour', args=(1,))
+        if meteor_hour < 0:
+            raise RuntimeError('forced meteor night contains no meteor sample')
+        cmd('anastasis.Sky.Day %d' % (1 if meteor_hour >= 21 else 2))
+        cmd('anastasis.Sky.Hour %.4f' % meteor_hour)
     atm.call_method('Apply')
     pockets = atm.call_method('ApplyMist')
-    report['states'][label] = {'cvars': cvars, 'mist_pockets': pockets}
+    report['states'][label] = {'cvars': cvars, 'mist_pockets': pockets, 'meteor_hour': meteor_hour}
     unreal.log('SKY_STATE %s pockets=%s cvars=%s' % (label, pockets, ';'.join(cvars)))
 
 
@@ -172,6 +186,26 @@ def sun_view():
     e = ridge[1]
     # 15 degres au-dessus de l'horizon : le soleil (38 degres) reste dans le champ, en haut.
     return ('sun_ridge', e, V(e.x - fwd.x / h * 10000, e.y - fwd.y / h * 10000, e.z + math.tan(math.radians(15)) * 10000))
+
+
+def moon_view():
+    moon = next((a for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.DirectionalLight)
+                 if a.actor_has_tag('AnastasisMoon')), None)
+    if moon is None:
+        raise RuntimeError('moon_ridge requested but no AnastasisMoon exists')
+    fwd = moon.get_actor_forward_vector()
+    e = ridge[1]
+    return ('moon_ridge', e, V(e.x - fwd.x * 10000, e.y - fwd.y * 10000, e.z - fwd.z * 10000))
+
+
+def state_views():
+    result = views + [sun_view()]
+    if 'night_zenith' in ONLY:
+        e = ridge[1]
+        result.append(('night_zenith', e, V(e.x + 1000, e.y, e.z + 10000)))
+    if 'moon_ridge' in ONLY:
+        result.append(moon_view())
+    return [v for v in result if not ONLY or v[0] in ONLY]
 
 
 def finish(msg, error=False):
@@ -199,10 +233,10 @@ def tick(_dt):
         if not queue:
             state_i += 1
             if state_i >= len(STATES):
-                finish('SKY_CAPTURE_COMPLETE views=%d states=%d' % (len(views) + 1, len(STATES)))
+                finish('SKY_CAPTURE_COMPLETE views=%d states=%d' % (len(report['gpu_ms_p50']) // max(1, len(STATES)), len(STATES)))
                 return
             apply_state(STATES[state_i])
-            queue = [(STATES[state_i], v) for v in views + [sun_view()] if not ONLY or v[0] in ONLY]
+            queue = [(STATES[state_i], v) for v in state_views()]
             # Nuages volumetriques, brouillard volumetrique et capture temps reel du ciel ont
             # besoin de frames pour converger : la premiere vue d'un etat attend plus longtemps.
             first, mark = True, time.monotonic()

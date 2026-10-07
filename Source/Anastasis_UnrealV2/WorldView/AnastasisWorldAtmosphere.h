@@ -12,6 +12,9 @@ class ASkyAtmosphere;
 class ASkyLight;
 class AVolumetricCloud;
 class UInstancedStaticMeshComponent;
+class UStaticMeshComponent;
+class UStaticMesh;
+class UMaterialInterface;
 class UAnastasisAtmosphereProfile;
 class ULightComponent;
 
@@ -76,6 +79,10 @@ public:
 	/** The sky as last written by Apply() or Tick(). Meaningful only while the clock is active. */
 	const AnastasisSkyClock::FSkyState& GetLastSkyState() const { return LastSky; }
 	bool IsSkyClockActive() const { return bSkyClockActive; }
+
+	/** Diagnostic: first visible meteor instant on an evening, with clear weather and the current seed. -1 if absent. */
+	UFUNCTION(BlueprintCallable, Category="Anastasis|Atmosphere|Diagnostics")
+	double GetFirstCosmicMeteorHour(int32 EveningDay) const;
 
 	/**
 	 * anastasis.Atmosphere: 1 (default) applies the profile, 0 leaves the level's own
@@ -252,6 +259,27 @@ protected:
 	 * Missing assets (tools/unreal/rain-material.ps1 not run) are logged once and leave no rain.
 	 */
 	void UpdateRain(const AnastasisSkyClock::FSkyState& Sky, bool bWeatherDrivesSky);
+
+	/** Map-independent night art. The dome is transient and reads only the sky clock. */
+	void UpdateCosmicSky(bool bForceLog);
+
+	UPROPERTY(VisibleAnywhere, Category="Atmosphere|Cosmic Sky")
+	TObjectPtr<UStaticMeshComponent> CosmicDome;
+
+	UPROPERTY(EditDefaultsOnly, Category="Atmosphere|Cosmic Sky")
+	TSoftObjectPtr<UStaticMesh> CosmicDomeMesh = TSoftObjectPtr<UStaticMesh>(
+		FSoftObjectPath(TEXT("/Engine/EngineSky/SM_SkySphere.SM_SkySphere")));
+
+	UPROPERTY(EditDefaultsOnly, Category="Atmosphere|Cosmic Sky")
+	TSoftObjectPtr<UMaterialInterface> CosmicSkyBaseMaterial = TSoftObjectPtr<UMaterialInterface>(
+		FSoftObjectPath(TEXT("/Game/Anastasis/Celestial/M_AnastasisCosmicSky.M_AnastasisCosmicSky")));
+
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> CosmicSkyInstance;
+
+	uint32 LastSkySeed = 12345u;
+	int32 LastCosmicEvening = -1;
+	bool bCosmicAssetsMissingLogged = false;
 
 	UPROPERTY()
 	TObjectPtr<UInstancedStaticMeshComponent> RainStreaks;
