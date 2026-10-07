@@ -18,6 +18,8 @@ Faire apparaitre les livraisons de bois et de pierre au chantier effectivement o
 - `AGENTS.md` (index des outils)
 - cette fiche
 
+Dependance lue, non possedee : `M_AnastasisArchitecture` et les archetypes de `architecture-crusade-001`.
+
 ## COMMIT
 
 PENDING
@@ -50,6 +52,7 @@ AUCUN : aucun fichier `Source/AnastasisSim/` modifie ; seule la presentation Unr
 ## INTEGRATION_RISK
 
 - `AGENTS.md` et `tools/unreal/proofs.txt` sont des fichiers chauds : le lot en cours les modifie aussi. Rebase et resolution explicite avant passation si `main` avance.
+- `architecture-crusade-001` remplace l'ancienne maison de 3,6 m par des archetypes d'environ 10 a 17 m et ajoute `SM_Kit_Woodpile` (pile couverte de 2 m). Les petits lots transitoires de cette mission gardent leur propre mesh ; leur position est calculee depuis les bornes du corps effectivement applique. Le lot d'architecture doit etre integre avant la generation de nos assets, car il fournit le materiau de cette recette.
 - `Source/Anastasis_UnrealV2/Village/AnastasisVillageBuilding.cpp` est deja partage avec d'autres missions de presentation ; la collision de merge doit etre inspectee par l'integrateur.
 - Le mesh du batiment reste aujourd'hui reduit en Z durant les travaux ; ce lot n'introduit pas encore les etapes de fondation/charpente.
 - Le seuil de 1 a 3 lots est une lecture qualitative du stock present, pas une equivalence unitaire ; la preuve verifie la monotonie et la disparition.

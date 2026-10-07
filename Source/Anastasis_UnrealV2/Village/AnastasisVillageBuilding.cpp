@@ -25,9 +25,6 @@ namespace
 
 	/** Dans le volume de la maison : la lumiere sort par la porte (+Y d'auteur) et la fenetre, pas par les murs. */
 	const FVector HearthLocal(0.0, 0.0, 120.0);
-	const FVector WoodStockAnchor(-115.0, 170.0, 0.0);
-	const FVector StoneStockAnchor(115.0, 170.0, 0.0);
-
 	int32 VisibleStockBundles(const int32 Stock, const int32 Need)
 	{
 		if (Stock <= 0 || Need <= 0) return 0;
@@ -261,6 +258,18 @@ void AAnastasisVillageBuilding::SetSiteStock(
 	if (WoodCount == VisibleWoodBundles && StoneCount == VisibleStoneBundles) return;
 	VisibleWoodBundles = WoodCount;
 	VisibleStoneBundles = StoneCount;
+	// Align with the actual body, including a later architecture archetype. +Y is the
+	// authored entry side; the two small stores flank its central approach.
+	float Side = 150.f;
+	float Front = 220.f;
+	if (Body && Body->GetStaticMesh())
+	{
+		const FBox Bounds = Body->GetStaticMesh()->GetBoundingBox();
+		Side = FMath::Clamp(static_cast<float>(Bounds.GetExtent().X * .4), 150.f, 250.f);
+		Front = static_cast<float>(Bounds.Max.Y + 90.0);
+	}
+	const FVector WoodStockAnchor(-Side, Front, 0.f);
+	const FVector StoneStockAnchor(Side, Front, 0.f);
 	const auto Place = [this](UInstancedStaticMeshComponent* Component, const int32 Count,
 		const FVector& Anchor, const float LayerHeight)
 	{

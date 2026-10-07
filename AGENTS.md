@@ -473,7 +473,7 @@ se change dans le script.
 |---|---|
 | `create-refugee-props.py` | Cree quatre accessoires de refugies et leur materiau dans RefugeeProps008. |
 | `create-village-buildings.ps1` + `.py` | Forge le puits, la maison et le grenier dans VillageBuildings, meme matiere que les props. `-Rebuild` regenere. |
-| `create-site-stock.ps1` + `.py` | Forge deux petits lots de bois et pierre dans SiteStock001 avec le materiau du village ; recette deterministe, `-Rebuild` limite aux deux assets de la mission ; aucun placement manuel |
+| `create-site-stock.ps1` + `.py` | Forge deux petits lots de bois et pierre dans SiteStock001 avec `M_AnastasisArchitecture` ; recette deterministe, `-Rebuild` limite aux deux assets de la mission ; aucun placement manuel |
 | `capture-refugee-props.ps1` + `capture-refugee-props.py` | Capture en studio les quatre objets, sans sauvegarder de niveau. |
 
 ### Architecture du village (ARCHITECTURE_SCALE_001)

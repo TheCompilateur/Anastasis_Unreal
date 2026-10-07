@@ -18,6 +18,9 @@ handle = None
 site_id = None
 full_stock = None
 saw_consumed_stock = False
+saw_smaller_visual = False
+reported_shrink = False
+last_sample = 0.0
 last = {}
 
 
@@ -37,9 +40,9 @@ def visual_counts(world, row):
     actor = next((a for a in actors if a.get_actor_label().endswith('_' + row['id'])), None)
     if not actor:
         raise AssertionError('site actor missing: ' + row['id'])
-    comps = {c.get_name(): c for c in actor.get_components_by_class(unreal.InstancedStaticMeshComponent)}
-    wood = comps['WoodStockVisual']
-    stone = comps['StoneStockVisual']
+    comps = list(actor.get_components_by_class(unreal.InstancedStaticMeshComponent))
+    wood = next(c for c in comps if c.get_name().startswith('WoodStockVisual'))
+    stone = next(c for c in comps if c.get_name().startswith('StoneStockVisual'))
     for component, name in ((wood, 'SM_Site_TimberBundle_01'), (stone, 'SM_Site_StoneBundle_01')):
         mesh = component.get_editor_property('static_mesh')
         if not mesh or mesh.get_name() != name:
@@ -54,7 +57,7 @@ def expected(stock, need, active=True):
 
 
 def tick(_dt):
-    global site_id, full_stock, saw_consumed_stock, last
+    global site_id, full_stock, saw_consumed_stock, saw_smaller_visual, reported_shrink, last_sample, last
     now = time.monotonic()
     if now - started > 210:
         finish(False, 'timeout phase=%s row=%s' % (phase, json.dumps(last)))
@@ -69,11 +72,14 @@ def tick(_dt):
         return
     if phase == 'pie':
         unreal.SystemLibrary.execute_console_command(world, 'anastasis.Sim.TimeScale 0')
-        unreal.SystemLibrary.execute_console_command(world, 'Anastasis.Village.FirstSite house 1 0')
+        unreal.SystemLibrary.execute_console_command(world, 'Anastasis.Village.FirstSite house 2 0')
         advance('dry')
         return
     if now - phase_at < .8:
         return
+    if now - last_sample < .2:
+        return
+    last_sample = now
     row = json.loads(dbg.get_build_status(world) or '{}')
     if not row.get('site'):
         if now - phase_at > 12:
@@ -111,13 +117,16 @@ def tick(_dt):
         elif phase == 'consume':
             if row['stockWood'] < full_stock[0] or row['stockStone'] < full_stock[1]:
                 saw_consumed_stock = True
+            if not row['completed'] and counts == want and (counts[0] < 3 or counts[1] < 3):
+                saw_smaller_visual = True
             if row['completed']:
                 advance('complete')
-            elif counts == want and saw_consumed_stock:
+            elif counts == want and saw_smaller_visual and not reported_shrink:
+                reported_shrink = True
                 unreal.log('SITE_STOCK_VISUAL_PIE CONSUMED ledger=%d,%d visual=%d,%d' %
                            (row['stockWood'], row['stockStone'], counts[0], counts[1]))
         elif phase == 'complete':
-            if counts != (0, 0) or not saw_consumed_stock:
+            if counts != (0, 0) or not saw_consumed_stock or not saw_smaller_visual:
                 raise AssertionError('completed site retained stock or consumption unseen: ' + str(counts))
             finish(True, 'dry=0,0 one=1,1 full=3,3 consumed=yes complete=0,0 site=' + site_id)
     except Exception as exc:

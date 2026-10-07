@@ -1,7 +1,7 @@
 """Two small, deterministic site-stock meshes. Run with create-site-stock.ps1.
 
 Geometry-only validation: py -3 tools/unreal/create-site-stock.py
-The existing village material supplies the stone and timber grain from vertex colour.
+The architecture material supplies the stone and timber grain from vertex colour.
 Only the two SiteStock001 assets below may be rebuilt by this recipe.
 """
 import hashlib
@@ -21,8 +21,9 @@ _buildings = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_buildings)
 Mesh = _buildings.Mesh
 tint = _buildings.tint
-WOOD = _buildings.WOOD
-STONE = _buildings.STONE
+# Vertex alpha follows M_AnastasisArchitecture (WOOD=.75, ASHLAR=.45).
+WOOD = (.16, .12, .085, .75)
+STONE = (.25, .235, .21, .45)
 
 
 def timber_bundle():
@@ -85,8 +86,8 @@ def validate():
 def create():
     import unreal as u
     eal = u.EditorAssetLibrary
-    material = eal.load_asset('/Game/Anastasis/VillageBuildings/M_VillageBuilding_Surface')
-    assert material, 'Existing village material is required'
+    material = eal.load_asset('/Game/Anastasis/VillageArchitecture/M_AnastasisArchitecture')
+    assert material, 'Architecture material is required (architecture-crusade-001)'
     expected = validate()
     for name, (verts, tris, colours, normals) in geometry().items():
         path = PKG + '/' + name
