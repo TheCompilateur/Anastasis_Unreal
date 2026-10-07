@@ -514,7 +514,12 @@ void AAnastasisWorldAtmosphere::UpdateCosmicSky(const bool bForceLog)
 		FVector Eye;
 		FRotator Facing;
 		PC->GetPlayerViewPoint(Eye, Facing);
-		CosmicDome->SetWorldLocation(Eye);
+		// Fifty metres of camera drift is invisible against a ten-kilometre sphere;
+		// avoid rebuilding the primitive transform on every game tick.
+		if (FVector::DistSquared(Eye, CosmicDome->GetComponentLocation()) > FMath::Square(5000.0))
+		{
+			CosmicDome->SetWorldLocation(Eye);
+		}
 	}
 	CosmicDome->SetVisibility(true);
 
