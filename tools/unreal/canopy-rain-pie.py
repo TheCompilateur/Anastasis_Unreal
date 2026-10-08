@@ -15,6 +15,8 @@ unreal.log('CANOPY_RAIN_MAP_LOAD=' + str(level.load_level('/Game/Anastasis/Maps/
 start = time.monotonic()
 phase = 0
 pie_started = 0.0
+pie_seen = None
+pie_frames = 0
 handle = None
 
 
@@ -26,7 +28,7 @@ def finish(ok, detail):
 
 
 def tick(_dt):
-    global phase, pie_started
+    global phase, pie_started, pie_seen, pie_frames
     now = time.monotonic()
     if now - start > 120:
         finish(False, 'timeout')
@@ -38,7 +40,14 @@ def tick(_dt):
         return
     if phase != 1 or not level.is_in_play_in_editor():
         return
-    if now - pie_started < 3:
+    # The host binds the crowns on its own Tick (BindRainCanopy). PIE startup on this map now
+    # blocks ~40 s inside the request frame (StaticDuplicateObject), so a wall clock started at
+    # the request had already expired at the first PIE frame, before any host tick: the read
+    # then saw an unbound village (0 everywhere). Count real PIE frames instead.
+    if pie_seen is None:
+        pie_seen = now
+    pie_frames += 1
+    if pie_frames < 30 or now - pie_seen < 3:
         return
     world = editor.get_game_world()
     if not world or debug.get_simulation_time(world) < 0:
