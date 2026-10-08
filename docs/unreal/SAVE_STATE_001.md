@@ -57,11 +57,12 @@ du joueur repart de ce que la simulation sait de lui.
 
 ## Ce qui n'est PAS sauvé (connu, déclaré)
 
-- **Biographie des bâtiments** (`FAnastasisVillagePresentation::Ledger`, SETTLEMENT_MORPHOGENESIS_001) et
-  **mémoire des passages** (`UAnastasisAnthropicSubsystem`). Ce sont des historiques accumulés par la
-  présentation, hors simulation : ils repartent de zéro au chargement, et une ligne
-  `ANASTASIS_SAVE presentation history not restored` le dit au log. La correction : les rapatrier dans la
-  simulation, ou les sauver à part.
+- **Mémoire des passages** (`UAnastasisAnthropicSubsystem`) : un historique de présentation pure, en
+  centimètres rendus. Expérimentale et **désactivée par défaut** (`anastasis.Anthropic.Memory 0`). Elle
+  repart de zéro au chargement, et une ligne `ANASTASIS_SAVE presentation history not restored` le dit au log.
+  Le passage que la simulation compte (`sim.traffic`, les sentiers) est, lui, sauvé.
+- ~~Biographie des bâtiments~~ : **sauvée depuis save-history-001** (écart n°46). Elle est observée par la
+  simulation, à chaque pas, et entre dans le parcours ; la forme des maisons revient au chargement.
 - `Colony` et `MarketStock` : les deux lacunes du registre, posées seulement par le harnais.
 - Le format JS (`serialize(sim)`) : une sauvegarde JS ne se recharge pas par `LoadState`, ni l'inverse
   (écart n°45, `A_TRANCHER`).

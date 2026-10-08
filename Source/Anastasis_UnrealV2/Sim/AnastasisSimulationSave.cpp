@@ -217,7 +217,7 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisSimLoad(
 		{
 			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_SAVE loaded %s"), *Message);
 			UE_LOG(LogAnastasis_UnrealV2, Display,
-				TEXT("ANASTASIS_SAVE presentation history not restored: building biographies and anthropic memory restart from the loaded state (SAVE_STATE_001)"));
+				TEXT("ANASTASIS_SAVE presentation history not restored: anthropic memory (experimental) restarts from the loaded state; building biographies are simulation state and were restored (SAVE_STATE_001)"));
 			return;
 		}
 		UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_SAVE load refused: %s"), *Message);

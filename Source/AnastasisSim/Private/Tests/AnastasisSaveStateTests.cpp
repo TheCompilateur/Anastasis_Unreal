@@ -320,10 +320,12 @@ bool FAnastasisSaveStateBiographyTest::RunTest(const FString&)
 	TestTrue(TEXT("... toujours activee"), Copy.GetVillage().IsBiographyEnabled());
 	TestEqual(TEXT("meme etat complet"), Copy.StateDigest(), Original.StateDigest());
 
-	// Le meme changement de mains dans les deux parties : la meme histoire s'ecrit.
+	// Le meme changement de mains dans les deux parties : le fondateur s'en va, un heritier reprend les murs.
 	for (FAnastasisSimulation* Sim : { &Original, &Copy })
 	{
-		Sim->GetVillage().AssignHome(Heir, House);
+		TestTrue(TEXT("le fondateur s'en va"), Sim->GetVillage().RemoveNpc(Founder));
+		Run(*Sim, 60);
+		TestTrue(TEXT("l'heritier reprend la maison"), Sim->GetVillage().AssignHome(Heir, House));
 		Run(*Sim, 60 * 10);
 	}
 	const FBuildingBiography* A = Original.GetVillage().FindBiography(House);

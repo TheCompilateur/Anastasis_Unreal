@@ -12,8 +12,9 @@
  * suite : les verrous de ses scenarios et le chemin du scenario exterieur. La presentation (acteurs,
  * cartes, sentiers rendus) n'y est pas : elle se reconstruit depuis la simulation.
  *
- * Deux historiques de presentation ne sont PAS sauves (SAVE_STATE_001.md) : la biographie des batiments
- * (FAnastasisVillagePresentation::Ledger) et la memoire des passages (UAnastasisAnthropicSubsystem).
+ * Un historique de presentation n'est PAS sauve (SAVE_STATE_001.md) : la memoire des passages
+ * (UAnastasisAnthropicSubsystem, experimentale, desactivee par defaut). La biographie des batiments, elle,
+ * est dans la simulation depuis save-history-001 (ecart n°46), donc dans SimState.
  */
 UCLASS()
 class UAnastasisSaveGame : public USaveGame
