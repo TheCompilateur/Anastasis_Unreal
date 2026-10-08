@@ -80,7 +80,7 @@ choix de typologie par graine par le programme de la biographie, régénère les
 d'architecture avec `Weathering`, et pose un MID permanent sur les corps d'archétype), pas seulement à
 `334b7897`.
 
-PROOFS: settlement-morphogenesis-pie, architecture-pie
+PROOFS: settlement-morphogenesis-pie, architecture-pie, site-stock-visual-pie
 
 ## SCN
 
