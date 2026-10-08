@@ -22,7 +22,7 @@ Le HEAD marqué par agent-worktree.ps1 finish.
 
 - BUILD: PASS — anastasis-unreal.ps1 build, 2026-10-08, Result: Succeeded, 21 actions, 177,98 s.
 - MATERIAL: PASS technique — cosmic-sky-material.ps1 -Version 1 -Rebuild, 2026-10-08 ; T_CosmicRiverV1 et M_AnastasisCosmicSkyV1 sauvés, COSMIC_MATERIAL_DONE, sortie 0, log Unreal zéro erreur. Apparence SCN inconnue.
-- TESTS: QUEUED — cosmic-night-pie au lot.
+- PIE LOCAL: PASS — editor-batch.ps1 -Proofs cosmic-night-pie, 2026-10-08, 59,8 s ; V1 → V0 → V1 observé sur le parent du MID, ciel coupé, jour, couverture totale et météore vérifiés. Le lot doit rejouer la preuve.
 - COMMANDS: tools/unreal/anastasis-unreal.ps1 build ; tools/unreal/cosmic-sky-material.ps1 -Version 1 -Rebuild
 
 ## PROOFS

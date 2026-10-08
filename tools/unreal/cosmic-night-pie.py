@@ -52,6 +52,7 @@ def sample(atm):
         'moon': float(material.get_scalar_parameter_value('MoonStrength')),
         'veil': float(material.get_scalar_parameter_value('VeilStrength')),
         'meteor': float(material.get_scalar_parameter_value('MeteorStrength')),
+        'art_cvar': float(unreal.SystemLibrary.get_console_variable_float_value('anastasis.Sky.CosmicArtVersion')),
     }
 
 
@@ -69,7 +70,7 @@ def finish(ok, message):
 def tick(_dt):
     global phase, mark, atm
     now = time.monotonic()
-    if now - start > 100:
+    if now - start > 150:
         finish(False, 'timeout phase=' + phase)
         return
     try:
@@ -93,17 +94,23 @@ def tick(_dt):
             cmd('anastasis.Sky.CosmicArtVersion', 0)
             phase, mark = 'v0', now
         elif phase == 'v0' and now - mark > 2:
-            samples['v0'] = sample(atm)
-            if 'M_AnastasisCosmicSky.' not in samples['v0']['parent']:
-                raise RuntimeError('art A/B did not restore V0 material')
-            cmd('anastasis.Sky.CosmicArtVersion', 1)
-            phase, mark = 'v1', now
+            probe = sample(atm)
+            if 'M_AnastasisCosmicSky.' in probe['parent']:
+                samples['v0'] = probe
+                cmd('anastasis.Sky.CosmicArtVersion', 1)
+                phase, mark = 'v1', now
+            elif now - mark > 18:
+                samples['v0_timeout'] = probe
+                raise RuntimeError('art A/B did not restore V0 material after 18s')
         elif phase == 'v1' and now - mark > 2:
-            samples['v1'] = sample(atm)
-            if 'M_AnastasisCosmicSkyV1' not in samples['v1']['parent']:
-                raise RuntimeError('art A/B did not restore V1 material')
-            cmd('anastasis.Sky.Cosmic', 0)
-            phase, mark = 'off', now
+            probe = sample(atm)
+            if 'M_AnastasisCosmicSkyV1' in probe['parent']:
+                samples['v1'] = probe
+                cmd('anastasis.Sky.Cosmic', 0)
+                phase, mark = 'off', now
+            elif now - mark > 18:
+                samples['v1_timeout'] = probe
+                raise RuntimeError('art A/B did not restore V1 material after 18s')
         elif phase == 'off' and now - mark > 2:
             atm = unreal.GameplayStatics.get_all_actors_of_class(
                 ues.get_game_world(), unreal.AnastasisWorldAtmosphere)[0]

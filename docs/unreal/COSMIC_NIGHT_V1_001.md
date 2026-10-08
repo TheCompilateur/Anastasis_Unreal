@@ -47,7 +47,7 @@ du calendrier du monde, se masque par la météo et garde sa forme après minuit
 | 12 | La marée froide | Une lente onde pâle traverse le ciel et se reflète dans l'eau | exceptionnel |
 | 13 | La seconde ombre | Pendant quelques minutes, l'ombre lunaire change de direction | anomalie rarissime |
 
-La météorite V1 et le voile V1 sont les premières formes mises en matière. Les autres
+Le météore V1 et le voile V1 sont les premières formes mises en matière. Les autres
 ne seront admises qu'une par une, avec une silhouette reconnaissable et un coût GPU mesuré.
 
 ## Preuve et limite
