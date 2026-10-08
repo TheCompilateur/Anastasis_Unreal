@@ -53,7 +53,8 @@ PENDING
   absents. `-cookall` ajouté pour inclure les assets chargés par chemins souples.
 - Runtime corrigé dans cette branche : le portrait n'est plus chargé ni affiché en
   jeu ; corps 3D à toute distance ; ressource absente = erreur et PNJ non dessiné.
-- BUILD du correctif : PENDING. Aucun PIE ni nouveau paquet sur ce commit.
+- BUILD du correctif : `BUILD::PASS` dans le worktree, UE 5.8.2 Editor Win64 Development,
+  19 actions UBT, `Result: Succeeded` (2026-10-08). Aucun PIE ni nouveau paquet sur ce commit.
 
 ## PROOFS
 
