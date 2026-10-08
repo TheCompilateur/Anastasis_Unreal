@@ -3,6 +3,7 @@
 class UWorld;
 namespace AnastasisWorld { struct FWorld; }
 namespace AnastasisVillage { class FVillage; }
+namespace AnastasisCanonicalGeography { struct FGeography; }
 namespace AnastasisSettlementSurvey
 {
 /** Reads the actual world's ExperimentalTerrain sections; never the process-global Forge cache. */
@@ -24,8 +25,15 @@ bool Read(UWorld* World, uint32 Seed, const AnastasisWorld::FWorld& Sim,
  */
 inline constexpr double ReliefFactor = 1.0;
 inline constexpr double CanonicalSpatialScale = 5.0;
+/**
+ * WATER_NETWORK_001 -- with `Canonical` (the drained relief of AnastasisCanonicalGeography, seed only, fixed
+ * recipe), heights and slopes are those of the relief the player sees at default settings, not the tile
+ * altitude: without it, the site at (22,17) sat on a rendered slope of 21.8 deg for a simulated 1.4 deg.
+ * Water, walkability and resources stay the simulation's own.
+ */
 void ReadSimulation(uint32 Seed, const AnastasisWorld::FWorld& Sim, const AnastasisVillage::FVillage& Village,
-    AnastasisSettlementSite::FInputs& Out, double Relief = ReliefFactor);
+    AnastasisSettlementSite::FInputs& Out, double Relief = ReliefFactor,
+    const AnastasisCanonicalGeography::FGeography* Canonical = nullptr);
 
 /**
  * Copies what the rendered survey OBSERVED (water at centres, rendered slope, provenance) into a

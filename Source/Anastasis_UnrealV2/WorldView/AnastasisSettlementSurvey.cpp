@@ -1,4 +1,6 @@
 #include "WorldView/AnastasisSettlementSurvey.h"
+#include "WorldView/AnastasisProjectedMesh.h"
+#include "WorldView/AnastasisCanonicalGeography.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
 #include "WorldView/AnastasisWorldView.h"
 #include "Village/AnastasisVillage.h"
@@ -11,50 +13,15 @@ namespace AnastasisSettlementSurveyPrivate
 {
 // XY bins over actual triangles, supporting ground, clipped lake mesh and river ribbons.
 // This avoids thousands of collision ray casts and cannot accidentally sample another PIE world.
-class FProjectedMesh
+void AddSection(AnastasisProjectedMesh::FProjectedMesh& Mesh, const FProcMeshSection* Section, const FTransform& Transform)
 {
-public:
-    double Cell = 2000.0;
-    TArray<FVector> V;
-    TArray<FIntVector> T;
-    TMap<FIntPoint,TArray<int32>> Bins;
-    void Add(const FProcMeshSection* Section, const FTransform& Transform)
-    {
-        if (!Section || !Section->bSectionVisible) return;
-        const int32 Offset = V.Num();
-        for (const auto& P : Section->ProcVertexBuffer) V.Add(Transform.TransformPosition(P.Position));
-        for (int32 I = 0; I + 2 < Section->ProcIndexBuffer.Num(); I += 3)
-        {
-            const int32 A = Offset+Section->ProcIndexBuffer[I], B = Offset+Section->ProcIndexBuffer[I+1], C = Offset+Section->ProcIndexBuffer[I+2];
-            const int32 K = T.Add(FIntVector(A,B,C));
-            const int32 X0 = FMath::FloorToInt32(FMath::Min3(V[A].X,V[B].X,V[C].X)/Cell);
-            const int32 X1 = FMath::FloorToInt32(FMath::Max3(V[A].X,V[B].X,V[C].X)/Cell);
-            const int32 Y0 = FMath::FloorToInt32(FMath::Min3(V[A].Y,V[B].Y,V[C].Y)/Cell);
-            const int32 Y1 = FMath::FloorToInt32(FMath::Max3(V[A].Y,V[B].Y,V[C].Y)/Cell);
-            for (int32 Y=Y0;Y<=Y1;++Y) for(int32 X=X0;X<=X1;++X) Bins.FindOrAdd(FIntPoint(X,Y)).Add(K);
-        }
-    }
-    bool Sample(double X, double Y, double& Z) const
-    {
-        const auto* Bucket = Bins.Find(FIntPoint(FMath::FloorToInt32(X/Cell),FMath::FloorToInt32(Y/Cell)));
-        if (!Bucket) return false;
-        bool Found=false;
-        for (int32 I : *Bucket)
-        {
-            const auto& Tri=T[I]; const auto& A=V[Tri.X]; const auto& B=V[Tri.Y]; const auto& C=V[Tri.Z];
-            const double D=(B.Y-C.Y)*(A.X-C.X)+(C.X-B.X)*(A.Y-C.Y);
-            if (FMath::Abs(D)<1.e-9) continue;
-            const double U=((B.Y-C.Y)*(X-C.X)+(C.X-B.X)*(Y-C.Y))/D;
-            const double W=((C.Y-A.Y)*(X-C.X)+(A.X-C.X)*(Y-C.Y))/D;
-            const double Q=1.0-U-W;
-            if (U < -1.e-7 || W < -1.e-7 || Q < -1.e-7) continue;
-            const double H=U*A.Z+W*B.Z+Q*C.Z;
-            if (!Found || H>Z) Z=H;
-            Found=true;
-        }
-        return Found;
-    }
-};
+    if (!Section || !Section->bSectionVisible) return;
+    TArray<FVector> Vertices; Vertices.Reserve(Section->ProcVertexBuffer.Num());
+    for (const auto& P : Section->ProcVertexBuffer) Vertices.Add(P.Position);
+    TArray<int32> Indices; Indices.Reserve(Section->ProcIndexBuffer.Num());
+    for (const uint32 I : Section->ProcIndexBuffer) Indices.Add(static_cast<int32>(I));
+    Mesh.Add(Vertices, Indices, Transform);
+}
 }
 
 bool AnastasisSettlementSurvey::Read(UWorld* World, uint32 Seed, const AnastasisWorld::FWorld& Sim,
@@ -82,13 +49,13 @@ bool AnastasisSettlementSurvey::Read(UWorld* World, uint32 Seed, const Anastasis
     }
     if(!Surface || !FMath::IsFinite(Scale) || Scale<=0) { Error=TEXT("terrain_not_ready"); return false; }
     const double Cell=AnastasisWorldView::TileWorldSize*Scale;
-    AnastasisSettlementSurveyPrivate::FProjectedMesh Ground, Water;
+    AnastasisProjectedMesh::FProjectedMesh Ground, Water;
     Ground.Cell=Water.Cell=Cell;
-    Ground.Add(Surface->GetProcMeshSection(0),Surface->GetComponentTransform());
-    Water.Add(Surface->GetProcMeshSection(1),Surface->GetComponentTransform());
-    Water.Add(Surface->GetProcMeshSection(2),Surface->GetComponentTransform());
+    AnastasisSettlementSurveyPrivate::AddSection(Ground,Surface->GetProcMeshSection(0),Surface->GetComponentTransform());
+    AnastasisSettlementSurveyPrivate::AddSection(Water,Surface->GetProcMeshSection(1),Surface->GetComponentTransform());
+    AnastasisSettlementSurveyPrivate::AddSection(Water,Surface->GetProcMeshSection(2),Surface->GetComponentTransform());
     Out.Seed=Seed; Out.SourceWorld=World->GetPathName(); Out.TerrainComponent=Surface->GetPathName();
-    const bool bWaterMeshAvailable=!Water.T.IsEmpty();
+    const bool bWaterMeshAvailable=!Water.IsEmpty();
     Out.W=Sim.W; Out.H=Sim.H; Out.TileMetres=Cell/100.0; Out.Cells.SetNum(Sim.Tiles.Num());
     for(int32 I=0;I<Sim.Tiles.Num();++I)
     {
@@ -129,7 +96,8 @@ bool AnastasisSettlementSurvey::Read(UWorld* World, uint32 Seed, const Anastasis
 }
 
 void AnastasisSettlementSurvey::ReadSimulation(uint32 Seed, const AnastasisWorld::FWorld& Sim,
-    const AnastasisVillage::FVillage& Village, AnastasisSettlementSite::FInputs& Out, double Relief)
+    const AnastasisVillage::FVillage& Village, AnastasisSettlementSite::FInputs& Out, double Relief,
+    const AnastasisCanonicalGeography::FGeography* Canonical)
 {
     using AnastasisWorld::ETileType;
     Out = {};
@@ -140,6 +108,9 @@ void AnastasisSettlementSurvey::ReadSimulation(uint32 Seed, const AnastasisWorld
     Out.TileMetres=Cell/100.0;
     Out.Cells.SetNum(Sim.Tiles.Num());
     if (Sim.W<=0 || Sim.H<=0 || Sim.Tiles.Num()!=Sim.W*Sim.H) return;
+    const bool bCanonical=Canonical && Canonical->bValid && Canonical->W==Sim.W && Canonical->H==Sim.H
+        && Canonical->GroundZ.Num()==Sim.Tiles.Num() && Canonical->Slope.Num()==Sim.Tiles.Num();
+    if (bCanonical) Out.TerrainComponent=TEXT("canonical_drained_relief");
     // Land above sea scaled by `Relief` (1 = the simulation's own relief, the default); the sea stays put.
     auto PolicyHeight=[&](int32 X,int32 Y)
     {
@@ -167,6 +138,7 @@ void AnastasisSettlementSurvey::ReadSimulation(uint32 Seed, const AnastasisWorld
         if (Y>0) DY=FMath::Max(DY,FMath::Abs(C.Height-PolicyHeight(X,Y-1))/Cell);
         if (Y+1<Sim.H) DY=FMath::Max(DY,FMath::Abs(PolicyHeight(X,Y+1)-C.Height)/Cell);
         C.Slope=FMath::RadiansToDegrees(FMath::Atan(FMath::Sqrt(DX*DX+DY*DY)));
+        if (bCanonical) { C.Height=Canonical->GroundZ[I]; C.Slope=Canonical->Slope[I]; }
         C.Fertility=T.Fertility;
         // The rendered survey wanted 1 m of freeboard; on tiles, a centre is not a shore tile.
         const bool bShore=IsWater(X-1,Y)||IsWater(X+1,Y)||IsWater(X,Y-1)||IsWater(X,Y+1);
@@ -203,7 +175,9 @@ AnastasisSettlementSite::FInputs AnastasisSettlementSurvey::SiteInputs(const Ana
 {
     if (!SiteFromSimulation()) return Rendered;
     AnastasisSettlementSite::FInputs In;
-    ReadSimulation(Seed, Sim, Village, In);
+    // WATER_NETWORK_001 : the relief the player sees (canonical recipe, never a render CVar).
+    const AnastasisCanonicalGeography::FGeography& Canonical=AnastasisCanonicalGeography::Get(Seed);
+    ReadSimulation(Seed, Sim, Village, In, ReliefFactor, Canonical.bValid ? &Canonical : nullptr);
     if (bRenderedOk) MergeRenderObservation(Rendered, In);
     return In;
 }

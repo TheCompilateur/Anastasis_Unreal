@@ -77,6 +77,35 @@ bool Apply(
 	const AnastasisWorldView::FWorldVisualSnapshot* HaloCrop = nullptr,
 	TArray<double>* OutLaplacian = nullptr);
 
+/**
+ * WATER_NETWORK_001 -- the settings of one forge run, passed explicitly. `FromConsole()` reads the
+ * anastasis.Terrain.Forge.* CVars (what the render uses, and what `Apply` above uses); `Canonical()`
+ * is their defaults, fixed: the simulation's geography (`AnastasisCanonicalGeography`) is computed
+ * with it and never reads a render CVar.
+ */
+struct FSettings
+{
+	int32 Subdiv = DefaultSubdiv;
+	double Exaggerate = 3.6;
+	bool bTerraces = false;
+	bool bEscarpments = false;
+	bool bBicubic = true;
+	bool bSharpen = false;
+	double TalusDeg = 40.0;
+	int32 ErosionIterations = 300;
+
+	static FSettings FromConsole();
+	static FSettings Canonical() { return FSettings(); }
+};
+
+bool Apply(
+	const AnastasisWorldView::FWorldVisualSnapshot& Crop,
+	AnastasisTerrainSurface::FGeometry& InOut,
+	FMesh& OutMeta,
+	const FSettings& Settings,
+	const AnastasisWorldView::FWorldVisualSnapshot* HaloCrop = nullptr,
+	TArray<double>* OutLaplacian = nullptr);
+
 bool SampleHeight(const FMesh& Mesh, double WorldX, double WorldY, double& OutZ);
 bool SampleActiveWater(double WorldX, double WorldY, double& OutZ);
 

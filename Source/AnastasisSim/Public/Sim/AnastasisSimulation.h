@@ -59,6 +59,14 @@ public:
 	void Reset(uint32 Seed, int32 Width, int32 Height);
 
 	/**
+	 * EXTENSION -- ecart n°51 (water-network-001) : juste apres Reset, l'hote donne l'eau du reseau de
+	 * drainage canonique (1 = eau par tuile) ; le monde la prend (AnastasisWorld::RestampWater) et le
+	 * village se relie a nouveau (grille de navigation rebatie). Refuse (-1) si le masque n'a pas la
+	 * taille du monde ou si le village a deja des habitants ou des batiments. Rend les tuiles changees.
+	 */
+	int32 ApplyWaterMask(const TArray<uint8>& Water);
+
+	/**
 	 * Harnais : le chemin de `deserialize`. Le monde est FOURNI (genere puis
 	 * `tileDiff` applique, Harness/AnastasisJsSave.h), l'horloge est celle de la
 	 * sauvegarde ; la file de minuit part vide (`_dayDeferred` n'est pas

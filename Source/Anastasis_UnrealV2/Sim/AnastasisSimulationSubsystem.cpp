@@ -31,6 +31,7 @@
 #include "Sim/AnastasisDialogueLines.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "WorldView/AnastasisCanonicalGeography.h"
 #include "HAL/PlatformTime.h"
 
 // Default 1 since SKY_TRANSITIONS_001 (2026-09-30), the JS reference's realtime: one day = 90 s.
@@ -101,6 +102,13 @@ static TAutoConsoleVariable<int32> CVarVillageSiteSelection(
 // SITE_FROM_SIM_001 -- GEO_MEASURE_001 measured the rendered-mesh survey moving the opening village by
 // 0.5 to 0.7 km when a RENDER CVar changed (Drainage 0, HumanGeography 0). The simulation now chooses from
 // its own tiles; the rendered survey is kept as an observation (water concordance, rendered slope).
+// WATER_NETWORK_001 -- decision d'Alexandre (2026-10-08) : « l'eau doit respecter son reseau ». Au reset,
+// la simulation prend l'eau du reseau de drainage canonique (AnastasisCanonicalGeography : graine seule,
+// recette fixe, aucune CVar de rendu). Ecart n°51 dans AnastasisSim.
+static TAutoConsoleVariable<int32> CVarSimWaterNetwork(
+    TEXT("anastasis.Sim.WaterNetwork"), 1,
+    TEXT("1 = the simulation's water follows the canonical drainage network (default; what the player sees at default render settings). 0 = the JS hydrology water (previous behaviour, A/B). Applied on reset."), ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarVillageSiteSource(
     TEXT("anastasis.Village.SiteSource"), 1,
     TEXT("Opening site read from: 1 = the simulation's tiles (default; render CVars cannot move the village, the rendered survey is only reported), 0 = the rendered relief (previous behaviour, for A/B)."), ECVF_Default);
@@ -533,6 +541,13 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	OpeningWorkId.Reset();
 	GeoScenarioPath.Reset();
 	Simulation.Reset(Seed, AnastasisWorldView::ReferenceWidth, AnastasisWorldView::ReferenceHeight);
+	if (CVarSimWaterNetwork.GetValueOnGameThread() != 0)
+	{
+		const AnastasisCanonicalGeography::FGeography& Mask = AnastasisCanonicalGeography::Get(Seed);
+		const int32 Changed = Mask.bValid ? Simulation.ApplyWaterMask(Mask.Water) : -1;
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_WATER_NETWORK seed=%u valid=%d error=%s water_tiles=%d rivers=%d lakes=%d changed_tiles=%d compute_s=%.2f"),
+			Seed, Mask.bValid ? 1 : 0, Mask.Error.IsEmpty() ? TEXT("-") : *Mask.Error, Mask.WaterTiles, Mask.Rivers, Mask.Lakes, Changed, Mask.Seconds);
+	}
 	// CHRONIQUE_VILLAGE_001 : une simulation neuve, une chronique neuve. Le nom provisoire d'un habitant
 	// s'accorde au portrait que la presentation lui donnera (meme tirage que SyncVillagers).
 	Chronicle.Reset(Seed);

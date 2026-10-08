@@ -462,4 +462,66 @@ namespace AnastasisWorld
 
 		return World;
 	}
+	int32 RestampWater(FWorld& World, const TArray<uint8>& Water)
+	{
+		// ecart n°51 : l'eau de la simulation suit le reseau de drainage canonique (decision d'Alexandre,
+		// 2026-10-08). La generation JS reste intacte : seul l'hote appelle cette passe.
+		const int32 W = World.W, H = World.H, N = W * H;
+		if (Water.Num() != N || World.Tiles.Num() != N) return -1;
+		int32 Changed = 0;
+		for (int32 I = 0; I < N; ++I)
+		{
+			FTile& T = World.Tiles[I];
+			const bool bWasWater = T.Type == ETileType::Water;
+			const bool bWater = Water[I] != 0;
+			if (bWater == bWasWater) continue;
+			++Changed;
+			if (bWater)
+			{
+				T.Type = ETileType::Water;
+				T.Resource = EResource::None;
+				T.Amount = 0;
+				T.CropId = ECropId::None;
+			}
+			else
+			{
+				T.Type = ETileType::Grass;
+				T.Resource = EResource::None;
+				T.Amount = 0;
+				T.CropId = ECropId::None;
+				T.Alt = FMath::Max(T.Alt, SeaLevel + 0.005);
+			}
+		}
+		// Distance a l'eau (4-voisinage), comme DistanceFieldToWater, mais sur le type de tuile.
+		TArray<uint8> Dist;
+		Dist.Init(255, N);
+		TArray<int32> Queue;
+		Queue.Reserve(N);
+		for (int32 I = 0; I < N; ++I)
+		{
+			if (World.Tiles[I].Type == ETileType::Water) { Dist[I] = 0; Queue.Add(I); }
+		}
+		for (int32 Head = 0; Head < Queue.Num(); ++Head)
+		{
+			const int32 I = Queue[Head];
+			if (Dist[I] >= 254) continue;
+			const int32 X = I % W, Y = I / W;
+			const int32 Next[4] = { X + 1 < W ? I + 1 : -1, X > 0 ? I - 1 : -1, Y + 1 < H ? I + W : -1, Y > 0 ? I - W : -1 };
+			for (const int32 J : Next)
+			{
+				if (J < 0 || Dist[J] != 255) continue;
+				Dist[J] = Dist[I] + 1;
+				Queue.Add(J);
+			}
+		}
+		for (int32 I = 0; I < N; ++I)
+		{
+			// Memes formules que la generation (voir GenerateWorld).
+			const uint8 WD = Dist[I];
+			FTile& T = World.Tiles[I];
+			T.Shore = WD == 0 ? 0.0 : AnastasisMath::Clamp(1.0 - (WD - 0.4) / 4.6, 0.0, 1.0);
+			T.Wetness = WD == 0 ? 1.0 : AnastasisMath::Clamp(1.0 - WD / 6.5, 0.0, 1.0);
+		}
+		return Changed;
+	}
 }

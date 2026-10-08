@@ -76,6 +76,16 @@ namespace AnastasisWorld
 	inline constexpr double ForestTileMaxFrac = 0.14;
 
 	ANASTASISSIM_API FWorld GenerateWorld(uint32 Seed, int32 W, int32 H);
+
+	/**
+	 * EXTENSION -- ecart n°51 (water-network-001) : reecrit l'eau du monde d'apres un masque (1 = eau),
+	 * celui du reseau de drainage canonique que fournit l'hote. Une tuile qui devient eau perd sa
+	 * ressource ; une tuile d'eau rendue a la terre devient prairie, relevee juste au-dessus de la mer.
+	 * `Shore` et `Wetness` sont recalcules sur la nouvelle eau avec les formules de la generation (les
+	 * points ou l'on boit suivent) ; les types tires de l'humidite (champs, foret) ne sont pas refaits.
+	 * Rend le nombre de tuiles changees, -1 si le masque n'a pas la taille du monde.
+	 */
+	ANASTASISSIM_API int32 RestampWater(FWorld& World, const TArray<uint8>& Water);
 	ANASTASISSIM_API ECropId PickFieldCropId(int32 X, int32 Y, uint32 Salt);
 	ANASTASISSIM_API const TCHAR* TileTypeName(ETileType Type);
 }

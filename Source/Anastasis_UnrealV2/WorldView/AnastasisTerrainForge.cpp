@@ -468,10 +468,35 @@ bool AnastasisTerrainForge::SampleHeight(const FMesh& Mesh, double WorldX, doubl
 	return FMath::IsFinite(OutZ);
 }
 
+AnastasisTerrainForge::FSettings AnastasisTerrainForge::FSettings::FromConsole()
+{
+	FSettings S;
+	S.Subdiv = CVarForgeSubdiv.GetValueOnGameThread();
+	S.Exaggerate = static_cast<double>(CVarForgeExaggerate.GetValueOnGameThread());
+	S.bTerraces = CVarForgeTerraces.GetValueOnGameThread() != 0;
+	S.bEscarpments = CVarForgeEscarpments.GetValueOnGameThread() != 0;
+	S.bBicubic = CVarForgeBicubic.GetValueOnGameThread() != 0;
+	S.bSharpen = CVarForgeSharpen.GetValueOnGameThread() != 0;
+	S.TalusDeg = static_cast<double>(CVarForgeTalusDeg.GetValueOnGameThread());
+	S.ErosionIterations = CVarForgeErosionIterations.GetValueOnGameThread();
+	return S;
+}
+
 bool AnastasisTerrainForge::Apply(
 	const FWorldVisualSnapshot& Crop,
 	AnastasisTerrainSurface::FGeometry& InOut,
 	FMesh& OutMeta,
+	const FWorldVisualSnapshot* HaloCrop,
+	TArray<double>* OutLaplacian)
+{
+	return Apply(Crop, InOut, OutMeta, FSettings::FromConsole(), HaloCrop, OutLaplacian);
+}
+
+bool AnastasisTerrainForge::Apply(
+	const FWorldVisualSnapshot& Crop,
+	AnastasisTerrainSurface::FGeometry& InOut,
+	FMesh& OutMeta,
+	const FSettings& Settings,
 	const FWorldVisualSnapshot* HaloCrop,
 	TArray<double>* OutLaplacian)
 {
@@ -483,12 +508,12 @@ bool AnastasisTerrainForge::Apply(
 		return false;
 	}
 
-	const int32 Subdiv = FMath::Clamp(CVarForgeSubdiv.GetValueOnGameThread(), 2, 6);
-	const double Exaggerate = FMath::Clamp(static_cast<double>(CVarForgeExaggerate.GetValueOnGameThread()), 1.0, 8.0);
-	const bool bTerraces = CVarForgeTerraces.GetValueOnGameThread() != 0;
-	const bool bEscarpments = CVarForgeEscarpments.GetValueOnGameThread() != 0;
-	const bool bBicubic = CVarForgeBicubic.GetValueOnGameThread() != 0;
-	const bool bSharpen = CVarForgeSharpen.GetValueOnGameThread() != 0;
+	const int32 Subdiv = FMath::Clamp(Settings.Subdiv, 2, 6);
+	const double Exaggerate = FMath::Clamp(Settings.Exaggerate, 1.0, 8.0);
+	const bool bTerraces = Settings.bTerraces;
+	const bool bEscarpments = Settings.bEscarpments;
+	const bool bBicubic = Settings.bBicubic;
+	const bool bSharpen = Settings.bSharpen;
 	// L'altitude fine se lit dans le halo quand il existe : au bord de Crop, le stencil
 	// bicubique a besoin des tuiles voisines, et sans elles la derniere cellule du chunk
 	// ne raccorderait pas a celle du monde entier (cf. Anastasis.Terrain.Forge.ChunkSeam).
@@ -871,8 +896,8 @@ bool AnastasisTerrainForge::Apply(
 		}
 	}
 
-	const double TalusDeg = FMath::Clamp(static_cast<double>(CVarForgeTalusDeg.GetValueOnGameThread()), 0.0, 89.0);
-	const int32 ErosionIterations = FMath::Clamp(CVarForgeErosionIterations.GetValueOnGameThread(), 0, 2000);
+	const double TalusDeg = FMath::Clamp(Settings.TalusDeg, 0.0, 89.0);
+	const int32 ErosionIterations = FMath::Clamp(Settings.ErosionIterations, 0, 2000);
 	if (TalusDeg > 0.0 && ErosionIterations > 0)
 	{
 		ThermalErode(Result.Vertices, Water, FineW, FineH,

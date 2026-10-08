@@ -29,6 +29,15 @@ void FAnastasisSimulation::Reset(uint32 SeedValue, int32 Width, int32 Height)
 	Geo.Unload();
 }
 
+int32 FAnastasisSimulation::ApplyWaterMask(const TArray<uint8>& Water)
+{
+	// ecart n°51 : l'eau suit le reseau ; seul un monde neuf, sans habitants, la recoit.
+	if (Water.Num() != World.Tiles.Num() || !Village.GetActors().IsEmpty() || !Village.GetBuildings().IsEmpty()) return -1;
+	const int32 Changed = AnastasisWorld::RestampWater(World, Water);
+	if (Changed > 0) Village.Bind(World);
+	return Changed;
+}
+
 void FAnastasisSimulation::ResetFromWorld(uint32 SeedValue, AnastasisWorld::FWorld&& InWorld, double InTime, int32 InDay)
 {
 	bBootDeferred = false;

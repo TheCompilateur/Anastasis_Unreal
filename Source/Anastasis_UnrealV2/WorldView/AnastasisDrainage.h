@@ -160,6 +160,11 @@ struct FParams
 	/** Points (XY monde) dont les plaines d'inondation se tiennent a l'ecart : village, point haut. */
 	TArray<FVector2D> Protected;
 	double ProtectedRadiusM = 220.0;
+	/**
+	 * WATER_NETWORK_001 : exageration de la forge dont la vitesse retire la pente. <= 0 = lire
+	 * anastasis.Terrain.Forge.Exaggerate (le rendu) ; > 0 = valeur fixe (recette canonique).
+	 */
+	double ForgeExaggeration = 0.0;
 };
 
 /** anastasis.Terrain.Drainage != 0. */

@@ -1326,7 +1326,11 @@ bool AnastasisDrainage::Apply(
 	// exageree par TERRAIN_FORGE (anastasis.Terrain.Forge.Exaggerate, x3.6) : la vitesse lit
 	// la pente physique, sinon toute riviere de plaine sortirait en torrent.
 	double Exaggeration = 1.0;
-	if (const IConsoleVariable* Exag = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Terrain.Forge.Exaggerate")))
+	if (Params.ForgeExaggeration > 0.0)
+	{
+		Exaggeration = FMath::Max(1.0, Params.ForgeExaggeration); // WATER_NETWORK_001 : recette canonique
+	}
+	else if (const IConsoleVariable* Exag = IConsoleManager::Get().FindConsoleVariable(TEXT("anastasis.Terrain.Forge.Exaggerate")))
 	{
 		Exaggeration = FMath::Max(1.0, static_cast<double>(Exag->GetFloat()));
 	}

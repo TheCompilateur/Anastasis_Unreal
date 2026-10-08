@@ -911,3 +911,22 @@ Réduit : `sharePeopleBeliefs` n'est pas porté, et son tirage (`sim.rng`, avant
 - **harnais** : aucune
 
 Chaque soir, une famille sans toit à soi (une par soir ; celle dont un seul a un toit, comme le chef de la maison d'ouverture, après celles qui n'en ont aucun) décide de bâtir : son chef trace la parcelle près de lui, sur une case d'où il atteint le puits et qui ne coupe personne de l'eau (devis livré : la famille apporte ses matériaux). Seuls la famille et ceux qui ont dit oui y travaillent. Les murs montent par les siens ; le toit (la moitié des pièces) attend qu'un aidant hors de la famille y ait posé ses pièces : les siens s'arrêtent, l'aidant pose seul les premières. Chaque jour, le chef va demander de l'aide à deux personnes de plus, d'abord celles qu'il apprécie ; chacune pèse sa réponse (Bible §29 : une somme, la raison dominante retournée) — souvenir d'une aide reçue de lui (+40, vécue : une aide racontée par un autre n'oblige pas), amitié (×0,5), entraide (+8), souvenir d'un refus de lui (−40, vécu aussi), son propre toit d'abord (−45), dette non rendue (−25), autre chantier (−20) ou son métier (−10), faiblesse (−40), inconnu (−12). Le refus se retient (`refusedHelp`) ; tout le monde sollicité, le tour recommence. La maison levée revient à la famille (le chef propriétaire, les siens y logent sans la capacité d'une maison de phase 1), et le chef retient chacun de ceux qui l'ont aidée (`helped`, avec ses coups de marteau). La demande ne se marche pas : elle se fait le soir, sans tour physique des maisons. À trancher : ces règles comme base de l'économie de l'entraide, ou les porter d'abord dans la référence.
+
+### n° 51 — L'eau du monde suit le réseau de drainage canonique
+
+- **classe** : EXTENSION
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : water-network-001
+- **activation** : hôte seulement — `FAnastasisSimulation::ApplyWaterMask`, appelé par `UAnastasisSimulationSubsystem::ResetCanonical` quand `anastasis.Sim.WaterNetwork` vaut 1 (défaut). Aucun test de la simulation ni scénario du harnais ne l'appelle : `GenerateWorld` et `Reset` restent ceux de la référence, au bit près.
+- **reference** : `src/world/hydrology.js` (`carveChannels`, `stampLakeBasins`, `prunePuddles`) — l'eau de la référence est faite de tranchées sous le niveau de la mer (27 plans d'eau, la plupart sans exutoire, HYDRO_NETWORK_001) ; décision d'Alexandre du 2026-10-08 : « l'eau doit respecter son réseau ».
+- **cpp** : `World/AnastasisWorld.cpp` (`RestampWater`), `Sim/AnastasisSimulation.cpp` (`ApplyWaterMask`)
+- **harnais** : aucune
+- **detail** : `docs/unreal/WATER_NETWORK_001.md`
+
+L'hôte calcule le réseau de drainage canonique (`Anastasis_UnrealV2/WorldView/AnastasisCanonicalGeography` :
+graine seule, recette fixe, aucune CVar de rendu) et en tire un masque d'eau par tuile ; la simulation
+le prend. Une tuile devenue eau perd sa ressource ; une tuile d'eau rendue à la terre devient prairie,
+juste au-dessus de la mer. `Shore` et `Wetness` sont recalculés sur la nouvelle eau avec les formules
+de la génération ; l'humidité de fond (`Moist`) et les types qui en découlent (champs, forêt) ne sont
+pas refaits. `FlowX` / `FlowZ` / `FlowAmt` restent ceux de la référence.
