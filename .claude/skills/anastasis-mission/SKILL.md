@@ -36,8 +36,9 @@ tools\unreal\anastasis-unreal.ps1 build                         # premier build 
 
 ## 3. Passer la main
 
-**Une file, un éditeur (EDITOR_QUEUE_001, `AGENTS.md`).** Un seul éditeur utile à la fois sur cette
-machine : on ne démarre plus d'éditeur pour se prouver. La suite et les preuves PIE tournent au lot.
+**Une file, un éditeur (EDITOR_QUEUE_001, `AGENTS.md`).** Un seul éditeur avec rendu à la fois sur cette
+machine : on n'en démarre pas pour se prouver. La suite tourne dans `finish`, sans rendu (HEADLESS_GATE_001,
+~5 min, un demi-éditeur à la porte mémoire) ; les preuves PIE tournent au lot.
 
 1. Fiche `docs/unreal/handoffs/<mission>.md` depuis `_TEMPLATE.md` : MISSION, FILES_OWNED, COMMIT, MEC
    (commandes et **valeurs** obtenues), SCN, PLY, ECARTS (si `Source/AnastasisSim/` est touché),
@@ -46,12 +47,13 @@ machine : on ne démarre plus d'éditeur pour se prouver. La suite et les preuve
    toi, ou `PROOFS: (aucune)`. Une preuve nouvelle : l'inscrire au registre (une ligne), la mettre au
    point par `tools\unreal\editor-batch.ps1 -Proofs <nom>` (un éditeur, ta preuve, il se ferme).
 2. Tout commiter.
-3. `tools\unreal\agent-worktree.ps1 finish -Mission <mission>` → `HANDOFF_READY::YES (queued)` : build
-   passé, **pas d'éditeur**, la suite et tes preuves attendent le lot. Le dire tel quel : `queued` n'est
-   pas un PASS. Une branche sans `Source/`, `Config/`, `Content/`, `Plugins/` ni `.uproject` sort
-   `(nounreal)`, sans build. `finish -Prove` (suite dans ton propre éditeur) : seulement si Alexandre
-   attend un verdict tout de suite ; rapporter alors PASS / KNOWN_EXPECTED_FAILURE / FAIL séparément.
-   `finish` marque le commit : un commit ajouté ensuite exige un nouveau `finish`.
+3. `tools\unreal\agent-worktree.ps1 finish -Mission <mission>` → `HANDOFF_READY::YES (proved)` : build
+   passé, suite passée sans rendu ; rapporter PASS / KNOWN_EXPECTED_FAILURE / FAIL séparément. Tes
+   preuves PIE attendent le lot. Une branche sans `Source/`, `Config/`, `Content/`, `Plugins/` ni
+   `.uproject` sort `(nounreal)`, sans build. Machine saturée (`EDITOR_GATE::TIMEOUT`) :
+   `finish -Queue` → `HANDOFF_READY::YES (queued)`, build seul, la suite attend le lot ; le dire tel
+   quel : `queued` n'est pas un PASS. `finish` marque le commit : un commit ajouté ensuite exige un
+   nouveau `finish`.
 4. **Ne pas intégrer soi-même**, même sur « intègre » ou « mets-le dans le jeu » : une seule session, désignée
    par Alexandre, lance `integrate` / `integrate-batch` (`AGENTS.md`, « Un seul intégrateur »). Ordre, dépendance
    entre branches ou preuve fragile : dans `INTEGRATION_RISK`. S'arrêter à `HANDOFF_READY::YES` : l'intégrateur voit ta mission dans
@@ -69,7 +71,8 @@ Si `finish` échoue :
 | un test marqué sort `Fail` | lire la sortie du test lui-même ; ne jamais toucher au marqueur ni au registre |
 | machine saturée (RAM libre < 4 Go, éditeur > 5 min au boot) | attendre une fenêtre calme, relancer ; ne pas tuer l'éditeur d'un autre |
 | `editeur Unreal encore ouvert sur ce worktree` | c'est le tien : `quit_editor()` par MCP ou `Stop-Process -Id <pid>`, puis relancer `finish` |
-| `EDITOR_GATE::WAIT` / `EDITOR_GATE::TIMEOUT` | porte mémoire (`AGENTS.md`) : trop d'éditeurs ou de RAM prise ; relancer plus tard, jamais `ANASTASIS_EDITOR_GATE=0` sans mandat |
+| `EDITOR_GATE::WAIT` / `EDITOR_GATE::TIMEOUT` | porte mémoire (`AGENTS.md`) : trop d'éditeurs ou de RAM prise ; relancer plus tard, ou `finish -Queue` (la suite attend le lot) ; jamais `ANASTASIS_EDITOR_GATE=0` sans mandat |
+| `FAIL: des tests sont en echec reel` | c'est ta suite, sans rendu : lire le test ; `HEADLESS_ECART::` = il passe avec rendu, à comprendre avant tout (ne pas l'inscrire à `rhi-tests.txt` pour faire taire) |
 
 ## 4. Verser (rôle intégrateur : la seule session désignée par Alexandre)
 

@@ -38,6 +38,18 @@
 # Le premier editeur passe toujours : le 2026-10-01, apres un redemarrage, sessions Claude
 # et Cursor laissaient 0,6 Go de RAM disponible sans aucun Unreal ouvert. Des seuils de
 # memoire appliques au premier editeur n'auraient laisse travailler personne.
+#
+# Editeur sans rendu (HEADLESS_GATE_001). Un lancement avec -nullrhi (la suite d'automation,
+# report-tests.ps1) n'est pas un editeur complet : mesure du 2026-10-08, meme suite de 369 tests,
+# 6,4 Go de memoire privee et 313 s sans rendu, contre 11,9 Go et 637 s avec. Il compte donc pour
+# ANASTASIS_EDITOR_HEADLESS_WEIGHT (0,5) editeur, ouvert comme a lancer, et a ses propres seuils :
+# ANASTASIS_EDITOR_HEADLESS_MIN_RAM_GB (2,5, son pic de RAM mesure) et
+# ANASTASIS_EDITOR_HEADLESS_MIN_COMMIT_GB (5). Il peut passer devant un ticket d'agent (priorite 1)
+# qui attend depuis moins de ANASTASIS_EDITOR_HEADLESS_OVERTAKE_MIN minutes (15) : cinq minutes de
+# suite ne doivent pas attendre derriere un editeur complet que la machine ne peut pas encore porter
+# (2026-10-08 : 12 min a la file pour 5 min de suite). Jamais devant un lot d'integration
+# (priorite 0), jamais devant une attente plus longue : le retard qu'il impose est borne. Un editeur
+# dont la ligne de commande est illisible (lance par un autre compte, eleve) compte pour un editeur entier.
 
 if (-not ('AnastasisLaunch' -as [type])) {
   Add-Type -TypeDefinition @'
@@ -103,21 +115,36 @@ public static class AnastasisMemory {
 '@
 }
 
-function Get-AnastasisEditorLoad {
-  $mem = [AnastasisMemory]::Read()
-  $eds = @(Get-Process UnrealEditor, UnrealEditor-Cmd -ErrorAction SilentlyContinue)
-  [pscustomobject]@{
-    Editors  = $eds.Count
-    Pids     = (($eds | ForEach-Object Id) -join ',')
-    RamGB    = [math]::Round($mem[0] / 1GB, 1)
-    CommitGB = [math]::Round($mem[1] / 1GB, 1)
-  }
-}
-
 function Get-AnastasisGateSetting([string]$Name, [double]$Default) {
   $v = [Environment]::GetEnvironmentVariable($Name)
   if ($v) { return [double]$v } # cast PowerShell : culture invariante, "2.5" partout
   return $Default
+}
+
+# Un lancement d'Unreal sans rendu : -nullrhi parmi ses arguments (ou dans sa ligne de commande).
+function Test-AnastasisHeadlessArgs([string]$CommandLine) {
+  return ($CommandLine -match '(?i)(^|\s)-nullrhi(\s|$)')
+}
+
+# Editeurs ouverts et memoire. Weight : chaque editeur compte 1, un sans rendu HeadlessWeight.
+function Get-AnastasisEditorLoad([double]$HeadlessWeight = (Get-AnastasisGateSetting 'ANASTASIS_EDITOR_HEADLESS_WEIGHT' 0.5)) {
+  $mem = [AnastasisMemory]::Read()
+  $eds = @()
+  try {
+    $eds = @(Get-CimInstance Win32_Process -Filter "Name='UnrealEditor.exe' or Name='UnrealEditor-Cmd.exe'" -ErrorAction Stop |
+      ForEach-Object { [pscustomobject]@{ Id = $_.ProcessId; Headless = [bool]($_.CommandLine -and (Test-AnastasisHeadlessArgs $_.CommandLine)) } })
+  } catch {
+    # Sans WMI, chaque editeur compte entier : la porte reste au moins aussi stricte qu'avant.
+    $eds = @(Get-Process UnrealEditor, UnrealEditor-Cmd -ErrorAction SilentlyContinue | ForEach-Object { [pscustomobject]@{ Id = $_.Id; Headless = $false } })
+  }
+  $light = @($eds | Where-Object Headless).Count
+  [pscustomobject]@{
+    Editors  = $eds.Count
+    Weight   = ($eds.Count - $light) + $light * $HeadlessWeight
+    Pids     = (($eds | ForEach-Object { if ($_.Headless) { "$($_.Id)h" } else { "$($_.Id)" } }) -join ',')
+    RamGB    = [math]::Round($mem[0] / 1GB, 1)
+    CommitGB = [math]::Round($mem[1] / 1GB, 1)
+  }
 }
 
 # Lance $Launch quand la machine peut porter un editeur de plus (voir l'en-tete), et rend
@@ -125,16 +152,27 @@ function Get-AnastasisGateSetting([string]$Name, [double]$Default) {
 function Invoke-AnastasisEditorGated {
   param(
     [Parameter(Mandatory = $true)][scriptblock]$Launch,
+    # Le lancement est sans rendu (-nullrhi) : poids, seuils et file d'un editeur sans rendu.
+    [switch]$Headless,
     [int]$MaxEditors = (Get-AnastasisGateSetting 'ANASTASIS_EDITOR_MAX' 2),
     [double]$MinRamGB = (Get-AnastasisGateSetting 'ANASTASIS_EDITOR_MIN_RAM_GB' 3),
     [double]$MinCommitGB = (Get-AnastasisGateSetting 'ANASTASIS_EDITOR_MIN_COMMIT_GB' 8),
+    [double]$HeadlessWeight = (Get-AnastasisGateSetting 'ANASTASIS_EDITOR_HEADLESS_WEIGHT' 0.5),
+    [double]$HeadlessMinRamGB = (Get-AnastasisGateSetting 'ANASTASIS_EDITOR_HEADLESS_MIN_RAM_GB' 2.5),
+    [double]$HeadlessMinCommitGB = (Get-AnastasisGateSetting 'ANASTASIS_EDITOR_HEADLESS_MIN_COMMIT_GB' 5),
+    [double]$HeadlessOvertakeMinutes = (Get-AnastasisGateSetting 'ANASTASIS_EDITOR_HEADLESS_OVERTAKE_MIN' 15),
     [double]$TimeoutMinutes = (Get-AnastasisGateSetting 'ANASTASIS_EDITOR_WAIT_MIN' 45),
-    [int]$PollSeconds = 15
+    [int]$PollSeconds = 15,
+    # Lecture de la charge ; le banc d'essai la remplace par une charge fixe.
+    [scriptblock]$ReadLoad = { Get-AnastasisEditorLoad $HeadlessWeight }
   )
   if ($env:ANASTASIS_EDITOR_GATE -eq '0') { return & $Launch }
+  $myWeight = if ($Headless) { $HeadlessWeight } else { 1 }
+  if ($Headless) { $MinRamGB = $HeadlessMinRamGB; $MinCommitGB = $HeadlessMinCommitGB }
   $gate = New-Object System.Threading.Mutex($false, 'Global\AnastasisEditorGate')
   $gateStart = Get-Date
   $gateNote = [datetime]::MinValue
+  $overtakeNoted = $false
   # File equitable (EDITOR_QUEUE_001). Sans elle, la place liberee allait a qui interrogeait au bon
   # moment : le 2026-10-01 un lot d'integration a attendu 30 min pendant que des suites arrivees apres
   # lui passaient. Un ticket par attente, `<priorite>-<horodatage>-<pid>` ; seul le plus ancien
@@ -156,20 +194,33 @@ function Invoke-AnastasisEditorGated {
         if (-not ($e -is [System.Threading.AbandonedMutexException] -or
                   $e.InnerException -is [System.Threading.AbandonedMutexException])) { throw }
       }
-      $load = Get-AnastasisEditorLoad
+      $load = & $ReadLoad
       $blocked = @()
       if ($ticket) {
         $ahead = 0
+        $passed = 0
         foreach ($t in @(Get-ChildItem $queueDir -Filter '*.ticket' -ErrorAction SilentlyContinue | Sort-Object Name)) {
           if ($t.FullName -eq $ticket) { break }
-          $owner = [int]($t.BaseName.Split('-')[-1])
+          $parts = $t.BaseName.Split('-')
+          $owner = [int]$parts[-1]
           # Ticket d'un lanceur disparu (tue, machine redemarree) : retire, il ne bloque personne.
           if (-not (Get-Process -Id $owner -ErrorAction SilentlyContinue)) { Remove-Item $t.FullName -Force -ErrorAction SilentlyContinue; continue }
+          # Sans rendu : passe devant un agent (priorite 1) qui attend depuis peu, voir l'en-tete.
+          if ($Headless -and $parts[0] -eq '1') {
+            $waitedMin = ((Get-Date).ToUniversalTime().Ticks - [long]$parts[1]) / [TimeSpan]::TicksPerMinute
+            if ($waitedMin -lt $HeadlessOvertakeMinutes) { $passed++; continue }
+          }
           $ahead++
         }
         if ($ahead -gt 0) { $blocked += "file=$ahead devant" }
+        if ($passed -gt 0 -and -not $overtakeNoted) {
+          Write-Host "EDITOR_GATE::SANS_RENDU passe devant $passed attente(s) d'agent de moins de $HeadlessOvertakeMinutes min"
+          $overtakeNoted = $true
+        }
       }
-      if ($load.Editors -ge $MaxEditors) { $blocked += "editeurs=$($load.Editors)/$MaxEditors (pids $($load.Pids))" }
+      if ($load.Weight + $myWeight -gt $MaxEditors) {
+        $blocked += "editeurs=$($load.Weight)+$myWeight/$MaxEditors (pids $($load.Pids), h = sans rendu)"
+      }
       if ($load.Editors -gt 0) {
         if ($load.RamGB -lt $MinRamGB) { $blocked += "ram_dispo=$($load.RamGB)/$MinRamGB Go" }
         if ($load.CommitGB -lt $MinCommitGB) { $blocked += "marge_engagee=$($load.CommitGB)/$MinCommitGB Go" }
@@ -203,7 +254,7 @@ function Start-AnastasisEditor {
     [Parameter(Mandatory = $true)][string]$FilePath,
     [string[]]$ArgumentList = @()
   )
-  $p = Invoke-AnastasisEditorGated {
+  $p = Invoke-AnastasisEditorGated -Headless:(Test-AnastasisHeadlessArgs ($ArgumentList -join ' ')) {
     if ($env:ANASTASIS_EDITOR_VISIBLE -eq '1') {
       Start-Process $FilePath -ArgumentList $ArgumentList -PassThru
     } elseif ($FilePath -match '-Cmd\.exe$') {

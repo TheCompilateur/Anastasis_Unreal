@@ -236,6 +236,44 @@ $dead = Join-Path $env:ANASTASIS_EDITOR_QUEUE_DIR ('1-{0:D19}-{1}.ticket' -f 1, 
 New-Item -ItemType File $dead | Out-Null
 $got = Invoke-AnastasisEditorGated -Launch { 'lance' } -MaxEditors 99 -MinRamGB 0 -MinCommitGB 0 -TimeoutMinutes 0.04 -PollSeconds 1
 Check 'S19 file : ticket d un lanceur mort ignore et retire, pas de ticket laisse' ($got -eq 'lance' -and -not (Test-Path $dead) -and -not @(Get-ChildItem $env:ANASTASIS_EDITOR_QUEUE_DIR -Filter '*.ticket').Count) $got
+
+# 30. HEADLESS_GATE_001 : un editeur sans rendu compte pour un demi, a ses seuils, et passe devant
+#     un agent qui attend depuis peu -- jamais devant un lot ni une longue attente. Charge simulee.
+function Load($w, $n, $ram = 20, $commit = 40) { $o = [pscustomobject]@{ Editors = $n; Weight = $w; Pids = 'banc'; RamGB = $ram; CommitGB = $commit }; return { $o }.GetNewClosure() }
+function Gate($load, [switch]$Headless) {
+  $m = ''
+  try { $m = Invoke-AnastasisEditorGated -Launch { 'lance' } -Headless:$Headless -ReadLoad $load -MaxEditors 2 -MinRamGB 3 -MinCommitGB 8 `
+      -HeadlessWeight 0.5 -HeadlessMinRamGB 2.5 -HeadlessMinCommitGB 5 -HeadlessOvertakeMinutes 15 -TimeoutMinutes 0.02 -PollSeconds 1 6>&1 | ForEach-Object { "$_" } } catch { $m = "$_" }
+  return ($m -join "`n")
+}
+Check 'S30 editeur complet + un ouvert : passe (comme avant)' ((Gate (Load 1 1)) -match 'lance')
+Check 'S30 deux complets ouverts : sans rendu bloque (2+0,5)' ((Gate (Load 2 2) -Headless) -match 'EDITOR_GATE::TIMEOUT.*editeurs=')
+$m = Gate (Load 1.5 2)
+Check 'S30 un complet + un sans rendu : complet bloque (1,5+1)' ($m -match 'EDITOR_GATE::TIMEOUT.*editeurs=') $m
+Check 'S30 un complet + un sans rendu : sans rendu passe (1,5+0,5)' ((Gate (Load 1.5 2) -Headless) -match 'lance')
+$m = Gate (Load 1 1 2.8 6)
+Check 'S30 RAM 2,8 / marge 6 Go : complet bloque par ses seuils' ($m -match 'ram_dispo=.*marge_engagee=') $m
+Check 'S30 RAM 2,8 / marge 6 Go : sans rendu passe (seuils 2,5 / 5)' ((Gate (Load 1 1 2.8 6) -Headless) -match 'lance')
+$recent = Join-Path $env:ANASTASIS_EDITOR_QUEUE_DIR ('1-{0:D19}-{1}.ticket' -f ((Get-Date).ToUniversalTime().AddMinutes(-1).Ticks), $PID)
+New-Item -ItemType File $recent | Out-Null
+$m = Gate (Load 0 0) -Headless
+Check 'S30 sans rendu passe devant un agent qui attend depuis 1 min' ($m -match 'EDITOR_GATE::SANS_RENDU passe devant 1' -and $m -match 'lance') $m
+$m = Gate (Load 0 0)
+Check 'S30 un complet ne passe devant personne' ($m -match 'file=1 devant') $m
+Remove-Item $recent
+$old = Join-Path $env:ANASTASIS_EDITOR_QUEUE_DIR ('1-{0:D19}-{1}.ticket' -f ((Get-Date).ToUniversalTime().AddMinutes(-20).Ticks), $PID)
+New-Item -ItemType File $old | Out-Null
+$m = Gate (Load 0 0) -Headless
+Check 'S30 sans rendu ne passe pas devant une attente de 20 min' ($m -match 'file=1 devant') $m
+Remove-Item $old
+$lot = Join-Path $env:ANASTASIS_EDITOR_QUEUE_DIR ('0-{0:D19}-{1}.ticket' -f ((Get-Date).ToUniversalTime().AddMinutes(-1).Ticks), $PID)
+New-Item -ItemType File $lot | Out-Null
+$m = Gate (Load 0 0) -Headless
+Check 'S30 sans rendu ne passe jamais devant un lot d integration' ($m -match 'file=1 devant') $m
+Remove-Item $lot
+Check 'S30 -nullrhi reconnu dans les arguments, pas un -nullrhix' ((Test-AnastasisHeadlessArgs '"x.uproject" /Engine/Maps/Entry -nullrhi -nosound') -and -not (Test-AnastasisHeadlessArgs '"x.uproject" -nullrhix') -and -not (Test-AnastasisHeadlessArgs '"x.uproject" -unattended'))
+$l = Get-AnastasisEditorLoad 0.5
+Check 'S30 charge reelle lisible (poids, RAM, marge)' ($null -ne $l.Weight -and $l.Weight -le $l.Editors -and $l.RamGB -gt 0 -and $l.CommitGB -gt 0) ($l | Out-String)
 Remove-Item Env:ANASTASIS_EDITOR_QUEUE_DIR
 
 # --- RETEST_RULE_001 ----------------------------------------------------------------------
@@ -264,7 +302,7 @@ $null = NewMission 'r3' @((SourceFile 'r3'))
 Prove 'r3'
 AdvanceMain 'd21' { param($w) Set-Content "$w\doc-d21.md" 'd21' }
 $r = AW integrate-batch -Missions 'r3'
-Check 'S20 lot, arbres identiques : RETEST::SKIP, verse sans portail' ($r.Code -eq 0 -and $r.Out -match 'RETEST::SKIP \(arbres Unreal identiques a \w{7}, finish -Prove de r3\)' -and $r.Out -notmatch 'BUILD::PASS|TESTS::(PASS|QUEUED)' -and $r.Out -match 'BATCH_INTEGRATED::r3' -and (G show 'main:Source/r3.cpp') -eq '// r3') $r.Out
+Check 'S20 lot, arbres identiques : RETEST::SKIP, verse sans portail' ($r.Code -eq 0 -and $r.Out -match 'RETEST::SKIP \(arbres Unreal identiques a \w{7}, suite du finish de r3\)' -and $r.Out -notmatch 'BUILD::PASS|TESTS::(PASS|QUEUED)' -and $r.Out -match 'BATCH_INTEGRATED::r3' -and (G show 'main:Source/r3.cpp') -eq '// r3') $r.Out
 
 # 21. Un seul fichier Source/ change sur main depuis la preuve : portail complet, jamais de reprise.
 #     r1 a ete prouvee avant que r2 et r3 n'arrivent dans main.
@@ -398,5 +436,18 @@ Check 'S29 copie retouchee par l union : prune la reconnait par contenu' ($r1.Co
 $null = NewMission 'pz2' @({ param($w) Set-Content "$w\doc-pz2.md" 'pas verse' })
 $r = AW prune -Mission pz2
 Check 'S29 prune refuse toujours une branche non versee' ($r.Code -ne 0 -and $r.Out -match 'absents de main' -and (G rev-parse --verify --quiet agent/pz2)) $r.Out
+
+# 31. HEADLESS_GATE_001 : finish joue la suite par defaut ; un `queued` n'est repris que par -Queue.
+G checkout -q -f main | Out-Null; G clean -fdq | Out-Null
+$r = AW finish -Mission r1 -Queue -Prove
+Check 'S31 -Queue avec -Prove : refuse' ($r.Code -ne 0 -and $r.Out -match '-Queue \(build seul\) exclut -Prove') $r.Out
+$wq = NewMission 'hq' @((SourceFile 'hq'))
+Set-Content (Join-Path $wtRoot '.handoff\hq.txt') ((G rev-parse agent/hq) + ' queued')
+AdvanceMain 'd31' { param($w) Set-Content "$w\doc-d31.md" 'd31' }
+& git -C $wq rebase -q main 2>&1 | Out-Null
+$r = AW finish -Mission hq
+Check 'S31 queued, finish par defaut : la suite n a jamais tourne, portail rejoue (build tente)' ($r.Code -ne 0 -and $r.Out -match 'UNREAL_CHANGE::OUI' -and $r.Out -notmatch 'RETEST::SKIP') $r.Out
+$r = AW finish -Mission hq -Queue
+Check 'S31 queued, finish -Queue : RETEST::SKIP, reste queued' ($r.Code -eq 0 -and $r.Out -match 'RETEST::SKIP' -and $r.Out -match 'HANDOFF_READY::YES \(queued\)') $r.Out
 
 Remove-Item $base -Recurse -Force -ErrorAction SilentlyContinue

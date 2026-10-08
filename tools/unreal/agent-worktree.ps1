@@ -10,7 +10,7 @@
 # Usage :
 #   agent-worktree.ps1 create     -Mission world-slice-007
 #   agent-worktree.ps1 status
-#   agent-worktree.ps1 finish     -Mission world-slice-007          (build seul ; -Prove : + suite ici)
+#   agent-worktree.ps1 finish     -Mission world-slice-007          (build + suite sans rendu ; -Queue : build seul)
 #   agent-worktree.ps1 integrate  -Mission world-slice-007          (mission deja prouvee seulement)
 #
 # RETEST_RULE_001 (2026-10-01) : une preuve se refait quand ce qu'elle juge a change, pas quand main a
@@ -38,13 +38,20 @@ param(
   # integrate-batch : suite d'automation ciblee (1 a 30 cas) au lieu de toute la suite.
   # Le verdict est explicitement TARGETED_PASS, jamais une preuve de suite complete.
   [string]$TestFilter,
-  # finish : lancer la suite ICI, dans un editeur a soi (l'ancien finish). Par defaut, la suite et
-  # les preuves PIE attendent le lot (EDITOR_QUEUE_001) : un seul editeur pour tout le monde.
-  [switch]$Prove
+  # finish : la suite tourne ICI par defaut, sans rendu (HEADLESS_GATE_001 : ~5 min, ~6 Go, la
+  # moitie d'un editeur a la porte memoire). -Prove reste accepte : c'est le defaut.
+  [switch]$Prove,
+  # finish : build seul, la suite attend le lot (le finish d'EDITOR_QUEUE_001) -- machine saturee,
+  # ou suite que seul le lot peut juger. Marque `queued`.
+  [switch]$Queue
 )
 $ErrorActionPreference = 'Stop'
 if ($TestFilter -and $Command -ne 'integrate-batch') {
   Write-Output 'FAIL: -TestFilter est reserve a integrate-batch'
+  exit 1
+}
+if ($Queue -and ($Prove -or $Full)) {
+  Write-Output 'FAIL: -Queue (build seul) exclut -Prove et -Full (qui lancent la suite)'
   exit 1
 }
 
@@ -71,8 +78,8 @@ $HandoffDir = Join-Path $WorktreeRoot '.handoff'
 function Handoff-Marker($m) { return (Join-Path $HandoffDir "$m.txt") }
 
 # Le marqueur dit AUSSI ce que finish a prouve (EDITOR_QUEUE_001) : `<sha> <mode>`.
-#   proved    build + suite passes dans le worktree (finish -Prove, ou -Full)
-#   queued    build passe ; suite et preuves PIE attendent le lot (integrate-batch)
+#   proved    build + suite passes dans le worktree (finish, le defaut depuis HEADLESS_GATE_001)
+#   queued    build passe ; suite et preuves PIE attendent le lot (finish -Queue)
 #   nounreal  rien que le build ou la suite puissent juger
 # Un marqueur d'avant (sha seul) vaut `proved`.
 function Read-HandoffMarker($m) {
@@ -257,7 +264,7 @@ function Reset-IntegrationTree([string]$integ, [string]$ib) {
 }
 
 # Le build et la suite d'un arbre, ou rien s'il n'y a pas de changement Unreal.
-# Sans $runTests (finish par defaut) : le build seul, la suite attend le lot -- pas d'editeur.
+# Sans $runTests (finish -Queue) : le build seul, la suite attend le lot -- pas d'editeur.
 # Ecrit son compte rendu et pose $script:GateOk et $script:GateMode (proved | queued | nounreal).
 function Invoke-UnrealGate([string]$root, [string[]]$unreal, [bool]$runTests = $true) {
   $script:GateOk = $false
@@ -293,7 +300,13 @@ function Invoke-UnrealGate([string]$root, [string[]]$unreal, [bool]$runTests = $
     }
     Write-Output "TESTS::TARGETED_PASS cas=$cases filter=$TestFilter -- suite complete non executee"
   } else {
-    & (Join-Path $root 'tools\unreal\report-tests.ps1')
+    # Porte memoire saturee (EDITOR_GATE::TIMEOUT) : ce n'est pas un echec de test, et la mission
+    # peut passer la main sans la suite.
+    try { & (Join-Path $root 'tools\unreal\report-tests.ps1') } catch {
+      Write-Output "$_"
+      Write-Output 'FAIL: suite non jouee -- machine saturee ? relancer plus tard, ou finish -Queue (la suite attend le lot)'
+      return
+    }
     if ($LASTEXITCODE -ne 0) { Write-Output 'FAIL: des tests sont en echec reel'; return }
   }
   $script:GateMode = 'proved'
@@ -622,25 +635,25 @@ switch ($Command) {
     # -base main : seul ce que la branche ajoute echoue ; un champ deja verse par une autre sort en WARN.
     & node (Join-Path $path 'tools\migration\check-state-fields.mjs') -base main
     if ($LASTEXITCODE -ne 0) { Fail 'FAIL: champs d etat non lus par StateDigest -- voir tools\migration\check-state-fields.mjs' }
-    # Build seulement si la branche change quelque chose qu'il juge ; la suite, seulement avec
-    # -Prove ou -Full (EDITOR_QUEUE_001 : sinon elle attend le lot, un editeur pour tous).
+    # Build et suite seulement si la branche change quelque chose qu'ils jugent ; la suite tourne
+    # sans rendu (HEADLESS_GATE_001), sauf -Queue (elle attend alors le lot, EDITOR_QUEUE_001).
     $mb = (Invoke-Git -C $path merge-base main HEAD).Out[0]
     $unreal = @(Unreal-Changes $path "$mb..HEAD")
     # RETEST_RULE_001 : finish apres un rebase. Le commit marque a deja passe ce portail ; si
     # ses arbres Unreal sont ceux de HEAD, le rejouer ne jugerait rien de nouveau. Le mode
-    # prouve est conserve : un `queued` reste `queued` (la suite attend toujours le lot), et
-    # -Prove n'est satisfait que par un `proved`. -Full force le portail.
+    # prouve est conserve : un `queued` n'est repris que par `finish -Queue` (sans -Queue, la
+    # suite n'a jamais tourne : elle tourne maintenant). -Full force le portail.
     $head = (Invoke-Git -C $path rev-parse HEAD).Out[0]
     $prev = Read-HandoffMarker $Mission
     $reuse = $unreal.Count -gt 0 -and -not $Full -and $prev -and $prev.Sha -ne $head -and
-      ($prev.Mode -eq 'proved' -or ($prev.Mode -eq 'queued' -and -not $Prove)) -and
+      ($prev.Mode -eq 'proved' -or ($prev.Mode -eq 'queued' -and $Queue)) -and
       (Test-SameUnrealTrees $path $prev.Sha $head)
     if ($reuse) {
       Write-RetestSkip $prev.Sha $prev.Mode ''
       $script:GateOk = $true
       $script:GateMode = $prev.Mode
     } else {
-      Invoke-UnrealGate $path $unreal ([bool]($Prove -or $Full))
+      Invoke-UnrealGate $path $unreal ([bool](-not $Queue))
     }
     if (-not $script:GateOk) { exit 1 }
     $dirty = @(& git -C $path status --porcelain --untracked-files=all)
@@ -924,7 +937,7 @@ switch ($Command) {
     }
     $top = (Invoke-Git -C $integ rev-parse HEAD).Out[0]
     $unreal = @(Unreal-Changes $integ "$mainBefore..$top")
-    # RETEST_RULE_001 : une mission du lot dont `finish -Prove` a juge exactement ces arbres
+    # RETEST_RULE_001 : une mission du lot dont la suite de `finish` a juge exactement ces arbres
     # Unreal (typiquement une mission seule, rejouee sur un main qui n'a bouge qu'en docs) : la
     # suite ne jugerait rien de neuf. Seul `proved` compte : `queued` n'a pas vu la suite.
     $reusedFrom = $null
@@ -937,7 +950,7 @@ switch ($Command) {
     $built = $false
     if ($reusedFrom) {
       Write-Output "UNREAL_CHANGE::OUI ($($unreal.Count) fichier(s), par ex. $($unreal[0]))"
-      Write-RetestSkip $reusedFrom.Sha 'proved' ", finish -Prove de $($reusedFrom.Mission)"
+      Write-RetestSkip $reusedFrom.Sha 'proved' ", suite du finish de $($reusedFrom.Mission)"
     } else {
       Invoke-UnrealGate $integ $unreal
       if (-not $script:GateOk) { Write-Output 'BATCH::FAIL rien n a bouge (main intact)'; exit 1 }

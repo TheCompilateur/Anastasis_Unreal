@@ -53,7 +53,7 @@ Cycle de vie, un outil unique : `tools\unreal\agent-worktree.ps1`
 |---|---|
 | `create -Mission <m>` | branche + worktree depuis `main`, port MCP du worktree enregistré |
 | `status` | tous les worktrees : modifications, avance/retard sur `main`, branches non intégrées, **verrou de `main`**, **missions prêtes pour le lot** et la commande `integrate-batch` à lancer. Le lot est **simulé d'avance** (`git merge-tree`, sans éditeur, ~1 s par commit) : `PRETES_POUR_LE_LOT::` ne garde que ce qui s'empile proprement sur `main` ; `LOT_SUIVANT::` = propre seule mais en conflit avec une mission du lot ; `A_REBASER::` = en conflit avec `main`, fichiers nommés (l'agent rebase puis `finish`) ; `DEJA_DANS_MAIN::` = versée par contenu (`prune`) |
-| `finish -Mission <m>` | portail de fin : index `tools/unreal/` à jour, aucun Unreal lancé hors `Start-AnastasisEditor`, aucun éditeur encore ouvert sur le worktree, preuves déclarées (`PROOFS:` de la fiche) présentes au registre, **build seul** si la branche touche `Source/`, `Config/`, `Content/`, `Plugins/` ou le `.uproject` — **pas d'éditeur : la suite et les preuves PIE attendent le lot** (`TESTS::QUEUED`) ; `-Prove` lance la suite ici (ancien finish), `-Full` force build + suite même sans changement Unreal ; refuse de passer la main si du travail n'est pas commité ; marque le commit (`ANASTASIS_WORKTREES\.handoff\<m>.txt` : `<sha> proved|queued|nounreal`) |
+| `finish -Mission <m>` | portail de fin : index `tools/unreal/` à jour, aucun Unreal lancé hors `Start-AnastasisEditor`, aucun éditeur encore ouvert sur le worktree, preuves déclarées (`PROOFS:` de la fiche) présentes au registre, **build puis suite sans rendu** si la branche touche `Source/`, `Config/`, `Content/`, `Plugins/` ou le `.uproject` (HEADLESS_GATE_001 : ~5 min, ~6 Go, marque `proved`) — **les preuves PIE attendent le lot** ; `-Queue` = build seul, la suite attend aussi le lot (`TESTS::QUEUED`, marque `queued`) ; `-Prove` reste accepté (c'est le défaut) ; `-Full` force build + suite même sans changement Unreal ; refuse de passer la main si du travail n'est pas commité ; marque le commit (`ANASTASIS_WORKTREES\.handoff\<m>.txt` : `<sha> proved|queued|nounreal`) |
 | `mcp -Mission <m>` | (ré)enregistre le port MCP d'un worktree existant côté Claude Code |
 | `integrate -Mission <m>` | rôle intégrateur, **une mission déjà prouvée** (`proved` / `nounreal`) : prend le verrou de `main`, avance rapide de **`main`** (jamais de la branche extraite du canonique), après avoir rejoué index et lancements Unreal sur l'arbre versé ; canonique hors `main` → copie de travail intacte. Refuse une mission `queued` (elle passe par le lot) et refuse pendant un lot (`MAIN_LOCK::TENU`). Si `main` a avancé : rejoue la branche sur `main` et la verse si la règle de retest le permet (point 6 ci-dessous), sinon `RETEST::REQUIS` |
 | `integrate-batch -Missions a,b,c` | rôle intégrateur, **file groupée — la voie normale** : prend le verrou de `main` (personne ne la déplace pendant le lot), admet les missions dont `finish` a passé sur le commit actuel, les empile sur `main` dans le worktree d'intégration persistant `ANASTASIS_WORKTREES\_integration` (`ANASTASIS_INTEGRATION_DIR` le déplace si ce chemin devient inscriptible) (une mission en conflit est écartée, les autres passent), **un seul** portail (index, lancements, build + suite si le lot touche Unreal), puis **toutes les preuves PIE déclarées par le lot dans un seul éditeur** (`editor-batch.ps1` ; une preuve en échec désigne sa mission, `main` intact), puis avance rapide de `main`. Une mission qui porte les commits d'une autre non versée est refusée, sauf **relais déclaré** : sa fiche écrit `RELAIS: a, b` et son `PROOFS:` reprend toutes les preuves de ces fiches (`RELAY_ADMITTED::`) |
@@ -74,9 +74,13 @@ Validé par Alexandre le 2026-10-01. La machine a 16 Go, un éditeur en prend 8 
 porte mémoire 8 à 14 min, puis 12 min de suite — et la preuve était perdue dès qu'un autre agent
 avançait `main` pendant ces 25 min. Désormais :
 
-1. **Ne démarre pas d'éditeur pour te prouver.** Travaille, build, commit, déclare dans ta fiche ce
+1. **Ne démarre pas d'éditeur avec rendu pour te prouver.** Travaille, build, commit, déclare dans ta fiche ce
    qu'il faudra rejouer — `PROOFS: <noms de tools/unreal/proofs.txt>` (ou `PROOFS: (aucune)`) — puis
-   `finish`. Il compile et s'arrête là : `HANDOFF_READY::YES (queued)`.
+   `finish`. Il compile, puis joue la suite **sans rendu** (HEADLESS_GATE_001, validé par Alexandre le
+   2026-10-08 : même verdict que l'ancien run sur les 369 tests, en 313 s et 6,4 Go au lieu de 637 s et
+   11,9 Go) : `HANDOFF_READY::YES (proved)`. Un test cassé se voit chez toi, pas au lot de tout le monde.
+   Les preuves PIE attendent le lot. Machine saturée (`EDITOR_GATE::TIMEOUT`) : `finish -Queue`, build
+   seul, `HANDOFF_READY::YES (queued)` ; la suite tourne alors au lot.
 2. **Une preuve PIE nouvelle s'inscrit au registre** `tools/unreal/proofs.txt` (nom, script, motif de
    réussite, motif d'échec, délai, variables). Pour la mettre au point, `editor-batch.ps1 -Proofs <nom>`
    dans ton worktree : un éditeur, ta preuve, puis il se ferme.
@@ -103,8 +107,9 @@ avançait `main` pendant ces 25 min. Désormais :
    nouveau PASS. Un seul fichier Unreal différent : portail complet (`RETEST::REQUIS` dans `integrate`). Seule
    une preuve `proved` couvre la suite ; `queued` ne couvre que le build. `integrate` rejoue désormais sur `main`
    une branche qui n'est plus en avance rapide, au lieu de la refuser, quand la règle le permet ; `-Full` la désactive.
-7. **`finish -Prove`** (suite dans ton propre éditeur) est l'exception : quand Alexandre attend un verdict
-   tout de suite, ou pour une mission que le lot ne peut pas juger.
+7. **`finish -Queue`** (build seul, suite au lot) est l'exception : machine saturée, ou suite que seul le
+   lot peut juger. Une mission `proved` dont les arbres Unreal sont ceux du lot (une seule mission Unreal
+   dans le lot, typiquement) lui épargne la suite : `RETEST::SKIP (…, suite du finish de <m>)`.
 
 Chaque worktree a ses propres `Binaries/` et `Intermediate/` : le premier build y est
 complet, c'est normal et c'est le prix de l'isolation.
@@ -327,12 +332,21 @@ compilation : tout gelait, puis un éditeur mourait, et son agent cherchait une 
 
 | Condition | Défaut | Variable |
 |---|---|---|
-| éditeurs Unreal ouverts (`UnrealEditor`, `UnrealEditor-Cmd`, **celui d'Alexandre compris**) | < 2 | `ANASTASIS_EDITOR_MAX` |
+| éditeurs Unreal ouverts (`UnrealEditor`, `UnrealEditor-Cmd`, **celui d'Alexandre compris**), celui à lancer compris | ≤ 2 | `ANASTASIS_EDITOR_MAX` |
 | RAM disponible, dès qu'un éditeur est déjà ouvert | ≥ 3 Go | `ANASTASIS_EDITOR_MIN_RAM_GB` |
 | marge avant la limite de mémoire engagée, idem | ≥ 8 Go | `ANASTASIS_EDITOR_MIN_COMMIT_GB` |
 
 Le premier éditeur passe toujours : après un redémarrage, les sessions Claude et Cursor laissent à elles
 seules moins d'1 Go de RAM disponible ; des seuils mémoire sur le premier éditeur bloqueraient tout le monde.
+
+**Éditeur sans rendu (HEADLESS_GATE_001).** Un lancement avec `-nullrhi` (la suite, `report-tests.ps1`) pèse
+la moitié d'un éditeur (mesure du 2026-10-08 : 6,4 Go de mémoire privée contre 11,9) : il compte pour 0,5 dans
+le total, ouvert comme à lancer (`ANASTASIS_EDITOR_HEADLESS_WEIGHT`), avec ses propres seuils, 2,5 Go de RAM
+(`ANASTASIS_EDITOR_HEADLESS_MIN_RAM_GB`) et 5 Go de marge engagée (`ANASTASIS_EDITOR_HEADLESS_MIN_COMMIT_GB`).
+Il peut passer devant un agent qui attend son éditeur depuis moins de 15 min
+(`ANASTASIS_EDITOR_HEADLESS_OVERTAKE_MIN`, `EDITOR_GATE::SANS_RENDU`), jamais devant un lot d'intégration.
+Un éditeur dont la ligne de commande est illisible (lancé par un autre compte) compte entier. Dans
+`EDITOR_GATE::WAIT`, un pid suivi de `h` est un éditeur sans rendu.
 
 Pendant l'attente, une ligne `EDITOR_GATE::WAIT` par minute dit ce qui bloque. Au bout de 45 min
 (`ANASTASIS_EDITOR_WAIT_MIN`) : `EDITOR_GATE::TIMEOUT`, levé comme une erreur. **C'est une machine saturée,
@@ -361,10 +375,10 @@ Opérateur et portails :
 | `nox-cubemap-probe.py` | NOX_003 : capture HDR emissive du ciel via l API UE, quatre etats a meme pose de crete ; sonde de la source seulement, pas le cubemap temps reel ni des lux ; registre `nox-cubemap-probe` |
 | `anastasis-unreal.ps1` | `status` / `build` / `build-game` / `verify` / `health` / `editor` |
 | `agent-worktree.ps1` | cycle de vie multi-agent : `create` / `status` / `finish` / `integrate` / `integrate-batch` / `prune` / `preflight` / `postflight` / `mcp` |
-| `test-agent-worktree.ps1` | banc d'essai de `finish` (saut sans changement Unreal, preuves déclarées), `integrate`, `integrate-batch`, verrou de `main`, règle de retest (arbres identiques / un `Source/` changé) et `prune` sur un dépôt jetable ; à relancer après toute modification de `agent-worktree.ps1` |
+| `test-agent-worktree.ps1` | banc d'essai de `finish` (saut sans changement Unreal, preuves déclarées), `integrate`, `integrate-batch`, verrou de `main`, règle de retest (arbres identiques / un `Source/` changé), `prune`, `finish -Queue`, et la porte mémoire (file, éditeur sans rendu, charge simulée) sur un dépôt jetable ; à relancer après toute modification de `agent-worktree.ps1` ou `editor-launch.ps1` |
 | `mcp-port.ps1` | port MCP d'une racine, à dot-sourcer |
 | `tools-index.ps1` | contrôle cet index contre le dossier, à dot-sourcer : `finish` bloque, `health` passe YELLOW |
-| `editor-launch.ps1` | `Start-AnastasisEditor` : lancement d'Unreal sans focus, avec gardien, derrière la porte mémoire, à dot-sourcer |
+| `editor-launch.ps1` | `Start-AnastasisEditor` : lancement d'Unreal sans focus, avec gardien, derrière la porte mémoire (un lancement `-nullrhi` y pèse un demi-éditeur), à dot-sourcer |
 | `editor-window-guard.ps1` | gardien lancé par `Start-AnastasisEditor` : fenêtres hors écran, focus rendu |
 | `report-tests.ps1` | suite `Anastasis`, classée PASS / KNOWN_EXPECTED_FAILURE / FAIL, refuse un run tronqué ; **sans rendu** par défaut (`-nullrhi`, `/Engine/Maps/Entry`, HEADLESS_TESTS_001) : run incomplet → suite rejouée avec rendu, test en échec → rejoué seul avec rendu, PASS seulement s'il est inscrit à `rhi-tests.txt` (sinon `HEADLESS_ECART::`, reste FAIL) ; `-Mode gpu` ou `ANASTASIS_TESTS_MODE=gpu` = l'ancien run ; durée et pic mémoire par run (`TEST_MODE::`) |
 | `editor-batch.ps1` + `editor-batch.py` | plusieurs preuves PIE du registre dans **un seul** éditeur (EDITOR_QUEUE_001) : `-Proofs a,b` ; les preuves PIE et la première capture `*-capture` partagent un éditeur, chaque capture de plus a le sien (EDITOR_BATCH_SPLIT_001 : la 2e capture d'un même éditeur plante dans PythonScriptPlugin) ; le `quit_editor()` de chaque script passe au suivant, PIE arrêté et rythme (`TimeScale`, `Speed`, `Warp`) reposé entre deux ; verdict `PROOF::PASS/FAIL` par preuve → `Saved/EditorBatch/<horodatage>/` ; appelé par `integrate-batch` |
