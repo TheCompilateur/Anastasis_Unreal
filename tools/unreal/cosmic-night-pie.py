@@ -18,6 +18,7 @@ CVARS = {
     'anastasis.Sim.TimeScale': 0,
     'anastasis.Sky.Clock': 1,
     'anastasis.Sky.Cosmic': 1,
+    'anastasis.Sky.CosmicArtVersion': 1,
     'anastasis.Sky.CosmicEvent': 2,
     'anastasis.Sky.Day': 1,
     'anastasis.Sky.Hour': 23,
@@ -42,9 +43,11 @@ def sample(atm):
     material = dome.get_material(0) if dome else None
     if not material or not isinstance(material, unreal.MaterialInstanceDynamic):
         raise RuntimeError('CosmicDome dynamic material absent')
+    parent = material.get_editor_property('parent')
     return {
         'visible': bool(dome.is_visible()),
         'material': material.get_path_name(),
+        'parent': parent.get_path_name() if parent else '',
         'night': float(material.get_scalar_parameter_value('NightStrength')),
         'moon': float(material.get_scalar_parameter_value('MoonStrength')),
         'veil': float(material.get_scalar_parameter_value('VeilStrength')),
@@ -85,6 +88,20 @@ def tick(_dt):
             if not (samples['veil']['visible'] and samples['veil']['night'] > .5
                     and samples['veil']['veil'] > .05 and samples['veil']['moon'] > 0):
                 raise RuntimeError('clear 23h night did not show sky, veil and moon')
+            if 'M_AnastasisCosmicSkyV1' not in samples['veil']['parent']:
+                raise RuntimeError('V1 night material was not bound')
+            cmd('anastasis.Sky.CosmicArtVersion', 0)
+            phase, mark = 'v0', now
+        elif phase == 'v0' and now - mark > 2:
+            samples['v0'] = sample(atm)
+            if 'M_AnastasisCosmicSky.' not in samples['v0']['parent']:
+                raise RuntimeError('art A/B did not restore V0 material')
+            cmd('anastasis.Sky.CosmicArtVersion', 1)
+            phase, mark = 'v1', now
+        elif phase == 'v1' and now - mark > 2:
+            samples['v1'] = sample(atm)
+            if 'M_AnastasisCosmicSkyV1' not in samples['v1']['parent']:
+                raise RuntimeError('art A/B did not restore V1 material')
             cmd('anastasis.Sky.Cosmic', 0)
             phase, mark = 'off', now
         elif phase == 'off' and now - mark > 2:

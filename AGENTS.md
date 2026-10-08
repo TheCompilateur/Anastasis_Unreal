@@ -476,7 +476,7 @@ manque puis se contentent de le vérifier ; `*_REBUILD=1` le régénère et écr
 | `shore-water.ps1` + `.py` | `M_AnastasisShoreWater` |
 | `water-look.ps1` + `.py` | `M_AnastasisWater` (Single Layer Water, WATER_LOOK_001) |
 | `rain-material.ps1` + `.py` | `M_AnastasisRain` et `SM_AnastasisRainStreak` (`/Game/Anastasis/Weather`, RAIN_001) : stries de pluie placées en HLSL autour de la caméra, translucide éclairé ; `-Rebuild` régénère |
-| `cosmic-sky-material.ps1` + `.py` | **écrit** `T_MoonLavender` et `M_AnastasisCosmicSky` depuis `ArtSource/Celestial/moon_lavender.png` et le shader procédural (`COSMIC_NIGHT_001`) ; aucun niveau sauvé ; `-Rebuild` régénère explicitement |
+| `cosmic-sky-material.ps1` + `.py` | **écrit** les textures et le matériau du ciel ; `-Version 0` garde la V0, `-Version 1 -Rebuild` crée `T_CosmicRiverV1` et `M_AnastasisCosmicSkyV1` depuis `ArtSource/Celestial/` ; aucun niveau sauvé |
 | `presentation-registry.py` | `DA_AnastasisPresentation` |
 | `atmosphere-profile.py` | `DA_AnastasisAtmosphere` |
 | `create_tree_asset.py` | `SM_Tree_*` (grille pontique + 7 essences x 3 formes : pin d'Alep, cypres, chene vert, olivier, platane, pin noir, sapin de Cephalonie), `SM_Shrub_*` (lentisque, chene kermes, genet, ronce x 3), `M_AnastasisVegetation`, `M_AnastasisBark`, `M_AnastasisRock` — régénérés à **chaque** run ; `ANASTASIS_TREE_MATERIALS_ONLY=1` ne réécrit que les trois matériaux |

@@ -168,6 +168,10 @@ static TAutoConsoleVariable<int32> CVarCosmicSky(
 	TEXT("anastasis.Sky.Cosmic"), 1,
 	TEXT("COSMIC_NIGHT_001. 1=the authored stars, galaxy, lavender moon and night events; 0=previous sky. Map-independent."),
 	ECVF_Default);
+static TAutoConsoleVariable<int32> CVarCosmicArtVersion(
+	TEXT("anastasis.Sky.CosmicArtVersion"), 1,
+	TEXT("COSMIC_NIGHT_V1_001. 0=original night material, 1=layered galactic material. Read live for art A/B."),
+	ECVF_Default);
 static TAutoConsoleVariable<int32> CVarCosmicEvent(
 	TEXT("anastasis.Sky.CosmicEvent"), -1,
 	TEXT("-1=seeded night calendar, 0=ordinary, 1=meteor night, 2=rare veil. Capture pin only; never changes simulation."),
@@ -489,10 +493,21 @@ void AAnastasisWorldAtmosphere::UpdateCosmicSky(const bool bForceLog)
 		CosmicDome->SetVisibility(false);
 		return;
 	}
+	const int32 ArtVersion = FMath::Clamp(CVarCosmicArtVersion.GetValueOnGameThread(), 0, 1);
+	if (CosmicSkyInstance && ArtVersion != LastCosmicArtVersion)
+	{
+		CosmicSkyInstance = nullptr;
+	}
 	if (!CosmicSkyInstance)
 	{
 		UStaticMesh* Mesh = CosmicDomeMesh.LoadSynchronous();
-		UMaterialInterface* Base = CosmicSkyBaseMaterial.LoadSynchronous();
+		UMaterialInterface* Base = ArtVersion == 1
+			? CosmicSkyBaseMaterialV1.LoadSynchronous() : CosmicSkyBaseMaterial.LoadSynchronous();
+		if (!Base && ArtVersion == 1)
+		{
+			UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_COSMIC_SKY v1_missing fallback=v0"));
+			Base = CosmicSkyBaseMaterial.LoadSynchronous();
+		}
 		if (!Mesh || !Base)
 		{
 			if (!bCosmicAssetsMissingLogged)
@@ -508,6 +523,7 @@ void AAnastasisWorldAtmosphere::UpdateCosmicSky(const bool bForceLog)
 		CosmicDome->SetRelativeScale3D(FVector(1000000.0f / Radius)); // 10 km: behind the managed cloud layer.
 		CosmicSkyInstance = UMaterialInstanceDynamic::Create(Base, this);
 		CosmicDome->SetMaterial(0, CosmicSkyInstance);
+		LastCosmicArtVersion = ArtVersion;
 	}
 	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 	{

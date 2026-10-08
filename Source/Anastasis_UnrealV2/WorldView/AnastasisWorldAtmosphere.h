@@ -274,9 +274,14 @@ protected:
 	TSoftObjectPtr<UMaterialInterface> CosmicSkyBaseMaterial = TSoftObjectPtr<UMaterialInterface>(
 		FSoftObjectPath(TEXT("/Game/Anastasis/Celestial/M_AnastasisCosmicSky.M_AnastasisCosmicSky")));
 
+	UPROPERTY(EditDefaultsOnly, Category="Atmosphere|Cosmic Sky")
+	TSoftObjectPtr<UMaterialInterface> CosmicSkyBaseMaterialV1 = TSoftObjectPtr<UMaterialInterface>(
+		FSoftObjectPath(TEXT("/Game/Anastasis/Celestial/M_AnastasisCosmicSkyV1.M_AnastasisCosmicSkyV1")));
+
 	UPROPERTY()
 	TObjectPtr<class UMaterialInstanceDynamic> CosmicSkyInstance;
 
+	int32 LastCosmicArtVersion = -1;
 	uint32 LastSkySeed = 12345u;
 	int32 LastCosmicEvening = -1;
 	bool bCosmicAssetsMissingLogged = false;

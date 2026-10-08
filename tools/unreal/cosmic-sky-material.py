@@ -9,11 +9,17 @@ import traceback
 import unreal
 
 PKG = '/Game/Anastasis/Celestial'
+VERSION = int(os.environ.get('ANASTASIS_COSMIC_VERSION', '0'))
+if VERSION not in (0, 1):
+    raise RuntimeError('unsupported cosmic art version: ' + str(VERSION))
 TEX = PKG + '/T_MoonLavender'
-SKY_TEX = PKG + '/T_CosmicRiver'
-MAT = PKG + '/M_AnastasisCosmicSky'
+SKY_NAME = 'T_CosmicRiverV1' if VERSION == 1 else 'T_CosmicRiver'
+SKY_TEX = PKG + '/' + SKY_NAME
+MAT_NAME = 'M_AnastasisCosmicSkyV1' if VERSION == 1 else 'M_AnastasisCosmicSky'
+MAT = PKG + '/' + MAT_NAME
 SOURCE = os.path.join(unreal.Paths.project_dir(), 'ArtSource', 'Celestial', 'moon_lavender.png')
-SKY_SOURCE = os.path.join(unreal.Paths.project_dir(), 'ArtSource', 'Celestial', 'cosmic_river.png')
+SKY_SOURCE = os.path.join(unreal.Paths.project_dir(), 'ArtSource', 'Celestial',
+                          'cosmic_river_v1.png' if VERSION == 1 else 'cosmic_river.png')
 REBUILD = os.environ.get('ANASTASIS_COSMIC_REBUILD') == '1'
 mel = unreal.MaterialEditingLibrary
 
@@ -88,6 +94,10 @@ float3 strange = max(veil,0.0) * VeilStrength * float3(0.0018,0.0008,0.0045);
 
 return (panorama*0.15*seam + galaxy + stars)*NightStrength + moon + meteor + strange;
 '''
+if VERSION == 1:
+    shader_path = os.path.join(unreal.Paths.project_dir(), 'ArtSource', 'Celestial', 'cosmic_sky_v1.hlsl')
+    with open(shader_path, encoding='utf-8') as shader_file:
+        HLSL = shader_file.read()
 
 
 def custom(mat, code, inputs):
@@ -122,7 +132,7 @@ def create_texture(path, asset_name):
     dest = PKG + '/' + asset_name
     if not os.path.isfile(path):
         raise RuntimeError('missing art source: ' + path)
-    if unreal.EditorAssetLibrary.does_asset_exist(dest) and not REBUILD:
+    if unreal.EditorAssetLibrary.does_asset_exist(dest) and (not REBUILD or (VERSION == 1 and asset_name == 'T_MoonLavender')):
         unreal.log('COSMIC_TEXTURE_PRESENT ' + dest)
         return unreal.load_asset(dest)
     task = unreal.AssetImportTask()
@@ -153,7 +163,7 @@ def create_material(moon, panorama):
         mel.delete_all_material_expressions(mat)
     else:
         mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
-            'M_AnastasisCosmicSky', PKG, unreal.Material, unreal.MaterialFactoryNew())
+            MAT_NAME, PKG, unreal.Material, unreal.MaterialFactoryNew())
     if mat is None:
         raise RuntimeError('sky material creation failed')
     mat.set_editor_property('blend_mode', unreal.BlendMode.BLEND_OPAQUE)
@@ -209,7 +219,7 @@ def create_material(moon, panorama):
 
 try:
     create_material(create_texture(SOURCE, 'T_MoonLavender'),
-                    create_texture(SKY_SOURCE, 'T_CosmicRiver'))
+                    create_texture(SKY_SOURCE, SKY_NAME))
     unreal.log('COSMIC_MATERIAL_DONE')
 except Exception:
     unreal.log_error('COSMIC_MATERIAL_FAIL ' + traceback.format_exc())

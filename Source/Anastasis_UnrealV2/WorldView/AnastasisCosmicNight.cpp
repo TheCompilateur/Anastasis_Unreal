@@ -91,7 +91,7 @@ FInstant Evaluate(const uint32 Seed, const int32 Day, const double Hours, const 
 		const uint32 Key = Mix(NightKey ^ (static_cast<uint32>(I + 1) * 0x27d4eb2du));
 		const double Centre = 22.2 + (I + 0.25 + 0.5 * Unit(Key ^ 0x13a5u))
 			* (5.8 / FMath::Max(1, Out.Night.MeteorCount));
-		const double DurationHours = 0.30; // ~1.1 real seconds at normal 90-second days.
+		const double DurationHours = 0.52; // ~2 real seconds at normal 90-second days: time to notice and turn.
 		const double Phase = (NightHour - (Centre - DurationHours * 0.5)) / DurationHours;
 		if (Phase < 0.0 || Phase > 1.0)
 		{
