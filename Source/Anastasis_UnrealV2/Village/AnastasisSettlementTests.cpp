@@ -108,6 +108,7 @@ bool FAnastasisSettlementBiographyTest::RunTest(const FString&)
 	if (!TestFalse(TEXT("trois maisons posees"), Farm.IsEmpty() || Hut.IsEmpty() || Refuge.IsEmpty())) return false;
 
 	// Jour 1 : personne. La forme reste provisoire.
+	Village.ObserveBiographies(1);
 	Ledger.Observe(Village, 1);
 	const AnastasisSettlement::FBiography* B = Ledger.Find(Farm);
 	if (!TestNotNull(TEXT("biographie ouverte"), B)) return false;
@@ -120,6 +121,7 @@ bool FAnastasisSettlementBiographyTest::RunTest(const FString&)
 	TestTrue(TEXT("metier de cultivateur"), Village.SetJob(Farmer, AnastasisGather::JobFarmer));
 	TestTrue(TEXT("maison du cultivateur"), Village.AssignHome(Farmer, Farm));
 	TestTrue(TEXT("maison du sans-metier"), Village.AssignHome(Settler, Hut));
+	Village.ObserveBiographies(2);
 	Ledger.Observe(Village, 2);
 	B = Ledger.Find(Farm);
 	const AnastasisSettlement::FBiography* H = Ledger.Find(Hut);
@@ -131,6 +133,7 @@ bool FAnastasisSettlementBiographyTest::RunTest(const FString&)
 
 	// Jour 3 : le cultivateur meurt. La maison se vide mais garde la forme de son fondateur.
 	TestTrue(TEXT("le fondateur disparait"), Village.RemoveNpc(Farmer));
+	Village.ObserveBiographies(3);
 	Ledger.Observe(Village, 3);
 	B = Ledger.Find(Farm);
 	TestTrue(TEXT("evenement : proprietaire perdu"), B->Events.ContainsByPredicate([](const AnastasisSettlement::FEvent& E)
@@ -143,6 +146,7 @@ bool FAnastasisSettlementBiographyTest::RunTest(const FString&)
 	const FString Builder = Village.SpawnNpc(9.5, 10.5, Calm());
 	Village.SetJob(Builder, AnastasisBuild::JobBuilder);
 	TestTrue(TEXT("reprise par un batisseur"), Village.AssignHome(Builder, Farm));
+	Village.ObserveBiographies(5);
 	Ledger.Observe(Village, 5);
 	B = Ledger.Find(Farm);
 	TestEqual(TEXT("un changement de mains"), B->OwnerChanges, 1);
@@ -155,8 +159,11 @@ bool FAnastasisSettlementBiographyTest::RunTest(const FString&)
 	// ils dorment au refuge sans maitre, qui se remplit. Sa forme reste provisoire (personne ne l'a fondee).
 	for (int32 K = 0; K < 3; ++K) Village.SpawnNpc(21.5 + K, 18.5, Calm());
 	Village.AssignSheltersDaily();
+	Village.ObserveBiographies(6);
 	Ledger.Observe(Village, 6);
+	Village.ObserveBiographies(6);
 	Ledger.Observe(Village, 6);
+	Village.ObserveBiographies(7);
 	Ledger.Observe(Village, 7);
 	const AnastasisSettlement::FBiography* R = Ledger.Find(Refuge);
 	AddInfo(FString::Printf(TEXT("refuge : %d dormeurs (pic %d), %d nuits pleines, %d evenements ; maison du cultivateur : %d dormeur(s)"),

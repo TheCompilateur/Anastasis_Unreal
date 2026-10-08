@@ -72,6 +72,8 @@ namespace AnastasisVillage
 		void VisitState(FStateArchive& Ar, AnastasisNavService::FNavCacheEntry& V);
 		void VisitState(FStateArchive& Ar, AnastasisNavService::FNavService& V);
 		void VisitState(FStateArchive& Ar, AnastasisPlanner::FUrgencySnapshot& V);
+		void VisitState(FStateArchive& Ar, FBiographyEvent& V);
+		void VisitState(FStateArchive& Ar, FBuildingBiography& V);
 
 		template <typename T>
 		void VisitStates(FStateArchive& Ar, TArray<T>& Items)
@@ -958,6 +960,46 @@ namespace AnastasisVillage
 		}
 	}
 
+	namespace
+	{
+		void VisitState(FStateArchive& Ar, FBiographyEvent& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("day")).Number(V.Day);
+			Ar.Key(TEXT("kind")).Number(V.Kind);
+			Ar.Key(TEXT("detail")).String(V.Detail);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FBuildingBiography& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("id")).String(V.Id);
+			Ar.Key(TEXT("type")).String(V.Type);
+			Ar.Key(TEXT("cellX")).Number(V.CellX);
+			Ar.Key(TEXT("cellY")).Number(V.CellY);
+			Ar.Key(TEXT("firstSeenDay")).Number(V.FirstSeenDay);
+			Ar.Key(TEXT("completedDay")).Number(V.CompletedDay);
+			Ar.Key(TEXT("foundedDay")).Number(V.FoundedDay);
+			Ar.Key(TEXT("founder")).String(V.Founder);
+			Ar.Key(TEXT("founderJob")).String(V.FounderJob);
+			Ar.Key(TEXT("founderHousehold")).Number(V.FounderHousehold);
+			Ar.Key(TEXT("formHousePhase")).Number(V.FormHousePhase);
+			Ar.Key(TEXT("formFixed")).Bool(V.bFormFixed);
+			Ar.Key(TEXT("owner")).String(V.Owner);
+			Ar.Key(TEXT("occupants")).Number(V.Occupants);
+			Ar.Key(TEXT("peakOccupants")).Number(V.PeakOccupants);
+			Ar.Key(TEXT("crowdedDays")).Number(V.CrowdedDays);
+			Ar.Key(TEXT("ownerChanges")).Number(V.OwnerChanges);
+			Ar.Key(TEXT("vacancyEpisodes")).Number(V.VacancyEpisodes);
+			Ar.Key(TEXT("wasOccupied")).Bool(V.bWasOccupied);
+			Ar.Key(TEXT("lastObservedDay")).Number(V.LastObservedDay);
+			Ar.Key(TEXT("events"));
+			VisitStates(Ar, V.Events);
+			Ar.EndObject();
+		}
+	}
+
 	uint64 FVillage::StateDigest() const
 	{
 		AnastasisDigest::FStateWriter Out;
@@ -1032,6 +1074,10 @@ namespace AnastasisVillage
 			Ar.Key(TEXT("roadEfforts"));
 			VisitSortedIntMap(Ar, RoadEfforts, [](FStateArchive& A, double& E) { A.Number(E); });
 		}
+		// ecart n°46 : la biographie des batiments (save-history-001).
+		Ar.Key(TEXT("biographyEnabled")).Bool(bBiographyEnabled);
+		Ar.Key(TEXT("biographies"));
+		VisitSortedStringMap(Ar, Biographies, [](FStateArchive& A, FBuildingBiography& Bio) { VisitState(A, Bio); });
 		Ar.Key(TEXT("settlement"));
 		VisitState(Ar, Settlement);
 		Ar.Key(TEXT("marketDx"));

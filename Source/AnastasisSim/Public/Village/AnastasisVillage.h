@@ -1056,6 +1056,70 @@ namespace AnastasisVillage
 	};
 
 	/**
+	 * EXTENSION -- ecart n°46 (save-history-001) : la biographie d'un batiment, observee par la simulation.
+	 *
+	 * Ce que la simulation sait d'un batiment au present (proprietaire, dormeurs, phase) ne dit pas son
+	 * HISTOIRE : qui l'a fonde, pour quel foyer, quand il a change de mains, combien de nuits il a ete
+	 * plein. SETTLEMENT_MORPHOGENESIS_001 l'ecrivait dans la presentation Unreal, image par image ; elle
+	 * fixe la forme du batiment (le programme de son fondateur), et elle n'est pas derivable d'un
+	 * instantane (un fondateur mort ne s'y lit plus). Elle vit donc ici, observee a chaque pas : elle entre
+	 * dans l'empreinte d'etat et dans la sauvegarde, et un saut de temps n'en perd aucune transition.
+	 * Aucune regle ne la lit : elle n'ecrit rien d'autre qu'elle-meme. La forme (le programme) se deduit
+	 * dans l'hote Unreal, de `FormHousePhase`, `FounderJob` et `FounderHousehold`.
+	 */
+	enum class EBiographyEvent : uint8
+	{
+		Seen,         // le batiment apparait (chantier ou pose directe)
+		Completed,    // le chantier s'acheve
+		Founded,      // un foyer le prend pour la premiere fois : la forme se fixe
+		OwnerChanged, // il passe a un autre foyer
+		OwnerLost,    // son proprietaire disparait (mort, depart) : la maison se vide
+		Crowded,      // premiere nuit ou le foyer remplit la maison (pression d'agrandissement)
+		Vacated,      // plus personne n'y dort
+		Reoccupied,   // quelqu'un y dort de nouveau
+	};
+
+	ANASTASISSIM_API const TCHAR* BiographyEventName(EBiographyEvent Kind);
+
+	struct FBiographyEvent
+	{
+		int32 Day = 0;
+		EBiographyEvent Kind = EBiographyEvent::Seen;
+		FString Detail;
+	};
+
+	struct FBuildingBiography
+	{
+		FString Id;
+		FString Type;
+		int32 CellX = 0;
+		int32 CellY = 0;
+		int32 FirstSeenDay = 0;
+		/** Jour d'achevement (FBuilding::CompletedDay, sinon le premier jour vu acheve). -1 = chantier. */
+		int32 CompletedDay = -1;
+		/** Jour ou un foyer l'a prise (ou, hors maison, ou elle s'est achevee) : la forme est fixe depuis. -1 = jamais. */
+		int32 FoundedDay = -1;
+		FString Founder;
+		FString FounderJob;
+		int32 FounderHousehold = 0;
+		/** Phase de la maison quand sa forme a ete lue : a la premiere vue, puis a la fondation. */
+		int32 FormHousePhase = 0;
+		bool bFormFixed = false;
+		FString Owner;
+		int32 Occupants = 0;
+		int32 PeakOccupants = 0;
+		/** Nuits ou le foyer remplissait la maison (`occupants >= capacite - 1`, la pression de `resolveHouseUpgrades`). */
+		int32 CrowdedDays = 0;
+		int32 OwnerChanges = 0;
+		int32 VacancyEpisodes = 0;
+		bool bWasOccupied = false;
+		int32 LastObservedDay = -1;
+		TArray<FBiographyEvent> Events;
+
+		int32 AgeDays(int32 Day) const { return CompletedDay < 0 ? 0 : FMath::Max(0, Day - CompletedDay); }
+	};
+
+	/**
 	 * L'etat du village et ses regles. Lie a un monde genere, qu'il ne possede
 	 * pas : l'hote de simulation garde le monde et le village cote a cote.
 	 */
@@ -1353,6 +1417,17 @@ namespace AnastasisVillage
 		/** Activation de l'ecart n°42 : l'hote Unreal seul ; le village C++ nu reste a faux (parite). */
 		void SetRoadEvolutionEnabled(bool bEnabled) { bRoadEvolutionEnabled = bEnabled; }
 		bool IsRoadEvolutionEnabled() const { return bRoadEvolutionEnabled; }
+
+		/**
+		 * ecart n°46 -- la biographie des batiments : observee a la fin de chaque `UpdateActors` quand l'hote
+		 * l'active (le village C++ nu reste a faux : le harnais n'en ecrit aucune). `ObserveBiographies` est
+		 * aussi appelable directement (tests). Rend le nombre d'evenements ecrits.
+		 */
+		void SetBiographyEnabled(bool bEnabled) { bBiographyEnabled = bEnabled; }
+		bool IsBiographyEnabled() const { return bBiographyEnabled; }
+		int32 ObserveBiographies(int32 Day);
+		const TMap<FString, FBuildingBiography>& GetBiographies() const { return Biographies; }
+		const FBuildingBiography* FindBiography(const FString& BuildingId) const { return Biographies.Find(BuildingId); }
 
 		/** `trafficAt(x, y)` : passage accumule (f32 relu en double), 0 hors bornes. */
 		double TrafficAt(int32 TileX, int32 TileY) const;
@@ -1933,6 +2008,9 @@ namespace AnastasisVillage
 		TMap<int32, AnastasisTraffic::FRoadTile> Roads;
 		TMap<int32, double> RoadEfforts;
 		bool bRoadEvolutionEnabled = false;
+		/** ecart n°46 : biographies par identifiant de batiment ; un batiment demoli garde la sienne. */
+		TMap<FString, FBuildingBiography> Biographies;
+		bool bBiographyEnabled = false;
 		int64 PassageCount = 0;
 		int32 NavVersion = 0;
 		/** `sim.navService` (nav-wiring-001). */

@@ -173,6 +173,8 @@ namespace AnastasisVillage
 		Roads.Reset();
 		RoadEfforts.Reset();
 		bRoadEvolutionEnabled = false;
+		Biographies.Reset();
+		bBiographyEnabled = false;
 		PassageCount = 0;
 		NavVersion = 0;
 		NavSourceShared.Reset();
@@ -1606,6 +1608,11 @@ namespace AnastasisVillage
 			UpdateNpc(Items[Index], Dt);
 		}
 		ProcessNavQueue();
+		// ecart n°46 : la biographie des batiments, apres les habitants (l'etat du pas est celui qu'elle lit).
+		if (bBiographyEnabled)
+		{
+			ObserveBiographies(Day());
+		}
 	}
 
 	bool FVillage::IsNight() const

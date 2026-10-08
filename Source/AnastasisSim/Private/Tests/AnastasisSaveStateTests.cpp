@@ -279,4 +279,62 @@ bool FAnastasisSaveStateRefusalTest::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAnastasisSaveStateBiographyTest,
+	"Anastasis.Sim.Sauvegarde.Biographie",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+// save-history-001 (ecart n°46) : la biographie des batiments est de l'etat. Fondee avant la sauvegarde, elle
+// revient entiere ; le meme changement de mains apres le rechargement s'ecrit pareil dans les deux parties.
+bool FAnastasisSaveStateBiographyTest::RunTest(const FString&)
+{
+	using namespace AnastasisSaveStateTest;
+	FAnastasisSimulation Original;
+	Populate(Original);
+	FVillage& Village = Original.GetVillage();
+	Village.SetBiographyEnabled(true);
+	const FPoint Centre = Village.GetSettlement();
+	FString House;
+	for (int32 R = 4; R <= 14 && House.IsEmpty(); ++R)
+	{
+		House = Village.AddBuilding(HouseType, FMath::FloorToInt32(Centre.X) - R, FMath::FloorToInt32(Centre.Y) - 2, 1.0, 1);
+	}
+	if (!TestFalse(TEXT("maison achevee posee"), House.IsEmpty())) return true;
+	const FString Founder = Village.GetActors()[1].Id;
+	const FString Heir = Village.GetActors()[2].Id;
+	TestTrue(TEXT("le fondateur prend la maison"), Village.AssignHome(Founder, House));
+	Run(Original, 60 * 10);
+	const FBuildingBiography* Bio = Village.FindBiography(House);
+	if (!TestNotNull(TEXT("biographie observee par la simulation"), Bio)) return true;
+	TestTrue(TEXT("forme fixee par son fondateur"), Bio->bFormFixed && Bio->Founder == Founder);
+
+	TArray<uint8> Bytes;
+	Original.SaveState(Bytes);
+	FAnastasisSimulation Copy;
+	FString Error;
+	if (!TestTrue(*FString::Printf(TEXT("rechargement (%s)"), *Error), Copy.LoadState(Bytes, Error))) return true;
+	const FBuildingBiography* Loaded = Copy.GetVillage().FindBiography(House);
+	if (!TestNotNull(TEXT("la biographie revient"), Loaded)) return true;
+	TestEqual(TEXT("... meme fondateur"), Loaded->Founder, Founder);
+	TestEqual(TEXT("... memes evenements"), Loaded->Events.Num(), Bio->Events.Num());
+	TestTrue(TEXT("... toujours activee"), Copy.GetVillage().IsBiographyEnabled());
+	TestEqual(TEXT("meme etat complet"), Copy.StateDigest(), Original.StateDigest());
+
+	// Le meme changement de mains dans les deux parties : la meme histoire s'ecrit.
+	for (FAnastasisSimulation* Sim : { &Original, &Copy })
+	{
+		Sim->GetVillage().AssignHome(Heir, House);
+		Run(*Sim, 60 * 10);
+	}
+	const FBuildingBiography* A = Original.GetVillage().FindBiography(House);
+	const FBuildingBiography* B = Copy.GetVillage().FindBiography(House);
+	TestTrue(TEXT("changement de mains ecrit"), A->OwnerChanges == 1 && A->Owner == Heir && A->Founder == Founder);
+	TestEqual(TEXT("... pareil dans la partie rechargee"), B->OwnerChanges, A->OwnerChanges);
+	TestEqual(TEXT("... memes evenements"), B->Events.Num(), A->Events.Num());
+	TestEqual(TEXT("meme etat complet apres"), Copy.StateDigest(), Original.StateDigest());
+	AddInfo(FString::Printf(TEXT("SAVE_HISTORY house=%s founder=%s heir=%s events=%d owner_changes=%d"),
+		*House, *Founder, *Heir, A->Events.Num(), A->OwnerChanges));
+	return true;
+}
+
 #endif

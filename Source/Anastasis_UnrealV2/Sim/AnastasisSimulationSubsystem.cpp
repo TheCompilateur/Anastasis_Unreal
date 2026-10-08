@@ -548,6 +548,8 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	Simulation.GetVillage().SetTerrainTravelCostEnabled(CVarVillageRouteCost.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetSoilWaterEnabled(CVarSoilWaterBudget.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetRoadEvolutionEnabled(CVarVillageRoadEvolution.GetValueOnGameThread() != 0);
+	// ecart n°46 : la biographie des batiments est observee par la simulation (save-history-001).
+	Simulation.GetVillage().SetBiographyEnabled(true);
 	LoggedDay = Simulation.GetDay();
 	UE_LOG(
 		LogAnastasis_UnrealV2,

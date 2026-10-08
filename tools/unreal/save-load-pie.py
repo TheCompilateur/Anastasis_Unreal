@@ -5,10 +5,11 @@ exterieur du jeu (Anastasis.Geo.Load). La simulation ne bouge que par Anastasis.
 (anastasis.Sim.TimeScale 0 : rien n'avance entre deux commandes), donc deux passages sur le meme etat
 doivent rendre le meme etat :
 
-  1. un jour vecu (Advance 1d), puis Anastasis.Sim.Save            -> empreinte S
+  1. trois jours vecus (Advance 3d : la maison d'ouverture est fondee), puis Anastasis.Sim.Save -> empreinte S
   2. deux jours de plus (Advance 2d)                                -> empreinte F
   3. Anastasis.Sim.Load                                             -> empreinte S, presentation refaite
-     (un acteur par batiment simule, une carte par habitant)
+     (un acteur par batiment simule, une carte par habitant), et chaque batiment garde sa FORME :
+     programme, variante affichee et fondateur, tires de sa biographie (save-history-001, ecart n°46)
   4. les memes deux jours (Advance 2d)                              -> empreinte F : le meme futur
   5. Anastasis.Sim.Load d'un slot absent                            -> refuse, empreinte inchangee
 
@@ -44,6 +45,13 @@ def console(cmd):
 
 def status():
     return json.loads(dbg.get_save_status(ues.get_game_world()) or '{}')
+
+
+def shapes():
+    """Forme de chaque batiment : programme (biographie), variante affichee, forme fixee, fondateur."""
+    s = json.loads(dbg.get_settlement_status(ues.get_game_world()) or '{}')
+    return {b['id']: {k: b.get(k) for k in ('type', 'program', 'variant', 'fixed', 'founder', 'job', 'household')}
+            for b in s.get('buildings', [])}
 
 
 def finish(ok, reason):
@@ -105,7 +113,7 @@ def step():
         return
     if phase == 3:
         console('Anastasis.Geo.Load')
-        console('Anastasis.Sim.Advance 1d')
+        console('Anastasis.Sim.Advance 3d')
         lived = status()
         states['lived'] = lived
         if not check('geo_not_loaded', lived.get('geo_loaded'), lived):
@@ -116,6 +124,10 @@ def step():
         if not check('save_failed', saved.get('last', {}).get('op') == 'save' and saved['last'].get('ok'), saved):
             return
         if not check('save_digest', saved['last'].get('digest') == saved.get('digest') == lived.get('digest'), saved):
+            return
+        states['shapes_saved'] = shapes()
+        founded = [i for i, b in states['shapes_saved'].items() if b['type'] == 'house' and b['fixed']]
+        if not check('no_founded_house', founded, states['shapes_saved']):
             return
 
         console('Anastasis.Sim.Advance 2d')
@@ -151,6 +163,10 @@ def step():
             return
         if not check('presentation_still_saved_state', shown.get('digest') == states['saved'].get('digest'), shown):
             return
+        states['shapes_loaded'] = shapes()
+        lost = {i: (b, states['shapes_loaded'].get(i)) for i, b in states['shapes_saved'].items() if states['shapes_loaded'].get(i) != b}
+        if not check('shapes_changed', not lost, lost):
+            return
 
         console('Anastasis.Sim.Advance 2d')
         replay = status()
@@ -166,9 +182,10 @@ def step():
             return
         if not check('refusal_wrote', refused.get('digest') == before, refused):
             return
-        finish(True, 'saved=%s future=%s replay=%s npcs=%d buildings=%d bytes=%d day=%d' % (
+        founded = sorted(i for i, b in states['shapes_loaded'].items() if b['type'] == 'house' and b['fixed'])
+        finish(True, 'saved=%s future=%s replay=%s npcs=%d buildings=%d bytes=%d day=%d founded=%s shapes_kept=%d' % (
             states['saved']['digest'], states['future']['digest'], replay['digest'], shown['npcs'], shown['buildings'],
-            states['saved']['last']['bytes'], states['saved']['day']))
+            states['saved']['last']['bytes'], states['saved']['day'], ','.join(founded), len(states['shapes_loaded'])))
 
 
 handle = unreal.register_slate_post_tick_callback(tick)

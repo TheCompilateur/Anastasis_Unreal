@@ -3,50 +3,29 @@
 #include "CoreMinimal.h"
 #include "Village/AnastasisArchitecture.h"
 
-namespace AnastasisVillage { class FVillage; struct FBuilding; }
+#include "Village/AnastasisVillage.h"
 
 /**
- * SETTLEMENT_MORPHOGENESIS_001 -- la biographie des batiments.
+ * SETTLEMENT_MORPHOGENESIS_001 -- la biographie des batiments, vue par la presentation.
  *
- * La simulation possede la verite sociale (qui possede, qui dort ou, quel metier, quand le chantier
- * s'acheve, depuis quand une maison est vide). Elle ne garde pas l'HISTOIRE d'un batiment : qui l'a
- * fonde, pour quel foyer, quand il a change de mains, combien de nuits il a ete trop plein. Ce registre
- * l'ecrit en OBSERVANT les transitions de la simulation, jour apres jour ; il ne decide rien pour elle
- * et n'y ecrit rien.
- *
- * Il fixe une chose que la simulation n'a pas : le PROGRAMME du batiment, la forme que lui a donnee son
- * fondateur. Une maison prend sa forme le jour ou un foyer la prend (metier du fondateur, taille de son
- * foyer, phase de la maison), et la GARDE : un nouveau proprietaire herite des murs d'un autre.
+ * Depuis save-history-001 (ecart n°46), les FAITS de la biographie vivent dans la simulation
+ * (AnastasisVillage::FBuildingBiography, observee a chaque pas, dans l'empreinte d'etat et la sauvegarde) :
+ * qui l'a fonde, pour quel foyer, quand il a change de mains, combien de nuits il a ete plein. Ce
+ * registre n'observe plus rien lui-meme : il recopie ces faits et en DEDUIT la forme, le programme
+ * d'architecture que lui a donne son fondateur.
  *
  *     BUILDING_VISUAL_STATE = f(BIOGRAPHIE, ETAT COURANT)    -- jamais f(graine)
  *
- * Persistance : aucune (comme la simulation, qui n'a pas de sauvegarde Unreal). Le registre est
- * RECONSTRUCTIBLE : rejouer la meme simulation (graine, commandes) reecrit la meme biographie, puisqu'il
- * ne tire rien et ne lit que l'etat simule. Le jour ou la simulation se sauvegarde, la biographie doit
- * l'etre avec elle (elle n'est pas derivable d'un instantane : un fondateur mort ne s'y lit plus).
+ * Une maison prend sa forme le jour ou un foyer la prend (metier du fondateur, taille de son foyer,
+ * phase de la maison), et la GARDE : un nouveau proprietaire herite des murs d'un autre. Une partie
+ * rechargee rend donc les memes formes.
  */
 namespace AnastasisSettlement
 {
-	enum class EEvent : uint8
-	{
-		Seen,         // le batiment apparait (chantier ou pose directe)
-		Completed,    // le chantier s'acheve
-		Founded,      // un foyer le prend pour la premiere fois : le programme se fixe
-		OwnerChanged, // il passe a un autre foyer
-		OwnerLost,    // son proprietaire disparait (mort, depart) : la maison se vide
-		Crowded,      // premiere nuit ou le foyer remplit la maison (pression d'agrandissement)
-		Vacated,      // plus personne n'y dort
-		Reoccupied,   // quelqu'un y dort de nouveau
-	};
+	using EEvent = AnastasisVillage::EBiographyEvent;
+	using FEvent = AnastasisVillage::FBiographyEvent;
 
 	const TCHAR* EventName(EEvent Kind);
-
-	struct FEvent
-	{
-		int32 Day = 0;
-		EEvent Kind = EEvent::Seen;
-		FString Detail;
-	};
 
 	struct FBiography
 	{
@@ -94,20 +73,21 @@ namespace AnastasisSettlement
 	{
 	public:
 		/**
-		 * Observe la simulation : nouveaux batiments, achevements, prises, changements de mains, pleins,
-		 * vides. Les compteurs journaliers (nuits pleines) ne comptent qu'une fois par jour simule.
-		 * Rend le nombre d'evenements ecrits.
+		 * Recopie les biographies de la simulation et en deduit la forme ; journalise chaque evenement
+		 * nouveau (`ANASTASIS_SETTLEMENT event`). Rend le nombre d'evenements nouveaux.
 		 */
 		int32 Observe(const AnastasisVillage::FVillage& Village, int32 Day);
 
 		const FBiography* Find(const FString& Id) const { return Bios.Find(Id); }
 		const TMap<FString, FBiography>& GetAll() const { return Bios; }
-		void Reset() { Bios.Reset(); }
+		void Reset() { Bios.Reset(); LoggedEvents.Reset(); }
 
 		/** Une ligne `ANASTASIS_SETTLEMENT bio ...` par batiment, plus ses evenements. */
 		void Log(int32 Day) const;
 
 	private:
 		TMap<FString, FBiography> Bios;
+		/** Evenements deja journalises par batiment (la presentation ne repete pas ce qu'elle a dit). */
+		TMap<FString, int32> LoggedEvents;
 	};
 }

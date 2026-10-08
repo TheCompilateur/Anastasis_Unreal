@@ -864,3 +864,23 @@ JS ne se recharge pas par `LoadState`, ni l'inverse. Le hachage est inchangé, b
 d'identité contre l'ancien hacheur, 13 points, consigné dans la fiche de save-state-001). Les deux lacunes
 du registre (`Colony`, `MarketStock`, posées seulement par `RestoreColonyForHarness`) ne sont pas sauvées.
 
+### n° 46 — Biographie des bâtiments observée par la simulation
+
+- **classe** : EXTENSION
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : save-history-001 (suite du chantier 4 d'IRON_CRUSADE_001 ; portée depuis l'hôte Unreal, SETTLEMENT_MORPHOGENESIS_001)
+- **activation** : `FVillage::SetBiographyEnabled(true)`, posé par l'hôte Unreal dans `ResetCanonical`. Le village C++ nu reste à faux : le harnais n'écrit aucune biographie.
+- **reference** : aucune (la référence n'a pas d'histoire des bâtiments ; le plus proche : `resolveHouseUpgrades`, non porté)
+- **cpp** : `Village/AnastasisVillageBiography.cpp` (`ObserveBiographies`) ; `Village/AnastasisVillage.{h,cpp}` (`FBuildingBiography`, appel en fin d'`UpdateActors`, remise à zéro dans `Bind`) ; `Village/AnastasisVillageStateDigest.cpp` (parcours d'état)
+- **harnais** : aucune
+- **fermeture** : à trancher
+
+Qui a fondé un bâtiment, pour quel foyer, quand il a changé de mains, combien de nuits il a été plein :
+l'hôte Unreal l'observait image par image pour fixer la forme des maisons. Cette histoire ne se relit
+pas dans un instantané, et une partie rechargée la perdait. Elle est maintenant observée à chaque pas
+de la simulation, après les habitants. Elle entre dans l'empreinte d'état et dans la sauvegarde
+(`SaveFormatVersion` 2), et un saut de temps n'en perd plus aucune transition. Aucune règle ne la lit.
+La forme (programme d'architecture) reste déduite dans l'hôte, des faits sauvés : phase de la maison,
+métier et foyer du fondateur.
+
