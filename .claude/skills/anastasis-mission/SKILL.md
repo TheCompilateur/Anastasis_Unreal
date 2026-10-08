@@ -157,3 +157,8 @@ riparian-transition-capture, dans le meme editeur.
 une mission qui ajoute sa ligne puis la modifie dans un commit suivant la retrouve en DOUBLE
 au lot des que le contexte voisin a bouge sur main (`proofs.txt du lot inscrit deux fois`).
 Regrouper ces commits (une ligne, sa forme finale) avant `finish`.
+
+**AGENTS.md ne se fusionne jamais par union** (ni `merge=union`, ni `git merge-file --union` dans un
+script de rebase) : l'union y garde les deux versions d'une ligne d'index et deplace des lignes hors de
+leur table (nettoyage agents-index-cleanup-001, 2026-10-08 : cinq lignes en double, une ligne d'index
+tombee dans la table de la racine canonique). Un conflit d'AGENTS.md se resout a la main.
