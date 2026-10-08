@@ -34,6 +34,38 @@ namespace AnastasisVillagerLooks
 		}
 	}
 
+	bool CategoryFor(const FString& Gender, double Age, EAnastasisVillagerCategory& OutCategory)
+	{
+		if (Gender.IsEmpty() || Age <= 0.0) return false;
+		const bool bFemale = Gender == TEXT("female");
+		if (Age < 13.0) OutCategory = bFemale ? EAnastasisVillagerCategory::ChildFemale : EAnastasisVillagerCategory::ChildMale;
+		else if (Age >= 58.0) OutCategory = bFemale ? EAnastasisVillagerCategory::ElderFemale : EAnastasisVillagerCategory::ElderMale;
+		else OutCategory = bFemale ? EAnastasisVillagerCategory::AdultFemale : EAnastasisVillagerCategory::AdultMale;
+		return true;
+	}
+
+	TArray<int32> PersonPool(const TArray<FAnastasisVillagerLook>& Looks, FName Job, EAnastasisVillagerCategory Category)
+	{
+		const bool bChild = Category == EAnastasisVillagerCategory::ChildMale || Category == EAnastasisVillagerCategory::ChildFemale;
+		const FName LookJob = Job == FName(TEXT("builder")) ? FName(TEXT("settler")) : Job;
+		TArray<int32> Pool;
+		for (int32 Index = 0; Index < Looks.Num(); ++Index)
+		{
+			const FAnastasisVillagerLook& Look = Looks[Index];
+			if (Look.Category != Category || !Look.bInGame || Look.Portrait.IsNull()) continue;
+			if (!bChild && !Look.Jobs.Contains(LookJob)) continue;
+			Pool.Add(Index);
+		}
+		// Meme ordre que VillagePool : la CRC de l'identifiant, pas l'ordre des assets.
+		Pool.Sort([&Looks](int32 A, int32 B)
+		{
+			const uint32 CA = FCrc::StrCrc32(*Looks[A].LookId.ToString());
+			const uint32 CB = FCrc::StrCrc32(*Looks[B].LookId.ToString());
+			return CA != CB ? CA < CB : Looks[A].LookId.LexicalLess(Looks[B].LookId);
+		});
+		return Pool;
+	}
+
 	TArray<int32> VillagePool(const TArray<FAnastasisVillagerLook>& Looks, FName Job)
 	{
 		// Le catalogue visuel n'a pas encore de portraits "builder". Garder les

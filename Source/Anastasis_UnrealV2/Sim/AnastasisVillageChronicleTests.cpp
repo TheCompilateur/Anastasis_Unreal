@@ -202,8 +202,9 @@ bool FAnastasisChronicleThirtyDaysTest::RunTest(const FString&)
 		return false;
 	}
 	FAnastasisSimulation& Sim = Scratch.Host->GetSimulation();
-	FVillageChronicle Chronicle;
-	Chronicle.Reset(kChronicleSeed);
+	// La chronique de l'hote, ouverte sur la fondation (familles et premier soir au feu quand
+	// anastasis.Village.Founders vaut 1), puis tenue ici a chaque tranche du saut.
+	FVillageChronicle Chronicle = Scratch.Host->GetChronicle();
 	Chronicle.Observe(Sim);
 	const double Began = FPlatformTime::Seconds();
 	AdvanceDays(Sim, 30, &Chronicle);

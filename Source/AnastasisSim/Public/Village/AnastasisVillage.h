@@ -838,6 +838,20 @@ namespace AnastasisVillage
 		/** Locally perceived source quantities; zero means observed exhausted. */
 		TMap<int32, int32> KnownFoodSources;
 
+		/**
+		 * familles-feu-001 (ecart n°44) -- l'identite d'un habitant : `npc.name`, `npc.familyName`, `npc.gender`
+		 * (« male » / « female »), `npc.age` (annees) et `npc.familyId` de createNpc. Ce ne sont que des donnees :
+		 * aucune decision ne les lit encore (ni stade de vie, ni lien de parente, ni enfant). Vides et 0 pour un
+		 * habitant cree par SpawnNpc seul, comme le reste du harnais. `KinRole` (chef, epouse, fils, frere,
+		 * pupille, engage...) est une EXTENSION : la reference ne range pas un frere ni un engage dans un foyer.
+		 */
+		FString Name;
+		FString FamilyName;
+		FString Gender;
+		double Age = 0.0;
+		FString FamilyId;
+		FString KinRole;
+
 		/** `npc.jobId`, `npc.workplace` (PAR IDENTIFIANT). */
 		FString JobId = AnastasisGather::JobSettler;
 		FString WorkplaceId;
@@ -1290,6 +1304,30 @@ namespace AnastasisVillage
 		 */
 		int32 UpdateMortalityDaily();
 		const TArray<FDeath>& GetDeaths() const { return DeathLog; }
+
+		/**
+		 * familles-feu-001 (ecart n°44) -- un foyer, forme de `createFamily` (life/household.js, sim/life.js) :
+		 * `adults`, `dependents`, `homeId`. `Name` (« la maison du Scribe ») est une EXTENSION : la reference nomme
+		 * le foyer par le `familyName` de ses membres. Pas de `births`, `lastBirthDay`, ni de couple forme par la
+		 * simulation : un foyer se pose seulement par l'hote (fondation).
+		 */
+		struct FFamily
+		{
+			FString Id;
+			FString Name;
+			TArray<FString> Adults;
+			TArray<FString> Dependents;
+			FString HomeId;
+		};
+
+		/** Pose un foyer vide et rend son identifiant (`family-N`). */
+		FString AddFamily(const FString& Name);
+		/** Range un habitant dans un foyer, adulte ou dependant, avec son role ; le retire de son foyer precedent. */
+		bool JoinFamily(const FString& NpcId, const FString& FamilyId, bool bAdult, const FString& KinRole);
+		/** Nom, nom de famille, sexe (« male » / « female ») et age d'un habitant. Ne change aucune decision. */
+		bool SetIdentity(const FString& NpcId, const FString& InName, const FString& InFamilyName, const FString& InGender, double InAge);
+		const TArray<FFamily>& GetFamilies() const { return Families; }
+		const FFamily* FindFamily(const FString& Id) const;
 		/** Observation : nourriture ajoutee aux champs par la repousse depuis Bind. */
 		int64 GetRegrownFood() const { return RegrownFood; }
 
@@ -1917,6 +1955,9 @@ namespace AnastasisVillage
 		TOptional<AnastasisPlanner::FUrgencySnapshot> UrgencyCache;
 		int32 NextBuildingId = 0;
 		TArray<FDeath> DeathLog;
+		/** ecart n°44 : les foyers poses par l'hote, et le compteur de leurs identifiants. */
+		TArray<FFamily> Families;
+		int32 NextFamilyId = 0;
 		int32 NextNpcId = 0;
 		/** `sim.time` du tick en cours (pose par UpdateActors). */
 		double Now = 0.0;

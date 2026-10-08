@@ -4,6 +4,7 @@
 #include "Sim/AnastasisSimulation.h"
 #include "Sim/AnastasisTimeWarp.h"
 #include "Sim/AnastasisVillageChronicle.h"
+#include "Sim/AnastasisValmireFounders.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "Village/AnastasisVillagePresentation.h"
@@ -56,6 +57,12 @@ public:
 	 * Rend l'identifiant du puits, vide si rien n'a pu etre pose.
 	 */
 	FString SeedStartVillage(int32 NpcCount, int32 TileX, int32 TileY);
+
+	/**
+	 * familles-feu-001 (ecart n°44) -- les fondateurs de Valmire poses par le village du lancement quand
+	 * anastasis.Village.Founders vaut 1 : quatre familles et le moine, dans l'ordre de pose. Vide sinon.
+	 */
+	const TArray<AnastasisFounders::FFounder>& GetFounders() const { return Founders; }
 
 	/**
 	 * La maison (mission house-rest-001) : deux maisons pres de (TileX, TileY),
@@ -192,6 +199,8 @@ private:
 	void LogDayIfChanged();
 	/** CHRONIQUE_VILLAGE_001 : la chronique lit la simulation, si anastasis.Chronicle.Enabled. */
 	void ObserveChronicle();
+	/** familles-feu-001 : la chronique s'ouvre sur les familles, puis le premier soir au feu. */
+	void TellFounding(const AnastasisFounders::FScenario& Scenario);
 public:
 	/**
 	 * geopolitical-world-001 (ecart n°38) -- ce que le monde exterieur a produit depuis le dernier
@@ -224,6 +233,8 @@ private:
 	FAnastasisSimulation Simulation;
 	/** CHRONIQUE_VILLAGE_001. Observation seule : n'ecrit jamais dans Simulation. */
 	AnastasisChronicle::FVillageChronicle Chronicle;
+	/** familles-feu-001 : les fondateurs poses, dans l'ordre de pose. */
+	TArray<AnastasisFounders::FFounder> Founders;
 	TWeakObjectPtr<AAnastasisWorldEmbodiment> RainCanopyActor;
 	FAnastasisVillagePresentation VillagePresentation;
 	FString FarmerGranaryId;

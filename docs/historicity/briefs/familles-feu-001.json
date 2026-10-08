@@ -1,0 +1,25 @@
+{
+  "mission": "familles-feu-001",
+  "target_period": "1204-1225",
+  "setting": "arriere_pays_pontique_fictif",
+  "model_ids": ["PONT-HIS-02"],
+  "claim": "Valmire est fondée par quatre familles d'origines différentes (une seule vient de Constantinople) et un moine de passage ; leurs passés, objets et absents sont des inventions plausibles pour l'arrière-pays de Trébizonde après 1204, pas des faits attestés.",
+  "basis": "hypothese_de_conception",
+  "source_ids": ["HIS-03", "HIS-04", "HIS-06"],
+  "inference": "HIS-03 situe la fondation de l'État des Grands Comnènes à Trébizonde après 1204 ; HIS-06 atteste raids et abandons de villages avant 1204 et une paix relative avec Konya ensuite ; HIS-04 décrit l'habitat de vallée et place la pression turkmène systématique surtout après 1277. Rien ne dit qu'un scribe de la Ville, un soldat d'un fort sans solde, une veuve de muletier ou un moine aient fondé un hameau de l'arrière-pays : ces quatre origines sont tirées des quatre matrices de la Bible et restent à faire relire. Les « razzias » qui chassent la famille de Georgios sont lues comme celles d'avant 1204 (HIS-06), pas comme la pression turkmène tardive.",
+  "current": "Avant la mission, le village du lancement était fait de douze habitants anonymes sans sexe, âge ni foyer (docs/unreal/chronique-village-001/chronique-pie-30-jours.txt).",
+  "target": "Quatorze fondateurs nommés, en quatre foyers dans la simulation (écart n°44), chacun présenté et interrogé au feu le premier soir dans la chronique ; une seule famille réfugiée de la Ville (PONT-HIS-02).",
+  "causal_effect": "Les foyers et l'ordre de pose donnent les métiers d'ouverture (maison et grenier à la famille paysanne, chantier au soldat et à son pupille) ; chaque fondateur est posé sur une case d'où le puits est atteignable, ce qui supprime les morts de soif par îlot de navigation observées par la chronique de la mission 1.",
+  "owner_paths": [
+    "Content/Anastasis/Scenario/valmire-fondateurs.json",
+    "Content/Anastasis/Dialogue/repliques-valmire.json",
+    "Source/Anastasis_UnrealV2/Sim/AnastasisValmireFounders.cpp"
+  ],
+  "evidence_plan": {
+    "mec": "Tests Anastasis.Familles.* (scénario, fondation à portée du puits, répliques, portraits) et preuve PIE chronicle-pie : familles et scène du feu dans la chronique écrite.",
+    "scn": "UNKNOWN : aucune capture ; la mission ne revendique rien de visuel au-delà du portrait accordé au sexe et à l'âge.",
+    "ply": "UNKNOWN : le joueur n'entre pas encore dans la scène du feu ; le verdict est la lecture de la chronique par Alexandre."
+  },
+  "verdict": "PROPOSE",
+  "evidence_paths": []
+}

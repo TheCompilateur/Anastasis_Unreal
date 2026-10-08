@@ -1,0 +1,230 @@
+CHRONIQUE DE VALMIRE
+Graine 12345. Du jour 1 au jour 30 ; 30 jours clos.
+
+EN BREF
+- 14 fondateurs, 0 arrivé, 0 parti ; 14 en vie à la fin.
+- Personne n'est mort.
+- 1 chantier mené à bout ; 0 encore ouvert.
+- Grenier vide 0 soir sur 30.
+- 10 amitiés nouées, 0 brouille.
+
+LES FAMILLES
+La maison du Scribe
+- Konstantinos le Scribe (41 ans) : sans métier ; sans maison à soi ; ami d'Eudokia et Euphrosyne.
+- Eudokia (36 ans) : sans métier ; sans maison à soi ; amie de Konstantinos.
+- Michael (12 ans) : enfant, garçon ; sans maison à soi ; ami de Maria.
+La famille de Georgios
+- Georgios (50 ans) : cultivateur ; vit dans la première maison ; ami d'Ioannes et Theodora.
+- Ioannes fils de Georgios (19 ans) : cultivateur ; sans maison à soi ; ami de Georgios et Theodora.
+- Theodora (47 ans) : cultivatrice ; sans maison à soi ; amie de Georgios et Ioannes.
+- Basileios frère de Georgios (44 ans) : sans métier ; sans maison à soi ; ami de Maria.
+La maison de Niketas
+- Niketas du fort (38 ans) : bâtisseur ; sans maison à soi ; ami de Leon.
+- Leon pupille de Niketas (16 ans) : bâtisseur ; sans maison à soi ; ami de Niketas.
+- Zoe (30 ans) : sans métier ; sans maison à soi ; amie d'Arsenios.
+La maisonnée de Maria
+- Maria la veuve du muletier (34 ans) : sans métier ; sans maison à soi ; amie de Basileios et Michael.
+- Euphrosyne fille de Maria (9 ans) : enfant, fille ; sans maison à soi ; amie de Konstantinos.
+- Sabas le muletier (22 ans) : sans métier ; sans maison à soi ; ami d'Arsenios.
+Hors des familles
+- Arsenios le moine (61 ans) : sans métier ; ancien ; sans maison à soi ; ami de Zoe et Sabas.
+
+JOUR 1
+  Le matin. Le village s'éveille. Ils sont 14, en 4 maisons : la maison du Scribe, la famille de Georgios, la maison de Niketas et la maisonnée de Maria ; et, hors des familles, Arsenios. Déjà debout : le puits, la première maison et le grenier. En chantier : la deuxième maison. Cultivent pour le grenier : Georgios, Ioannes et Theodora. Bâtissent : Niketas et Leon. Sans métier : Basileios, Konstantinos, Eudokia, Michael, Zoe, Maria, Euphrosyne, Sabas et Arsenios. Georgios a une maison à soi.
+  Le matin. La maison du Scribe : Konstantinos le Scribe, avec Eudokia (sa femme) et Michael (leur fils, 12 ans). Des gens de la Ville, qui savent lire et écrire et n'ont jamais tenu une houe.
+  Le matin. La famille de Georgios : Georgios, avec Theodora (sa femme), Ioannes (leur fils) et Basileios (son frère). Des paysans de la vallée, chassés d'en bas par les razzias ; la terre, ils la connaissent.
+  Le matin. La maison de Niketas : Niketas du fort, avec Zoe (sa femme) et Leon (son pupille). Un soldat sans solde et les siens : il ne se bat plus, il organise.
+  Le matin. La maisonnée de Maria : Maria la veuve du muletier, avec Euphrosyne (sa fille, 9 ans) et Sabas (muletier engagé). Une veuve des routes, qui connaît les marchés, les langues et les prix.
+  L'après-midi. Niketas apporte du bois et de la pierre au chantier de la deuxième maison.
+  Le soir, au feu.
+    Arsenios : « Je ne resterai peut-être pas. Mais avant de bâtir, il faut savoir qui bâtit. Parlez, chacun à son tour. »
+    Arsenios : « Au printemps où Constantinople a brûlé, où étais-tu ? »
+    Konstantinos : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+    Arsenios : « Montre-nous ce que tu as porté jusqu'ici. »
+    Konstantinos : « Une petite icône de la Vierge, cousue dans mon manteau. »
+    Arsenios : « Qui manque à ce feu, de ton côté ? »
+    Konstantinos : « La mère d'Eudokia. Elle ne pouvait plus marcher. Nous l'avons laissée chez des voisins. »
+    Georgios : « C'est une lourde charge à porter. »
+    Arsenios : « Tu as dit vrai, et c'est assez pour ce soir. »
+    Arsenios : « Dis-nous où la nouvelle de la Ville t'a trouvé. »
+    Georgios : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+    Arsenios : « Qu'as-tu pris avec toi en partant ? »
+    Georgios : « La clé de notre maison d'en bas. Il n'y a plus de porte, mais j'ai gardé la clé. »
+    Arsenios : « Et qui n'est pas venu avec toi ? »
+    Georgios : « Mon père. Il a dit qu'il mourrait sur sa terre. Il l'a fait. »
+    Niketas : « C'est une lourde charge à porter. »
+    Arsenios : « Nous prierons pour son père. »
+    Arsenios : « Quand les Latins sont entrés dans la Ville, où se tenait ta maison ? »
+    Niketas : « Au fort, sur le col. La solde a cessé d'arriver, et puis les ordres aussi. »
+    Arsenios : « Qu'as-tu emporté ? »
+    Niketas : « Une hache et la corne d'appel du fort. La hache pour le bois ; la corne, si un jour il faut rassembler. »
+    Arsenios : « Qui as-tu laissé derrière toi ? »
+    Niketas : « Mes hommes. Ils se sont dispersés. Certains reviendront peut-être. »
+    Maria : « Je ne savais pas. »
+    Arsenios : « Nous prierons pour ses hommes. »
+    Arsenios : « Où étais-tu quand la Ville est tombée ? »
+    Maria : « Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires. »
+    Arsenios : « De tout ce que tu avais, qu'as-tu gardé dans tes mains ? »
+    Maria : « Deux mules. Ce sont elles qui nous ont portés jusqu'ici. »
+    Arsenios : « Nomme-nous celui qui n'est pas là, pour qu'on prie pour lui. »
+    Maria : « Mon fils aîné. Il est parti avec une caravane vers la côte. Il ne sait pas où nous sommes. »
+    Konstantinos : « Le chemin a été dur pour tout le monde. »
+    Arsenios : « Tu as dit vrai, et c'est assez pour ce soir. »
+    Arsenios : « Je bénis ce lieu et ceux qui y restent. Que personne n'y meure seul. »
+  La nuit. Euphrosyne et Konstantinos deviennent amis. « Tu as une nouvelle? »
+  Bilan du soir : 14 habitants ; 1 maison debout ; 1 chantier ; grenier : 54 portions ; 13 sans toit.
+
+JOUR 2
+  Le matin. Leon met la main au chantier de la deuxième maison.
+  L'après-midi. Basileios met la main au chantier de la deuxième maison.
+  L'après-midi. La deuxième maison est achevée, grâce à Niketas, Leon et Basileios.
+  La nuit. Zoe et Arsenios deviennent amis. « On a ri assez pour tenir l'hiver. »
+  Bilan du soir : 14 habitants ; 2 maisons debout ; 0 chantier ; grenier : 111 portions ; 13 sans toit.
+
+JOUR 3
+  La nuit. Niketas trouve un abri pour la nuit dans la deuxième maison.
+  La nuit. Leon trouve un abri pour la nuit dans la deuxième maison.
+  La nuit. Ioannes trouve un abri pour la nuit dans la deuxième maison.
+  La nuit. Ioannes et Theodora deviennent amis. « On se raconte tout, non? »
+  La nuit. Michael et Maria deviennent amis. « Le village a besoin de gens comme toi. »
+  La nuit. Sabas et Arsenios deviennent amis. « Entre nous, on peut dire les choses droites. »
+  Bilan du soir : 14 habitants ; 2 maisons debout ; 0 chantier ; grenier : 163 portions ; 10 sans toit.
+
+JOUR 4
+  La nuit. Georgios et Theodora deviennent amis. « J'ai garde une histoire pour toi. »
+  La nuit. Basileios et Maria deviennent amis. « Reste un peu, parlons. »
+  La nuit. Konstantinos et Eudokia deviennent amis. « On a ri assez pour tenir l'hiver. »
+  Bilan du soir : 14 habitants ; 2 maisons debout ; 0 chantier ; grenier : 243 portions ; 10 sans toit.
+
+JOUR 5
+  Le soir. Niketas et Leon deviennent amis. « Ca fait du bien de te voir. »
+  Bilan du soir : 14 habitants ; 2 maisons debout ; 0 chantier ; grenier : 294 portions ; 10 sans toit.
+
+JOURS 6 À 19
+  Rien de notable.
+  Bilan du soir : 14 habitants ; 2 maisons debout ; 0 chantier ; grenier : 292 portions ; 10 sans toit.
+
+JOUR 20
+  L'après-midi. Ioannes et Georgios deviennent amis. « Ca fait du bien de te voir. »
+  Bilan du soir : 14 habitants ; 2 maisons debout ; 0 chantier ; grenier : 285 portions ; 10 sans toit.
+
+JOURS 21 À 30
+  Rien de notable.
+  Bilan du soir : 14 habitants ; 2 maisons debout ; 0 chantier ; grenier : 300 portions ; 10 sans toit.
+
+CE QU'A VÉCU CHACUN
+
+LA MAISON DU SCRIBE
+
+Konstantinos
+  Jour 1, le matin : Konstantinos est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 1, le soir : Konstantinos : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+  Jour 1, le soir : Konstantinos : « Une petite icône de la Vierge, cousue dans mon manteau. »
+  Jour 1, le soir : Konstantinos : « La mère d'Eudokia. Elle ne pouvait plus marcher. Nous l'avons laissée chez des voisins. »
+  Jour 1, le soir : Konstantinos : « Le chemin a été dur pour tout le monde. »
+  Jour 1, la nuit : Euphrosyne et Konstantinos deviennent amis. « Tu as une nouvelle? »
+  Jour 4, la nuit : Konstantinos et Eudokia deviennent amis. « On a ri assez pour tenir l'hiver. »
+
+Eudokia
+  Jour 1, le matin : Eudokia est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 4, la nuit : Konstantinos et Eudokia deviennent amis. « On a ri assez pour tenir l'hiver. »
+
+Michael
+  Jour 1, le matin : Michael est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 3, la nuit : Michael et Maria deviennent amis. « Le village a besoin de gens comme toi. »
+
+LA FAMILLE DE GEORGIOS
+
+Georgios
+  Jour 1, le matin : Georgios vit dans la première maison et est cultivateur au grenier.
+  Jour 1, le soir : Georgios : « C'est une lourde charge à porter. »
+  Jour 1, le soir : Georgios : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  Jour 1, le soir : Georgios : « La clé de notre maison d'en bas. Il n'y a plus de porte, mais j'ai gardé la clé. »
+  Jour 1, le soir : Georgios : « Mon père. Il a dit qu'il mourrait sur sa terre. Il l'a fait. »
+  Jour 4, la nuit : Georgios et Theodora deviennent amis. « J'ai garde une histoire pour toi. »
+  Jour 20, l'après-midi : Ioannes et Georgios deviennent amis. « Ca fait du bien de te voir. »
+
+Ioannes
+  Jour 1, le matin : Ioannes est cultivateur au grenier.
+  Jour 3, la nuit : Ioannes trouve un abri pour la nuit dans la deuxième maison.
+  Jour 3, la nuit : Ioannes et Theodora deviennent amis. « On se raconte tout, non? »
+  Jour 20, l'après-midi : Ioannes et Georgios deviennent amis. « Ca fait du bien de te voir. »
+
+Theodora
+  Jour 1, le matin : Theodora est cultivatrice au grenier.
+  Jour 3, la nuit : Ioannes et Theodora deviennent amis. « On se raconte tout, non? »
+  Jour 4, la nuit : Georgios et Theodora deviennent amis. « J'ai garde une histoire pour toi. »
+
+Basileios
+  Jour 1, le matin : Basileios est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 2, l'après-midi : Basileios met la main au chantier de la deuxième maison.
+  Jour 2, l'après-midi : La deuxième maison est achevée, grâce à Niketas, Leon et Basileios.
+  Jour 4, la nuit : Basileios et Maria deviennent amis. « Reste un peu, parlons. »
+
+LA MAISON DE NIKETAS
+
+Niketas
+  Jour 1, le matin : Niketas est bâtisseur.
+  Jour 1, l'après-midi : Niketas apporte du bois et de la pierre au chantier de la deuxième maison.
+  Jour 1, le soir : Niketas : « C'est une lourde charge à porter. »
+  Jour 1, le soir : Niketas : « Au fort, sur le col. La solde a cessé d'arriver, et puis les ordres aussi. »
+  Jour 1, le soir : Niketas : « Une hache et la corne d'appel du fort. La hache pour le bois ; la corne, si un jour il faut rassembler. »
+  Jour 1, le soir : Niketas : « Mes hommes. Ils se sont dispersés. Certains reviendront peut-être. »
+  Jour 2, l'après-midi : La deuxième maison est achevée, grâce à Niketas, Leon et Basileios.
+  Jour 3, la nuit : Niketas trouve un abri pour la nuit dans la deuxième maison.
+  Jour 5, le soir : Niketas et Leon deviennent amis. « Ca fait du bien de te voir. »
+
+Leon
+  Jour 1, le matin : Leon est bâtisseur.
+  Jour 2, le matin : Leon met la main au chantier de la deuxième maison.
+  Jour 2, l'après-midi : La deuxième maison est achevée, grâce à Niketas, Leon et Basileios.
+  Jour 3, la nuit : Leon trouve un abri pour la nuit dans la deuxième maison.
+  Jour 5, le soir : Niketas et Leon deviennent amis. « Ca fait du bien de te voir. »
+
+Zoe
+  Jour 1, le matin : Zoe est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 2, la nuit : Zoe et Arsenios deviennent amis. « On a ri assez pour tenir l'hiver. »
+
+LA MAISONNéE DE MARIA
+
+Maria
+  Jour 1, le matin : Maria est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 1, le soir : Maria : « Je ne savais pas. »
+  Jour 1, le soir : Maria : « Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires. »
+  Jour 1, le soir : Maria : « Deux mules. Ce sont elles qui nous ont portés jusqu'ici. »
+  Jour 1, le soir : Maria : « Mon fils aîné. Il est parti avec une caravane vers la côte. Il ne sait pas où nous sommes. »
+  Jour 3, la nuit : Michael et Maria deviennent amis. « Le village a besoin de gens comme toi. »
+  Jour 4, la nuit : Basileios et Maria deviennent amis. « Reste un peu, parlons. »
+
+Euphrosyne
+  Jour 1, le matin : Euphrosyne est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 1, la nuit : Euphrosyne et Konstantinos deviennent amis. « Tu as une nouvelle? »
+
+Sabas
+  Jour 1, le matin : Sabas est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 3, la nuit : Sabas et Arsenios deviennent amis. « Entre nous, on peut dire les choses droites. »
+
+HORS DES FAMILLES
+
+Arsenios
+  Jour 1, le matin : Arsenios est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 1, le soir : Arsenios : « Je ne resterai peut-être pas. Mais avant de bâtir, il faut savoir qui bâtit. Parlez, chacun à son tour. »
+  Jour 1, le soir : Arsenios : « Au printemps où Constantinople a brûlé, où étais-tu ? »
+  Jour 1, le soir : Arsenios : « Montre-nous ce que tu as porté jusqu'ici. »
+  Jour 1, le soir : Arsenios : « Qui manque à ce feu, de ton côté ? »
+  Jour 1, le soir : Arsenios : « Tu as dit vrai, et c'est assez pour ce soir. »
+  Jour 1, le soir : Arsenios : « Dis-nous où la nouvelle de la Ville t'a trouvé. »
+  Jour 1, le soir : Arsenios : « Qu'as-tu pris avec toi en partant ? »
+  Jour 1, le soir : Arsenios : « Et qui n'est pas venu avec toi ? »
+  Jour 1, le soir : Arsenios : « Nous prierons pour son père. »
+  Jour 1, le soir : Arsenios : « Quand les Latins sont entrés dans la Ville, où se tenait ta maison ? »
+  Jour 1, le soir : Arsenios : « Qu'as-tu emporté ? »
+  Jour 1, le soir : Arsenios : « Qui as-tu laissé derrière toi ? »
+  Jour 1, le soir : Arsenios : « Nous prierons pour ses hommes. »
+  Jour 1, le soir : Arsenios : « Où étais-tu quand la Ville est tombée ? »
+  Jour 1, le soir : Arsenios : « De tout ce que tu avais, qu'as-tu gardé dans tes mains ? »
+  Jour 1, le soir : Arsenios : « Nomme-nous celui qui n'est pas là, pour qu'on prie pour lui. »
+  Jour 1, le soir : Arsenios : « Tu as dit vrai, et c'est assez pour ce soir. »
+  Jour 1, le soir : Arsenios : « Je bénis ce lieu et ceux qui y restent. Que personne n'y meure seul. »
+  Jour 2, la nuit : Zoe et Arsenios deviennent amis. « On a ri assez pour tenir l'hiver. »
+  Jour 3, la nuit : Sabas et Arsenios deviennent amis. « Entre nous, on peut dire les choses droites. »

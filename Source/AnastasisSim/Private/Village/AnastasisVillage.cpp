@@ -1430,7 +1430,62 @@ namespace AnastasisVillage
 			PlayerPersonId.Reset();
 			ResetPlayerHand();
 		}
+		// ecart n°44 : un foyer ne garde pas un absent. Sans foyer pose, rien ne change.
+		for (FFamily& Family : Families)
+		{
+			Family.Adults.Remove(Id);
+			Family.Dependents.Remove(Id);
+		}
 		return Actors.RemoveById(Id);
+	}
+
+	FString FVillage::AddFamily(const FString& Name)
+	{
+		// ecart n°44 : la reference cree un foyer quand deux adultes s'unissent (`createFamily`) ; ici l'hote
+		// pose les foyers fondateurs.
+		FFamily& Family = Families.AddDefaulted_GetRef();
+		Family.Id = FString::Printf(TEXT("family-%d"), NextFamilyId++);
+		Family.Name = Name;
+		return Family.Id;
+	}
+
+	const FVillage::FFamily* FVillage::FindFamily(const FString& Id) const
+	{
+		return Families.FindByPredicate([&Id](const FFamily& F) { return F.Id == Id; });
+	}
+
+	bool FVillage::JoinFamily(const FString& NpcId, const FString& FamilyId, bool bAdult, const FString& KinRole)
+	{
+		FNpc* Npc = Actors.FindById(NpcId);
+		FFamily* Family = Families.FindByPredicate([&FamilyId](const FFamily& F) { return F.Id == FamilyId; });
+		if (!Npc || !Family)
+		{
+			return false;
+		}
+		// `leavePreviousFamily` : un habitant n'appartient qu'a un foyer.
+		for (FFamily& Other : Families)
+		{
+			Other.Adults.Remove(NpcId);
+			Other.Dependents.Remove(NpcId);
+		}
+		(bAdult ? Family->Adults : Family->Dependents).Add(NpcId);
+		Npc->FamilyId = FamilyId;
+		Npc->KinRole = KinRole;
+		return true;
+	}
+
+	bool FVillage::SetIdentity(const FString& NpcId, const FString& InName, const FString& InFamilyName, const FString& InGender, double InAge)
+	{
+		FNpc* Npc = Actors.FindById(NpcId);
+		if (!Npc)
+		{
+			return false;
+		}
+		Npc->Name = InName;
+		Npc->FamilyName = InFamilyName;
+		Npc->Gender = InGender;
+		Npc->Age = InAge;
+		return true;
 	}
 
 	FString FVillage::CauseOfDeath(const FNpc& Npc)

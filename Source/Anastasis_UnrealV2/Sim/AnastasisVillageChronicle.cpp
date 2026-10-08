@@ -1,6 +1,8 @@
 #include "Sim/AnastasisVillageChronicle.h"
 
+#include "Algo/StableSort.h"
 #include "Life/AnastasisBonds.h"
+#include "Sim/AnastasisDialogueLines.h"
 #include "Sim/AnastasisSimulation.h"
 #include "Village/AnastasisVillage.h"
 #include "World/AnastasisPathfinding.h"
@@ -134,6 +136,7 @@ namespace AnastasisChronicle
 		case EKind::FoodOut: return TEXT("FoodOut");
 		case EKind::FoodBack: return TEXT("FoodBack");
 		case EKind::FoodLow: return TEXT("FoodLow");
+		case EKind::Scene: return TEXT("Scene");
 		case EKind::Stalled: return TEXT("Stalled");
 		}
 		return TEXT("Unknown");
@@ -168,6 +171,27 @@ namespace AnastasisChronicle
 		UsedNames.Reset();
 		Entries.Reset();
 		Days.Reset();
+		FamilyViews.Reset();
+	}
+
+	FString FVillageChronicle::Quote(const FString& SpeakerId, const TCHAR* Pool, int32 Rank, const TMap<FString, FString>& Holes) const
+	{
+		if (!Lines) return FString();
+		const FString Line = Lines->Pick(Pool, AnastasisDialogue::FLibrary::KeyOf(Seed, SpeakerId, Pool, Rank), Holes);
+		return Line.IsEmpty() ? FString() : FString::Printf(TEXT(" « %s »"), *Line);
+	}
+
+	void FVillageChronicle::ReadFamilies(const FAnastasisSimulation& Sim)
+	{
+		FamilyViews.Reset();
+		for (const AnastasisVillage::FVillage::FFamily& Family : Sim.GetVillage().GetFamilies())
+		{
+			FFamilyView& View = FamilyViews.AddDefaulted_GetRef();
+			View.Id = Family.Id;
+			View.Name = Family.Name;
+			View.Members = Family.Adults;
+			View.Members.Append(Family.Dependents);
+		}
 	}
 
 	int32 FVillageChronicle::CountOf(EKind Kind) const
@@ -239,11 +263,32 @@ namespace AnastasisChronicle
 		}
 		FPersonState State;
 		State.Look = LookResolver ? LookResolver(Npc) : FPersonLook();
+		// familles-feu-001 : ce que la simulation sait d'un habitant passe avant tout tirage.
+		if (!Npc.Gender.IsEmpty())
+		{
+			State.Look.bKnown = true;
+			State.Look.bFemale = Npc.Gender == TEXT("female");
+		}
+		if (Npc.Age > 0.0)
+		{
+			State.Look.Age = Npc.Age;
+			State.Look.bElder = Npc.Age >= 58.0;
+			State.Look.bChild = Npc.Age < 13.0;
+		}
 		if (!State.Look.bKnown)
 		{
 			State.Look.bFemale = (FCrc::StrCrc32(*Npc.Id) & 1u) != 0u;
 		}
-		State.Name = PickName(Npc.Id, State.Look);
+		State.FamilyName = Npc.FamilyName;
+		if (!Npc.Name.IsEmpty())
+		{
+			State.Name = Npc.Name;
+			UsedNames.Add(Npc.Name);
+		}
+		else
+		{
+			State.Name = PickName(Npc.Id, State.Look);
+		}
 		State.HomeId = Npc.HomeId;
 		State.ShelterId = Npc.ShelterId;
 		if (!Npc.ShelterId.IsEmpty()) State.SheltersTold.Add(Npc.ShelterId);
@@ -334,6 +379,7 @@ namespace AnastasisChronicle
 		FirstDay = Day;
 		CurrentDay = Day;
 		DeathsSeen = Village.GetDeaths().Num();
+		ReadFamilies(Sim);
 
 		TArray<FString> Ids;
 		for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
@@ -359,6 +405,29 @@ namespace AnastasisChronicle
 		FString Text = Ids.Num() == 0
 			? FString(TEXT("Le village n'a encore personne."))
 			: FString::Printf(TEXT("Le village s'éveille. Ils sont %d : %s."), Ids.Num(), *Names(Ids));
+		if (FamilyViews.Num() > 0)
+		{
+			TArray<FString> Houses;
+			TSet<FString> InFamily;
+			for (const FFamilyView& View : FamilyViews)
+			{
+				Houses.Add(View.Name);
+				InFamily.Append(View.Members);
+			}
+			TArray<FString> Alone;
+			for (const FString& Id : Ids)
+			{
+				if (!InFamily.Contains(Id)) Alone.Add(Id);
+			}
+			FString HouseList;
+			for (int32 Index = 0; Index < Houses.Num(); ++Index)
+			{
+				if (Index > 0) HouseList += Index == Houses.Num() - 1 ? TEXT(" et ") : TEXT(", ");
+				HouseList += Houses[Index];
+			}
+			Text = FString::Printf(TEXT("Le village s'éveille. Ils sont %d, en %d maisons : %s%s."), Ids.Num(), Houses.Num(), *HouseList,
+				Alone.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" ; et, hors des familles, %s"), *Names(Alone)));
+		}
 		auto Join = [](const TArray<FString>& Labels)
 		{
 			FString Out;
@@ -506,6 +575,8 @@ namespace AnastasisChronicle
 			return;
 		}
 
+		ReadFamilies(Sim);
+
 		// Les jours finis se closent sur l'etat lu au passage precedent : le soir, pas apres minuit.
 		while (CurrentDay < Day)
 		{
@@ -523,9 +594,23 @@ namespace AnastasisChronicle
 			State->bAlive = false;
 			State->DeathDay = Day;
 			State->DeathCause = CauseText(Death.Cause);
-			Add(Day, Hour, EKind::Death, { Death.NpcId }, Death.Cause.IsEmpty()
+			FString Text = Death.Cause.IsEmpty()
 				? FString::Printf(TEXT("%s est mort%s."), *State->Name, E(State->Look.bFemale))
-				: FString::Printf(TEXT("%s est mort%s %s."), *State->Name, E(State->Look.bFemale), *State->DeathCause));
+				: FString::Printf(TEXT("%s est mort%s %s."), *State->Name, E(State->Look.bFemale), *State->DeathCause);
+			TArray<FString> Concerned = { Death.NpcId };
+			for (const FFamilyView& View : FamilyViews)
+			{
+				if (!View.Members.Contains(Death.NpcId)) continue;
+				for (const FString& Kin : View.Members)
+				{
+					const FPersonState* KinState = People.Find(Kin);
+					if (Kin == Death.NpcId || !KinState || !KinState->bAlive) continue;
+					Text += FString::Printf(TEXT(" %s :%s"), *KinState->Name, *Quote(Kin, TEXT("quotidien.mort"), Day, { { TEXT("absent"), State->Name } }));
+					Concerned.Add(Kin);
+					break;
+				}
+			}
+			Add(Day, Hour, EKind::Death, Concerned, Text);
 		}
 
 		// 2. Les batiments nouveaux : un chantier qui s'ouvre, ou un batiment pose d'un coup.
@@ -666,7 +751,8 @@ namespace AnastasisChronicle
 						Stats.Food, S(Stats.Food), bFemale ? TEXT("elle") : TEXT("il"));
 				}
 				else Why = FString::Printf(TEXT(", alors que le grenier a encore %d portion%s"), Stats.Food, S(Stats.Food));
-				Add(Day, Hour, EKind::Hunger, { Npc.Id }, FString::Printf(TEXT("%s a faim%s."), *State.Name, *Why));
+				Add(Day, Hour, EKind::Hunger, { Npc.Id }, FString::Printf(TEXT("%s a faim%s.%s"), *State.Name, *Why,
+					*Quote(Npc.Id, TEXT("quotidien.faim"), Day)));
 			}
 			else if (State.bHungry && Hunger <= HungerOverAt)
 			{
@@ -682,7 +768,8 @@ namespace AnastasisChronicle
 				const FString Why = WellAccess == 0 ? FString(TEXT(" : il n'y a pas de puits"))
 					: WellAccess == 1 ? FString::Printf(TEXT(" : aucun chemin ne mène au puits depuis là où %s se trouve"), bFemale ? TEXT("elle") : TEXT("il"))
 					: FString(TEXT(", alors que le puits est à sa portée"));
-				Add(Day, Hour, EKind::Thirst, { Npc.Id }, FString::Printf(TEXT("%s a soif%s."), *State.Name, *Why));
+				Add(Day, Hour, EKind::Thirst, { Npc.Id }, FString::Printf(TEXT("%s a soif%s.%s"), *State.Name, *Why,
+					*Quote(Npc.Id, TEXT("quotidien.soif"), Day)));
 			}
 			else if (State.bThirsty && Thirst <= ThirstOverAt)
 			{
@@ -715,8 +802,9 @@ namespace AnastasisChronicle
 					if (!bAlready)
 					{
 						Add(Day, Hour, EKind::Friendship, { Npc.Id, Relation.Key },
-							FString::Printf(TEXT("%s et %s deviennent ami%ss."), *State.Name, *Other->Name,
-								(State.Look.bFemale && Other->Look.bFemale) ? TEXT("e") : TEXT("")));
+							FString::Printf(TEXT("%s et %s deviennent ami%ss.%s"), *State.Name, *Other->Name,
+								(State.Look.bFemale && Other->Look.bFemale) ? TEXT("e") : TEXT(""),
+								*Quote(Npc.Id, TEXT("talkCatalog.BOND_LINES.friend"), Day)));
 					}
 				}
 				if (Relation.Value <= AnastasisBonds::RivalAt && !State.Foes.Contains(Relation.Key))
@@ -791,7 +879,9 @@ namespace AnastasisChronicle
 		}
 		Out += FString::Printf(TEXT("Graine %u. Du jour %d au jour %d ; %d jour%s clos.\n"),
 			Seed, FirstDay, LastDay, Days.Num(), Days.Num() > 1 ? TEXT("s") : TEXT(""));
-		Out += TEXT("Les noms sont provisoires : les familles et leurs vrais noms viendront avec la mission 2.\n\n");
+		// Sans foyer dans la simulation, les habitants portent des noms provisoires : on le dit, seulement alors.
+		if (FamilyViews.IsEmpty()) Out += TEXT("Les noms sont provisoires : la simulation ne les porte pas pour ces habitants.\n");
+		Out += TEXT("\n");
 
 		// En bref : ce qu'un lecteur presse doit savoir avant les jours.
 		{
@@ -842,35 +932,44 @@ namespace AnastasisChronicle
 				CountOf(EKind::Quarrel), S(CountOf(EKind::Quarrel)));
 		}
 
-		Out += TEXT("LES HABITANTS\n");
-		for (const FString& Id : PersonOrder)
+		// Les habitants, famille par famille quand la simulation en a ; ceux qui n'en ont pas a la fin.
+		TArray<TPair<FString, TArray<FString>>> Groups;
 		{
-			const FPersonState& State = People[Id];
-			TArray<FString> Parts;
-			Parts.Add(JobLabel(State.JobId, State.Look.bFemale));
-			if (State.Look.bElder) Parts.Add(State.Look.bFemale ? TEXT("ancienne") : TEXT("ancien"));
-			if (State.bAlive && !State.bGone)
+			TSet<FString> Placed;
+			for (const FFamilyView& View : FamilyViews)
 			{
-				Parts.Add(State.HomeId.IsEmpty() ? FString(TEXT("sans maison à soi")) : FString::Printf(TEXT("vit dans %s"), *BuildingLabel(State.HomeId)));
-			}
-			if (State.FirstDay > FirstDay) Parts.Add(FString::Printf(TEXT("arrivé%s le jour %d"), E(State.Look.bFemale), State.FirstDay));
-			if (!State.bAlive)
-			{
-				Parts.Add(FString::Printf(TEXT("mort%s le jour %d%s%s"), E(State.Look.bFemale), State.DeathDay,
-					State.DeathCause.IsEmpty() ? TEXT("") : TEXT(", "), *State.DeathCause));
-			}
-			if (State.bGone) Parts.Add(TEXT("parti"));
-			if (State.Friends.Num())
-			{
-				TArray<FString> Friends;
-				for (const FString& Other : PersonOrder)
+				TArray<FString> Members;
+				for (const FString& Id : PersonOrder)
 				{
-					if (State.Friends.Contains(Other)) Friends.Add(Other);
+					if (View.Members.Contains(Id)) Members.Add(Id);
 				}
-				Parts.Add(FString::Printf(TEXT("ami%s %s"), E(State.Look.bFemale), *DeName(Names(Friends))));
+				// Un membre parti ou mort a quitte le foyer dans la simulation : on le garde dans le recit.
+				for (const FString& Id : PersonOrder)
+				{
+					const FPersonState& State = People[Id];
+					if (!Members.Contains(Id) && State.FamilyName == View.Name) Members.Add(Id);
+				}
+				Placed.Append(Members);
+				Groups.Add(TPair<FString, TArray<FString>>(Capitalize(View.Name), Members));
 			}
-			Out += FString::Printf(TEXT("- %s : %s.\n"), *State.Name, *FString::Join(Parts, TEXT(" ; ")));
+			TArray<FString> Others;
+			for (const FString& Id : PersonOrder)
+			{
+				if (!Placed.Contains(Id)) Others.Add(Id);
+			}
+			if (Others.Num()) Groups.Add(TPair<FString, TArray<FString>>(FamilyViews.Num() ? FString(TEXT("Hors des familles")) : FString(), Others));
 		}
+		Out += FamilyViews.Num() ? TEXT("LES FAMILLES\n") : TEXT("LES HABITANTS\n");
+		for (const TPair<FString, TArray<FString>>& Group : Groups)
+		{
+			if (!Group.Key.IsEmpty()) Out += FString::Printf(TEXT("%s\n"), *Group.Key);
+			for (const FString& Id : Group.Value) Out += FString::Printf(TEXT("- %s\n"), *PersonLine(Id));
+		}
+
+		// Les lignes d'un jour dans l'ordre des heures : une scene racontee le soir passe apres le matin.
+		TArray<const FEntry*> Sorted;
+		for (const FEntry& Entry : Entries) Sorted.Add(&Entry);
+		Algo::StableSort(Sorted, [](const FEntry* A, const FEntry* B) { return A->Day != B->Day ? A->Day < B->Day : A->Hour < B->Hour; });
 
 		auto IsQuiet = [this](int32 Day)
 		{
@@ -892,11 +991,21 @@ namespace AnastasisChronicle
 			{
 				Out += FString::Printf(TEXT("\nJOUR %d%s\n"), Day, bClosed ? TEXT("") : TEXT(" (en cours)"));
 				bool bAny = false;
-				for (const FEntry& Entry : Entries)
+				int32 LastHourLabel = -1;
+				for (const FEntry* Entry : Sorted)
 				{
-					if (Entry.Day != Day || !Entry.bDayLog) continue;
+					if (Entry->Day != Day || !Entry->bDayLog) continue;
 					bAny = true;
-					Out += FString::Printf(TEXT("  %s. %s\n"), *Capitalize(HourLabel(Entry.Hour)), *Entry.Text);
+					// Une scene se lit d'un bloc : son heure n'est dite qu'une fois.
+					if (Entry->Kind == EKind::Scene)
+					{
+						if (LastHourLabel != Entry->Hour) Out += FString::Printf(TEXT("  %s, au feu.\n"), *Capitalize(HourLabel(Entry->Hour)));
+						LastHourLabel = Entry->Hour;
+						Out += FString::Printf(TEXT("    %s\n"), *Entry->Text);
+						continue;
+					}
+					LastHourLabel = -1;
+					Out += FString::Printf(TEXT("  %s. %s\n"), *Capitalize(HourLabel(Entry->Hour)), *Entry->Text);
 				}
 				if (!bAny) Out += TEXT("  Rien de notable.\n");
 			}
@@ -919,18 +1028,53 @@ namespace AnastasisChronicle
 		}
 
 		Out += TEXT("\nCE QU'A VÉCU CHACUN\n");
-		for (const FString& Id : PersonOrder)
+		for (const TPair<FString, TArray<FString>>& Group : Groups)
 		{
-			const FPersonState& State = People[Id];
-			Out += FString::Printf(TEXT("\n%s\n"), *State.Name);
-			for (const FEntry& Entry : Entries)
+			if (!Group.Key.IsEmpty()) Out += FString::Printf(TEXT("\n%s\n"), *Group.Key.ToUpper());
+			for (const FString& Id : Group.Value)
 			{
-				// Le paragraphe de fondation nomme tout le monde : chacun a deja sa propre ligne du premier jour.
-				if (!Entry.People.Contains(Id) || (Entry.Kind == EKind::Founding && Entry.People.Num() > 1)) continue;
-				Out += FString::Printf(TEXT("  Jour %d, %s : %s\n"), Entry.Day, *HourLabel(Entry.Hour), *Entry.Text);
+				const FPersonState& State = People[Id];
+				Out += FString::Printf(TEXT("\n%s\n"), *State.Name);
+				for (const FEntry* Entry : Sorted)
+				{
+					// Le paragraphe de fondation et la presentation d'une famille nomment plusieurs personnes : chacun a sa ligne.
+					if (!Entry->People.Contains(Id) || (Entry->Kind == EKind::Founding && Entry->People.Num() > 1)) continue;
+					Out += FString::Printf(TEXT("  Jour %d, %s : %s\n"), Entry->Day, *HourLabel(Entry->Hour), *Entry->Text);
+				}
 			}
 		}
 		return Out;
+	}
+
+	FString FVillageChronicle::PersonLine(const FString& Id) const
+	{
+		const FPersonState& State = People[Id];
+		FString Name = State.Look.Byname.IsEmpty() ? State.Name : FString::Printf(TEXT("%s %s"), *State.Name, *State.Look.Byname);
+		if (State.Look.Age > 0.0) Name += FString::Printf(TEXT(" (%d ans)"), FMath::RoundToInt32(State.Look.Age));
+		TArray<FString> Parts;
+		Parts.Add(State.Look.bChild ? FString(State.Look.bFemale ? TEXT("enfant, fille") : TEXT("enfant, garçon")) : JobLabel(State.JobId, State.Look.bFemale));
+		if (State.Look.bElder) Parts.Add(State.Look.bFemale ? TEXT("ancienne") : TEXT("ancien"));
+		if (State.bAlive && !State.bGone)
+		{
+			Parts.Add(State.HomeId.IsEmpty() ? FString(TEXT("sans maison à soi")) : FString::Printf(TEXT("vit dans %s"), *BuildingLabel(State.HomeId)));
+		}
+		if (State.FirstDay > FirstDay) Parts.Add(FString::Printf(TEXT("arrivé%s le jour %d"), E(State.Look.bFemale), State.FirstDay));
+		if (!State.bAlive)
+		{
+			Parts.Add(FString::Printf(TEXT("mort%s le jour %d%s%s"), E(State.Look.bFemale), State.DeathDay,
+				State.DeathCause.IsEmpty() ? TEXT("") : TEXT(", "), *State.DeathCause));
+		}
+		if (State.bGone) Parts.Add(TEXT("parti"));
+		if (State.Friends.Num())
+		{
+			TArray<FString> Friends;
+			for (const FString& Other : PersonOrder)
+			{
+				if (State.Friends.Contains(Other)) Friends.Add(Other);
+			}
+			Parts.Add(FString::Printf(TEXT("ami%s %s"), E(State.Look.bFemale), *DeName(Names(Friends))));
+		}
+		return FString::Printf(TEXT("%s : %s."), *Name, *FString::Join(Parts, TEXT(" ; ")));
 	}
 
 	FString FVillageChronicle::StatusJson() const

@@ -530,7 +530,32 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 			{
 				Pool = &Pools.Add(Job, AnastasisVillagerLooks::VillagePool(Registry.Villagers, Job));
 			}
-			const int32 LookIndex = AnastasisVillagerLooks::PickLook(*Pool, Npc.Id);
+			// familles-feu-001 : un habitant dont la simulation connait le sexe et l'age porte un portrait de sa
+			// categorie (Eudokia, une femme ; Michael, un enfant). Sans portrait de sa categorie, le tirage d'avant.
+			int32 LookIndex = INDEX_NONE;
+			EAnastasisVillagerCategory Category = EAnastasisVillagerCategory::AdultMale;
+			if (AnastasisVillagerLooks::CategoryFor(Npc.Gender, Npc.Age, Category))
+			{
+				// Un pool par sexe et par age est petit : on passe un visage deja porte par un autre habitant.
+				const TArray<int32> Person = AnastasisVillagerLooks::PersonPool(Registry.Villagers, Job, Category);
+				const int32 First = AnastasisVillagerLooks::PickLook(Person, Npc.Id);
+				if (First != INDEX_NONE)
+				{
+					TSet<FName> Worn;
+					for (const TPair<FString, TWeakObjectPtr<AAnastasisVillagerVisual>>& Other : Villagers)
+					{
+						if (const AAnastasisVillagerVisual* OtherActor = Other.Value.Get()) Worn.Add(OtherActor->GetLookId());
+					}
+					const int32 Start = Person.IndexOfByKey(First);
+					for (int32 Step = 0; Step < Person.Num() && LookIndex == INDEX_NONE; ++Step)
+					{
+						const int32 Candidate = Person[(Start + Step) % Person.Num()];
+						if (!Worn.Contains(Registry.Villagers[Candidate].LookId)) LookIndex = Candidate;
+					}
+					if (LookIndex == INDEX_NONE) LookIndex = First;
+				}
+			}
+			if (LookIndex == INDEX_NONE) LookIndex = AnastasisVillagerLooks::PickLook(*Pool, Npc.Id);
 			UMaterialInterface* Material = Registry.VillagerMaterial.LoadSynchronous();
 			UTexture2D* Portrait = LookIndex != INDEX_NONE ? Registry.Villagers[LookIndex].Portrait.LoadSynchronous() : nullptr;
 			if (!Portrait || !Material)

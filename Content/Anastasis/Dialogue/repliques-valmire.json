@@ -34,10 +34,11 @@
     ],
     "feu.moine.apres_reponse": [
       "Que Dieu garde {absent}.",
+      "Nous prierons pour {absent}.",
       "Nous retiendrons ton nom, {nom}.",
-      "Ce que tu as porté servira ici.",
       "Voilà une maison de plus autour du feu.",
-      "Tu as dit vrai, et c'est assez pour ce soir."
+      "Tu as dit vrai, et c'est assez pour ce soir.",
+      "Ce qui manque à ce feu, nous le porterons ensemble."
     ],
     "feu.moine.benediction": [
       "Que cette vallée vous garde, et que vous la gardiez. Demain, on commence.",
@@ -47,13 +48,13 @@
     ],
     "feu.ecoute": [
       "Nous aussi, nous avons laissé quelqu'un.",
-      "Que Dieu le garde.",
+      "Que Dieu garde les tiens.",
       "Je ne savais pas.",
       "On n'en parlera plus, si tu veux.",
       "C'est une lourde charge à porter.",
-      "Ici, ça pourra servir.",
-      "Tu as eu de la chance, toi.",
-      "Le chemin a été dur pour tout le monde."
+      "Le chemin a été dur pour tout le monde.",
+      "On priera pour eux, ici aussi.",
+      "Personne n'arrive ici sans avoir perdu quelqu'un."
     ],
     "aide.demande.chantier": [
       "Je lève ma maison. Viendrais-tu m'aider quelques jours ?",

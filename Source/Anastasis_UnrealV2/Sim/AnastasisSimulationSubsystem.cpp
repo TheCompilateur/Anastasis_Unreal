@@ -28,6 +28,7 @@
 #include "WorldView/AnastasisSettlementSurvey.h"
 #include "WorldView/AnastasisPresentationRegistry.h"
 #include "Village/AnastasisVillagerLooks.h"
+#include "Sim/AnastasisDialogueLines.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "HAL/PlatformTime.h"
@@ -124,6 +125,13 @@ static TAutoConsoleVariable<int32> CVarChronicleEnabled(
 	TEXT("CHRONIQUE_VILLAGE_001: 1 = the village chronicle reads the simulation every frame and every chunk of Anastasis.Sim.Advance; 0 = it stops reading (the simulation is unchanged either way). Anastasis.Chronicle.Write / Print to read it."),
 	ECVF_Default);
 
+// familles-feu-001 (ecart n°44). Le village du lancement : les fondateurs de Valmire, ou des anonymes.
+static TAutoConsoleVariable<int32> CVarVillageFounders(
+	TEXT("anastasis.Village.Founders"),
+	1,
+	TEXT("familles-feu-001: 1 = the start village is the four founding families of Valmire and the monk Arsenios (Content/Anastasis/Scenario/valmire-fondateurs.json), seeded on tiles that reach the well, with the first evening at the fire told in the chronicle; 0 = anastasis.Village.StartVillagers anonymous villagers, as before."),
+	ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarVillageCanopyRain(
 	TEXT("anastasis.Village.CanopyRain"), 1,
 	TEXT("1 = embodied tree crowns partly intercept rain exposure for villagers; 0 = reference exposure at every outdoor position."),
@@ -214,15 +222,47 @@ void UAnastasisSimulationSubsystem::TryStartVillage(float DeltaTime)
 
 FString UAnastasisSimulationSubsystem::SeedStartVillage(int32 NpcCount, int32 TileX, int32 TileY)
 {
-	const FString WellId = SeedFirstWell(NpcCount, TileX, TileY);
+	// familles-feu-001 : le puits seul, puis les fondateurs a leur place ; sans scenario lisible, les anonymes.
+	const AnastasisFounders::FScenario* Scenario = CVarVillageFounders.GetValueOnGameThread() != 0 ? AnastasisFounders::FScenario::Get() : nullptr;
+	const FString WellId = SeedFirstWell(Scenario ? 0 : NpcCount, TileX, TileY);
 	bStartVillage = !WellId.IsEmpty();
 	if (bStartVillage)
 	{
+		if (Scenario) Founders = AnastasisFounders::Seed(Simulation, WellId, *Scenario);
 		SeedOpeningHousehold();
 		if (CVarVillageOpeningConstruction.GetValueOnGameThread() != 0) SeedOpeningConstruction();
 		SeedOpeningWorkforce();
+		if (Scenario) TellFounding(*Scenario);
 	}
 	return WellId;
+}
+
+void UAnastasisSimulationSubsystem::TellFounding(const AnastasisFounders::FScenario& Scenario)
+{
+	if (Founders.IsEmpty()) return;
+	// La chronique s'ouvre maintenant, sur le village tel qu'il est pose (metiers d'ouverture compris).
+	Chronicle.Observe(Simulation);
+	const int32 Day = Simulation.GetDay();
+	const int32 Hour = FMath::Clamp(FMath::FloorToInt32(Simulation.DayFrac() * 24.0), 0, 23);
+	for (int32 F = 0; F < Scenario.Families.Num(); ++F)
+	{
+		TArray<FString> Members;
+		for (const AnastasisFounders::FFounder& Founder : Founders)
+		{
+			if (Founder.Family == F) Members.Add(Founder.NpcId);
+		}
+		Chronicle.AddNarration(Day, Hour, AnastasisChronicle::EKind::Founding, Members, AnastasisFounders::FamilyIntro(Scenario.Families[F]));
+	}
+	// Le premier soir, au feu (Bible §10.6) : le moine interroge, chaque famille repond.
+	constexpr int32 EveningHour = 20;
+	const TArray<AnastasisFounders::FLine> Scene = AnastasisFounders::FireScene(Scenario, Founders, Simulation.GetSeed(), AnastasisDialogue::FLibrary::Get());
+	for (const AnastasisFounders::FLine& Line : Scene)
+	{
+		Chronicle.AddNarration(Day, EveningHour, AnastasisChronicle::EKind::Scene, { Line.SpeakerId },
+			FString::Printf(TEXT("%s : « %s »"), *Chronicle.NameOf(Line.SpeakerId), *Line.Text));
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_FOUNDERS founding told families=%d founders=%d fire_lines=%d"),
+		Scenario.Families.Num(), Founders.Num(), Scene.Num());
 }
 
 void UAnastasisSimulationSubsystem::SeedOpeningHousehold()
@@ -234,12 +274,29 @@ void UAnastasisSimulationSubsystem::SeedOpeningHousehold()
 	const FNpc& Resident = Village.GetActors()[0];
 	const FPoint Origin{ Resident.X, Resident.Y };
 	const AnastasisPath::FWorldNavSource Nav(Village.GetNavGrid(), World);
+	// familles-feu-001 : un batiment pose a cote du resident peut l'enfermer. Il ne suffit pas qu'il atteigne
+	// sa porte : il doit encore atteindre le puits, sinon il meurt de soif chez lui (vu par la chronique).
+	auto ReachesWell = [&]()
+	{
+		bool bAnyWell = false;
+		for (const FBuilding& Well : Village.GetBuildings())
+		{
+			if (Well.Type != WellType || Well.Progress < 1.0) continue;
+			bAnyWell = true;
+			for (const FPoint& Door : Well.AccessPoints)
+			{
+				TArray<FPoint> Path;
+				if (AnastasisPath::FindPath(Nav, Origin, Door, {}, Path)) return true;
+			}
+		}
+		return !bAnyWell;
+	};
 	auto Reachable = [&](const FBuilding& Building)
 	{
 		for (const FPoint& Door : Building.AccessPoints)
 		{
 			TArray<FPoint> Path;
-			if (AnastasisPath::FindPath(Nav, Origin, Door, {}, Path)) return true;
+			if (AnastasisPath::FindPath(Nav, Origin, Door, {}, Path)) return ReachesWell();
 		}
 		return false;
 	};
@@ -459,9 +516,20 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	// CHRONIQUE_VILLAGE_001 : une simulation neuve, une chronique neuve. Le nom provisoire d'un habitant
 	// s'accorde au portrait que la presentation lui donnera (meme tirage que SyncVillagers).
 	Chronicle.Reset(Seed);
-	Chronicle.SetLookResolver([](const AnastasisVillage::FNpc& Npc)
+	Founders.Reset();
+	Chronicle.SetDialogue(&AnastasisDialogue::FLibrary::Get());
+	Chronicle.SetLookResolver([this](const AnastasisVillage::FNpc& Npc)
 	{
 		AnastasisChronicle::FPersonLook Look;
+		// familles-feu-001 : le surnom d'un fondateur (« le Scribe ») vient du scenario.
+		if (const AnastasisFounders::FScenario* Scenario = AnastasisFounders::FScenario::Get())
+		{
+			if (const AnastasisFounders::FFounder* Founder = Founders.FindByPredicate([&Npc](const AnastasisFounders::FFounder& F) { return F.NpcId == Npc.Id; }))
+			{
+				int32 Family = INDEX_NONE;
+				if (const AnastasisFounders::FMember* Member = Scenario->FindMember(Founder->Key, Family)) Look.Byname = Member->Byname;
+			}
+		}
 		const UAnastasisPresentationRegistry& Registry = AnastasisPresentation::GetRegistry();
 		const TArray<int32> Pool = AnastasisVillagerLooks::VillagePool(Registry.Villagers, FName(*Npc.JobId));
 		const int32 Index = AnastasisVillagerLooks::PickLook(Pool, Npc.Id);

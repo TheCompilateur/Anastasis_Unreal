@@ -1,12 +1,16 @@
 {
   "_doc": "Les fondateurs de Valmire (mission familles-feu-001), validés par Alexandre le 2026-10-08 : quatre familles, une par matrice d'origine de la Bible (§10.2), et un moine de passage qui pose les trois questions au feu (§10.6). Pour chaque question, la première variante est celle qu'Alexandre a validée ; les autres sont des variantes plausibles, tirées selon la graine de la partie pour que deux parties ne racontent pas la même chose. Les familles et leurs membres ne varient pas.",
   "historicite": "HYPOTHESE_DE_CONCEPTION : personnes, biographies et objets sont inventés pour une vallée fictive de l'arrière-pays de Trébizonde vers 1204 (docs/historicity/MODELE.md, PONT-HIS-02 : une seule famille vient de la Ville). Faits de contexte utilisés comme tels, à faire relire : prise de Constantinople par les croisés en avril 1204 ; Alexios Comnène à Trébizonde en 1204 avec un appui géorgien ; voisinage seldjoukide et razzias sur les marges. Tout le reste est une invention plausible, pas un fait attesté.",
+  "ordre_de_pose": {
+    "_doc": "L'ordre dans lequel le village du lancement pose les habitants. Il donne les métiers d'ouverture : le premier reçoit la maison et devient cultivateur au grenier, les deux suivants qui atteignent le chantier d'ouverture le bâtissent, les deux suivants qui atteignent le grenier y cultivent. Les autres commencent sans métier. L'ordre tient aussi compte des portraits peints (VILLAGER_PNG_001) : deux hommes cultivateurs, trois femmes et cinq hommes sans métier, pour que personne ne porte le visage d'un autre. Si un chemin manque, l'hôte prend le suivant : la chronique dit qui a eu quoi.",
+    "cles": ["georgios", "niketas", "leon", "ioannes", "theodora", "basileios", "konstantinos", "eudokia", "michael", "zoe", "maria", "euphrosyne", "sabas", "arsenios"]
+  },
   "moine": {
     "cle": "arsenios",
     "prenom": "Arsenios",
     "surnom": "le moine",
     "sexe": "M",
-    "age": 57,
+    "age": 61,
     "role": "moine de passage"
   },
   "familles": [
@@ -17,9 +21,9 @@
       "repondant": "konstantinos",
       "presentation": "Des gens de la Ville, qui savent lire et écrire et n'ont jamais tenu une houe.",
       "membres": [
-        { "cle": "konstantinos", "prenom": "Konstantinos", "surnom": "le Scribe", "sexe": "M", "age": 41, "lien": "chef", "metier": "settler" },
-        { "cle": "eudokia", "prenom": "Eudokia", "sexe": "F", "age": 36, "lien": "epouse", "metier": "settler" },
-        { "cle": "michael", "prenom": "Michael", "sexe": "M", "age": 12, "lien": "fils", "metier": "settler" }
+        { "cle": "konstantinos", "prenom": "Konstantinos", "surnom": "le Scribe", "sexe": "M", "age": 41, "lien": "chef" },
+        { "cle": "eudokia", "prenom": "Eudokia", "sexe": "F", "age": 36, "lien": "epouse" },
+        { "cle": "michael", "prenom": "Michael", "sexe": "M", "age": 12, "lien": "fils" }
       ],
       "ville": [
         "Dans la Ville, près des Saints-Apôtres. J'ai vu les Latins entrer par les murs de la Corne d'Or.",
@@ -44,10 +48,10 @@
       "repondant": "georgios",
       "presentation": "Des paysans de la vallée, chassés d'en bas par les razzias ; la terre, ils la connaissent.",
       "membres": [
-        { "cle": "georgios", "prenom": "Georgios", "sexe": "M", "age": 50, "lien": "chef", "metier": "farmer" },
-        { "cle": "theodora", "prenom": "Theodora", "sexe": "F", "age": 47, "lien": "epouse", "metier": "farmer" },
-        { "cle": "ioannes", "prenom": "Ioannes", "surnom": "fils de Georgios", "sexe": "M", "age": 19, "lien": "fils", "metier": "farmer" },
-        { "cle": "basileios", "prenom": "Basileios", "surnom": "frère de Georgios", "sexe": "M", "age": 44, "lien": "frere", "metier": "settler" }
+        { "cle": "georgios", "prenom": "Georgios", "sexe": "M", "age": 50, "lien": "chef" },
+        { "cle": "theodora", "prenom": "Theodora", "sexe": "F", "age": 47, "lien": "epouse" },
+        { "cle": "ioannes", "prenom": "Ioannes", "surnom": "fils de Georgios", "sexe": "M", "age": 19, "lien": "fils" },
+        { "cle": "basileios", "prenom": "Basileios", "surnom": "frère de Georgios", "sexe": "M", "age": 44, "lien": "frere" }
       ],
       "ville": [
         "Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru.",
@@ -72,9 +76,9 @@
       "repondant": "niketas",
       "presentation": "Un soldat sans solde et les siens : il ne se bat plus, il organise.",
       "membres": [
-        { "cle": "niketas", "prenom": "Niketas", "surnom": "du fort", "sexe": "M", "age": 38, "lien": "chef", "metier": "settler" },
-        { "cle": "zoe", "prenom": "Zoe", "sexe": "F", "age": 30, "lien": "epouse", "metier": "settler" },
-        { "cle": "leon", "prenom": "Leon", "surnom": "pupille de Niketas", "sexe": "M", "age": 16, "lien": "pupille", "metier": "settler" }
+        { "cle": "niketas", "prenom": "Niketas", "surnom": "du fort", "sexe": "M", "age": 38, "lien": "chef" },
+        { "cle": "zoe", "prenom": "Zoe", "sexe": "F", "age": 30, "lien": "epouse" },
+        { "cle": "leon", "prenom": "Leon", "surnom": "pupille de Niketas", "sexe": "M", "age": 16, "lien": "pupille" }
       ],
       "ville": [
         "Au fort, sur le col. La solde a cessé d'arriver, et puis les ordres aussi.",
@@ -99,9 +103,9 @@
       "repondant": "maria",
       "presentation": "Une veuve des routes, qui connaît les marchés, les langues et les prix.",
       "membres": [
-        { "cle": "maria", "prenom": "Maria", "surnom": "la veuve du muletier", "sexe": "F", "age": 34, "lien": "chef", "metier": "settler" },
-        { "cle": "euphrosyne", "prenom": "Euphrosyne", "surnom": "fille de Maria", "sexe": "F", "age": 9, "lien": "fille", "metier": "settler" },
-        { "cle": "sabas", "prenom": "Sabas", "surnom": "le muletier", "sexe": "M", "age": 22, "lien": "engage", "metier": "settler" }
+        { "cle": "maria", "prenom": "Maria", "surnom": "la veuve du muletier", "sexe": "F", "age": 34, "lien": "chef" },
+        { "cle": "euphrosyne", "prenom": "Euphrosyne", "surnom": "fille de Maria", "sexe": "F", "age": 9, "lien": "fille" },
+        { "cle": "sabas", "prenom": "Sabas", "surnom": "le muletier", "sexe": "M", "age": 22, "lien": "engage" }
       ],
       "ville": [
         "Sur la route, entre Trébizonde et le plateau, avec nos mules.",

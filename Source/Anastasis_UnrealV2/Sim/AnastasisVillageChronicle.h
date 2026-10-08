@@ -22,6 +22,11 @@
 
 class FAnastasisSimulation;
 
+namespace AnastasisDialogue
+{
+	class FLibrary;
+}
+
 namespace AnastasisVillage
 {
 	struct FNpc;
@@ -55,6 +60,8 @@ namespace AnastasisChronicle
 		FoodOut,
 		FoodBack,
 		FoodLow,
+		/** Une scene racontee par l'hote (le feu du premier soir) : une ligne par replique. */
+		Scene,
 		/** Un chantier qui n'avance plus depuis 3, 7, 15 ou 30 jours. Toujours le dernier : StatusJson s'arrete la. */
 		Stalled,
 	};
@@ -98,6 +105,10 @@ namespace AnastasisChronicle
 		bool bKnown = false;
 		bool bFemale = false;
 		bool bElder = false;
+		/** familles-feu-001 : un enfant (moins de treize ans), son age, et le surnom que l'hote lui connait. */
+		bool bChild = false;
+		double Age = 0.0;
+		FString Byname;
 	};
 
 	/** Libelle francais d'une heure : « la nuit », « a l'aube », « le matin »... */
@@ -113,6 +124,12 @@ namespace AnastasisChronicle
 
 		/** Facultatif : l'hote dit quel portrait porte un habitant, pour accorder son nom. */
 		void SetLookResolver(FLookResolver InResolver) { LookResolver = MoveTemp(InResolver); }
+
+		/** Facultatif : la base de repliques ; avec elle, la faim, la soif, le deuil et l'amitie se disent aussi. */
+		void SetDialogue(const AnastasisDialogue::FLibrary* InLines) { Lines = InLines; }
+
+		/** Une ligne que l'hote raconte lui-meme (presentation d'une famille, replique d'une scene). Ne lit rien. */
+		void AddNarration(int32 Day, int32 Hour, EKind Kind, const TArray<FString>& InPeople, const FString& Text) { Add(Day, Hour, Kind, InPeople, Text); }
 
 		/** Lit la simulation et ecrit ce qui a change depuis le dernier passage. Ne la modifie jamais. */
 		void Observe(const FAnastasisSimulation& Sim);
@@ -131,13 +148,24 @@ namespace AnastasisChronicle
 		const TArray<FDaySummary>& GetDays() const { return Days; }
 		int32 CountOf(EKind Kind) const;
 
-		/** Nom provisoire d'un habitant deja vu ; l'identifiant brut sinon. */
+		/** Nom d'un habitant deja vu (le sien s'il en a un, provisoire sinon) ; l'identifiant brut sinon. */
 		FString NameOf(const FString& NpcId) const;
+
+		/** Les foyers lus dans la simulation : nom et membres, dans l'ordre. */
+		struct FFamilyView
+		{
+			FString Id;
+			FString Name;
+			TArray<FString> Members;
+		};
+		const TArray<FFamilyView>& GetFamilyViews() const { return FamilyViews; }
 
 	private:
 		struct FPersonState
 		{
 			FString Name;
+			/** Le nom du foyer que la simulation lui donne (`FNpc::FamilyName`) : un mort reste de sa famille. */
+			FString FamilyName;
 			FPersonLook Look;
 			bool bAlive = true;
 			bool bGone = false;
@@ -191,6 +219,10 @@ namespace AnastasisChronicle
 		FString LabelFor(const FString& Type);
 		FString BuildingLabel(const FString& BuildingId) const;
 		FString Names(const TArray<FString>& Ids) const;
+		/** Une replique de la base pour cette situation, entre guillemets, ou vide sans base. */
+		FString Quote(const FString& SpeakerId, const TCHAR* Pool, int32 Rank, const TMap<FString, FString>& Holes = TMap<FString, FString>()) const;
+		void ReadFamilies(const FAnastasisSimulation& Sim);
+		FString PersonLine(const FString& Id) const;
 		FStats ReadStats(const FAnastasisSimulation& Sim) const;
 		void CloseDay(int32 Day);
 		/** Rend 0 sans batiment acheve de ce type, 1 si aucun chemin n'en atteint un seuil, 2 s'il est atteignable. */
@@ -205,6 +237,8 @@ namespace AnastasisChronicle
 		int32 FoodLowDay = 0;
 		FStats LastStats;
 		FLookResolver LookResolver;
+		const AnastasisDialogue::FLibrary* Lines = nullptr;
+		TArray<FFamilyView> FamilyViews;
 		TArray<FString> PersonOrder;
 		TMap<FString, FPersonState> People;
 		TArray<FString> BuildingOrder;

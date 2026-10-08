@@ -60,6 +60,7 @@ namespace AnastasisVillage
 		void VisitState(FStateArchive& Ar, FPlayerRefusal& V);
 		void VisitState(FStateArchive& Ar, FPlayerGoalOption& V);
 		void VisitState(FStateArchive& Ar, FVillage::FDeath& V);
+		void VisitState(FStateArchive& Ar, FVillage::FFamily& V);
 		void VisitState(FStateArchive& Ar, AnastasisWeatherBehavior::FSimWeather& V);
 		void VisitState(FStateArchive& Ar, AnastasisBudget::FDirector& V);
 		void VisitState(FStateArchive& Ar, AnastasisNav::FNavGrid& V);
@@ -669,6 +670,13 @@ namespace AnastasisVillage
 			Ar.Key(TEXT("failedActions")).Number(V.FailedActions);
 			Ar.Key(TEXT("homeId")).String(V.HomeId);
 			Ar.Key(TEXT("shelterId")).String(V.ShelterId);
+			// ecart n°44 : l'identite.
+			Ar.Key(TEXT("name")).String(V.Name);
+			Ar.Key(TEXT("familyName")).String(V.FamilyName);
+			Ar.Key(TEXT("gender")).String(V.Gender);
+			Ar.Key(TEXT("age")).Number(V.Age);
+			Ar.Key(TEXT("familyId")).String(V.FamilyId);
+			Ar.Key(TEXT("kinRole")).String(V.KinRole);
 			Ar.Key(TEXT("inside"));
 			VisitState(Ar, V.Inside);
 			Ar.Key(TEXT("doorStuckAt")).Number(V.DoorStuckAt);
@@ -887,6 +895,20 @@ namespace AnastasisVillage
 			Ar.EndObject();
 		}
 
+		// ecart n°44 : un foyer pose par l'hote.
+		void VisitState(FStateArchive& Ar, FVillage::FFamily& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("id")).String(V.Id);
+			Ar.Key(TEXT("name")).String(V.Name);
+			Ar.Key(TEXT("adults"));
+			VisitStrings(Ar, V.Adults);
+			Ar.Key(TEXT("dependents"));
+			VisitStrings(Ar, V.Dependents);
+			Ar.Key(TEXT("homeId")).String(V.HomeId);
+			Ar.EndObject();
+		}
+
 		void VisitState(FStateArchive& Ar, AnastasisWeatherBehavior::FSimWeather& V)
 		{
 			Ar.BeginObject();
@@ -1029,6 +1051,9 @@ namespace AnastasisVillage
 		Ar.Key(TEXT("nextBuildingId")).Number(NextBuildingId);
 		Ar.Key(TEXT("deathLog"));
 		VisitStates(Ar, DeathLog);
+		Ar.Key(TEXT("families"));
+		VisitStates(Ar, Families);
+		Ar.Key(TEXT("nextFamilyId")).Number(NextFamilyId);
 		Ar.Key(TEXT("nextNpcId")).Number(NextNpcId);
 		Ar.Key(TEXT("now")).Number(Now);
 		Ar.Key(TEXT("weatherSeed")).Number(WeatherSeed);

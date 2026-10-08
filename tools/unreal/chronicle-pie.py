@@ -63,6 +63,10 @@ def verdict(world):
         # Le jour 30 seul, ou au bout d'un bloc de jours calmes (« JOURS 17 À 30 »).
         'file_has_last_day': ('\nJOUR %d\n' % DAYS) in text or (' À %d\n' % DAYS) in text,
     }
+    # familles-feu-001 : avec les fondateurs, la chronique s'ouvre sur les familles et le premier soir au feu.
+    if unreal.SystemLibrary.get_console_variable_int_value('anastasis.Village.Founders') == 1:
+        checks['families'] = 'LES FAMILLES' in text and 'La maison du Scribe' in text
+        checks['fire_scene'] = kinds.get('Scene', 0) >= 20
     ok = all(checks.values())
     unreal.log('CHRONICLE_PIE_STATUS ' + json.dumps(st, ensure_ascii=False))
     unreal.log('CHRONICLE_PIE %s path=%s days_closed=%s entries=%s told=%d people=%s alive=%s checks=%s' % (

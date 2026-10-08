@@ -30,7 +30,9 @@ ROOT = Path(unreal.Paths.project_dir())
 OUT = Path(os.environ.get('ANASTASIS_VILLAGER_PIE_OUT', str(ROOT / 'Saved' / 'VillagerEvidence' / 'pie')))
 OUT.mkdir(parents=True, exist_ok=True)
 NPC_COUNT = int(os.environ.get('ANASTASIS_VILLAGER_PIE_NPCS', '12'))
-START_COUNT = 12  # anastasis.Village.StartVillagers par defaut
+# Le village du lancement : les fondateurs de Valmire (familles-feu-001, quatre familles et le moine, 14)
+# quand anastasis.Village.Founders vaut 1, sinon anastasis.Village.StartVillagers anonymes (12).
+START_COUNT = 14 if unreal.SystemLibrary.get_console_variable_int_value('anastasis.Village.Founders') == 1 else 12
 # Le rythme du jeu (point 4) : la preuve le garde, sauf pendant une prise ou elle gele (TimeScale 0 ;
 # Sim.Speed 0 ne gele rien, PumpFrame lit toute vitesse < 1 comme 1).
 GAME_TIME_SCALE = unreal.SystemLibrary.get_console_variable_float_value('anastasis.Sim.TimeScale')
@@ -87,8 +89,9 @@ def check(c, label):
         errs.append('portraits en double: %s' % sorted(looks))
     # Aucun portrait builder n'existe encore : le pont de presentation emploie
     # explicitement le pool settler pour ce metier, sans changer le job simule.
+    # Un enfant fondateur (familles-feu-001) porte un portrait d'enfant, qui n'a pas de metier.
     wrong = ['%s(%s)=%s' % (x['npc'], x['job'], x['look']) for x in v
-             if x['look'] and x['job'] not in JOBS.get(x['look'], set())
+             if x['look'] and '_Child_' not in x['look'] and x['job'] not in JOBS.get(x['look'], set())
              and not (x['job'] == 'builder' and 'settler' in JOBS.get(x['look'], set()))]
     if wrong:
         errs.append('portrait d un autre metier, assis ou enfant: %s' % wrong)

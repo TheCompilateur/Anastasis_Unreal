@@ -51,6 +51,19 @@ namespace AnastasisVillagerLooks
 	int32 PickLook(const TArray<int32>& Pool, const FString& NpcId);
 
 	/**
+	 * familles-feu-001 -- la categorie de portrait qu'un habitant doit porter quand la simulation connait son
+	 * sexe (« male » / « female ») et son age : enfant sous treize ans, ancien a partir de cinquante-huit, adulte
+	 * sinon. Faux si la simulation ne les connait pas (habitant anonyme) : le portrait se tire comme avant.
+	 */
+	bool CategoryFor(const FString& Gender, double Age, EAnastasisVillagerCategory& OutCategory);
+
+	/**
+	 * Les portraits de cette categorie que ce metier peut porter (meme ordre et memes regles que VillagePool).
+	 * Un enfant n'a pas de metier : tous les portraits d'enfant en jeu lui vont.
+	 */
+	TArray<int32> PersonPool(const TArray<FAnastasisVillagerLook>& Looks, FName Job, EAnastasisVillagerCategory Category);
+
+	/**
 	 * How the 3D body of a villager is dressed (VILLAGER_BODY_3D_001). Colours are linear; heights
 	 * are fractions of the body's own height on the bind pose (the material reads the pre-skinned
 	 * position, so a band stays on the same piece of body while it walks).
