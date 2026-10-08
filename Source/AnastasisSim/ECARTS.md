@@ -771,6 +771,25 @@ habitant**, via `PerceiveFoodContext` ; `ReserveMeal` garde toutes ses validatio
 Cette correction de jouabilité diverge de la référence JS et reste à trancher par Alexandre.
 Les scénarios actuels du harnais n'incarnent pas de joueur.
 
+### n° 40 — Village d'ouverture du jeu Unreal : foyer, poste, chantier et maison décidés par la simulation
+
+- **classe** : EXTENSION
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : opening-in-sim-001
+- **activation** : hôte seulement — `FVillage::SeedOpeningVillage`, appelé par `UAnastasisSimulationSubsystem::TryStartVillage` après `SeedFirstWell` (village de lancement, `anastasis.Village.StartVillagers` > 0 ; chantier si `anastasis.Village.OpeningConstruction` 1). Il pose le verrou `OpeningSiteId` que lit `AssignCompletedOpeningHome` à la fin de chaque `UpdateActors`. Aucun scénario du harnais ne l'appelle ; sans verrou, la règle ne lit ni n'écrit rien.
+- **reference** : aucune. Le plus proche : `populateFoundingLife` de `src/sim/simulation.js` (fondateurs tirés par `sim.rng`, `seedStarterHomes`, `assignSheltersDaily`, `ensureWorkplacesDaily`, `restoreFounderJobs`) et `tryOpenNewConstruction`, non portés.
+- **cpp** : `Village/AnastasisVillageOpening.cpp` (`SeedOpeningVillage`, `AssignCompletedOpeningHome`), `Village/AnastasisVillage.cpp` (`Bind`, fin d'`UpdateActors`), `Public/Village/AnastasisVillage.h` (`FOpeningReport`, `FOpeningHomeOutcome`)
+- **harnais** : aucune
+- **detail** : `docs/unreal/handoffs/opening-in-sim-001.md`
+
+Le jeu Unreal ouvre sur un puits et douze colons posés par l'hôte, pas sur la fondation de la référence.
+Les décisions qui suivent étaient prises par l'hôte (`SeedOpeningHousehold`, `SeedOpeningConstruction`,
+`SeedOpeningWorkforce`, `AssignCompletedOpeningHome`) ; elles sont déplacées telles quelles dans la
+simulation : chemins réels (`findPath`), ordre des habitants, aucun tirage. La maison achevée est donnée
+au pas où elle s'achève, et non plus à la frame d'hôte suivante. À trancher : garder cette ouverture comme
+extension Unreal, ou la remplacer par le port de `populateFoundingLife`.
+
 ### n° 41 — Interception partielle de la pluie par une couronne incarnée
 
 - **classe** : EXTENSION

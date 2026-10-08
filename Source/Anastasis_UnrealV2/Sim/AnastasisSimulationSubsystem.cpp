@@ -254,9 +254,9 @@ FString UAnastasisSimulationSubsystem::SeedStartVillage(int32 NpcCount, int32 Ti
 	if (bStartVillage)
 	{
 		if (Scenario) Founders = AnastasisFounders::Seed(Simulation, WellId, *Scenario);
-		SeedOpeningHousehold();
-		if (CVarVillageOpeningConstruction.GetValueOnGameThread() != 0) SeedOpeningConstruction();
-		SeedOpeningWorkforce();
+		// opening-in-sim-001 : foyer, poste, chantier, batisseurs, porteur et embauches sont decides par la
+		// simulation (FVillage::SeedOpeningVillage, ecart n°40) ; l'hote ne fait que le dire.
+		LogOpeningReport(Simulation.GetVillage().SeedOpeningVillage(Simulation.GetDay(), CVarVillageOpeningConstruction.GetValueOnGameThread() != 0));
 		if (Scenario) TellFounding(*Scenario);
 	}
 	return WellId;
@@ -293,219 +293,57 @@ void UAnastasisSimulationSubsystem::TellFounding(const AnastasisFounders::FScena
 		Scenario.Families.Num(), Founders.Num(), Scene.Num(), Memories);
 }
 
-void UAnastasisSimulationSubsystem::SeedOpeningHousehold()
+void UAnastasisSimulationSubsystem::LogOpeningReport(const AnastasisVillage::FOpeningReport& Opening)
 {
-	using namespace AnastasisVillage;
-	FVillage& Village = Simulation.GetVillage();
-	const AnastasisWorld::FWorld& World = Simulation.GetWorld();
-	if (Village.GetActors().IsEmpty()) return;
-	const FNpc& Resident = Village.GetActors()[0];
-	const FPoint Origin{ Resident.X, Resident.Y };
-	const AnastasisPath::FWorldNavSource Nav(Village.GetNavGrid(), World);
-	// familles-feu-001 : un batiment pose a cote du resident peut l'enfermer. Il ne suffit pas qu'il atteigne
-	// sa porte : il doit encore atteindre le puits, sinon il meurt de soif chez lui (vu par la chronique).
-	auto ReachesWell = [&]()
+	// Memes lignes, dans le meme ordre, que lorsque l'hote decidait lui-meme (preuves PIE et A/B).
+	if (Opening.bHousehold)
 	{
-		bool bAnyWell = false;
-		for (const FBuilding& Well : Village.GetBuildings())
-		{
-			if (Well.Type != WellType || Well.Progress < 1.0) continue;
-			bAnyWell = true;
-			for (const FPoint& Door : Well.AccessPoints)
-			{
-				TArray<FPoint> Path;
-				if (AnastasisPath::FindPath(Nav, Origin, Door, {}, Path)) return true;
-			}
-		}
-		return !bAnyWell;
-	};
-	auto Reachable = [&](const FBuilding& Building)
-	{
-		for (const FPoint& Door : Building.AccessPoints)
-		{
-			TArray<FPoint> Path;
-			if (AnastasisPath::FindPath(Nav, Origin, Door, {}, Path)) return ReachesWell();
-		}
-		return false;
-	};
-	auto PlaceReachable = [&](const FString& Type, int32 CX, int32 CY, int32 RadiusMax)
-	{
-		for (int32 R = 1; R <= RadiusMax; ++R)
-		for (int32 DY = -R; DY <= R; ++DY)
-		for (int32 DX = -R; DX <= R; ++DX)
-		{
-			if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) != R) continue;
-			const int32 X = CX + DX, Y = CY + DY;
-			if (X < 2 || Y < 2 || X >= World.W - 2 || Y >= World.H - 2
-				|| Village.IsFootBlocked(X + 0.5, Y + 0.5)) continue;
-			const FString Id = Village.AddBuilding(Type, X, Y, 1.0, Simulation.GetDay());
-			if (Id.IsEmpty()) continue;
-			if (const FBuilding* Building = Village.FindBuilding(Id))
-			{
-				if (Reachable(*Building)) return Id;
-			}
-			Village.RemoveBuilding(Id);
-		}
-		return FString();
-	};
-	const FString ResidentId = Resident.Id;
-	const FString HomeId = PlaceReachable(HouseType, FMath::FloorToInt32(Origin.X), FMath::FloorToInt32(Origin.Y), 5);
-	if (!HomeId.IsEmpty()) Village.AssignHome(ResidentId, HomeId);
-
-	// Le poste doit desservir une vraie nourriture du monde, comme FirstFarmer.
-	FString WorkId;
-	TArray<const AnastasisWorld::FTile*> Fields;
-	for (const AnastasisWorld::FTile& Tile : World.Tiles)
-	{
-		const AnastasisWorld::FTile Live = Village.LiveTileAt(Tile.X, Tile.Y);
-		if (Live.Resource == AnastasisWorld::EResource::Food && Live.Amount > 0) Fields.Add(&Tile);
-	}
-	Fields.Sort([&](const AnastasisWorld::FTile& A, const AnastasisWorld::FTile& B)
-	{
-		const auto Distance = [&](const AnastasisWorld::FTile& T)
-		{
-			return FMath::Abs(T.X - FMath::FloorToInt32(Origin.X))
-				+ FMath::Abs(T.Y - FMath::FloorToInt32(Origin.Y));
-		};
-		return Distance(A) < Distance(B);
-	});
-	for (const AnastasisWorld::FTile* Field : Fields)
-	{
-		TArray<FPoint> Path;
-		if (!AnastasisPath::FindPath(Nav, Origin, { Field->X + 0.5, Field->Y + 0.5 }, {}, Path)) continue;
-		WorkId = PlaceReachable(GranaryType, Field->X, Field->Y, 4);
-		if (!WorkId.IsEmpty()) break;
-	}
-	if (!WorkId.IsEmpty() && Village.AssignWorkplace(ResidentId, AnastasisGather::JobFarmer, WorkId)) OpeningWorkId = WorkId;
-	UE_LOG(LogAnastasis_UnrealV2, Display,
-		TEXT("ANASTASIS_VILLAGE opening household npc=%s home=%s work=%s"),
-		*ResidentId, HomeId.IsEmpty() ? TEXT("none") : *HomeId, WorkId.IsEmpty() ? TEXT("none") : *WorkId);
-}
-
-void UAnastasisSimulationSubsystem::SeedOpeningConstruction()
-{
-	using namespace AnastasisVillage;
-	FVillage& Village = Simulation.GetVillage();
-	const AnastasisWorld::FWorld& World = Simulation.GetWorld();
-	if (Village.GetActors().Num() < 2) return;
-	const AnastasisPath::FWorldNavSource Nav(Village.GetNavGrid(), World);
-	// Les habitants initiaux peuvent etre sur des ilots de navigation differents.
-	// Chercher autour de chacun, puis choisir les ouvriers qui atteignent vraiment l'acces.
-	for (int32 Anchor = 1; Anchor < Village.GetActors().Num(); ++Anchor)
-	for (int32 R = 2; R <= 5; ++R)
-	for (int32 DY = -R; DY <= R; ++DY)
-	for (int32 DX = -R; DX <= R; ++DX)
-	{
-		if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) != R) continue;
-		const FNpc& AnchorNpc = Village.GetActors()[Anchor];
-		const int32 X = FMath::FloorToInt32(AnchorNpc.X) + DX;
-		const int32 Y = FMath::FloorToInt32(AnchorNpc.Y) + DY;
-		if (X < 2 || Y < 2 || X >= World.W - 2 || Y >= World.H - 2
-			|| Village.LiveTileAt(X, Y).Resource != AnastasisWorld::EResource::None
-			|| Village.IsFootBlocked(X + 0.5, Y + 0.5)) continue;
-		// Chantier reellement sec : un porteur retire bois et pierre du terrain vivant.
-		const FString SiteId = Village.OpenSite(HouseType, X, Y, false);
-		if (SiteId.IsEmpty()) continue;
-		const FBuilding* Site = Village.FindBuilding(SiteId);
-		TArray<FString> ReachableBuilders;
-		if (Site)
-		{
-			for (int32 N = 1; N < Village.GetActors().Num(); ++N)
-			{
-				const FNpc& Builder = Village.GetActors()[N];
-				for (const FPoint& Door : Site->AccessPoints)
-				{
-					TArray<FPoint> Path;
-					if (AnastasisPath::FindPath(Nav, { Builder.X, Builder.Y }, Door, {}, Path))
-					{
-						ReachableBuilders.Add(Builder.Id);
-						break;
-					}
-				}
-				if (ReachableBuilders.Num() == 2) break;
-			}
-		}
-		if (ReachableBuilders.IsEmpty())
-		{
-			Village.RemoveBuilding(SiteId);
-			continue;
-		}
-		FirstSiteId = SiteId;
-		OpeningSiteId = SiteId;
-		for (const FString& BuilderId : ReachableBuilders) Village.SetJob(BuilderId, AnastasisBuild::JobBuilder);
-		Village.SetMaterialCourier(ReachableBuilders[0]);
 		UE_LOG(LogAnastasis_UnrealV2, Display,
-			TEXT("ANASTASIS_VILLAGE opening construction site=%s tile=(%d,%d) builders=%s courier=%s stock=%d wood %d stone"),
-			*SiteId, X, Y, *FString::Join(ReachableBuilders, TEXT(",")), *ReachableBuilders[0], Site->Materials.StockWood, Site->Materials.StockStone);
-		return;
+			TEXT("ANASTASIS_VILLAGE opening household npc=%s home=%s work=%s"),
+			*Opening.ResidentId, Opening.HomeId.IsEmpty() ? TEXT("none") : *Opening.HomeId, Opening.WorkId.IsEmpty() ? TEXT("none") : *Opening.WorkId);
 	}
-	UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VILLAGE opening construction unavailable: no reachable site for any settler"));
-}
-
-void UAnastasisSimulationSubsystem::AssignCompletedOpeningHome()
-{
-	if (OpeningSiteId.IsEmpty()) return;
-	AnastasisVillage::FVillage& Village = Simulation.GetVillage();
-	const AnastasisVillage::FBuilding* House = Village.FindBuilding(OpeningSiteId);
-	if (!House)
+	if (Opening.bConstructionTried)
 	{
-		OpeningSiteId.Reset();
-		return;
-	}
-	if (!House->IsCompleted()) return;
-	const FString HouseId = OpeningSiteId;
-	OpeningSiteId.Reset(); // Un seul essai apres l'achevement, aucun pathfinding par frame.
-	const AnastasisPath::FWorldNavSource Nav(Village.GetNavGrid(), Simulation.GetWorld());
-	FString BestId;
-	int32 BestLength = MAX_int32;
-	for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
-	{
-		if (Npc.JobId != AnastasisBuild::JobBuilder || !Npc.HomeId.IsEmpty()) continue;
-		for (const AnastasisVillage::FPoint& Door : House->AccessPoints)
+		if (!Opening.SiteId.IsEmpty())
 		{
-			TArray<AnastasisVillage::FPoint> Path;
-			if (AnastasisPath::FindPath(Nav, { Npc.X, Npc.Y }, Door, {}, Path) && Path.Num() < BestLength)
-			{
-				BestId = Npc.Id;
-				BestLength = Path.Num();
-			}
+			FirstSiteId = Opening.SiteId;
+			UE_LOG(LogAnastasis_UnrealV2, Display,
+				TEXT("ANASTASIS_VILLAGE opening construction site=%s tile=(%d,%d) builders=%s courier=%s stock=%d wood %d stone"),
+				*Opening.SiteId, Opening.SiteX, Opening.SiteY, *FString::Join(Opening.Builders, TEXT(",")), *Opening.CourierId, Opening.StockWood, Opening.StockStone);
+		}
+		else
+		{
+			UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VILLAGE opening construction unavailable: no reachable site for any settler"));
 		}
 	}
-	if (!BestId.IsEmpty() && Village.AssignHome(BestId, HouseId))
+	if (Opening.bWorkforce)
 	{
-		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE opening home assigned npc=%s home=%s"), *BestId, *HouseId);
-	}
-	else
-	{
-		UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VILLAGE opening home unassigned site=%s: no reachable homeless builder"), *HouseId);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE opening workforce granary=%s farmers=%s"),
+			*Opening.WorkId, Opening.Farmers.IsEmpty() ? TEXT("none") : *FString::Join(Opening.Farmers, TEXT(",")));
 	}
 }
 
-void UAnastasisSimulationSubsystem::SeedOpeningWorkforce()
+void UAnastasisSimulationSubsystem::LogOpeningHome()
 {
-	if (OpeningWorkId.IsEmpty()) return;
-	AnastasisVillage::FVillage& Village = Simulation.GetVillage();
-	const AnastasisVillage::FBuilding* Granary = Village.FindBuilding(OpeningWorkId);
-	if (!Granary) return;
-	const AnastasisPath::FWorldNavSource Nav(Village.GetNavGrid(), Simulation.GetWorld());
-	TArray<FString> Recruits;
-	for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
+	// La simulation attribue la maison d'ouverture (FVillage::AssignCompletedOpeningHome, ecart n°40) ;
+	// l'hote ne fait que dire l'issue, une fois.
+	const AnastasisVillage::FOpeningHomeOutcome& Outcome = Simulation.GetVillage().GetOpeningHome();
+	using AnastasisVillage::EOpeningHomeStatus;
+	if (Outcome.Status == EOpeningHomeStatus::None || Outcome.Status == EOpeningHomeStatus::Pending)
 	{
-		if (Npc.JobId != AnastasisGather::JobSettler) continue;
-		for (const AnastasisVillage::FPoint& Door : Granary->AccessPoints)
-		{
-			TArray<AnastasisVillage::FPoint> Path;
-			if (AnastasisPath::FindPath(Nav, { Npc.X, Npc.Y }, Door, {}, Path))
-			{
-				Recruits.Add(Npc.Id);
-				break;
-			}
-		}
-		if (Recruits.Num() == 2) break;
+		bOpeningHomeLogged = false;
+		return;
 	}
-	for (const FString& Id : Recruits) Village.AssignWorkplace(Id, AnastasisGather::JobFarmer, OpeningWorkId);
-	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE opening workforce granary=%s farmers=%s"),
-		*OpeningWorkId, Recruits.IsEmpty() ? TEXT("none") : *FString::Join(Recruits, TEXT(",")));
+	if (bOpeningHomeLogged) return;
+	bOpeningHomeLogged = true;
+	if (Outcome.Status == EOpeningHomeStatus::Assigned)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE opening home assigned npc=%s home=%s"), *Outcome.NpcId, *Outcome.SiteId);
+	}
+	else if (Outcome.Status == EOpeningHomeStatus::Unassigned)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VILLAGE opening home unassigned site=%s: no reachable homeless builder"), *Outcome.SiteId);
+	}
 }
 
 void UAnastasisSimulationSubsystem::ReplaceStartVillage()
@@ -537,9 +375,13 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	StartVillageWait = 0.0;
 	SettlementSiteReport = TEXT("{\"status\":\"reset\"}");
 	FirstSiteId.Reset();
-	OpeningSiteId.Reset();
-	OpeningWorkId.Reset();
 	GeoScenarioPath.Reset();
+	// Le grenier et le champ du dernier FirstFarmer : sans cette remise, get_gather_status lisait un
+	// identifiant d'un village precedent (les ids `building-N` repartent de zero).
+	FarmerGranaryId.Reset();
+	FarmerField = FIntPoint(-1, -1);
+	// Le verrou de la maison d'ouverture vit dans la simulation (ecart n°40) : Simulation.Reset le vide.
+	bOpeningHomeLogged = false;
 	Simulation.Reset(Seed, AnastasisWorldView::ReferenceWidth, AnastasisWorldView::ReferenceHeight);
 	if (CVarSimWaterNetwork.GetValueOnGameThread() != 0)
 	{
@@ -661,7 +503,7 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 		EffectiveRate += (Advanced / static_cast<double>(DeltaTime) - EffectiveRate) * Alpha;
 	}
 	LogDayIfChanged();
-	AssignCompletedOpeningHome();
+	LogOpeningHome();
 	ObserveChronicle();
 	SyncVillagePresentation();
 	VillagePresentation.SyncVillagers(

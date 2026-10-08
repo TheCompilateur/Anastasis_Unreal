@@ -225,14 +225,14 @@ private:
 	void ReplaceStartVillage();
 	void TryStartVillage(float DeltaTime);
 	void BindRainCanopy();
-	/** Equipe un habitant du village initial d'un foyer et d'un travail reels. */
-	void SeedOpeningHousehold();
-	/** Un chantier initial fini par les habitants existants, sans creer de PNJ ni modifier AnastasisSim. */
-	void SeedOpeningConstruction();
-	/** Affecte des colons encore libres au grenier accessible du village initial. */
-	void SeedOpeningWorkforce();
-	/** Attribue la maison achevee a un de ses bâtisseurs capable d'en atteindre l'acces. */
-	void AssignCompletedOpeningHome();
+	/**
+	 * opening-in-sim-001 : dit ce que la simulation a decide pour le village d'ouverture
+	 * (`FVillage::SeedOpeningVillage`, ecart n°40), avec les lignes de log d'avant ; retient le chantier.
+	 */
+	void LogOpeningReport(const AnastasisVillage::FOpeningReport& Opening);
+	/** Dit une fois l'issue de la maison d'ouverture, attribuee par la simulation elle-meme. */
+	void LogOpeningHome();
+	bool bOpeningHomeLogged = false;
 	bool bPendingStartVillage = false;
 	double StartVillageWait = 0.0;
 	FString SettlementSiteReport = TEXT("{\"status\":\"not_started\"}");
@@ -248,8 +248,6 @@ private:
 	FAnastasisVillagePresentation VillagePresentation;
 	FString FarmerGranaryId;
 	FString FirstSiteId;
-	FString OpeningSiteId;
-	FString OpeningWorkId;
 	FIntPoint FarmerField = FIntPoint(-1, -1);
 	/** SAVE_STATE_001 : chemin du scenario exterieur charge (vide sans monde exterieur). */
 	FString GeoScenarioPath;

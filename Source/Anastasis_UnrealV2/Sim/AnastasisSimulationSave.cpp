@@ -60,8 +60,6 @@ bool UAnastasisSimulationSubsystem::SaveGameToSlot(const FString& InSlot, FStrin
 	Save->SavedAtUtc = FDateTime::UtcNow().ToIso8601();
 	Save->GeoScenarioPath = Simulation.GetGeo().IsLoaded() ? GeoScenarioPath : FString();
 	Save->bStartVillage = bStartVillage;
-	Save->OpeningSiteId = OpeningSiteId;
-	Save->OpeningWorkId = OpeningWorkId;
 	Save->FarmerGranaryId = FarmerGranaryId;
 	Save->FirstSiteId = FirstSiteId;
 	Save->FarmerField = FarmerField;
@@ -137,8 +135,6 @@ bool UAnastasisSimulationSubsystem::LoadGameFromSlot(const FString& InSlot, FStr
 	bPendingStartVillage = false;
 	StartVillageWait = 0.0;
 	bStartVillage = Save->bStartVillage;
-	OpeningSiteId = Save->OpeningSiteId;
-	OpeningWorkId = Save->OpeningWorkId;
 	FarmerGranaryId = Save->FarmerGranaryId;
 	FirstSiteId = Save->FirstSiteId;
 	FarmerField = Save->FarmerField;

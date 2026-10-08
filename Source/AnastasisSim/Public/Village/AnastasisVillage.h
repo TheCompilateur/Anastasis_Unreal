@@ -1135,6 +1135,59 @@ namespace AnastasisVillage
 	};
 
 	/**
+	 * EXTENSION — ecart n°40 (opening-in-sim-001). Ce que `FVillage::SeedOpeningVillage` a decide pour le
+	 * village d'ouverture du jeu Unreal. Un rapport, pas un etat : l'etat est dans les habitants et les
+	 * batiments (foyer, poste, metier, porteur), plus le verrou `OpeningSiteId` du village.
+	 */
+	struct FOpeningReport
+	{
+		/** Au moins un colon : le foyer et le poste du premier ont ete cherches. */
+		bool bHousehold = false;
+		FString ResidentId;
+		FString HomeId;
+		FString WorkId;
+		/** Chantier demande et au moins deux colons : il a ete cherche. */
+		bool bConstructionTried = false;
+		/** Vide si aucun chantier atteignable n'a ete trouve. */
+		FString SiteId;
+		int32 SiteX = -1;
+		int32 SiteY = -1;
+		TArray<FString> Builders;
+		FString CourierId;
+		int32 StockWood = 0;
+		int32 StockStone = 0;
+		/** Le premier colon est embauche au grenier : les colons libres qui l'atteignent l'y rejoignent. */
+		bool bWorkforce = false;
+		TArray<FString> Farmers;
+	};
+
+	/** Ou en est l'attribution de la maison d'ouverture achevee (ecart n°40). */
+	enum class EOpeningHomeStatus : uint8
+	{
+		/** Aucun chantier d'ouverture dans ce village (harnais, scenarios explicites). */
+		None,
+		/** Chantier ouvert, maison pas encore achevee. */
+		Pending,
+		/** Achevee et donnee au batisseur sans toit le plus proche par le chemin. */
+		Assigned,
+		/** Achevee, mais aucun batisseur sans toit ne l'atteint. */
+		Unassigned,
+		/** Le chantier a disparu avant d'etre acheve. */
+		SiteGone,
+	};
+
+	struct FOpeningHomeOutcome
+	{
+		EOpeningHomeStatus Status = EOpeningHomeStatus::None;
+		FString SiteId;
+		FString NpcId;
+		/** `sim.time` de la resolution (0 tant qu'en attente). */
+		double Time = 0.0;
+	};
+
+	ANASTASISSIM_API const TCHAR* OpeningHomeStatusName(EOpeningHomeStatus Status);
+
+	/**
 	 * L'etat du village et ses regles. Lie a un monde genere, qu'il ne possede
 	 * pas : l'hote de simulation garde le monde et le village cote a cote.
 	 */
@@ -1214,6 +1267,28 @@ namespace AnastasisVillage
 		 * crees (moins que `Count` si le sol libre manque, vide sans monde).
 		 */
 		TArray<FString> AdmitExternalArrivals(int32 Count, double Radius, double StartAngle);
+
+		/**
+		 * EXTENSION — ecart n°40 (opening-in-sim-001). Le village d'ouverture du jeu Unreal, une fois le puits
+		 * et les colons poses : le premier colon recoit une maison et un poste au grenier qu'il atteint
+		 * (pres du champ de nourriture le plus proche qu'il atteint) ; si `bOpenConstruction`, un chantier
+		 * de maison sec est ouvert pres d'un colon, ses un ou deux batisseurs atteignent son seuil, le
+		 * premier porte les materiaux ; puis deux colons libres qui atteignent le grenier y sont embauches.
+		 * Tout par chemin reel (`findPath`), dans l'ordre des habitants, sans tirage. `Day` date les
+		 * batiments. Pose le verrou lu par `AssignCompletedOpeningHome`.
+		 */
+		FOpeningReport SeedOpeningVillage(int32 Day, bool bOpenConstruction);
+
+		/**
+		 * EXTENSION — ecart n°40. La regle de la maison d'ouverture, lue a la fin de chaque `UpdateActors` :
+		 * des que le chantier d'ouverture est acheve, une seule tentative le donne au batisseur sans toit
+		 * qui en atteint un seuil par le chemin le plus court (premier dans l'ordre des habitants a
+		 * egalite), puis le verrou tombe. Sans verrou (tout village du harnais) : ne fait rien.
+		 */
+		void AssignCompletedOpeningHome();
+		/** Le chantier d'ouverture en attente d'achevement ; vide sinon. */
+		const FString& GetOpeningSiteId() const { return OpeningSiteId; }
+		const FOpeningHomeOutcome& GetOpeningHome() const { return OpeningHome; }
 
 		// --- Le joueur est un habitant (player-minimal-001, simulation.js « Incarnation ») ---------
 		//
@@ -2115,6 +2190,9 @@ namespace AnastasisVillage
 		TMap<FString, FBuildingBiography> Biographies;
 		bool bBiographyEnabled = false;
 		int64 PassageCount = 0;
+		/** ecart n°40 : le chantier d'ouverture a attribuer quand il s'acheve, et l'issue. `Bind` les vide. */
+		FString OpeningSiteId;
+		FOpeningHomeOutcome OpeningHome;
 		int32 NavVersion = 0;
 		/** `sim.navService` (nav-wiring-001). */
 		AnastasisNavService::FNavService NavService;

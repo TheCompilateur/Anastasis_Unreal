@@ -22,8 +22,11 @@ class UAnastasisSaveGame : public USaveGame
 	GENERATED_BODY()
 
 public:
-	/** Version du conteneur (les champs ci-dessous) ; la version de l'etat est dans SimState. */
-	static constexpr int32 HostFormatVersion = 1;
+	/**
+	 * Version du conteneur (les champs ci-dessous) ; la version de l'etat est dans SimState. 2 : le verrou de la
+	 * maison d'ouverture n'est plus un champ de l'hote, il vit dans la simulation (opening-in-sim-001, ecart n°40).
+	 */
+	static constexpr int32 HostFormatVersion = 2;
 
 	UPROPERTY()
 	int32 HostVersion = 0;
@@ -44,11 +47,7 @@ public:
 	UPROPERTY()
 	bool bStartVillage = false;
 
-	UPROPERTY()
-	FString OpeningSiteId;
 
-	UPROPERTY()
-	FString OpeningWorkId;
 
 	UPROPERTY()
 	FString FarmerGranaryId;

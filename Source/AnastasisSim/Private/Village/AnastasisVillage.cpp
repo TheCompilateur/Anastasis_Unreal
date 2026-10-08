@@ -177,6 +177,9 @@ namespace AnastasisVillage
 		Biographies.Reset();
 		bBiographyEnabled = false;
 		PassageCount = 0;
+		// ecart n°40 : un monde neuf n'a pas de chantier d'ouverture.
+		OpeningSiteId.Reset();
+		OpeningHome = FOpeningHomeOutcome();
 		NavVersion = 0;
 		NavSourceShared.Reset();
 		NavService = AnastasisNavService::FNavService();
@@ -1840,6 +1843,8 @@ namespace AnastasisVillage
 			UpdateNpc(Items[Index], Dt);
 		}
 		ProcessNavQueue();
+		// ecart n°40 : la maison d'ouverture achevee trouve son proprietaire ; sans verrou, rien.
+		AssignCompletedOpeningHome();
 		// ecart n°46 : la biographie des batiments, apres les habitants (l'etat du pas est celui qu'elle lit).
 		if (bBiographyEnabled)
 		{

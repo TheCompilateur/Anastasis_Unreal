@@ -1100,6 +1100,13 @@ namespace AnastasisVillage
 		VisitState(Ar, Nav);
 		Ar.Key(TEXT("terrainTravelCostEnabled")).Bool(bTerrainTravelCostEnabled);
 		Ar.Key(TEXT("materialCourierId")).String(MaterialCourierId);
+		// ecart n°40 (opening-in-sim-001) : le verrou de la maison d'ouverture et son issue sont de l'etat :
+		// ils decident qui recevra la maison achevee.
+		Ar.Key(TEXT("openingSiteId")).String(OpeningSiteId);
+		Ar.Key(TEXT("openingHomeStatus")).Number(OpeningHome.Status);
+		Ar.Key(TEXT("openingHomeSiteId")).String(OpeningHome.SiteId);
+		Ar.Key(TEXT("openingHomeNpcId")).String(OpeningHome.NpcId);
+		Ar.Key(TEXT("openingHomeTime")).Number(OpeningHome.Time);
 		Ar.Key(TEXT("navVersion")).Number(NavVersion);
 		// `sim.traffic` et les sentiers qu'il fixe (ecart n°42) : la decroissance de minuit et l'effort de
 		// defrichage en dependent, l'A* lit le cout des sentiers.

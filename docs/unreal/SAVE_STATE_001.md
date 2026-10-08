@@ -66,8 +66,8 @@ du joueur repart de ce que la simulation sait de lui.
 - `Colony` et `MarketStock` : les deux lacunes du registre, posées seulement par le harnais.
 - Le format JS (`serialize(sim)`) : une sauvegarde JS ne se recharge pas par `LoadState`, ni l'inverse
   (écart n°45, `A_TRANCHER`).
-- Le verrou d'ouverture de `main` vit encore dans l'hôte (`OpeningSiteId`) : il est sauvé par le
-  `USaveGame`. Quand `opening-in-sim-001` sera versée, il passera dans la simulation et le parcours.
+- Le verrou de la maison d'ouverture vit dans la simulation (`FVillage::OpeningSiteId` et `OpeningHome`,
+  opening-in-sim-001) : il est dans le parcours, donc sauvé ; le `USaveGame` ne le porte plus (conteneur version 2).
 
 ## Preuves
 
