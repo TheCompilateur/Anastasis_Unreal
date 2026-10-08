@@ -8,13 +8,13 @@ PIE sur Lvl_AnastasisSlice SANS COMMANDE de scenario : le village du lancement, 
 
 Mesures (pas des impressions) :
   - chaque habitant a un corps monte (has_body) ;
-  - corps montre <=> habitant a moins de anastasis.Village.BodyDistance de la camera (carte au-dela) ;
+  - corps 3D montre a toute distance, aucune carte PNG en jeu ;
   - un habitant QUI MARCHE : sur ~3 s, ses deux pieds (os foot_l / foot_r, relatifs aux pieds de
     l'acteur, projetes sur son cap) balaient chacun plus de 20 cm -- les jambes marchent ;
     son cap suit sa direction de deplacement (ecart median < 30 degres) ;
   - un habitant A L'ARRET : sa main et sa tete bougent encore (respiration de l'idle), > 0,2 cm.
 Prises : 01-marche-a..d (le marcheur suivi de profil, ~0,4 s d'ecart), 02-arret (face, 2,5 m),
-03-groupe (vue de 15 m), 04-loin (120 m : des cartes, plus de corps).
+03-groupe (vue de 15 m), 04-loin (120 m : toujours des corps 3D).
 Une verification qui echoue echoue ; jamais de PASS raconte.
 """
 import json
@@ -154,9 +154,9 @@ def pump_shot(world):
     return False
 
 
-def check_switch(world, c, label):
-    """Corps montre <=> a moins de BodyDistance de la camera (marge 2 m pour la frame de retard)."""
-    limit = unreal.SystemLibrary.get_console_variable_float_value('anastasis.Village.BodyDistance') * 100.0
+def check_bodies(world, c, label):
+    """Tous les habitants visibles gardent un corps 3D, meme au loin."""
+    limit = 80.0 * 100.0  # ancien seuil, seulement pour separer les prises proches et lointaines
     cam = state['camera'].get_actor_location()
     wrong, near, far = [], 0, 0
     for x in c.get('villagers', []):
@@ -166,16 +166,13 @@ def check_switch(world, c, label):
             wrong.append('%s sans corps' % x['npc'])
             continue
         d = math.sqrt((x['x'] - cam.x) ** 2 + (x['y'] - cam.y) ** 2 + (x['z'] - cam.z) ** 2)
-        if abs(d - limit) < 200.0:
-            continue
-        expected = d < limit
-        near += expected
-        far += not expected
-        if x['body'] != expected:
+        near += d < limit
+        far += d >= limit
+        if not x['body']:
             wrong.append('%s a %.0f m : body=%s' % (x['npc'], d / 100.0, x['body']))
-    rec = {'at': label, 'limit_m': limit / 100.0, 'near_bodies': near, 'far_cards': far, 'errors': wrong}
+    rec = {'at': label, 'reference_distance_m': limit / 100.0, 'near_bodies': near, 'far_bodies': far, 'errors': wrong}
     state['checks'].append(rec)
-    log('SWITCH ' + json.dumps(rec))
+    log('BODIES ' + json.dumps(rec))
     for e in wrong:
         fail(label + ': ' + e)
     return rec
@@ -194,7 +191,7 @@ def tick(dt):
     if state['phase'] == 1:
         if not les.is_in_play_in_editor() or not world or DBG.get_simulation_time(world) < 0:
             return
-        for cmd in ('anastasis.Village.Debug 0', 'anastasis.Village.Portraits 1', 'anastasis.Village.Bodies 1',
+        for cmd in ('anastasis.Village.Debug 0', 'anastasis.Village.Portraits 1', 'anastasis.Village.Bodies 2',
                     'showflag.Fog 0', 'r.MotionBlurQuality 0', 'anastasis.Sim.Speed 1'):
             unreal.SystemLibrary.execute_console_command(world, cmd)
         cams = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.CameraActor)
@@ -330,13 +327,13 @@ def tick(dt):
     elif step == 8:
         shoot('03-groupe', {'npc': state['walker'], 'view': 'oblique', 'dist': 1300, 'up': 500, 'aim_z': 100, 'settle': 1.0})
     elif step == 9:
-        check_switch(world, c, '03-groupe')
+        check_bodies(world, c, '03-groupe')
         shoot('04-loin', {'npc': state['walker'], 'view': 'oblique', 'dist': 11000, 'up': 2500, 'aim_z': 100, 'settle': 1.5})
     elif step == 10:
-        rec = check_switch(world, c, '04-loin')
-        if rec['far_cards'] == 0:
-            fail('04-loin : aucun habitant au-dela de la distance, bascule non observee')
-        finish('corps montes, jambes qui marchent, idle vivant, bascule carte au loin')
+        rec = check_bodies(world, c, '04-loin')
+        if rec['far_bodies'] == 0:
+            fail('04-loin : aucun habitant au-dela de la distance de reference')
+        finish('corps montes a toute distance, jambes qui marchent, idle vivant')
         return
 
 

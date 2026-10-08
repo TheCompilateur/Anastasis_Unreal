@@ -3,12 +3,18 @@
 ## MISSION
 
 Produire un vrai exécutable Windows jouable hors interface d'édition et fournir à
-l'intégrateur une seule commande de mise à jour après chaque lot intégré.
+l'intégrateur une seule commande de mise à jour après chaque lot intégré. Correction
+du 2026-10-08 : le premier paquet dessinait 12 cartes PNG car des assets 3D n'étaient
+pas cuits ; le runtime ne doit plus dessiner ces références comme personnages.
 
 ## FILES_OWNED
 
 - `tools/unreal/package-playable.ps1`
 - `tools/unreal/play-packaged.ps1`
+- `Source/Anastasis_UnrealV2/Village/AnastasisVillagerVisual.h/.cpp`
+- `Source/Anastasis_UnrealV2/Village/AnastasisVillagePresentation.cpp`
+- `Source/Anastasis_UnrealV2/Sim/AnastasisSimulationSubsystem.cpp` (aide de la CVar héritée)
+- `tools/unreal/villager-body-pie.py` (preuve existante alignée sur corps 3D partout)
 - `docs/unreal/PLAYABLE_WINDOWS_001.md`
 - `AGENTS.md` (index des deux scripts)
 - cette fiche
@@ -42,6 +48,12 @@ PENDING
   plus reprise du `staging/` réussi sans nouvelle cuisson : `PACKAGE::PASS`.
 - Le paquet est produit depuis `main` canonique, avec garde sur le verrou d'intégration,
   les processus Unreal et le HEAD. Le pointeur `latest.json` n'est publié qu'après UAT.
+- Audit correctif du paquet `640fa3e` : journal du jeu `villager bodies: missing`,
+  `body=card` pour les 12 PNJ ; `M_AnastasisVillagerBody` et `SKM_Quinn_Simple`
+  absents. `-cookall` ajouté pour inclure les assets chargés par chemins souples.
+- Runtime corrigé dans cette branche : le portrait n'est plus chargé ni affiché en
+  jeu ; corps 3D à toute distance ; ressource absente = erreur et PNJ non dessiné.
+- BUILD du correctif : PENDING. Aucun PIE ni nouveau paquet sur ce commit.
 
 ## PROOFS
 
@@ -64,7 +76,12 @@ de la lisibilité ou du plaisir de jeu n'a été faite.
 - La première cuisson Win64 peut être longue et gourmande en RAM. Aucun éditeur d'agent
   ne doit être fermé pour la faire passer. Le script passe par la file mémoire existante
   et réserve le créneau pendant UAT ; les éditeurs suivants attendent leur tour.
+- La mission touche maintenant le C++ de présentation. L'intégrateur doit vérifier
+  dans le nouveau paquet que le journal annonce `body=3d` pour les PNJ, sans ressource
+  manquante, puis regarder le village. Le simple `PACKAGE::PASS` reste insuffisant.
 
 ## STOP
 
 Pas de claim de gameplay, de Shipping, de distribution publique ou de performance.
+Les visages et vêtements modelés depuis les planches restent à réaliser ; le mannequin
+3D actuel est un état transitoire, pas le personnage artistique final.

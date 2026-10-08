@@ -14,19 +14,10 @@ class UTexture2D;
 namespace AnastasisVillagerLooks { struct FBodyLook; }
 
 /**
- * The face of one simulated villager: a cut-out portrait on a vertical card (VILLAGER_PNG_001).
- *
- * The actor origin is the villager's FEET. The card is the shared 100 x 200 cm canvas, so the
- * stature painted into the PNG is the stature in the world. It turns about the vertical axis
- * only (a cylindrical billboard: it stays upright under a high camera), toward the first local
- * player's camera in a game world. Portraits are painted facing three-quarters LEFT; walking
- * toward the right of the screen mirrors the card, standing still keeps the last facing.
- *
- * VILLAGER_BODY_3D_001 -- near the camera the villager is a 3D body instead: a skinned mannequin,
- * dressed by its material, that walks with its legs at the speed it is drawn at, breathes when it
- * stands, and turns toward where it goes. Beyond `anastasis.Village.BodyDistance` the card takes
- * over (a person is a dozen pixels tall there). `anastasis.Village.Bodies` 0 = cards only,
- * 1 = bodies near (default), 2 = bodies everywhere. No body bound (assets missing): the card, always.
+ * One simulated villager as an animated 3D skeletal body. The actor origin is the villager's feet.
+ * Source portraits guide the body palette; they are never drawn in a game world. A portrait card
+ * remains available only for explicit editor lineups of the source references.
+ * Missing body assets are reported by the presentation layer and never replaced by a PNG.
  *
  * Pure presentation: spawned and moved by FAnastasisVillagePresentation from the simulation,
  * it reads nothing back into it.
@@ -39,7 +30,7 @@ class AAnastasisVillagerVisual : public AActor
 public:
 	AAnastasisVillagerVisual();
 
-	/** Binds the portrait through a dynamic instance of `Material` (`Portrait` texture parameter). False if either is missing. */
+	/** Binds the style ID. A portrait and material may be supplied together for an editor-only reference lineup. */
 	UFUNCTION(BlueprintCallable, Category = "Anastasis|Villagers")
 	bool SetLook(FName InLookId, UTexture2D* Portrait, UMaterialInterface* Material);
 
@@ -56,20 +47,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Villagers")
 	bool IsMirrored() const { return bMirrored; }
 
-	/** Puts the feet at `Feet` and remembers the step, which picks the facing in Tick. */
+	/** Puts the feet at `Feet` and remembers motion for animation and heading. */
 	void MoveFeetTo(const FVector& Feet);
 
 	/**
 	 * Binds the 3D body: `Mesh` played through `Locomotion` (single-node blend space, X = direction
-	 * relative to the facing, Y = speed in cm/s), `Material` instanced on every slot with the dress of `Look`. False if a piece is missing:
-	 * the villager then keeps its card at every distance.
+	 * relative to the facing, Y = speed in cm/s), `Material` instanced on every slot with the dress of `Look`.
+	 * False if a piece is missing; the caller does not spawn a visual in that case.
 	 */
 	bool SetBody(USkeletalMesh* Mesh, UBlendSpace* Locomotion, UMaterialInterface* Material, const AnastasisVillagerLooks::FBodyLook& Look);
 
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Villagers")
 	bool HasBody() const;
 
-	/** True when the body, not the card, is drawn this frame. */
+	/** True when the 3D body is drawn this frame. */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Villagers")
 	bool IsShowingBody() const { return bShowingBody; }
 
@@ -81,7 +72,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Villagers")
 	float GetBodyHeading() const { return BodyHeading; }
 
-	/** Card or body, by hand (a lineup has no player camera to measure the distance from). */
+	/** Toggles the 3D body; editor-only reference lineups may reveal the portrait card. */
 	UFUNCTION(BlueprintCallable, Category = "Anastasis|Villagers")
 	void ShowBody(bool bBody);
 
@@ -106,7 +97,6 @@ private:
 
 	FName LookId;
 	bool bMirrored = false;
-	FVector LastStep = FVector::ZeroVector;
 
 	bool bShowingBody = false;
 	float BodyScale = 1.0f;

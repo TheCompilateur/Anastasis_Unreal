@@ -80,7 +80,7 @@ static TAutoConsoleVariable<int32> CVarVillageMetabolism(
 static TAutoConsoleVariable<int32> CVarVillagePortraits(
 	TEXT("anastasis.Village.Portraits"),
 	1,
-	TEXT("1 = draw each simulated villager as its portrait card (VILLAGER_PNG_001). 0 = remove the cards; the debug spheres stay under anastasis.Village.Debug."),
+	TEXT("1 = draw each simulated villager as an animated 3D body. 0 = hide villager visuals; debug spheres stay under anastasis.Village.Debug. Legacy variable name."),
 	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarVillageStartVillagers(

@@ -2,12 +2,10 @@
 
 #include "Animation/AnimSingleNodeInstance.h"
 #include "Animation/BlendSpace.h"
-#include "Camera/PlayerCameraManager.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
-#include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "ProceduralMeshComponent.h"
@@ -15,22 +13,14 @@
 
 static TAutoConsoleVariable<int32> CVarVillageBodies(
 	TEXT("anastasis.Village.Bodies"),
-	1,
-	TEXT("VILLAGER_BODY_3D_001 -- 0: portrait cards only; 1: 3D bodies near the camera, cards beyond anastasis.Village.BodyDistance; 2: 3D bodies everywhere."),
-	ECVF_Default);
-
-static TAutoConsoleVariable<float> CVarVillageBodyDistance(
-	TEXT("anastasis.Village.BodyDistance"),
-	80.0f,
-	TEXT("VILLAGER_BODY_3D_001 -- metres from the camera beyond which a villager is drawn as its portrait card (anastasis.Village.Bodies 1)."),
+	2,
+	TEXT("3D villagers in game: 0 hides bodies for diagnosis; 1 or 2 shows bodies at every distance. Portrait cards are editor previews only."),
 	ECVF_Default);
 
 namespace
 {
 	const FName PortraitParam(TEXT("Portrait"));
 	const FName MirrorParam(TEXT("Mirror"));
-	/** Below this step (cm) the villager is standing: keep the facing, do not flicker. */
-	constexpr double MinStepCm = 0.5;
 	/** Faster than this between two frames is a jump (scenario, reset), not a walk: cm/s. */
 	constexpr double MaxWalkCmPerSecond = 2000.0;
 	/** Below this the body stands: cm/s. Under it the heading is kept. */
@@ -59,6 +49,7 @@ AAnastasisVillagerVisual::AAnastasisVillagerVisual()
 	Card->CastShadow = true;
 	Card->bCastShadowAsTwoSided = true;
 	BuildCard();
+	Card->SetVisibility(false);
 
 	Body = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Body"));
 	Body->SetupAttachment(FeetRoot);
@@ -94,6 +85,12 @@ void AAnastasisVillagerVisual::BuildCard()
 
 bool AAnastasisVillagerVisual::SetLook(FName InLookId, UTexture2D* Portrait, UMaterialInterface* Material)
 {
+	LookId = InLookId;
+	// Runtime villagers keep the style ID and measured colours, but never load the reference image.
+	if (!Portrait && !Material)
+	{
+		return true;
+	}
 	if (!Portrait || !Material)
 	{
 		return false;
@@ -102,7 +99,8 @@ bool AAnastasisVillagerVisual::SetLook(FName InLookId, UTexture2D* Portrait, UMa
 	PortraitMaterial->SetTextureParameterValue(PortraitParam, Portrait);
 	PortraitMaterial->SetScalarParameterValue(MirrorParam, bMirrored ? 1.0f : 0.0f);
 	Card->SetMaterial(0, PortraitMaterial);
-	LookId = InLookId;
+	const UWorld* World = GetWorld();
+	Card->SetVisibility(!bShowingBody && World && !World->IsGameWorld());
 	return true;
 }
 
@@ -131,11 +129,6 @@ void AAnastasisVillagerVisual::SetMirrored(bool bInMirrored)
 
 void AAnastasisVillagerVisual::MoveFeetTo(const FVector& Feet)
 {
-	const FVector Step = Feet - GetActorLocation();
-	if (Step.SizeSquared2D() > MinStepCm * MinStepCm)
-	{
-		LastStep = Step;
-	}
 	SetActorLocation(Feet);
 }
 
@@ -185,7 +178,9 @@ void AAnastasisVillagerVisual::ShowBody(bool bBody)
 	}
 	bShowingBody = bBody;
 	Body->SetVisibility(bBody);
-	Card->SetVisibility(!bBody);
+	// A missing 3D asset must not silently turn a villager into a painted billboard.
+	const UWorld* World = GetWorld();
+	Card->SetVisibility(!bBody && PortraitMaterial != nullptr && World && !World->IsGameWorld());
 }
 
 void AAnastasisVillagerVisual::UpdateBodyMotion(float DeltaSeconds)
@@ -217,16 +212,7 @@ void AAnastasisVillagerVisual::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	UpdateBodyMotion(DeltaSeconds);
-
-	UWorld* World = GetWorld();
-	const APlayerController* Player = World ? World->GetFirstPlayerController() : nullptr;
-	const APlayerCameraManager* Camera = Player ? Player->PlayerCameraManager.Get() : nullptr;
-	if (Camera)
-	{
-		const int32 Mode = CVarVillageBodies.GetValueOnGameThread();
-		const double Limit = CVarVillageBodyDistance.GetValueOnGameThread() * 100.0;
-		ShowBody(Mode >= 2 || (Mode == 1 && FVector::DistSquared(Camera->GetCameraLocation(), GetActorLocation()) < Limit * Limit));
-	}
+	ShowBody(CVarVillageBodies.GetValueOnGameThread() != 0);
 	if (bShowingBody)
 	{
 		Body->SetWorldRotation(FRotator(0.0, BodyHeading + MeshYawOffset, 0.0));
@@ -238,23 +224,5 @@ void AAnastasisVillagerVisual::Tick(float DeltaSeconds)
 			// so it is fed the speed it would have at full size.
 			Single->SetBlendSpacePosition(FVector(0.0, BodySpeed / BodyScale, 0.0));
 		}
-	}
-	if (!Camera)
-	{
-		return;
-	}
-	FaceTowards(Camera->GetCameraLocation());
-
-	if (!LastStep.IsNearlyZero())
-	{
-		// Facing the camera, the card's +X points at the viewer: the screen's right is (n.Y, -n.X).
-		const FVector Normal = GetActorForwardVector();
-		const FVector ScreenRight(Normal.Y, -Normal.X, 0.0);
-		const double Lateral = FVector::DotProduct(LastStep, ScreenRight);
-		if (FMath::Abs(Lateral) > MinStepCm)
-		{
-			SetMirrored(Lateral > 0.0);
-		}
-		LastStep = FVector::ZeroVector;
 	}
 }

@@ -13,7 +13,6 @@
 #include "WorldView/AnastasisPresentationRegistry.h"
 #include "Animation/BlendSpace.h"
 #include "Engine/SkeletalMesh.h"
-#include "Engine/Texture2D.h"
 #include "Materials/MaterialInterface.h"
 #include "WorldView/AnastasisWorldView.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
@@ -513,9 +512,8 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 		AAnastasisVillagerVisual* Actor = FindVillager(Npc.Id);
 		if (Actor && VillagerJobs.FindRef(Npc.Id) != Job)
 		{
-			// Le metier a change (embauche au grenier) : l'objet peint doit suivre. Le visage change
-			// avec lui -- aucun individu des planches n'existe avec deux objets.
-			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE villager %s job %s -> %s: card redrawn"),
+			// Le metier change la palette et l'identite visuelle du corps 3D.
+			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE villager %s job %s -> %s: body rebound"),
 				*Npc.Id, *VillagerJobs.FindRef(Npc.Id).ToString(), *Job.ToString());
 			Actor->Destroy();
 			Villagers.Remove(Npc.Id);
@@ -556,16 +554,31 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 				}
 			}
 			if (LookIndex == INDEX_NONE) LookIndex = AnastasisVillagerLooks::PickLook(*Pool, Npc.Id);
-			UMaterialInterface* Material = Registry.VillagerMaterial.LoadSynchronous();
-			UTexture2D* Portrait = LookIndex != INDEX_NONE ? Registry.Villagers[LookIndex].Portrait.LoadSynchronous() : nullptr;
-			if (!Portrait || !Material)
+			if (LookIndex == INDEX_NONE)
 			{
 				if (!bWarnedNoLooks)
 				{
 					bWarnedNoLooks = true;
 					UE_LOG(LogAnastasis_UnrealV2, Warning,
-						TEXT("ANASTASIS_VILLAGE villager cards: none for job %s (looks=%d pool=%d material=%s) -- see VILLAGER_PNG_001"),
-						*Job.ToString(), Registry.Villagers.Num(), Pool->Num(), Material ? TEXT("ok") : TEXT("missing"));
+						TEXT("ANASTASIS_VILLAGE villager style: none for job %s (looks=%d pool=%d)"),
+						*Job.ToString(), Registry.Villagers.Num(), Pool->Num());
+				}
+				continue;
+			}
+			const FAnastasisVillagerLook& Look = Registry.Villagers[LookIndex];
+			const AnastasisVillagerLooks::FBodyLook BodyLook = AnastasisVillagerLooks::BodyLookFor(Look);
+			USkeletalMesh* BodyMesh = (BodyLook.bFemale ? Registry.VillagerBodyFemale : Registry.VillagerBodyMale).LoadSynchronous();
+			UBlendSpace* Locomotion = Registry.VillagerLocomotion.LoadSynchronous();
+			UMaterialInterface* BodyMaterial = Registry.VillagerBodyMaterial.LoadSynchronous();
+			if (!BodyMesh || !Locomotion || !BodyMaterial)
+			{
+				if (!bWarnedNoBody)
+				{
+					bWarnedNoBody = true;
+					UE_LOG(LogAnastasis_UnrealV2, Error,
+						TEXT("ANASTASIS_VILLAGE villager bodies: missing (mesh=%s locomotion=%s material=%s) -- no PNG fallback"),
+						*(BodyLook.bFemale ? Registry.VillagerBodyFemale : Registry.VillagerBodyMale).ToString(),
+						*Registry.VillagerLocomotion.ToString(), *Registry.VillagerBodyMaterial.ToString());
 				}
 				continue;
 			}
@@ -577,25 +590,18 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 			{
 				continue;
 			}
-			const FAnastasisVillagerLook& Look = Registry.Villagers[LookIndex];
 			const FName LookId = Look.LookId;
-			Actor->SetLook(LookId, Portrait, Material);
-			// VILLAGER_BODY_3D_001 : le corps 3D de pres, aux teintes mesurees sur le portrait. Une piece absente :
-			// la carte reste seule, a toute distance, comme avant.
-			const AnastasisVillagerLooks::FBodyLook BodyLook = AnastasisVillagerLooks::BodyLookFor(Look);
-			const bool bBody = Actor->SetBody(
-				(BodyLook.bFemale ? Registry.VillagerBodyFemale : Registry.VillagerBodyMale).LoadSynchronous(),
-				Registry.VillagerLocomotion.LoadSynchronous(),
-				Registry.VillagerBodyMaterial.LoadSynchronous(),
-				BodyLook);
-			if (!bBody && !bWarnedNoBody)
+			Actor->SetLook(LookId, nullptr, nullptr);
+			// Les PNG sont des references d'atelier. Les teintes deja mesurees guident le corps 3D,
+			// mais aucun portrait n'est charge ni affiche dans le jeu.
+			const bool bBody = Actor->SetBody(BodyMesh, Locomotion, BodyMaterial, BodyLook);
+			if (!bBody)
 			{
-				bWarnedNoBody = true;
-				UE_LOG(LogAnastasis_UnrealV2, Warning,
-					TEXT("ANASTASIS_VILLAGE villager bodies: missing (mesh=%s locomotion=%s material=%s) -- cards only, see VILLAGER_BODY_3D_001"),
-					*(BodyLook.bFemale ? Registry.VillagerBodyFemale : Registry.VillagerBodyMale).ToString(),
-					*Registry.VillagerLocomotion.ToString(), *Registry.VillagerBodyMaterial.ToString());
+				UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_VILLAGE villager %s: failed to bind 3D body -- no PNG fallback"), *Npc.Id);
+				Actor->Destroy();
+				continue;
 			}
+			Actor->ShowBody(true);
 #if WITH_EDITOR
 			Actor->SetActorLabel(FString::Printf(TEXT("Villager_%s_%s"), *Npc.Id, *LookId.ToString()));
 #endif
@@ -603,10 +609,10 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 			VillagerJobs.Add(Npc.Id, Job);
 			++Changes;
 			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE villager %s (%s) -> look %s at %s body=%s"),
-				*Npc.Id, *Job.ToString(), *LookId.ToString(), *Feet.ToCompactString(), bBody ? TEXT("3d") : TEXT("card"));
+				*Npc.Id, *Job.ToString(), *LookId.ToString(), *Feet.ToCompactString(), TEXT("3d"));
 		}
 		Actor->MoveFeetTo(Feet);
-		// Dedans : la simulation garde la position du seuil, la carte ne doit pas y rester plantee.
+		// Dedans : la simulation garde la position du seuil ; cacher le corps au lieu de le laisser au seuil.
 		Actor->SetActorHiddenInGame(Npc.Inside.bActive);
 	}
 	return Changes;

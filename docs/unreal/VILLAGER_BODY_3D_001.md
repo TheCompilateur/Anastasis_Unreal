@@ -1,5 +1,11 @@
 # VILLAGER_BODY_3D_001 -- des corps qui marchent
 
+> État historique au 2026-10-01. La règle de présentation a changé le 2026-10-08 :
+> les portraits sont des références de style, les PNJ en jeu gardent un corps 3D à
+> toute distance, et une ressource 3D manquante ne déclenche plus de carte PNG.
+> Voir `docs/unreal/PLAYABLE_WINDOWS_001.md` (Correction PNJ). Les visages et
+> vêtements en volume restent à modéliser.
+
 Mission : critique d'Alexandre du 2026-10-01 sur VILLAGER_PNG_001 -- « ce sont des images mises sur des
 objets en mouvement ; leur visage ne bouge pas, leurs pieds non plus, leurs mains non plus ». Option C
 retenue : **corps 3D animes de pres, cartes portrait au loin**. Sans toucher au simulateur.

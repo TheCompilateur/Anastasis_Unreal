@@ -149,7 +149,7 @@ try {
   $gameBuildLog = Join-Path $staging 'GameBuild.log'
   $uatArgs = @(
     'BuildCookRun', "-project=$Project", '-noP4', '-platform=Win64',
-    '-clientconfig=Development', '-skipbuild', '-cook', "-map=$gameMap", '-stage',
+    '-clientconfig=Development', '-skipbuild', '-cook', '-cookall', "-map=$gameMap", '-stage',
     '-pak', '-archive', "-archivedirectory=$staging", '-unattended', '-utf8output'
   )
   Write-Output "PACKAGE::BUILD $head"

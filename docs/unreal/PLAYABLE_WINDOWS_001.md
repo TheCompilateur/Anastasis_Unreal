@@ -5,8 +5,10 @@
 Après intégration, l'intégrateur produit un paquet **Win64 Development** depuis la racine
 canonique. `build-game` compile le target Game mais ne cuit pas les assets ; il ne suffit pas
 à créer un jeu autonome. `package-playable.ps1` compile d'abord Editor et Game avec l'opérateur
-du projet, puis pilote `RunUAT BuildCookRun` (`-skipbuild`, cook de `GameDefaultMap`, stage, pak,
-archive). Il vérifie la présence de l'exécutable et des données
+du projet, puis pilote `RunUAT BuildCookRun` (`-skipbuild`, `-cookall`, `GameDefaultMap`, stage,
+pak, archive). `-cookall` est nécessaire ici : plusieurs meshes, animations et matériaux
+chargés par chemins souples dans le code ne sont pas des dépendances directes de la carte.
+Il vérifie la présence de l'exécutable et des données
 cuites avant de publier la version.
 
 ```powershell
@@ -47,3 +49,29 @@ La commande de mise à jour est indépendante des tests de gameplay. Un paquet c
 la compilation et la cuisson de la carte ; il ne prouve ni la jouabilité, ni la qualité
 de la boucle, ni les touches physiques. Les commandes `DebugExecBindings` documentées
 pour PIE ne définissent pas à elles seules une interface de jeu distribuable.
+
+## Correction PNJ du 2026-10-08
+
+Le premier paquet `640fa3e8` ouvrait bien une fenêtre, mais son journal indique
+`villager bodies: missing` et `body=card` pour les 12 habitants :
+`M_AnastasisVillagerBody` et `SKM_Quinn_Simple` étaient absents de la cuisson. D'autres
+assets de présentation chargés par chemin souple manquaient également. Le succès d'UAT
+ne validait donc pas la présentation du jeu. La correction inclut tout `Content/` dans
+la cuisson et rend les corps 3D obligatoires à toute distance. Les PNG restent des
+références d'atelier et leurs teintes mesurées alimentent la palette ; le runtime ne
+charge plus leurs textures pour afficher les habitants. Si une ressource 3D manque,
+le journal donne une erreur et l'habitant n'est pas dessiné.
+
+Cette correction ne crée pas encore les visages, coiffes et vêtements en volume que
+montrent les planches. Le corps actuel est le mannequin animé d'Epic, avec une tenue
+peinte. Un nouveau paquet après intégration et une observation directe seront requis
+avant toute affirmation visuelle ou joueur.
+
+Pour remplacer ce corps provisoire, prendre les planches `A_population_fond_terre`,
+`D_silhouettes` et `E_visages` de `docs/visual/villager-png-001/` comme références de
+modélisation : silhouette et couches du vêtement en volume, visage et âge lisibles,
+coiffe ou cheveux, puis accessoires portés selon l'activité. Les textures PNG ne sont
+pas des cartes de rendu. Chaque modèle devra être un asset 3D animé branché dans le
+registre de présentation, observé de près, de profil et de loin avant extension à la
+population. La sonde MetaHuman existante est bloquée par le contenu optionnel absent
+et l'authentification Epic ; elle n'a fourni aucun habitant assemblé utilisable.
