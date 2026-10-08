@@ -206,6 +206,7 @@
 #include "Life/AnastasisReconsider.h"
 #include "Life/AnastasisWorkShift.h"
 #include "Ai/AnastasisNous.h"
+#include "World/AnastasisTraffic.h"
 #include "World/AnastasisExplore.h"
 #include "World/AnastasisSoilWater.h"
 #include "Core/AnastasisRng.h"
@@ -1294,6 +1295,33 @@ namespace AnastasisVillage
 		 */
 		void ForgetStaleDaily(int32 Day);
 
+		// --- Passage et sentiers (`sim.traffic`, settlement-morphogenesis-001) ------------------
+
+		/** `decayFootTraffic` (trafficDecay.js), a minuit avant les logements. Fidele. Rend les cases touchees. */
+		int32 DecayTrafficDaily();
+
+		/**
+		 * `updateRoadEvolutionDaily`, branche sentier de desir seule (ecart n°42) : une case foulee
+		 * au-dela de 14 passages accumule un effort ; apres 18 nuits (plus pour un champ ou une foret)
+		 * elle devient un sentier (`Road`, classe `path`), dont le cout de marche tombe a 0,86. Ne fait
+		 * rien tant que l'hote n'a pas active l'extension (`SetRoadEvolutionEnabled`). Rend les sentiers poses.
+		 */
+		int32 UpdateRoadEvolutionDaily(int32 Day);
+
+		/** Activation de l'ecart n°42 : l'hote Unreal seul ; le village C++ nu reste a faux (parite). */
+		void SetRoadEvolutionEnabled(bool bEnabled) { bRoadEvolutionEnabled = bEnabled; }
+		bool IsRoadEvolutionEnabled() const { return bRoadEvolutionEnabled; }
+
+		/** `trafficAt(x, y)` : passage accumule (f32 relu en double), 0 hors bornes. */
+		double TrafficAt(int32 TileX, int32 TileY) const;
+		const TArray<float>& GetTraffic() const { return Traffic; }
+		/** Sentiers nes du passage : index de case -> classe, jour de naissance, passage a la naissance. */
+		const TMap<int32, AnastasisTraffic::FRoadTile>& GetRoads() const { return Roads; }
+		/** Effort de defrichage en cours (`roadBuildEffort`) : index de case -> jours accumules. */
+		const TMap<int32, double>& GetRoadEfforts() const { return RoadEfforts; }
+		/** Observation : passages enregistres depuis Bind. */
+		int64 GetPassageCount() const { return PassageCount; }
+
 		/** Graine du flux de tirages du village (rumeurs). Defaut fixe ; l'hote la pose. */
 		void SetRngSeed(uint32 Seed) { VillageRng = FAnastasisRng(Seed); }
 
@@ -1635,7 +1663,7 @@ namespace AnastasisVillage
 		FPoint DoorQueueWaypoint(FNpc& Npc, const FPoint& Target, const FPoint& Waypoint);
 		/** `movementSpeedFactor(sim, actor, target)`. */
 		double MovementSpeedFactor(FNpc& Npc, const FPoint* Target);
-		/** `recordPassage(actor)`. */
+		/** `recordPassage(actor)` : un passage de plus (plafond 180, f32), ni sur l'eau ni sur un batiment ; toutes les 0,85 s de marche. */
 		void RecordPassage(const FNpc& Npc);
 		/** Copie l'habitant dans sa vue du service, et l'inverse. */
 		static void FillNavAgent(const FNpc& Npc, AnastasisNavService::FNavAgent& Agent);
@@ -1847,13 +1875,17 @@ namespace AnastasisVillage
 		bool bTerrainTravelCostEnabled = false;
 		FString MaterialCourierId;
 		TFunction<double(double, double)> RainCanopyCover;
+		/** `sim.traffic` : Float32Array de la reference, une case par tuile, plafonnee a 180 (`recordPassage`). Float : `decayFootTraffic` (x0,88 - 0,55). */
+		TArray<float> Traffic;
+		TMap<int32, AnastasisTraffic::FRoadTile> Roads;
+		TMap<int32, double> RoadEfforts;
+		bool bRoadEvolutionEnabled = false;
+		int64 PassageCount = 0;
 		int32 NavVersion = 0;
 		/** `sim.navService` (nav-wiring-001). */
 		AnastasisNavService::FNavService NavService;
 		/** Vues des habitants prises par le service pendant un appel, recopiees a la sortie (`FlushNavAgents`). */
 		TMap<FString, AnastasisNavService::FNavAgent> NavAgents;
-		/** `sim.traffic` : passages par tuile, plafonnes a 180. */
-		TArray<int32> Traffic;
 		/** Ce que `findPath(sim, ...)` interroge, construit a la demande (references sur `Nav` et `World`). */
 		mutable TSharedPtr<AnastasisPath::FWorldNavSource> NavSourceShared;
 		FPoint Settlement;

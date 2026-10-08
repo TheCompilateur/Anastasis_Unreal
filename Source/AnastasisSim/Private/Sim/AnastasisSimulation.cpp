@@ -181,6 +181,8 @@ uint64 FAnastasisSimulation::StateDigest() const
 void FAnastasisSimulation::OnNewDay(bool bDefer)
 {
 	++NewDayCount;
+	// `decayPassageTrafficDaily(this)` : la reference l'appelle avant l'economie et les logements.
+	Village.DecayTrafficDaily();
 	// Section critique de minuit, « eco + logements » : de la reference n'est porte
 	// que `assignSheltersDaily` (les sans-toit recoivent un lit). Achats de maison,
 	// agrandissements, loyers : economie, non portee.
@@ -230,6 +232,10 @@ void FAnastasisSimulation::RunDayJob(int32 Job)
 	if (Job == DayJobLandRegen)
 	{
 		RunLandRegen();
+	}
+	else if (Job == DayJobRoadEvolution)
+	{
+		LastRoadsBuilt = Village.UpdateRoadEvolutionDaily(Day);
 	}
 	else if (Job == DayJobLifeDaily)
 	{

@@ -781,3 +781,35 @@ Les scénarios actuels du harnais n'incarnent pas de joueur.
 - **harnais** : actors
 
 La couverture géométrique d'une couronne réellement posée réduit au plus de 20 % la perte d'énergie et de santé due à la pluie. Les seuils de l'orage et la décision de chercher un bâtiment restent ceux de la référence ; un arbre ne devient pas un toit. Le facteur 20 % est un paramètre de jeu borné, pas une mesure validée pour ces essences. À trancher : garder cette extension dans le jeu ou porter une couverture du couvert arboré dans la référence JS.
+
+### n° 42 — Sentiers de désir : posés sans paiement, sans classes formelles, sans raser de ressource
+
+- **classe** : REDUIT
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : settlement-morphogenesis-001 (numéroté 38 sur sa branche), versé par relay-settlement-001 sur le trafic de nav-wiring-001
+- **activation** : `anastasis.Village.RoadEvolution=1` dans l'hôte Unreal ; défaut 1. Le village C++ nu reste à 0 (`SetRoadEvolutionEnabled`) : le harnais ne pose jamais de sentier.
+- **reference** : `src/sim/simulation.js` (`recordPassage`, `updateRoadEvolutionDaily`, `evolveDesirePathTileDaily`, `setPlannedRoad`, `claimRoadFootprint`, `evolveFormalRoadTileDaily`, `canAffordRoadCost`), `src/sim/trafficDecay.js` (`decayFootTraffic`, `decayHaulTraffic`)
+- **cpp** : `World/AnastasisTraffic.{h,cpp}` ; `Village/AnastasisVillage.cpp` (`DecayTrafficDaily`, `UpdateRoadEvolutionDaily`) ; `Village/AnastasisVillageNav.cpp` (`RecordPassage`, `MoveActor`, de nav-wiring-001) ; `Village/AnastasisVillagePlayer.cpp` (`DrivePlayer`) ; `Sim/AnastasisSimulation.cpp` (`OnNewDay`, travail 8 `roadEvolution`)
+- **harnais** : actors
+- **fermeture** : à attribuer (portage du marché et de son stock de bois, puis `evolveFormalRoadTileDaily` — ruelle, axe, pavage —, `claimRoadFootprint` sur les cases porteuses d'une ressource, `decayHaulTraffic` avec le transport, lecture de `traffic` dans `AnastasisJsSave`)
+
+Un seul compteur : `sim.traffic` et `recordPassage` sont ceux de nav-wiring-001 (`FVillage::Traffic`,
+`FVillage::RecordPassage`, `FNpc::TrafficTimer`). Le compteur passe d'entiers à `float` (Float32Array de la
+référence) : la décroissance de minuit en a besoin. Le test « bâtiment » de `recordPassage` est celui de main
+(liste vivante des bâtiments), lu à la case d'ancrage `floor(x), floor(y)` comme `buildingIndex` de la
+référence ; `updateRoadEvolutionDaily` lit la même chose. Porté fidèlement : le compteur (f32, +1 par passage,
+plafond 180), le pas de 0,85 s de marche (`trafficTimer` ; pour le joueur, seulement s'il a bougé, comme
+`drivePlayerActor`), la décroissance de minuit `decayFootTraffic` (×0,88 − 0,55, nul sous 0,35), l'effort de
+défrichage du sentier de désir (seuil 14, +1 + min(0,75, (t − 14)/42) par nuit, ×0,72 sous le seuil, 18 jours
++ 6 champ + 4 forêt + ⌈bois/10⌉), la classe `roadClassForTraffic` plafonnée à `lane`, le coût de marche du
+profil posé sur la case, la version de navigation incrémentée s'il y a des habitants.
+
+Réduit : la référence paie un bois au marché (`canAffordRoadCost`) ; le C++ n'a pas de marché, le sentier se
+pose sans payer. Une case qui porte encore une ressource (champ semé, bois debout) n'est pas rasée : la
+référence la rase et laisse un fantôme de culture. Les classes formelles (montée en ruelle ou en axe, pavage)
+ne sont pas portées : un sentier reste de sa classe de naissance. Pas de journal ni de cadastre
+(`markCadastreDirty`, `refreshUrbanIntents`), pas de `decayHaulTraffic` (aucun transport porté). Le travail
+de nuit garde son rang 8 dans la file. Harnais : `traffic` n'est pas dans la projection JS (`Digest`) ni lu
+de la sauvegarde (`packTraffic`) ; il est haché par `StateDigest`, avec les sentiers et leurs efforts. Le
+sentier ne naît jamais sans l'activation de l'hôte ; la décroissance de minuit, fidèle, tourne partout.

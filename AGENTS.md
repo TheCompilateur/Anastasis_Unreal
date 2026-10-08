@@ -504,6 +504,16 @@ une maisonnee remplit sa parcelle (corps + assise terrassee). Catalogue fonction
 | `architecture-preview.py` | **hors editeur** (Python systeme, Pillow + numpy) : rend chaque maisonnee en z-buffer logiciel avec des silhouettes de 170 cm (trois-quarts a hauteur d'oeil, oblique, arriere, porte, coupe) en secondes -> `Saved/ArchitecturePreview/` ; juge proportions et silhouettes, pas la matiere |
 | `architecture-pie.ps1` + `architecture-pie.py` | preuve PIE : `Anastasis.Village.Hamlet` AVANT (`anastasis.Village.Architecture 0`, anciens meshes) puis APRES, memes cameras ; chaque batiment porte son archetype et son assise, terrasse < 480 cm, deux typologies au moins ; mannequins au corps des habitants devant, dans la porte, a l'interieur ; 13 prises -> `Saved/ArchitectureEvidence/pie/` ; au registre (`architecture-pie`) ; rien n'est sauve |
 
+### Morphogenese du peuplement (SETTLEMENT_MORPHOGENESIS_001)
+
+Le passage des habitants fait les sentiers (`sim.traffic`, ecart n°42, `anastasis.Village.RoadEvolution`) ; la forme
+d'une maison vient de sa biographie (fondateur, metier, foyer : `Village/AnastasisSettlementLedger.*`), sa patine de son
+age. Rapport : `docs/unreal/SETTLEMENT_MORPHOGENESIS_001.md`. Console : `Anastasis.Village.SettlementReport`.
+
+| Script | Role |
+|---|---|
+| `settlement-morphogenesis-pie.ps1` + `settlement-morphogenesis-pie.py` | preuve PIE : village d'ouverture tel quel, `Anastasis.Sim.Advance` par sauts de 6 jours (36 par defaut), etat JSON avant / apres (`GetSettlementStatus`) ; PASS = passage compte, chaque sentier ne d'un passage >= 14 au cout 0,86 et rendu, une maison fondee, chaque corps = programme de sa biographie, patine des batiments ages ; prises village, passage (debug), sentier a 1,7 m, maisons fondees -> `Saved/SettlementEvidence/pie/` ; `-Keep` laisse l'editeur ouvert ; au registre (`settlement-morphogenesis-pie`) ; rien n'est sauve |
+
 ### AAA visual lab
 
 | Script | Role |

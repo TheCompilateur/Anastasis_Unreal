@@ -3,6 +3,9 @@
 #include "CoreMinimal.h"
 #include "UObject/WeakObjectPtrTemplates.h"
 #include "Village/AnastasisBuildingMetabolism.h"
+#include "Village/AnastasisArchitecture.h"
+#include "Village/AnastasisSettlementLedger.h"
+#include "Village/AnastasisSettlementPaths.h"
 #include "SmartObjectTypes.h"
 #include "SmartObjectRuntime.h"
 
@@ -43,7 +46,17 @@ public:
 	 * inchanges, rien n'est detruit). Rend le nombre d'instances ecartees ; -1 si l'archetype n'est pas charge.
 	 */
 	static int32 SettleArchitecture(AAnastasisVillageBuilding& Actor, const AnastasisVillage::FVillage& Village,
-		const FString& BuildingId, UWorld* PresentationWorld);
+		const FString& BuildingId, UWorld* PresentationWorld, AnastasisArchitecture::EVariant Variant);
+
+	/**
+	 * SETTLEMENT_MORPHOGENESIS_001 : la biographie de chaque batiment (qui l'a fonde, pour quel foyer, ce qui
+	 * lui est arrive), ecrite en observant la simulation. Elle fixe le programme (la forme) du batiment.
+	 */
+	const AnastasisSettlement::FLedger& GetLedger() const { return Ledger; }
+	const FAnastasisSettlementPaths& GetPaths() const { return Paths; }
+
+	/** Trace de debogage du peuplement : sentiers, passage, biographie (anastasis.Village.Debug). */
+	void DrawSettlementDebug(UWorld* World, const AnastasisVillage::FVillage& Village, const AnastasisWorld::FWorld& SimWorld, int32 Day) const;
 
 	/**
 	 * Aligne les acteurs sur les enregistrements. Rend le nombre d'acteurs crees + detruits.
@@ -120,4 +133,6 @@ private:
 	TMap<FString, FInteractionUse> InteractionUses;
 	bool bWarnedNoLooks = false;
 	bool bWarnedNoBody = false;
+	AnastasisSettlement::FLedger Ledger;
+	FAnastasisSettlementPaths Paths;
 };

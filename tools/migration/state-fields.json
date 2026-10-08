@@ -2,7 +2,8 @@
   "_lisezmoi": "STATE_ORACLE_001. Registre de tools/migration/check-state-fields.mjs. Chaque champ d'une structure ci-dessous est lu par son hacheur (lecteur.fonction, via lecteur.acces), ou classe dans hors_etat avec une raison qui commence par cache:, derive:, pointeur:, observation: ou lacune:. Ajouter une structure ici des qu'un hacheur d'etat la lit.",
   "structures": [
     { "nom": "FAnastasisSimulation", "entete": "Source/AnastasisSim/Public/Sim/AnastasisSimulation.h",
-      "lecteur": { "fichier": "Source/AnastasisSim/Private/Sim/AnastasisSimulation.cpp", "fonction": "uint64 FAnastasisSimulation::StateDigest() const", "acces": "" } },
+      "lecteur": { "fichier": "Source/AnastasisSim/Private/Sim/AnastasisSimulation.cpp", "fonction": "uint64 FAnastasisSimulation::StateDigest() const", "acces": "" },
+      "hors_etat": { "LastRoadsBuilt": "observation: sentiers poses par le dernier travail roadEvolution (ecart n 42), pour le rapport ; aucune regle ne le relit" } },
     { "nom": "FWorld", "entete": "Source/AnastasisSim/Public/World/AnastasisWorld.h",
       "lecteur": { "fichier": "Source/AnastasisSim/Private/Sim/AnastasisSimulation.cpp", "fonction": "uint64 FAnastasisSimulation::StateDigest() const", "acces": "World." },
       "hors_etat": { "Archetype": "derive: parametres de generation (FKnobs), fonction de la graine ; le monde qu'ils produisent est hache tuile par tuile" } },
@@ -14,7 +15,8 @@
         "CollectiveDecisionOverride": "pointeur: crochet de test (TFunction), jamais pose en jeu",
         "RainCanopyCover": "pointeur: crochet hote (TFunction) pose par l incarnation Unreal pour lire la canopee rendue (ecart n°41, canopy-rain-shelter-001) ; son effet passe par l etat des habitants, deja hache",
         "Colony": "lacune: FColonyState du planificateur (priorites, rapport de stock, charte) ; pose seulement par RestoreColonyForHarness, jamais pour un village cree par le C++ (bHasColony, tresor et rayon sont lus) ; a lire avant toute sauvegarde",
-        "MarketStock": "lacune: FOrderedMap du marche, meme condition que Colony"
+        "MarketStock": "lacune: FOrderedMap du marche, meme condition que Colony",
+        "PassageCount": "observation: passages enregistres depuis Bind (settlement-morphogenesis-001), pour le rapport et les tests ; aucune regle ne le relit"
       } },
     { "nom": "FNpc", "entete": "Source/AnastasisSim/Public/Village/AnastasisVillage.h",
       "lecteur": { "fichier": "Source/AnastasisSim/Private/Village/AnastasisVillageStateDigest.cpp", "fonction": "void HashState(FStateWriter& Out, const FNpc& V)", "acces": "V." },

@@ -50,6 +50,13 @@ public:
 	 * simulation (SimToUnreal), le corps, l'assise et le foyer descendent ou montent ensemble (ARCH-10).
 	 */
 	void SetPadOffset(double OffsetCm);
+
+	/**
+	 * SETTLEMENT_MORPHOGENESIS_001 : la patine de l'age (0..1), tiree des jours ecoules depuis l'achevement
+	 * (biographie), distincte de l'abandon (`SetNeglect`). Seulement pour un corps d'archetype.
+	 */
+	void SetWeathering(double Level);
+	double GetWeathering() const { return WeatheringLevel; }
 	double GetPadOffset() const { return PadOffset; }
 	bool HasArchitecture() const { return bHasArchitecture; }
 	AnastasisArchitecture::EVariant GetVariant() const { return Variant; }
@@ -101,6 +108,9 @@ private:
 	AnastasisArchitecture::EVariant Variant = AnastasisArchitecture::EVariant::HousePoor;
 	bool bHasArchitecture = false;
 	double PadOffset = 0.0;
+	double WeatheringLevel = -1.0;
+	/** Le MID permanent d'un corps d'archetype : Neglect et Weathering y vivent ensemble. */
+	UMaterialInstanceDynamic* EnsureArchitectureMaterial();
 	FVector HearthAuthored = FVector(0.0, 0.0, 120.0);
 
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis|Site Stock")

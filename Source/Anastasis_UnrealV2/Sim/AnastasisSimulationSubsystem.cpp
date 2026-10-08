@@ -11,6 +11,10 @@
 #include "Core/AnastasisSimClock.h"
 #include "Village/AnastasisVillage.h"
 #include "Village/AnastasisArchitecture.h"
+#include "Work/AnastasisBuild.h"
+#include "Work/AnastasisGather.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Village/AnastasisVillageBuilding.h"
 #include "Village/AnastasisVillageInteractionSubsystem.h"
 #include "Village/AnastasisVillagerVisual.h"
@@ -88,6 +92,12 @@ static TAutoConsoleVariable<int32> CVarVillageOpeningConstruction(
 static TAutoConsoleVariable<int32> CVarVillageSiteSelection(
     TEXT("anastasis.Village.SiteSelection"), 1,
     TEXT("1 selects the opening village from this world rendered terrain and navigable resource access. 0 retains legacy centre placement for comparison. Explicit scenarios and saves are not relocated."), ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarVillageRoadEvolution(
+	TEXT("anastasis.Village.RoadEvolution"),
+	1,
+	TEXT("settlement-morphogenesis-001 (ecart n°42) : 1 = une case foulee assez longtemps devient un sentier (sim.traffic -> Road, cout 0,86) ; 0 = le passage est compte mais ne marque pas le sol. Lu au demarrage de la simulation."),
+	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarVillageRouteCost(
 	TEXT("anastasis.Village.RouteCost"), 1,
@@ -430,6 +440,7 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	Simulation.Reset(Seed, AnastasisWorldView::ReferenceWidth, AnastasisWorldView::ReferenceHeight);
 	Simulation.GetVillage().SetTerrainTravelCostEnabled(CVarVillageRouteCost.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetSoilWaterEnabled(CVarSoilWaterBudget.GetValueOnGameThread() != 0);
+	Simulation.GetVillage().SetRoadEvolutionEnabled(CVarVillageRoadEvolution.GetValueOnGameThread() != 0);
 	LoggedDay = Simulation.GetDay();
 	UE_LOG(
 		LogAnastasis_UnrealV2,
@@ -461,6 +472,7 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 	const double TimeBefore = Simulation.GetTime();
 	Simulation.GetVillage().SetTerrainTravelCostEnabled(CVarVillageRouteCost.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetSoilWaterEnabled(CVarSoilWaterBudget.GetValueOnGameThread() != 0);
+	Simulation.GetVillage().SetRoadEvolutionEnabled(CVarVillageRoadEvolution.GetValueOnGameThread() != 0);
 	const double Multiplier = FMath::Max(1.0, AnastasisJs::NumberOr(Speed, 1.0)) * Warp;
 	// player-minimal-001 : la direction du pawn conduit le corps incarne pendant les pas de cette frame.
 	ApplyPlayerInput();
@@ -514,6 +526,7 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 	if (CVarVillageDebug.GetValueOnGameThread() != 0)
 	{
 		FAnastasisVillagePresentation::DrawDebug(GetWorld(), Simulation.GetVillage(), Simulation.GetWorld());
+		VillagePresentation.DrawSettlementDebug(GetWorld(), Simulation.GetVillage(), Simulation.GetWorld(), Simulation.GetDay());
 	}
 	DrawOverlay();
 }
@@ -780,6 +793,7 @@ int32 UAnastasisSimulationSubsystem::AdvanceBy(double Seconds)
 	const double From = Simulation.GetTime();
 	Simulation.GetVillage().SetTerrainTravelCostEnabled(CVarVillageRouteCost.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetSoilWaterEnabled(CVarSoilWaterBudget.GetValueOnGameThread() != 0);
+	Simulation.GetVillage().SetRoadEvolutionEnabled(CVarVillageRoadEvolution.GetValueOnGameThread() != 0);
 	const int32 FromDay = Simulation.GetDay();
 	const double Start = FPlatformTime::Seconds();
 	// Par tranches de 15 s simulees (90 pas) : le temoin informe le village AU FIL du saut, et chaque
@@ -1126,6 +1140,17 @@ int32 UAnastasisSimulationSubsystem::SeedArchitectureHamlet(int32 Houses, int32 
 					Needs.Health = 90.0;
 					Needs.Morale = 55.0;
 					const FString Id = Village.SpawnNpc(X + 0.5, Y + 0.5, Needs, 4.0);
+					// settlement-morphogenesis-001 : des foyers de metiers differents, pour que la forme de leurs
+					// maisons ait une cause. Le premier cultive pour le grenier, le deuxieme et le quatrieme batissent ;
+					// les autres sont des colons sans metier propre.
+					if (K == 0 && !Granary.IsEmpty())
+					{
+						Village.AssignWorkplace(Id, AnastasisGather::JobFarmer, Granary);
+					}
+					else if (K == 1 || K == 3)
+					{
+						Village.SetJob(Id, AnastasisBuild::JobBuilder);
+					}
 					if (HouseIds.IsValidIndex(K))
 					{
 						Village.AssignHome(Id, HouseIds[K]);
@@ -1145,6 +1170,38 @@ int32 UAnastasisSimulationSubsystem::SeedArchitectureHamlet(int32 Houses, int32 
 	return 1 + HouseIds.Num() + (Granary.IsEmpty() ? 0 : 1);
 }
 
+void UAnastasisSimulationSubsystem::LogSettlement() const
+{
+	const AnastasisVillage::FVillage& Village = Simulation.GetVillage();
+	const int32 Day = Simulation.GetDay();
+	VillagePresentation.GetLedger().Log(Day);
+	// Le passage et les sentiers : combien, ou, depuis quand, a quel cout.
+	double Total = 0.0;
+	double Peak = 0.0;
+	int32 Hot = 0;
+	for (const float T : Village.GetTraffic())
+	{
+		Total += T;
+		Peak = FMath::Max<double>(Peak, T);
+		Hot += T >= AnastasisTraffic::DesireTraffic ? 1 : 0;
+	}
+	const int32 W = Simulation.GetWorld().W;
+	TArray<int32> Keys;
+	Village.GetRoads().GetKeys(Keys);
+	Keys.Sort();
+	FString Cells;
+	for (const int32 K : Keys)
+	{
+		const AnastasisTraffic::FRoadTile& R = Village.GetRoads()[K];
+		Cells += FString::Printf(TEXT(" (%d,%d)j%d/%.0f/c%.2f"), K % FMath::Max(1, W), K / FMath::Max(1, W), R.BuiltDay, R.TrafficAtBirth,
+			AnastasisNav::MoveCostAt(Village.GetNavGrid(), K % FMath::Max(1, W), K / FMath::Max(1, W)));
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_SETTLEMENT traffic day=%d evolution=%d passages=%lld total=%.1f peak=%.1f hot_cells=%d efforts=%d roads=%d paths_segments=%d grass_hidden=%d roads_at=[%s]"),
+		Day, Village.IsRoadEvolutionEnabled() ? 1 : 0, Village.GetPassageCount(), Total, Peak, Hot, Village.GetRoadEfforts().Num(),
+		Village.GetRoads().Num(), VillagePresentation.GetPaths().NumSegments(), VillagePresentation.GetPaths().NumHiddenGrass(), *Cells.TrimStart());
+}
+
 void UAnastasisSimulationSubsystem::LogArchitecture() const
 {
 	const AnastasisVillage::FVillage& Village = Simulation.GetVillage();
@@ -1152,6 +1209,11 @@ void UAnastasisSimulationSubsystem::LogArchitecture() const
 	{
 		AnastasisArchitecture::EVariant Variant;
 		if (!AnastasisArchitecture::ChooseVariant(B.Type, B.HousePhase, B.Id, Variant)) continue;
+		// La forme vient de la biographie (settlement-morphogenesis-001) ; le repli de phase sinon.
+		if (const AnastasisSettlement::FBiography* Bio = VillagePresentation.GetLedger().Find(B.Id))
+		{
+			Variant = Bio->Program;
+		}
 		const AnastasisArchitecture::FBuildingRecord Record = AnastasisArchitecture::Describe(Village, B, Variant, Simulation.GetDay());
 		FString Where = TEXT("-");
 		if (const AAnastasisVillageBuilding* Actor = VillagePresentation.FindActor(B.Id))
@@ -1321,6 +1383,17 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVillageHamlet(
 			const int32 X = Args.IsValidIndex(2) ? FCString::Atoi(*Args[2]) : FMath::FloorToInt32(Settlement.X);
 			const int32 Y = Args.IsValidIndex(3) ? FCString::Atoi(*Args[3]) : FMath::FloorToInt32(Settlement.Y);
 			Host->SeedArchitectureHamlet(Houses, Count, X, Y);
+		}
+	}));
+
+static FAutoConsoleCommandWithWorld CmdAnastasisVillageSettlementReport(
+	TEXT("Anastasis.Village.SettlementReport"),
+	TEXT("SETTLEMENT_MORPHOGENESIS_001 : la biographie de chaque batiment (lignes ANASTASIS_SETTLEMENT bio) et l'etat du passage et des sentiers (ANASTASIS_SETTLEMENT traffic)."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		if (UAnastasisSimulationSubsystem* Host = VillageHost(World))
+		{
+			Host->LogSettlement();
 		}
 	}));
 
@@ -1844,6 +1917,63 @@ FString UAnastasisSimulationDebugLibrary::GetBuildStatus(const UObject* WorldCon
 		Builder ? *Builder->Goal : TEXT(""), Builder ? *Builder->Activity : TEXT(""),
 		Builder && Builder->WorkSession.bActive ? TEXT("true") : TEXT("false"),
 		S.X, S.Y, S.Z, N.X, N.Y, N.Z);
+}
+
+FString UAnastasisSimulationDebugLibrary::GetSettlementStatus(const UObject* WorldContextObject)
+{
+	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	const UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+	if (!Host || !Host->GetSimulation().IsRunning()) return TEXT("{}");
+	const FAnastasisSimulation& Sim = Host->GetSimulation();
+	const AnastasisVillage::FVillage& V = Sim.GetVillage();
+	const AnastasisWorld::FWorld& SimWorld = Sim.GetWorld();
+	const int32 W = FMath::Max(1, SimWorld.W);
+	const int32 Day = Sim.GetDay();
+	double Total = 0.0;
+	double Peak = 0.0;
+	int32 Hot = 0;
+	for (const float T : V.GetTraffic())
+	{
+		Total += T;
+		Peak = FMath::Max<double>(Peak, T);
+		Hot += T >= AnastasisTraffic::DesireTraffic ? 1 : 0;
+	}
+	TArray<FString> Roads;
+	for (const TPair<int32, AnastasisTraffic::FRoadTile>& R : V.GetRoads())
+	{
+		const int32 X = R.Key % W;
+		const int32 Y = R.Key / W;
+		const FVector P = FAnastasisVillagePresentation::SimToUnreal(SimWorld, X + 0.5, Y + 0.5, const_cast<UWorld*>(World));
+		Roads.Add(FString::Printf(TEXT("{\"x\":%d,\"y\":%d,\"day\":%d,\"traffic_at_birth\":%.2f,\"traffic\":%.2f,\"cost\":%.4f,\"wx\":%.0f,\"wy\":%.0f,\"wz\":%.0f}"),
+			X, Y, R.Value.BuiltDay, R.Value.TrafficAtBirth, V.TrafficAt(X, Y), AnastasisNav::MoveCostAt(V.GetNavGrid(), X, Y), P.X, P.Y, P.Z));
+	}
+	TArray<FString> Buildings;
+	const AnastasisSettlement::FLedger& Ledger = Host->GetVillagePresentation().GetLedger();
+	for (const AnastasisVillage::FBuilding& B : V.GetBuildings())
+	{
+		const AnastasisSettlement::FBiography* Bio = Ledger.Find(B.Id);
+		const AAnastasisVillageBuilding* Actor = Host->GetVillagePresentation().FindActor(B.Id);
+		const FVector L = Actor ? Actor->GetActorLocation() : FVector::ZeroVector;
+		FString Mesh;
+		if (Actor && Actor->GetBody() && Actor->GetBody()->GetStaticMesh()) Mesh = Actor->GetBody()->GetStaticMesh()->GetName();
+		Buildings.Add(FString::Printf(
+			TEXT("{\"id\":\"%s\",\"type\":\"%s\",\"progress\":%.2f,\"program\":\"%s\",\"fixed\":%s,\"founded\":%d,\"founder\":\"%s\",\"job\":\"%s\",")
+			TEXT("\"household\":%d,\"owner\":\"%s\",\"occupants\":%d,\"peak\":%d,\"crowded_days\":%d,\"owner_changes\":%d,\"age\":%d,\"events\":%d,")
+			TEXT("\"mesh\":\"%s\",\"variant\":\"%s\",\"weathering\":%.3f,\"neglect\":%.3f,\"pad\":%.1f,\"x\":%.0f,\"y\":%.0f,\"z\":%.0f,\"yaw\":%.1f,\"cause\":\"%s\"}"),
+			*B.Id, *B.Type, B.Progress, Bio ? AnastasisArchitecture::Get(Bio->Program).Id : TEXT(""), Bio && Bio->bProgramFixed ? TEXT("true") : TEXT("false"),
+			Bio ? Bio->FoundedDay : -1, Bio ? *Bio->Founder : TEXT(""), Bio ? *Bio->FounderJob : TEXT(""), Bio ? Bio->FounderHousehold : 0,
+			*B.Owner, Bio ? Bio->Occupants : 0, Bio ? Bio->PeakOccupants : 0, Bio ? Bio->CrowdedDays : 0, Bio ? Bio->OwnerChanges : 0,
+			Bio ? Bio->AgeDays(Day) : 0, Bio ? Bio->Events.Num() : 0, *Mesh,
+			Actor && Actor->HasArchitecture() ? AnastasisArchitecture::Get(Actor->GetVariant()).Id : TEXT(""),
+			Actor ? Actor->GetWeathering() : -1.0, Actor ? Actor->GetNeglect() : -1.0, Actor ? Actor->GetPadOffset() : 0.0,
+			L.X, L.Y, L.Z, Actor ? Actor->GetActorRotation().Yaw : 0.0, Bio ? *Bio->ProgramCause.Replace(TEXT("\""), TEXT("'")) : TEXT("")));
+	}
+	const FAnastasisSettlementPaths& Paths = Host->GetVillagePresentation().GetPaths();
+	return FString::Printf(
+		TEXT("{\"day\":%d,\"time\":%.2f,\"evolution\":%s,\"passages\":%lld,\"traffic_total\":%.1f,\"traffic_peak\":%.1f,\"hot_cells\":%d,\"efforts\":%d,")
+		TEXT("\"segments\":%d,\"grass_hidden\":%d,\"roads\":[%s],\"buildings\":[%s]}"),
+		Day, Sim.GetTime(), V.IsRoadEvolutionEnabled() ? TEXT("true") : TEXT("false"), V.GetPassageCount(), Total, Peak, Hot, V.GetRoadEfforts().Num(),
+		Paths.NumSegments(), Paths.NumHiddenGrass(), *FString::Join(Roads, TEXT(",")), *FString::Join(Buildings, TEXT(",")));
 }
 
 FString UAnastasisSimulationDebugLibrary::GetBuildingCapacityStatus(const UObject* WorldContextObject)

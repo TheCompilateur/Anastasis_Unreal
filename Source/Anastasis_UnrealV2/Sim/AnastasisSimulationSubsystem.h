@@ -74,6 +74,9 @@ public:
 
 	/** Une ligne `ANASTASIS_ARCH record` par batiment : archetype et etat vivant (AnastasisArchitecture::Describe). */
 	void LogArchitecture() const;
+
+	/** SETTLEMENT_MORPHOGENESIS_001 : biographies (`ANASTASIS_SETTLEMENT bio`) et passage / sentiers (`ANASTASIS_SETTLEMENT traffic`). */
+	void LogSettlement() const;
 	bool SeedFoodSupply();
 
 	/**
@@ -265,6 +268,13 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetBuildStatus(const UObject* WorldContextObject);
+
+	/**
+	 * SETTLEMENT_MORPHOGENESIS_001 : passage, sentiers et biographie des batiments (JSON). Lu par
+	 * settlement-morphogenesis-pie.py ; rien n'est ecrit.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetSettlementStatus(const UObject* WorldContextObject);
 
 	/** Capacites et resultats observes du village courant ; les buts sont des intentions instantanees. */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))

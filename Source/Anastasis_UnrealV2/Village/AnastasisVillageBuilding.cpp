@@ -103,6 +103,16 @@ void AAnastasisVillageBuilding::SetNeglect(const double Level)
 	{
 		return;
 	}
+	if (bHasArchitecture)
+	{
+		// Corps d'archetype : un seul MID permanent, l'abandon n'est qu'un parametre (0 compris).
+		if (UMaterialInstanceDynamic* Mid = EnsureArchitectureMaterial())
+		{
+			NeglectLevel = Clamped;
+			Mid->SetScalarParameterValue(TEXT("Neglect"), static_cast<float>(Clamped));
+		}
+		return;
+	}
 	if (Clamped <= 0.0)
 	{
 		// Quelqu'un est revenu : la maison reprend son materiau d'origine.
@@ -182,10 +192,12 @@ bool AAnastasisVillageBuilding::ApplyArchitecture(AnastasisArchitecture::EVarian
 	if (AgedMaterial)
 	{
 		Body->SetMaterial(0, nullptr);
+		if (Footing) Footing->SetMaterial(0, nullptr);
 	}
 	OriginalMaterial = nullptr;
 	AgedMaterial = nullptr;
-	NeglectLevel = 0.0;
+	NeglectLevel = -1.0;
+	WeatheringLevel = -1.0;
 	Body->SetStaticMesh(BodyMesh);
 	Body->SetVisibility(true);
 	if (Footing)
@@ -199,6 +211,49 @@ bool AAnastasisVillageBuilding::ApplyArchitecture(AnastasisArchitecture::EVarian
 	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_ARCH %s archetype=%s tier=%d body=%s footing=%d"),
 		*SimId.ToString(), A.Id, A.Tier, *BodyMesh->GetName(), FootMesh ? 1 : 0);
 	return true;
+}
+
+UMaterialInstanceDynamic* AAnastasisVillageBuilding::EnsureArchitectureMaterial()
+{
+	if (!Body)
+	{
+		return nullptr;
+	}
+	if (AgedMaterial && Body->GetMaterial(0) == AgedMaterial)
+	{
+		return AgedMaterial;
+	}
+	UMaterialInterface* Base = Body->GetMaterial(0);
+	if (!Base)
+	{
+		return nullptr;
+	}
+	OriginalMaterial = Base;
+	AgedMaterial = UMaterialInstanceDynamic::Create(Base, this);
+	Body->SetMaterial(0, AgedMaterial);
+	if (Footing)
+	{
+		Footing->SetMaterial(0, AgedMaterial);
+	}
+	return AgedMaterial;
+}
+
+void AAnastasisVillageBuilding::SetWeathering(const double Level)
+{
+	if (!bHasArchitecture)
+	{
+		return;
+	}
+	const double Clamped = FMath::Clamp(Level, 0.0, 1.0);
+	if (FMath::IsNearlyEqual(Clamped, WeatheringLevel, 0.005))
+	{
+		return;
+	}
+	if (UMaterialInstanceDynamic* Mid = EnsureArchitectureMaterial())
+	{
+		WeatheringLevel = Clamped;
+		Mid->SetScalarParameterValue(TEXT("Weathering"), static_cast<float>(Clamped));
+	}
 }
 
 void AAnastasisVillageBuilding::SetPadOffset(const double OffsetCm)

@@ -1,5 +1,5 @@
 {
- "version": "architecture-crusade-001-v1",
+ "version": "settlement-morphogenesis-001-v1",
  "convention": {
   "human": 170.0,
   "parcel": 2000.0,
@@ -779,7 +779,7 @@
  "kit": [
   {
    "name": "SM_Kit_Wall_Rubble_300",
-   "triangles": 1632,
+   "triangles": 1542,
    "size_cm": [
     300,
     63,
@@ -788,7 +788,7 @@
   },
   {
    "name": "SM_Kit_Wall_Rubble_Door_300",
-   "triangles": 1242,
+   "triangles": 1314,
    "size_cm": [
     300,
     115,
@@ -797,7 +797,7 @@
   },
   {
    "name": "SM_Kit_Wall_Rubble_Window_300",
-   "triangles": 1512,
+   "triangles": 1530,
    "size_cm": [
     300,
     91,
@@ -806,7 +806,7 @@
   },
   {
    "name": "SM_Kit_Wall_Rubble_Corner",
-   "triangles": 3786,
+   "triangles": 3744,
    "size_cm": [
     334,
     334,
@@ -864,30 +864,30 @@
    "size_cm": [
     300,
     10,
-    259
+    260
    ]
   },
   {
    "name": "SM_Kit_Wall_Drystone_300",
-   "triangles": 1824,
+   "triangles": 1902,
    "size_cm": [
-    307,
+    300,
     63,
-    176
+    181
    ]
   },
   {
    "name": "SM_Kit_Fence_Wattle_300",
    "triangles": 1136,
    "size_cm": [
-    305,
+    306,
     10,
-    154
+    150
    ]
   },
   {
    "name": "SM_Kit_Roof_Tile_300",
-   "triangles": 7942,
+   "triangles": 7982,
    "size_cm": [
     441,
     557,
@@ -896,9 +896,9 @@
   },
   {
    "name": "SM_Kit_Roof_Board_300",
-   "triangles": 2276,
+   "triangles": 2172,
    "size_cm": [
-    463,
+    452,
     547,
     192
    ]
@@ -932,7 +932,7 @@
   },
   {
    "name": "SM_Kit_Oven",
-   "triangles": 630,
+   "triangles": 612,
    "size_cm": [
     203,
     200,
@@ -941,7 +941,7 @@
   },
   {
    "name": "SM_Kit_Gate",
-   "triangles": 3050,
+   "triangles": 3090,
    "size_cm": [
     401,
     177,
@@ -952,14 +952,14 @@
    "name": "SM_Kit_Pithos_Group",
    "triangles": 756,
    "size_cm": [
-    245,
-    86,
-    126
+    242,
+    111,
+    121
    ]
   },
   {
    "name": "SM_Kit_Woodpile",
-   "triangles": 2972,
+   "triangles": 2912,
    "size_cm": [
     220,
     80,
@@ -968,7 +968,7 @@
   },
   {
    "name": "SM_Kit_Roof_Chimney",
-   "triangles": 7416,
+   "triangles": 7212,
    "size_cm": [
     421,
     437,

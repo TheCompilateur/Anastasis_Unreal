@@ -354,10 +354,22 @@ namespace AnastasisVillage
 		const double NextX = Npc.X + PlayerDrive.X * Step;
 		const double NextY = Npc.Y + PlayerDrive.Y * Step;
 		const bool bStuck = IsFootBlocked(Npc.X, Npc.Y);
+		const double BeforeX = Npc.X;
+		const double BeforeY = Npc.Y;
 		if (bStuck || !IsFootBlocked(NextX, Npc.Y)) Npc.X = Clamp(NextX, 1.0, Nav.W - 2);
 		if (bStuck || !IsFootBlocked(Npc.X, NextY)) Npc.Y = Clamp(NextY, 1.0, Nav.H - 2);
 		Npc.bHasTarget = false;
 		ClearNavigation(Npc);
 		Npc.StuckTimer = 0.0;
+		// `drivePlayerActor` : le joueur foule aussi, mais seulement s'il a bouge.
+		if (JsHypot(Npc.X - BeforeX, Npc.Y - BeforeY) > 1e-5)
+		{
+			Npc.TrafficTimer += FMath::Max(0.0, Dt);
+			if (Npc.TrafficTimer >= AnastasisTraffic::PassageInterval)
+			{
+				Npc.TrafficTimer = 0.0;
+				RecordPassage(Npc);
+			}
+		}
 	}
 }

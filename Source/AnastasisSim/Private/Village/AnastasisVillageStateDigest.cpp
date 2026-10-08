@@ -497,6 +497,8 @@ namespace AnastasisVillage
 			Out.Key(TEXT("destBuildingId")).String(V.DestBuildingId);
 			Out.Key(TEXT("stuckTimer")).Number(V.StuckTimer);
 			Out.Key(TEXT("stuckStage")).Number(V.StuckStage);
+			// `actor.trafficTimer` : decide quand tombe le prochain passage (relay-settlement-001).
+			Out.Key(TEXT("trafficTimer")).Number(V.TrafficTimer);
 
 			Out.Key(TEXT("inventoryFood")).Number(V.InventoryFood);
 			Out.Key(TEXT("materialCarry")).Number(V.MaterialCarry);
@@ -754,6 +756,41 @@ namespace AnastasisVillage
 		Out.Key(TEXT("terrainTravelCostEnabled")).Bool(bTerrainTravelCostEnabled);
 		Out.Key(TEXT("materialCourierId")).String(MaterialCourierId);
 		Out.Key(TEXT("navVersion")).Number(NavVersion);
+		// `sim.traffic` et les sentiers qu'il fixe (ecart n°42) : la decroissance de minuit et l'effort de
+		// defrichage en dependent, l'A* lit le cout des sentiers.
+		Out.Key(TEXT("traffic")).BeginArray(Traffic.Num());
+		for (const float T : Traffic) Out.Number(static_cast<double>(T));
+		Out.EndArray();
+		Out.Key(TEXT("roadEvolutionEnabled")).Bool(bRoadEvolutionEnabled);
+		{
+			TArray<int32> RoadKeys;
+			Roads.GetKeys(RoadKeys);
+			RoadKeys.Sort();
+			Out.Key(TEXT("roads")).BeginArray(RoadKeys.Num());
+			for (const int32 Index : RoadKeys)
+			{
+				const AnastasisTraffic::FRoadTile& Road = Roads[Index];
+				Out.BeginArray(4);
+				Out.Number(Index);
+				Out.Number(static_cast<int32>(Road.Class));
+				Out.Number(Road.BuiltDay);
+				Out.Number(Road.TrafficAtBirth);
+				Out.EndArray();
+			}
+			Out.EndArray();
+			TArray<int32> EffortKeys;
+			RoadEfforts.GetKeys(EffortKeys);
+			EffortKeys.Sort();
+			Out.Key(TEXT("roadEfforts")).BeginArray(EffortKeys.Num());
+			for (const int32 Index : EffortKeys)
+			{
+				Out.BeginArray(2);
+				Out.Number(Index);
+				Out.Number(RoadEfforts[Index]);
+				Out.EndArray();
+			}
+			Out.EndArray();
+		}
 		Out.Key(TEXT("settlement"));
 		HashState(Out, Settlement);
 		Out.Key(TEXT("marketDx"));

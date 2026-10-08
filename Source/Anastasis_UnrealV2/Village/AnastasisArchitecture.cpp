@@ -113,13 +113,10 @@ namespace AnastasisArchitecture
 		{
 			return false;
 		}
-		// Phase de la reference : 1-2 noyau, 3-4 extension, 5-6 maison amelioree. La graine (stable : un hash
-		// du texte, pas de l'adresse) ajoute au plus un rang, pour qu'un village a la phase 1 ne soit pas un
-		// lotissement de huttes identiques. Ce n'est pas un tirage de la simulation : rien n'en depend.
-		const int32 PhaseTier = FMath::Clamp(HousePhase, 1, 6) <= 2 ? 0 : (HousePhase <= 4 ? 1 : 2);
-		const uint32 Seed = GetTypeHash(BuildingId);
-		const int32 Lift = static_cast<int32>(Seed % 7u) < 3 ? 0 : (static_cast<int32>(Seed % 7u) < 6 ? 1 : 2);
-		const int32 Tier = FMath::Clamp(PhaseTier + Lift, 0, 2);
+		// Phase de la reference seule : 1-2 noyau, 3-4 extension, 5-6 maison amelioree. La forme d'une maison
+		// prise par un foyer vient de sa biographie (AnastasisSettlement::ProgramFor) ; ceci n'est que le repli
+		// d'une maison sans histoire. Aucune graine : settlement-morphogenesis-001 a retire le tirage par identifiant.
+		const int32 Tier = FMath::Clamp(HousePhase, 1, 6) <= 2 ? 0 : (HousePhase <= 4 ? 1 : 2);
 		OutVariant = Tier == 0 ? EVariant::HousePoor : (Tier == 1 ? EVariant::HouseMedium : EVariant::HouseFarm);
 		return true;
 	}

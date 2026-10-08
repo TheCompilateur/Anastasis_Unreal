@@ -435,12 +435,16 @@ namespace AnastasisVillage
 		if (!World || !Nav.IsInBounds(TX, TY)) return;
 		const int32 Index = TY * World->W + TX;
 		if (World->Tiles[Index].Type == AnastasisWorld::ETileType::Water) return;
+		// `this.buildingAt(tile.x, tile.y)` : `buildingIndex[floor(y) * w + floor(x)]`, la case d'ancrage.
 		for (const FBuilding& B : Buildings.GetItems())
 		{
-			if (B.X == TX && B.Y == TY) return;
+			if (NavFloor(B.X) == TX && NavFloor(B.Y) == TY) return;
 		}
 		if (Traffic.Num() != World->W * World->H) Traffic.SetNumZeroed(World->W * World->H);
-		Traffic[Index] = FMath::Min(180, Traffic[Index] + 1);
+		// `sim.traffic` est un Float32Array : `min(180, previous + 1)` stocke en f32 (settlement-morphogenesis-001,
+		// le compteur decroit chaque nuit par `decayFootTraffic`).
+		Traffic[Index] = AnastasisTraffic::AddPassage(Traffic[Index]);
+		++PassageCount;
 	}
 
 	void FVillage::MoveActor(FNpc& Npc, const FPoint& Target, double Dt)

@@ -7,6 +7,7 @@
 #include "Core/AnastasisStateDigest.h"
 #include "World/AnastasisWorld.h"
 #include "World/AnastasisWeather.h"
+#include "World/AnastasisTraffic.h"
 #include "Work/AnastasisFields.h"
 
 namespace AnastasisVillage
@@ -169,6 +170,10 @@ namespace AnastasisVillage
 		AnastasisNav::RebuildMoveCosts(Nav, InWorld);
 		bTerrainTravelCostEnabled = false;
 		MaterialCourierId.Reset();
+		Roads.Reset();
+		RoadEfforts.Reset();
+		bRoadEvolutionEnabled = false;
+		PassageCount = 0;
 		NavVersion = 0;
 		NavSourceShared.Reset();
 		NavService = AnastasisNavService::FNavService();
@@ -6110,5 +6115,72 @@ namespace AnastasisVillage
 		Score += G::TraitGoalBias(Trait, B::GoalBuild);
 		Score += G::SkillGoalBias(Npc.SkillCraft);
 		return Score;
+	}
+}
+
+namespace AnastasisVillage
+{
+	int32 FVillage::DecayTrafficDaily()
+	{
+		return AnastasisTraffic::DecayFootTraffic(Traffic);
+	}
+
+	double FVillage::TrafficAt(int32 TileX, int32 TileY) const
+	{
+		const int32 Index = TileIndexOf(World, TileX, TileY);
+		return Index != INDEX_NONE && Traffic.IsValidIndex(Index) ? static_cast<double>(Traffic[Index]) : 0.0;
+	}
+
+	int32 FVillage::UpdateRoadEvolutionDaily(int32 Day)
+	{
+		// ecart n°42 : branche `evolveDesirePathTileDaily` seule, sans paiement, sans classes formelles.
+		if (!bRoadEvolutionEnabled || !World) return 0;
+		using AnastasisWorld::ETileType;
+		int32 PathsBuilt = 0;
+		// `this.buildingAt(tile.x, tile.y)` : la case d'ancrage d'un batiment (`buildingIndex`), lue comme
+		// `RecordPassage` la lit, sur la liste vivante des batiments.
+		TSet<int32> BuildingCells;
+		for (const FBuilding& B : Buildings.GetItems())
+		{
+			const int32 BIndex = TileIndexOf(World, FloorInt(B.X), FloorInt(B.Y));
+			if (BIndex != INDEX_NONE) BuildingCells.Add(BIndex);
+		}
+		const int32 Count = FMath::Min(Traffic.Num(), World->Tiles.Num());
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const AnastasisWorld::FTile Tile = LiveTile(Index);
+			const bool bBuilding = BuildingCells.Contains(Index);
+			if (bBuilding || Tile.Type == ETileType::Road) continue;
+			if (!AnastasisTraffic::IsRoadReclaimable(Tile, bBuilding))
+			{
+				RoadEfforts.Remove(Index);
+				continue;
+			}
+			const double CellTraffic = Traffic[Index];
+			double Effort = RoadEfforts.Contains(Index) ? RoadEfforts[Index] : -1.0;
+			const bool bFix = AnastasisTraffic::AdvanceDesireEffort(CellTraffic, AnastasisTraffic::RoadClearEffortDays(Tile), Effort);
+			if (Effort < 0.0) RoadEfforts.Remove(Index); else RoadEfforts.Add(Index, Effort);
+			if (!bFix) continue;
+			// `setPlannedRoad(x, y, max(traffic, path.traffic), { roadClass: roadClassForTraffic(min(traffic, lane.traffic)) })`.
+			using namespace AnastasisTraffic;
+			const ERoadClass Class = RoadClassForTraffic(FMath::Min(CellTraffic, ProfileOf(ERoadClass::Lane).Traffic));
+			AnastasisWorld::FTile& Live = LiveTiles.FindOrAdd(Index, World->Tiles[Index]);
+			Live.Resource = AnastasisWorld::EResource::None;
+			Live.Amount = 0;
+			Live.Type = ETileType::Road;
+			FRoadTile& Road = Roads.FindOrAdd(Index);
+			Road.Class = StrongerRoadClass(Road.Class, Class);
+			Road.BuiltDay = Day;
+			Road.TrafficAtBirth = CellTraffic;
+			Traffic[Index] = AnastasisJs::StoreF32(FMath::Max<double>(Traffic[Index], FMath::Max(CellTraffic, ProfileOf(ERoadClass::Path).Traffic)));
+			// Cout local : une route neuve biaise l'A* sans tout reconstruire (`roadProfileAt(x, y).pathCost`).
+			const double PathCost = ProfileOf(Road.Class).PathCost;
+			Nav.MoveCost[Index] = AnastasisJs::StoreF32(AnastasisNav::TerrainMoveCostOf(&Live, &PathCost));
+			// `bumpNavVersion(this, "road")` : seulement si des habitants marchent.
+			if (Actors.Num() > 0) ++NavVersion;
+			RoadEfforts.Remove(Index);
+			++PathsBuilt;
+		}
+		return PathsBuilt;
 	}
 }

@@ -139,12 +139,11 @@ bool FAnastasisVillagePresentation::TraceGround(UWorld* PresentationWorld, const
 }
 
 int32 FAnastasisVillagePresentation::SettleArchitecture(AAnastasisVillageBuilding& Actor,
-    const AnastasisVillage::FVillage& Village, const FString& BuildingId, UWorld* PresentationWorld)
+    const AnastasisVillage::FVillage& Village, const FString& BuildingId, UWorld* PresentationWorld,
+    AnastasisArchitecture::EVariant Variant)
 {
     const AnastasisVillage::FBuilding* Building = Village.FindBuilding(BuildingId);
-    AnastasisArchitecture::EVariant Variant;
     if (!Building || CVarArchitecture.GetValueOnGameThread() == 0
-        || !AnastasisArchitecture::ChooseVariant(Building->Type, Building->HousePhase, Building->Id, Variant)
         || !Actor.ApplyArchitecture(Variant))
     {
         return -1;
@@ -242,6 +241,20 @@ int32 FAnastasisVillagePresentation::Sync(
 	const int32 Day)
 {
 	int32 Changes = 0;
+	// SETTLEMENT_MORPHOGENESIS_001 : la biographie d'abord, la forme ensuite (elle en depend).
+	Ledger.Observe(Village, Day);
+	const auto ProgramOf = [&](const AnastasisVillage::FBuilding& Building)
+	{
+		const AnastasisSettlement::FBiography* Bio = Ledger.Find(Building.Id);
+		return Bio ? Bio->Program : AnastasisArchitecture::EVariant::HousePoor;
+	};
+	const auto Age = [&](AAnastasisVillageBuilding& Actor, const AnastasisVillage::FBuilding& Building)
+	{
+		// La patine monte avec les jours depuis l'achevement : a moitie en ~45 jours, presque pleine a 120.
+		const AnastasisSettlement::FBiography* Bio = Ledger.Find(Building.Id);
+		const double Days = Bio ? Bio->AgeDays(Day) : 0.0;
+		Actor.SetWeathering(0.12 + 0.88 * (1.0 - FMath::Exp(-Days / 60.0)));
+	};
 
 	// ICEBERG_001 : ce que la simulation sait d'une maison, traduit en foyer. Rien n'est ecrit en retour.
 	const auto ApplyMetabolism = [&](AAnastasisVillageBuilding& Actor, const AnastasisVillage::FBuilding& Building)
@@ -305,11 +318,24 @@ int32 FAnastasisVillagePresentation::Sync(
 		{
 			if (AAnastasisVillageBuilding* Actor = Existing->Get())
 			{
+				// Un foyer vient de prendre la maison : elle prend la forme de son fondateur.
+				const AnastasisArchitecture::EVariant Program = ProgramOf(Building);
+				if (Actor->HasArchitecture() && Actor->GetVariant() != Program)
+				{
+					const AnastasisArchitecture::EVariant Was = Actor->GetVariant();
+					SettleArchitecture(*Actor, Village, Building.Id, Rooms.GetWorld(), Program);
+					const AnastasisSettlement::FBiography* Bio = Ledger.Find(Building.Id);
+					UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_SETTLEMENT reform id=%s %s -> %s day=%d cause=\"%s\""),
+						*Building.Id, AnastasisArchitecture::Get(Was).Id, AnastasisArchitecture::Get(Program).Id, Day,
+						Bio ? *Bio->ProgramCause : TEXT("-"));
+					++Changes;
+				}
 				Actor->SetConstructionProgress(Building.Progress);
 				Actor->SetSiteStock(Building.Materials.StockWood, Building.Materials.NeedWood,
 					Building.Materials.StockStone, Building.Materials.NeedStone,
 					Building.bHasMaterials && !Building.IsCompleted());
 				ApplyMetabolism(*Actor, Building);
+				Age(*Actor, Building);
 			}
 			continue;
 		}
@@ -343,12 +369,13 @@ int32 FAnastasisVillagePresentation::Sync(
 #if WITH_EDITOR
 		Actor->SetActorLabel(FString::Printf(TEXT("SimBuilding_%s_%s"), *Building.Type, *Building.Id));
 #endif
-		SettleArchitecture(*Actor, Village, Building.Id, Rooms.GetWorld());
+		SettleArchitecture(*Actor, Village, Building.Id, Rooms.GetWorld(), ProgramOf(Building));
 		Actor->SetConstructionProgress(Building.Progress);
 		Actor->SetSiteStock(Building.Materials.StockWood, Building.Materials.NeedWood,
 			Building.Materials.StockStone, Building.Materials.NeedStone,
 			Building.bHasMaterials && !Building.IsCompleted());
 		ApplyMetabolism(*Actor, Building);
+		Age(*Actor, Building);
 		Actors.Add(Building.Id, Actor);
 		++Changes;
 		UE_LOG(
@@ -362,6 +389,21 @@ int32 FAnastasisVillagePresentation::Sync(
 			*Actor->GetName(),
 			*Location.ToCompactString());
 	}
+	// Les sentiers nes du passage, et le seuil de chaque parcelle qui les rejoint.
+	TArray<FAnastasisSettlementPaths::FDoorLink> Doors;
+	for (const TPair<FString, TWeakObjectPtr<AAnastasisVillageBuilding>>& Pair : Actors)
+	{
+		const AAnastasisVillageBuilding* Actor = Pair.Value.Get();
+		const AnastasisVillage::FBuilding* Building = Village.FindBuilding(Pair.Key);
+		if (!Actor || !Building || !Actor->HasArchitecture() || Building->AccessPoints.Num() == 0) continue;
+		const AnastasisArchitecture::FArchetype& A = AnastasisArchitecture::Get(Actor->GetVariant());
+		FAnastasisSettlementPaths::FDoorLink Link;
+		Link.Entry = Actor->GetActorTransform().TransformPosition(A.EntryLocal);
+		Link.AccessTileX = FMath::FloorToInt32(Building->AccessPoints[0].X);
+		Link.AccessTileY = FMath::FloorToInt32(Building->AccessPoints[0].Y);
+		Doors.Add(Link);
+	}
+	Changes += Paths.Sync(Village, World, Rooms.GetWorld(), Doors) > 0 ? 1 : 0;
 	return Changes;
 }
 
@@ -587,6 +629,8 @@ void FAnastasisVillagePresentation::Clear(UAnastasisVillageInteractionSubsystem*
 		}
 	}
 	Actors.Reset();
+	Ledger.Reset();
+	Paths.Clear();
 }
 
 AAnastasisVillageBuilding* FAnastasisVillagePresentation::FindActor(const FString& SimId) const
@@ -831,5 +875,47 @@ void FAnastasisVillagePresentation::LogStatus(const AnastasisVillage::FVillage& 
 			D.Winner.IsEmpty() ? TEXT("-") : *D.Winner,
 			D.TargetSource.IsEmpty() ? TEXT("-") : *D.TargetSource,
 			D.BuildingId.IsEmpty() ? TEXT("-") : *D.BuildingId);
+	}
+}
+
+void FAnastasisVillagePresentation::DrawSettlementDebug(UWorld* World, const AnastasisVillage::FVillage& Village,
+	const AnastasisWorld::FWorld& SimWorld, const int32 Day) const
+{
+	if (!World || SimWorld.W <= 0)
+	{
+		return;
+	}
+	// Passage par case (sim.traffic) : un point dont la taille et la couleur suivent le compteur ;
+	// sentiers nes (Road) : un carre brun et le jour de leur naissance.
+	const TArray<float>& Traffic = Village.GetTraffic();
+	for (int32 Index = 0; Index < Traffic.Num(); ++Index)
+	{
+		const double T = Traffic[Index];
+		if (T < 1.0) continue;
+		const int32 X = Index % SimWorld.W;
+		const int32 Y = Index / SimWorld.W;
+		const FVector P = SimToUnreal(SimWorld, X + 0.5, Y + 0.5, World) + FVector(0, 0, 60);
+		const float A = static_cast<float>(FMath::Clamp(T / 60.0, 0.0, 1.0));
+		DrawDebugPoint(World, P, 6.f + 22.f * A, FLinearColor::LerpUsingHSV(FLinearColor(0.2f, 0.6f, 1.f), FLinearColor(1.f, 0.25f, 0.1f), A).ToFColor(true), false, 0.f);
+	}
+	for (const TPair<int32, AnastasisTraffic::FRoadTile>& Road : Village.GetRoads())
+	{
+		const int32 X = Road.Key % SimWorld.W;
+		const int32 Y = Road.Key / SimWorld.W;
+		const FVector P = SimToUnreal(SimWorld, X + 0.5, Y + 0.5, World);
+		DrawDebugBox(World, P + FVector(0, 0, 30), FVector(160, 160, 25), FColor(150, 100, 50), false, 0.f, 0, 6.f);
+		DrawDebugString(World, P + FVector(0, 0, 120), FString::Printf(TEXT("sentier j%d (passage %.0f)"), Road.Value.BuiltDay, Road.Value.TrafficAtBirth),
+			nullptr, FColor(220, 170, 110), 0.f);
+	}
+	// La biographie au-dessus de chaque batiment : pourquoi cette forme, depuis quand, pour qui.
+	for (const TPair<FString, AnastasisSettlement::FBiography>& Pair : Ledger.GetAll())
+	{
+		const AnastasisSettlement::FBiography& B = Pair.Value;
+		const FVector P = SimToUnreal(SimWorld, B.CellX + 0.5, B.CellY + 0.5, World);
+		DrawDebugString(World, P + FVector(0, 0, 1150),
+			FString::Printf(TEXT("%s %s | fonde j%d par %s (%s) | age %d j | %d/%d dorment | %d nuits pleines | %s"),
+				*B.Id, AnastasisArchitecture::Get(B.Program).Id, B.FoundedDay, B.Founder.IsEmpty() ? TEXT("-") : *B.Founder,
+				B.FounderJob.IsEmpty() ? TEXT("-") : *B.FounderJob, B.AgeDays(Day), B.Occupants, B.PeakOccupants, B.CrowdedDays, *B.ProgramCause),
+			nullptr, FColor(240, 220, 160), 0.f);
 	}
 }

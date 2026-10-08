@@ -20,7 +20,7 @@ import os
 import random
 
 PKG = '/Game/Anastasis/VillageArchitecture'
-VERSION = 'architecture-crusade-001-v1'
+VERSION = 'settlement-morphogenesis-001-v1'
 MATERIAL = 'M_AnastasisArchitecture'
 
 # --- Convention d'echelle (ARCHITECTURE_SCALE_001) ------------------------------------------
@@ -1863,8 +1863,10 @@ float side = 1.0 - abs(N.z);
 float damp = saturate(1.0 - (hz - 10.0) / (45.0 + 30.0 * n2)) * side * (1.0 - isTile) * (1.0 - isIron);
 float splash = saturate(1.0 - hz / 28.0) * side;
 float t = saturate(Neglect);
+// Weathering (0..1) : l'age depuis l'achevement (biographie, settlement-morphogenesis-001), pas l'abandon.
+float age = saturate(Weathering);
 // enduit tombe : bas des murs (pluie, gel) + plaques, plus avec l'abandon
-float loss = smoothstep(.62 - .25 * t - .25 * saturate(1.0 - hz / 120.0), .74 - .2 * t, n2 * .7 + n7 * .3);
+float loss = smoothstep(.66 - .25 * t - .14 * age - .25 * saturate(1.0 - hz / 120.0), .78 - .2 * t - .1 * age, n2 * .7 + n7 * .3);
 float tone = 1.0;
 tone += isWood * (woodTone - 1.0) + isPlank * (woodTone * .95 - 1.0);
 tone += isRubble * (rubble - 1.0) + isAshlar * (ashlar - 1.0);
@@ -1876,15 +1878,17 @@ float3 stoneUnder = float3(.27, .25, .22) * rubble;
 col = lerp(col, stoneUnder, isPlaster * loss);
 // bois grise au soleil (plus sur ce qui regarde le ciel), surtout s'il est neglige
 float lum = dot(col, float3(.3, .59, .11));
-col = lerp(col, float3(lum, lum, lum) * float3(.95, .97, 1.0) * 1.1, (isWood + isPlank) * saturate(.25 + .45 * up + .4 * t));
+col = lerp(col, float3(lum, lum, lum) * float3(.95, .97, 1.0) * 1.1, (isWood + isPlank) * saturate(.12 + .3 * age + .45 * up + .4 * t));
 // humidite au pied des murs : plus sombre, lisere de sels
 col *= 1.0 - .38 * damp;
 col = lerp(col, float3(.42, .40, .36), smoothstep(.02, 0.0, abs(damp - .15)) * .25 * side * (isPlaster + isRubble));
 col = lerp(col, float3(.16, .12, .08), splash * .45 * (1.0 - isTile));
 // mousse et lichen : faces qui regardent le ciel, creux humides, tuiles nord ; davantage a l'abandon
-float mossMask = saturate((up - .45) * 2.0) * smoothstep(.55 - .3 * t, .8, fbm) * (1.0 - isIron) * (1.0 - isEarth) * (1.0 - isFiber);
-mossMask += isTile * smoothstep(.62 - .25 * t, .8, n7 * .6 + n2 * .4) * .7;
-col = lerp(col, float3(.07, .10, .04) * (.7 + .6 * n23), saturate(mossMask) * (.55 + .45 * t));
+float mossMask = saturate((up - .45) * 2.0) * smoothstep(.62 - .3 * t - .18 * age, .82, fbm) * (1.0 - isIron) * (1.0 - isEarth) * (1.0 - isFiber);
+mossMask += isTile * smoothstep(.7 - .25 * t - .2 * age, .86, n7 * .6 + n2 * .4) * .7;
+col = lerp(col, float3(.07, .10, .04) * (.7 + .6 * n23), saturate(mossMask) * (.45 + .25 * age + .3 * t));
+// patine : salissure qui coule sous les debords et s'accumule avec les annees
+col *= 1.0 - .1 * age * (1.0 - up) * (.6 + .4 * n2);
 // abandon : ternit
 float l2 = dot(col, float3(.3, .59, .11));
 col = lerp(col, float3(l2, l2, l2) * .85, t * .45);
@@ -1973,8 +1977,11 @@ def build_material(u):
     neg = mel.create_material_expression(mat, u.MaterialExpressionScalarParameter, -900, 560)
     neg.set_editor_property('parameter_name', 'Neglect')
     neg.set_editor_property('default_value', 0.0)
+    wea = mel.create_material_expression(mat, u.MaterialExpressionScalarParameter, -900, 640)
+    wea.set_editor_property('parameter_name', 'Weathering')
+    wea.set_editor_property('default_value', 0.35)
     col = _custom(u, mel, mat, MATERIAL_CODE, u.CustomMaterialOutputType.CMOT_FLOAT3,
-                  ['C', 'A', 'UV', 'WP', 'OP', 'N', 'Neglect'], -400, 0)
+                  ['C', 'A', 'UV', 'WP', 'OP', 'N', 'Neglect', 'Weathering'], -400, 0)
     rough = _custom(u, mel, mat, ROUGH_CODE, u.CustomMaterialOutputType.CMOT_FLOAT1, ['A', 'WP', 'OP', 'N'], -400, 300)
     nmap = _custom(u, mel, mat, NORMAL_CODE.replace('float hgt(float2 q) {\n  return 0.0;\n}\n', ''),
                    u.CustomMaterialOutputType.CMOT_FLOAT3, ['A', 'UV'], -400, 500)
@@ -1990,6 +1997,7 @@ def build_material(u):
         assert mel.connect_material_expressions(op, '', node, 'OP')
         assert mel.connect_material_expressions(nrm, '', node, 'N')
     assert mel.connect_material_expressions(neg, '', col, 'Neglect')
+    assert mel.connect_material_expressions(wea, '', col, 'Weathering')
     assert mel.connect_material_property(col, '', u.MaterialProperty.MP_BASE_COLOR)
     assert mel.connect_material_property(rough, '', u.MaterialProperty.MP_ROUGHNESS)
     assert mel.connect_material_property(nmap, '', u.MaterialProperty.MP_NORMAL)

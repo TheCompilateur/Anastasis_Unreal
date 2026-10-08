@@ -85,10 +85,9 @@ namespace AnastasisArchitecture
 	TConstArrayView<FArchetype> All();
 
 	/**
-	 * Typologie d'un batiment de la simulation. Maison : par sa phase (1..6, agrandissements de la reference)
-	 * et une graine stable de son identifiant, pour qu'un village ne soit pas fait de clones ; la phase
-	 * l'emporte des qu'elle bouge (aujourd'hui toujours 1 dans le port). Grenier, puits : un archetype.
-	 * Faux pour un type inconnu.
+	 * Repli d'un batiment SANS biographie : la phase de la reference seule (1-2 pauvre, 3-4 moyenne, 5-6 ferme)
+	 * pour une maison, un archetype pour le grenier et le puits. Aucune graine. La forme d'une maison prise par
+	 * un foyer vient de AnastasisSettlement::ProgramFor (metier du fondateur, taille du foyer). Faux pour un type inconnu.
 	 */
 	bool ChooseVariant(const FString& SimType, int32 HousePhase, const FString& BuildingId, EVariant& OutVariant);
 

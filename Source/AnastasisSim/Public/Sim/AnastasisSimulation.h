@@ -36,14 +36,19 @@ public:
 
 	/**
 	 * La file de minuit de la reference (`enqueueDayDeferred`), ses 17 travaux dans l'ordre.
-	 * Portes : `landRegen` (0), `lifeDaily` (10, mortalite reduite) et `memory` (14, oubli quotidien). Les autres occupent leur
+	 * Portes : `landRegen` (0), `roadEvolution` (8, sentiers de desir, ecart n°42), `lifeDaily` (10, mortalite reduite) et `memory` (14, oubli quotidien). Les autres occupent leur
 	 * place et leur part du budget sans rien faire : NOT_IMPLEMENTED.
 	 */
 	static constexpr int32 DayDeferredJobCount = 17;
 	static constexpr int32 DayJobLandRegen = 0;
 	/** `lifeDaily` (updateLifeDaily) : porte reduit a la mort certaine (ecart n°28). */
 	static constexpr int32 DayJobLifeDaily = 10;
+	/** `roadEvolution` (updateRoadEvolutionDaily) : sentiers de desir seuls, si l'hote les active (ecart n°42). */
+	static constexpr int32 DayJobRoadEvolution = 8;
 	static constexpr int32 DayJobMemory = 14;
+
+	/** Sentiers poses par le dernier travail `roadEvolution` (ecart n°42). */
+	int32 GetLastRoadsBuilt() const { return LastRoadsBuilt; }
 
 	FAnastasisSimulation();
 
@@ -125,6 +130,8 @@ private:
 	void ProcessDayDeferred(int32 MaxJobs);
 	/** Tete de la file de minuit : `regrowFieldsDaily` (regrowForestDaily est sans effet dans la reference). */
 	void RunLandRegen();
+	/** Sentiers poses par le dernier travail `roadEvolution` (observation, hors digest). */
+	int32 LastRoadsBuilt = 0;
 	void RunDayJob(int32 Job);
 
 	bool bBootDeferred = true;

@@ -160,28 +160,21 @@ bool FAnastasisArchitectureVariantTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("puits"), ChooseVariant(TEXT("well"), 1, TEXT("building-1"), V) && V == EVariant::Well);
 	TestTrue(TEXT("grenier"), ChooseVariant(TEXT("granary"), 1, TEXT("building-2"), V) && V == EVariant::Storehouse);
 	TestFalse(TEXT("type inconnu"), ChooseVariant(TEXT("tavern"), 1, TEXT("building-3"), V));
-	int32 Counts[3] = {0, 0, 0};
-	int32 Rich = 0;
-	for (int32 I = 0; I < 90; ++I)
+	// settlement-morphogenesis-001 : plus de graine. Deux maisons de meme phase ont la meme forme de repli,
+	// quel que soit leur identifiant ; seule la phase de la reference fait grandir.
+	for (int32 I = 0; I < 30; ++I)
 	{
 		const FString Id = FString::Printf(TEXT("building-%d"), I);
 		EVariant A;
-		EVariant B;
 		TestTrue(TEXT("maison"), ChooseVariant(TEXT("house"), 1, Id, A));
-		ChooseVariant(TEXT("house"), 1, Id, B);
-		TestEqual(TEXT("stable d'un appel a l'autre"), static_cast<int32>(A), static_cast<int32>(B));
-		++Counts[static_cast<int32>(A) - static_cast<int32>(EVariant::HousePoor)];
-		EVariant Late;
-		ChooseVariant(TEXT("house"), 6, Id, Late);
-		TestTrue(TEXT("phase 6 : jamais la hutte"), Late != EVariant::HousePoor);
-		Rich += Late == EVariant::HouseFarm;
+		TestEqual(TEXT("phase 1 : la meme forme pour tous (pas de tirage)"), static_cast<int32>(A), static_cast<int32>(EVariant::HousePoor));
 	}
-	for (int32 K = 0; K < 3; ++K)
-	{
-		TestTrue(FString::Printf(TEXT("typologie %d presente au village (%d / 90)"), K, Counts[K]), Counts[K] > 0);
-		TestTrue(FString::Printf(TEXT("aucune typologie ne fait le lotissement (%d / 90)"), Counts[K]), Counts[K] <= 54);
-	}
-	TestTrue(TEXT("la phase fait grandir les maisons"), Rich > Counts[2]);
+	EVariant P3;
+	EVariant P6;
+	ChooseVariant(TEXT("house"), 3, TEXT("building-1"), P3);
+	ChooseVariant(TEXT("house"), 6, TEXT("building-1"), P6);
+	TestEqual(TEXT("phase 3 : deux niveaux"), static_cast<int32>(P3), static_cast<int32>(EVariant::HouseMedium));
+	TestEqual(TEXT("phase 6 : ferme"), static_cast<int32>(P6), static_cast<int32>(EVariant::HouseFarm));
 	return true;
 }
 
