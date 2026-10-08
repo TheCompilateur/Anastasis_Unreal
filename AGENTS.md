@@ -366,7 +366,7 @@ Opérateur et portails :
 | `tools-index.ps1` | contrôle cet index contre le dossier, à dot-sourcer : `finish` bloque, `health` passe YELLOW |
 | `editor-launch.ps1` | `Start-AnastasisEditor` : lancement d'Unreal sans focus, avec gardien, derrière la porte mémoire, à dot-sourcer |
 | `editor-window-guard.ps1` | gardien lancé par `Start-AnastasisEditor` : fenêtres hors écran, focus rendu |
-| `report-tests.ps1` | suite `Anastasis`, classée PASS / KNOWN_EXPECTED_FAILURE / FAIL, refuse un run tronqué |
+| `report-tests.ps1` | suite `Anastasis`, classée PASS / KNOWN_EXPECTED_FAILURE / FAIL, refuse un run tronqué ; **sans rendu** par défaut (`-nullrhi`, `/Engine/Maps/Entry`, HEADLESS_TESTS_001) : run incomplet → suite rejouée avec rendu, test en échec → rejoué seul avec rendu, PASS seulement s'il est inscrit à `rhi-tests.txt` (sinon `HEADLESS_ECART::`, reste FAIL) ; `-Mode gpu` ou `ANASTASIS_TESTS_MODE=gpu` = l'ancien run ; durée et pic mémoire par run (`TEST_MODE::`) |
 | `editor-batch.ps1` + `editor-batch.py` | plusieurs preuves PIE du registre dans **un seul** éditeur (EDITOR_QUEUE_001) : `-Proofs a,b` ; les preuves PIE et la première capture `*-capture` partagent un éditeur, chaque capture de plus a le sien (EDITOR_BATCH_SPLIT_001 : la 2e capture d'un même éditeur plante dans PythonScriptPlugin) ; le `quit_editor()` de chaque script passe au suivant, PIE arrêté et rythme (`TimeScale`, `Speed`, `Warp`) reposé entre deux ; verdict `PROOF::PASS/FAIL` par preuve → `Saved/EditorBatch/<horodatage>/` ; appelé par `integrate-batch` |
 | `proofs.txt` | registre des preuves PIE rejouables en lot : nom, script, motif de réussite, motif d'échec, délai, variables ; une fiche les déclare par `PROOFS:` |
 | `weather-materials.ps1` + `weather-materials.py` | regenere uniquement les materiaux existants de vegetation, herbe, eau, bois et roche avec la collection meteo commune ; ecrit Content/ |
@@ -380,6 +380,7 @@ Opérateur et portails :
 | `scheduled-verify.ps1` | run nocturne (Planificateur de tâches) : `verify` puis `report-tests` |
 | `smoke-pie.py` | smoke PIE lancé par `verify` |
 | `known-expected-failures.txt` | registre KNOWN_EXPECTED_FAILURE — sur mandat seulement |
+| `rhi-tests.txt` | tests qui ont montré qu'ils lisent le rendu : seuls à compter PASS au repli avec rendu de `report-tests.ps1` ; une ligne par test, dans la mission qui le montre ; pas un registre d'échecs |
 | `known-log-patterns.txt` | baseline des Error/Warning connus du log éditeur — idem |
 
 Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
@@ -595,9 +596,16 @@ Une preuve qui accelere ne doit donc pas incarner de joueur, sauf si c'est ce qu
 ## Tests
 
 ```powershell
-UnrealEditor-Cmd.exe "<uproject>" -unattended -nopause -nosplash -NoLiveCoding `
+UnrealEditor-Cmd.exe "<uproject>" /Engine/Maps/Entry -nullrhi -nosound -unattended -nopause -nosplash -NoLiveCoding `
   -abslog="<log>" -ExecCmds="Automation RunTests Anastasis;Quit" -testexit="Automation Test Queue Empty"
 ```
+
+**La suite tourne sans rendu (HEADLESS_TESTS_001).** Aucun test ne lit une image ni le GPU : ceux de
+`Source/AnastasisSim/` n'ont même pas `Engine`, les autres créent leur propre monde ou chargent des assets.
+`report-tests.ps1` les lance donc en `-nullrhi` sur une carte vide, sans shaders ni monde incarné. Un test qui a
+besoin du rendu s'inscrit à `tools/unreal/rhi-tests.txt` ; mieux, il cesse d'en dépendre. Un nouveau test n'a
+pas besoin du rendu sauf s'il le mesure : ce qui se vérifie à l'image est une preuve PIE (`proofs.txt`), pas un
+test d'automation.
 
 **Divergences connues, marquées explicitement dans le framework de tests — ne pas les attribuer à un changement en cours, ne pas les « corriger » sans mandat :**
 

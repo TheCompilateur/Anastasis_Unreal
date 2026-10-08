@@ -1,0 +1,14 @@
+# Tests d'automation qui ont besoin du rendu (HEADLESS_TESTS_001).
+#
+# report-tests.ps1 lance la suite sans rendu (-nullrhi, /Engine/Maps/Entry). Un test qui
+# y echoue est rejoue avec rendu ; s'il y passe, il ne compte PASS que s'il est inscrit ici.
+# Sinon il reste FAIL (HEADLESS_ECART::) : une repetition qui passe ne distingue pas un test
+# qui depend du rendu d'un test instable.
+#
+# S'inscrit ici un test dont on a montre qu'il lit le rendu (pixel, GPU, ressource RHI),
+# dans la mission qui le montre. Ce n'est pas un registre d'echecs : le test tourne toujours,
+# et doit passer avec rendu. Chaque entree coute un editeur avec rendu a chaque suite ; le
+# mieux reste de rendre le test independant du rendu, puis de retirer sa ligne
+# (report-tests.ps1 le signale : RHI_TEST::INUTILE).
+#
+# Format, celui de known-expected-failures.txt : <chemin complet du test> | rhi | <ce qu'il lit du rendu>
