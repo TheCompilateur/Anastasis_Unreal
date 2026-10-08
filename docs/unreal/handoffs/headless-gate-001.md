@@ -45,8 +45,15 @@ Voir `git log` de `agent/headless-gate-001`. Porte les deux commits de `headless
   laisse passer un sans rendu ; passe devant un agent de 1 min, pas devant une attente de 20 min ni un
   lot ; un complet ne passe devant personne ; `-nullrhi` reconnu, `-nullrhix` non ; charge reelle lisible),
   S31 (`-Queue -Prove` refuse ; `queued` rebase : `finish` rejoue le portail, `finish -Queue` reprend).
-- TESTS Unreal : aucun run nouveau. La suite sans rendu elle-meme est mesuree dans la fiche de
-  headless-tests-001 (369 / 369, 0 difference).
+- RUN REEL (2026-10-08, commit 2cb67e9) : `agent-worktree.ps1 finish -Mission headless-gate-001 -Full`,
+  le chemin complet sur le moteur, machine partagee (un autre agent attendait a la porte) :
+  - `BUILD::PASS` (228,7 s, premier build du worktree) ;
+  - `EDITOR_GATE::SANS_RENDU passe devant 1 attente(s) d'agent de moins de 15 min`, aucune ligne
+    `EDITOR_GATE::WAIT` (headless-tests-001 avait attendu 12,2 min au meme endroit) ;
+  - `TEST_MODE::HEADLESS duree=283s pic_ws=2,8 Go pic_prive=6,3 Go` ;
+  - PASS 365, KNOWN_EXPECTED_FAILURE 4, FAIL 0, TOTAL 369, ANNONCES PAR LE LANCEUR 369, `TESTS::PASS` ;
+  - `HANDOFF_READY::YES (proved)` ; 527 s de bout en bout.
+  Le commit de cette fiche suit : `finish` le marque ensuite `(nounreal)` (aucun fichier Unreal).
 - COMMANDS:
   - `tools\unreal\agent-worktree.ps1 finish -Mission <m>`          (build + suite sans rendu)
   - `tools\unreal\agent-worktree.ps1 finish -Mission <m> -Queue`   (build seul)
@@ -74,15 +81,16 @@ Sans objet : ne touche pas `Source/AnastasisSim`.
 - **Effet immediat sur tous les agents** : apres versement, chaque `finish` d'une mission Unreal prend
   ~5 min de plus et un demi-editeur. Les agents qui travaillent sur un `agent-worktree.ps1` d'avant
   (worktree non rebase) gardent l'ancien `finish` jusqu'a leur rebase : leurs missions restent `queued`.
-- Le premier `finish` reel apres versement est la vraie preuve du chemin `proved` (le banc n'a pas de
-  moteur : il voit le build tente, pas la suite jouee).
+- La porte a laisse passer ce run devant un agent qui attendait (moins de 15 min) : ce retard impose est
+  voulu et borne (5 min de suite), mais c'est un changement de politique a connaitre.
 - La porte lit les lignes de commande par WMI a chaque tour (15 s) : un peu plus lent que `Get-Process`,
   sans effet mesurable sur l'attente.
 
 ## STOP
 
-- Ne revendique aucun run de `finish` avec suite reelle : le banc prouve les branchements (suite demandee
-  par defaut, `-Queue`, reprise d'un `queued`), pas un `HANDOFF_READY::YES (proved)` obtenu sur moteur.
+- Un seul run reel (`-Full`, MEC) : il prouve la porte sans rendu et la suite dans `finish` ; le chemin
+  par defaut (sans `-Full`, branche qui touche `Source/`) n'est prouve que par le banc (S31) -- il appelle
+  le meme portail.
 - Les seuils sans rendu (0,5 ; 2,5 Go ; 5 Go ; 15 min) viennent d'une seule mesure ; a revoir avec les
   lignes `TEST_MODE::` des prochains runs.
 - Ne touche ni au lot (`integrate-batch` joue toujours la suite si ses arbres different de toute preuve
