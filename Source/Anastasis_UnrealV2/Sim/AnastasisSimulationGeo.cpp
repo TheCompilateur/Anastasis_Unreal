@@ -86,7 +86,7 @@ namespace
 
 bool UAnastasisSimulationSubsystem::ReadGeoScenarioFile(const FString& Path, AnastasisGeo::FScenario& Out)
 {
-	return ReadScenario(Path, Out);
+	return ReadScenario(ResolveScenarioPath(Path), Out);
 }
 
 void UAnastasisSimulationSubsystem::LogGeoEvents()
@@ -108,7 +108,10 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisGeoLoad(
 		{
 			return;
 		}
-		const FString Path = ResolveScenarioPath(Args.IsValidIndex(0) ? Args[0] : FString());
+		// Le chemin tel que donne (relatif a Content/ par defaut) : c'est lui que retient une sauvegarde,
+		// pour se recharger depuis n'importe quelle copie du jeu.
+		const FString Given = Args.IsValidIndex(0) ? Args[0] : CVarGeoScenarioPath.GetValueOnGameThread();
+		const FString Path = ResolveScenarioPath(Given);
 		AnastasisGeo::FScenario Scenario;
 		if (!ReadScenario(Path, Scenario))
 		{
@@ -124,7 +127,7 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisGeoLoad(
 			}
 			return;
 		}
-		Host->NoteGeoScenarioPath(Path);
+		Host->NoteGeoScenarioPath(Given);
 		Sim.AdmitGeoMigration();
 		Host->LogGeoEvents();
 		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_GEO loaded %s from %s at day %d"), *Scenario.Id, *Path, Sim.GetDay());

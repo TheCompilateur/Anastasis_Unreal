@@ -168,10 +168,10 @@ public:
 	/** JSON du dernier Save / Load (slot, octets, empreinte, presentation refaite). `{}` avant. */
 	const FString& GetSaveStatus() const { return SaveStatus; }
 
-	/** Le scenario exterieur charge par Anastasis.Geo.Load, pour qu'une sauvegarde sache le relire. */
+	/** Le scenario exterieur charge par Anastasis.Geo.Load (chemin tel que donne, relatif a Content/), pour qu'une sauvegarde sache le relire. */
 	void NoteGeoScenarioPath(const FString& Path) { GeoScenarioPath = Path; }
 
-	/** Lit et valide un scenario exterieur (AnastasisSimulationGeo.cpp) ; journalise chaque erreur. */
+	/** Lit et valide un scenario exterieur, chemin relatif a Content/ ou absolu (AnastasisSimulationGeo.cpp) ; journalise chaque erreur. */
 	static bool ReadGeoScenarioFile(const FString& Path, AnastasisGeo::FScenario& Out);
 
 private:
