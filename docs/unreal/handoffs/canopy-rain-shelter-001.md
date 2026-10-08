@@ -23,14 +23,14 @@ Relier l'interception partielle de l'averse aux couronnes réellement instancié
 
 ## COMMIT
 
-HEAD de `agent/canopy-rain-shelter-001` au `finish` ; commit fonctionnel `691cfbf746c0659ac8ca725ce4322259c63bdc6b` avant mise à jour de cette fiche. La branche reprend les ajouts récents de `main` par rebase sans fusion manuelle.
+HEAD de `agent/canopy-rain-shelter-001` au `finish` ; commit fonctionnel rebasé `107c7c47dd5ecca8aa2af85a936c5658df389008`. La branche reprend les ajouts récents de `main` par rebase sans fusion manuelle.
 
 ## MEC
 
 - Premier build du worktree avant modification : PASS, 213,40 s.
 - Premier build modifié : FAIL de compilation (inclusion de `AnastasisWorldEmbodiment.h` manquante), corrigé.
 - Deuxième build modifié : compilation UBT réussie, mais `anastasis-unreal.ps1` a justement refusé le verdict : source/config/HEAD ont bougé durant le rebase. Aucun PASS n'est revendiqué pour ce passage.
-- Troisième build sur `691cfbf` après rebase : `BUILD::PASS`, UBT « Target is up to date », 0 action ; la fenêtre source/config/HEAD est stable. Ce PASS porte sur le binaire compilé au passage précédent puis revérifié.
+- Troisième build sur `691cfbf` après le premier rebase : `BUILD::PASS`, UBT « Target is up to date », 0 action ; la fenêtre source/config/HEAD était stable. Ce PASS porte sur le binaire compilé au passage précédent puis revérifié. Un second rebase a ensuite repris de nouveaux fichiers Unreal ; le `finish` doit rebâtir le commit final.
 - `tools/unreal/report-tests.ps1 -Filter Anastasis.Sim.Parite.MeteoHabitants` : `TESTS::PASS`, 1 test annoncé/exécuté, 1 PASS, 0 échec connu, 0 FAIL. Ce test inclut le témoin sans couronne et l'atténuation partielle sous couronne.
 - `python -m py_compile tools/unreal/canopy-rain-pie.py` : PASS (syntaxe seulement).
 - `node tools/migration/check-ecarts.mjs -base main -handoff docs/unreal/handoffs/canopy-rain-shelter-001.md` : ECARTS::PASS, avertissements hérités des n° 2, 5, 9, 17, 33 et marques anciennes 6/14/15.
@@ -45,6 +45,8 @@ PROOFS: canopy-rain-pie
 Capture de référence du niveau vivant : `tools/unreal/capture-slice.ps1 -Out canopy_rain_baseline.png -Cam world -TimeoutSec 300` → `CAPTURE::PASS`, fichier local `Saved/SliceEvidence/canopy_rain_baseline.png` (1 101 844 octets), inspecté. Éditeur de **ce** worktree, niveau `Lvl_AnastasisSlice` chargé ; journal : carte source 96×96, cadrage de capture 32×32, 47 arbres retenus dans la tranche. Vue aérienne : un bosquet de couronnes et une zone ouverte discernables ; elle ne démontre pas l'effet de pluie ni la visibilité à hauteur humaine.
 
 Preuve PIE locale sur le binaire du worktree : `tools/unreal/editor-batch.ps1 -Proofs canopy-rain-pie` → `PROOF::PASS canopy-rain-pie (79.1s)`, `EDITOR_BATCH::PASS 1/1`. Journal `Saved/EditorBatch/20261007-143712/editor-batch.log` : `rendered_crowns=5489 bins=22271`, carte chargée, centre d'une couronne `(34.566,1.410)` rayon `0.071` tuile ; couverture lue par le village `on=1.000 off=0.000 on_again=1.000`, case ouverte `0.000`. C'est une preuve du couplage géométrique et du commutateur hôte, pas de la santé d'un PNJ individuel ni du rendu de pluie.
+
+Cette preuve précède le second rebase. `main` a depuis ajouté un sous-système audio et un test de fertilité, donc l'arbre Unreal final n'est plus identique. La preuve du lot est **requise** ; ne pas reprendre le PASS local comme verdict d'intégration.
 
 ## PLY
 
