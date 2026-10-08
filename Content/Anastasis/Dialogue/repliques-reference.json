@@ -1,0 +1,1871 @@
+{
+  "_doc": "Repliques francaises de la reference JS, recopiees par tools/migration/gen-talk-lines.mjs. Ne pas editer : relancer. Ton de la reference : sans accents.",
+  "source": "anastasis-ref-p3 (fee66ae)",
+  "pools": 280,
+  "lines": 1302,
+  "failures": [],
+  "data": {
+    "collectiveTalk.BLIND_STOCK_LINES": [
+      "On parle de penurie — et si le stock dormait ailleurs?",
+      "Le conseil compte mal: un depot loin du marche n'entre jamais dans les tetes.",
+      "Rumeur de marche contre reserve lointaine: qui a raison?",
+      "On veut encore une scierie… alors que le bois est peut-etre deja la.",
+      "Ce qu'on croit manquer dort parfois hors du regard."
+    ],
+    "collectiveTalk.BRIDGE_WORK_LINES": [
+      "On pose un pont sur le gue — fini de detourner.",
+      "Les piles percent l'eau: Valmire franchit le courant.",
+      "Pierre et bois sur l'eau — le pont avance, lentement.",
+      "Bientot on ne mouillera plus les bottes a cet endroit.",
+      "Le pont tient deja un peu — assez pour y croire."
+    ],
+    "collectiveTalk.CHARTER_GRUMBLE": [
+      "Encore une charte... et ma faim, elle?",
+      "Le conseil parle haut; les ventres, eux, murmurent.",
+      "On peut suivre la charte — si on mange encore.",
+      "Bel ordre — mais le pain, qui le promet?"
+    ],
+    "collectiveTalk.CHARTER_RALLY.clear": [
+      "Ouvrir la lisiere: la charte est claire.",
+      "On coupe pour batir, pas pour vider le mur — c'est dit.",
+      "Le conseil veut de la place nette. On y va.",
+      "Place nette d'abord: la charte pousse la hache juste."
+    ],
+    "collectiveTalk.CHARTER_RALLY.food": [
+      "Charte du pain: les champs passent avant les luxes.",
+      "On a entendu le conseil — nourrir d'abord.",
+      "La table d'abord, dit le fondateur. Ca va.",
+      "Le pain avant le reste — la charte est claire."
+    ],
+    "collectiveTalk.CHARTER_RALLY.forge": [
+      "La forge d'abord: la charte pousse le fer.",
+      "Sans outils, rien ne tient — le fondateur l'a dit.",
+      "On suit: ateliers et enclume avant le reste.",
+      "Le fer d'abord — la charte a raison, la-dessus."
+    ],
+    "collectiveTalk.CHARTER_RALLY.house": [
+      "Le fondateur a parle: des toits d'abord.",
+      "On suit la charte — on batit avant le reste.",
+      "Loger Valmire: la parole du conseil tient.",
+      "Des toits d'abord: on a entendu, on s'y met."
+    ],
+    "collectiveTalk.FOOD_LINES": [
+      "La table baisse. Les champs appellent avant le reste.",
+      "On parle deja de rations — la panique n'aide pas.",
+      "Le grenier sonne creux. Semer, pecher, puis le reste.",
+      "Trop de bouches pour trop peu de pain, ces jours-ci.",
+      "Sans pain, les serments ne nourrissent personne.",
+      "Le ventre decide plus fort que le conseil, aujourd'hui."
+    ],
+    "collectiveTalk.HOUSING_LINES": [
+      "On dort trop serre — il faut des toits, pas des tavernes.",
+      "Encore des foyers sans maison. Valmire doit batir.",
+      "Les jeunes grandissent plus vite que les charpentes.",
+      "Sans place nette et sans poutres, on reste dehors.",
+      "Le village compte les tetes et manque de portes.",
+      "Une famille de plus, et plus de mur libre.",
+      "On promet des toits depuis trop de soirs."
+    ],
+    "collectiveTalk.LABOR_LINES": [
+      "On a trop de bras au meme metier, et rien a cote.",
+      "Certains ateliers restent vides — le village le voit.",
+      "Il manque des mains la ou ca compte vraiment.",
+      "On se marche dessus au meme poste, et rien ailleurs.",
+      "Trop de monde au meme ouvrage — le reste attend."
+    ],
+    "collectiveTalk.PATROL_LINES": [
+      "Les gardes allongent la ronde — Valmire veille.",
+      "On entend des pas sur le chemin de ronde.",
+      "La tour, les murs, et des yeux ouverts: on respire un peu.",
+      "Mieux vaut une ronde de trop qu'une lisiere trop calme.",
+      "La ronde rassure autant qu'elle protege."
+    ],
+    "collectiveTalk.RESOLVED_LINES": [
+      "La crise se calme. Valmire reprend son souffle.",
+      "Les priorites retombent — on a tenu.",
+      "On a passe le pire. Les voix se detendent.",
+      "Le village respire: la pression baisse."
+    ],
+    "collectiveTalk.ROAD_WORK_LINES": [
+      "On ouvre un chemin — Valmire ne veut plus tourner en rond.",
+      "Les batisseurs tassent une route. Ca va changer les passages.",
+      "Bois et pierre pour le chemin: le village s'y met.",
+      "Enfin un vrai sentier, pas seulement des traces dans l'herbe.",
+      "Chaque pierre posee sur la route, c'est une heure gagnee demain."
+    ],
+    "collectiveTalk.SECURITY_LINES": [
+      "La nuit pese: on voudrait une tour qui veille.",
+      "Peu de gardes pour trop de lisiere.",
+      "On se sent exposes — la defense tarde.",
+      "Les ombres a la lisiere font parler bas.",
+      "Sans yeux ouverts, le camp dort mal."
+    ],
+    "collectiveTalk.TOOLS_LINES": [
+      "Les outils manquent: la forge devrait fumer.",
+      "Sans fer, on travaille deux fois plus pour la moitie.",
+      "On attend un forgeron comme on attend la pluie.",
+      "Les manches cassent; le metal ne suit pas.",
+      "Un outil propre ferait gagner une journee entiere.",
+      "La hache est emoussee — Valmire le sent partout."
+    ],
+    "collectiveTalk.TRANSPORT_LINES": [
+      "Les sentiers craquent sous les passages — une route aiderait.",
+      "On perd la journee a contourner la boue.",
+      "Trop de monde sur trop peu de chemin.",
+      "Les charges trainent: le pave n'est pas a la hauteur.",
+      "Un vrai chemin epargnerait des dos et des heures."
+    ],
+    "collectiveTalk.VACANT_HOUSE_LINES": [
+      "Des maisons vides, et des gens sans foyer — l'or manque, pas les toits.",
+      "On veut encore batir… alors que des portes restent sans cle.",
+      "Le stock de maisons attend un acheteur, pas une scierie de plus.",
+      "Libre et inhabitee: Valmire doit peupler avant d'agrandir.",
+      "Des foyers dehors, des portes closes — ca n'a pas de sens.",
+      "Peupler d'abord. Agrandir ensuite."
+    ],
+    "collectiveTalk.WATCH_LIGHT_LINES": [
+      "On a plante des lanternes — la nuit lit mieux les chemins.",
+      "Des braises le long de la route: Valmire ne dort pas toute entiere.",
+      "Poteaux de veille autour de la tour — moins d'ombre aux lisieres.",
+      "La ronde a ses feux: on voit ou marcher apres le couchant.",
+      "Une lumiere de plus, et la lisiere fait moins peur."
+    ],
+    "collectiveTalk.WINTER_FIELD_LINES": [
+      "Les champs dorment — on ne cueille presque plus.",
+      "L'hiver a endormi les parcelles. Patience, et du grain garde.",
+      "La terre est froide: peu de pousse, peu de recolte.",
+      "On dit que les champs dorment. Le pain, lui, ne dort pas.",
+      "Sous la neige des jours, les sillons attendent le printemps."
+    ],
+    "episodes.EPISODE_LINES.abandoned.firsthand": [
+      "j'ai du renoncer a mon reve: {note}",
+      "ce chemin-la ({note}) m'a battu",
+      "j'ai laisse tomber ce que je poursuivais: {note}",
+      "mon reve ({note}) s'est eteint avant d'arriver",
+      "je n'ai pas tenu: {note} restera un souhait"
+    ],
+    "episodes.EPISODE_LINES.abandoned.legend": [
+      "on dit que certains reves s'eteignent avant d'arriver",
+      "on raconte des ambitions abandonnees au bord du chemin",
+      "les anciens savent que tout le monde ne touche pas au but",
+      "autour du feu, on parle bas des reves laisses",
+      "on dit que Valmire compte aussi ses renoncements"
+    ],
+    "episodes.EPISODE_LINES.ambition.firsthand": [
+      "j'ai enfin accompli ce que je voulais: {note}",
+      "mon reve a pris forme: {note}",
+      "apres tant de jours, j'ai reussi: {note}",
+      "le village m'a vu atteindre mon but: {note}",
+      "ce que je poursuivais — {note} — est enfin la"
+    ],
+    "episodes.EPISODE_LINES.ambition.legend": [
+      "on dit que certains realisent enfin leurs grands projets a Valmire",
+      "on raconte des vies qui touchent au but, apres des annees",
+      "les anciens aiment les histoires de reves accomplis",
+      "on dit qu'un reve tenu change tout un foyer",
+      "autour du feu, on loue ceux qui touchent au but"
+    ],
+    "episodes.EPISODE_LINES.arrival.firsthand": [
+      "{who} est arrive ici",
+      "j'ai vu {who} arriver a Valmire",
+      "{who} a rejoint le feu du camp",
+      "un nouveau visage, {who}, est arrive parmi nous",
+      "j'etais la quand {who} a atteint Valmire"
+    ],
+    "episodes.EPISODE_LINES.arrival.legend": [
+      "on raconte que {who} est arrive un jour a Valmire",
+      "les anciens se souviennent de l'arrivee de {who}",
+      "on dit qu'un nouveau visage a rejoint le camp",
+      "autour du feu, on parle encore de l'arrivee de {who}",
+      "Valmire garde le souvenir de {who} venu de la route"
+    ],
+    "episodes.EPISODE_LINES.bereaved.firsthand": [
+      "{who} est mort",
+      "j'ai perdu {who}",
+      "la mort a pris {who} chez nous",
+      "depuis que {who} n'est plus, la maison sonne creux",
+      "je porte encore le nom de {who} dans la bouche"
+    ],
+    "episodes.EPISODE_LINES.bereaved.legend": [
+      "on parle encore de ceux qui sont morts cette annee-la",
+      "les anciens murmurent les noms des disparus",
+      "on dit que Valmire a pleure bien des fois",
+      "autour du feu, on repete les absents",
+      "on raconte que le silence a un jour entre dans le village"
+    ],
+    "episodes.EPISODE_LINES.born.firsthand": [
+      "{who} est ne chez nous",
+      "un enfant, {who}, est venu au monde a la maison",
+      "la famille s'est agrandie: {who}",
+      "j'ai vu {who} ouvrir les yeux pour la premiere fois",
+      "un cri neuf — {who} — a change la maison"
+    ],
+    "episodes.EPISODE_LINES.born.legend": [
+      "il parait qu'un enfant est ne sous une bonne etoile",
+      "on chante parfois les naissances heureuses de Valmire",
+      "on dit qu'un berceau a berce tout le village",
+      "les anciens aiment les histoires de premiers cris",
+      "on raconte qu'une naissance a ranime tout un foyer"
+    ],
+    "episodes.EPISODE_LINES.counsel.firsthand": [
+      "{who} m'a conseille, et ca m'a remis d'aplomb",
+      "les mots de {who} m'ont aide a tenir",
+      "j'ai ecoute {who}, et j'y ai trouve du courage",
+      "{who} m'a parle comme un aine parle aux siens",
+      "sans les mots de {who}, j'aurais derape"
+    ],
+    "episodes.EPISODE_LINES.counsel.legend": [
+      "on dit que les aines de Valmire savent encore parler juste",
+      "on raconte des conseils qui changent une vie",
+      "les anciens murmurent que la sagesse se partage encore",
+      "autour du feu, on repete les paroles qui ont remis quelqu'un d'aplomb",
+      "on dit qu'un bon conseil vaut parfois plus qu'un outil"
+    ],
+    "episodes.EPISODE_LINES.crafted.firsthand": [
+      "j'ai franchi un palier a l'ouvrage ({detail} pieces)",
+      "mes mains ont bien travaille: {detail} ouvrages deja",
+      "l'atelier m'a vu grandir — {detail} pieces derriere moi",
+      "on reconnait enfin mon savoir-faire ({note})",
+      "mon metier tient: {detail} pieces, et le geste s'affine"
+    ],
+    "episodes.EPISODE_LINES.crafted.legend": [
+      "on dit qu'un artisan de Valmire ne dort jamais vraiment",
+      "on raconte des ateliers qui ne s'eteignent guere",
+      "certains parlent d'ouvrages qui font la fierte du village",
+      "les anciens jurent que la main habile sauve le camp",
+      "on dit que l'enclume et le metier portent Valmire autant que les murs"
+    ],
+    "episodes.EPISODE_LINES.departure.firsthand": [
+      "{who} a quitte Valmire",
+      "{who} est parti sans revenir",
+      "j'ai vu {who} prendre la route, loin d'ici",
+      "{who} a tourne le dos au feu du camp",
+      "la place de {who} est restee vide, le matin"
+    ],
+    "episodes.EPISODE_LINES.departure.legend": [
+      "certains sont partis et ne sont jamais revenus",
+      "on dit que la route emporte parfois les notres",
+      "on raconte des silhouettes qui quittent Valmire a l'aube",
+      "les anciens parlent de chemins qui ne ramenent personne",
+      "on dit que le village garde les absents dans la bouche"
+    ],
+    "episodes.EPISODE_LINES.famine.firsthand": [
+      "le grenier etait vide",
+      "la faim a frappe fort, chez nous",
+      "il n'y avait plus rien a mettre sur la table",
+      "j'ai connu le ventre creux, et Valmire aussi",
+      "le pain manquait — on comptait chaque miette"
+    ],
+    "episodes.EPISODE_LINES.famine.legend": [
+      "les anciens parlent d'un temps ou le grenier resta vide",
+      "on dit qu'un hiver a mis Valmire a genoux",
+      "on raconte encore la grande disette",
+      "autour du feu, on frissonne en parlant de la faim d'alors",
+      "on dit que le silence du grenier a dure trop longtemps"
+    ],
+    "episodes.EPISODE_LINES.inherited.firsthand": [
+      "j'ai herite de {who}",
+      "la maison de {who} m'est revenue",
+      "j'ai repris ce que {who} a laisse",
+      "les murs de {who} sont devenus les miens",
+      "ce que {who} a bati, je le porte maintenant"
+    ],
+    "episodes.EPISODE_LINES.inherited.legend": [
+      "on dit que cette maison change de mains depuis des generations",
+      "on raconte des heritages qui passent de foyer en foyer",
+      "les murs, dit-on, se souviennent de leurs maitres",
+      "on dit qu'un toit ne meurt jamais tout a fait",
+      "les anciens parlent de clefs qui changent de poche"
+    ],
+    "episodes.EPISODE_LINES.raised.firsthand": [
+      "j'ai acheve un chantier",
+      "un toit de plus s'est leve sous mes mains",
+      "j'ai pose la derniere pierre d'un ouvrage",
+      "j'ai vu mon ouvrage tenir debout, enfin",
+      "la charpente a chante juste — j'y etais"
+    ],
+    "episodes.EPISODE_LINES.raised.legend": [
+      "on dit que ce toit s'est leve en une nuit",
+      "on raconte des chantiers acheves avant l'aube",
+      "certains jurent qu'un mur entier a pousse en un jour",
+      "on dit que les poutres ont parle avant les hommes",
+      "les anciens gonflent les histoires de toits magiques"
+    ],
+    "episodes.EPISODE_LINES.robbed.firsthand": [
+      "{who} m'a pris {detail} or",
+      "{who} m'a vide la bourse un soir",
+      "j'ai perdu {detail} or a cause de {who}",
+      "{who} m'a vole sous les yeux du village",
+      "ma bourse etait pleine — {who} l'a faite legere"
+    ],
+    "episodes.EPISODE_LINES.robbed.legend": [
+      "on dit qu'il rode un voleur qui vide les bourses la nuit",
+      "on raconte qu'un filou rode autour de Valmire",
+      "certains parlent d'or disparu sous les etoiles",
+      "les anciens jurent qu'un ombre prend ce qui brille",
+      "on dit que les bourses trop lourdes attirent le malheur"
+    ],
+    "episodes.EPISODE_LINES.saved.firsthand": [
+      "{who} m'a donne a manger quand je mourais de faim",
+      "{who} m'a sauve la vie avec une miche, un jour de disette",
+      "sans {who}, je n'aurais pas tenu l'hiver",
+      "{who} a partage son pain quand le mien manquait",
+      "je dois encore mon souffle a {who}"
+    ],
+    "episodes.EPISODE_LINES.saved.legend": [
+      "on raconte qu'un inconnu a nourri un mourant, un hiver, pres d'ici",
+      "on dit qu'une main secourable a partage son pain dans la famine",
+      "les anciens parlent d'un sauvetage au bord du chemin",
+      "on chuchote qu'un pain a sauve une vie, un soir de froid",
+      "Valmire se souvient d'une faim apaisee par une seule main"
+    ],
+    "episodes.EPISODE_LINES.union.firsthand": [
+      "{who} a fonde un foyer",
+      "je me suis lie a {who}",
+      "nos chemins se sont joints, avec {who}",
+      "avec {who}, on a choisi le meme toit",
+      "j'ai tendu la main a {who} — et on a tenu"
+    ],
+    "episodes.EPISODE_LINES.union.legend": [
+      "on chante encore ces noces-la",
+      "on raconte des unions qui ont uni deux maisons",
+      "les anciens aiment parler des foyers fondes sous le meme toit",
+      "on dit que deux vies se sont nouees devant tout Valmire",
+      "autour du feu, on repete encore ces liens-la"
+    ],
+    "followVignette.ACTIVITY_FRAMES": [
+      "{name} {activity}.",
+      "Pour l'instant, {name} {activity}."
+    ],
+    "followVignette.BOND_LINES.acquaint": [
+      "{name} commence à connaître {other}.",
+      "{name} n'est plus un inconnu pour {other}."
+    ],
+    "followVignette.BOND_LINES.close": [
+      "{name} se rapproche de {other}.",
+      "{name} tient {other} pour un proche.",
+      "Le lien avec {other} s'approfondit."
+    ],
+    "followVignette.BOND_LINES.friend": [
+      "{name} se lie d'amitié avec {other}.",
+      "{name} et {other} deviennent amis.",
+      "Un ami de plus: {other} compte pour {name}."
+    ],
+    "followVignette.BOND_LINES.intrigue": [
+      "{name} a le cœur tiré vers {other}.",
+      "Une intrigue naît entre {name} et {other}.",
+      "{name} ne quitte plus {other} des yeux."
+    ],
+    "followVignette.BOND_LINES.rival": [
+      "{name} se brouille avec {other}.",
+      "La rancune monte entre {name} et {other}.",
+      "{name} ne digère pas {other}."
+    ],
+    "followVignette.DAY_CATALYST_FRAMES": [
+      "Jour {day} · {chapter}. {pulse}",
+      "Jour {day} · {chapter}. On en parlera: {pulse}",
+      "Jour {day} · {chapter}. Ce jour marque: {pulse}"
+    ],
+    "followVignette.DAY_FALLBACK_EARLY": [
+      "Jour {day} · {chapter}. Dix vies, une clairière — tout commence.",
+      "Jour {day} · {chapter}. Le premier feu tient encore — on apprend à rester.",
+      "Jour {day} · {chapter}. Peu de noms, beaucoup d'espace. Ça commence."
+    ],
+    "followVignette.DAY_FALLBACK_QUIET": [
+      "Jour {day} · {chapter}. La clairière tient. Rien d'écrit: tout se vit.",
+      "Jour {day} · {chapter}. Pas de sceau aujourd'hui — seulement le souffle du village.",
+      "Jour {day} · {chapter}. Les vies avancent sans faire de bruit pour la chronique.",
+      "Jour {day} · {chapter}. Valmire respire. Le témoin regarde."
+    ],
+    "followVignette.DAY_PULSE_FRAMES": [
+      "Jour {day} · {chapter}. {pulse}",
+      "Jour {day} · {chapter}. Au fil du jour: {pulse}"
+    ],
+    "followVignette.DAY_STREET_SEAL_FRAMES": [
+      "Jour {day} · {chapter}. La rue en parle: {pulse}",
+      "Jour {day} · {chapter}. On répète encore: {pulse}",
+      "Jour {day} · {chapter}. Après le sceau: {pulse}"
+    ],
+    "followVignette.DIALOGUE_FRAMES": [
+      "On les entend: {dialogue}",
+      "Échange à portée: {dialogue}",
+      "Le fil de la conversation: {dialogue}"
+    ],
+    "followVignette.FOLLOW_SEAL_FRAMES": [
+      "La rue en parle: {seal}.",
+      "On dit encore dans Valmire: {seal}.",
+      "{name} passe — autour, on murmure: {seal}."
+    ],
+    "followVignette.GESTURE_LINES.accuse_accused": [
+      "{name} reçoit l'accusation de {other}.",
+      "{name} fait face à {other}.",
+      "{name} se défend face à {other}."
+    ],
+    "followVignette.GESTURE_LINES.accuse_accuser": [
+      "{name} affronte {other}.",
+      "{name} accuse {other} en face.",
+      "{name} ne lâche pas {other}."
+    ],
+    "followVignette.GESTURE_LINES.celebrate": [
+      "{name} célèbre avec les siens.",
+      "{name} partage la fête.",
+      "{name} est pris{e} dans la joie du village."
+    ],
+    "followVignette.GESTURE_LINES.console_comforted": [
+      "{name} est consolé{e} par {other}.",
+      "{name} s'appuie sur {other}."
+    ],
+    "followVignette.GESTURE_LINES.console_comforter": [
+      "{name} console {other}.",
+      "{name} soutient {other} dans le deuil."
+    ],
+    "followVignette.GESTURE_LINES.drinkWell": [
+      "{name} boit à la source.",
+      "{name} étanche sa soif."
+    ],
+    "followVignette.GESTURE_LINES.marketTrade": [
+      "{name} échange au marché.",
+      "{name} traite à l'étal."
+    ],
+    "followVignette.GESTURE_LINES.mournVigil": [
+      "{name} veille avec les siens.",
+      "{name} reste au deuil.",
+      "{name} tient le silence du deuil."
+    ],
+    "followVignette.GESTURE_LINES.shareFood_donor": [
+      "{name} tend sa ration à {other}.",
+      "{name} partage son pain avec {other}.",
+      "{name} donne à manger — {other} tient."
+    ],
+    "followVignette.GESTURE_LINES.shareFood_receiver": [
+      "{name} reçoit le pain de {other}.",
+      "{name} est nourri{e} par {other}.",
+      "{name} prend la ration — {other} a tendu la main."
+    ],
+    "followVignette.GESTURE_LINES.shareRumor_listener": [
+      "{name} tend l'oreille — un on-dit.",
+      "{name} écoute {other} parler d'un lieu.",
+      "{name} retient ce que {other} vient de dire."
+    ],
+    "followVignette.GESTURE_LINES.shareRumor_teller": [
+      "{name} confie un on-dit à {other}.",
+      "{name} murmure un lieu à {other}.",
+      "{name} passe un secret de terrain à {other}."
+    ],
+    "followVignette.GESTURE_LINES.steal_thief": [
+      "{name} dérobe {other}.",
+      "{name} file avec la bourse de {other}.",
+      "{name} vole — {other} n'a rien vu venir."
+    ],
+    "followVignette.GESTURE_LINES.steal_victim": [
+      "{name} vient d'être volé{e}.",
+      "{name} a perdu sa bourse — {other} a frappé.",
+      "{name} cherche sa bourse. Vol."
+    ],
+    "followVignette.GOAL_FRAMES": [
+      "{name} {goalVerb}: {goal}.",
+      "{name} s'y tient: {goal}."
+    ],
+    "followVignette.HOUSEHOLD_DELIVER": [
+      "{name} livre pendant que {other} cueille.",
+      "{name} porte la charge du foyer — {other} ramasse.",
+      "Foyer: {name} livre, {other} cueille."
+    ],
+    "followVignette.HOUSEHOLD_GATHER": [
+      "{name} cueille pour le foyer — {other} livre.",
+      "{name} ramasse; {other} porte la charge du couple.",
+      "Foyer: {name} cueille, {other} livre."
+    ],
+    "followVignette.HUNGER_LINES": [
+      "{name} a faim. {they} cherche de quoi tenir jusqu'au soir.",
+      "{name} a faim. Le ventre tire plus fort que le devoir.",
+      "{name} cherche à manger — la faim coupe le reste."
+    ],
+    "followVignette.HURT_LINES": [
+      "{name} est blessé{e}. Chaque pas coûte.",
+      "{name} boîte. La douleur lit chaque geste.",
+      "{name} est blessé{e}. {they} avance quand même."
+    ],
+    "followVignette.IDLE_LINES": [
+      "{name} vaque dans la clairière. Rien n'est ordonné — {theyLower} choisit.",
+      "{name} passe. Pas d'ordre — seulement une vie qui marche.",
+      "{name} est là, quelque part entre deux gestes."
+    ],
+    "followVignette.INSIDE_LINES": [
+      "{name} est à l'abri. {their} journée se joue entre quatre murs.",
+      "{name} reste au foyer. Quatre murs, et la clairière s'éloigne.",
+      "{name} est à l'intérieur. La vie continue sans le vent."
+    ],
+    "followVignette.LOW_MORALE_LINES": [
+      "{name} baisse la tête. Le moral flanche — {they} continue quand même.",
+      "{name} marche sans regard. Le cœur est bas, les pieds avancent.",
+      "{name} semble loin. Valmire pèse — {they} tient malgré tout."
+    ],
+    "followVignette.SCENE_LINES.birth": [
+      "{name} veille une naissance.",
+      "{name} reste au foyer pour l'enfant.",
+      "{name} accueille une vie nouvelle."
+    ],
+    "followVignette.SCENE_LINES.childPlay": [
+      "{name} joue avec d'autres dans la cour.",
+      "{name} court et rit avec ses camarades.",
+      "{name} est pris{e} dans le jeu des jeunes."
+    ],
+    "followVignette.SCENE_LINES.dispute": [
+      "{name} est pris{e} dans une dispute.",
+      "{name} ne lâche pas le conflit.",
+      "{name} reste face à son rival."
+    ],
+    "followVignette.SCENE_LINES.hearth": [
+      "{name} veille le feu avec les siens.",
+      "{name} reste au foyer pour la soirée.",
+      "{name} partage le soir sous ce toit."
+    ],
+    "followVignette.SCENE_LINES.meal": [
+      "{name} mange à table avec les siens.",
+      "{name} partage le repas du foyer.",
+      "{name} est assis{e} au repas de famille."
+    ],
+    "followVignette.SCENE_LINES.mourning": [
+      "{name} reste au deuil.",
+      "{name} veille les siens.",
+      "{name} ne quitte pas le rassemblement."
+    ],
+    "followVignette.SCENE_LINES.neighborVisit": [
+      "{name} reçoit un voisin au seuil.",
+      "{name} passe chez le voisin.",
+      "{name} s'attarde à la porte d'à côté."
+    ],
+    "followVignette.SCENE_LINES.shelterGrant": [
+      "{name} gagne un seuil.",
+      "{name} a enfin un toit pour la nuit.",
+      "{name} regagne un abri."
+    ],
+    "followVignette.SCENE_LINES.wedding": [
+      "{name} célèbre une union.",
+      "{name} est à la fête du couple.",
+      "{name} partage la joie du mariage."
+    ],
+    "followVignette.STREET_FRAMES": [
+      "{name} {streetVerb} — {street}.",
+      "{name} {streetVerb}. On lit: {street}."
+    ],
+    "followVignette.TALK_FRAMES": [
+      "{name} dit: « {talk} »",
+      "À voix basse, {name} dit: « {talk} »",
+      "Plus loin, {name} dit: « {talk} »"
+    ],
+    "followVignette.THIRST_LINES": [
+      "{name} a soif. {they} cherche l'eau.",
+      "{name} a soif. La gorge brûle avant les paroles.",
+      "{name} gagne l'eau — la soif n'attend pas."
+    ],
+    "followVignette.TIRED_LINES": [
+      "{name} n'en peut plus. {they} cherche un endroit pour souffler.",
+      "{name} traîne les pas. Le repos appelle plus fort que le travail.",
+      "{name} est à bout. {they} cherche où s'asseoir."
+    ],
+    "landTalk.COLONIZATION_TALK_BLOCKED": [
+      "Plus de place nette: la hache doit passer avant le chantier.",
+      "On etouffe dans la clairiere — il faut ouvrir.",
+      "Sans lisiere, pas de maison. C'est tout.",
+      "Les toits attendent: la foret bloque encore.",
+      "On ne batit plus — on manque d'air net."
+    ],
+    "landTalk.COLONIZATION_TALK_BUILD": [
+      "La place est ouverte: maintenant le toit.",
+      "Pas la peine de couper plus — il faut batir sur ce qu'on a net.",
+      "Un pad, une maison. C'est la mesure.",
+      "La clairiere a donne: aux poutres de repondre.",
+      "On a la place — qu'on leve la charpente."
+    ],
+    "landTalk.COLONIZATION_TALK_EXPAND": [
+      "La bande avance: on pousse la colonie, pas le mur entier.",
+      "Chaque toit tire la lisiere un peu plus loin.",
+      "On elargit la clairiere a petits pas — assez pour grandir.",
+      "Valmire gagne un souffle — pas une foret entiere.",
+      "L'expansion suit les toits, pas la hache seule."
+    ],
+    "landTalk.COLONIZATION_TALK_LINES": [
+      "On ouvre la lisiere — assez pour un toit, pas plus.",
+      "La clairiere manque: on avance d'un pas dans le bois.",
+      "Couper pour batir, pas pour vider le mur vert.",
+      "Une place nette, puis les poutres.",
+      "Le mur reste; on lui prend juste de quoi loger.",
+      "La hache sert le foyer — pas la vanite.",
+      "Un pas de clairiere, et on s'arrete: assez."
+    ],
+    "landTalk.LAND_FOUNDING_LINES.deepwood": [
+      "On allume le feu pour se rappeler ou finit la clairiere.",
+      "Le premier feu dessine le bord des massifs — assez pour tenir."
+    ],
+    "landTalk.LAND_FOUNDING_LINES.delta": [
+      "On pose le camp ou l'eau pardonne — et on compte deja les poutres.",
+      "Le premier serment sent le sel et la vase."
+    ],
+    "landTalk.LAND_FOUNDING_LINES.highland": [
+      "La premiere pioche frappe le roc avant le premier arbre.",
+      "Le feu tient contre le vent des cols — c'est deja une victoire."
+    ],
+    "landTalk.LAND_FOUNDING_LINES.plateau": [
+      "Sous le ciel ouvert, le premier serment porte loin.",
+      "On allume le feu sans ombre pour le cacher — le plateau regarde."
+    ],
+    "landTalk.LAND_FOUNDING_LINES.vale": [
+      "Les fondateurs lisent la vallee comme une promesse tenue a moitie.",
+      "On pose le feu ou l'eau et le bois se touchent presque."
+    ],
+    "landTalk.LAND_LINES.deepwood": [
+      "Region de la foret: massifs autour, place au milieu.",
+      "On coupe, on ecoute, on ne siffle pas trop fort.",
+      "Valmire de la Foret — les lisieres nous cadrent.",
+      "Sous les pins, le jour baisse plus vite.",
+      "Le bois est la; la place nette, on la gagne.",
+      "Garde les enfants pres du camp: la couronne a des dents.",
+      "On elargit la place a la hache — un pas a la fois.",
+      "Entre deux troncs, on apprend a parler bas.",
+      "La clairiere est un souffle; les massifs, le cadre."
+    ],
+    "landTalk.LAND_LINES.delta": [
+      "Le delta nous nourrit, mais le bois manque deja.",
+      "L'air sent l'eau: la faim se calme, la pierre non.",
+      "Marche mouillee, filets, et encore trop peu de poutres.",
+      "Valmire du Delta — on batit sur l'humide.",
+      "La berge decide plus que le chemin, ici.",
+      "Si tu manques de pierre, regarde loin: le delta n'en donne pas.",
+      "Les bottes restent mouillees — c'est le prix du poisson.",
+      "Ici le pain vient de l'eau; les murs, il faut les faire venir."
+    ],
+    "landTalk.LAND_LINES.highland": [
+      "Les Hauts donnent la pierre: le bois reste en bas.",
+      "La carriere appelle plus fort que la scierie, ici.",
+      "Valmire des Hauts — l'air coupe, le roc tient.",
+      "On monte pour la pierre, on redescend pour le pain.",
+      "Peu d'arbres, beaucoup de grit. C'est notre mesure.",
+      "Si tu cherches du bois, regarde vers la vallee — pas ici.",
+      "Le roc ne ment pas — il fatigue, c'est tout.",
+      "En haut, on parle moins: le vent emporte le reste."
+    ],
+    "landTalk.LAND_LINES.plateau": [
+      "Le plateau est ouvert: place pour les champs, peu pour le gibier.",
+      "On voit loin — et on manque de ce qui se cache.",
+      "Valmire du Plateau: le vent passe avant les loups.",
+      "Beaucoup d'herbe, peu d'ombre. On s'y habitue.",
+      "Les sentiers sont larges; le bois, lui, se fait discret.",
+      "Ici on seme d'abord, on chasse apres — s'il reste quelque chose.",
+      "Sous ce ciel, chaque arbre compte double.",
+      "Le vent raconte plus que les murs, sur le plateau."
+    ],
+    "landTalk.LAND_LINES.vale": [
+      "La vallee tient encore: bois et eau a portee.",
+      "Ici rien n'oblige — on choisit ou poser le prochain toit.",
+      "Valmire de la Vallee, ca sonne juste.",
+      "Le chemin suit l'eau, comme toujours dans ce creux.",
+      "On n'est pas presses: la terre laisse le temps.",
+      "Un regard sur les bois, un autre sur la rive — c'est chez nous.",
+      "Dans le creux, on entend l'eau avant les voix.",
+      "La vallee pardonne les erreurs — pas trop, juste assez."
+    ],
+    "momentTalk.RUMOR_ECHO_LISTENER": [
+      "Oui, je l'ai entendu aussi.",
+      "Tout le monde le reprend aujourd'hui.",
+      "Ça tourne déjà dans le village."
+    ],
+    "momentTalk.RUMOR_ECHO_SPEAKER": [
+      "On en parle encore près de la place.",
+      "Le mot court encore par ici.",
+      "La rumeur tient depuis ce matin."
+    ],
+    "momentTalk.RUMOR_LISTENER": [
+      "Je m'en souviendrai.",
+      "Montre-moi ça demain.",
+      "Noté. On y va."
+    ],
+    "momentTalk.RUMOR_TELLER": [
+      "Écoute — un lieu à ne pas oublier.",
+      "J'ai vu un coin encore plein.",
+      "Par là: quelque chose à retenir."
+    ],
+    "momentTalk.SCENE_LINES.birth": [
+      "Un enfant est né ici.",
+      "Le foyer s'agrandit.",
+      "Une vie de plus sous ce toit."
+    ],
+    "momentTalk.SCENE_LINES.childPlay": [
+      "On joue ! Attrape-moi.",
+      "La cour est à nous.",
+      "Encore une partie — viens."
+    ],
+    "momentTalk.SCENE_LINES.dispute": [
+      "Je ne te laisse pas passer ça.",
+      "Dis-le en face, alors.",
+      "Ça se règle ici — pas dans le dos."
+    ],
+    "momentTalk.SCENE_LINES.hearth": [
+      "Le feu tient. On reste.",
+      "Soirée au foyer — on se retrouve.",
+      "Près du feu, on parle bas."
+    ],
+    "momentTalk.SCENE_LINES.meal": [
+      "À table. On mange ensemble.",
+      "Le foyer tient — on partage le pain.",
+      "Assieds-toi. On mange."
+    ],
+    "momentTalk.SCENE_LINES.mourning": [
+      "On veille. Le silence tient.",
+      "Ici, on reste pour les nôtres.",
+      "Le deuil rassemble ce soir."
+    ],
+    "momentTalk.SCENE_LINES.neighborVisit": [
+      "Passe le seuil — entre.",
+      "Un voisin au pas de la porte.",
+      "On reçoit. Assieds-toi un moment."
+    ],
+    "momentTalk.SCENE_LINES.shelterGrant": [
+      "Un seuil pour dormir. Enfin.",
+      "Un toit — on tient.",
+      "Le seuil s'ouvre. On rentre."
+    ],
+    "momentTalk.SCENE_LINES.wedding": [
+      "Aujourd'hui, on célèbre.",
+      "Deux maisons deviennent une.",
+      "L'union tient — on boit à ça."
+    ],
+    "momentTalk.SHARE_DONOR": [
+      "Tiens — mange avant de tomber.",
+      "Prends. On ne laisse personne crever ici.",
+      "Ma ration pour toi. Tiens bon."
+    ],
+    "momentTalk.SHARE_RECEIVER": [
+      "Merci. Je n'oublierai pas.",
+      "Tu me sauves. Merci.",
+      "Une main — je m'en souviendrai."
+    ],
+    "momentTalk.THEFT_THIEF": [
+      "Pas un mot.",
+      "Ce n'était pas à moi — tant pis.",
+      "Vite. Personne n'a vu."
+    ],
+    "momentTalk.THEFT_VICTIM": [
+      "Ma bourse — on m'a volé!",
+      "Voleur! Rends ça!",
+      "On m'a dérobé — je ne l'oublie pas."
+    ],
+    "sealTalk.SEAL_LINES.becomeVillage": [
+      "On n'est plus un camp. Les toits se tiennent.",
+      "Valmire — on ose dire le nom comme un village.",
+      "Regarde les portes: ca tient, ca dure.",
+      "Le marche a des voisins, maintenant.",
+      "Les chemins se croisent. C'est un village.",
+      "On reste — ce n'est plus seulement survivre."
+    ],
+    "sealTalk.SEAL_LINES.firstBirth": [
+      "Un enfant. La vallee romaine n'est plus seulement des survivants.",
+      "On entend un cri de naissance, pas de peur.",
+      "Une vie commence ici. Ca compte.",
+      "Les anciens sourient autrement, depuis l'enfant.",
+      "Quelqu'un nait sans avoir connu d'autre terre.",
+      "Ce cri-la change le camp plus qu'un serment."
+    ],
+    "sealTalk.SEAL_LINES.firstDeath": [
+      "On a perdu quelqu'un. Le silence reste.",
+      "La clairiere a connu son premier deuil.",
+      "{who} ne reviendra pas. On le dit bas.",
+      "Meme la foret semble plus lourde, depuis.",
+      "On continue — mais plus comme avant.",
+      "Autour du feu, une place reste vide.",
+      "Le deuil ne s'ecrit pas: il s'assied avec nous."
+    ],
+    "sealTalk.SEAL_LINES.firstFamine": [
+      "Le grenier sonne creux. On en parle bas.",
+      "Des ventres vides — Valmire doit semer, pecher, tenir.",
+      "{who} a connu la faim. D'autres craignent la suite.",
+      "Sans pain, les toits ne suffisent pas.",
+      "La disette n'est pas un serment. C'est un fait.",
+      "On partage autrement, quand le pain manque."
+    ],
+    "sealTalk.SEAL_LINES.firstFood": [
+      "De quoi nourrir. Plus seulement glaner.",
+      "La table aura un lendemain.",
+      "{who} a leve de quoi manger. Ca change tout.",
+      "Champs ou filets — Valmire se nourrit.",
+      "Le pain cesse d'etre une rumeur."
+    ],
+    "sealTalk.SEAL_LINES.firstInheritance": [
+      "Une maison passe. Les morts laissent des toits.",
+      "{who} herite — Valmire se souvient par ses murs.",
+      "Le toit survit a celui qui l'a leve.",
+      "Heritage: pas un chantier, une continuite.",
+      "On n'enterre pas seulement un corps. On transmet un seuil.",
+      "La maison a deja vecu. {who} y entre."
+    ],
+    "sealTalk.SEAL_LINES.firstNativeAdult": [
+      "{who} est ne ici — et devient adulte. Ca change tout.",
+      "Un enfant de Valmire porte maintenant un outil d'adulte.",
+      "Les fondateurs n'etaient que quatre. Maintenant leurs enfants grandissent.",
+      "Ne ici, eleve ici, adulte ici. Valmire produit sa vie.",
+      "On n'est plus seulement des exiles. On a une generation.",
+      "{who} n'a jamais connu d'autre foret. C'est la sienne."
+    ],
+    "sealTalk.SEAL_LINES.firstOutpost": [
+      "Un toit hors clairiere. On s'etend.",
+      "{who} a porte Valmire plus loin.",
+      "L'avant-poste existe. Les chemins suivront.",
+      "Hors du premier feu, un abri tient.",
+      "On a pose un pied plus loin — et il reste."
+    ],
+    "sealTalk.SEAL_LINES.firstRoof": [
+      "Tu as vu? Le premier vrai toit tient.",
+      "Enfin un abri qui n'est pas une tente.",
+      "{who} a leve une charpente — on dormira moins dehors.",
+      "Un toit. Valmire commence a ressembler a quelque chose.",
+      "On parle du toit partout. Ca change le camp.",
+      "Sous ce toit-la, quelqu'un pourra fermer les yeux.",
+      "La premiere vraie maison — ce toit change le camp."
+    ],
+    "sealTalk.SEAL_LINES.firstTools": [
+      "La forge fume. Les outils naissent.",
+      "Sans fer, on travaille deux fois plus — ca change.",
+      "{who} allume le metal. Valmire s'arme de mains.",
+      "Un outil propre vaut trois bras fatigues.",
+      "Le marteau parle: on n'est plus seulement des survivants."
+    ],
+    "sealTalk.SEAL_LINES.firstUnion": [
+      "Deux vies sous le meme toit. Le premier foyer.",
+      "{who} n'est plus seul le soir. Ca se voit.",
+      "On parle d'union — pas de serment de roi, de choix.",
+      "Valmire a un couple. Les solitudes reculent.",
+      "Apres le feu, quelqu'un reste pour quelqu'un.",
+      "Un foyer a deux. Le village sourit autrement."
+    ],
+    "sealTalk.SEAL_LINES.firstWater": [
+      "On a trouve de l'eau. Enfin.",
+      "La soif recule — le camp respire.",
+      "{who} a montre ou boire. On s'en souvient.",
+      "Puits ou berge: l'eau decide autant que le feu.",
+      "Sans eau, le feu ne suffit pas. On le sait maintenant."
+    ],
+    "sealTalk.SEAL_LINES.firstWinter": [
+      "L'hiver est la. La foret se tait autrement.",
+      "Le froid decide autant que les outils.",
+      "On compte le bois et le grain, maintenant.",
+      "Valmire connait son premier hiver — rien n'est promis.",
+      "La neige n'a pas d'ordre a donner. Elle vient.",
+      "Le feu du soir compte double, cet hiver."
+    ],
+    "sealTalk.SEAL_LINES.firstWood": [
+      "Le bois devient metier, pas seulement survie.",
+      "On coupe pour batir, pas pour le feu seul.",
+      "{who} ouvre le travail du bois.",
+      "La scierie / le camp a bois: on entend les coups.",
+      "Les fagots s'empilent — Valmire respire mieux."
+    ],
+    "sealTalk.SEAL_LINES.foundingFire": [
+      "Le premier feu tient encore. On s'en souvient.",
+      "Autour des flammes, Valmire a commence a croire.",
+      "Ce feu-la n'est pas un campement. C'est un seuil.",
+      "On etait quatre. Le feu a dit: on reste.",
+      "La clairiere a un centre, depuis le premier soir.",
+      "Sans ce feu, on n'aurait pas de nom a se donner."
+    ],
+    "sealTalk.SEAL_LINES.openLisiere": [
+      "On ouvre la lisiere — sans tout raser.",
+      "La foret recule un peu. On avance prudent.",
+      "Couper pour batir, pas pour vider le monde.",
+      "Un pas sur la lisiere. Pas plus.",
+      "La clairiere gagne de l'air — la foret garde le reste."
+    ],
+    "talkCatalog.AMBITION_LINES.batisseur": [
+      "Je veux laisser des murs derriere moi.",
+      "Valmire grandira de mes mains.",
+      "Chaque pierre posee compte.",
+      "Batir, c'est rester.",
+      "Quand je ne serai plus la, les poutres parleront.",
+      "Un village se mesure a ce qu'il tient debout."
+    ],
+    "talkCatalog.AMBITION_LINES.defricheur": [
+      "La clairiere doit gagner un pas, pas la foret entiere.",
+      "On ouvre la lisiere — assez pour un toit, pas plus.",
+      "Couper pour batir, pas pour vider le mur vert.",
+      "Une place nette, puis les poutres.",
+      "La hache sert le foyer, pas la vanite.",
+      "Je veux de la place — juste assez pour vivre."
+    ],
+    "talkCatalog.AMBITION_LINES.explorateur": [
+      "Il y a encore des sentiers que je ne connais pas.",
+      "Au-dela des murs, le monde attend.",
+      "Je cartographie ce que d'autres oublient.",
+      "La colline cache encore des secrets.",
+      "Je ramene des noms avant des tresors.",
+      "Qui marche loin, raconte mieux."
+    ],
+    "talkCatalog.AMBITION_LINES.fortune": [
+      "La bourse grossit, lentement.",
+      "L'or ouvre des portes, a Valmire.",
+      "Je veux ne plus craindre le lendemain.",
+      "Qui economise aujourd'hui, mange demain.",
+      "Je compte les pieces comme d'autres prient.",
+      "Pas pour briller — pour ne plus trembler."
+    ],
+    "talkCatalog.AMBITION_LINES.foyer": [
+      "Je reve d'un foyer qui dure.",
+      "La famille, c'est mon vrai chantier.",
+      "Un enfant change tout un village.",
+      "Je cherche quelqu'un avec qui tenir.",
+      "Je veux une table ou l'on s'assoit sans peur.",
+      "Le sang et le pain — le reste suit."
+    ],
+    "talkCatalog.AMBITION_LINES.maitrise": [
+      "Mon metier n'a pas encore dit son dernier mot.",
+      "La main s'affine avec les jours.",
+      "Je veux devenir digne de mon ouvrage.",
+      "La maitrise, c'est de la patience.",
+      "Je veux que mon geste parle sans moi.",
+      "Chaque defaut corrige devient une fierte."
+    ],
+    "talkCatalog.AMBITION_LINES.notable": [
+      "Je veux que Valmire se souvienne de mon nom.",
+      "Le respect, ca se gagne jour apres jour.",
+      "Un notable ecoute avant de parler.",
+      "On me connait un peu mieux, maintenant.",
+      "Pas pour commander — pour etre entendu.",
+      "Le poids d'un nom, ca se porte droit."
+    ],
+    "talkCatalog.AMBITION_LINES.proprietaire": [
+      "Un jour j'aurai mon toit a moi.",
+      "Chaque piece me rapproche d'une maison.",
+      "Je compte pour mon foyer.",
+      "Sans toit, on n'est jamais tout a fait chez soi.",
+      "Je veux une porte que je ferme moi-meme.",
+      "Le camp suffit a survivre — pas a appartenir."
+    ],
+    "talkCatalog.BOND_LINES.coworker": [
+      "Le travail avance?",
+      "Il manque encore des bras.",
+      "Surveille ce chantier.",
+      "On se retrouve a l'ouvrage.",
+      "Les stocks sont-ils bons?",
+      "La journee sera longue.",
+      "On tient le rythme, ensemble.",
+      "Faut pas laisser le travail trainer.",
+      "Ton geste m'a sauve du retard, hier.",
+      "Si l'un lache, l'ouvrage penche.",
+      "On se partage la peine, pas seulement le pain.",
+      "Dis-moi si l'outil manque — j'en ai un."
+    ],
+    "talkCatalog.BOND_LINES.family": [
+      "Comment vont les notres?",
+      "Passe a la maison avant la nuit.",
+      "On se tient, comme toujours.",
+      "Les enfants ont besoin de toi.",
+      "Racontes ce que tu as vu.",
+      "La lignee compte sur nous.",
+      "Meme loin, on reste du meme sang.",
+      "Fais attention, pour les notres.",
+      "Meme disait: on ne laisse personne dehors.",
+      "Le nom qu'on porte, on le porte a deux.",
+      "Viens souper, on t'attend sans faire de bruit.",
+      "Quand l'un tombe, l'autre ramasse."
+    ],
+    "talkCatalog.BOND_LINES.founder": [
+      "Fondateur, tu as une minute?",
+      "C'est toi qui tiens Valmire, non?",
+      "Ecoute-moi un instant.",
+      "On compte sur toi, ici.",
+      "Tu vois ce qui se passe au village?",
+      "Parle-moi franchement.",
+      "Depuis que tu es la, les choses bougent.",
+      "Dis-moi ce que tu comptes faire.",
+      "Tu regardes beaucoup — dis-moi ce que tu vois.",
+      "On parle de toi au marche, parfois."
+    ],
+    "talkCatalog.BOND_LINES.friend": [
+      "Ca fait du bien de te voir.",
+      "Tu as une nouvelle?",
+      "Viens boire un coup plus tard.",
+      "Je pensais juste a toi.",
+      "Reste un peu, parlons.",
+      "Tu me manquais, mon vieux.",
+      "On se raconte tout, non?",
+      "Le village a besoin de gens comme toi.",
+      "J'ai garde une histoire pour toi.",
+      "Entre nous, on peut dire les choses droites.",
+      "Si tu peines, tu frappes a ma porte.",
+      "On a ri assez pour tenir l'hiver."
+    ],
+    "talkCatalog.BOND_LINES.partner": [
+      "Reste avec moi un moment.",
+      "La maison nous attend ce soir.",
+      "Tu manques quand tu es loin.",
+      "On tiendra Valmire, toi et moi.",
+      "Dis-moi comment tu te sens.",
+      "Ton regard me suffit, ce soir.",
+      "On a traverse bien des jours.",
+      "Promets-moi de rentrer avant la nuit.",
+      "J'ai garde une place aupres du feu.",
+      "Sans toi, les murs sont trop grands.",
+      "Raconte-moi ta journee, meme les riens.",
+      "On a choisi ce village ensemble — on le garde."
+    ],
+    "talkCatalog.BOND_LINES.rival": [
+      "Toi. On a un compte a regler.",
+      "Je ne digere pas ce que tu as fait.",
+      "Reste loin de mon chemin.",
+      "Tu crois que j'ai oublie?",
+      "Valmire est trop petite pour nous deux.",
+      "Un jour, tu paieras.",
+      "Ne me parle pas comme si de rien n'etait.",
+      "Garde ton or et tes sourires.",
+      "Ton ombre me coupe l'appetit.",
+      "On se croise trop, pour mon gout.",
+      "Le village a des oreilles — moi aussi."
+    ],
+    "talkCatalog.BOND_LINES.stranger": [
+      "Bonne route.",
+      "Que dit le marche?",
+      "Tu viens d'ou?",
+      "Valmire change vite.",
+      "Dieu garde ton chemin.",
+      "Le temps tient?",
+      "On se croise souvent, ici.",
+      "Que Valmire te soit douce.",
+      "Le pave reconnait peu a peu les pas.",
+      "Ici, on salue avant de demander.",
+      "Le village a de la place — et des yeux.",
+      "Si tu restes, tu apprendras nos noms."
+    ],
+    "talkCatalog.CHAIN_BRIDGE_LINES.ambition_job": [
+      "Ce reve-la pousse aussi l'ouvrage: {follow}",
+      "Pour y arriver, il faut: {follow}"
+    ],
+    "talkCatalog.CHAIN_BRIDGE_LINES.bond_need": [
+      "Entre nous… {follow}",
+      "Puisque tu es la: {follow}"
+    ],
+    "talkCatalog.CHAIN_BRIDGE_LINES.collective_gossip": [
+      "Le village grogne; on colporte: {follow}"
+    ],
+    "talkCatalog.CHAIN_BRIDGE_LINES.default": [
+      "Et puis: {follow}",
+      "La suite: {follow}",
+      "Sinon: {follow}"
+    ],
+    "talkCatalog.CHAIN_BRIDGE_LINES.emotion_job": [
+      "Malgre ca, l'ouvrage: {follow}",
+      "Le coeur penche — les mains, elles: {follow}"
+    ],
+    "talkCatalog.CHAIN_BRIDGE_LINES.family_bond": [
+      "Les notres comptent — {follow}"
+    ],
+    "talkCatalog.CHAIN_BRIDGE_LINES.gossip_bond": [
+      "Assez de rumeurs — {follow}",
+      "Gardons ca entre nous. {follow}",
+      "La nouvelle passe; nous, on reste: {follow}"
+    ],
+    "talkCatalog.CHAIN_BRIDGE_LINES.houseTale_family": [
+      "Ces murs en memoire… {follow}"
+    ],
+    "talkCatalog.CHAIN_BRIDGE_LINES.job_gossip": [
+      "En travaillant, j'ai aussi entendu: {follow}",
+      "Au poste on murmure: {follow}",
+      "Entre deux gestes: {follow}",
+      "L'ouvrage laisse filtrer une nouvelle: {follow}"
+    ],
+    "talkCatalog.CHAIN_BRIDGE_LINES.land_job": [
+      "La terre parle ainsi; les mains repondent: {follow}"
+    ],
+    "talkCatalog.CHAIN_BRIDGE_LINES.need_hungry_job": [
+      "Une miche d'abord — ensuite: {follow}",
+      "Le ventre calme, les mains suivent: {follow}",
+      "Manger, puis: {follow}"
+    ],
+    "talkCatalog.CHAIN_BRIDGE_LINES.need_job": [
+      "D'abord tenir — puis l'ouvrage: {follow}",
+      "Le besoin passe, le travail reste: {follow}",
+      "Oui… et au geste: {follow}",
+      "Apres ca, on reprend: {follow}"
+    ],
+    "talkCatalog.CHAIN_BRIDGE_LINES.need_tired_job": [
+      "Un souffle, puis l'ouvrage: {follow}",
+      "Le dos se remet — au travail: {follow}"
+    ],
+    "talkCatalog.CHAIN_BRIDGE_LINES.place_job": [
+      "Ce lieu en tete, au travail: {follow}",
+      "On saura ou aller — d'abord: {follow}"
+    ],
+    "talkCatalog.CULTURE_LINES.halmyra": [
+      "Chez nous, le sel decide qui mange.",
+      "Le quai raconte plus que la chapelle.",
+      "Je viens des anses — ici, la terre sent le pain.",
+      "On se fie aux vents et aux etals.",
+      "Le marche, c'est notre lieu sacre de voyage.",
+      "La mer n'oublie personne.",
+      "J'ai suivi la route du sel jusqu'a Valmire.",
+      "Chez les miens, on negocie avant de prier.",
+      "Sans ecume d'eau, je me sens un peu sourd.",
+      "Ici on batit en pierre; chez nous, on tient au flux.",
+      "Le sel apprend vite ce qu'un foyer vaut vraiment.",
+      "Pres de la mer, on sait qu'une reserve mal gardee n'est deja plus a soi."
+    ],
+    "talkCatalog.CULTURE_LINES.orestis": [
+      "Chez nous, le col decide qui passe.",
+      "La foret nourrit mieux qu'un serment.",
+      "Je viens des hauteurs — ici, l'air est doux.",
+      "On se fie aux chiens et aux sentiers.",
+      "La taverne, c'est notre chapelle de voyage.",
+      "Les montagnes n'oublient personne.",
+      "J'ai marche longtemps avant Valmire.",
+      "Chez les miens, on coupe le bois avant de prier.",
+      "Le vent des cols m'a appris a parler bas.",
+      "Valmire est plate — je m'y habitue, lentement.",
+      "Dans les hauteurs, on juge un homme a ce qu'il porte jusqu'au col.",
+      "La montagne apprend d'abord a durer, ensuite a parler."
+    ],
+    "talkCatalog.CULTURE_LINES.valmire": [
+      "On a plante Valmire ici, et ca tient.",
+      "Le serment du camp, je m'en souviens encore.",
+      "Ici, on batit avant de se vanter.",
+      "La chapelle et le pain: c'est notre mesure.",
+      "Valmire n'est pas un camp de passage.",
+      "On doit quelque chose a ceux qui ont pose la premiere pierre.",
+      "Les coutumes du camp nous gardent droits.",
+      "Quand on promet a Valmire, on tient.",
+      "Le premier feu n'est pas eteint — on le porte encore.",
+      "Ici, on partage avant de compter.",
+      "Nous sommes encore Romains, meme sous des toiles et du bois brut.",
+      "La saintete n'attend pas la pierre; elle tient deja dans le camp.",
+      "On ne garde pas seulement des vies ici - on garde une maniere de vivre.",
+      "Constantinople nous manque, mais Valmire demande des mains presentes.",
+      "La memoire de la Ville ne sert a rien si elle ne nourrit personne ici."
+    ],
+    "talkCatalog.DISTRICT_LINES.atHome": [
+      "Ici, c'est mon quartier — je m'y reconnais.",
+      "Le pave de chez nous tient encore.",
+      "On se salue dans mon coin, au moins.",
+      "Rentrer dans mon quartier, ca me remet.",
+      "Les voix d'ici, je les connais sans les voir."
+    ],
+    "talkCatalog.DISTRICT_LINES.away": [
+      "Je suis loin de mon quartier, aujourd'hui.",
+      "Ca me manque, le coin des {label}.",
+      "Ce n'est pas chez moi, ici — mais on fait avec.",
+      "L'air d'ailleurs fatigue autrement."
+    ],
+    "talkCatalog.DISTRICT_LINES.conflict": [
+      "Ce coin-la me met mal a l'aise.",
+      "Je prefere mon quartier aux {label} d'ici.",
+      "On ne parle pas la meme langue, dans ce secteur.",
+      "Depressons vite — ce n'est pas mon air.",
+      "Ici, les regards pesent trop."
+    ],
+    "talkCatalog.DISTRICT_LINES.pride": [
+      "Le quartier des {label} tient bon.",
+      "On dit du bien des {label}, et c'est merite.",
+      "Sans les {label}, Valmire perdrait sa couleur.",
+      "Les {label} portent plus que leur part."
+    ],
+    "talkCatalog.DISTRICT_LINES.rooted": [
+      "Je vis et je travaille au meme endroit — ca compte.",
+      "Mon poste est a deux pas du foyer. Ca tient.",
+      "Le quartier des {label} me nourrit et m'occupe.",
+      "Pas besoin d'aller loin: tout mon monde est la.",
+      "Racines et ouvrage, meme air — je tiens."
+    ],
+    "talkCatalog.DISTRICT_LINES.workHome": [
+      "Mon ouvrage est encore dans mon quartier.",
+      "Travailler chez les miens, ca console.",
+      "Le poste tient dans le meme air que la maison.",
+      "Je n'ai pas a choisir entre le pain et le foyer."
+    ],
+    "talkCatalog.EMOTION_LINES.bitter": [
+      "On m'en a trop fait, ces derniers temps.",
+      "La rancune colle aux habits.",
+      "Je n'oublie pas aussi vite qu'on le croit.",
+      "Certains sourires cachent trop de choses.",
+      "On parle de justice — moi, je compte les affronts.",
+      "Le village a la memoire courte. Pas moi."
+    ],
+    "talkCatalog.EMOTION_LINES.content": [
+      "Aujourd'hui, le vent est doux.",
+      "Je me sens bien, pour une fois.",
+      "Valmire a du bon, quand on regarde bien.",
+      "Le coeur est leger, ce matin.",
+      "On tient le coup, et ca suffit.",
+      "J'ai dormi, mange, parle — c'est deja beaucoup.",
+      "Il y a de la place pour rire, aujourd'hui."
+    ],
+    "talkCatalog.EMOTION_LINES.low": [
+      "Les jours pesent plus lourd, ces temps-ci.",
+      "J'ai le coeur bas, sans trop savoir pourquoi.",
+      "Valmire me parait plus froide, aujourd'hui.",
+      "Il me faudrait une bonne nouvelle.",
+      "Parfois je doute que ca s'arrange.",
+      "Je souris moins, et les autres le voient.",
+      "Meme le pain a un gout fade, ces jours-ci."
+    ],
+    "talkCatalog.EMOTION_LINES.proud": [
+      "Je suis fier de ce que l'on batit ici.",
+      "Mon nom pese un peu plus, a Valmire.",
+      "On m'adresse la parole autrement, maintenant.",
+      "Le village me reconnait, enfin.",
+      "Ce que j'ai fait tient — on le voit.",
+      "La fierte, c'est quand le travail parle pour toi."
+    ],
+    "talkCatalog.FAMILY_LINES.house": [
+      "Notre maison tient bon.",
+      "Le foyer nous attend.",
+      "Chez nous, le feu ne s'eteint guere.",
+      "Quatre murs, et tout change.",
+      "La porte ferme, et Valmire devient plus douce."
+    ],
+    "talkCatalog.FAMILY_LINES.kids": [
+      "Les enfants grandissent trop vite.",
+      "Faut veiller sur les petits, ce soir.",
+      "Ils demandent des histoires, toujours.",
+      "Un foyer bruyant, c'est un foyer vivant.",
+      "Ils portent deja le village dans leurs jeux.",
+      "Quand ils dorment, la maison respire enfin."
+    ],
+    "talkCatalog.FAMILY_LINES.lineage": [
+      "La lignee porte notre nom.",
+      "On doit honorer ceux d'avant.",
+      "Le sang compte, a Valmire.",
+      "Ce qu'ils ont commence, on le finit."
+    ],
+    "talkCatalog.FAMILY_LINES.noHouse": [
+      "Sans toit, on dort mal.",
+      "Je reve encore d'une vraie maison.",
+      "Le camp n'est pas un foyer.",
+      "On partage le vent plus que le pain."
+    ],
+    "talkCatalog.FAMILY_LINES.partnerMiss": [
+      "Mon conjoint me manque deja.",
+      "Je pense a la maison, la-bas.",
+      "On se retrouve au foyer, j'espere.",
+      "Sans sa voix, la journee penche."
+    ],
+    "talkCatalog.JOB_LINES.artisan": [
+      "La main habile sauve le bois.",
+      "Chaque piece a sa mesure.",
+      "L'atelier sent la colle et la sciure.",
+      "Un bel ouvrage dure plus qu'un discours.",
+      "Faut pas bruler les etapes.",
+      "Le detail qu'on cache, le temps le montre.",
+      "Je signe mon travail autrement qu'avec mon nom.",
+      "Le bel ouvrage commence quand la main cesse de se presser.",
+      "Une piece mal mesuree revient toujours demander son prix."
+    ],
+    "talkCatalog.JOB_LINES.baker": [
+      "Le four chauffe des avant l'aube.",
+      "La farine sent bon, aujourd'hui.",
+      "Sans pain, Valmire grogne.",
+      "La miche cuit juste a point.",
+      "Le levain a bien monte.",
+      "Qui sent le pain, retrouve le village.",
+      "La croute raconte si la nuit a ete bonne."
+    ],
+    "talkCatalog.JOB_LINES.blacksmith": [
+      "La forge chante des l'aube.",
+      "Le fer obeit a la chaleur.",
+      "Sans enclume, point de village.",
+      "L'etincelle, c'est mon pain.",
+      "Les outils manquent, partout.",
+      "Le marteau dit vrai quand la parole ment.",
+      "Une lame mal trempee trahit son village.",
+      "Le fer obeit a la chaleur, pas a l'orgueil.",
+      "Une lame mal trempee trahit plus surement qu'un temoin faible."
+    ],
+    "talkCatalog.JOB_LINES.builder": [
+      "Les murs tiennent si la main est sure.",
+      "Encore une charpente a poser.",
+      "La pierre et le bois font Valmire.",
+      "Un toit de plus, c'est une famille en plus.",
+      "Surveille l'equerre, le reste suivra.",
+      "Le niveau ne ment jamais — la vanite, si.",
+      "Quand la poutre chante juste, on dort mieux.",
+      "Batis d'abord sec. Le haut viendra plus tard.",
+      "Une poutre juste vaut mieux qu'un grand discours sur l'avenir."
+    ],
+    "talkCatalog.JOB_LINES.butcher": [
+      "La viande doit rester propre.",
+      "On ne gaspille rien, ici.",
+      "Le coutelas connait son office.",
+      "Sans sel, rien ne se conserve.",
+      "Le village mange grace a nos mains.",
+      "Respecter la bete, c'est respecter la table.",
+      "Le sang se lave; la faim, non."
+    ],
+    "talkCatalog.JOB_LINES.cheesemaker": [
+      "Le lait tourne bien, cette semaine.",
+      "La cave garde son secret.",
+      "Un bon fromage, c'est du temps.",
+      "Les meules murissent a l'ombre.",
+      "Le marche attend mon fromage.",
+      "On ne presse pas une cave — elle presse le temps.",
+      "Le gout change avec la saison, pas avec les mots."
+    ],
+    "talkCatalog.JOB_LINES.farmer": [
+      "Les champs demandent de la patience.",
+      "Si la pluie vient, on mangera.",
+      "Le sillon est droit, ce matin.",
+      "La terre rend ce qu'on lui donne.",
+      "Faut surveiller les blets avant la grele.",
+      "Le grain a peur du vent, pas de moi.",
+      "On seme pour ceux qu'on ne connait pas encore.",
+      "On seme pour ceux qui dormiront ici apres nous.",
+      "Le champ demande moins de fierte que de regularite."
+    ],
+    "talkCatalog.JOB_LINES.fisherman": [
+      "La riviere a bien donne, hier.",
+      "Le filet tire lourd, parfois.",
+      "L'eau est froide, mais le poisson tient.",
+      "On lit le courant comme une carte.",
+      "Pas de prise, pas de soupe.",
+      "Le silence de l'eau vaut mieux qu'un discours.",
+      "Quand la brume tombe, on rentre.",
+      "L'eau nourrit les humbles et humilie les presses.",
+      "Quand le filet revient vide, c'est tout le camp qui apprend le silence."
+    ],
+    "talkCatalog.JOB_LINES.guard": [
+      "La ronde est calme, pour l'instant.",
+      "On veille pour que les autres dorment.",
+      "Les chemins hors mur sont louches.",
+      "Un bon regard vaut dix lances.",
+      "La nuit appartient a ceux qui veillent.",
+      "J'ecoute les pas avant les voix.",
+      "Si le village dort, c'est qu'on a bien fait."
+    ],
+    "talkCatalog.JOB_LINES.herder": [
+      "Le troupeau s'inquiete avec le vent.",
+      "Faut ramener les betes avant la nuit.",
+      "Une brebis perdue, c'est du lait en moins.",
+      "Les patures tiennent encore.",
+      "Les betes connaissent le chemin mieux que moi.",
+      "Le chien voit avant moi ce qui manque.",
+      "Compter les tetes, c'est deja prier.",
+      "Les betes sentent l'orage avant les hommes.",
+      "Garder le troupeau, c'est compter la faim avant qu'elle n'entre au camp."
+    ],
+    "talkCatalog.JOB_LINES.innkeeper": [
+      "La salle est pleine de nouvelles.",
+      "Un pichet ouvre les langues.",
+      "Ici, on entend tout Valmire.",
+      "Le feu de l'auberge ne s'eteint guere.",
+      "Assieds-toi, raconte.",
+      "Les rumeurs arrivent avant les voyageurs.",
+      "Qui boit ici, laisse un peu de son histoire."
+    ],
+    "talkCatalog.JOB_LINES.merchant": [
+      "Le marche parle plus fort que les rumeurs.",
+      "Les prix dansent selon le ventre.",
+      "J'ai vu passer de belles affaires.",
+      "Qui compte bien, mange mieux.",
+      "Valmire achete, Valmire vend.",
+      "Une bonne affaire laisse les deux mains contentes.",
+      "Les etals savent avant la chronique.",
+      "Un prix trop bas humilie le travail; trop haut, il affame le voisin.",
+      "Le credit tient entre gens droits, sinon il serre la gorge."
+    ],
+    "talkCatalog.JOB_LINES.priest": [
+      "Que la paix te garde.",
+      "Les ames aussi ont faim.",
+      "Je prie pour ceux qui peinent.",
+      "La chapelle reste ouverte.",
+      "Dieu voit ce que l'on tait.",
+      "Le silence de la pierre console parfois.",
+      "On porte les morts et les vivants, ensemble."
+    ],
+    "talkCatalog.JOB_LINES.quarryman": [
+      "La pierre ne ment jamais.",
+      "Encore un bloc a detacher.",
+      "La carriere crache de la poussiere.",
+      "Sans pierre, pas de murs.",
+      "Le marteau parle plus que moi.",
+      "Chaque coup compte — la falaise n'oublie pas.",
+      "On sort la pierre; Valmire la garde.",
+      "La pierre supporte tout - sauf l'impatience.",
+      "Chaque bloc sorti de la falaise epargne une peur a une famille."
+    ],
+    "talkCatalog.JOB_LINES.settler": [
+      "On prend Valmire comme elle vient.",
+      "Chacun trouve sa place, ici.",
+      "Il y a toujours quelque chose a faire.",
+      "Le village avance, pas a pas.",
+      "Je n'ai pas encore de metier fixe — j'apprends le sol.",
+      "Tant qu'il y a des mains, il y a un camp.",
+      "Nous ne refaisons pas la Ville en petit. Nous faisons un lieu qui tienne.",
+      "On apprend d'abord le sol, puis seulement le reste."
+    ],
+    "talkCatalog.JOB_LINES.steward": [
+      "Les comptes ne mentent pas.",
+      "Faut tenir les stocks droits.",
+      "Valmire avance si l'on organise.",
+      "Un ordre clair epargne dix disputes.",
+      "Je surveille ce qui entre et ce qui sort.",
+      "Sans registre, le village se ment a lui-meme.",
+      "Je compte pour que d'autres n'aient pas a craindre."
+    ],
+    "talkCatalog.JOB_LINES.tanner": [
+      "Les peaux demandent du temps.",
+      "L'odeur, on s'y fait.",
+      "Un bon cuir tient des annees.",
+      "Le tanin fait le reste.",
+      "Sans peaux, pas de bottes pour l'hiver.",
+      "Le cuir se souvient de la pluie.",
+      "Patience: le tanin ne court jamais."
+    ],
+    "talkCatalog.JOB_LINES.weaver": [
+      "Le metier a tisser ne pardonne pas.",
+      "Le fil casse quand on presse trop.",
+      "Un drap chaud vaut de l'or.",
+      "Les couleurs tiennent si on les respecte.",
+      "Valmire a besoin de laine.",
+      "Chaque trame porte un hiver.",
+      "On tisse plus que du tissu — on tisse le foyer."
+    ],
+    "talkCatalog.JOB_LINES.woodcutter": [
+      "Le bois se fait rare cote colline.",
+      "La hache chante des l'aube.",
+      "Faut laisser pousser, aussi.",
+      "Les fagots seront pret avant l'hiver.",
+      "La foret donne, mais elle se defend.",
+      "On coupe pour le toit, pas pour le plaisir.",
+      "La lisiere avance — trop vite, parfois."
+    ],
+    "talkCatalog.MARKET_LINES.high": [
+      "Les etals regorgeaient de {resource}.",
+      "Au marche, le {resource} ne manquait pas.",
+      "J'ai vu le {resource} bien garni aux etals.",
+      "On pouvait choisir son {resource}, pour une fois."
+    ],
+    "talkCatalog.MARKET_LINES.low": [
+      "Le marche manquait de {resource}, la derniere fois.",
+      "Aux etals, plus grand-chose en {resource}.",
+      "Faut surveiller le {resource} au marche — ca baissait.",
+      "Le {resource} se faisait rare aux etals."
+    ],
+    "talkCatalog.MARKET_LINES.stale": [
+      "Je ne suis pas passe au marche depuis un moment.",
+      "Que dit le marche, ces jours-ci?",
+      "Mes nouvelles des etals datent un peu.",
+      "Faudrait que je repasse aux etals."
+    ],
+    "talkCatalog.NEED_LINES.bored": [
+      "La journee n'en finit plus.",
+      "Il me faudrait un peu de bruit.",
+      "Viens, sortons de cette routine.",
+      "Mon esprit tourne a vide.",
+      "Rien ne bouge, et ca me demange.",
+      "Donne-moi une nouvelle, n'importe laquelle."
+    ],
+    "talkCatalog.NEED_LINES.hungry": [
+      "J'ai une faim de loup.",
+      "Il faut manger bientot.",
+      "Le grenier m'appelle.",
+      "Mon ventre crie plus fort que moi.",
+      "Une miche, et je reprends courage.",
+      "Meme le travail a un gout de rien, a jeun.",
+      "Si le pain manque, la parole aussi.",
+      "Donne d'abord aux petits. Les grands savent attendre.",
+      "Une journee de plus a jeun, et les mains trembleront avant les voix."
+    ],
+    "talkCatalog.NEED_LINES.lonely": [
+      "J'avais besoin d'entendre une voix.",
+      "Reste, je me sentais seul.",
+      "Parle-moi un peu.",
+      "Le silence pese trop, aujourd'hui.",
+      "Une conversation, c'est deja du pain.",
+      "Les murs n'ont pas de reponse.",
+      "Meme un salut change la journee.",
+      "Reste pres de moi un instant - j'ai besoin de savoir qui tient encore.",
+      "Une voix humaine remet parfois un village entier en place."
+    ],
+    "talkCatalog.NEED_LINES.tired": [
+      "Je n'en peux plus.",
+      "Il me faut du repos.",
+      "La nuit sera bienvenue.",
+      "Mes jambes ne portent plus.",
+      "Encore un pas, puis le lit.",
+      "Les yeux me brulent plus que les mains.",
+      "Je parlerai mieux demain, apres le sommeil.",
+      "Mes bras peuvent encore tenir. Mon dos, lui, reclame demain.",
+      "Je veux juste une nuit sans compter les respirations autour du feu."
+    ],
+    "talkCatalog.PHASE_LINES.evening": [
+      "La journee s'acheve.",
+      "Bientot le foyer.",
+      "Le soir ramene les voix.",
+      "L'ombre s'allonge sur Valmire.",
+      "Les feux s'allument un a un.",
+      "C'est l'heure ou l'on se raconte."
+    ],
+    "talkCatalog.PHASE_LINES.night": [
+      "Il se fait tard.",
+      "Rentre dormir.",
+      "La nuit est pour les gardes.",
+      "Les chemins sont sombres, a cette heure.",
+      "Le village parle plus bas, la nuit.",
+      "Garde une lampe — les sentiers mentent."
+    ],
+    "talkCatalog.PLACE_LINES.food": [
+      "On peut encore trouver de la {resource} {where}.",
+      "J'ai vu de la {resource} {where}.",
+      "La {resource} n'est pas loin — {where}.",
+      "Regarde {where} si tu as faim: il y a de la {resource}."
+    ],
+    "talkCatalog.PLACE_LINES.hearsay": [
+      "On m'a dit qu'il y avait du {resource} {where}.",
+      "Parait qu'on trouve du {resource} {where}.",
+      "Quelqu'un parlait de {resource} {where}."
+    ],
+    "talkCatalog.PLACE_LINES.stone": [
+      "Il y a de la {resource} {where}.",
+      "J'ai repere de la {resource} {where}.",
+      "La {resource} affleure {where}.",
+      "Si tu manques de {resource}, va {where}."
+    ],
+    "talkCatalog.PLACE_LINES.wood": [
+      "J'ai vu du {resource} {where}.",
+      "Il reste du {resource} {where}, je te jure.",
+      "Si tu cherches du {resource}, regarde {where}.",
+      "Le {resource} pousse encore {where}."
+    ],
+    "talkCatalog.REPLY_LINES.ambition": [
+      "Tu es sur la bonne voie.",
+      "Ce reve-la te va bien.",
+      "Continue — Valmire a besoin de ca.",
+      "Je te souhaite d'y arriver.",
+      "Garde ce feu — il te porte."
+    ],
+    "talkCatalog.REPLY_LINES.bond": [
+      "Moi aussi, ca me fait plaisir.",
+      "Restons un moment.",
+      "Tu as raison.",
+      "Bon, parlons encore un peu.",
+      "Ta compagnie tient chaud."
+    ],
+    "talkCatalog.REPLY_LINES.contradict.ambition": [
+      "Beaux reves — le sol decide autrement.",
+      "Garde les pieds sur la terre."
+    ],
+    "talkCatalog.REPLY_LINES.contradict.bond": [
+      "Pas tout a fait d'accord.",
+      "On n'a pas la meme memoire, toi et moi."
+    ],
+    "talkCatalog.REPLY_LINES.contradict.emotion": [
+      "Le coeur trompe, parfois.",
+      "Je ne vois pas Valmire comme toi."
+    ],
+    "talkCatalog.REPLY_LINES.contradict.generic": [
+      "Je ne vois pas comme toi.",
+      "Pas d'accord.",
+      "C'est vite dit.",
+      "Moi, je dirais le contraire."
+    ],
+    "talkCatalog.REPLY_LINES.contradict.gossip": [
+      "On dit trop de choses.",
+      "J'en doute.",
+      "Les langues allongent vite, ici.",
+      "Je n'avale pas celle-la."
+    ],
+    "talkCatalog.REPLY_LINES.contradict.job": [
+      "L'ouvrage ne chante pas pour tout le monde.",
+      "Facile a dire — moins a faire.",
+      "On surestime ce metier-la."
+    ],
+    "talkCatalog.REPLY_LINES.contradict.land": [
+      "La terre ne parle pas a tout le monde ainsi.",
+      "Moi je lis autre chose dans ce sol."
+    ],
+    "talkCatalog.REPLY_LINES.contradict.market": [
+      "Le marche ment souvent, la-dessus.",
+      "Moi j'ai vu le contraire aux etals.",
+      "Le {resource} n'etait pas si rare, hier."
+    ],
+    "talkCatalog.REPLY_LINES.contradict.need": [
+      "Tu tiendras — ce n'est pas si grave.",
+      "D'autres ont pire, ces jours-ci."
+    ],
+    "talkCatalog.REPLY_LINES.contradict.place": [
+      "Pas sur que le {resource} soit encore la.",
+      "J'ai regarde — plus grand-chose.",
+      "On dit ca, mais le coin etait vide.",
+      "Le {resource} se deplace plus vite que les langues."
+    ],
+    "talkCatalog.REPLY_LINES.culture": [
+      "Oui, les coutumes comptent.",
+      "Valmire se souvient, c'est vrai.",
+      "On tient a ce qu'on a jure.",
+      "Le camp a sa propre voix.",
+      "Tes cols ont d'autres regles, je vois.",
+      "Chacun apporte sa voix au village.",
+      "D'ou tu viens se voit encore dans ta parole.",
+      "Oui, la memoire vaut surtout si elle tient dans les gestes d'aujourd'hui.",
+      "On reste les memes par ce qu'on pratique, pas seulement par ce qu'on pleure."
+    ],
+    "talkCatalog.REPLY_LINES.deflect": [
+      "Parlons d'autre chose.",
+      "Changeons de sujet.",
+      "Assez pour ca — autre chose.",
+      "Bon, tournons la page.",
+      "Le temps file — autre histoire."
+    ],
+    "talkCatalog.REPLY_LINES.district": [
+      "Chaque quartier a son air.",
+      "Je vois ce que tu veux dire.",
+      "Valmire, c'est plusieurs mondes.",
+      "Ton coin te ressemble.",
+      "On appartient a un pave, parfois."
+    ],
+    "talkCatalog.REPLY_LINES.emotion": [
+      "Je t'entends.",
+      "Dis-moi si je peux aider.",
+      "On tient ensemble, alors.",
+      "Ca fait du bien de le dire.",
+      "Ta peine n'est pas seule, ici."
+    ],
+    "talkCatalog.REPLY_LINES.family": [
+      "Les notres comptent, oui.",
+      "Passe leur dire bonjour de ma part.",
+      "La famille, c'est la base.",
+      "Je pense a eux aussi.",
+      "Qu'ils tiennent, autant que toi."
+    ],
+    "talkCatalog.REPLY_LINES.gossip": [
+      "Tu m'en diras tant.",
+      "Je n'avais pas entendu celle-la.",
+      "Garde ca pour toi, aussi.",
+      "Valmire fourmille de nouvelles.",
+      "Ca me donne a reflechir.",
+      "Les oreilles du village sont grandes.",
+      "La rumeur enfle vite; je prefere ce qu'on peut encore verifier.",
+      "On-dit ou pas, le camp finit toujours par payer le vrai prix."
+    ],
+    "talkCatalog.REPLY_LINES.houseTale": [
+      "Les murs se souviennent, c'est vrai.",
+      "Belle histoire de maison.",
+      "La lignee porte loin.",
+      "Chez vous, ca compte.",
+      "On devrait raconter ca plus souvent."
+    ],
+    "talkCatalog.REPLY_LINES.job": [
+      "Le travail ne ment pas.",
+      "On tient le rythme, alors.",
+      "Ton metier se voit sur toi.",
+      "Courage a l'ouvrage.",
+      "Les mains disent plus que les titres.",
+      "Oui - le geste juste compte plus que le bruit autour.",
+      "Le travail tient mieux quand chacun nomme ce qu'il porte."
+    ],
+    "talkCatalog.REPLY_LINES.land": [
+      "Oui, la terre parle comme ca, ici.",
+      "On le sent tous, ce sol-la.",
+      "C'est pour ca qu'on reste a Valmire.",
+      "Tu as raison — ce n'est pas n'importe quel camp.",
+      "La terre decide plus que les serments, parfois.",
+      "On apprend le sol avant d'apprendre les noms."
+    ],
+    "talkCatalog.REPLY_LINES.market": [
+      "Les etals changent vite, oui.",
+      "Je passerai verifier au marche.",
+      "Ca colle a ce que j'avais entendu.",
+      "Le {resource}, toujours a surveiller.",
+      "Le marche ment moins que les langues."
+    ],
+    "talkCatalog.REPLY_LINES.need.bored": [
+      "Viens, on trouve de quoi faire.",
+      "Le village ne manque pas de bruit.",
+      "Suis-moi — on verra bien."
+    ],
+    "talkCatalog.REPLY_LINES.need.hungry": [
+      "Va manger, avant tout.",
+      "Le grenier t'attend.",
+      "Une miche, et tu reprendras.",
+      "Le ventre d'abord — le reste suivra."
+    ],
+    "talkCatalog.REPLY_LINES.need.lonely": [
+      "Je reste un moment.",
+      "Tu n'es pas seul, la.",
+      "Parle, j'ecoute.",
+      "Une voix, ca suffit parfois."
+    ],
+    "talkCatalog.REPLY_LINES.need.tired": [
+      "Va te reposer.",
+      "Le lit te fera du bien.",
+      "Ne force pas plus.",
+      "Le sommeil vaut mieux qu'un discours."
+    ],
+    "talkCatalog.REPLY_LINES.phase": [
+      "Oui, le temps presse.",
+      "Bientot le foyer, alors.",
+      "La journee file, c'est vrai.",
+      "L'heure a raison de nous, parfois."
+    ],
+    "talkCatalog.REPLY_LINES.place": [
+      "Merci, j'irai voir pour le {resource}.",
+      "Bon a savoir, pour le {resource}.",
+      "Je notais justement ca.",
+      "On manquait de {resource}, tiens.",
+      "Je te crois — j'y passerai.",
+      "Cette piste-la, je la garde."
+    ],
+    "talkCatalog.REPLY_LINES.question.ambition": [
+      "Et pour y arriver, tu vises quoi?",
+      "Qui t'aide dans ce reve?",
+      "C'est pour quand, ca?"
+    ],
+    "talkCatalog.REPLY_LINES.question.bond": [
+      "Et toi, comment tu te sens?",
+      "On se revoit ce soir?"
+    ],
+    "talkCatalog.REPLY_LINES.question.emotion": [
+      "Tu veux en dire plus?",
+      "Depuis quand ca pese?",
+      "Je peux faire quelque chose?"
+    ],
+    "talkCatalog.REPLY_LINES.question.family": [
+      "Ils vont bien, les notres?",
+      "Tu leur as parle, ces jours-ci?"
+    ],
+    "talkCatalog.REPLY_LINES.question.generic": [
+      "Et toi, qu'en penses-tu?",
+      "Tu en es sur?",
+      "Comment tu le sais?",
+      "On en reparle demain?"
+    ],
+    "talkCatalog.REPLY_LINES.question.gossip": [
+      "Qui t'a dit ca?",
+      "Tu en es sur?",
+      "C'etait de premiere main?",
+      "On le dit ou, ca?"
+    ],
+    "talkCatalog.REPLY_LINES.question.job": [
+      "Depuis quand tu fais ca?",
+      "Ca rapporte assez, l'ouvrage?",
+      "Tu tiens le rythme?"
+    ],
+    "talkCatalog.REPLY_LINES.question.land": [
+      "Tu le sens ou, ce sol-la?",
+      "Depuis quand Valmire te parle ainsi?"
+    ],
+    "talkCatalog.REPLY_LINES.question.market": [
+      "Tu y es passe quand, au marche?",
+      "Le {resource}, a quel prix?",
+      "Les etals tenaient encore?"
+    ],
+    "talkCatalog.REPLY_LINES.question.need": [
+      "Tu veux que je t'aide?",
+      "Ca fait longtemps comme ca?",
+      "Tu as deja mange / dormi un peu?"
+    ],
+    "talkCatalog.REPLY_LINES.question.place": [
+      "Ou exactement, pour le {resource}?",
+      "Tu en as pris, du {resource}?",
+      "C'etait encore frais, la-bas?",
+      "Combien il en restait?"
+    ],
+    "talkCatalog.REPLY_LINES.refuse": [
+      "Pas envie d'en parler.",
+      "Laissons ca.",
+      "Une autre fois, peut-etre.",
+      "Je n'ai rien a dire la-dessus.",
+      "Ca me fatigue, ce sujet.",
+      "Garde ta question pour un autre jour."
+    ],
+    "talkCatalog.REPLY_LINES.seal": [
+      "Oui… on n'arrete pas d'en parler.",
+      "Moi aussi, j'y pense.",
+      "Ca change Valmire, ca.",
+      "Tu as raison de le dire.",
+      "Je l'ai vu de mes yeux.",
+      "Ces jours-la restent dans la bouche du village.",
+      "On s'en souviendra longtemps."
+    ],
+    "talkCatalog.REPLY_LINES.share": [
+      "Moi j'ai vu autre chose: {follow}",
+      "De mon cote: {follow}",
+      "Tiens, un coin: {follow}",
+      "Si tu cherches, essaie ca: {follow}",
+      "Je te file une piste: {follow}"
+    ],
+    "talkCatalog.SEEK_WORK_LINES.poste_perdu": [
+      "Mon poste a disparu. Il faut en trouver un autre.",
+      "On m'a laisse sans atelier — je cherche.",
+      "Plus de siege. Je ne reste pas les bras croises.",
+      "Le chantier s'est ferme sous moi — je recommence."
+    ],
+    "talkCatalog.SEEK_WORK_LINES.sans_metier": [
+      "Je cherche encore ma place au village.",
+      "Pas de metier fixe, pour l'instant.",
+      "Faudra bien que quelqu'un m'embauche.",
+      "Je tourne, en attendant un vrai metier.",
+      "Les mains sont pretes — il manque le nom du travail."
+    ],
+    "talkCatalog.SEEK_WORK_LINES.sans_poste": [
+      "J'ai le metier, il me manque le poste.",
+      "Quelqu'un doit encore avoir une place a pourvoir.",
+      "Je suis forme, mais sans siege pour travailler.",
+      "Mon outil attend un etablissement.",
+      "Savoir faire sans atelier, c'est une faim etrange."
+    ],
+    "witnessMemory.CLOSING_LINES": [
+      "Tu n'as rien ordonne. Tu as regarde.",
+      "Tu n'as rien ordonne. Tu as seulement regarde.",
+      "Pas d'ordre — tu as seulement regarde."
+    ],
+    "witnessMemory.EMPTY_CLOSING": [
+      "Suis un habitant. Puis reviens ici.",
+      "Pose le regard. Puis reviens lire ce qu'il a garde."
+    ],
+    "witnessMemory.EMPTY_DAY": [
+      "Tu n'as encore pose le regard sur personne.",
+      "La veille n'a encore touche personne."
+    ],
+    "witnessMemory.EMPTY_REMEMBER": [
+      "Personne n'a encore traverse ton attention.",
+      "Aucun visage n'a encore tenu sous ton regard."
+    ],
+    "witnessMemory.EMPTY_VILLAGE": [
+      "Valmire attend d'etre vue.",
+      "La clairiere attend un temoin."
+    ],
+    "witnessMemory.REMEMBER_FRAMES": [
+      "Je me souviens de {name}, {gloss}.",
+      "Je revois {name}, {gloss}.",
+      "{name} reste: {gloss}."
+    ],
+    "witnessMemory.REMEMBER_NAME_ONLY": [
+      "Je me souviens de {name}.",
+      "Le regard a retenu {name}.",
+      "{name} a traverse mon attention."
+    ],
+    "witnessMemory.VILLAGE_BY_KIND.birth": [
+      "Une naissance a change un foyer.",
+      "Une vie a commence sous ton regard."
+    ],
+    "witnessMemory.VILLAGE_BY_KIND.death": [
+      "Un deuil a traverse la clairiere.",
+      "La colonie a connu un silence qui reste."
+    ],
+    "witnessMemory.VILLAGE_BY_KIND.famine": [
+      "La disette a marque la clairiere.",
+      "Le grenier a parle trop bas."
+    ],
+    "witnessMemory.VILLAGE_BY_KIND.house": [
+      "Un toit s'est leve sous ton regard.",
+      "Quelqu'un a gagne un abri pendant ta veille."
+    ],
+    "witnessMemory.VILLAGE_BY_KIND.mourning": [
+      "Un deuil a traverse la clairiere.",
+      "On a pleure sous ton regard."
+    ],
+    "witnessMemory.VILLAGE_BY_KIND.raised": [
+      "Un toit s'est leve sous ton regard.",
+      "Une charpente a tenu pendant que tu regardais."
+    ],
+    "witnessMemory.VILLAGE_BY_KIND.union": [
+      "Deux vies se sont liees.",
+      "Un lien s'est noue au village."
+    ]
+  }
+}

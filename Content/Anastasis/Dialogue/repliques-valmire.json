@@ -1,0 +1,225 @@
+{
+  "_doc": "Répliques propres à ANÁSTASIS, écrites à la main (mission familles-feu-001, 2026-10-08). À côté de repliques-reference.json (recopiées du JS, sans accents). Chaque pool est une situation ; une réplique se choisit par hachage (qui parle, à qui, quand), jamais par le flux aléatoire de la simulation. Trous : {nom} celui qui parle, {cible} à qui il parle, {famille} sa maison, {objet} ce qu'il a emporté, {absent} qui n'est pas venu, {lieu} un bâtiment, {raison} la raison d'un refus. Registre : début du XIIIe siècle, arrière-pays pontique ; pas d'anachronisme (ni pomme de terre, ni café, ni horloge, ni « OK »).",
+  "data": {
+    "feu.moine.ouverture": [
+      "Asseyez-vous près du feu. Une vallée ne devient un village que le soir où l'on se dit qui l'on est.",
+      "Le Seigneur nous a menés jusqu'ici par des chemins que personne n'aurait choisis. Ce soir, racontons-les.",
+      "Je ne resterai peut-être pas. Mais avant de bâtir, il faut savoir qui bâtit. Parlez, chacun à son tour.",
+      "Le feu est petit et la nuit est grande. Serrez-vous, et dites-moi d'où vous venez.",
+      "On m'a appris qu'un lieu sans mémoire se perd en trois hivers. Donnons-lui la nôtre, ce soir."
+    ],
+    "feu.moine.question_ville": [
+      "Où étais-tu quand la Ville est tombée ?",
+      "Quand les Latins sont entrés dans la Ville, où se tenait ta maison ?",
+      "Au printemps où Constantinople a brûlé, où étais-tu ?",
+      "Dis-nous où la nouvelle de la Ville t'a trouvé."
+    ],
+    "feu.moine.question_emporte": [
+      "Qu'as-tu emporté ?",
+      "De tout ce que tu avais, qu'as-tu gardé dans tes mains ?",
+      "Qu'as-tu pris avec toi en partant ?",
+      "Montre-nous ce que tu as porté jusqu'ici."
+    ],
+    "feu.moine.question_absent": [
+      "Et qui n'est pas venu avec toi ?",
+      "Qui manque à ce feu, de ton côté ?",
+      "Qui as-tu laissé derrière toi ?",
+      "Nomme-nous celui qui n'est pas là, pour qu'on prie pour lui."
+    ],
+    "feu.moine.relance": [
+      "Continue, on t'écoute.",
+      "Prends ton temps. La nuit est longue.",
+      "Personne ici ne te jugera.",
+      "Dis-le simplement."
+    ],
+    "feu.moine.apres_reponse": [
+      "Que Dieu garde {absent}.",
+      "Nous retiendrons ton nom, {nom}.",
+      "Ce que tu as porté servira ici.",
+      "Voilà une maison de plus autour du feu.",
+      "Tu as dit vrai, et c'est assez pour ce soir."
+    ],
+    "feu.moine.benediction": [
+      "Que cette vallée vous garde, et que vous la gardiez. Demain, on commence.",
+      "Quatre maisons, un feu. C'est ainsi qu'on fonde. Allez dormir ; la terre attend.",
+      "Je bénis ce lieu et ceux qui y restent. Que personne n'y meure seul.",
+      "Souvenez-vous de ce soir quand vous vous disputerez. Il viendra, ce jour-là."
+    ],
+    "feu.ecoute": [
+      "Nous aussi, nous avons laissé quelqu'un.",
+      "Que Dieu le garde.",
+      "Je ne savais pas.",
+      "On n'en parlera plus, si tu veux.",
+      "C'est une lourde charge à porter.",
+      "Ici, ça pourra servir.",
+      "Tu as eu de la chance, toi.",
+      "Le chemin a été dur pour tout le monde."
+    ],
+    "aide.demande.chantier": [
+      "Je lève ma maison. Viendrais-tu m'aider quelques jours ?",
+      "Il me faut des bras pour la charpente. Tu en serais ?",
+      "Seul, je n'arriverai jamais au toit. Viens m'aider, je te le rendrai.",
+      "Les murs tiennent, mais pas le toit. J'ai besoin de toi.",
+      "Avant l'hiver, il faut fermer cette maison. Tu peux venir ?",
+      "On dit que tu as la main sûre. Aide-moi à poser les poutres.",
+      "Je n'ai pas de quoi payer, mais je te devrai ces journées."
+    ],
+    "aide.demande.grain": [
+      "Il ne me reste presque rien. Peux-tu me prêter du grain jusqu'à la moisson ?",
+      "Les miens ont faim. Prête-moi une mesure d'orge, je te la rendrai.",
+      "Je n'aime pas demander. Mais il me faut du grain."
+    ],
+    "aide.accepte": [
+      "Je viendrai. Demain à l'aube.",
+      "Tu peux compter sur moi.",
+      "D'accord. Tu me le rendras quand mon tour viendra.",
+      "On ne laisse pas un voisin dormir sous la pluie. J'arrive.",
+      "Je finis ici et je te rejoins.",
+      "Pour toi, oui. Tu m'as aidé, toi aussi.",
+      "Bien sûr. Qui d'autre le ferait ?",
+      "J'ai deux jours. Ils sont à toi."
+    ],
+    "aide.refuse.occupe": [
+      "Pas maintenant. Mon propre travail n'attend pas.",
+      "Je n'ai pas un jour à moi avant la fin de la semaine.",
+      "Le champ m'appelle. Une autre fois.",
+      "Je suis déjà pris ailleurs.",
+      "Si je viens chez toi, qui fera mon ouvrage ?"
+    ],
+    "aide.refuse.son_toit": [
+      "Je viendrai quand mon propre toit sera levé.",
+      "Ma famille dort encore dehors. Elle passe d'abord.",
+      "D'abord ma maison, ensuite la tienne.",
+      "Je n'ai pas fini la mienne. Comprends-moi."
+    ],
+    "aide.refuse.dette": [
+      "Tant qu'on me doit quelque chose, je ne bouge pas.",
+      "Ton frère me doit encore du grain. Réglez ça d'abord.",
+      "Tu ne m'as jamais rendu les journées de l'an dernier.",
+      "Rends-moi ce que tu me dois, et on en reparlera.",
+      "J'ai déjà prêté. On ne m'a rien rendu."
+    ],
+    "aide.refuse.rancune": [
+      "Après ce que tu as dit de moi ? Non.",
+      "Demande à tes amis.",
+      "Je n'ai pas oublié, moi.",
+      "Pas toi. Pas après ce qui s'est passé.",
+      "Va voir ailleurs."
+    ],
+    "aide.refuse.faible": [
+      "Je tiens à peine debout. Je ne te serais d'aucune aide.",
+      "Mes forces ne reviennent pas. Pardonne-moi.",
+      "Avec ce ventre vide, je ne soulève plus une pierre."
+    ],
+    "aide.refuse.inconnu": [
+      "Je ne te connais pas assez.",
+      "On ne s'est jamais parlé, toi et moi.",
+      "Qui es-tu, pour me demander ça ?",
+      "Va d'abord voir les tiens."
+    ],
+    "aide.refuse.moyens": [
+      "Je n'ai plus rien à prêter.",
+      "Mon grenier est aussi vide que le tien.",
+      "Si je te donne, les miens jeûneront."
+    ],
+    "aide.merci": [
+      "Je n'oublierai pas.",
+      "Que Dieu te le rende. Moi aussi, je te le rendrai.",
+      "Tu as ma parole : ton tour viendra.",
+      "Sans toi, le toit serait encore par terre.",
+      "Je te dois ces journées."
+    ],
+    "aide.rappel_dette": [
+      "Tu te souviens des journées que je t'ai données ?",
+      "J'ai besoin de toi, à mon tour.",
+      "Il est temps de rendre ce que tu me dois.",
+      "Je t'ai aidé quand tu en avais besoin."
+    ],
+    "quotidien.salut.matin": [
+      "Le jour est levé. Dieu te garde.",
+      "Bien dormi ?",
+      "Déjà debout ?",
+      "La rosée est lourde ce matin.",
+      "Que la journée te soit douce.",
+      "Encore un jour de gagné.",
+      "On commence tôt, aujourd'hui."
+    ],
+    "quotidien.salut.soir": [
+      "La journée est finie. Rentre avant la nuit.",
+      "Bonne nuit. Garde le feu.",
+      "Assez pour aujourd'hui.",
+      "Tu as l'air fourbu.",
+      "Le soleil tombe derrière la crête.",
+      "Encore une journée sans malheur. Rendons grâce."
+    ],
+    "quotidien.faim": [
+      "J'ai le ventre creux depuis hier.",
+      "On a tous faim. On n'en parle pas.",
+      "Le grenier se vide plus vite qu'il ne se remplit.",
+      "Je donnerais ma chemise pour un pain.",
+      "Les enfants mangent d'abord. Nous, on attend.",
+      "Si la moisson manque, on ne passera pas l'hiver."
+    ],
+    "quotidien.soif": [
+      "Ma gorge brûle.",
+      "Le puits est loin quand on a soif.",
+      "J'ai bu de l'eau de la rivière. Elle était froide.",
+      "Il faudrait un second puits."
+    ],
+    "quotidien.meteo.pluie": [
+      "La pluie ne s'arrêtera pas avant ce soir.",
+      "Rentre, tu vas prendre froid.",
+      "Bonne pluie pour l'orge, mauvaise pour les murs.",
+      "La rivière va monter.",
+      "Le chemin sera de la boue demain."
+    ],
+    "quotidien.meteo.beau": [
+      "Un ciel pareil, c'est un jour pour travailler.",
+      "Le soleil sèche enfin la terre.",
+      "Profitons-en, ça ne durera pas.",
+      "On voit jusqu'aux montagnes, aujourd'hui."
+    ],
+    "quotidien.meteo.froid": [
+      "Le vent descend des crêtes.",
+      "Il faudra du bois, beaucoup de bois.",
+      "L'hiver vient tôt dans cette vallée."
+    ],
+    "quotidien.travail": [
+      "Encore une rangée et je m'arrête.",
+      "La terre est dure ici, mais elle rend.",
+      "On n'a pas fini de porter des pierres.",
+      "Mes mains se souviennent de la Ville. Elles apprennent la vallée.",
+      "Le travail ne manque pas. Les bras, si.",
+      "Chaque poutre posée, c'est un hiver de moins dehors."
+    ],
+    "quotidien.puits": [
+      "L'eau est bonne, ce matin.",
+      "Tout le village passe par ce puits. On y apprend tout.",
+      "Remplis ta cruche et laisse la place.",
+      "On dit que l'eau d'ici guérit les fièvres. Je n'en crois rien."
+    ],
+    "quotidien.mort": [
+      "{absent} ne verra pas le printemps.",
+      "On l'a mis en terre ce matin.",
+      "La vallée a pris sa première dîme.",
+      "Priez pour lui. Il n'avait personne.",
+      "Il est mort de soif à deux pas du puits. Comment est-ce possible ?",
+      "On aurait dû le voir faiblir."
+    ],
+    "quotidien.ragot": [
+      "Tu as vu comme il regarde la fille de Georgios ?",
+      "Le scribe garde ses papiers sous son lit, on dit.",
+      "On raconte que la veuve sait parler aux Turcs.",
+      "Le soldat donne des ordres comme si le fort existait encore.",
+      "Le moine repartira, crois-moi. Ils repartent toujours.",
+      "Il paraît que quelqu'un a pris du grain la nuit."
+    ],
+    "quotidien.ville": [
+      "On dit que les Latins tiennent toujours la Ville.",
+      "La Ville ne se relèvera pas de notre vivant.",
+      "Constantinople nous manque, mais la vallée nous nourrit.",
+      "Mes enfants ne verront jamais la Ville. C'est peut-être mieux.",
+      "Il paraît qu'un Comnène règne à Trébizonde, maintenant."
+    ]
+  }
+}

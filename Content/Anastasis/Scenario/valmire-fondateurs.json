@@ -1,0 +1,122 @@
+{
+  "_doc": "Les fondateurs de Valmire (mission familles-feu-001), validés par Alexandre le 2026-10-08 : quatre familles, une par matrice d'origine de la Bible (§10.2), et un moine de passage qui pose les trois questions au feu (§10.6). Pour chaque question, la première variante est celle qu'Alexandre a validée ; les autres sont des variantes plausibles, tirées selon la graine de la partie pour que deux parties ne racontent pas la même chose. Les familles et leurs membres ne varient pas.",
+  "historicite": "HYPOTHESE_DE_CONCEPTION : personnes, biographies et objets sont inventés pour une vallée fictive de l'arrière-pays de Trébizonde vers 1204 (docs/historicity/MODELE.md, PONT-HIS-02 : une seule famille vient de la Ville). Faits de contexte utilisés comme tels, à faire relire : prise de Constantinople par les croisés en avril 1204 ; Alexios Comnène à Trébizonde en 1204 avec un appui géorgien ; voisinage seldjoukide et razzias sur les marges. Tout le reste est une invention plausible, pas un fait attesté.",
+  "moine": {
+    "cle": "arsenios",
+    "prenom": "Arsenios",
+    "surnom": "le moine",
+    "sexe": "M",
+    "age": 57,
+    "role": "moine de passage"
+  },
+  "familles": [
+    {
+      "cle": "scribe",
+      "nom": "la maison du Scribe",
+      "matrice": "refugie_polis",
+      "repondant": "konstantinos",
+      "presentation": "Des gens de la Ville, qui savent lire et écrire et n'ont jamais tenu une houe.",
+      "membres": [
+        { "cle": "konstantinos", "prenom": "Konstantinos", "surnom": "le Scribe", "sexe": "M", "age": 41, "lien": "chef", "metier": "settler" },
+        { "cle": "eudokia", "prenom": "Eudokia", "sexe": "F", "age": 36, "lien": "epouse", "metier": "settler" },
+        { "cle": "michael", "prenom": "Michael", "sexe": "M", "age": 12, "lien": "fils", "metier": "settler" }
+      ],
+      "ville": [
+        "Dans la Ville, près des Saints-Apôtres. J'ai vu les Latins entrer par les murs de la Corne d'Or.",
+        "Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues.",
+        "Dans la Ville. Au troisième jour du sac, nous sommes sortis avec la foule, sans nous retourner."
+      ],
+      "emporte": [
+        { "objet": "un psautier", "texte": "Un psautier, et l'acte de notre maison là-bas. Ici, l'acte ne vaut plus rien ; le psautier, si." },
+        { "objet": "un encrier et des plumes", "texte": "Mon encrier, mes plumes et trois feuilles de parchemin. Quelqu'un, ici, devra écrire les choses." },
+        { "objet": "une icône de la Vierge", "texte": "Une petite icône de la Vierge, cousue dans mon manteau." }
+      ],
+      "absent": [
+        { "qui": "la mère d'Eudokia", "texte": "La mère d'Eudokia. Elle ne pouvait plus marcher. Nous l'avons laissée chez des voisins." },
+        { "qui": "son frère Andronikos", "texte": "Mon frère Andronikos. Il est resté pour garder la maison. Je ne sais pas s'il vit." },
+        { "qui": "leur fille aînée", "texte": "Notre fille aînée. La fièvre l'a prise sur la route. Nous l'avons enterrée au bord du chemin." }
+      ]
+    },
+    {
+      "cle": "georgios",
+      "nom": "la famille de Georgios",
+      "matrice": "provincial",
+      "repondant": "georgios",
+      "presentation": "Des paysans de la vallée, chassés d'en bas par les razzias ; la terre, ils la connaissent.",
+      "membres": [
+        { "cle": "georgios", "prenom": "Georgios", "sexe": "M", "age": 50, "lien": "chef", "metier": "farmer" },
+        { "cle": "theodora", "prenom": "Theodora", "sexe": "F", "age": 47, "lien": "epouse", "metier": "farmer" },
+        { "cle": "ioannes", "prenom": "Ioannes", "surnom": "fils de Georgios", "sexe": "M", "age": 19, "lien": "fils", "metier": "farmer" },
+        { "cle": "basileios", "prenom": "Basileios", "surnom": "frère de Georgios", "sexe": "M", "age": 44, "lien": "frere", "metier": "settler" }
+      ],
+      "ville": [
+        "Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru.",
+        "Aux champs. On a su pour la Ville après les moissons, par des muletiers.",
+        "Chez nous. La Ville, je ne l'ai jamais vue. Ce qui nous a chassés, ce sont les razzias, pas les Latins."
+      ],
+      "emporte": [
+        { "objet": "de l'orge de semence", "texte": "Deux sacs d'orge de semence. On les mangera le jour où on n'aura plus rien d'autre, pas avant." },
+        { "objet": "le soc de la charrue", "texte": "Le soc de notre charrue. Le bois, on le refera ; le fer, non." },
+        { "objet": "la clé de la maison d'en bas", "texte": "La clé de notre maison d'en bas. Il n'y a plus de porte, mais j'ai gardé la clé." }
+      ],
+      "absent": [
+        { "qui": "leur fille Anna", "texte": "Notre fille Anna. Elle est mariée dans la vallée voisine. Elle n'a pas voulu laisser son mari." },
+        { "qui": "son père", "texte": "Mon père. Il a dit qu'il mourrait sur sa terre. Il l'a fait." },
+        { "qui": "le voisin Petros", "texte": "Petros, notre voisin. Il est parti vers la côte au lieu de monter avec nous. On s'est quittés fâchés." }
+      ]
+    },
+    {
+      "cle": "niketas",
+      "nom": "la maison de Niketas",
+      "matrice": "militaire",
+      "repondant": "niketas",
+      "presentation": "Un soldat sans solde et les siens : il ne se bat plus, il organise.",
+      "membres": [
+        { "cle": "niketas", "prenom": "Niketas", "surnom": "du fort", "sexe": "M", "age": 38, "lien": "chef", "metier": "settler" },
+        { "cle": "zoe", "prenom": "Zoe", "sexe": "F", "age": 30, "lien": "epouse", "metier": "settler" },
+        { "cle": "leon", "prenom": "Leon", "surnom": "pupille de Niketas", "sexe": "M", "age": 16, "lien": "pupille", "metier": "settler" }
+      ],
+      "ville": [
+        "Au fort, sur le col. La solde a cessé d'arriver, et puis les ordres aussi.",
+        "En garnison, plus au sud. Quand on a su pour la Ville, le commandant est parti le premier.",
+        "Sur la route du col, avec dix hommes. On attendait une relève qui n'est jamais venue."
+      ],
+      "emporte": [
+        { "objet": "une hache et la corne du fort", "texte": "Une hache et la corne d'appel du fort. La hache pour le bois ; la corne, si un jour il faut rassembler." },
+        { "objet": "le rôle de la garnison", "texte": "Le rôle de la garnison. Des noms. La plupart sont morts ou partis." },
+        { "objet": "un arc", "texte": "Mon arc. Je ne m'en servirai que pour la chasse, je l'ai promis." }
+      ],
+      "absent": [
+        { "qui": "Stephanos, le père de Leon", "texte": "Stephanos, le père de Leon. Mort au col, d'une flèche. Son fils est à moi, maintenant." },
+        { "qui": "le commandant du fort", "texte": "Le commandant. Il est parti avec la caisse et les chevaux. Je ne prononce plus son nom." },
+        { "qui": "ses hommes", "texte": "Mes hommes. Ils se sont dispersés. Certains reviendront peut-être." }
+      ]
+    },
+    {
+      "cle": "maria",
+      "nom": "la maisonnée de Maria",
+      "matrice": "circulateur",
+      "repondant": "maria",
+      "presentation": "Une veuve des routes, qui connaît les marchés, les langues et les prix.",
+      "membres": [
+        { "cle": "maria", "prenom": "Maria", "surnom": "la veuve du muletier", "sexe": "F", "age": 34, "lien": "chef", "metier": "settler" },
+        { "cle": "euphrosyne", "prenom": "Euphrosyne", "surnom": "fille de Maria", "sexe": "F", "age": 9, "lien": "fille", "metier": "settler" },
+        { "cle": "sabas", "prenom": "Sabas", "surnom": "le muletier", "sexe": "M", "age": 22, "lien": "engage", "metier": "settler" }
+      ],
+      "ville": [
+        "Sur la route, entre Trébizonde et le plateau, avec nos mules.",
+        "À Trébizonde, au marché. On a vu arriver un Comnène et ses Géorgiens, la même année.",
+        "Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires."
+      ],
+      "emporte": [
+        { "objet": "une créance", "texte": "Une créance sur un marchand de Trébizonde. Il me doit trois charges de sel. Un jour, j'irai la réclamer." },
+        { "objet": "deux mules", "texte": "Deux mules. Ce sont elles qui nous ont portés jusqu'ici." },
+        { "objet": "une balance", "texte": "Une balance et ses poids. Partout où il y a des gens, il faut peser." }
+      ],
+      "absent": [
+        { "qui": "son mari", "texte": "Mon mari. Tué sur la route, par des cavaliers. Je ne sais même pas qui ils étaient." },
+        { "qui": "son fils aîné", "texte": "Mon fils aîné. Il est parti avec une caravane vers la côte. Il ne sait pas où nous sommes." }
+      ]
+    }
+  ]
+}
