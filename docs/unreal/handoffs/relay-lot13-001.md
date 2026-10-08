@@ -64,7 +64,12 @@ PROOFS: canopy-rain-pie
 
 ## SCN
 
-Preuve rejouée une fois dans ce worktree, `MAIN_LOCK::libre` : voir le résultat consigné ci-dessous.
+Preuve rejouée une fois dans ce worktree (`MAIN_LOCK::libre`, binaire du worktree sur `main` 625f5ad3 + ce relais) :
+`editor-batch.ps1 -Proofs canopy-rain-pie` → `PROOF::PASS canopy-rain-pie (90.1s)`, `EDITOR_BATCH::PASS 1/1`,
+journal local `Saved/EditorBatch/20261008-121358/editor-batch.log` :
+`CANOPY_RAIN_PIE PASS tree=(34.566,1.410) radius_tiles=0.071 on=1.000 off=0.000 on_again=1.000 open=0.000`,
+lue à la frame [35] (démarrage PIE 49,1 s, `StaticDuplicateObject` 36,3 s). Ensuite rebasé sur `main` 70237070
+(relay-pontic-001 versé) : l'arbre Unreal n'est plus identique, la preuve du lot reste **requise**.
 
 ## PLY
 
