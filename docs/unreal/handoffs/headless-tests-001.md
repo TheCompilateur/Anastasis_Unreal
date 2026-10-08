@@ -53,6 +53,25 @@ Voir `git log` de la branche `agent/headless-tests-001`.
     `ANASTASIS_TESTS_MODE=headless` (pas de repli) ; filtre cible (`TOTAL` juste) ; valeur de mode invalide
     (erreur franche).
   - index `tools/unreal/` : `MISSING []`, `STALE []` (meme lecture que `tools-index.ps1`).
+- MESURE (2026-10-08, poste d'Alexandre, worktree `headless-tests-001` sur `640fa3e` + c3f008a, `BUILD::PASS`
+  en 132 s, un autre editeur ouvert pendant les deux runs) :
+
+  | | `-Mode headless` | `-Mode gpu` |
+  |---|---|---|
+  | ANNONCES PAR LE LANCEUR | 369 | 369 |
+  | TOTAL | 369 | 369 |
+  | PASS | 365 | 365 |
+  | KNOWN_EXPECTED_FAILURE | 4 | 4 |
+  | FAIL | 0 | 0 |
+  | duree (`TEST_MODE::`) | **313 s** | 637 s |
+  | pic memoire privee, processus principal | **6,4 Go** | 11,9 Go |
+  | pic working set, processus principal | 2,5 Go | 2,6 Go |
+
+  Comparaison test par test des deux logs (`Test Completed. Result={..} Path={..}`) : 369 et 369 resultats,
+  **0 difference**. Lignes `Error:` identiques dans les deux runs (bruit `Condition failed` du demarrage, et le
+  `RaiseScriptError` du test Python marque). Le run sans rendu a attendu 12,2 min a la porte memoire
+  (`EDITOR_GATE::WAIT file=2`) : elle le traite encore comme un editeur complet.
+  Logs : `Saved/CanonicalVerification/report-tests-headless-run.log`, `report-tests-gpu-run.log` du worktree.
 - COMMANDS:
   - `tools\unreal\report-tests.ps1`                 (auto)
   - `tools\unreal\report-tests.ps1 -Mode gpu`       (ancien run)
@@ -75,12 +94,11 @@ Sans objet : ne touche pas `Source/AnastasisSim`.
 
 ## INTEGRATION_RISK
 
-- **Premiere mesure a faire, une fois, editeurs fermes, sur la racine d'integration :**
-  `report-tests.ps1 -Mode gpu` puis `report-tests.ps1 -Mode headless`. Les deux doivent donner les memes
-  `PASS`, `KNOWN_EXPECTED_FAILURE`, `FAIL` **et le meme `ANNONCES PAR LE LANCEUR`**. Ce dernier compte est le
-  vrai risque : un plugin qui ne charge pas sous `-nullrhi` n'enregistre pas ses tests, et un test jamais
-  enregistre ne peut pas echouer. Si le compte baisse : `ANASTASIS_TESTS_MODE=gpu` pour l'integrateur, et une
-  mission pour comprendre. Les lignes `TEST_MODE::` des deux runs donnent le gain reel (duree, memoire).
+- **Premiere mesure faite** (MEC, 2026-10-08) dans le worktree, pas sur la racine d'integration : memes
+  `PASS` / `KNOWN_EXPECTED_FAILURE` / `FAIL`, meme `ANNONCES PAR LE LANCEUR` (369), aucun test qui change de
+  verdict. Le risque principal (un plugin qui ne charge pas sous `-nullrhi` et n'enregistre pas ses tests) ne
+  s'est pas produit sur cet arbre. Il peut revenir avec un plugin ajoute plus tard : si `ANNONCES PAR LE LANCEUR`
+  baisse un jour, `ANASTASIS_TESTS_MODE=gpu` pour l'integrateur, et une mission pour comprendre.
 - La branche ne touche aucun fichier Unreal : le lot ne lancera pas la suite pour elle. Le premier lot qui
   touche Unreal apres versement l'executera sans rendu.
 - `project-health.ps1` lit `report-tests.log`, le run sans rendu. Apres un repli, le verdict qui fait foi est
@@ -90,8 +108,10 @@ Sans objet : ne touche pas `Source/AnastasisSim`.
 
 ## STOP
 
-- Ne revendique aucun run Unreal : ni que la suite passe sans rendu, ni le gain de temps ou de memoire. Ce
-  sont des hypotheses tirees du code, a confirmer par la mesure ci-dessus.
+- Revendique une seule mesure, sur un seul arbre (`640fa3e`), machine partagee : le gain (moitie du temps,
+  -5,5 Go de memoire privee) est un ordre de grandeur, pas une constante. Le repli `auto` (run incomplet ou
+  test en echec sans rendu) n'a pas ete exerce en vrai : aucun echec ne s'est produit ; il reste prouve par le
+  banc a blanc seulement.
 - Pas de Low Level Tests (executable sans editeur) : demande une cible de test C++ jamais compilee contre le
   moteur installe de ce poste ; a faire seulement si le mode sans rendu laisse un cout qui le justifie.
 - Ne touche ni a la porte memoire, ni a `agent-worktree.ps1`, ni aux preuves PIE (qui ont besoin du rendu).
