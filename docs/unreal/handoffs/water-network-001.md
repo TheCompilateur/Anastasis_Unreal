@@ -23,7 +23,7 @@ sans CVar de rendu. Le site de départ lit le relief drainé de cette même géo
 - `Source/AnastasisSim/Public|Private/Sim/AnastasisSimulation.*` : `ApplyWaterMask`
 - `Source/AnastasisSim/Private/Tests/AnastasisWaterRestampTests.cpp` (nouveau) :
   `Anastasis.Sim.Monde.Eau.Reseau.Restamp`, `.Simulation`
-- `Source/AnastasisSim/ECARTS.md` : n° 44
+- `Source/AnastasisSim/ECARTS.md` : n° 51
 - `docs/unreal/WATER_NETWORK_001.md`
 
 ## COMMIT
@@ -68,23 +68,35 @@ N/A
 
 ## ECARTS
 
-n° 44 OUVERT (EXTENSION, A_TRANCHER) : l'eau du monde suit le réseau de drainage canonique ; appelé par
+n° 51 OUVERT (EXTENSION, A_TRANCHER) : l'eau du monde suit le réseau de drainage canonique ; appelé par
 l'hôte seulement. `GenerateWorld` et `Reset` ne changent pas, la parité est intacte.
 
 ## INTEGRATION_RISK
 
+- **Rebasée le 2026-10-08 sur `main` = `ad18bb99`** (après `chronique-village-001` et `save-state-001`) : conflit
+  dans `ResetCanonical` (chronique et eau du réseau gardées toutes deux, l'eau d'abord) et dans `ECARTS.md`
+  (fiche alors n°44, renumérotée depuis n°51). Preuves rejouées sur la pile `opening-in-sim-001`, qui contient
+  celle-ci : `EDITOR_BATCH::PASS 9/9`.
 - **Relais de `site-from-sim-001`**, non versé (le lot de 11 h l'a laissé dehors).
-  - `opening-in-sim-001` porte aussi ces commits, en relais.
+  - `opening-in-sim-001` porte aussi ces commits, et celui-ci, en relais.
   - Les deux missions modifient `AnastasisSimulationSubsystem.cpp` dans des fonctions différentes
     (`ResetCanonical` ici, `SeedOpening*` là-bas). Le conflit, s'il y en a un, est textuel.
 - **Changement de gameplay** : l'eau change sur 833 tuiles, le site de départ bouge. Les preuves
   déclarées passent ; les captures n'ont pas été rejouées.
 - **Coût** : 2 à 3 s de calcul au premier reset d'une graine dans un processus (forge et drainage refaits).
 - **Numérotation** : n° 40 est pris par `opening-in-sim-001` (non versé), n° 41 par `canopy-rain-shelter-001`
-  (versé pendant la mission), n° 42 par `relay-settlement-001` (versé ensuite), n° 43 par `labor-social-001` (versé le 2026-10-08), n° 44 par celle-ci (renumérotée à trois rebases).
-- **Fiabilité de `npc-life-pie`** : `opening-in-sim-001` l'a vue échouer sur `main` = `70237070`, sur une
-  machine chargée. Elle passe ici : base `4d57ad49`, machine moins chargée. Je soupçonne son délai de
-  220 s en temps réel, mais ce n'est pas établi.
+  (versé pendant la mission), n° 42 par `relay-settlement-001` (versé ensuite), n° 43 par `labor-social-001` (versé le 2026-10-08), n° 44 par `familles-feu-001`, n° 45 et 46 par `save-state-001` et `save-history-001` (tous versés le 2026-10-08), n° 47-48 par `relay-memoire-001`, n° 49 par `arrivants-001`, n° 50 par `valmire-grows-001`, n° 51 par celle-ci (renumérotée à trois rebases).
+- **`npc-life-pie` et `site-from-sim-001`** (2026-10-08) : `site-from-sim-001` **seule**, rebasée sur `main`
+  = `eebb9af2`, fait échouer `npc-life-pie` par blocage (porteur chargé de pierre qui ne livre jamais au site
+  (39 ; 42)), pas par lenteur : `npc-life-warp-001` a montré que l'ancien script passe même bridé à 15 images/s.
+  Avec l'eau du réseau, le site devient (36 ; 20) et la preuve passe. **Verser cette mission, pas
+  `site-from-sim-001` seule.** Sa branche garde un commit de fiche (`fc4ba2d3`) absent d'ici : il ne change que
+  sa fiche, ne pas la verser pour lui.
+- **Rebases du 2026-10-08** sur `main` = `eebb9af2` (après `relay-settlement-001`), puis `640fa3e8` (après `npc-life-warp-001` et `state-fields-tidy-001`), puis `ab6960c8` (après `labor-social-001` : conflit dans `ECARTS.md` seul, mon écart renuméroté 44) ; `check-state-fields` passe en mode strict. Les preuves de
+  la section MEC ont tourné sur `4d57ad49` ; `opening-in-sim-001`, empilée sur ce commit, les rejoue sur l'arbre
+  rebasé.
+- **`opening-in-sim-001`** est empilée sur celle-ci (`RELAIS: site-from-sim-001, water-network-001`) : la verser
+  dans le même lot, ou après.
 
 ## STOP
 
