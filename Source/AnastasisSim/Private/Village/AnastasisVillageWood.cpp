@@ -89,7 +89,8 @@ double FVillage::WoodRowScore(const FNpc& Npc, double PhaseBias, const FWorkRowC
     return Base*G::SurvivalWorkFactor(TEXT("gatherWood"),Work.WorkFactor,Work.bMealBlocked)
         + PhaseBias + G::TraitGoalBias(G::TraitAt(Npc.TraitIndex),TEXT("gatherWood"))
         + G::SkillGoalBias(Npc.SkillGather)
-        + G::CompletionBias(TEXT("gatherWood"),Npc.InventoryWood+Npc.InventoryFood,0,SessionGoalOf(Npc),NeedsCritical(Npc.Needs));
+        + G::CompletionBias(TEXT("gatherWood"),Npc.InventoryWood+Npc.InventoryFood,0,SessionGoalOf(Npc),NeedsCritical(Npc.Needs))
+        + EpisodeGoalBiasOf(Npc,TEXT("gatherWood")); // ecart n°47
 }
 
 int32 FVillage::ProgressWoodGather(FNpc& Npc)

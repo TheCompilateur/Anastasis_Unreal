@@ -76,14 +76,12 @@
       "D'accord. Tu me le rendras quand mon tour viendra.",
       "On ne laisse pas un voisin dormir sous la pluie. J'arrive.",
       "Je finis ici et je te rejoins.",
-      "Pour toi, oui. Tu m'as aidé, toi aussi.",
       "Bien sûr. Qui d'autre le ferait ?",
       "J'ai deux jours. Ils sont à toi."
     ],
     "aide.refuse.occupe": [
       "Pas maintenant. Mon propre travail n'attend pas.",
       "Je n'ai pas un jour à moi avant la fin de la semaine.",
-      "Le champ m'appelle. Une autre fois.",
       "Je suis déjà pris ailleurs.",
       "Si je viens chez toi, qui fera mon ouvrage ?"
     ],
@@ -94,11 +92,10 @@
       "Je n'ai pas fini la mienne. Comprends-moi."
     ],
     "aide.refuse.dette": [
-      "Tant qu'on me doit quelque chose, je ne bouge pas.",
-      "Ton frère me doit encore du grain. Réglez ça d'abord.",
-      "Tu ne m'as jamais rendu les journées de l'an dernier.",
-      "Rends-moi ce que tu me dois, et on en reparlera.",
-      "J'ai déjà prêté. On ne m'a rien rendu."
+      "Tu me dois déjà des journées.",
+      "Je suis venu chez toi. Toi, tu n'es jamais venu chez moi.",
+      "Rends-moi d'abord ce que tu me dois.",
+      "J'ai déjà donné. On ne m'a rien rendu."
     ],
     "aide.refuse.rancune": [
       "Après ce que tu as dit de moi ? Non.",
@@ -221,6 +218,93 @@
       "Constantinople nous manque, mais la vallée nous nourrit.",
       "Mes enfants ne verront jamais la Ville. C'est peut-être mieux.",
       "Il paraît qu'un Comnène règne à Trébizonde, maintenant."
+    ],
+    "episodes.EPISODE_LINES.fall.firsthand": [
+      "{note}"
+    ],
+    "episodes.EPISODE_LINES.fall.legend": [
+      "on raconte que certains ici ont vu brûler la Ville",
+      "on dit qu'un des fondateurs était dans la Ville quand les Latins sont entrés",
+      "les anciens parlent du printemps où Constantinople a brûlé",
+      "autour du feu, on répète qu'ils ont tous fui la même nuit",
+      "on dit que la Ville est tombée en une seule nuit, et qu'un des nôtres l'a vue"
+    ],
+    "episodes.EPISODE_LINES.carried.firsthand": [
+      "j'ai porté {note} jusqu'ici",
+      "de tout ce que j'avais, j'ai gardé {note}",
+      "{note}, c'est tout ce qui m'est resté de là-bas"
+    ],
+    "episodes.EPISODE_LINES.carried.legend": [
+      "on dit qu'un des fondateurs a sauvé un trésor de la Ville",
+      "on raconte que les premiers sont arrivés avec quelque chose de précieux",
+      "les anciens jurent qu'une relique est arrivée avec les premiers",
+      "on dit que les premiers sont venus les mains pleines d'or",
+      "on raconte qu'un objet de la Ville dort encore dans une maison de Valmire"
+    ],
+    "episodes.EPISODE_LINES.leftBehind.firsthand": [
+      "j'ai laissé {note} derrière moi",
+      "nous avons dû laisser {note} sur la route",
+      "je pense encore à {note}, chaque soir"
+    ],
+    "episodes.EPISODE_LINES.leftBehind.legend": [
+      "on dit que chaque maison de Valmire a laissé quelqu'un sur la route",
+      "on raconte qu'un des fondateurs a abandonné les siens",
+      "les anciens parlent de ceux qu'on n'a pas pu emmener",
+      "on dit qu'il y a eu une trahison, sur la route de la vallée",
+      "autour du feu, on compte encore les absents des premiers jours"
+    ],
+    "episodes.EPISODE_LINES.helped.firsthand": [
+      "{who} a donné {detail} coups de marteau à ma maison",
+      "sans {who}, ma maison serait encore par terre : {detail} coups de marteau de sa main",
+      "je dois {detail} coups de marteau à {who}"
+    ],
+    "episodes.EPISODE_LINES.helped.legend": [
+      "on raconte qu'à Valmire, les maisons se lèvent à plusieurs",
+      "on dit qu'un voisin a bâti une maison qui n'était pas la sienne",
+      "les anciens disent qu'ici, personne ne lève un toit seul"
+    ],
+    "episodes.EPISODE_LINES.refusedHelp.firsthand": [
+      "{who} a refusé de m'aider",
+      "j'ai demandé à {who}, et la réponse a été non",
+      "je n'oublie pas que {who} m'a laissé seul avec mes poutres"
+    ],
+    "episodes.EPISODE_LINES.refusedHelp.legend": [
+      "on dit que certains ici ne lèvent pas le petit doigt pour les autres",
+      "on raconte qu'un voisin a refusé son aide quand il le fallait",
+      "les anciens parlent d'une maison restée sans toit faute de bras"
+    ],
+    "memoire.raconte_par": [
+      "{source} m'a raconté : “{histoire}”",
+      "{source} disait : “{histoire}”",
+      "j'ai entendu {source} dire : “{histoire}”"
+    ],
+    "aide.accepte.dette_rendue": [
+      "Pour toi, oui. Tu m'as aidé, toi aussi.",
+      "Je te dois bien ça.",
+      "Tu es venu chez moi ; je viens chez toi.",
+      "Tu as levé mon toit. Je lève le tien."
+    ],
+    "aide.accepte.amitie": [
+      "Pour un ami, j'arrive.",
+      "Tu n'as même pas besoin de demander.",
+      "Garde-moi une place à ta table, et je viens.",
+      "Entre nous, c'est oui."
+    ],
+    "aide.refuse.refus_rendu": [
+      "Tu m'as dit non quand je te l'ai demandé.",
+      "Tu ne m'as pas aidé. Pourquoi je t'aiderais ?",
+      "Souviens-toi : tu as refusé, toi aussi.",
+      "Quand j'avais besoin de toi, tu étais occupé. Moi aussi, maintenant."
+    ],
+    "aide.refuse.occupe.farmer": [
+      "Le champ m'appelle. Une autre fois.",
+      "La terre n'attend pas, et le grenier non plus.",
+      "Si je laisse le champ, qui nourrira le village ?"
+    ],
+    "aide.refuse.occupe.builder": [
+      "J'ai déjà un chantier sur les bras.",
+      "Les pierres m'attendent ailleurs.",
+      "Pas avant d'avoir fini là où je suis."
     ]
   }
 }

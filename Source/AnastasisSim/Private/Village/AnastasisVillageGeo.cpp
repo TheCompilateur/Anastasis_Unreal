@@ -42,6 +42,14 @@ namespace AnastasisVillage
 				Ids.Add(SpawnNpc(X + 0.5, Y + 0.5, AnastasisNeeds::FNeeds()));
 			}
 		}
+		// `recordWitnesses(this, arrival, "arrival", { about: arrival, rootId, radius: 7 })` (ecart n°47).
+		for (const FString& Id : Ids)
+		{
+			FEpisodeOptions Seen;
+			Seen.AboutId = Id;
+			Seen.RootId = FString::Printf(TEXT("arrival-%s"), *Id);
+			RecordWitnesses(Id, TEXT("arrival"), Seen, 7.0);
+		}
 		return Ids;
 	}
 }

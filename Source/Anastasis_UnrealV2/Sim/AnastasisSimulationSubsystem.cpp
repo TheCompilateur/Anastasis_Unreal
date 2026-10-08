@@ -240,6 +240,9 @@ FString UAnastasisSimulationSubsystem::SeedStartVillage(int32 NpcCount, int32 Ti
 void UAnastasisSimulationSubsystem::TellFounding(const AnastasisFounders::FScenario& Scenario)
 {
 	if (Founders.IsEmpty()) return;
+	// memoire-decisions-001 : ce qui se dira au feu est deja memoire quand la chronique s'ouvre (elle ne
+	// raconte donc pas ces cent cinquante histoires entendues comme des rumeurs du premier jour).
+	const int32 Memories = AnastasisFounders::RecordFireMemories(Simulation, Scenario, Founders, Simulation.GetSeed());
 	// La chronique s'ouvre maintenant, sur le village tel qu'il est pose (metiers d'ouverture compris).
 	Chronicle.Observe(Simulation);
 	const int32 Day = Simulation.GetDay();
@@ -261,8 +264,8 @@ void UAnastasisSimulationSubsystem::TellFounding(const AnastasisFounders::FScena
 		Chronicle.AddNarration(Day, EveningHour, AnastasisChronicle::EKind::Scene, { Line.SpeakerId },
 			FString::Printf(TEXT("%s : « %s »"), *Chronicle.NameOf(Line.SpeakerId), *Line.Text));
 	}
-	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_FOUNDERS founding told families=%d founders=%d fire_lines=%d"),
-		Scenario.Families.Num(), Founders.Num(), Scene.Num());
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_FOUNDERS founding told families=%d founders=%d fire_lines=%d fire_memories=%d"),
+		Scenario.Families.Num(), Founders.Num(), Scene.Num(), Memories);
 }
 
 void UAnastasisSimulationSubsystem::SeedOpeningHousehold()
@@ -516,6 +519,7 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	// CHRONIQUE_VILLAGE_001 : une simulation neuve, une chronique neuve. Le nom provisoire d'un habitant
 	// s'accorde au portrait que la presentation lui donnera (meme tirage que SyncVillagers).
 	Chronicle.Reset(Seed);
+	Notebook.Reset();
 	Founders.Reset();
 	Chronicle.SetDialogue(&AnastasisDialogue::FLibrary::Get());
 	Chronicle.SetLookResolver([this](const AnastasisVillage::FNpc& Npc)
@@ -833,7 +837,24 @@ void UAnastasisSimulationSubsystem::ObserveChronicle()
 	if (CVarChronicleEnabled.GetValueOnGameThread() != 0)
 	{
 		Chronicle.Observe(Simulation);
+		// memoire-decisions-001 : le carnet du joueur, aux memes passages ; les noms sont ceux de la chronique.
+		Notebook.Observe(Simulation, AnastasisDialogue::FLibrary::Get(), [this](const FString& Id) { return Chronicle.NameOf(Id); });
 	}
+}
+
+FString UAnastasisSimulationSubsystem::WriteNotebook(const FString& FileName) const
+{
+	const FString Name = FileName.IsEmpty()
+		? FString::Printf(TEXT("carnet-%u-jour-%d.txt"), Simulation.GetSeed(), Simulation.GetDay())
+		: FileName;
+	const FString Path = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Chronicle"), Name));
+	if (!FFileHelper::SaveStringToFile(Notebook.Render(), *Path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_NOTEBOOK write failed path=%s"), *Path);
+		return FString();
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_NOTEBOOK written path=%s %s"), *Path, *Notebook.StatusJson());
+	return Path;
 }
 
 FString UAnastasisSimulationSubsystem::WriteChronicle(const FString& FileName) const
@@ -1043,6 +1064,20 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisChronicleWrite(
 			return;
 		}
 		Host->WriteChronicle(Args.IsValidIndex(0) ? Args[0] : FString());
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisNotebookWrite(
+	TEXT("Anastasis.Carnet.Write"),
+	TEXT("Anastasis.Carnet.Write [file.txt] - writes the incarnated player's notebook (what they heard, from whom, version by version) to Saved/Chronicle/ and logs ANASTASIS_NOTEBOOK written path=... (memoire-decisions-001)."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		const UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+		if (!Host || !Host->GetSimulation().IsRunning())
+		{
+			UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_NOTEBOOK no running simulation in this world (PIE only)"));
+			return;
+		}
+		Host->WriteNotebook(Args.IsValidIndex(0) ? Args[0] : FString());
 	}));
 
 static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisChroniclePrint(
@@ -1663,6 +1698,24 @@ FString UAnastasisSimulationDebugLibrary::GetChronicleStatus(const UObject* Worl
 {
 	const UAnastasisSimulationSubsystem* Host = DebugHost(WorldContextObject);
 	return Host ? Host->GetChronicle().StatusJson() : FString();
+}
+
+FString UAnastasisSimulationDebugLibrary::GetNotebookText(const UObject* WorldContextObject)
+{
+	const UAnastasisSimulationSubsystem* Host = DebugHost(WorldContextObject);
+	return Host ? Host->GetNotebook().Render() : FString();
+}
+
+FString UAnastasisSimulationDebugLibrary::GetNotebookStatus(const UObject* WorldContextObject)
+{
+	const UAnastasisSimulationSubsystem* Host = DebugHost(WorldContextObject);
+	return Host ? Host->GetNotebook().StatusJson() : FString();
+}
+
+FString UAnastasisSimulationDebugLibrary::WriteNotebook(const UObject* WorldContextObject, const FString& FileName)
+{
+	const UAnastasisSimulationSubsystem* Host = DebugHost(WorldContextObject);
+	return Host ? Host->WriteNotebook(FileName) : FString();
 }
 
 FString UAnastasisSimulationDebugLibrary::WriteChronicle(const UObject* WorldContextObject, const FString& FileName)

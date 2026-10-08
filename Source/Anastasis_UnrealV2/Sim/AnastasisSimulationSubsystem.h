@@ -5,6 +5,7 @@
 #include "Sim/AnastasisTimeWarp.h"
 #include "Sim/AnastasisVillageChronicle.h"
 #include "Sim/AnastasisValmireFounders.h"
+#include "Sim/AnastasisNotebook.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "Village/AnastasisVillagePresentation.h"
@@ -134,6 +135,12 @@ public:
 	 */
 	FString WriteChronicle(const FString& FileName = FString()) const;
 
+	/** memoire-decisions-001 -- le carnet du joueur incarne : ce qu'il a entendu, de qui, version par version. */
+	const AnastasisNotebook::FPlayerNotebook& GetNotebook() const { return Notebook; }
+
+	/** Ecrit le carnet dans Saved/Chronicle/ (carnet-<graine>-jour-<jour>.txt par defaut). Rend le chemin, vide en echec. */
+	FString WriteNotebook(const FString& FileName = FString()) const;
+
 	/**
 	 * TIME_WARP_001 -- avance instantanee (Anastasis.Sim.Advance) : `Seconds` simulees dans cette
 	 * frame, presentation resynchronisee, temoin informe (tout ce temps est oisif pour le village).
@@ -233,6 +240,8 @@ private:
 	FAnastasisSimulation Simulation;
 	/** CHRONIQUE_VILLAGE_001. Observation seule : n'ecrit jamais dans Simulation. */
 	AnastasisChronicle::FVillageChronicle Chronicle;
+	/** memoire-decisions-001. Lecture seule, comme la chronique. */
+	AnastasisNotebook::FPlayerNotebook Notebook;
 	/** familles-feu-001 : les fondateurs poses, dans l'ordre de pose. */
 	TArray<AnastasisFounders::FFounder> Founders;
 	TWeakObjectPtr<AAnastasisWorldEmbodiment> RainCanopyActor;
@@ -292,6 +301,18 @@ public:
 	/** CHRONIQUE_VILLAGE_001 : resume JSON de la chronique (jours clos, lignes par type, habitants, morts). */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetChronicleStatus(const UObject* WorldContextObject);
+
+	/** memoire-decisions-001 : le carnet du joueur (texte complet), vide sans simulation. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetNotebookText(const UObject* WorldContextObject);
+
+	/** memoire-decisions-001 : resume JSON du carnet (choses entendues, histoires, conteurs, legendes). */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetNotebookStatus(const UObject* WorldContextObject);
+
+	/** memoire-decisions-001 : ecrit le carnet dans Saved/Chronicle/ et rend le chemin, vide sans simulation. */
+	UFUNCTION(BlueprintCallable, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString WriteNotebook(const UObject* WorldContextObject, const FString& FileName);
 
 	/** CHRONIQUE_VILLAGE_001 : ecrit la chronique dans Saved/Chronicle/ et rend le chemin, vide sans simulation. */
 	UFUNCTION(BlueprintCallable, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))

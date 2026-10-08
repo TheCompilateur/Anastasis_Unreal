@@ -1,0 +1,607 @@
+CHRONIQUE DE VALMIRE
+Graine 12345. Du jour 1 au jour 30 ; 30 jours clos.
+
+EN BREF
+- 14 fondateurs, 1 arrivé, 0 parti ; 14 en vie à la fin.
+- 1 mort : 1 de faim.
+- 5 chantiers menés à bout ; 0 encore ouvert.
+- Grenier vide 0 soir sur 30.
+- 54 histoires racontées de bouche en bouche, 0 devenue légende.
+- 12 amitiés nouées, 0 brouille.
+
+LES FAMILLES
+La maison du Scribe
+- Konstantinos le Scribe (41 ans) : sans métier ; vit dans la troisième maison ; ami de Michael et Sabas.
+- Eudokia (36 ans) : sans métier ; vit dans la troisième maison ; amie de Zoe.
+- Michael (12 ans) : enfant, garçon ; vit dans la troisième maison ; ami de Konstantinos et Arsenios.
+La famille de Georgios
+- Georgios (50 ans) : cultivateur ; vit dans la sixième maison ; ami de Theodora.
+- Ioannes fils de Georgios (19 ans) : cultivateur ; vit dans la sixième maison ; ami de Theodora.
+- Theodora (47 ans) : cultivatrice ; vit dans la sixième maison ; amie de Georgios et Ioannes.
+- Basileios frère de Georgios (44 ans) : sans métier ; vit dans la sixième maison ; ami d'Euphrosyne et Nikolaos.
+La maison de Niketas
+- Niketas du fort (38 ans) : bâtisseur ; vit dans la quatrième maison ; ami de Leon.
+- Leon pupille de Niketas (16 ans) : bâtisseur ; vit dans la quatrième maison ; ami de Niketas et Maria.
+- Zoe (30 ans) : sans métier ; vit dans la quatrième maison ; amie d'Eudokia et Maria.
+La maisonnée de Maria
+- Maria la veuve du muletier (34 ans) : sans métier ; vit dans la cinquième maison ; amie de Leon, Zoe et Euphrosyne.
+- Euphrosyne fille de Maria (9 ans) : enfant, fille ; vit dans la cinquième maison ; amie de Basileios et Maria.
+- Sabas le muletier (22 ans) : sans métier ; vit dans la cinquième maison ; ami de Konstantinos.
+Hors des familles
+- Arsenios le moine (61 ans) : sans métier ; ancien ; sans maison à soi ; ami de Michael et Nikolaos.
+- Nikolaos : sans métier ; ancien ; mort le jour 8, de faim ; ami de Basileios et Arsenios.
+
+JOUR 1
+  Le matin. Le village s'éveille. Ils sont 14, en 4 maisons : la maison du Scribe, la famille de Georgios, la maison de Niketas et la maisonnée de Maria ; et, hors des familles, Arsenios. Déjà debout : le puits, la première maison et le grenier. En chantier : la deuxième maison. Cultivent pour le grenier : Georgios, Ioannes et Theodora. Bâtissent : Niketas et Leon. Sans métier : Basileios, Konstantinos, Eudokia, Michael, Zoe, Maria, Euphrosyne, Sabas et Arsenios. Georgios a une maison à soi.
+  Le matin. La maison du Scribe : Konstantinos le Scribe, avec Eudokia (sa femme) et Michael (leur fils, 12 ans). Des gens de la Ville, qui savent lire et écrire et n'ont jamais tenu une houe.
+  Le matin. La famille de Georgios : Georgios, avec Theodora (sa femme), Ioannes (leur fils) et Basileios (son frère). Des paysans de la vallée, chassés d'en bas par les razzias ; la terre, ils la connaissent.
+  Le matin. La maison de Niketas : Niketas du fort, avec Zoe (sa femme) et Leon (son pupille). Un soldat sans solde et les siens : il ne se bat plus, il organise.
+  Le matin. La maisonnée de Maria : Maria la veuve du muletier, avec Euphrosyne (sa fille, 9 ans) et Sabas (muletier engagé). Une veuve des routes, qui connaît les marchés, les langues et les prix.
+  L'après-midi. Niketas apporte du bois et de la pierre au chantier de la deuxième maison.
+  L'après-midi. Nikolaos arrive au village.
+  Le soir, au feu.
+    Arsenios : « Je ne resterai peut-être pas. Mais avant de bâtir, il faut savoir qui bâtit. Parlez, chacun à son tour. »
+    Arsenios : « Au printemps où Constantinople a brûlé, où étais-tu ? »
+    Konstantinos : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+    Arsenios : « Montre-nous ce que tu as porté jusqu'ici. »
+    Konstantinos : « Une petite icône de la Vierge, cousue dans mon manteau. »
+    Arsenios : « Qui manque à ce feu, de ton côté ? »
+    Konstantinos : « La mère d'Eudokia. Elle ne pouvait plus marcher. Nous l'avons laissée chez des voisins. »
+    Georgios : « C'est une lourde charge à porter. »
+    Arsenios : « Tu as dit vrai, et c'est assez pour ce soir. »
+    Arsenios : « Dis-nous où la nouvelle de la Ville t'a trouvé. »
+    Georgios : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+    Arsenios : « Qu'as-tu pris avec toi en partant ? »
+    Georgios : « La clé de notre maison d'en bas. Il n'y a plus de porte, mais j'ai gardé la clé. »
+    Arsenios : « Et qui n'est pas venu avec toi ? »
+    Georgios : « Mon père. Il a dit qu'il mourrait sur sa terre. Il l'a fait. »
+    Niketas : « C'est une lourde charge à porter. »
+    Arsenios : « Nous prierons pour son père. »
+    Arsenios : « Quand les Latins sont entrés dans la Ville, où se tenait ta maison ? »
+    Niketas : « Au fort, sur le col. La solde a cessé d'arriver, et puis les ordres aussi. »
+    Arsenios : « Qu'as-tu emporté ? »
+    Niketas : « Une hache et la corne d'appel du fort. La hache pour le bois ; la corne, si un jour il faut rassembler. »
+    Arsenios : « Qui as-tu laissé derrière toi ? »
+    Niketas : « Mes hommes. Ils se sont dispersés. Certains reviendront peut-être. »
+    Maria : « Je ne savais pas. »
+    Arsenios : « Nous prierons pour ses hommes. »
+    Arsenios : « Où étais-tu quand la Ville est tombée ? »
+    Maria : « Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires. »
+    Arsenios : « De tout ce que tu avais, qu'as-tu gardé dans tes mains ? »
+    Maria : « Deux mules. Ce sont elles qui nous ont portés jusqu'ici. »
+    Arsenios : « Nomme-nous celui qui n'est pas là, pour qu'on prie pour lui. »
+    Maria : « Mon fils aîné. Il est parti avec une caravane vers la côte. Il ne sait pas où nous sommes. »
+    Konstantinos : « Le chemin a été dur pour tout le monde. »
+    Arsenios : « Tu as dit vrai, et c'est assez pour ce soir. »
+    Arsenios : « Je bénis ce lieu et ceux qui y restent. Que personne n'y meure seul. »
+  Le soir. Ioannes et Theodora deviennent amis. « Entre nous, on peut dire les choses droites. »
+  La nuit. Leon et Maria deviennent amis. « Reste un peu, parlons. »
+  La nuit. Zoe et Maria deviennent amies. « Tu me manquais, mon vieux. »
+  Bilan du soir : 15 habitants ; 1 maison debout ; 1 chantier ; grenier : 62 portions ; 14 sans toit.
+
+JOUR 2
+  La nuit. La maison du Scribe n'a pas encore de toit à soi : Konstantinos décide de bâtir et trace la parcelle de la troisième maison.
+  La nuit. Konstantinos raconte à Sabas : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  La nuit. Niketas raconte à Leon : « J'ai porté une hache et la corne du fort jusqu'ici »
+  La nuit. Sabas raconte à Nikolaos : « J'ai entendu Konstantinos dire : “de tout ce que j'avais, j'ai gardé une icône de la Vierge” »
+  Le matin. Konstantinos met la main au chantier de la deuxième maison.
+  Le matin. Maria raconte à Zoe : « De tout ce que j'avais, j'ai gardé deux mules »
+  Le matin. Arsenios raconte à Nikolaos : « Georgios m'a raconté : “je pense encore à mon père, chaque soir” »
+  Le matin. Nikolaos et Arsenios deviennent amis. « Je pensais juste a toi. »
+  Le matin. Leon met la main au chantier de la deuxième maison.
+  Le matin. Georgios raconte à Ioannes : « De tout ce que j'avais, j'ai gardé la clé de la maison d'en bas »
+  L'après-midi. Georgios raconte à Theodora : « De tout ce que j'avais, j'ai gardé la clé de la maison d'en bas »
+  L'après-midi. Konstantinos met la main au chantier de la troisième maison.
+  L'après-midi. Konstantinos raconte à Michael : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  L'après-midi. La deuxième maison est achevée, grâce à Konstantinos, Niketas, Leon et Euphrosyne.
+  L'après-midi. Georgios raconte à Ioannes : « Je pense encore à mon père, chaque soir »
+  L'après-midi. Les murs de la troisième maison sont debout ; la maison du Scribe attend des bras pour le toit : on ne lève pas un toit seul.
+  Le soir. Konstantinos et Michael deviennent amis. « On a ri assez pour tenir l'hiver. »
+  Le soir. Eudokia et Zoe deviennent amies. « Si tu peines, tu frappes a ma porte. »
+  Bilan du soir : 15 habitants ; 2 maisons debout ; 1 chantier ; grenier : 127 portions ; 14 sans toit.
+
+JOUR 3
+  La nuit. La maison de Niketas n'a pas encore de toit à soi : Niketas décide de bâtir et trace la parcelle de la quatrième maison.
+  La nuit. Niketas trouve un abri pour la nuit dans la deuxième maison.
+  La nuit. Leon trouve un abri pour la nuit dans la deuxième maison.
+  La nuit. Ioannes trouve un abri pour la nuit dans la deuxième maison.
+  La nuit. Konstantinos va demander de l'aide à Sabas : « Il me faut des bras pour la charpente. Tu en serais ? ». Sabas accepte : « Tu n'as même pas besoin de demander. »
+  La nuit. Konstantinos va demander de l'aide à Georgios : « Avant l'hiver, il faut fermer cette maison. Tu peux venir ? ». Georgios refuse : « Si je laisse le champ, qui nourrira le village ? »
+  Le matin. Niketas met la main au chantier de la quatrième maison.
+  Le matin. Leon met la main au chantier de la quatrième maison.
+  Le matin. Konstantinos s'installe dans la troisième maison, qu'il a aidé à bâtir.
+  Le matin. Eudokia s'installe dans la troisième maison.
+  Le matin. Michael s'installe dans la troisième maison.
+  Le matin. La troisième maison est achevée, grâce à Sabas. Elle revient à la maison du Scribe.
+  Le matin. Les murs de la quatrième maison sont debout ; la maison de Niketas attend des bras pour le toit : on ne lève pas un toit seul.
+  L'après-midi. Basileios raconte à Nikolaos : « J'ai entendu Niketas dire : “nous avons dû laisser mes hommes sur la route” »
+  Le soir. Maria raconte à Leon : « De tout ce que j'avais, j'ai gardé deux mules »
+  Le soir. Georgios raconte à Theodora : « Je pense encore à mon père, chaque soir »
+  La nuit. Niketas et Leon deviennent amis. « Ca fait du bien de te voir. »
+  Bilan du soir : 15 habitants ; 3 maisons debout ; 1 chantier ; grenier : 198 portions ; 8 sans toit.
+
+JOUR 4
+  La nuit. La maisonnée de Maria n'a pas encore de toit à soi : Maria décide de bâtir et trace la parcelle de la cinquième maison.
+  La nuit. Niketas va demander de l'aide à Georgios : « Il me faut des bras pour la charpente. Tu en serais ? ». Georgios refuse : « La terre n'attend pas, et le grenier non plus. »
+  La nuit. Niketas va demander de l'aide à Ioannes : « Les murs tiennent, mais pas le toit. J'ai besoin de toi. ». Ioannes refuse : « La terre n'attend pas, et le grenier non plus. »
+  Le matin. Sabas met la main au chantier de la cinquième maison.
+  Le matin. Les murs de la cinquième maison sont debout ; la maisonnée de Maria attend des bras pour le toit : on ne lève pas un toit seul.
+  L'après-midi. Georgios raconte à Ioannes : « De tout ce que j'avais, j'ai gardé la clé de la maison d'en bas »
+  Le soir. Niketas raconte à Leon : « J'ai porté une hache et la corne du fort jusqu'ici »
+  Le soir. Konstantinos raconte à Michael : « Je dois 10 coups de marteau à Sabas »
+  Le soir. Maria et Euphrosyne deviennent amies. « Si tu peines, tu frappes a ma porte. »
+  Bilan du soir : 15 habitants ; 3 maisons debout ; 2 chantiers ; grenier : 291 portions ; 8 sans toit.
+
+JOUR 5
+  La nuit. La famille de Georgios est à l'étroit, les siens dorment chez les autres : Georgios décide de bâtir pour eux et trace la parcelle de la sixième maison.
+  La nuit. Nikolaos a faim, alors que le grenier a encore 289 portions. « Les enfants mangent d'abord. Nous, on attend. »
+  La nuit. Niketas va demander de l'aide à Theodora : « Je lève ma maison. Viendrais-tu m'aider quelques jours ? ». Theodora refuse : « D'abord ma maison, ensuite la tienne. »
+  La nuit. Niketas va demander de l'aide à Basileios : « Je n'ai pas de quoi payer, mais je te devrai ces journées. ». Basileios refuse : « D'abord ma maison, ensuite la tienne. »
+  La nuit. Maria va demander de l'aide à Leon : « Il me faut des bras pour la charpente. Tu en serais ? ». Leon accepte : « Tu n'as même pas besoin de demander. »
+  La nuit. Maria va demander de l'aide à Zoe : « Avant l'hiver, il faut fermer cette maison. Tu peux venir ? ». Zoe accepte : « Garde-moi une place à ta table, et je viens. »
+  Le matin. Leon met la main au chantier de la cinquième maison.
+  Le matin. Nikolaos a soif, alors que le puits est à sa portée. « Il faudrait un second puits. »
+  L'après-midi. Maria s'installe dans la cinquième maison.
+  L'après-midi. Euphrosyne s'installe dans la cinquième maison.
+  L'après-midi. Sabas s'installe dans la cinquième maison, qu'il a aidé à bâtir.
+  L'après-midi. La cinquième maison est achevée, grâce à Leon. Elle revient à la maisonnée de Maria.
+  L'après-midi. Basileios met la main au chantier de la sixième maison.
+  Le soir. Konstantinos et Sabas deviennent amis. « On se raconte tout, non? »
+  Le soir. Les murs de la sixième maison sont debout ; la famille de Georgios attend des bras pour le toit : on ne lève pas un toit seul.
+  La nuit. Michael raconte à Arsenios : « Konstantinos m'a raconté : “sans Sabas, ma maison serait encore par terre : 13 coups de marteau de sa main” »
+  Bilan du soir : 15 habitants ; 4 maisons debout ; 2 chantiers ; grenier : 296 portions ; 5 sans toit.
+
+JOUR 6
+  La nuit. Georgios va demander de l'aide à Niketas : « Seul, je n'arriverai jamais au toit. Viens m'aider, je te le rendrai. ». Niketas refuse : « D'abord ma maison, ensuite la tienne. »
+  La nuit. Georgios va demander de l'aide à Leon : « Je n'ai pas de quoi payer, mais je te devrai ces journées. ». Leon refuse : « Je viendrai quand mon propre toit sera levé. »
+  La nuit. Niketas va demander de l'aide à Konstantinos : « Je lève ma maison. Viendrais-tu m'aider quelques jours ? ». Konstantinos accepte : « J'ai deux jours. Ils sont à toi. »
+  La nuit. Niketas va demander de l'aide à Eudokia : « Il me faut des bras pour la charpente. Tu en serais ? ». Eudokia accepte : « Je finis ici et je te rejoins. »
+  Le matin. Konstantinos met la main au chantier de la quatrième maison.
+  Le matin. Eudokia met la main au chantier de la quatrième maison.
+  Le matin. Niketas s'installe dans la quatrième maison, qu'il a aidé à bâtir.
+  Le matin. Leon s'installe dans la quatrième maison, qu'il a aidé à bâtir.
+  Le matin. Zoe s'installe dans la quatrième maison.
+  Le matin. La quatrième maison est achevée, grâce à Eudokia et Konstantinos. Elle revient à la maison de Niketas.
+  L'après-midi. Nikolaos s'affaiblit.
+  Le soir. Niketas raconte à Leon : « Je dois 8 coups de marteau à Eudokia »
+  Le soir. Niketas raconte à Leon : « Sans Konstantinos, ma maison serait encore par terre : 6 coups de marteau de sa main »
+  Le soir. Euphrosyne raconte à Basileios : « Maria disait : “je dois 18 coups de marteau à Leon” »
+  Le soir. Basileios et Euphrosyne deviennent amis. « Je pensais juste a toi. »
+  Le soir. Maria raconte à Euphrosyne : « Leon a donné 14 coups de marteau à ma maison »
+  Bilan du soir : 15 habitants ; 5 maisons debout ; 1 chantier ; grenier : 300 portions ; 4 sans toit.
+
+JOUR 7
+  La nuit. Theodora trouve un abri pour la nuit dans la deuxième maison.
+  La nuit. Basileios trouve un abri pour la nuit dans la deuxième maison.
+  La nuit. Georgios va demander de l'aide à Konstantinos : « Je lève ma maison. Viendrais-tu m'aider quelques jours ? ». Konstantinos refuse : « Quand j'avais besoin de toi, tu étais occupé. Moi aussi, maintenant. »
+  La nuit. Georgios va demander de l'aide à Eudokia : « Je n'ai pas de quoi payer, mais je te devrai ces journées. ». Eudokia accepte : « D'accord. Tu me le rendras quand mon tour viendra. »
+  Le matin. Eudokia met la main au chantier de la sixième maison.
+  Le matin. Georgios quitte la première maison pour la sixième maison.
+  Le matin. Ioannes s'installe dans la sixième maison.
+  Le matin. Theodora s'installe dans la sixième maison.
+  Le matin. Basileios s'installe dans la sixième maison, qu'il a aidé à bâtir.
+  Le matin. La sixième maison est achevée, grâce à Eudokia. Elle revient à la famille de Georgios.
+  Le soir. Maria raconte à Leon : « Je pense encore à mon fils aîné, chaque soir »
+  Le soir. Konstantinos raconte à Michael : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  Le soir. Eudokia raconte à Zoe : « J'ai acheve un chantier »
+  La nuit. Leon raconte à Maria : « J'ai entendu Niketas dire : “sans Konstantinos, ma maison serait encore par terre : 8 coups de marteau de sa main” »
+  La nuit. Arsenios et Michael deviennent amis. « On a ri assez pour tenir l'hiver. »
+  Bilan du soir : 15 habitants ; 6 maisons debout ; 0 chantier ; grenier : 299 portions ; 2 sans toit.
+
+JOUR 8
+  La nuit. Nikolaos est mort de faim.
+  La nuit. Arsenios trouve un abri pour la nuit dans la deuxième maison.
+  Le soir. Niketas raconte à Leon : « J'ai laissé mes hommes derrière moi »
+  Le soir. Konstantinos raconte à Sabas : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  La nuit. Georgios et Theodora deviennent amis. « J'ai garde une histoire pour toi. »
+  La nuit. Georgios raconte à Theodora : « Sans Eudokia, ma maison serait encore par terre : 11 coups de marteau de sa main »
+  La nuit. Leon raconte à Maria : « J'ai entendu Niketas dire : “je dois 10 coups de marteau à Eudokia” »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 300 portions ; 0 sans toit ; 1 mort.
+
+JOUR 9
+  Le soir. Georgios raconte à Ioannes : « Sans Eudokia, ma maison serait encore par terre : 11 coups de marteau de sa main »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 300 portions ; 0 sans toit.
+
+JOUR 10
+  Rien de notable.
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 300 portions ; 0 sans toit.
+
+JOUR 11
+  La nuit. Georgios raconte à Theodora : « Konstantinos a refusé de m'aider »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 299 portions ; 0 sans toit.
+
+JOUR 12
+  Le soir. Konstantinos raconte à Michael : « Je n'oublie pas que Georgios m'a laissé seul avec mes poutres »
+  Le soir. Maria raconte à Euphrosyne : « De tout ce que j'avais, j'ai gardé deux mules »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 299 portions ; 0 sans toit.
+
+JOUR 13
+  Le soir. Niketas raconte à Leon : « J'ai demandé à Theodora, et la réponse a été non »
+  Le soir. Konstantinos raconte à Sabas : « Je n'oublie pas que Georgios m'a laissé seul avec mes poutres »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 300 portions ; 0 sans toit.
+
+JOUR 14
+  Le soir. Georgios raconte à Theodora : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 299 portions ; 0 sans toit.
+
+JOUR 15
+  Le matin. Georgios raconte à Theodora : « Je pense encore à mon père, chaque soir »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 299 portions ; 0 sans toit.
+
+JOUR 16
+  L'après-midi. Georgios raconte à Ioannes : « Je pense encore à mon père, chaque soir »
+  Le soir. Maria raconte à Leon : « Je pense encore à mon fils aîné, chaque soir »
+  Le soir. Niketas raconte à Leon : « J'ai demandé à Basileios, et la réponse a été non »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 296 portions ; 0 sans toit.
+
+JOUR 17
+  Rien de notable.
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 300 portions ; 0 sans toit.
+
+JOUR 18
+  Le soir. Maria raconte à Leon : « Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires. »
+  Le soir. Georgios raconte à Theodora : « Je n'oublie pas que Niketas m'a laissé seul avec mes poutres »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 299 portions ; 0 sans toit.
+
+JOUR 19
+  Le soir. Georgios raconte à Theodora : « J'ai demandé à Leon, et la réponse a été non »
+  Le soir. Konstantinos raconte à Sabas : « Je pense encore à la mère d'Eudokia, chaque soir »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 299 portions ; 0 sans toit.
+
+JOUR 20
+  Le soir. Konstantinos raconte à Michael : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+  Le soir. Konstantinos raconte à Michael : « Je pense encore à la mère d'Eudokia, chaque soir »
+  Le soir. Maria raconte à Euphrosyne : « Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires. »
+  Le soir. Konstantinos raconte à Sabas : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 298 portions ; 0 sans toit.
+
+JOUR 21
+  L'après-midi. Maria raconte à Euphrosyne : « Je pense encore à mon fils aîné, chaque soir »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 300 portions ; 0 sans toit.
+
+JOUR 22
+  Le soir. Niketas raconte à Leon : « J'ai laissé mes hommes derrière moi »
+  Le soir. Niketas raconte à Konstantinos : « Je dois 8 coups de marteau à Eudokia »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 298 portions ; 0 sans toit.
+
+JOUR 23
+  Rien de notable.
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 300 portions ; 0 sans toit.
+
+JOUR 24
+  Le soir. Georgios raconte à Theodora : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 300 portions ; 0 sans toit.
+
+JOUR 25
+  Le soir. Niketas raconte à Leon : « Au fort, sur le col. La solde a cessé d'arriver, et puis les ordres aussi. »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 300 portions ; 0 sans toit.
+
+JOUR 26
+  Le soir. Niketas raconte à Leon : « Sans Konstantinos, ma maison serait encore par terre : 6 coups de marteau de sa main »
+  Le soir. Niketas raconte à Leon : « Je dois 8 coups de marteau à Eudokia »
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 300 portions ; 0 sans toit.
+
+JOURS 27 À 30
+  Rien de notable.
+  Bilan du soir : 14 habitants ; 6 maisons debout ; 0 chantier ; grenier : 299 portions ; 0 sans toit.
+
+CE QU'A VÉCU CHACUN
+
+LA MAISON DU SCRIBE
+
+Konstantinos
+  Jour 1, le matin : Konstantinos est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 1, le soir : Konstantinos : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+  Jour 1, le soir : Konstantinos : « Une petite icône de la Vierge, cousue dans mon manteau. »
+  Jour 1, le soir : Konstantinos : « La mère d'Eudokia. Elle ne pouvait plus marcher. Nous l'avons laissée chez des voisins. »
+  Jour 1, le soir : Konstantinos : « Le chemin a été dur pour tout le monde. »
+  Jour 2, la nuit : La maison du Scribe n'a pas encore de toit à soi : Konstantinos décide de bâtir et trace la parcelle de la troisième maison.
+  Jour 2, la nuit : Konstantinos raconte à Sabas : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  Jour 2, le matin : Konstantinos met la main au chantier de la deuxième maison.
+  Jour 2, l'après-midi : Konstantinos met la main au chantier de la troisième maison.
+  Jour 2, l'après-midi : Konstantinos raconte à Michael : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  Jour 2, l'après-midi : La deuxième maison est achevée, grâce à Konstantinos, Niketas, Leon et Euphrosyne.
+  Jour 2, l'après-midi : Les murs de la troisième maison sont debout ; la maison du Scribe attend des bras pour le toit : on ne lève pas un toit seul.
+  Jour 2, le soir : Konstantinos et Michael deviennent amis. « On a ri assez pour tenir l'hiver. »
+  Jour 3, la nuit : Konstantinos va demander de l'aide à Sabas : « Il me faut des bras pour la charpente. Tu en serais ? ». Sabas accepte : « Tu n'as même pas besoin de demander. »
+  Jour 3, la nuit : Konstantinos va demander de l'aide à Georgios : « Avant l'hiver, il faut fermer cette maison. Tu peux venir ? ». Georgios refuse : « Si je laisse le champ, qui nourrira le village ? »
+  Jour 3, le matin : Konstantinos s'installe dans la troisième maison, qu'il a aidé à bâtir.
+  Jour 4, le soir : Konstantinos raconte à Michael : « Je dois 10 coups de marteau à Sabas »
+  Jour 5, le soir : Konstantinos et Sabas deviennent amis. « On se raconte tout, non? »
+  Jour 6, la nuit : Niketas va demander de l'aide à Konstantinos : « Je lève ma maison. Viendrais-tu m'aider quelques jours ? ». Konstantinos accepte : « J'ai deux jours. Ils sont à toi. »
+  Jour 6, le matin : Konstantinos met la main au chantier de la quatrième maison.
+  Jour 6, le matin : La quatrième maison est achevée, grâce à Eudokia et Konstantinos. Elle revient à la maison de Niketas.
+  Jour 7, la nuit : Georgios va demander de l'aide à Konstantinos : « Je lève ma maison. Viendrais-tu m'aider quelques jours ? ». Konstantinos refuse : « Quand j'avais besoin de toi, tu étais occupé. Moi aussi, maintenant. »
+  Jour 7, le soir : Konstantinos raconte à Michael : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  Jour 8, le soir : Konstantinos raconte à Sabas : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  Jour 12, le soir : Konstantinos raconte à Michael : « Je n'oublie pas que Georgios m'a laissé seul avec mes poutres »
+  Jour 13, le soir : Konstantinos raconte à Sabas : « Je n'oublie pas que Georgios m'a laissé seul avec mes poutres »
+  Jour 19, le soir : Konstantinos raconte à Sabas : « Je pense encore à la mère d'Eudokia, chaque soir »
+  Jour 20, le soir : Konstantinos raconte à Michael : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+  Jour 20, le soir : Konstantinos raconte à Michael : « Je pense encore à la mère d'Eudokia, chaque soir »
+  Jour 20, le soir : Konstantinos raconte à Sabas : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+  Jour 22, le soir : Niketas raconte à Konstantinos : « Je dois 8 coups de marteau à Eudokia »
+
+Eudokia
+  Jour 1, le matin : Eudokia est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 2, la nuit : La maison du Scribe n'a pas encore de toit à soi : Konstantinos décide de bâtir et trace la parcelle de la troisième maison.
+  Jour 2, l'après-midi : Les murs de la troisième maison sont debout ; la maison du Scribe attend des bras pour le toit : on ne lève pas un toit seul.
+  Jour 2, le soir : Eudokia et Zoe deviennent amies. « Si tu peines, tu frappes a ma porte. »
+  Jour 3, le matin : Eudokia s'installe dans la troisième maison.
+  Jour 6, la nuit : Niketas va demander de l'aide à Eudokia : « Il me faut des bras pour la charpente. Tu en serais ? ». Eudokia accepte : « Je finis ici et je te rejoins. »
+  Jour 6, le matin : Eudokia met la main au chantier de la quatrième maison.
+  Jour 6, le matin : La quatrième maison est achevée, grâce à Eudokia et Konstantinos. Elle revient à la maison de Niketas.
+  Jour 7, la nuit : Georgios va demander de l'aide à Eudokia : « Je n'ai pas de quoi payer, mais je te devrai ces journées. ». Eudokia accepte : « D'accord. Tu me le rendras quand mon tour viendra. »
+  Jour 7, le matin : Eudokia met la main au chantier de la sixième maison.
+  Jour 7, le matin : La sixième maison est achevée, grâce à Eudokia. Elle revient à la famille de Georgios.
+  Jour 7, le soir : Eudokia raconte à Zoe : « J'ai acheve un chantier »
+
+Michael
+  Jour 1, le matin : Michael est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 2, la nuit : La maison du Scribe n'a pas encore de toit à soi : Konstantinos décide de bâtir et trace la parcelle de la troisième maison.
+  Jour 2, l'après-midi : Konstantinos raconte à Michael : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  Jour 2, l'après-midi : Les murs de la troisième maison sont debout ; la maison du Scribe attend des bras pour le toit : on ne lève pas un toit seul.
+  Jour 2, le soir : Konstantinos et Michael deviennent amis. « On a ri assez pour tenir l'hiver. »
+  Jour 3, le matin : Michael s'installe dans la troisième maison.
+  Jour 4, le soir : Konstantinos raconte à Michael : « Je dois 10 coups de marteau à Sabas »
+  Jour 5, la nuit : Michael raconte à Arsenios : « Konstantinos m'a raconté : “sans Sabas, ma maison serait encore par terre : 13 coups de marteau de sa main” »
+  Jour 7, le soir : Konstantinos raconte à Michael : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  Jour 7, la nuit : Arsenios et Michael deviennent amis. « On a ri assez pour tenir l'hiver. »
+  Jour 12, le soir : Konstantinos raconte à Michael : « Je n'oublie pas que Georgios m'a laissé seul avec mes poutres »
+  Jour 20, le soir : Konstantinos raconte à Michael : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+  Jour 20, le soir : Konstantinos raconte à Michael : « Je pense encore à la mère d'Eudokia, chaque soir »
+
+LA FAMILLE DE GEORGIOS
+
+Georgios
+  Jour 1, le matin : Georgios vit dans la première maison et est cultivateur au grenier.
+  Jour 1, le soir : Georgios : « C'est une lourde charge à porter. »
+  Jour 1, le soir : Georgios : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  Jour 1, le soir : Georgios : « La clé de notre maison d'en bas. Il n'y a plus de porte, mais j'ai gardé la clé. »
+  Jour 1, le soir : Georgios : « Mon père. Il a dit qu'il mourrait sur sa terre. Il l'a fait. »
+  Jour 2, le matin : Georgios raconte à Ioannes : « De tout ce que j'avais, j'ai gardé la clé de la maison d'en bas »
+  Jour 2, l'après-midi : Georgios raconte à Theodora : « De tout ce que j'avais, j'ai gardé la clé de la maison d'en bas »
+  Jour 2, l'après-midi : Georgios raconte à Ioannes : « Je pense encore à mon père, chaque soir »
+  Jour 3, la nuit : Konstantinos va demander de l'aide à Georgios : « Avant l'hiver, il faut fermer cette maison. Tu peux venir ? ». Georgios refuse : « Si je laisse le champ, qui nourrira le village ? »
+  Jour 3, le soir : Georgios raconte à Theodora : « Je pense encore à mon père, chaque soir »
+  Jour 4, la nuit : Niketas va demander de l'aide à Georgios : « Il me faut des bras pour la charpente. Tu en serais ? ». Georgios refuse : « La terre n'attend pas, et le grenier non plus. »
+  Jour 4, l'après-midi : Georgios raconte à Ioannes : « De tout ce que j'avais, j'ai gardé la clé de la maison d'en bas »
+  Jour 5, la nuit : La famille de Georgios est à l'étroit, les siens dorment chez les autres : Georgios décide de bâtir pour eux et trace la parcelle de la sixième maison.
+  Jour 5, le soir : Les murs de la sixième maison sont debout ; la famille de Georgios attend des bras pour le toit : on ne lève pas un toit seul.
+  Jour 6, la nuit : Georgios va demander de l'aide à Niketas : « Seul, je n'arriverai jamais au toit. Viens m'aider, je te le rendrai. ». Niketas refuse : « D'abord ma maison, ensuite la tienne. »
+  Jour 6, la nuit : Georgios va demander de l'aide à Leon : « Je n'ai pas de quoi payer, mais je te devrai ces journées. ». Leon refuse : « Je viendrai quand mon propre toit sera levé. »
+  Jour 7, la nuit : Georgios va demander de l'aide à Konstantinos : « Je lève ma maison. Viendrais-tu m'aider quelques jours ? ». Konstantinos refuse : « Quand j'avais besoin de toi, tu étais occupé. Moi aussi, maintenant. »
+  Jour 7, la nuit : Georgios va demander de l'aide à Eudokia : « Je n'ai pas de quoi payer, mais je te devrai ces journées. ». Eudokia accepte : « D'accord. Tu me le rendras quand mon tour viendra. »
+  Jour 7, le matin : Georgios quitte la première maison pour la sixième maison.
+  Jour 8, la nuit : Georgios et Theodora deviennent amis. « J'ai garde une histoire pour toi. »
+  Jour 8, la nuit : Georgios raconte à Theodora : « Sans Eudokia, ma maison serait encore par terre : 11 coups de marteau de sa main »
+  Jour 9, le soir : Georgios raconte à Ioannes : « Sans Eudokia, ma maison serait encore par terre : 11 coups de marteau de sa main »
+  Jour 11, la nuit : Georgios raconte à Theodora : « Konstantinos a refusé de m'aider »
+  Jour 14, le soir : Georgios raconte à Theodora : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  Jour 15, le matin : Georgios raconte à Theodora : « Je pense encore à mon père, chaque soir »
+  Jour 16, l'après-midi : Georgios raconte à Ioannes : « Je pense encore à mon père, chaque soir »
+  Jour 18, le soir : Georgios raconte à Theodora : « Je n'oublie pas que Niketas m'a laissé seul avec mes poutres »
+  Jour 19, le soir : Georgios raconte à Theodora : « J'ai demandé à Leon, et la réponse a été non »
+  Jour 24, le soir : Georgios raconte à Theodora : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+
+Ioannes
+  Jour 1, le matin : Ioannes est cultivateur au grenier.
+  Jour 1, le soir : Ioannes et Theodora deviennent amis. « Entre nous, on peut dire les choses droites. »
+  Jour 2, le matin : Georgios raconte à Ioannes : « De tout ce que j'avais, j'ai gardé la clé de la maison d'en bas »
+  Jour 2, l'après-midi : Georgios raconte à Ioannes : « Je pense encore à mon père, chaque soir »
+  Jour 3, la nuit : Ioannes trouve un abri pour la nuit dans la deuxième maison.
+  Jour 4, la nuit : Niketas va demander de l'aide à Ioannes : « Les murs tiennent, mais pas le toit. J'ai besoin de toi. ». Ioannes refuse : « La terre n'attend pas, et le grenier non plus. »
+  Jour 4, l'après-midi : Georgios raconte à Ioannes : « De tout ce que j'avais, j'ai gardé la clé de la maison d'en bas »
+  Jour 5, la nuit : La famille de Georgios est à l'étroit, les siens dorment chez les autres : Georgios décide de bâtir pour eux et trace la parcelle de la sixième maison.
+  Jour 5, le soir : Les murs de la sixième maison sont debout ; la famille de Georgios attend des bras pour le toit : on ne lève pas un toit seul.
+  Jour 7, le matin : Ioannes s'installe dans la sixième maison.
+  Jour 9, le soir : Georgios raconte à Ioannes : « Sans Eudokia, ma maison serait encore par terre : 11 coups de marteau de sa main »
+  Jour 16, l'après-midi : Georgios raconte à Ioannes : « Je pense encore à mon père, chaque soir »
+
+Theodora
+  Jour 1, le matin : Theodora est cultivatrice au grenier.
+  Jour 1, le soir : Ioannes et Theodora deviennent amis. « Entre nous, on peut dire les choses droites. »
+  Jour 2, l'après-midi : Georgios raconte à Theodora : « De tout ce que j'avais, j'ai gardé la clé de la maison d'en bas »
+  Jour 3, le soir : Georgios raconte à Theodora : « Je pense encore à mon père, chaque soir »
+  Jour 5, la nuit : La famille de Georgios est à l'étroit, les siens dorment chez les autres : Georgios décide de bâtir pour eux et trace la parcelle de la sixième maison.
+  Jour 5, la nuit : Niketas va demander de l'aide à Theodora : « Je lève ma maison. Viendrais-tu m'aider quelques jours ? ». Theodora refuse : « D'abord ma maison, ensuite la tienne. »
+  Jour 5, le soir : Les murs de la sixième maison sont debout ; la famille de Georgios attend des bras pour le toit : on ne lève pas un toit seul.
+  Jour 7, la nuit : Theodora trouve un abri pour la nuit dans la deuxième maison.
+  Jour 7, le matin : Theodora s'installe dans la sixième maison.
+  Jour 8, la nuit : Georgios et Theodora deviennent amis. « J'ai garde une histoire pour toi. »
+  Jour 8, la nuit : Georgios raconte à Theodora : « Sans Eudokia, ma maison serait encore par terre : 11 coups de marteau de sa main »
+  Jour 11, la nuit : Georgios raconte à Theodora : « Konstantinos a refusé de m'aider »
+  Jour 14, le soir : Georgios raconte à Theodora : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  Jour 15, le matin : Georgios raconte à Theodora : « Je pense encore à mon père, chaque soir »
+  Jour 18, le soir : Georgios raconte à Theodora : « Je n'oublie pas que Niketas m'a laissé seul avec mes poutres »
+  Jour 19, le soir : Georgios raconte à Theodora : « J'ai demandé à Leon, et la réponse a été non »
+  Jour 24, le soir : Georgios raconte à Theodora : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+
+Basileios
+  Jour 1, le matin : Basileios est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 3, l'après-midi : Basileios raconte à Nikolaos : « J'ai entendu Niketas dire : “nous avons dû laisser mes hommes sur la route” »
+  Jour 5, la nuit : La famille de Georgios est à l'étroit, les siens dorment chez les autres : Georgios décide de bâtir pour eux et trace la parcelle de la sixième maison.
+  Jour 5, la nuit : Niketas va demander de l'aide à Basileios : « Je n'ai pas de quoi payer, mais je te devrai ces journées. ». Basileios refuse : « D'abord ma maison, ensuite la tienne. »
+  Jour 5, l'après-midi : Basileios met la main au chantier de la sixième maison.
+  Jour 5, le soir : Les murs de la sixième maison sont debout ; la famille de Georgios attend des bras pour le toit : on ne lève pas un toit seul.
+  Jour 6, le soir : Euphrosyne raconte à Basileios : « Maria disait : “je dois 18 coups de marteau à Leon” »
+  Jour 6, le soir : Basileios et Euphrosyne deviennent amis. « Je pensais juste a toi. »
+  Jour 7, la nuit : Basileios trouve un abri pour la nuit dans la deuxième maison.
+  Jour 7, le matin : Basileios s'installe dans la sixième maison, qu'il a aidé à bâtir.
+
+LA MAISON DE NIKETAS
+
+Niketas
+  Jour 1, le matin : Niketas est bâtisseur.
+  Jour 1, l'après-midi : Niketas apporte du bois et de la pierre au chantier de la deuxième maison.
+  Jour 1, le soir : Niketas : « C'est une lourde charge à porter. »
+  Jour 1, le soir : Niketas : « Au fort, sur le col. La solde a cessé d'arriver, et puis les ordres aussi. »
+  Jour 1, le soir : Niketas : « Une hache et la corne d'appel du fort. La hache pour le bois ; la corne, si un jour il faut rassembler. »
+  Jour 1, le soir : Niketas : « Mes hommes. Ils se sont dispersés. Certains reviendront peut-être. »
+  Jour 2, la nuit : Niketas raconte à Leon : « J'ai porté une hache et la corne du fort jusqu'ici »
+  Jour 2, l'après-midi : La deuxième maison est achevée, grâce à Konstantinos, Niketas, Leon et Euphrosyne.
+  Jour 3, la nuit : La maison de Niketas n'a pas encore de toit à soi : Niketas décide de bâtir et trace la parcelle de la quatrième maison.
+  Jour 3, la nuit : Niketas trouve un abri pour la nuit dans la deuxième maison.
+  Jour 3, le matin : Niketas met la main au chantier de la quatrième maison.
+  Jour 3, le matin : Les murs de la quatrième maison sont debout ; la maison de Niketas attend des bras pour le toit : on ne lève pas un toit seul.
+  Jour 3, la nuit : Niketas et Leon deviennent amis. « Ca fait du bien de te voir. »
+  Jour 4, la nuit : Niketas va demander de l'aide à Georgios : « Il me faut des bras pour la charpente. Tu en serais ? ». Georgios refuse : « La terre n'attend pas, et le grenier non plus. »
+  Jour 4, la nuit : Niketas va demander de l'aide à Ioannes : « Les murs tiennent, mais pas le toit. J'ai besoin de toi. ». Ioannes refuse : « La terre n'attend pas, et le grenier non plus. »
+  Jour 4, le soir : Niketas raconte à Leon : « J'ai porté une hache et la corne du fort jusqu'ici »
+  Jour 5, la nuit : Niketas va demander de l'aide à Theodora : « Je lève ma maison. Viendrais-tu m'aider quelques jours ? ». Theodora refuse : « D'abord ma maison, ensuite la tienne. »
+  Jour 5, la nuit : Niketas va demander de l'aide à Basileios : « Je n'ai pas de quoi payer, mais je te devrai ces journées. ». Basileios refuse : « D'abord ma maison, ensuite la tienne. »
+  Jour 6, la nuit : Georgios va demander de l'aide à Niketas : « Seul, je n'arriverai jamais au toit. Viens m'aider, je te le rendrai. ». Niketas refuse : « D'abord ma maison, ensuite la tienne. »
+  Jour 6, la nuit : Niketas va demander de l'aide à Konstantinos : « Je lève ma maison. Viendrais-tu m'aider quelques jours ? ». Konstantinos accepte : « J'ai deux jours. Ils sont à toi. »
+  Jour 6, la nuit : Niketas va demander de l'aide à Eudokia : « Il me faut des bras pour la charpente. Tu en serais ? ». Eudokia accepte : « Je finis ici et je te rejoins. »
+  Jour 6, le matin : Niketas s'installe dans la quatrième maison, qu'il a aidé à bâtir.
+  Jour 6, le soir : Niketas raconte à Leon : « Je dois 8 coups de marteau à Eudokia »
+  Jour 6, le soir : Niketas raconte à Leon : « Sans Konstantinos, ma maison serait encore par terre : 6 coups de marteau de sa main »
+  Jour 8, le soir : Niketas raconte à Leon : « J'ai laissé mes hommes derrière moi »
+  Jour 13, le soir : Niketas raconte à Leon : « J'ai demandé à Theodora, et la réponse a été non »
+  Jour 16, le soir : Niketas raconte à Leon : « J'ai demandé à Basileios, et la réponse a été non »
+  Jour 22, le soir : Niketas raconte à Leon : « J'ai laissé mes hommes derrière moi »
+  Jour 22, le soir : Niketas raconte à Konstantinos : « Je dois 8 coups de marteau à Eudokia »
+  Jour 25, le soir : Niketas raconte à Leon : « Au fort, sur le col. La solde a cessé d'arriver, et puis les ordres aussi. »
+  Jour 26, le soir : Niketas raconte à Leon : « Sans Konstantinos, ma maison serait encore par terre : 6 coups de marteau de sa main »
+  Jour 26, le soir : Niketas raconte à Leon : « Je dois 8 coups de marteau à Eudokia »
+
+Leon
+  Jour 1, le matin : Leon est bâtisseur.
+  Jour 1, la nuit : Leon et Maria deviennent amis. « Reste un peu, parlons. »
+  Jour 2, la nuit : Niketas raconte à Leon : « J'ai porté une hache et la corne du fort jusqu'ici »
+  Jour 2, le matin : Leon met la main au chantier de la deuxième maison.
+  Jour 2, l'après-midi : La deuxième maison est achevée, grâce à Konstantinos, Niketas, Leon et Euphrosyne.
+  Jour 3, la nuit : La maison de Niketas n'a pas encore de toit à soi : Niketas décide de bâtir et trace la parcelle de la quatrième maison.
+  Jour 3, la nuit : Leon trouve un abri pour la nuit dans la deuxième maison.
+  Jour 3, le matin : Leon met la main au chantier de la quatrième maison.
+  Jour 3, le matin : Les murs de la quatrième maison sont debout ; la maison de Niketas attend des bras pour le toit : on ne lève pas un toit seul.
+  Jour 3, le soir : Maria raconte à Leon : « De tout ce que j'avais, j'ai gardé deux mules »
+  Jour 3, la nuit : Niketas et Leon deviennent amis. « Ca fait du bien de te voir. »
+  Jour 4, le soir : Niketas raconte à Leon : « J'ai porté une hache et la corne du fort jusqu'ici »
+  Jour 5, la nuit : Maria va demander de l'aide à Leon : « Il me faut des bras pour la charpente. Tu en serais ? ». Leon accepte : « Tu n'as même pas besoin de demander. »
+  Jour 5, le matin : Leon met la main au chantier de la cinquième maison.
+  Jour 5, l'après-midi : La cinquième maison est achevée, grâce à Leon. Elle revient à la maisonnée de Maria.
+  Jour 6, la nuit : Georgios va demander de l'aide à Leon : « Je n'ai pas de quoi payer, mais je te devrai ces journées. ». Leon refuse : « Je viendrai quand mon propre toit sera levé. »
+  Jour 6, le matin : Leon s'installe dans la quatrième maison, qu'il a aidé à bâtir.
+  Jour 6, le soir : Niketas raconte à Leon : « Je dois 8 coups de marteau à Eudokia »
+  Jour 6, le soir : Niketas raconte à Leon : « Sans Konstantinos, ma maison serait encore par terre : 6 coups de marteau de sa main »
+  Jour 7, le soir : Maria raconte à Leon : « Je pense encore à mon fils aîné, chaque soir »
+  Jour 7, la nuit : Leon raconte à Maria : « J'ai entendu Niketas dire : “sans Konstantinos, ma maison serait encore par terre : 8 coups de marteau de sa main” »
+  Jour 8, le soir : Niketas raconte à Leon : « J'ai laissé mes hommes derrière moi »
+  Jour 8, la nuit : Leon raconte à Maria : « J'ai entendu Niketas dire : “je dois 10 coups de marteau à Eudokia” »
+  Jour 13, le soir : Niketas raconte à Leon : « J'ai demandé à Theodora, et la réponse a été non »
+  Jour 16, le soir : Maria raconte à Leon : « Je pense encore à mon fils aîné, chaque soir »
+  Jour 16, le soir : Niketas raconte à Leon : « J'ai demandé à Basileios, et la réponse a été non »
+  Jour 18, le soir : Maria raconte à Leon : « Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires. »
+  Jour 22, le soir : Niketas raconte à Leon : « J'ai laissé mes hommes derrière moi »
+  Jour 25, le soir : Niketas raconte à Leon : « Au fort, sur le col. La solde a cessé d'arriver, et puis les ordres aussi. »
+  Jour 26, le soir : Niketas raconte à Leon : « Sans Konstantinos, ma maison serait encore par terre : 6 coups de marteau de sa main »
+  Jour 26, le soir : Niketas raconte à Leon : « Je dois 8 coups de marteau à Eudokia »
+
+Zoe
+  Jour 1, le matin : Zoe est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 1, la nuit : Zoe et Maria deviennent amies. « Tu me manquais, mon vieux. »
+  Jour 2, le matin : Maria raconte à Zoe : « De tout ce que j'avais, j'ai gardé deux mules »
+  Jour 2, le soir : Eudokia et Zoe deviennent amies. « Si tu peines, tu frappes a ma porte. »
+  Jour 3, la nuit : La maison de Niketas n'a pas encore de toit à soi : Niketas décide de bâtir et trace la parcelle de la quatrième maison.
+  Jour 3, le matin : Les murs de la quatrième maison sont debout ; la maison de Niketas attend des bras pour le toit : on ne lève pas un toit seul.
+  Jour 5, la nuit : Maria va demander de l'aide à Zoe : « Avant l'hiver, il faut fermer cette maison. Tu peux venir ? ». Zoe accepte : « Garde-moi une place à ta table, et je viens. »
+  Jour 6, le matin : Zoe s'installe dans la quatrième maison.
+  Jour 7, le soir : Eudokia raconte à Zoe : « J'ai acheve un chantier »
+
+LA MAISONNéE DE MARIA
+
+Maria
+  Jour 1, le matin : Maria est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 1, le soir : Maria : « Je ne savais pas. »
+  Jour 1, le soir : Maria : « Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires. »
+  Jour 1, le soir : Maria : « Deux mules. Ce sont elles qui nous ont portés jusqu'ici. »
+  Jour 1, le soir : Maria : « Mon fils aîné. Il est parti avec une caravane vers la côte. Il ne sait pas où nous sommes. »
+  Jour 1, la nuit : Leon et Maria deviennent amis. « Reste un peu, parlons. »
+  Jour 1, la nuit : Zoe et Maria deviennent amies. « Tu me manquais, mon vieux. »
+  Jour 2, le matin : Maria raconte à Zoe : « De tout ce que j'avais, j'ai gardé deux mules »
+  Jour 3, le soir : Maria raconte à Leon : « De tout ce que j'avais, j'ai gardé deux mules »
+  Jour 4, la nuit : La maisonnée de Maria n'a pas encore de toit à soi : Maria décide de bâtir et trace la parcelle de la cinquième maison.
+  Jour 4, le matin : Les murs de la cinquième maison sont debout ; la maisonnée de Maria attend des bras pour le toit : on ne lève pas un toit seul.
+  Jour 4, le soir : Maria et Euphrosyne deviennent amies. « Si tu peines, tu frappes a ma porte. »
+  Jour 5, la nuit : Maria va demander de l'aide à Leon : « Il me faut des bras pour la charpente. Tu en serais ? ». Leon accepte : « Tu n'as même pas besoin de demander. »
+  Jour 5, la nuit : Maria va demander de l'aide à Zoe : « Avant l'hiver, il faut fermer cette maison. Tu peux venir ? ». Zoe accepte : « Garde-moi une place à ta table, et je viens. »
+  Jour 5, l'après-midi : Maria s'installe dans la cinquième maison.
+  Jour 6, le soir : Maria raconte à Euphrosyne : « Leon a donné 14 coups de marteau à ma maison »
+  Jour 7, le soir : Maria raconte à Leon : « Je pense encore à mon fils aîné, chaque soir »
+  Jour 7, la nuit : Leon raconte à Maria : « J'ai entendu Niketas dire : “sans Konstantinos, ma maison serait encore par terre : 8 coups de marteau de sa main” »
+  Jour 8, la nuit : Leon raconte à Maria : « J'ai entendu Niketas dire : “je dois 10 coups de marteau à Eudokia” »
+  Jour 12, le soir : Maria raconte à Euphrosyne : « De tout ce que j'avais, j'ai gardé deux mules »
+  Jour 16, le soir : Maria raconte à Leon : « Je pense encore à mon fils aîné, chaque soir »
+  Jour 18, le soir : Maria raconte à Leon : « Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires. »
+  Jour 20, le soir : Maria raconte à Euphrosyne : « Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires. »
+  Jour 21, l'après-midi : Maria raconte à Euphrosyne : « Je pense encore à mon fils aîné, chaque soir »
+
+Euphrosyne
+  Jour 1, le matin : Euphrosyne est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 2, l'après-midi : La deuxième maison est achevée, grâce à Konstantinos, Niketas, Leon et Euphrosyne.
+  Jour 4, la nuit : La maisonnée de Maria n'a pas encore de toit à soi : Maria décide de bâtir et trace la parcelle de la cinquième maison.
+  Jour 4, le matin : Les murs de la cinquième maison sont debout ; la maisonnée de Maria attend des bras pour le toit : on ne lève pas un toit seul.
+  Jour 4, le soir : Maria et Euphrosyne deviennent amies. « Si tu peines, tu frappes a ma porte. »
+  Jour 5, l'après-midi : Euphrosyne s'installe dans la cinquième maison.
+  Jour 6, le soir : Euphrosyne raconte à Basileios : « Maria disait : “je dois 18 coups de marteau à Leon” »
+  Jour 6, le soir : Basileios et Euphrosyne deviennent amis. « Je pensais juste a toi. »
+  Jour 6, le soir : Maria raconte à Euphrosyne : « Leon a donné 14 coups de marteau à ma maison »
+  Jour 12, le soir : Maria raconte à Euphrosyne : « De tout ce que j'avais, j'ai gardé deux mules »
+  Jour 20, le soir : Maria raconte à Euphrosyne : « Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires. »
+  Jour 21, l'après-midi : Maria raconte à Euphrosyne : « Je pense encore à mon fils aîné, chaque soir »
+
+Sabas
+  Jour 1, le matin : Sabas est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 2, la nuit : Konstantinos raconte à Sabas : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  Jour 2, la nuit : Sabas raconte à Nikolaos : « J'ai entendu Konstantinos dire : “de tout ce que j'avais, j'ai gardé une icône de la Vierge” »
+  Jour 3, la nuit : Konstantinos va demander de l'aide à Sabas : « Il me faut des bras pour la charpente. Tu en serais ? ». Sabas accepte : « Tu n'as même pas besoin de demander. »
+  Jour 3, le matin : La troisième maison est achevée, grâce à Sabas. Elle revient à la maison du Scribe.
+  Jour 4, la nuit : La maisonnée de Maria n'a pas encore de toit à soi : Maria décide de bâtir et trace la parcelle de la cinquième maison.
+  Jour 4, le matin : Sabas met la main au chantier de la cinquième maison.
+  Jour 4, le matin : Les murs de la cinquième maison sont debout ; la maisonnée de Maria attend des bras pour le toit : on ne lève pas un toit seul.
+  Jour 5, l'après-midi : Sabas s'installe dans la cinquième maison, qu'il a aidé à bâtir.
+  Jour 5, le soir : Konstantinos et Sabas deviennent amis. « On se raconte tout, non? »
+  Jour 8, le soir : Konstantinos raconte à Sabas : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  Jour 13, le soir : Konstantinos raconte à Sabas : « Je n'oublie pas que Georgios m'a laissé seul avec mes poutres »
+  Jour 19, le soir : Konstantinos raconte à Sabas : « Je pense encore à la mère d'Eudokia, chaque soir »
+  Jour 20, le soir : Konstantinos raconte à Sabas : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+
+HORS DES FAMILLES
+
+Arsenios
+  Jour 1, le matin : Arsenios est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 1, le soir : Arsenios : « Je ne resterai peut-être pas. Mais avant de bâtir, il faut savoir qui bâtit. Parlez, chacun à son tour. »
+  Jour 1, le soir : Arsenios : « Au printemps où Constantinople a brûlé, où étais-tu ? »
+  Jour 1, le soir : Arsenios : « Montre-nous ce que tu as porté jusqu'ici. »
+  Jour 1, le soir : Arsenios : « Qui manque à ce feu, de ton côté ? »
+  Jour 1, le soir : Arsenios : « Tu as dit vrai, et c'est assez pour ce soir. »
+  Jour 1, le soir : Arsenios : « Dis-nous où la nouvelle de la Ville t'a trouvé. »
+  Jour 1, le soir : Arsenios : « Qu'as-tu pris avec toi en partant ? »
+  Jour 1, le soir : Arsenios : « Et qui n'est pas venu avec toi ? »
+  Jour 1, le soir : Arsenios : « Nous prierons pour son père. »
+  Jour 1, le soir : Arsenios : « Quand les Latins sont entrés dans la Ville, où se tenait ta maison ? »
+  Jour 1, le soir : Arsenios : « Qu'as-tu emporté ? »
+  Jour 1, le soir : Arsenios : « Qui as-tu laissé derrière toi ? »
+  Jour 1, le soir : Arsenios : « Nous prierons pour ses hommes. »
+  Jour 1, le soir : Arsenios : « Où étais-tu quand la Ville est tombée ? »
+  Jour 1, le soir : Arsenios : « De tout ce que tu avais, qu'as-tu gardé dans tes mains ? »
+  Jour 1, le soir : Arsenios : « Nomme-nous celui qui n'est pas là, pour qu'on prie pour lui. »
+  Jour 1, le soir : Arsenios : « Tu as dit vrai, et c'est assez pour ce soir. »
+  Jour 1, le soir : Arsenios : « Je bénis ce lieu et ceux qui y restent. Que personne n'y meure seul. »
+  Jour 2, le matin : Arsenios raconte à Nikolaos : « Georgios m'a raconté : “je pense encore à mon père, chaque soir” »
+  Jour 2, le matin : Nikolaos et Arsenios deviennent amis. « Je pensais juste a toi. »
+  Jour 5, la nuit : Michael raconte à Arsenios : « Konstantinos m'a raconté : “sans Sabas, ma maison serait encore par terre : 13 coups de marteau de sa main” »
+  Jour 7, la nuit : Arsenios et Michael deviennent amis. « On a ri assez pour tenir l'hiver. »
+  Jour 8, la nuit : Arsenios trouve un abri pour la nuit dans la deuxième maison.
+
+Nikolaos
+  Jour 1, l'après-midi : Nikolaos arrive au village.
+  Jour 2, la nuit : Sabas raconte à Nikolaos : « J'ai entendu Konstantinos dire : “de tout ce que j'avais, j'ai gardé une icône de la Vierge” »
+  Jour 2, le matin : Arsenios raconte à Nikolaos : « Georgios m'a raconté : “je pense encore à mon père, chaque soir” »
+  Jour 2, le matin : Nikolaos et Arsenios deviennent amis. « Je pensais juste a toi. »
+  Jour 3, l'après-midi : Basileios raconte à Nikolaos : « J'ai entendu Niketas dire : “nous avons dû laisser mes hommes sur la route” »
+  Jour 5, la nuit : Nikolaos a faim, alors que le grenier a encore 289 portions. « Les enfants mangent d'abord. Nous, on attend. »
+  Jour 5, le matin : Nikolaos a soif, alors que le puits est à sa portée. « Il faudrait un second puits. »
+  Jour 6, l'après-midi : Nikolaos s'affaiblit.
+  Jour 8, la nuit : Nikolaos est mort de faim.

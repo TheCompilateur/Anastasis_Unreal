@@ -45,6 +45,20 @@ namespace AnastasisFounders
 			}
 		}
 
+		/** « son pere » -> « mon pere » : le repondant parle de ses absents a la premiere personne. */
+		FString FirstPerson(const FString& Subject)
+		{
+			static const TPair<const TCHAR*, const TCHAR*> Possessives[] = {
+				{ TEXT("son "), TEXT("mon ") }, { TEXT("sa "), TEXT("ma ") }, { TEXT("ses "), TEXT("mes ") },
+				{ TEXT("leur "), TEXT("notre ") }, { TEXT("leurs "), TEXT("nos ") },
+			};
+			for (const TPair<const TCHAR*, const TCHAR*>& P : Possessives)
+			{
+				if (Subject.StartsWith(P.Key, ESearchCase::CaseSensitive)) return FString(P.Value) + Subject.Mid(FCString::Strlen(P.Key));
+			}
+			return Subject;
+		}
+
 		const FFounder* FounderOf(const TArray<FFounder>& Founders, const FString& Key)
 		{
 			return Founders.FindByPredicate([&Key](const FFounder& F) { return F.Key == Key; });
@@ -307,6 +321,46 @@ namespace AnastasisFounders
 		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_FOUNDERS seeded %d of %d around %s"),
 			Founders.Num(), Scenario.PoseOrder.Num(), *WellId);
 		return Founders;
+	}
+
+	int32 RecordFireMemories(FAnastasisSimulation& Sim, const FScenario& Scenario, const TArray<FFounder>& Founders, uint32 Seed)
+	{
+		AnastasisVillage::FVillage& Village = Sim.GetVillage();
+		int32 Kept = 0;
+		for (const FFamilyDef& Family : Scenario.Families)
+		{
+			const FFounder* Respondent = FounderOf(Founders, Family.Respondent);
+			if (!Respondent) continue;
+			const FString Where = Family.Where[Variant(Seed, Family.Key, TEXT("ville"), Family.Where.Num())];
+			const FAnswer& Carried = Family.Carried[Variant(Seed, Family.Key, TEXT("emporte"), Family.Carried.Num())];
+			const FAnswer& Missing = Family.Missing[Variant(Seed, Family.Key, TEXT("absent"), Family.Missing.Num())];
+			TArray<FString> Lived;
+			auto Remember = [&](const TCHAR* Kind, const FString& Note)
+			{
+				AnastasisVillage::FVillage::FEpisodeOptions Options;
+				Options.Note = Note;
+				Options.RootId = FString::Printf(TEXT("feu-%s-%s"), *Family.Key, Kind);
+				const FString Id = Village.RecordEpisode(Respondent->NpcId, Kind, Options);
+				if (!Id.IsEmpty())
+				{
+					Lived.Add(Id);
+					++Kept;
+				}
+			};
+			Remember(TEXT("fall"), Where);
+			Remember(TEXT("carried"), Carried.Subject);
+			Remember(TEXT("leftBehind"), FirstPerson(Missing.Subject));
+			// Tous les autres etaient au feu : ils l'ont entendu de sa bouche.
+			for (const FFounder& Listener : Founders)
+			{
+				if (Listener.NpcId == Respondent->NpcId) continue;
+				for (const FString& Id : Lived)
+				{
+					if (Village.TellEpisode(Respondent->NpcId, Listener.NpcId, Id)) ++Kept;
+				}
+			}
+		}
+		return Kept;
 	}
 
 	FString FamilyIntro(const FFamilyDef& Family)

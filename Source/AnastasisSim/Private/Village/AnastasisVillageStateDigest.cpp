@@ -61,6 +61,9 @@ namespace AnastasisVillage
 		void VisitState(FStateArchive& Ar, FPlayerGoalOption& V);
 		void VisitState(FStateArchive& Ar, FVillage::FDeath& V);
 		void VisitState(FStateArchive& Ar, FVillage::FFamily& V);
+		void VisitState(FStateArchive& Ar, FVillage::FHelpAnswer& V);
+		void VisitState(FStateArchive& Ar, AnastasisEpisodes::FEpisode& V);
+		void VisitState(FStateArchive& Ar, AnastasisEpisodes::FChronicle& V);
 		void VisitState(FStateArchive& Ar, AnastasisWeatherBehavior::FSimWeather& V);
 		void VisitState(FStateArchive& Ar, AnastasisBudget::FDirector& V);
 		void VisitState(FStateArchive& Ar, AnastasisNav::FNavGrid& V);
@@ -284,6 +287,12 @@ namespace AnastasisVillage
 				VisitPair(A, [&Worker](FStateArchive& B) { B.String(Worker.Key).Number(Worker.Value); });
 			});
 			Ar.Key(TEXT("completedDay")).Number(V.CompletedDay);
+			// ecart n°48 : la maison d'une famille.
+			Ar.Key(TEXT("ownerFamilyId")).String(V.OwnerFamilyId);
+			Ar.Key(TEXT("allowedBuilders"));
+			VisitStrings(Ar, V.AllowedBuilders);
+			Ar.Key(TEXT("askedIds"));
+			VisitStrings(Ar, V.AskedIds);
 			Ar.Key(TEXT("completedById")).String(V.CompletedById);
 			Ar.Key(TEXT("vacantSinceDay")).Number(V.VacantSinceDay);
 			Ar.EndObject();
@@ -679,6 +688,8 @@ namespace AnastasisVillage
 			Ar.Key(TEXT("age")).Number(V.Age);
 			Ar.Key(TEXT("familyId")).String(V.FamilyId);
 			Ar.Key(TEXT("kinRole")).String(V.KinRole);
+			Ar.Key(TEXT("chronicle"));
+			VisitState(Ar, V.Chronicle);
 			Ar.Key(TEXT("inside"));
 			VisitState(Ar, V.Inside);
 			Ar.Key(TEXT("doorStuckAt")).Number(V.DoorStuckAt);
@@ -897,6 +908,56 @@ namespace AnastasisVillage
 			Ar.EndObject();
 		}
 
+		// ecart n°47 : un souvenir, et la memoire qui les tient.
+		void VisitState(FStateArchive& Ar, AnastasisEpisodes::FEpisode& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("id")).String(V.Id);
+			Ar.Key(TEXT("rootId")).String(V.RootId);
+			Ar.Key(TEXT("kind")).String(V.Kind);
+			Ar.Key(TEXT("day")).Number(V.Day);
+			Ar.Key(TEXT("tone")).Number(V.Tone);
+			Ar.Key(TEXT("weight")).Number(V.Weight);
+			Ar.Key(TEXT("aboutId")).String(V.AboutId);
+			Ar.Key(TEXT("aboutName")).String(V.AboutName);
+			Ar.Key(TEXT("x")).Number(V.X);
+			Ar.Key(TEXT("y")).Number(V.Y);
+			Ar.Key(TEXT("detail")).Number(V.Detail);
+			Ar.Key(TEXT("note")).String(V.Note);
+			Ar.Key(TEXT("hops")).Number(V.Hops);
+			Ar.Key(TEXT("firsthand")).Bool(V.bFirsthand);
+			Ar.Key(TEXT("sourceId")).String(V.SourceId);
+			Ar.Key(TEXT("sourceEpisodeId")).String(V.SourceEpisodeId);
+			Ar.Key(TEXT("originalSourceId")).String(V.OriginalSourceId);
+			Ar.Key(TEXT("confidence")).Number(V.Confidence);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisEpisodes::FChronicle& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("events"));
+			VisitStates(Ar, V.Events);
+			Ar.Key(TEXT("lived")).Number(V.Lived);
+			Ar.Key(TEXT("told")).Number(V.Told);
+			Ar.Key(TEXT("heard")).Number(V.Heard);
+			Ar.Key(TEXT("nextId")).Number(V.NextId);
+			Ar.EndObject();
+		}
+
+		// ecart n°48 : une demande d'aide et sa reponse.
+		void VisitState(FStateArchive& Ar, FVillage::FHelpAnswer& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("day")).Number(V.Day);
+			Ar.Key(TEXT("fromId")).String(V.FromId);
+			Ar.Key(TEXT("toId")).String(V.ToId);
+			Ar.Key(TEXT("siteId")).String(V.SiteId);
+			Ar.Key(TEXT("accepted")).Bool(V.bAccepted);
+			Ar.Key(TEXT("reason")).String(V.Reason);
+			Ar.EndObject();
+		}
+
 		// ecart n°44 : un foyer pose par l'hote.
 		void VisitState(FStateArchive& Ar, FVillage::FFamily& V)
 		{
@@ -1099,6 +1160,8 @@ namespace AnastasisVillage
 		VisitStates(Ar, DeathLog);
 		Ar.Key(TEXT("families"));
 		VisitStates(Ar, Families);
+		Ar.Key(TEXT("helpLog"));
+		VisitStates(Ar, HelpLog);
 		Ar.Key(TEXT("nextFamilyId")).Number(NextFamilyId);
 		Ar.Key(TEXT("nextNpcId")).Number(NextNpcId);
 		Ar.Key(TEXT("now")).Number(Now);

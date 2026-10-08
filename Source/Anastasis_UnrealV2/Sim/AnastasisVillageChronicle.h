@@ -62,6 +62,16 @@ namespace AnastasisChronicle
 		FoodLow,
 		/** Une scene racontee par l'hote (le feu du premier soir) : une ligne par replique. */
 		Scene,
+		/** memoire-decisions-001 : un habitant raconte un souvenir a un autre (la version que l'autre retient). */
+		Rumor,
+		/** Une histoire passee par trois bouches : plus personne ne l'a vecue. */
+		Legend,
+		/** memoire-decisions-001 (ecart n°48) : une famille decide de batir sa maison. */
+		HouseDecided,
+		/** On a demande de l'aide, et on a dit oui. */
+		HelpGiven,
+		/** On a demande de l'aide, et on a dit non : la raison. */
+		HelpRefused,
 		/** Un chantier qui n'avance plus depuis 3, 7, 15 ou 30 jours. Toujours le dernier : StatusJson s'arrete la. */
 		Stalled,
 	};
@@ -185,6 +195,8 @@ namespace AnastasisChronicle
 			FString DeathCause;
 			TSet<FString> Friends;
 			TSet<FString> Foes;
+			/** Les souvenirs deja vus dans sa memoire (`FNpc::Chronicle`), par identifiant. */
+			TSet<FString> Episodes;
 		};
 
 		struct FBuildingState
@@ -196,6 +208,10 @@ namespace AnastasisChronicle
 			FString Owner;
 			/** Ceux qui y ont pose une piece ou apporte des materiaux, dans l'ordre ou ils sont venus. */
 			TArray<FString> Helpers;
+			/** ecart n°48 : la maison d'une famille (son nom), qui attend des bras pour son toit. */
+			FString FamilyName;
+			bool bAwaitsHelp = false;
+			bool bAwaitTold = false;
 			/** Avancement lu, et le jour ou il a bouge pour la derniere fois : un chantier qui stagne se dit. */
 			double Progress = 0.0;
 			int32 ProgressDay = 0;
@@ -239,6 +255,10 @@ namespace AnastasisChronicle
 		FLookResolver LookResolver;
 		const AnastasisDialogue::FLibrary* Lines = nullptr;
 		TArray<FFamilyView> FamilyViews;
+		/** Les histoires dont la chronique a deja dit qu'elles etaient devenues legendes. */
+		TSet<FString> LegendRoots;
+		/** Les demandes d'aide deja racontees (`FVillage::GetHelpLog`). */
+		int32 HelpSeen = 0;
 		TArray<FString> PersonOrder;
 		TMap<FString, FPersonState> People;
 		TArray<FString> BuildingOrder;

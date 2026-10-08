@@ -10,6 +10,7 @@
 // simulation, comme `hashTalk` de la reference. Ce module ne lit ni n'ecrit la simulation.
 
 #include "CoreMinimal.h"
+#include "Life/AnastasisEpisodes.h"
 
 namespace AnastasisDialogue
 {
@@ -35,6 +36,19 @@ namespace AnastasisDialogue
 
 		/** La base livree, chargee une fois. Jamais nulle ; vide si les fichiers manquent (un avertissement au log). */
 		static const FLibrary& Get();
+
+		/**
+		 * memoire-decisions-001 -- `episodeText(event)` d'episodes.js : le souvenir mis en mots, version vecue ou
+		 * legende (a partir de trois bouches), variante tiree de son identifiant (`variantIndex`), trous {who},
+		 * {note}, {detail} remplis comme `fillEpisodeLine`.
+		 */
+		FString EpisodeLine(const AnastasisEpisodes::FEpisode& Event) const;
+
+		/**
+		 * Ce que dit celui qui porte ce souvenir : la version vecue s'il y etait, « Untel m'a raconte : ... » s'il
+		 * l'a entendue (une ou deux bouches), la legende au-dela. `OriginName` : celui qui l'a vecue.
+		 */
+		FString TellerVersion(const AnastasisEpisodes::FEpisode& Event, const FString& OriginName) const;
 
 		/** Cle de choix stable : graine de la partie, qui parle, la situation, et un rang. */
 		static uint32 KeyOf(uint32 Seed, const FString& Speaker, const FString& Situation, int32 Rank = 0);

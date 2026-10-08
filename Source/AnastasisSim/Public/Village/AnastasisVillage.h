@@ -213,6 +213,7 @@
 #include "Core/AnastasisSimBudget.h"
 #include "Core/AnastasisSpatialGrid.h"
 #include "Life/AnastasisBonds.h"
+#include "Life/AnastasisEpisodes.h"
 #include "Life/AnastasisLifestyle.h"
 #include "Life/AnastasisNature.h"
 #include "Life/AnastasisNeeds.h"
@@ -438,6 +439,14 @@ namespace AnastasisVillage
 		FString BuilderId;
 		/** `building.workers[npcId]` : pieces posees par chacun, dans l'ordre d'arrivee. */
 		TArray<TPair<FString, int32>> Workers;
+		/**
+		 * memoire-decisions-001 (ecart n°48) -- la maison d'une famille : le foyer qui l'a voulue, ceux qui ont le
+		 * droit d'y travailler (la famille et ceux qui ont dit oui ; vide = tout le monde, comme la reference),
+		 * et ceux a qui l'on a deja demande.
+		 */
+		FString OwnerFamilyId;
+		TArray<FString> AllowedBuilders;
+		TArray<FString> AskedIds;
 		/** `completedDay`, `completedById` : -1 / vide tant qu'il n'est pas acheve sous les coups. */
 		int32 CompletedDay = -1;
 		FString CompletedById;
@@ -851,6 +860,12 @@ namespace AnastasisVillage
 		double Age = 0.0;
 		FString FamilyId;
 		FString KinRole;
+
+		/**
+		 * memoire-decisions-001 (ecart n°47) -- `npc.chronicle` d'ai/episodes.js : ce que l'habitant a vecu, vu
+		 * ou entendu, avec la deformation de chaque bouche. Vide tant que rien ne lui arrive.
+		 */
+		AnastasisEpisodes::FChronicle Chronicle;
 
 		/** `npc.jobId`, `npc.workplace` (PAR IDENTIFIANT). */
 		FString JobId = AnastasisGather::JobSettler;
@@ -1392,6 +1407,86 @@ namespace AnastasisVillage
 		bool SetIdentity(const FString& NpcId, const FString& InName, const FString& InFamilyName, const FString& InGender, double InAge);
 		const TArray<FFamily>& GetFamilies() const { return Families; }
 		const FFamily* FindFamily(const FString& Id) const;
+
+		// --- Memoire episodique (memoire-decisions-001, ecart n°47 ; ai/episodes.js) -----------------------
+
+		/** Les options de `recordEpisode(sim, npc, kind, options)`. */
+		struct FEpisodeOptions
+		{
+			/** L'autre habitant implique (`about`) : son identifiant ; son nom est lu sur lui. */
+			FString AboutId;
+			FString Note;
+			double Detail = 0.0;
+			double Intensity = 1.0;
+			TOptional<double> Weight;
+			/** Un fait vecu par plusieurs partage une racine ; vide = l'identifiant du souvenir. */
+			FString RootId;
+		};
+
+		/**
+		 * `recordEpisode` : ce qui arrive a cet habitant et qu'il n'oubliera pas de sitot. Rend l'identifiant du
+		 * souvenir, vide s'il le savait deja (comme la reference, un souvenir aussitot evince par la capacite compte).
+		 */
+		FString RecordEpisode(const FString& NpcId, const FString& Kind, const FEpisodeOptions& Options);
+		/** `recordWitnesses` : ceux qui etaient assez pres retiennent la scene, moins fort ; quatre au plus. Rend leur nombre. */
+		int32 RecordWitnesses(const FString& SubjectId, const FString& Kind, const FEpisodeOptions& Options, double Radius = 6.0);
+		/**
+		 * EXTENSION (ecart n°47) -- un habitant raconte a un autre UN souvenir precis, de vive voix (le premier soir
+		 * au feu) : la meme deformation que `tellEpisodes` (`retell`, puis `createGossipEpisode` et sa reception),
+		 * sans le tirage du choix ni celui de l'envie de repeter. Rend vrai si l'autre l'a retenu.
+		 */
+		bool TellEpisode(const FString& FromId, const FString& ToId, const FString& EpisodeId);
+		/** `fadeEpisodes` pour chacun : le travail `memory` de minuit. */
+		void FadeEpisodesDaily(int32 Day);
+		/** `applyEpisodeFeelings` : ce que l'on a vecu avec quelqu'un teinte la relation. Phase « relations » de la vie du soir. */
+		void ApplyEpisodeFeelingsDaily();
+		// --- Decider de batir, demander de l'aide (memoire-decisions-001, ecart n°48 ; Bible §29) -------------
+
+		/** Une reponse a une demande d'aide : qui a demande a qui, pour quel chantier, oui ou non, et la raison dominante. */
+		struct FHelpAnswer
+		{
+			int32 Day = 0;
+			FString FromId;
+			FString ToId;
+			FString SiteId;
+			bool bAccepted = false;
+			/** dette_rendue, amitie, voisin ; refus_rendu, dette, son_toit, occupe, faible, inconnu. */
+			FString Reason;
+		};
+
+		/** Combien de personnes un chef de famille va voir par jour. */
+		static constexpr int32 HelpAsksPerDay = 2;
+
+		/**
+		 * Le soir (phase « vie » de minuit) : une famille sans maison decide d'en batir une (une famille par soir) ;
+		 * chaque famille qui batit va demander de l'aide a deux personnes de plus ; une maison achevee revient a
+		 * sa famille, et son chef se souvient de qui l'a aidee. Sans foyer pose (le harnais), ne fait rien.
+		 */
+		void UpdateFamilyHousesDaily();
+
+		/** `evaluateRequest` (Bible §29) : la somme des raisons, et la plus forte dans le sens de la reponse. */
+		FHelpAnswer EvaluateHelp(const FNpc& Asker, const FNpc& Asked, const FBuilding& Site) const;
+
+		/**
+		 * « Seul pour un abri, a plusieurs pour une vraie maison » (Alexandre, 2026-10-08) : la maison d'une famille
+		 * monte a moitie par les siens ; le toit attend qu'un aidant hors de la famille ait dit oui.
+		 */
+		static constexpr double FamilyRoofAt = 0.5;
+		/** Le toit attend : personne hors de la famille n'y a encore travaille, ni n'a dit oui. */
+		bool AwaitsHelp(const FBuilding& Site) const;
+		/**
+		 * Pour cet habitant : un membre de la famille attend qu'un aidant soit venu poser ses pieces (dire oui ne
+		 * suffit pas) ; un aidant, lui, n'attend personne.
+		 */
+		bool AwaitsHelpFor(const FBuilding& Site, const FNpc& Npc) const;
+
+		/** Ce chantier admet-il cet habitant ? (Vide : tout le monde.) */
+		static bool CanBuildAt(const FBuilding& Site, const FString& NpcId) { return Site.AllowedBuilders.IsEmpty() || Site.AllowedBuilders.Contains(NpcId); }
+
+		const TArray<FHelpAnswer>& GetHelpLog() const { return HelpLog; }
+
+		/** `episodeGoalBias(npc, goal)` : borne, nul sans souvenir. */
+		double EpisodeGoalBiasOf(const FNpc& Npc, const FString& Goal) const { return AnastasisEpisodes::GoalBias(Npc.Chronicle, Goal); }
 		/** Observation : nourriture ajoutee aux champs par la repousse depuis Bind. */
 		int64 GetRegrownFood() const { return RegrownFood; }
 
@@ -1710,6 +1805,14 @@ namespace AnastasisVillage
 		/** `stampStreetDecision(sim, npc, scores, previousGoal)`. */
 		void StampStreetDecision(FNpc& Npc, const TArray<TPair<FString, double>>& Scores, const FString& PreviousGoal);
 		void FailHungerAction(FNpc& Npc, const FString& Reason, const FString& ExcludedType);
+		/** ecart n°48 : une maison de famille achevee lui revient ; le chef retient qui l'a aidee. */
+		void SettleFamilyHouse(FBuilding& Site);
+		/** `shareEpisodes(sim, a, b)` dans `spreadRumorExchange` : chacun raconte, dans cet ordre. Rend le nombre retenu. */
+		int32 ShareEpisodes(FNpc& A, FNpc& B);
+		/** `tellEpisodes(sim, from, to)`. */
+		int32 TellEpisodes(FNpc& From, FNpc& To);
+		/** `createGossipEpisode` puis `commitReceivedEpisodeBelief` : l'autre retient la version qu'on lui a racontee. */
+		bool ReceiveEpisode(FNpc& From, FNpc& To, const AnastasisEpisodes::FEpisode& Source, const AnastasisEpisodes::FEpisode& Retold);
 		void CancelHungerAction(FNpc& Npc, const FString& Reason);
 		bool Eat(FNpc& Npc);
 
@@ -2033,6 +2136,8 @@ namespace AnastasisVillage
 		TOptional<AnastasisPlanner::FUrgencySnapshot> UrgencyCache;
 		int32 NextBuildingId = 0;
 		TArray<FDeath> DeathLog;
+		/** ecart n°48 : toutes les demandes d'aide et leurs reponses, dans l'ordre. */
+		TArray<FHelpAnswer> HelpLog;
 		/** ecart n°44 : les foyers poses par l'hote, et le compteur de leurs identifiants. */
 		TArray<FFamily> Families;
 		int32 NextFamilyId = 0;

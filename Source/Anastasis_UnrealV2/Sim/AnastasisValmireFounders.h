@@ -96,6 +96,14 @@ namespace AnastasisFounders
 	ANASTASIS_UNREALV2_API TArray<FLine> FireScene(const FScenario& Scenario, const TArray<FFounder>& Founders, uint32 Seed,
 		const AnastasisDialogue::FLibrary& Lines);
 
+	/**
+	 * memoire-decisions-001 (ecart n°47) -- ce qui a ete dit au feu devient memoire : chaque repondant retient,
+	 * vecus, ou il etait (`fall`), ce qu'il a porte (`carried`) et qui n'est pas venu (`leftBehind`), dans la
+	 * variante que la scene a racontee ; chaque autre fondateur les entend de sa bouche (une bouche : aucun
+	 * tirage). Rend le nombre de souvenirs retenus, vecus et entendus.
+	 */
+	ANASTASIS_UNREALV2_API int32 RecordFireMemories(FAnastasisSimulation& Sim, const FScenario& Scenario, const TArray<FFounder>& Founders, uint32 Seed);
+
 	/** Deux phrases par famille : qui la compose, et ce qu'elle est. */
 	ANASTASIS_UNREALV2_API FString FamilyIntro(const FFamilyDef& Family);
 

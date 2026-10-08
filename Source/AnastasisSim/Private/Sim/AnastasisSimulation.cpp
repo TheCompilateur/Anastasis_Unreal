@@ -447,11 +447,17 @@ void FAnastasisSimulation::RunDayJob(int32 Job)
 	{
 		// `updateLifeDaily` : ni `agePopulation` ni les tirages de mortalite ne sont portes (ecart n°28).
 		Village.UpdateMortalityDaily();
+		// `runLifeRelationsPhase` -> `applyEpisodeFeelings` : le souvenir a le dernier mot (ecart n°47 : ni
+		// rencontres ni frictions avant lui).
+		Village.ApplyEpisodeFeelingsDaily();
+		// ecart n°48 (EXTENSION) : les familles sans maison decident de batir, et vont demander de l'aide.
+		Village.UpdateFamilyHousesDaily();
 	}
 	else if (Job == DayJobMemory)
 	{
-		// `memory` : forgetStale + forgetStalePeople pour chacun (fadeEpisodes : non porte).
+		// `memory` : forgetStale + forgetStalePeople + fadeEpisodes pour chacun (ecart n°47 pour le detail).
 		Village.ForgetStaleDaily(Day);
+		Village.FadeEpisodesDaily(Day);
 	}
 }
 

@@ -2,6 +2,7 @@
 #include "Work/AnastasisCraftMiss.h"
 
 #include "Ai/AnastasisSpatialRisk.h"
+#include "Algo/StableSort.h"
 #include "Core/AnastasisJsNumeric.h"
 #include "Core/AnastasisSimMath.h"
 #include "Core/AnastasisStateDigest.h"
@@ -1490,6 +1491,208 @@ namespace AnastasisVillage
 		return true;
 	}
 
+	// --- Memoire episodique (ecart n°47, ai/episodes.js) ------------------------------------------------
+
+	FString FVillage::RecordEpisode(const FString& NpcId, const FString& Kind, const FEpisodeOptions& Options)
+	{
+		namespace E = AnastasisEpisodes;
+		FNpc* Npc = Actors.FindById(NpcId);
+		const E::FKindModel* Model = E::KindModel(Kind);
+		if (!Npc || !Model) return FString();
+		E::FChronicle& Chronicle = Npc->Chronicle;
+		// « On ne vit pas deux fois le meme fait. »
+		if (!Options.RootId.IsEmpty() && E::KnowsRoot(Chronicle, Options.RootId)) return FString();
+		const FNpc* About = Options.AboutId.IsEmpty() ? nullptr : Actors.FindById(Options.AboutId);
+		E::FEpisode Event;
+		Event.Id = FString::Printf(TEXT("%s-e%d"), *Npc->Id, Chronicle.NextId++);
+		Event.RootId = Options.RootId.IsEmpty() ? Event.Id : Options.RootId;
+		Event.Kind = Kind;
+		Event.Day = Day();
+		Event.Tone = Model->Tone;
+		Event.Weight = Options.Weight.IsSet() ? Options.Weight.GetValue() : Model->Weight * Options.Intensity;
+		Event.AboutId = About ? About->Id : FString();
+		Event.AboutName = About ? About->Name : FString();
+		// `Math.round(npc.x)`.
+		Event.X = static_cast<int32>(AnastasisJs::Floor(Npc->X + 0.5));
+		Event.Y = static_cast<int32>(AnastasisJs::Floor(Npc->Y + 0.5));
+		Event.Detail = Options.Detail;
+		Event.Note = Options.Note;
+		Event.Hops = 0;
+		Event.bFirsthand = true;
+		const FString Id = Event.Id;
+		Chronicle.Events.Add(MoveTemp(Event));
+		Chronicle.Lived += 1;
+		E::Trim(Chronicle);
+		// ecart n°47 : `socialAppraisal` / `noteSocialFromEpisode` (croyances sur les personnes) ne sont pas portes.
+		return Id;
+	}
+
+	int32 FVillage::RecordWitnesses(const FString& SubjectId, const FString& Kind, const FEpisodeOptions& Options, double Radius)
+	{
+		const FNpc* Subject = Actors.FindById(SubjectId);
+		if (!Subject) return 0;
+		FEpisodeOptions Seen = Options;
+		// « Tous les temoins racontent LE MEME fait. »
+		if (Seen.RootId.IsEmpty()) Seen.RootId = FString::Printf(TEXT("%s-w%d-%s"), *SubjectId, Day(), *Kind);
+		Seen.Intensity = Options.Intensity * 0.55;
+		const double SX = Subject->X;
+		const double SY = Subject->Y;
+		TArray<FString> Others;
+		for (const FNpc& Other : Actors.GetItems())
+		{
+			// `other.lifeStage === "child"` : un enfant ne temoigne pas (moins de douze ans, ecart n°44).
+			if (Other.Id == SubjectId || (Other.Age > 0.0 && Other.Age < 12.0)) continue;
+			const double DX = Other.X - SX;
+			const double DY = Other.Y - SY;
+			if (DX * DX + DY * DY > Radius * Radius) continue;
+			Others.Add(Other.Id);
+		}
+		int32 Noted = 0;
+		for (const FString& OtherId : Others)
+		{
+			if (RecordEpisode(OtherId, Kind, Seen).IsEmpty()) continue;
+			if (++Noted >= 4) break;
+		}
+		return Noted;
+	}
+
+	int32 FVillage::ShareEpisodes(FNpc& A, FNpc& B)
+	{
+		const int32 Told = TellEpisodes(A, B);
+		return Told + TellEpisodes(B, A);
+	}
+
+	int32 FVillage::TellEpisodes(FNpc& From, FNpc& To)
+	{
+		namespace E = AnastasisEpisodes;
+		const E::FChronicle& Source = From.Chronicle;
+		if (Source.Events.IsEmpty()) return 0;
+		const AnastasisGather::FTrait& Trait = AnastasisGather::TraitAt(From.TraitIndex);
+		const E::FBias Bias = E::StorytellerBias(Trait.Explore, From.Needs.Morale, From.Reputation);
+		const int32 Count = Source.Events.Num();
+		const int32 Start = static_cast<int32>(AnastasisJs::Floor(VillageRng.Next() * Count));
+		int32 Told = 0;
+		for (int32 I = 0; I < Count && Told < E::Constants::TellPerMeeting; ++I)
+		{
+			// Copie : la reception peut trier la chronique de l'autre, jamais celle du conteur.
+			const E::FEpisode Event = From.Chronicle.Events[(Start + I) % Count];
+			if (Event.Weight < E::Constants::TellMinWeight) continue;
+			if (Event.Hops >= E::Constants::MaxHops) continue;
+			if (Event.AboutId == To.Id) continue;
+			if (E::KnowsRoot(To.Chronicle, Event.RootId.IsEmpty() ? Event.Id : Event.RootId)) continue;
+			const E::FKindModel* Model = E::KindModel(Event.Kind);
+			// `cultureEpisodeSpread` vaut 1 (ecart n°47 : pas de culture).
+			const double SpreadChance = FMath::Min(0.95, Model ? Model->Spread : 0.6);
+			if (VillageRng.Next() > SpreadChance) continue;
+			const E::FEpisode Retold = E::Retell(Event, Bias, [this]() { return VillageRng.Next(); });
+			if (ReceiveEpisode(From, To, Event, Retold)) ++Told;
+		}
+		return Told;
+	}
+
+	bool FVillage::ReceiveEpisode(FNpc& From, FNpc& To, const AnastasisEpisodes::FEpisode& Source, const AnastasisEpisodes::FEpisode& Retold)
+	{
+		namespace E = AnastasisEpisodes;
+		const FString RootId = Source.RootId.IsEmpty() ? Source.Id : Source.RootId;
+		if (RootId.IsEmpty() || Source.Kind.IsEmpty()) return false;
+		// `createGossipEpisode` : la croyance recue. REFERENCE (ecart n°47) : `aboutName: received.aboutName ??
+		// source.aboutName` -- le nom que `retell` a perdu revient, `??` lisant `null` comme absent.
+		E::FEpisode Belief = Retold;
+		Belief.RootId = RootId;
+		Belief.Kind = Source.Kind;
+		if (Belief.AboutId.IsEmpty()) Belief.AboutId = Source.AboutId;
+		if (Belief.AboutName.IsEmpty()) Belief.AboutName = Source.AboutName;
+		Belief.bFirsthand = false;
+		Belief.SourceId = From.Id;
+		Belief.SourceEpisodeId = Source.Id;
+		Belief.OriginalSourceId = !Source.OriginalSourceId.IsEmpty() ? Source.OriginalSourceId
+			: (Source.bFirsthand ? From.Id : (!Source.SourceId.IsEmpty() ? Source.SourceId : From.Id));
+		const double Confidence = Source.Confidence >= 0.0 ? Source.Confidence * 0.9 : (Source.bFirsthand ? 0.95 : 0.75);
+		Belief.Confidence = FMath::Clamp(Confidence, 0.0, 1.0);
+		// `commitReceivedEpisodeBelief`.
+		if (E::KnowsRoot(To.Chronicle, RootId)) return false;
+		To.Chronicle.Events.Add(MoveTemp(Belief));
+		E::Trim(To.Chronicle);
+		From.Chronicle.Told += 1;
+		To.Chronicle.Heard += 1;
+		return true;
+	}
+
+	bool FVillage::TellEpisode(const FString& FromId, const FString& ToId, const FString& EpisodeId)
+	{
+		namespace E = AnastasisEpisodes;
+		FNpc* From = Actors.FindById(FromId);
+		FNpc* To = Actors.FindById(ToId);
+		if (!From || !To || From == To) return false;
+		const E::FEpisode* Found = From->Chronicle.Events.FindByPredicate([&EpisodeId](const E::FEpisode& Known) { return Known.Id == EpisodeId; });
+		if (!Found) return false;
+		const E::FEpisode Event = *Found;
+		const AnastasisGather::FTrait& Trait = AnastasisGather::TraitAt(From->TraitIndex);
+		const E::FBias Bias = E::StorytellerBias(Trait.Explore, From->Needs.Morale, From->Reputation);
+		const E::FEpisode Retold = E::Retell(Event, Bias, [this]() { return VillageRng.Next(); });
+		return ReceiveEpisode(*From, *To, Event, Retold);
+	}
+
+	void FVillage::FadeEpisodesDaily(int32 InDay)
+	{
+		namespace E = AnastasisEpisodes;
+		for (FNpc& Npc : Actors.GetItemsMutable())
+		{
+			E::FChronicle& Chronicle = Npc.Chronicle;
+			if (Chronicle.Events.IsEmpty()) continue;
+			TArray<E::FEpisode> Kept;
+			for (E::FEpisode& Event : Chronicle.Events)
+			{
+				Event.Weight -= E::Constants::FadePerDay;
+				const int32 Age = InDay - Event.Day;
+				if (Event.Weight >= E::Constants::MinWeight && Age <= E::Constants::ForgetAfterDays) Kept.Add(Event);
+			}
+			Chronicle.Events = MoveTemp(Kept);
+			// `repairChronicleReferences` : une racine, une seule fois ; puis le tri. ecart n°47 : un mort n'est
+			// pas efface du souvenir (la reference le garde par son memorial, que `rememberGone` pose a chaque mort).
+			TSet<FString> Roots;
+			Chronicle.Events.RemoveAll([&Roots](const E::FEpisode& Event)
+			{
+				const FString Root = Event.RootId.IsEmpty() ? Event.Id : Event.RootId;
+				if (Roots.Contains(Root)) return true;
+				Roots.Add(Root);
+				return false;
+			});
+			E::Trim(Chronicle);
+		}
+	}
+
+	void FVillage::ApplyEpisodeFeelingsDaily()
+	{
+		namespace E = AnastasisEpisodes;
+		TSet<FString> Living;
+		for (const FNpc& Npc : Actors.GetItems()) Living.Add(Npc.Id);
+		for (FNpc& Npc : Actors.GetItemsMutable())
+		{
+			if (Npc.Chronicle.Events.IsEmpty()) continue;
+			TSet<FString> Seen;
+			for (const E::FEpisode& Event : Npc.Chronicle.Events)
+			{
+				if (Event.AboutId.IsEmpty() || Seen.Contains(Event.AboutId) || !Living.Contains(Event.AboutId)) continue;
+				Seen.Add(Event.AboutId);
+				// `commitReceivedRobbedRelation` : aucun vol porte. `legacyEpisodeFeeling` ecarte le vol recu.
+				double Legacy = 0.0;
+				for (const E::FEpisode& Other : Npc.Chronicle.Events)
+				{
+					if (Other.AboutId != Event.AboutId) continue;
+					if (Other.Kind == TEXT("robbed") && !Other.bFirsthand) continue;
+					Legacy += Other.Tone * Other.Weight * (Other.bFirsthand ? 1.0 : E::Constants::HearsayScale);
+				}
+				const double Nudge = Clamp(Legacy * E::Constants::FeelingScale, -E::Constants::FeelingCap, E::Constants::FeelingCap);
+				if (Nudge == 0.0) continue;
+				// `npc.relations[event.aboutId] = clamp((... || 0) + nudge * 0.1, -100, 100)`.
+				TPair<FString, double>* Row = Npc.Relations.FindByPredicate([&Event](const TPair<FString, double>& R) { return R.Key == Event.AboutId; });
+				if (!Row) Row = &Npc.Relations.Add_GetRef(TPair<FString, double>(Event.AboutId, 0.0));
+				Row->Value = Clamp(Row->Value + Nudge * 0.1, -100.0, 100.0);
+			}
+		}
+	}
+
 	FString FVillage::CauseOfDeath(const FNpc& Npc)
 	{
 		// ecart n°28 : seule la branche `(npc.health ?? 100) <= 0` de causeOfDeath. Le libelle « de faim »
@@ -1527,6 +1730,35 @@ namespace AnastasisVillage
 				continue;
 			}
 			const FString Id = Ids[I];
+			// `die` (mortality.js) : le deuil, avant l'oubli. « Une seule mort, une seule histoire » : une racine.
+			// ecart n°47 : la reference endeuille le conjoint (intensite 1,2) et les enfants ; ici les membres du
+			// foyer (ecart n°44), le conjoint a 1,2, puis les temoins a 7 cases.
+			{
+				const FString DeathRoot = FString::Printf(TEXT("death-%s"), *Id);
+				FEpisodeOptions Grief;
+				Grief.AboutId = Id;
+				Grief.RootId = DeathRoot;
+				const FNpc* Dead = Actors.FindById(Id);
+				if (Dead && !Dead->FamilyId.IsEmpty())
+				{
+					if (const FFamily* Family = FindFamily(Dead->FamilyId))
+					{
+						TArray<FString> Kin = Family->Adults;
+						Kin.Append(Family->Dependents);
+						const bool bDeadSpouse = Dead->KinRole == TEXT("chef") || Dead->KinRole == TEXT("epouse");
+						for (const FString& KinId : Kin)
+						{
+							const FNpc* Relative = Actors.FindById(KinId);
+							if (!Relative || KinId == Id) continue;
+							const bool bSpouse = bDeadSpouse && (Relative->KinRole == TEXT("chef") || Relative->KinRole == TEXT("epouse"));
+							FEpisodeOptions KinGrief = Grief;
+							KinGrief.Intensity = bSpouse ? 1.2 : 1.0;
+							RecordEpisode(KinId, TEXT("bereaved"), KinGrief);
+						}
+					}
+				}
+				RecordWitnesses(Id, TEXT("bereaved"), Grief, 7.0);
+			}
 			RemoveNpc(Id);
 			// `forgetTheDead` : plus de relation avec un disparu. La lignee et les memoires restent.
 			for (FNpc& Other : Actors.GetItemsMutable())
@@ -2135,7 +2367,12 @@ namespace AnastasisVillage
 			}
 		}
 		// Un chantier ouvert : la ligne `build` de chacun lit le meme facteur de travail.
-		const TArray<const FBuilding*> OpenSites = ActiveSites();
+		// ecart n°48 : seulement un chantier qui l'admet (la maison d'une famille : les siens et ceux qui ont dit oui).
+		TArray<const FBuilding*> OpenSites;
+		for (const FBuilding* Active : ActiveSites())
+		{
+			if (CanBuildAt(*Active, Npc.Id) && !AwaitsHelpFor(*Active, Npc)) OpenSites.Add(Active);
+		}
 		const bool bSite = OpenSites.Num() > 0;
 		bool bWoodBlocksEverySite = bSite && IsWoodHarvester(Npc);
 		if (bWoodBlocksEverySite)
@@ -2273,6 +2510,8 @@ namespace AnastasisVillage
 			if (FoodSources.Num() > 0 && G == TEXT("deliver"))
 				Score = Npc.InventoryFood > 0 && KnownFoodDepot(Npc) ? 100.0 + 5.0 * Npc.InventoryFood : -1000.0;
 			Score += RhythmStatusLifestyle(Npc, Phase, Subject, G);
+			// `score.episode` (ecart n°47) : a sa place, apres completion ; nul sans souvenir.
+			Score += EpisodeGoalBiasOf(Npc, G);
 			Rows.Add(TPair<FString, double>(G, Score));
 		}
 
@@ -4556,6 +4795,7 @@ namespace AnastasisVillage
 		Score += PhaseBias;
 		Score += G::GranaryWorkplaceGoalBias(Npc.JobId, Goal, Npc.InventoryFood);
 		Score += G::CompletionBias(Goal, Load, DepotLoad, SessionGoal, NeedsCritical(Npc.Needs));
+		Score += EpisodeGoalBiasOf(Npc, Goal);
 		Score += G::TraitGoalBias(Trait, Goal);
 		Score += G::SkillGoalBias(DomainSkill);
 		return Score;
@@ -4827,6 +5067,7 @@ namespace AnastasisVillage
 		Score += PhaseBias;
 		if (IsGranaryWorker(Npc)) Score += G::GranaryWorkplaceGoalBias(Npc.JobId, GoalHelpFarm, Npc.InventoryFood);
 		Score += G::CompletionBias(GoalHelpFarm, Npc.InventoryFood, IsGranaryWorker(Npc) ? Npc.InventoryFood : 0, SessionGoalOf(Npc), NeedsCritical(Npc.Needs));
+		Score += EpisodeGoalBiasOf(Npc, GoalHelpFarm);
 		Score += G::TraitGoalBias(G::TraitAt(Npc.TraitIndex), GoalHelpFarm);
 		// `skillGoalBias` : domaine `gather` pour `helpFarm` (skills.js).
 		Score += G::SkillGoalBias(Npc.SkillGather);
@@ -5195,6 +5436,7 @@ namespace AnastasisVillage
 		const int32 DepotLoad = IsGranaryWorker(Npc) ? Npc.InventoryFood : 0;
 		const FString SessionGoal = SessionGoalOf(Npc);
 		Score += G::CompletionBias(Goal, Npc.InventoryFood, DepotLoad, SessionGoal, NeedsCritical(Npc.Needs));
+		Score += EpisodeGoalBiasOf(Npc, Goal);
 		// `moodletGoalBias` (lu sur une copie : `tickMoodlets` elague deja a chaque tick).
 		TArray<AnastasisBonds::FMoodlet> Moodlets = Npc.Moodlets;
 		Score += AnastasisBonds::MoodletGoalBias(Moodlets, Goal, Now);
@@ -5759,6 +6001,9 @@ namespace AnastasisVillage
 		// `spreadRumorExchange` (personnes, episodes, chronique) : ecart n°16.
 		TellSpots(Npc, *Other);
 		TellSpots(*Other, Npc);
+		// `spreadRumorExchange` -> `shareEpisodes` : les histoires, apres les lieux (ecart n°47 : sans
+		// `sharePeopleBeliefs`, dont le tirage manque au flux, ni l'echo de chronique village).
+		ShareEpisodes(Npc, *Other);
 		// `maybeCounselPair` : aucun aine dans ce portage (ecart n°8).
 		// `gain = max(2, floor(bondTalkGain(npc, other) * 0.5))`, sans `bumpRelation` : pas de palier note.
 		const int32 Gain = FMath::Max(2, static_cast<int32>(AnastasisJs::Floor(BD::BondTalkGain(RelationOf(Npc, Other->Id) >= BD::FriendAt) * 0.5)));
@@ -5829,7 +6074,9 @@ namespace AnastasisVillage
 				++Npc.RumorsHeard;
 			}
 		}
-		// `shareRumors(..., { resourceSpots: false })` : croyances non portees (ecart n°16).
+		// `shareRumors(..., { resourceSpots: false })` : croyances non portees (ecart n°16) ; les histoires,
+		// `spreadRumorExchange` -> `shareEpisodes`, oui (ecart n°47).
+		ShareEpisodes(Npc, Other);
 		NoteMeeting(Npc, Other);
 		++Npc.TalksWithCompanion;
 	}
@@ -6032,8 +6279,8 @@ namespace AnastasisVillage
 	{
 		if (Npc.BuildBinding.IsEmpty()) return nullptr;
 		FBuilding* Site = Buildings.FindById(Npc.BuildBinding);
-		// Le lien meurt avec son objet : chantier disparu ou acheve.
-		if (!Site || Site->Progress >= 1.0)
+		// Le lien meurt avec son objet : chantier disparu ou acheve (ou qui ne l'admet pas, ou attend des bras, ecart n°48).
+		if (!Site || Site->Progress >= 1.0 || !CanBuildAt(*Site, Npc.Id) || AwaitsHelpFor(*Site, Npc))
 		{
 			Npc.BuildBinding.Reset();
 			return nullptr;
@@ -6048,7 +6295,7 @@ namespace AnastasisVillage
 		double BestScore = -AnastasisNav::Infinity;
 		for (FBuilding& Site : Buildings.GetItemsMutable())
 		{
-			if (Site.Progress >= 1.0) continue;
+			if (Site.Progress >= 1.0 || !CanBuildAt(Site, Npc.Id) || AwaitsHelpFor(Site, Npc)) continue;
 			FPoint Access{ Site.X + 0.5, Site.Y + 0.5 };
 			BuildingAccessPoint(Site, &Npc, Access);
 			const double D = Dist(Npc.X, Npc.Y, Access.X, Access.Y);
@@ -6069,7 +6316,7 @@ namespace AnastasisVillage
 		// `activeConstruction()` : le premier chantier du tableau, pas le mieux note.
 		for (FBuilding& Site : Buildings.GetItemsMutable())
 		{
-			if (Site.Progress >= 1.0) continue;
+			if (Site.Progress >= 1.0 || !CanBuildAt(Site, Npc.Id)) continue;
 			if (!BuildingAccessPoint(Site, &Npc, OutTarget)) return false;
 			Npc.DestBuildingId = Site.Id;
 			return true;
@@ -6105,6 +6352,8 @@ namespace AnastasisVillage
 	{
 		namespace B = AnastasisBuild;
 		if (Site.Progress >= 1.0) return false;
+		// ecart n°48 : le toit d'une maison de famille ne se pose pas sans un aidant qui a dit oui.
+		if (AwaitsHelpFor(Site, Npc)) return false;
 		if (Site.bHasMaterials && !B::ConsumeSiteMaterials(Site.Materials, Site.PiecesPlaced))
 		{
 			// `requestSiteDeliveries` : livraisons non portees (ecart n°18), le chantier attend.
@@ -6123,9 +6372,310 @@ namespace AnastasisVillage
 		// Acheve. Episode, reputation, annonce, postes, restitution du reliquat : non portes.
 		Site.CompletedDay = Day();
 		Site.CompletedById = Npc.Id;
+		// « Il s'en souviendra, et il le racontera : c'est son oeuvre. » (`recordEpisode(this, npc, "raised", { detail: 1 })`)
+		{
+			FEpisodeOptions Work;
+			Work.Detail = 1.0;
+			RecordEpisode(Npc.Id, TEXT("raised"), Work);
+		}
 		++Npc.BuildingsCompleted;
 		Npc.Needs.Morale = Clamp(Npc.Needs.Morale + B::CompletionMorale, 0.0, 100.0);
+		// ecart n°48 : la maison d'une famille lui revient, et son chef se souvient de qui l'a aidee.
+		if (!Site.OwnerFamilyId.IsEmpty()) SettleFamilyHouse(Site);
 		return true;
+	}
+
+	bool FVillage::AwaitsHelp(const FBuilding& Site) const
+	{
+		if (Site.OwnerFamilyId.IsEmpty() || Site.Progress < FamilyRoofAt) return false;
+		for (const FString& Id : Site.AllowedBuilders)
+		{
+			const FNpc* Builder = Actors.FindById(Id);
+			if (Builder && Builder->FamilyId != Site.OwnerFamilyId) return false;
+		}
+		for (const TPair<FString, int32>& Worker : Site.Workers)
+		{
+			const FNpc* Builder = Actors.FindById(Worker.Key);
+			if (Builder && Builder->FamilyId != Site.OwnerFamilyId) return false;
+		}
+		return true;
+	}
+
+	bool FVillage::AwaitsHelpFor(const FBuilding& Site, const FNpc& Npc) const
+	{
+		if (Site.OwnerFamilyId.IsEmpty() || Site.Progress < FamilyRoofAt) return false;
+		if (Npc.FamilyId != Site.OwnerFamilyId) return false;
+		for (const TPair<FString, int32>& Worker : Site.Workers)
+		{
+			const FNpc* Builder = Actors.FindById(Worker.Key);
+			if (Builder && Builder->FamilyId != Site.OwnerFamilyId && Worker.Value > 0) return false;
+		}
+		return true;
+	}
+
+	void FVillage::SettleFamilyHouse(FBuilding& Site)
+	{
+		FFamily* Family = Families.FindByPredicate([&Site](const FFamily& F) { return F.Id == Site.OwnerFamilyId; });
+		if (!Family) return;
+		Family->HomeId = Site.Id;
+		TArray<FString> Members = Family->Adults;
+		Members.Append(Family->Dependents);
+		FString ChefId;
+		for (const FString& Id : Members)
+		{
+			const FNpc* Member = Actors.FindById(Id);
+			if (Member && Member->KinRole == TEXT("chef")) ChefId = Id;
+		}
+		if (ChefId.IsEmpty() && Members.Num()) ChefId = Members[0];
+		// Le chef en est le proprietaire ; les siens y vivent (sans la capacite d'une maison de phase 1, ecart n°48).
+		if (!ChefId.IsEmpty()) AssignHome(ChefId, Site.Id);
+		for (const FString& Id : Members)
+		{
+			if (FNpc* Member = Actors.FindById(Id))
+			{
+				if (Member->HomeId.IsEmpty()) Member->HomeId = Site.Id;
+			}
+		}
+		// « Une aide cree une dette » : le chef retient chacun de ceux qui y ont pose une piece hors de la famille.
+		for (const TPair<FString, int32>& Worker : Site.Workers)
+		{
+			if (Members.Contains(Worker.Key) || !Actors.FindById(Worker.Key) || ChefId.IsEmpty()) continue;
+			FEpisodeOptions Debt;
+			Debt.AboutId = Worker.Key;
+			Debt.Detail = Worker.Value;
+			Debt.RootId = FString::Printf(TEXT("aide-%s-%s"), *Site.Id, *Worker.Key);
+			RecordEpisode(ChefId, TEXT("helped"), Debt);
+		}
+	}
+
+	FVillage::FHelpAnswer FVillage::EvaluateHelp(const FNpc& Asker, const FNpc& Asked, const FBuilding& Site) const
+	{
+		namespace E = AnastasisEpisodes;
+		// Bible §29 : « une somme ponderee dont la raison dominante est toujours retournee ».
+		TArray<TPair<FString, double>> Terms;
+		// Le souvenir : il m'a aide (je lui dois), il m'a refuse (je lui rends).
+		double Owed = 0.0;
+		double Refused = 0.0;
+		bool bKnows = false;
+		for (const E::FEpisode& Event : Asked.Chronicle.Events)
+		{
+			// La dette et le refus sont les miens : une aide racontee par un autre ne m'oblige a rien.
+			if (Event.bFirsthand && Event.AboutId == Asker.Id && Event.Kind == TEXT("helped")) Owed += 40.0;
+			if (Event.bFirsthand && Event.AboutId == Asker.Id && Event.Kind == TEXT("refusedHelp")) Refused -= 40.0;
+			if (Event.AboutId == Asker.Id || Event.OriginalSourceId == Asker.Id || Event.SourceId == Asker.Id) bKnows = true;
+		}
+		Terms.Emplace(TEXT("dette_rendue"), Owed);
+		Terms.Emplace(TEXT("refus_rendu"), Refused);
+		// Il me doit deja des journees : je l'ai aide, il ne m'a jamais rendu la pareille.
+		bool bHelpedAsker = false;
+		bool bAskerHelpedBack = false;
+		for (const FBuilding& Done : Buildings.GetItems())
+		{
+			if (Done.Progress < 1.0 || Done.OwnerFamilyId.IsEmpty()) continue;
+			const bool bAskerHouse = Done.OwnerFamilyId == Asker.FamilyId;
+			const bool bAskedHouse = Done.OwnerFamilyId == Asked.FamilyId;
+			for (const TPair<FString, int32>& Worker : Done.Workers)
+			{
+				if (bAskerHouse && Worker.Key == Asked.Id) bHelpedAsker = true;
+				if (bAskedHouse && Worker.Key == Asker.Id) bAskerHelpedBack = true;
+			}
+		}
+		Terms.Emplace(TEXT("dette"), bHelpedAsker && !bAskerHelpedBack ? -25.0 : 0.0);
+		// L'affection, dans les deux sens de la relation (-100..100).
+		double Relation = 0.0;
+		for (const TPair<FString, double>& Row : Asked.Relations)
+		{
+			if (Row.Key == Asker.Id) Relation = Row.Value;
+		}
+		Terms.Emplace(TEXT("amitie"), Relation * 0.5);
+		// Son propre toit d'abord : sa famille batit encore.
+		bool bOwnSite = false;
+		bool bElsewhere = false;
+		for (const FBuilding& Other : Buildings.GetItems())
+		{
+			if (Other.Progress >= 1.0 || Other.Id == Site.Id) continue;
+			if (!Asked.FamilyId.IsEmpty() && Other.OwnerFamilyId == Asked.FamilyId) bOwnSite = true;
+			else if (Other.AllowedBuilders.Contains(Asked.Id) || (Asked.bHasBuildBinding && Asked.BuildBinding == Other.Id)) bElsewhere = true;
+		}
+		Terms.Emplace(TEXT("son_toit"), bOwnSite ? -45.0 : 0.0);
+		// Son propre ouvrage : un metier (le champ, le chantier) a ses journees, qu'on ne donne pas a un inconnu.
+		const bool bHasTrade = !Asked.JobId.IsEmpty() && Asked.JobId != AnastasisGather::JobSettler;
+		Terms.Emplace(TEXT("occupe"), bElsewhere ? -20.0 : (bHasTrade ? -10.0 : 0.0));
+		// Le corps : trop faible, ou trop affame, pour porter des poutres.
+		Terms.Emplace(TEXT("faible"), Asked.Needs.Health < 45.0 || Asked.Needs.Hunger >= 70.0 ? -40.0 : 0.0);
+		// Un inconnu : ni lien, ni histoire de lui.
+		Terms.Emplace(TEXT("inconnu"), !bKnows && Relation < 5.0 ? -12.0 : 0.0);
+		// L'entraide entre voisins : un village qui commence ne laisse pas les siens dehors.
+		Terms.Emplace(TEXT("voisin"), 8.0);
+		double Total = 0.0;
+		for (const TPair<FString, double>& Term : Terms) Total += Term.Value;
+		FHelpAnswer Answer;
+		Answer.Day = Day();
+		Answer.FromId = Asker.Id;
+		Answer.ToId = Asked.Id;
+		Answer.SiteId = Site.Id;
+		Answer.bAccepted = Total > 0.0;
+		// La raison dominante, dans le sens de la reponse.
+		double Strongest = 0.0;
+		for (const TPair<FString, double>& Term : Terms)
+		{
+			const bool bSameSide = Answer.bAccepted ? Term.Value > 0.0 : Term.Value < 0.0;
+			if (bSameSide && FMath::Abs(Term.Value) > Strongest)
+			{
+				Strongest = FMath::Abs(Term.Value);
+				Answer.Reason = Term.Key;
+			}
+		}
+		return Answer;
+	}
+
+	void FVillage::UpdateFamilyHousesDaily()
+	{
+		if (Families.IsEmpty() || !World) return;
+		const AnastasisPath::FWorldNavSource Source(Nav, *World);
+		auto ChefOf = [this](const FFamily& Family) -> FNpc*
+		{
+			for (const FString& Id : Family.Adults)
+			{
+				FNpc* Member = Actors.FindById(Id);
+				if (Member && Member->KinRole == TEXT("chef")) return Member;
+			}
+			return Family.Adults.Num() ? Actors.FindById(Family.Adults[0]) : nullptr;
+		};
+		auto ReachesWell = [&](const FPoint& From)
+		{
+			for (const FBuilding& Well : Buildings.GetItems())
+			{
+				if (Well.Type != WellType || Well.Progress < 1.0) continue;
+				for (const FPoint& Door : Well.AccessPoints)
+				{
+					TArray<FPoint> Path;
+					if (AnastasisPath::FindPath(Source, From, Door, {}, Path)) return true;
+				}
+			}
+			return false;
+		};
+		bool bOpenedTonight = false;
+		// Une famille a son toit quand sa maison est levee, ou quand chacun des siens a deja le sien. Celle dont un
+		// seul a un toit (le chef loge, les autres dehors) batit aussi, mais apres celles qui n'en ont aucun.
+		auto RoofsOf = [this](const FFamily& Family, bool& bAll)
+		{
+			int32 Roofed = 0;
+			for (const FString& Id : Family.Adults)
+			{
+				const FNpc* Member = Actors.FindById(Id);
+				if (Member && !Member->HomeId.IsEmpty()) ++Roofed;
+			}
+			bAll = !Family.HomeId.IsEmpty() || Roofed >= Family.Adults.Num();
+			return Roofed;
+		};
+		auto OwnSiteOf = [this](const FFamily& Family) -> FBuilding*
+		{
+			FBuilding* Own = nullptr;
+			for (FBuilding& Building : Buildings.GetItemsMutable())
+			{
+				if (Building.OwnerFamilyId == Family.Id && Building.Progress < 1.0) Own = &Building;
+			}
+			return Own;
+		};
+		bool bRooflessWaiting = false;
+		for (const FFamily& Family : Families)
+		{
+			bool bAll = false;
+			if (RoofsOf(Family, bAll) == 0 && !bAll && !OwnSiteOf(Family) && ChefOf(Family)) bRooflessWaiting = true;
+		}
+		for (FFamily& Family : Families)
+		{
+			FNpc* Chef = ChefOf(Family);
+			if (!Chef) continue;
+			bool bHoused = false;
+			const int32 Roofed = RoofsOf(Family, bHoused);
+			if (bHoused) continue;
+			FBuilding* Own = OwnSiteOf(Family);
+			// Les sans-toit d'abord : une famille deja a moitie logee attend que chacune ait sa parcelle.
+			if (!Own && Roofed > 0 && bRooflessWaiting) continue;
+			// Decider de batir : une famille par soir, le chef ouvre le chantier pres de lui (ecart n°48 :
+			// `tryOpenNewConstruction` n'est pas porte ; le devis est livre, la famille apporte ses materiaux).
+			if (!Own && !bOpenedTonight)
+			{
+				// Ceux qui atteignent le puits ce soir doivent l'atteindre encore, la parcelle tracee : on ne mure
+				// personne loin de l'eau (le joueur compris).
+				TArray<FPoint> Walkers;
+				for (const FNpc& Other : Actors.GetItems())
+				{
+					if (!Other.Inside.bActive && ReachesWell({ Other.X, Other.Y })) Walkers.Add({ Other.X, Other.Y });
+				}
+				const int32 CX = FMath::FloorToInt32(Chef->X);
+				const int32 CY = FMath::FloorToInt32(Chef->Y);
+				FString SiteId;
+				for (int32 R = 2; R <= 6 && SiteId.IsEmpty(); ++R)
+				for (int32 DY = -R; DY <= R && SiteId.IsEmpty(); ++DY)
+				for (int32 DX = -R; DX <= R && SiteId.IsEmpty(); ++DX)
+				{
+					if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) != R) continue;
+					const int32 X = CX + DX;
+					const int32 Y = CY + DY;
+					if (X < 2 || Y < 2 || X > Nav.W - 3 || Y > Nav.H - 3) continue;
+					if (LiveTileAt(X, Y).Resource != AnastasisWorld::EResource::None || IsFootBlocked(X + 0.5, Y + 0.5)) continue;
+					const FString Id = OpenSite(HouseType, X, Y, /*bDelivered=*/true);
+					if (Id.IsEmpty()) continue;
+					FBuilding* Site = Buildings.FindById(Id);
+					bool bReach = false;
+					for (const FPoint& Door : Site->AccessPoints)
+					{
+						TArray<FPoint> Path;
+						if (AnastasisPath::FindPath(Source, { Chef->X, Chef->Y }, Door, {}, Path)) { bReach = true; break; }
+					}
+					// Un chantier qui enferme son chef, ou qui que ce soit, loin du puits ne se garde pas.
+					bool bWalled = !bReach || !ReachesWell({ Chef->X, Chef->Y });
+					for (int32 W = 0; W < Walkers.Num() && !bWalled; ++W) bWalled = !ReachesWell(Walkers[W]);
+					if (bWalled)
+					{
+						RemoveBuilding(Id);
+						continue;
+					}
+					SiteId = Id;
+				}
+				if (SiteId.IsEmpty()) continue;
+				bOpenedTonight = true;
+				Own = Buildings.FindById(SiteId);
+				Own->OwnerFamilyId = Family.Id;
+				for (const FString& Id : Family.Adults) Own->AllowedBuilders.Add(Id);
+				continue; // on demandera demain : ce soir, on trace la parcelle.
+			}
+			if (!Own) continue;
+			// Le tour du village : deux personnes de plus par jour, d'abord celles qu'on apprecie.
+			TArray<const FNpc*> Candidates;
+			for (const FNpc& Other : Actors.GetItems())
+			{
+				if (Other.Id == Chef->Id || Other.FamilyId == Family.Id || Other.Id == PlayerPersonId) continue;
+				if (Other.Age > 0.0 && Other.Age < 16.0) continue;
+				if (Own->AskedIds.Contains(Other.Id)) continue;
+				Candidates.Add(&Other);
+			}
+			// Tout le monde a ete sollicite et le toit attend toujours : on recommence le tour demain.
+			if (Candidates.IsEmpty() && AwaitsHelp(*Own)) Own->AskedIds.Reset();
+			Algo::StableSort(Candidates, [this, Chef](const FNpc* A, const FNpc* B) { return RelationOf(*Chef, A->Id) > RelationOf(*Chef, B->Id); });
+			for (int32 I = 0; I < Candidates.Num() && I < HelpAsksPerDay; ++I)
+			{
+				const FNpc& Asked = *Candidates[I];
+				const FHelpAnswer Answer = EvaluateHelp(*Chef, Asked, *Own);
+				Own->AskedIds.Add(Asked.Id);
+				HelpLog.Add(Answer);
+				if (Answer.bAccepted)
+				{
+					Own->AllowedBuilders.Add(Asked.Id);
+				}
+				else
+				{
+					// Le refus se retient : le chef se souvient de qui lui a dit non.
+					FEpisodeOptions Refusal;
+					Refusal.AboutId = Asked.Id;
+					Refusal.RootId = FString::Printf(TEXT("refus-%s-%s"), *Own->Id, *Asked.Id);
+					RecordEpisode(Chef->Id, TEXT("refusedHelp"), Refusal);
+				}
+			}
+		}
 	}
 
 	int32 FVillage::ProgressBuildWork(FNpc& Npc, double Dt)
@@ -6224,6 +6774,7 @@ namespace AnastasisVillage
 		Score += PhaseBias;
 		const int32 DepotLoad = IsGranaryWorker(Npc) ? Npc.InventoryFood : 0;
 		Score += G::CompletionBias(B::GoalBuild, Npc.InventoryFood, DepotLoad, SessionGoalOf(Npc), NeedsCritical(Npc.Needs));
+		Score += EpisodeGoalBiasOf(Npc, B::GoalBuild);
 		Score += G::TraitGoalBias(Trait, B::GoalBuild);
 		Score += G::SkillGoalBias(Npc.SkillCraft);
 		return Score;

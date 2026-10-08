@@ -137,6 +137,11 @@ namespace AnastasisChronicle
 		case EKind::FoodBack: return TEXT("FoodBack");
 		case EKind::FoodLow: return TEXT("FoodLow");
 		case EKind::Scene: return TEXT("Scene");
+		case EKind::Rumor: return TEXT("Rumor");
+		case EKind::Legend: return TEXT("Legend");
+		case EKind::HouseDecided: return TEXT("HouseDecided");
+		case EKind::HelpGiven: return TEXT("HelpGiven");
+		case EKind::HelpRefused: return TEXT("HelpRefused");
 		case EKind::Stalled: return TEXT("Stalled");
 		}
 		return TEXT("Unknown");
@@ -172,6 +177,8 @@ namespace AnastasisChronicle
 		Entries.Reset();
 		Days.Reset();
 		FamilyViews.Reset();
+		LegendRoots.Reset();
+		HelpSeen = 0;
 	}
 
 	FString FVillageChronicle::Quote(const FString& SpeakerId, const TCHAR* Pool, int32 Rank, const TMap<FString, FString>& Holes) const
@@ -300,6 +307,7 @@ namespace AnastasisChronicle
 		State.Pieces = Npc.PiecesPlaced;
 		State.Materials = Npc.MaterialsDelivered;
 		State.FirstDay = Day;
+		for (const AnastasisEpisodes::FEpisode& Event : Npc.Chronicle.Events) State.Episodes.Add(Event.Id);
 		for (const TPair<FString, double>& Relation : Npc.Relations)
 		{
 			if (Relation.Value >= AnastasisBonds::FriendAt) State.Friends.Add(Relation.Key);
@@ -379,6 +387,7 @@ namespace AnastasisChronicle
 		FirstDay = Day;
 		CurrentDay = Day;
 		DeathsSeen = Village.GetDeaths().Num();
+		HelpSeen = Village.GetHelpLog().Num();
 		ReadFamilies(Sim);
 
 		TArray<FString> Ids;
@@ -625,9 +634,32 @@ namespace AnastasisChronicle
 			State.Owner = Building.Owner;
 			State.Progress = Building.Progress;
 			State.ProgressDay = Day;
+			const FFamilyView* OwnerFamily = Building.OwnerFamilyId.IsEmpty() ? nullptr
+				: FamilyViews.FindByPredicate([&Building](const FFamilyView& V) { return V.Id == Building.OwnerFamilyId; });
 			if (State.bDone)
 			{
 				Add(Day, Hour, EKind::BuildingPlaced, {}, FString::Printf(TEXT("On pose %s."), *State.Label));
+			}
+			else if (OwnerFamily)
+			{
+				// ecart n°48 : une famille sans maison decide de batir ; son chef trace la parcelle.
+				FString Chef;
+				for (const FString& Id : OwnerFamily->Members)
+				{
+					if (Building.AllowedBuilders.Num() && Building.AllowedBuilders[0] == Id) Chef = Id;
+				}
+				// Un des siens a deja un toit (le chef de la maison d'ouverture) : les autres dorment ailleurs.
+				bool bPartly = false;
+				for (const FString& Id : OwnerFamily->Members)
+				{
+					const FPersonState* Member = People.Find(Id);
+					if (Member && !Member->HomeId.IsEmpty()) bPartly = true;
+				}
+				const FString Family = Capitalize(OwnerFamily->Name);
+				const FString Who = Chef.IsEmpty() ? FString(TEXT("la famille")) : NameOf(Chef);
+				Add(Day, Hour, EKind::HouseDecided, OwnerFamily->Members, bPartly
+					? FString::Printf(TEXT("%s est à l'étroit, les siens dorment chez les autres : %s décide de bâtir pour eux et trace la parcelle %s."), *Family, *Who, *De(State.Label))
+					: FString::Printf(TEXT("%s n'a pas encore de toit à soi : %s décide de bâtir et trace la parcelle %s."), *Family, *Who, *De(State.Label)));
 			}
 			else
 			{
@@ -789,6 +821,32 @@ namespace AnastasisChronicle
 				Add(Day, Hour, EKind::Recovered, { Npc.Id }, FString::Printf(TEXT("%s reprend des forces."), *State.Name));
 			}
 
+			// memoire-decisions-001 : les histoires qu'on lui raconte, et celles qui deviennent legendes. Ce qu'il a
+			// oublie sort de la liste : l'entendre de nouveau se raconte.
+			{
+				TSet<FString> Remembered;
+				for (const AnastasisEpisodes::FEpisode& Event : Npc.Chronicle.Events) Remembered.Add(Event.Id);
+				State.Episodes = State.Episodes.Intersect(Remembered);
+			}
+			for (const AnastasisEpisodes::FEpisode& Event : Npc.Chronicle.Events)
+			{
+				if (State.Episodes.Contains(Event.Id)) continue;
+				State.Episodes.Add(Event.Id);
+				if (Event.bFirsthand) continue;
+				const FString Teller = NameOf(Event.SourceId);
+				const FString Origin = Event.OriginalSourceId.IsEmpty() ? FString() : NameOf(Event.OriginalSourceId);
+				const FString Story = Lines ? Lines->TellerVersion(Event, Origin == Teller ? FString() : Origin) : FString(TEXT("une histoire"));
+				Add(Day, Hour, EKind::Rumor, { Npc.Id, Event.SourceId },
+					FString::Printf(TEXT("%s raconte à %s : « %s »"), *Teller, *State.Name, *Capitalize(Story)));
+				const FString Root = Event.RootId.IsEmpty() ? Event.Id : Event.RootId;
+				if (AnastasisEpisodes::IsLegend(Event) && !LegendRoots.Contains(Root))
+				{
+					LegendRoots.Add(Root);
+					Add(Day, Hour, EKind::Legend, { Npc.Id },
+						FString::Printf(TEXT("Une légende court à Valmire : « %s »"), *Capitalize(Lines ? Lines->EpisodeLine(Event) : FString(TEXT("une histoire")))));
+				}
+			}
+
 			// Amities et brouilles : une ligne par paire, la premiere fois qu'un des deux franchit le seuil.
 			for (const TPair<FString, double>& Relation : Npc.Relations)
 			{
@@ -822,6 +880,30 @@ namespace AnastasisChronicle
 			}
 		}
 
+		// ecart n°48 : le tour du village -- qui a demande de l'aide a qui, la reponse, et sa raison.
+		const TArray<AnastasisVillage::FVillage::FHelpAnswer>& Help = Village.GetHelpLog();
+		for (; HelpSeen < Help.Num(); ++HelpSeen)
+		{
+			const AnastasisVillage::FVillage::FHelpAnswer& Answer = Help[HelpSeen];
+			FString Pool = Answer.bAccepted
+				? (Answer.Reason == TEXT("voisin") || Answer.Reason.IsEmpty() ? FString(TEXT("aide.accepte")) : FString::Printf(TEXT("aide.accepte.%s"), *Answer.Reason))
+				: FString::Printf(TEXT("aide.refuse.%s"), *Answer.Reason);
+			// « Occupe » parle de son ouvrage : le champ pour un cultivateur, le chantier pour un batisseur.
+			if (!Answer.bAccepted && Answer.Reason == TEXT("occupe") && Lines)
+			{
+				const FPersonState* Asked = People.Find(Answer.ToId);
+				const FString ByTrade = Asked ? FString::Printf(TEXT("aide.refuse.occupe.%s"), *Asked->JobId) : FString();
+				if (!ByTrade.IsEmpty() && Lines->HasPool(ByTrade)) Pool = ByTrade;
+			}
+			const FString Said = Lines ? Lines->Pick(Pool, AnastasisDialogue::FLibrary::KeyOf(Seed, Answer.ToId, Pool, HelpSeen)) : FString();
+			const FString Ask = Lines ? Lines->Pick(TEXT("aide.demande.chantier"), AnastasisDialogue::FLibrary::KeyOf(Seed, Answer.FromId, TEXT("aide.demande.chantier"), HelpSeen)) : FString();
+			const FString Text = FString::Printf(TEXT("%s va demander de l'aide à %s%s. %s %s%s"),
+				*NameOf(Answer.FromId), *NameOf(Answer.ToId), Ask.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" : « %s »"), *Ask),
+				*NameOf(Answer.ToId), Answer.bAccepted ? TEXT("accepte") : TEXT("refuse"),
+				Said.IsEmpty() ? TEXT(".") : *FString::Printf(TEXT(" : « %s »"), *Said));
+			Add(Day, Hour, Answer.bAccepted ? EKind::HelpGiven : EKind::HelpRefused, { Answer.FromId, Answer.ToId }, Text);
+		}
+
 		// 4. Ceux qui ne sont plus la sans etre morts : ils sont partis.
 		for (const FString& Id : PersonOrder)
 		{
@@ -846,6 +928,16 @@ namespace AnastasisChronicle
 				Add(Day, Hour, EKind::BuildingGone, {}, FString::Printf(TEXT("%s a disparu."), *Capitalize(State.Label)));
 				continue;
 			}
+			const bool bAwaits = !Building->OwnerFamilyId.IsEmpty() && Village.AwaitsHelp(*Building);
+			if (bAwaits && !State.bAwaitTold)
+			{
+				State.bAwaitTold = true;
+				const FFamilyView* OwnerFamily = FamilyViews.FindByPredicate([Building](const FFamilyView& V) { return V.Id == Building->OwnerFamilyId; });
+				Add(Day, Hour, EKind::Stalled, OwnerFamily ? OwnerFamily->Members : TArray<FString>(),
+					FString::Printf(TEXT("Les murs %s sont debout ; %s attend des bras pour le toit : on ne lève pas un toit seul."),
+						*De(State.Label), OwnerFamily ? *OwnerFamily->Name : TEXT("la famille")));
+			}
+			State.bAwaitsHelp = bAwaits;
 			if (Building->Progress > State.Progress)
 			{
 				State.Progress = Building->Progress;
@@ -857,8 +949,21 @@ namespace AnastasisChronicle
 				State.bDone = true;
 				FString Text = FString::Printf(TEXT("%s est achevé%s"), *Capitalize(State.Label),
 					State.Label.StartsWith(TEXT("la ")) ? TEXT("e") : TEXT(""));
-				if (State.Helpers.Num()) Text += FString::Printf(TEXT(", grâce à %s"), *Names(State.Helpers));
-				Add(Day, Hour, EKind::BuildingDone, State.Helpers, Text + TEXT("."));
+				// Ceux qui y ont pose des pieces, tels que la simulation les compte (`building.workers`) ; pour la
+				// maison d'une famille, ceux du dehors seulement : les siens vont de soi.
+				const FFamilyView* Owners = Building->OwnerFamilyId.IsEmpty() ? nullptr
+					: FamilyViews.FindByPredicate([Building](const FFamilyView& V) { return V.Id == Building->OwnerFamilyId; });
+				TArray<FString> Workers;
+				for (const TPair<FString, int32>& Worker : Building->Workers)
+				{
+					if (Worker.Value > 0 && !(Owners && Owners->Members.Contains(Worker.Key))) Workers.Add(Worker.Key);
+				}
+				if (Workers.IsEmpty() && !Owners) Workers = State.Helpers;
+				if (Workers.Num()) Text += FString::Printf(TEXT(", grâce à %s"), *Names(Workers));
+				const FFamilyView* OwnerFamily = Building->OwnerFamilyId.IsEmpty() ? nullptr
+					: FamilyViews.FindByPredicate([Building](const FFamilyView& V) { return V.Id == Building->OwnerFamilyId; });
+				if (OwnerFamily) Text += FString::Printf(TEXT(". Elle revient à %s"), *OwnerFamily->Name);
+				Add(Day, Hour, EKind::BuildingDone, Workers, Text + TEXT("."));
 			}
 		}
 
@@ -927,6 +1032,9 @@ namespace AnastasisChronicle
 			{
 				Out += FString::Printf(TEXT("- Grenier vide %d soir%s sur %d.\n"), EmptyEvenings, S(EmptyEvenings), Days.Num());
 			}
+			Out += FString::Printf(TEXT("- %d histoire%s racontée%s de bouche en bouche, %d devenue%s légende%s.\n"),
+				CountOf(EKind::Rumor), S(CountOf(EKind::Rumor)), S(CountOf(EKind::Rumor)),
+				CountOf(EKind::Legend), S(CountOf(EKind::Legend)), S(CountOf(EKind::Legend)));
 			Out += FString::Printf(TEXT("- %d amitié%s nouée%s, %d brouille%s.\n\n"),
 				CountOf(EKind::Friendship), S(CountOf(EKind::Friendship)), S(CountOf(EKind::Friendship)),
 				CountOf(EKind::Quarrel), S(CountOf(EKind::Quarrel)));

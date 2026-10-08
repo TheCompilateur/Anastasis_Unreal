@@ -81,6 +81,30 @@ namespace AnastasisDialogue
 		return Line;
 	}
 
+	FString FLibrary::EpisodeLine(const AnastasisEpisodes::FEpisode& Event) const
+	{
+		const FString Name = FString::Printf(TEXT("episodes.EPISODE_LINES.%s.%s"), *Event.Kind,
+			AnastasisEpisodes::IsLegend(Event) ? TEXT("legend") : TEXT("firsthand"));
+		const TArray<FString>* Lines = Pools.Find(Name);
+		if (!Lines || Lines->IsEmpty()) return TEXT("quelque chose est arrive");
+		FString Line = (*Lines)[AnastasisEpisodes::VariantIndex(Event, Lines->Num())];
+		const FString Detail = Event.Detail == 0.0 ? FString(TEXT("mon"))
+			: (FMath::IsNearlyEqual(Event.Detail, FMath::RoundToDouble(Event.Detail)) ? FString::Printf(TEXT("%d"), FMath::RoundToInt32(Event.Detail)) : FString::SanitizeFloat(Event.Detail));
+		Line.ReplaceInline(TEXT("{who}"), Event.AboutName.IsEmpty() ? TEXT("quelqu'un") : *Event.AboutName, ESearchCase::CaseSensitive);
+		Line.ReplaceInline(TEXT("{note}"), Event.Note.IsEmpty() ? TEXT("un reve") : *Event.Note, ESearchCase::CaseSensitive);
+		Line.ReplaceInline(TEXT("{detail}"), *Detail, ESearchCase::CaseSensitive);
+		return Line;
+	}
+
+	FString FLibrary::TellerVersion(const AnastasisEpisodes::FEpisode& Event, const FString& OriginName) const
+	{
+		const FString Story = EpisodeLine(Event);
+		if (Event.bFirsthand || AnastasisEpisodes::IsLegend(Event) || OriginName.IsEmpty()) return Story;
+		const uint32 Key = FCrc::StrCrc32(*Event.Id);
+		const FString Framed = Pick(TEXT("memoire.raconte_par"), Key, { { TEXT("source"), OriginName }, { TEXT("histoire"), Story } });
+		return Framed.IsEmpty() ? Story : Framed;
+	}
+
 	const FLibrary& FLibrary::Get()
 	{
 		static const FLibrary Library = []()

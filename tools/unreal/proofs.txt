@@ -111,3 +111,5 @@ canopy-rain-pie | tools/unreal/canopy-rain-pie.py | CANOPY_RAIN_PIE PASS | CANOP
 settlement-morphogenesis-pie | tools/unreal/settlement-morphogenesis-pie.py | MORPH_PIE PASS | MORPH_PIE FAIL|Traceback | 1800 | ANASTASIS_MORPH_OUT=@Saved/SettlementEvidence/pie
 # CHRONIQUE_VILLAGE_001 : 30 jours du village du lancement (Advance 30d) ; PASS = fondation, 30 bilans, recit au-dela de la fondation, fichier ecrit. Pas un verdict sur l interet du recit.
 chronicle-pie | tools/unreal/chronicle-pie.py | CHRONICLE_PIE PASS | CHRONICLE_PIE FAIL|CHRONICLE_PIE_TIMEOUT|Traceback | 420 | -
+# memoire-decisions-001 : 30 jours avec le joueur arrive ; PASS = histoires racontees, une maison decidee, une aide demandee, le carnet a note, fichiers ecrits. Pas un verdict sur l interet du recit.
+memory-pie | tools/unreal/memory-pie.py | MEMORY_PIE PASS | MEMORY_PIE FAIL|MEMORY_PIE_TIMEOUT|Traceback | 480 | -
