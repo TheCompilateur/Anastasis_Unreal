@@ -380,6 +380,8 @@ Opérateur et portails :
 | `cosmic-night-pie.py` | PIE du ciel cosmique : dôme/material dynamique, lune et voile nocturnes, coupure, occultation diurne/nuageuse, météore programmé et comète V1 ; verdict instrumental, image séparée ; registre `cosmic-night-pie` |
 | `nox-cubemap-probe.py` | NOX_003 : capture HDR emissive du ciel via l API UE, quatre etats a meme pose de crete ; sonde de la source seulement, pas le cubemap temps reel ni des lux ; registre `nox-cubemap-probe` |
 | `anastasis-unreal.ps1` | `status` / `build` / `build-game` / `verify` / `health` / `editor` |
+| `package-playable.ps1` | après un lot intégré et la compilation canonique : build + cook + paquet Windows Development versionné sous `C:\dev\ANASTASIS_RELEASES\Playable` ; publie `latest.json` seulement après succès, sans ouvrir d'éditeur interactif |
+| `play-packaged.ps1` | ouvre l'exécutable du dernier paquet publié dans une fenêtre de jeu visible, sans interface d'édition |
 | `agent-worktree.ps1` | cycle de vie multi-agent : `create` / `status` / `finish` / `integrate` / `integrate-batch` / `prune` / `preflight` / `postflight` / `mcp` |
 | `test-agent-worktree.ps1` | banc d'essai de `finish` (saut sans changement Unreal, preuves déclarées), `integrate`, `integrate-batch`, verrou de `main`, règle de retest (arbres identiques / un `Source/` changé), `prune`, `finish -Queue`, et la porte mémoire (file, éditeur sans rendu, charge simulée) sur un dépôt jetable ; à relancer après toute modification de `agent-worktree.ps1` ou `editor-launch.ps1` |
 | `mcp-port.ps1` | port MCP d'une racine, à dot-sourcer |
