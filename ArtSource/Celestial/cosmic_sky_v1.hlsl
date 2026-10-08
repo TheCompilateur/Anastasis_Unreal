@@ -70,6 +70,27 @@ if (MeteorStrength > 0.001)
             + fire*float3(0.55,0.61,0.76))*MeteorStrength;
 }
 
+float3 comet = 0.0;
+if (CometStrength > 0.001)
+{
+    float3 head = normalize(CometHead.xyz), tail = normalize(CometTail.xyz);
+    float3 axis = normalize(tail-head);
+    float span = length(tail-head);
+    // Use the same rotating sky coordinates as the star river: the comet
+    // follows the night sky, then shifts only between successive evenings.
+    float3 delta = skyDir-head;
+    float along = dot(delta,axis);
+    float side = length(delta-along*axis);
+    float progress = saturate(along/span);
+    float extent = smoothstep(0.0,0.012,along) * (1.0-smoothstep(span*0.88,span,along));
+    float dust = exp(-pow(side/(0.006+0.026*progress),2.0)) * extent * (1.0-progress);
+    float ion = exp(-pow(side/(0.002+0.007*progress),2.0)) * extent * (1.0-0.7*progress);
+    float nucleus = exp(-pow(length(delta)/0.006,2.0));
+    comet = (dust*float3(0.018,0.016,0.038)
+           + ion*float3(0.095,0.155,0.250)
+           + nucleus*float3(0.42,0.48,0.68))*CometStrength;
+}
+
 float az = atan2(skyDir.y,skyDir.x);
 float wave = dot(skyDir,normalize(float3(-0.26,0.41,0.87)))
            - 0.13*sin(az*3.0+SkyRotation*0.34);
@@ -79,4 +100,4 @@ float pulse = 0.68+0.32*sin(az*17.0+skyDir.z*45.0+SkyRotation*0.56);
 float3 veil = (filament*float3(0.010,0.032,0.055)
              + fringe*float3(0.014,0.006,0.029))*pulse*VeilStrength;
 
-return celestial + moon + meteor + veil;
+return celestial + moon + meteor + veil + comet;

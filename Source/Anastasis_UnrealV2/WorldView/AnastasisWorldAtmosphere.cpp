@@ -174,7 +174,7 @@ static TAutoConsoleVariable<int32> CVarCosmicArtVersion(
 	ECVF_Default);
 static TAutoConsoleVariable<int32> CVarCosmicEvent(
 	TEXT("anastasis.Sky.CosmicEvent"), -1,
-	TEXT("-1=seeded night calendar, 0=ordinary, 1=meteor night, 2=rare veil. Capture pin only; never changes simulation."),
+	TEXT("-1=seeded night calendar, 0=ordinary, 1=meteor night, 2=rare veil, 3=comet preview. Capture pin only; never changes simulation."),
 	ECVF_Default);
 static TAutoConsoleVariable<float> CVarCosmicIntensity(
 	TEXT("anastasis.Sky.CosmicIntensity"), 1.0f,
@@ -570,14 +570,18 @@ void AAnastasisWorldAtmosphere::UpdateCosmicSky(const bool bForceLog)
 	CosmicSkyInstance->SetVectorParameterValue(TEXT("MeteorStart"), FLinearColor(Night.MeteorStart.X, Night.MeteorStart.Y, Night.MeteorStart.Z, 0));
 	CosmicSkyInstance->SetVectorParameterValue(TEXT("MeteorEnd"), FLinearColor(Night.MeteorEnd.X, Night.MeteorEnd.Y, Night.MeteorEnd.Z, 0));
 	CosmicSkyInstance->SetScalarParameterValue(TEXT("VeilStrength"), Night.VeilStrength * Intensity);
+	CosmicSkyInstance->SetScalarParameterValue(TEXT("CometStrength"), Night.CometStrength * Intensity);
+	CosmicSkyInstance->SetVectorParameterValue(TEXT("CometHead"), FLinearColor(Night.CometHead.X, Night.CometHead.Y, Night.CometHead.Z, 0));
+	CosmicSkyInstance->SetVectorParameterValue(TEXT("CometTail"), FLinearColor(Night.CometTail.X, Night.CometTail.Y, Night.CometTail.Z, 0));
 	if (bForceLog || Night.Night.EveningDay != LastCosmicEvening)
 	{
 		LastCosmicEvening = Night.Night.EveningDay;
 		const TCHAR* Kind = Night.Night.Kind == AnastasisCosmicNight::EKind::Meteors ? TEXT("meteors")
-			: Night.Night.Kind == AnastasisCosmicNight::EKind::Veil ? TEXT("veil") : TEXT("ordinary");
-		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_COSMIC_SKY day=%d kind=%s meteors=%d visibility=%.3f veil=%.3f"),
-			Night.Night.EveningDay, Kind, Night.Night.MeteorCount,
-			Night.Visibility, Night.VeilStrength);
+			: Night.Night.Kind == AnastasisCosmicNight::EKind::Veil ? TEXT("veil")
+			: Night.Night.Kind == AnastasisCosmicNight::EKind::Comet ? TEXT("comet") : TEXT("ordinary");
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_COSMIC_SKY day=%d kind=%s meteors=%d comet_start=%d comet_night=%d visibility=%.3f veil=%.3f comet=%.3f"),
+			Night.Night.EveningDay, Kind, Night.Night.MeteorCount, Night.Night.CometStartDay,
+			Night.Night.CometDayIndex, Night.Visibility, Night.VeilStrength, Night.CometStrength);
 	}
 }
 

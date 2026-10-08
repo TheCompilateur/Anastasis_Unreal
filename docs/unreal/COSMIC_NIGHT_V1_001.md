@@ -26,16 +26,17 @@ continuent de décider quand le phénomène existe. La V1 change la présentatio
 - Forge : tools/unreal/cosmic-sky-material.ps1 -Version 1 -Rebuild crée
   T_CosmicRiverV1 et M_AnastasisCosmicSkyV1 sans écraser la V0.
 
-## Treize nuits à développer ensuite
+## Treize motifs de nuit
 
-Ce sont des directions artistiques, pas treize effets déjà codés. Chaque nuit se tire
-du calendrier du monde, se masque par la météo et garde sa forme après minuit.
+Ces motifs forment la réserve artistique. La comète patiente (#3) est codée dans la
+V1.1 ; les douze autres restent des directions. Le calendrier du monde et la météo
+décident de leur apparition, sans toucher à la simulation.
 
 | # | Nom | Signe visible | Rythme envisagé |
 |---|---|---|---|
 | 1 | La conjonction des aiguilles | Trois étoiles-guides s'alignent une heure | saisonnier |
 | 2 | La couronne de cendre | Anneau froid et poussiéreux autour de la lune | après pluie humide |
-| 3 | La comète patiente | Même chevelure se déplace sur plusieurs nuits | très rare, plusieurs jours |
+| 3 | La comète patiente | Même chevelure se déplace sur plusieurs nuits | codée V1.1 : quatre nuits |
 | 4 | La rivière obscurcie | Une faille de poussière traverse le coeur galactique | rare |
 | 5 | La pluie transverse | Plusieurs météores partent d'un même radiant | nuit annoncée par quelques précurseurs |
 | 6 | La nacre basse | L'horizon ouvre une bande iridescente entre les nuages | bref après l'orage |
@@ -47,8 +48,17 @@ du calendrier du monde, se masque par la météo et garde sa forme après minuit
 | 12 | La marée froide | Une lente onde pâle traverse le ciel et se reflète dans l'eau | exceptionnel |
 | 13 | La seconde ombre | Pendant quelques minutes, l'ombre lunaire change de direction | anomalie rarissime |
 
-Le météore V1 et le voile V1 sont les premières formes mises en matière. Les autres
+Le météore, le voile et la comète sont les trois formes mises en matière. Les douze autres
 ne seront admises qu'une par une, avec une silhouette reconnaissable et un coût GPU mesuré.
+
+## La comète patiente (V1.1)
+
+Un début rare du calendrier donne quatre soirées consécutives avec la même comète. Elle
+avance de cinq degrés par nuit par rapport aux étoiles, gagne en éclat puis décline. Son
+noyau, sa queue ionique et sa poussière sont dessinés dans le matériau V1. La couverture
+nuageuse ou le jour l'effacent à l'écran sans supprimer la date de l'événement. La CVar
+`anastasis.Sky.CosmicEvent 3` permet de la prévisualiser sur une soirée épinglée ; `-1`
+redonne le calendrier déterministe. Ce motif ne crée aucune ressource ni croyance de PNJ.
 
 ## Preuve et limite
 

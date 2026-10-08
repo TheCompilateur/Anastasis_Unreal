@@ -57,4 +57,51 @@ bool FAnastasisCosmicVisibility::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisCosmicComet,
+	"Anastasis.Sky.Cosmic.Comet", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisCosmicComet::RunTest(const FString&)
+{
+	using namespace AnastasisCosmicNight;
+	int32 Onset = 0;
+	for (int32 Day = 1; Day <= 480; ++Day)
+	{
+		const FNight Night = Plan(12345u, Day);
+		if (Night.Kind == EKind::Comet && Night.CometDayIndex == 0)
+		{
+			Onset = Day;
+			break;
+		}
+	}
+	if (!TestTrue(TEXT("seeded calendar contains a comet onset"), Onset > 0))
+	{
+		return false;
+	}
+	FVector PreviousHead = FVector::ZeroVector;
+	for (int32 Index = 0; Index < 4; ++Index)
+	{
+		const FNight Night = Plan(12345u, Onset + Index);
+		TestEqual(TEXT("comet persists four evenings"), static_cast<int32>(Night.Kind), static_cast<int32>(EKind::Comet));
+		TestEqual(TEXT("same comet retains onset"), Night.CometStartDay, Onset);
+		TestEqual(TEXT("comet advances one night"), Night.CometDayIndex, Index);
+		TestEqual(TEXT("comet does not stage a meteor shower"), Night.MeteorCount, 0);
+		const FInstant Clear = Evaluate(12345u, Onset + Index, 23.0, -22.0, 0.0, 0.0);
+		TestTrue(TEXT("clear comet is visible and above horizon"),
+			Clear.CometStrength > 0.1f && Clear.CometHead.Z > 0.0 && Clear.CometTail.Z > 0.0);
+		if (Index > 0)
+		{
+			TestTrue(TEXT("comet shifts against the stars overnight"),
+				FVector::DotProduct(PreviousHead, Clear.CometHead) < 0.999);
+		}
+		PreviousHead = Clear.CometHead;
+	}
+	const FInstant AfterMidnight = Evaluate(12345u, Onset + 1, 2.0, -22.0, 0.0, 0.0);
+	TestEqual(TEXT("comet evening survives midnight"), AfterMidnight.Night.CometStartDay, Onset);
+	TestEqual(TEXT("comet evening index survives midnight"), AfterMidnight.Night.CometDayIndex, 0);
+	TestEqual(TEXT("cloud hides comet without erasing calendar"),
+		Evaluate(12345u, Onset, 23.0, -22.0, 1.0, 0.0).CometStrength, 0.0f);
+	TestEqual(TEXT("day hides comet without erasing calendar"),
+		Evaluate(12345u, Onset, 12.0, 45.0, 0.0, 0.0).CometStrength, 0.0f);
+	return true;
+}
+
 #endif

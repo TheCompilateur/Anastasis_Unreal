@@ -194,6 +194,12 @@ def create_material(moon, panorama):
         'MeteorEnd': vector(mat, 'MeteorEnd', (0,0,1,0), 740),
         'VeilStrength': scalar(mat, 'VeilStrength', 0, 830),
     }
+    if VERSION == 1:
+        nodes.update({
+            'CometStrength': scalar(mat, 'CometStrength', 0, 920),
+            'CometHead': vector(mat, 'CometHead', (0,0,1,0), 1010),
+            'CometTail': vector(mat, 'CometTail', (0,0,1,0), 1100),
+        })
     sky = custom(mat, HLSL, tuple(nodes.keys()))
     wiring = {}
     for name, node in nodes.items():

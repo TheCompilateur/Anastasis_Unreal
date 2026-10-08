@@ -43,15 +43,41 @@ FNight Plan(const uint32 Seed, const int32 EveningDay, const int32 ForcedKind)
 	const uint32 Roll = Mix(Seed ^ (static_cast<uint32>(Out.EveningDay) * 0x9e3779b9u) ^ 0xc35a3b27u);
 	if (ForcedKind >= 0)
 	{
-		Out.Kind = static_cast<EKind>(FMath::Clamp(ForcedKind, 0, 2));
+		Out.Kind = static_cast<EKind>(FMath::Clamp(ForcedKind, 0, 3));
+		if (Out.Kind == EKind::Comet)
+		{
+			Out.CometStartDay = Out.EveningDay; // Preview a comet on any pinned evening.
+			Out.CometDayIndex = 0;
+		}
 	}
-	else if (Roll % 1000u < 22u)
+	else
 	{
-		Out.Kind = EKind::Veil;
-	}
-	else if (Roll % 1000u < 155u)
-	{
-		Out.Kind = EKind::Meteors;
+		// A single onset is discoverable for four evenings. Prefer the older onset
+		// if the rare calendar ever places two within the same four-day window.
+		for (int32 Age = 3; Age >= 0; --Age)
+		{
+			const int32 StartDay = Out.EveningDay - Age;
+			if (StartDay < 1)
+			{
+				continue;
+			}
+			const uint32 CometRoll = Mix(Seed ^ (static_cast<uint32>(StartDay) * 0x9e3779b9u) ^ 0xa071f00du);
+			if (CometRoll % 1000u < 12u)
+			{
+				Out.Kind = EKind::Comet;
+				Out.CometStartDay = StartDay;
+				Out.CometDayIndex = Age;
+				break;
+			}
+		}
+		if (Out.Kind != EKind::Comet && Roll % 1000u < 22u)
+		{
+			Out.Kind = EKind::Veil;
+		}
+		else if (Out.Kind != EKind::Comet && Roll % 1000u < 155u)
+		{
+			Out.Kind = EKind::Meteors;
+		}
 	}
 	if (Out.Kind == EKind::Meteors)
 	{
@@ -84,6 +110,20 @@ FInstant Evaluate(const uint32 Seed, const int32 Day, const double Hours, const 
 	{
 		Out.VeilStrength = static_cast<float>(Out.Visibility
 			* Smooth((NightHour - 22.0) / 1.0) * (1.0 - Smooth((NightHour - 27.0) / 1.0)));
+	}
+
+	if (Out.Night.Kind == EKind::Comet)
+	{
+		static constexpr double NightBrightness[4] = {0.55, 0.82, 1.0, 0.68};
+		const int32 Index = FMath::Clamp(Out.Night.CometDayIndex, 0, 3);
+		const uint32 Key = Mix(Seed ^ (static_cast<uint32>(Out.Night.CometStartDay) * 0x41c64e6du));
+		const double Azimuth = 2.0 * UE_DOUBLE_PI * Unit(Key ^ 0xe393u)
+			+ FMath::DegreesToRadians(5.0 * Index);
+		const double Elevation = 38.0 + 18.0 * Unit(Key ^ 0x651du) + 1.5 * Index;
+		Out.CometHead = SkyDirection(Azimuth, Elevation);
+		Out.CometTail = SkyDirection(Azimuth - FMath::DegreesToRadians(12.0), Elevation + 4.0);
+		Out.CometStrength = static_cast<float>(Out.Visibility * NightBrightness[Index]
+			* Smooth((NightHour - 21.0) / 1.0) * (1.0 - Smooth((NightHour - 28.0) / 1.0)));
 	}
 
 	for (int32 I = 0; I < Out.Night.MeteorCount; ++I)

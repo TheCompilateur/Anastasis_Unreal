@@ -52,6 +52,7 @@ def sample(atm):
         'moon': float(material.get_scalar_parameter_value('MoonStrength')),
         'veil': float(material.get_scalar_parameter_value('VeilStrength')),
         'meteor': float(material.get_scalar_parameter_value('MeteorStrength')),
+        'comet': float(material.get_scalar_parameter_value('CometStrength')) if 'V1' in parent.get_name() else 0.0,
         'art_cvar': float(unreal.SystemLibrary.get_console_variable_float_value('anastasis.Sky.CosmicArtVersion')),
     }
 
@@ -144,7 +145,21 @@ def tick(_dt):
             samples['meteor'] = sample(atm)
             if samples['meteor']['meteor'] <= .1:
                 raise RuntimeError('scheduled meteor did not reach the material')
-            finish(True, 'dome, lunar and rare event parameters respond in PIE; image quality separate')
+            cmd('anastasis.Sky.CosmicEvent', 3)
+            cmd('anastasis.Sky.Day', 1)
+            cmd('anastasis.Sky.Hour', 23)
+            phase, mark = 'comet', now
+        elif phase == 'comet' and now - mark > 2:
+            samples['comet'] = sample(atm)
+            if samples['comet']['comet'] <= .1 or samples['comet']['meteor'] > .01:
+                raise RuntimeError('forced comet did not reach the V1 material cleanly')
+            cmd('anastasis.Sky.Cover', 1)
+            phase, mark = 'comet_cloud', now
+        elif phase == 'comet_cloud' and now - mark > 2:
+            samples['comet_cloud'] = sample(atm)
+            if samples['comet_cloud']['comet'] > .01:
+                raise RuntimeError('cloud cover did not hide comet')
+            finish(True, 'dome, lunar, meteor and comet parameters respond in PIE; image quality separate')
     except Exception:
         finish(False, traceback.format_exc())
 

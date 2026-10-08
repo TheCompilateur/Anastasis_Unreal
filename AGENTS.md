@@ -377,7 +377,7 @@ Opérateur et portails :
 | `nox-sky-capture.py` | NOX_001 : trois profils nocturnes, pleine lune et sans lune, midi temoin, poses `valley_long` et `ridge_long` dans `Saved/NoxEvidence/batch/` via `capture-sky.py` ; `SKY_CAPTURE_COMPLETE` instrumental, verdict image et joueur separes ; registre `nox-sky-capture` |
 | `nox-exposure-diagnostic.py` | NOX_001 : meme pose sans lune a EV +2, -6 et -10 pour distinguer absence de radiance et exposition inadaptee ; restauration du plein clair de lune, aucune sauvegarde d'asset |
 | `nox-skylight-probe.py` | NOX_002 : a nuit sans lune et EV fixe, compare Sky Light natif/eteint/amplifie ×1000 ; capture HDR SceneColor brute et PNG sur deux poses, temoin repete et pleine lune ; diagnostic seulement, aucun asset sauve |
-| `cosmic-night-pie.py` | PIE du ciel cosmique : dôme/material dynamique, lune et voile nocturnes, coupure, occultation diurne/nuageuse et météore programmé ; verdict instrumental, image séparée ; registre `cosmic-night-pie` |
+| `cosmic-night-pie.py` | PIE du ciel cosmique : dôme/material dynamique, lune et voile nocturnes, coupure, occultation diurne/nuageuse, météore programmé et comète V1 ; verdict instrumental, image séparée ; registre `cosmic-night-pie` |
 | `nox-cubemap-probe.py` | NOX_003 : capture HDR emissive du ciel via l API UE, quatre etats a meme pose de crete ; sonde de la source seulement, pas le cubemap temps reel ni des lux ; registre `nox-cubemap-probe` |
 | `anastasis-unreal.ps1` | `status` / `build` / `build-game` / `verify` / `health` / `editor` |
 | `agent-worktree.ps1` | cycle de vie multi-agent : `create` / `status` / `finish` / `integrate` / `integrate-batch` / `prune` / `preflight` / `postflight` / `mcp` |
