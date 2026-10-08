@@ -57,11 +57,21 @@ archétype = programme de la biographie, `Anastasis.Village.SettlementReport`, p
 
 ## COMMIT
 
-voir `git log agent/relay-settlement-001` (un commit de relais sur `main` a6bbd484)
+voir `git log agent/relay-settlement-001` (un commit de relais sur `main` 423955c5)
 
 ## MEC
 
-MEC_PLACEHOLDER
+- BUILD: PASS (`Build.bat Anastasis_UnrealV2Editor Win64 Development`, worktree, apres rebase sur main 423955c5, 2026-10-08)
+- TESTS: `report-tests.ps1 -Filter "Anastasis.Sim+Anastasis.Village.Settlement+Anastasis.Village.Architecture"` (worktree,
+  MAIN_LOCK libre) : 173 PASS, 2 KNOWN_EXPECTED_FAILURE (Parite.Fbm, Parite.SemantiqueJs), 0 FAIL, 175 annonces.
+  Dont `Sentiers.{Passage,Naissance,Abandon,Renforcement}`, `Recolte.RouteCostDelivery`, `Parite.Nav{Chemin,Cout,Invariants,Service,ServiceFonctions}`, `Village.Navigation`,
+  `Village.Settlement.{Programme,Biographie}` : Success. Valeurs : `Passage` 105 passages, 105,0 sur la route, 0 hors
+  route ; `Naissance` 24 sentiers, premier au jour 21, 0 hors route, cout 0,860 ; `Abandon` passage 0,000, efforts 0,
+  sentiers 0 ; `Renforcement` 23 cases de route, cout 230,0 -> 197,8, trajet parallele 0 case, 230,0 -> 230,0 ;
+  `Biographie` refuge 3 dormeurs, 2 nuits pleines, maison du cultivateur 1 dormeur. Suite complete : au lot.
+- ECARTS: `node tools/migration/check-ecarts.mjs -base main -handoff docs/unreal/handoffs/relay-settlement-001.md` -> `ECARTS::PASS fiches=39 ouvertes=39 fail=0 warn=9`
+- STATE_FIELDS: `node tools/migration/check-state-fields.mjs -base main` -> `STATE_FIELDS::PASS structures=37 lacunes=2 warn=31`
+- Doublons index AGENTS.md / proofs.txt : aucun ; marqueurs de conflit : 0.
 
 ## PROOFS
 
