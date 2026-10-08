@@ -22,12 +22,12 @@ les appeler et les dire au log. Plus : `ResetCanonical` remet enfin `FarmerGrana
 - `Source/AnastasisSim/ECARTS.md` : fiche n° 40
 - `Source/Anastasis_UnrealV2/Sim/AnastasisSimulationSubsystem.{h,cpp}` : les quatre fonctions d'hôte retirées,
   `LogOpeningReport` / `LogOpeningHome` (mêmes lignes de log), remise de `FarmerGranaryId` / `FarmerField`
-- Relais (commits repris, voir INTEGRATION_RISK) : `site-from-sim-001` (et `geo-measure-001`, déjà sur `main`)
+- Relais (commits repris, voir INTEGRATION_RISK) : `site-from-sim-001` et `water-network-001` (`geo-measure-001` est déjà sur `main`)
 
 ## COMMIT
 
-Voir `git log main..agent/opening-in-sim-001` : les deux commits de `site-from-sim-001` rebasés sur `main`, puis
-le commit de cette mission.
+Voir `git log main..agent/opening-in-sim-001` (base `main` = `640fa3e8`) : les deux commits de `site-from-sim-001`,
+les deux de `water-network-001` (mêmes hashes que sa branche, sommet `7c6be7e1`), puis le commit de cette mission.
 
 ## MEC
 
@@ -71,13 +71,35 @@ Mesures :
 - `node tools/migration/check-ecarts.mjs` : `ECARTS::PASS fiches=38 ouvertes=38 fail=0 warn=9` (avertissements préexistants)
 - `node tools/migration/check-state-fields.mjs -base main` : `STATE_FIELDS::PASS`
 
+### MEC empilée (2026-10-08, `main` = `640fa3e8` + `water-network-001` `7c6be7e1` + cette mission)
+
+- BUILD: PASS (`tools\unreal\anastasis-unreal.ps1 build`, worktree)
+- TESTS: `tools\unreal\report-tests.ps1 -Filter 'Anastasis.Sim.Village.Ouverture+Anastasis.WaterNetwork+Anastasis.Sim.Empreinte+Anastasis.SettlementSite+Anastasis.Sim.Monde.Eau.Reseau+Anastasis.Sim.Village.Chantier'`
+  → PASS 19 / KNOWN_EXPECTED_FAILURE 0 / FAIL 0, 19 annoncés, run complet.
+  - `OPENING_IN_SIM` : rapport et attribution identiques à la mesure d'avant (`home status=assigned npc=npc-1 home=building-3 steps=12620`).
+  - `WATER_NETWORK seed=12345 network_water=893 js_water=1198 changed=833` ; `WATER_NETWORK_SITE site=(36,20)`.
+- PROOFS: `tools\unreal\editor-batch.ps1 -Proofs geography-concordance-pie,settlement-sensitivity-pie,settlement-site-pie,npc-life-pie,material-courier-pie,terrain-access-pie,villager-pie,village-fabric-pie`
+  → `Saved/EditorBatch/20261008-150624/`, `EDITOR_BATCH::PASS 8/8` :
+  - `geography-concordance-pie` PASS : 0 case en désaccord dans l'état de référence ;
+  - `settlement-sensitivity-pie` PASS : site (36 ; 20) dans les quatre états (`ref`, `drainage0`, `humangeo0`, `ref2`), STABLE ;
+  - `settlement-site-pie` PASS ;
+  - `npc-life-pie` PASS (nouveau script Warp 10 de `npc-life-warp-001`) : 22 pièces, propriétaire `npc-1`,
+    32 matériaux livrés, 99 s simulées ;
+  - `material-courier-pie` PASS : 32 livrés (24 bois, 8 pierre) ;
+  - `terrain-access-pie` INSTRUMENT_PASS ; `villager-pie` PASS ; `village-fabric-pie` PASS.
+- Lignes d'ouverture en PIE (10 démarrages) : `opening household npc=npc-0 home=building-1 work=building-2`,
+  `opening construction site=building-3 tile=(40,21) builders=npc-1,npc-2 courier=npc-1 stock=0 wood 0 stone`,
+  `opening workforce granary=building-2 farmers=npc-3,npc-4`, et **`opening home assigned npc=npc-1 home=building-3`** :
+  sur le site du réseau, la maison d'ouverture s'achève et la **simulation** l'attribue, en jeu.
+- `check-ecarts` : `ECARTS::PASS fiches=41` ; `check-state-fields` : `STATE_FIELDS::PASS structures=44 lacunes=2` (strict).
+
 ## PROOFS
 
 Preuves PIE que le lot rejoue pour cette mission, noms de `tools/unreal/proofs.txt` (EDITOR_QUEUE_001) :
 
-RELAIS: geo-measure-001, site-from-sim-001
+RELAIS: site-from-sim-001, water-network-001
 
-PROOFS: settlement-sensitivity-pie, settlement-site-pie, npc-life-pie, villager-pie, terrain-access-pie, village-fabric-pie, material-courier-pie
+PROOFS: geography-concordance-pie, settlement-sensitivity-pie, settlement-site-pie, npc-life-pie, material-courier-pie, terrain-access-pie, villager-pie, village-fabric-pie, save-load-pie, chronicle-pie
 
 ## SCN
 
@@ -98,17 +120,48 @@ N/A
   `restoreFounderJobs`, non portés). Activé par l'hôte seulement ; harnais : aucune section (sans verrou, la règle
   ne lit ni n'écrit rien). Marques `ecart n°40` dans `AnastasisVillageOpening.cpp`, `AnastasisVillage.{h,cpp}`,
   `AnastasisVillageStateDigest.cpp`.
+- n° 51 — repris du relais `water-network-001`, inchangé : OUVERT, A_TRANCHER (l'eau de la simulation suit le réseau
+  de drainage rendu). Fiche et marques : voir la fiche de `water-network-001`.
 
 ## INTEGRATION_RISK
 
-- **Dépend de `site-from-sim-001`** (même fichier `AnastasisSimulationSubsystem.cpp`, `TryStartVillage`) :
-  - ses deux commits sont repris ici, rebasés sur `main` (hashes différents de sa branche) ;
-  - verser `site-from-sim-001` avant ou dans le même lot, ou cette mission comme relais
-    (`RELAIS: geo-measure-001, site-from-sim-001`, toutes leurs preuves dans `PROOFS:`).
-- **`geo-measure-001`** : déjà sur `main` (28c70855) ; son commit a été sauté au rebase.
-- **`npc-life-pie` échoue déjà sur la base empilée**, avant ce changement comme après (timeout, maison
-  d'ouverture sans pierre). C'est une preuve déclarée par `site-from-sim-001` : le lot la verra `FAIL` tant que
-  le porteur n'apporte pas la pierre au site (39 ; 42). Ce n'est pas causé par cette mission (A/B identique).
+- **Rebasée une troisième fois le 2026-10-08 sur `main` = `e82fc307`** (après `relay-memoire-001`) : seul conflit le numéro de
+  format (`SaveFormatVersion` 5). `settlement-site-pie` : son contrôle `twelve_npcs` attendait exactement 12 habitants ;
+  depuis `familles-feu-001` (versée), le village part de 14 fondateurs. Il échouait donc aussi sur `main`. Il vérifie
+  désormais qu'au moins 12 habitants sont posés (`at_least_twelve_npcs`).
+- **Rebasée de nouveau le 2026-10-08 sur `main` = `da0c3094`** (après `familles-feu-001` et `save-history-001`) :
+  - `SeedStartVillage` : fondateurs (`AnastasisFounders::Seed`), puis l'ouverture décidée par la simulation,
+    puis le récit de la fondation (`TellFounding`) ;
+  - la correction des familles dans l'ouverture (un bâtiment posé ne doit pas couper le résident du puits,
+    `ReachesWell`) est **portée dans `FVillage::SeedOpeningVillage`** : sans elle, la régression « mort de
+    soif chez lui » revenait ;
+  - fin d'`UpdateActors` : la maison d'ouverture est attribuée, puis la biographie l'observe dans le même pas ;
+  - `SaveFormatVersion` 3 (`main` en est à 2) ;
+  - `chronicle-pie` ajoutée aux preuves : l'ouverture précède le récit de la fondation.
+- **Rebasée le 2026-10-08 sur `main` = `ad18bb99`** (après `chronique-village-001` et `save-state-001`), conflits
+  résolus à la main :
+  - `TryStartVillage` : garde `SeedStartVillage` de `chronique-village-001`, dont le corps devient
+    `SeedOpeningVillage` (la simulation décide) ;
+  - `ResetCanonical` : chronique et eau du réseau gardées toutes deux ;
+  - `AnastasisVillageStateDigest.cpp` : les champs d'ouverture sont écrits dans le nouveau parcours
+    `VisitState` de la sauvegarde ;
+  - le verrou d'ouverture n'est plus un champ de l'hôte : retiré du `USaveGame` (`HostFormatVersion` 2), et
+    `SaveFormatVersion` 2 (le parcours a changé).
+  - Preuves rejouées sur cet arbre : `EDITOR_BATCH::PASS 9/9`, `save-load-pie` comprise (la sauvegarde
+    porte maintenant l'ouverture).
+- **`SaveFormatVersion`** : 5 sur cette pile (`main` = 4, après `relay-memoire-001`). `arrivants-001` et `valmire-grows-001` le
+  montent aussi à 5 : la mission versée en second prend 6 (rebase mécanique, je le fais).
+- **Empilée sur `water-network-001`, qui porte `site-from-sim-001`** (2026-10-08, rebase sur `agent/water-network-001`
+  = `7e7bf55f`) :
+  - verser `water-network-001` d'abord, ou dans le même lot ; cette mission peut aussi passer seule comme relais
+    des deux (`RELAIS: site-from-sim-001, water-network-001`, toutes leurs preuves dans `PROOFS:`) ;
+  - **ne jamais verser `site-from-sim-001` seule** : sur `main` récent elle fait échouer `npc-life-pie` (voir sa fiche).
+- **`geo-measure-001`** : déjà sur `main` (28c70855).
+- **ECARTS** : n°40 (cette mission) et n°51 (`water-network-001`, renuméroté à chaque versement voisin : n°43 à 50 sont pris par `labor-social-001`, `familles-feu-001`, `save-state-001`, `save-history-001`, `relay-memoire-001`, `arrivants-001` et `valmire-grows-001`) ; `check-ecarts` PASS sur l'arbre empilé.
+- **Mesures de la section MEC** : faites sur l'ancienne base (`site-from-sim-001` seule) ; l'arbre empilé est rejugé
+  ci-dessous (section `MEC empilée`) et par le lot.
+- **`npc-life-pie`** : elle échouait sur l'ancienne pile (`site-from-sim-001` seule, site (39 ; 42), porteur bloqué),
+  avant comme après ce changement. Sur la pile actuelle (eau du réseau, site (36 ; 20)), elle passe.
 - **STATE_ORACLE_001** (`state-oracle-001`, désormais sur `main`) : nouveaux champs d'état `FVillage::OpeningSiteId`
   et `FVillage::OpeningHome` (struct `FOpeningHomeOutcome` : `Status`, `SiteId`, `NpcId`, `Time`), **hachés** dans
   `FVillage::StateDigest` ; rien à classer dans `tools/migration/state-fields.json`. `FOpeningReport` est un
@@ -118,8 +171,7 @@ N/A
 
 ## STOP
 
-- Ne revendique pas que la maison d'ouverture s'achève en PIE : elle ne s'achève pas sur la base empilée
-  (`npc-life-pie` FAIL, avant comme après).
-- Ne revendique pas l'identité de la ligne `opening home assigned` en PIE : absente des deux côtés de l'A/B.
+- L'A/B d'identité (MEC, première partie) a été fait sur l'ancienne pile, où la maison ne s'achevait pas : il
+  ne compare pas la ligne `opening home assigned`, vue seulement sur la pile actuelle (après le changement).
 - Ne porte pas `populateFoundingLife` ; la politique de site (`AnastasisSettlementSite`) reste dans l'hôte.
-- Suite complète non lancée ici : elle attend le lot (`finish` → `queued`).
+- Suite complète non lancée ici : elle attend le lot (`finish` → `queued`). Les tests ciblés et les 8 preuves ont tourné.

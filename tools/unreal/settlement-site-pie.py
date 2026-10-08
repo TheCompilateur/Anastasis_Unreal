@@ -128,7 +128,8 @@ def run():
         expected_y=(best['y']+0.5)*data['tile_m']*100
         check('well_really_at_selected_site',any(abs(a.get_actor_location().x-expected_x)<1 and abs(a.get_actor_location().y-expected_y)<1 for a in buildings))
         cards=json.loads(DBG.get_villager_cards(world))
-        check('twelve_npcs',cards.get('npcs')==12)
+        # familles-feu-001 : le village part de ses fondateurs (14), plus des 12 anonymes d'avant.
+        check('at_least_twelve_npcs',cards.get('npcs',0)>=12)
         state['initial_rows']={r['npc']:(r['x'],r['y']) for r in cards.get('villagers',[])}
         state['sim_start']=DBG.get_simulation_time(world)
         state['phase']=3
