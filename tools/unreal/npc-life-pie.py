@@ -1,8 +1,18 @@
 """PIE du village initial : un habitant a foyer, travail et une vie autonome.
 
 Lance par editor-batch.ps1 -Proofs npc-life-pie. Aucune commande de scenario.
+
+Temps accelere (TIME_WARP_001, npc-life-warp-001) : la preuve avance le temps simule par
+anastasis.Sim.Warp et borne son attente en temps SIMULE. Avant, elle attendait 180 s reelles a
+Speed 5 : PumpFrame plafonne son rattrapage par image, donc une machine chargee (plusieurs
+editeurs) simulait moins de temps dans les memes 180 s et la preuve tombait en timeout sans que le
+village ait change. Les criteres de reussite sont inchanges.
+  ANASTASIS_NPC_LIFE_SIM_SECONDS  temps simule maximal (defaut 1800 : vingt jours)
+  ANASTASIS_NPC_LIFE_WARP         acceleration (defaut 10)
+  ANASTASIS_NPC_LIFE_WALL_SECONDS plafond reel de securite (defaut 200, sous le delai du registre)
 """
 import json
+import os
 import time
 
 import unreal
@@ -12,7 +22,13 @@ ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
 dbg = unreal.AnastasisSimulationDebugLibrary
 les.load_level('/Game/Anastasis/Maps/Lvl_AnastasisSlice')
 
+SIM_SECONDS = float(os.environ.get('ANASTASIS_NPC_LIFE_SIM_SECONDS', '1800'))
+WARP = float(os.environ.get('ANASTASIS_NPC_LIFE_WARP', '10'))
+WALL_SECONDS = float(os.environ.get('ANASTASIS_NPC_LIFE_WALL_SECONDS', '200'))
+
 started = time.monotonic()
+sim_started = None
+sim_elapsed = 0.0
 last_sample = 0.0
 phase = 0
 rows = []
@@ -24,17 +40,23 @@ handle = None
 
 
 def finish(ok, reason):
-    unreal.log('NPC_LIFE_PIE %s %s' % ('PASS' if ok else 'FAIL', reason))
+    # Une preuve qui accelere remet le rythme en partant (TIME_WARP_001).
+    unreal.SystemLibrary.execute_console_command(None, 'anastasis.Sim.Warp 1')
+    unreal.log('NPC_LIFE_PIE %s %s sim_s=%.0f wall_s=%.0f' % ('PASS' if ok else 'FAIL', reason, sim_elapsed, time.monotonic() - started))
     unreal.unregister_slate_post_tick_callback(handle)
     unreal.SystemLibrary.quit_editor()
 
 
 def tick(_dt):
-    global phase, last_sample, saw_material_carry, initial_site_dry
+    global phase, last_sample, saw_material_carry, initial_site_dry, sim_started, sim_elapsed
     now = time.monotonic()
-    if now - started > 180:
-        finish(False, 'timeout life=%s build=%s' %
-               (json.dumps(rows[-1]) if rows else 'none', json.dumps(build_rows[-1]) if build_rows else 'none'))
+    state = lambda: (json.dumps(rows[-1]) if rows else 'none', json.dumps(build_rows[-1]) if build_rows else 'none')
+    if sim_elapsed > SIM_SECONDS:
+        finish(False, 'sim_timeout life=%s build=%s' % state())
+        return
+    if now - started > WALL_SECONDS:
+        # Machine trop lente pour parcourir le temps simule demande : ce n'est pas un verdict sur le village.
+        finish(False, 'wall_timeout life=%s build=%s' % state())
         return
     if phase == 0 and now - started > 3:
         phase = 1
@@ -44,7 +66,7 @@ def tick(_dt):
         phase = 2
         world = ues.get_game_world()
         unreal.SystemLibrary.execute_console_command(world, 'anastasis.Sim.TimeScale 1')
-        unreal.SystemLibrary.execute_console_command(world, 'anastasis.Sim.Speed 5')
+        unreal.SystemLibrary.execute_console_command(world, 'anastasis.Sim.Warp %g' % WARP)
         return
     if phase != 2 or now - last_sample < 0.5:
         return
@@ -52,6 +74,10 @@ def tick(_dt):
     world = ues.get_game_world()
     if not world:
         return
+    sim_now = dbg.get_simulation_time(world)
+    if sim_started is None:
+        sim_started = sim_now
+    sim_elapsed = sim_now - sim_started
     row = json.loads(dbg.get_opening_life_status(world) or '{}')
     build = json.loads(dbg.get_build_status(world) or '{}')
     cards = json.loads(dbg.get_villager_cards(world) or '{}')
