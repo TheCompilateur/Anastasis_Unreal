@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Sim/AnastasisSimulation.h"
 #include "Sim/AnastasisTimeWarp.h"
+#include "Sim/AnastasisVillageChronicle.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "Village/AnastasisVillagePresentation.h"
@@ -47,6 +48,14 @@ public:
 	 * Tout passe par la simulation ; la presentation suit au prochain Sync.
 	 */
 	FString SeedFirstWell(int32 NpcCount, int32 TileX, int32 TileY);
+
+	/**
+	 * Le village du lancement pose sur une case deja choisie : premier puits, `NpcCount` habitants, foyer et
+	 * grenier d'ouverture, chantier d'ouverture (si anastasis.Village.OpeningConstruction), bras du grenier.
+	 * C'est la sequence que le debut de partie lance apres l'arpentage du site ; un test la lance sans rendu.
+	 * Rend l'identifiant du puits, vide si rien n'a pu etre pose.
+	 */
+	FString SeedStartVillage(int32 NpcCount, int32 TileX, int32 TileY);
 
 	/**
 	 * La maison (mission house-rest-001) : deux maisons pres de (TileX, TileY),
@@ -106,6 +115,19 @@ public:
 	const FAnastasisSimulation& GetSimulation() const { return Simulation; }
 
 	/**
+	 * CHRONIQUE_VILLAGE_001 -- la chronique du village, tenue a chaque frame et a chaque tranche d'un saut
+	 * (anastasis.Chronicle.Enabled). Remise a zero avec la simulation (ResetCanonical, scenario qui remplace
+	 * le village du lancement). Ne lit que la simulation.
+	 */
+	const AnastasisChronicle::FVillageChronicle& GetChronicle() const { return Chronicle; }
+
+	/**
+	 * Ecrit la chronique en texte (UTF-8) dans Saved/Chronicle/ : `FileName` s'il est donne, sinon
+	 * chronique-<graine>-jour-<jour>.txt. Rend le chemin complet, vide en cas d'echec.
+	 */
+	FString WriteChronicle(const FString& FileName = FString()) const;
+
+	/**
 	 * TIME_WARP_001 -- avance instantanee (Anastasis.Sim.Advance) : `Seconds` simulees dans cette
 	 * frame, presentation resynchronisee, temoin informe (tout ce temps est oisif pour le village).
 	 * Rend le nombre de Tick consommes.
@@ -146,6 +168,8 @@ private:
 	/** Le pawn retrouve sa marche Unreal. */
 	void UnbindPawn();
 	void LogDayIfChanged();
+	/** CHRONIQUE_VILLAGE_001 : la chronique lit la simulation, si anastasis.Chronicle.Enabled. */
+	void ObserveChronicle();
 public:
 	/**
 	 * geopolitical-world-001 (ecart n°38) -- ce que le monde exterieur a produit depuis le dernier
@@ -176,6 +200,8 @@ private:
 	FString SettlementSiteReport = TEXT("{\"status\":\"not_started\"}");
 
 	FAnastasisSimulation Simulation;
+	/** CHRONIQUE_VILLAGE_001. Observation seule : n'ecrit jamais dans Simulation. */
+	AnastasisChronicle::FVillageChronicle Chronicle;
 	TWeakObjectPtr<AAnastasisWorldEmbodiment> RainCanopyActor;
 	FAnastasisVillagePresentation VillagePresentation;
 	FString FarmerGranaryId;
@@ -222,6 +248,18 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetSettlementSiteStatus(const UObject* WorldContextObject);
+
+	/** CHRONIQUE_VILLAGE_001 : la chronique du village en francais (texte complet), vide sans simulation. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetChronicleText(const UObject* WorldContextObject);
+
+	/** CHRONIQUE_VILLAGE_001 : resume JSON de la chronique (jours clos, lignes par type, habitants, morts). */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetChronicleStatus(const UObject* WorldContextObject);
+
+	/** CHRONIQUE_VILLAGE_001 : ecrit la chronique dans Saved/Chronicle/ et rend le chemin, vide sans simulation. */
+	UFUNCTION(BlueprintCallable, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString WriteChronicle(const UObject* WorldContextObject, const FString& FileName);
 
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FVector GetSettlementGroundPoint(const UObject* WorldContextObject, double SimX, double SimY);

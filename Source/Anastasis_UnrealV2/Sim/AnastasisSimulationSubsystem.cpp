@@ -26,6 +26,10 @@
 #include "Village/AnastasisBuildingMetabolism.h"
 #include "EngineUtils.h"
 #include "WorldView/AnastasisSettlementSurvey.h"
+#include "WorldView/AnastasisPresentationRegistry.h"
+#include "Village/AnastasisVillagerLooks.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "HAL/PlatformTime.h"
 
 // Default 1 since SKY_TRANSITIONS_001 (2026-09-30), the JS reference's realtime: one day = 90 s.
@@ -113,6 +117,13 @@ static TAutoConsoleVariable<int32> CVarSimOverlay(
 	TEXT("1 = draw day/time overlay in PIE. 0 = log only."),
 	ECVF_Default);
 
+// CHRONIQUE_VILLAGE_001. Observation seule : 0 ne change rien a la simulation, seulement au recit.
+static TAutoConsoleVariable<int32> CVarChronicleEnabled(
+	TEXT("anastasis.Chronicle.Enabled"),
+	1,
+	TEXT("CHRONIQUE_VILLAGE_001: 1 = the village chronicle reads the simulation every frame and every chunk of Anastasis.Sim.Advance; 0 = it stops reading (the simulation is unchanged either way). Anastasis.Chronicle.Write / Print to read it."),
+	ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarVillageCanopyRain(
 	TEXT("anastasis.Village.CanopyRain"), 1,
 	TEXT("1 = embodied tree crowns partly intercept rain exposure for villagers; 0 = reference exposure at every outdoor position."),
@@ -190,14 +201,7 @@ void UAnastasisSimulationSubsystem::TryStartVillage(float DeltaTime)
     }
     const int32 Count = CVarVillageStartVillagers.GetValueOnGameThread();
     if (Count <= 0) return;
-    const FString WellId = SeedFirstWell(Count, X, Y);
-    bStartVillage = !WellId.IsEmpty();
-    if (bStartVillage)
-    {
-        SeedOpeningHousehold();
-        if (CVarVillageOpeningConstruction.GetValueOnGameThread() != 0) SeedOpeningConstruction();
-		SeedOpeningWorkforce();
-    }
+    const FString WellId = SeedStartVillage(Count, X, Y);
     const auto* Well = Village.FindBuilding(WellId);
     if (!Well || (CVarVillageSiteSelection.GetValueOnGameThread()!=0 && (Well->X!=X || Well->Y!=Y)))
     {
@@ -206,6 +210,19 @@ void UAnastasisSimulationSubsystem::TryStartVillage(float DeltaTime)
     }
     UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE start village: %s + %d inhabitants site=(%d,%d)"),
         *WellId, Village.GetActors().Num(), X, Y);
+}
+
+FString UAnastasisSimulationSubsystem::SeedStartVillage(int32 NpcCount, int32 TileX, int32 TileY)
+{
+	const FString WellId = SeedFirstWell(NpcCount, TileX, TileY);
+	bStartVillage = !WellId.IsEmpty();
+	if (bStartVillage)
+	{
+		SeedOpeningHousehold();
+		if (CVarVillageOpeningConstruction.GetValueOnGameThread() != 0) SeedOpeningConstruction();
+		SeedOpeningWorkforce();
+	}
+	return WellId;
 }
 
 void UAnastasisSimulationSubsystem::SeedOpeningHousehold()
@@ -438,6 +455,27 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	OpeningSiteId.Reset();
 	OpeningWorkId.Reset();
 	Simulation.Reset(Seed, AnastasisWorldView::ReferenceWidth, AnastasisWorldView::ReferenceHeight);
+	// CHRONIQUE_VILLAGE_001 : une simulation neuve, une chronique neuve. Le nom provisoire d'un habitant
+	// s'accorde au portrait que la presentation lui donnera (meme tirage que SyncVillagers).
+	Chronicle.Reset(Seed);
+	Chronicle.SetLookResolver([](const AnastasisVillage::FNpc& Npc)
+	{
+		AnastasisChronicle::FPersonLook Look;
+		const UAnastasisPresentationRegistry& Registry = AnastasisPresentation::GetRegistry();
+		const TArray<int32> Pool = AnastasisVillagerLooks::VillagePool(Registry.Villagers, FName(*Npc.JobId));
+		const int32 Index = AnastasisVillagerLooks::PickLook(Pool, Npc.Id);
+		if (Registry.Villagers.IsValidIndex(Index))
+		{
+			const EAnastasisVillagerCategory Category = Registry.Villagers[Index].Category;
+			Look.bKnown = true;
+			Look.bFemale = Category == EAnastasisVillagerCategory::AdultFemale
+				|| Category == EAnastasisVillagerCategory::ElderFemale
+				|| Category == EAnastasisVillagerCategory::ChildFemale;
+			Look.bElder = Category == EAnastasisVillagerCategory::ElderMale
+				|| Category == EAnastasisVillagerCategory::ElderFemale;
+		}
+		return Look;
+	});
 	Simulation.GetVillage().SetTerrainTravelCostEnabled(CVarVillageRouteCost.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetSoilWaterEnabled(CVarSoilWaterBudget.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetRoadEvolutionEnabled(CVarVillageRoadEvolution.GetValueOnGameThread() != 0);
@@ -517,6 +555,7 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 	}
 	LogDayIfChanged();
 	AssignCompletedOpeningHome();
+	ObserveChronicle();
 	SyncVillagePresentation();
 	VillagePresentation.SyncVillagers(
 		Simulation.GetVillage(), Simulation.GetWorld(), GetWorld(),
@@ -718,6 +757,29 @@ void UAnastasisSimulationSubsystem::LogStatus() const
 		Simulation.IsRunning() ? 1 : 0);
 }
 
+void UAnastasisSimulationSubsystem::ObserveChronicle()
+{
+	if (CVarChronicleEnabled.GetValueOnGameThread() != 0)
+	{
+		Chronicle.Observe(Simulation);
+	}
+}
+
+FString UAnastasisSimulationSubsystem::WriteChronicle(const FString& FileName) const
+{
+	const FString Name = FileName.IsEmpty()
+		? FString::Printf(TEXT("chronique-%u-jour-%d.txt"), Simulation.GetSeed(), Simulation.GetDay())
+		: FileName;
+	const FString Path = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Chronicle"), Name));
+	if (!FFileHelper::SaveStringToFile(Chronicle.Render(), *Path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_CHRONICLE write failed path=%s"), *Path);
+		return FString();
+	}
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_CHRONICLE written path=%s %s"), *Path, *Chronicle.StatusJson());
+	return Path;
+}
+
 void UAnastasisSimulationSubsystem::LogDayIfChanged()
 {
 	// geopolitical-world-001 : les evenements du monde exterieur, meme sans changement de jour.
@@ -807,6 +869,8 @@ int32 UAnastasisSimulationSubsystem::AdvanceBy(double Seconds)
 		const double ChunkFrom = Simulation.GetTime();
 		Steps += AnastasisTimeWarp::Advance(Simulation, Chunk);
 		ObservePlayerTime(Simulation.GetTime() - ChunkFrom, TNumericLimits<double>::Max());
+		// CHRONIQUE_VILLAGE_001 : une lecture toutes les quatre heures simulees, le saut garde son recit.
+		ObserveChronicle();
 		Left -= Chunk;
 	}
 	const double WallMs = (FPlatformTime::Seconds() - Start) * 1000.0;
@@ -894,6 +958,43 @@ static FAutoConsoleCommand CmdAnastasisSimPause(
 		{
 			SetWarp(GWarpBeforePause > 0.0 ? GWarpBeforePause : 1.0, TEXT("Resume"));
 		}
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisChronicleWrite(
+	TEXT("Anastasis.Chronicle.Write"),
+	TEXT("Anastasis.Chronicle.Write [file.txt] - writes the village chronicle (French text) to Saved/Chronicle/ and logs ANASTASIS_CHRONICLE written path=... with a JSON summary (CHRONIQUE_VILLAGE_001)."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		const UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+		if (!Host || !Host->GetSimulation().IsRunning())
+		{
+			UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_CHRONICLE no running simulation in this world (PIE only)"));
+			return;
+		}
+		Host->WriteChronicle(Args.IsValidIndex(0) ? Args[0] : FString());
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisChroniclePrint(
+	TEXT("Anastasis.Chronicle.Print"),
+	TEXT("Anastasis.Chronicle.Print [days=1] - logs the last N days of the village chronicle, one ANASTASIS_CHRONICLE line each (CHRONIQUE_VILLAGE_001)."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		const UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+		if (!Host || !Host->GetSimulation().IsRunning())
+		{
+			UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_CHRONICLE no running simulation in this world (PIE only)"));
+			return;
+		}
+		const int32 Wanted = Args.IsValidIndex(0) ? FMath::Max(1, FCString::Atoi(*Args[0])) : 1;
+		const AnastasisChronicle::FVillageChronicle& Chronicle = Host->GetChronicle();
+		const int32 From = Host->GetSimulation().GetDay() - Wanted + 1;
+		for (const AnastasisChronicle::FEntry& Entry : Chronicle.GetEntries())
+		{
+			if (Entry.Day < From) continue;
+			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_CHRONICLE jour %d, %s : %s"),
+				Entry.Day, *AnastasisChronicle::HourLabel(Entry.Hour), *Entry.Text);
+		}
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_CHRONICLE status %s"), *Chronicle.StatusJson());
 	}));
 
 static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisSimAdvance(
@@ -1469,6 +1570,34 @@ namespace
 		const UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
 		return Host && Host->GetSimulation().IsRunning() ? &Host->GetSimulation() : nullptr;
 	}
+}
+
+namespace
+{
+	const UAnastasisSimulationSubsystem* DebugHost(const UObject* WorldContextObject)
+	{
+		const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+		const UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+		return Host && Host->GetSimulation().IsRunning() ? Host : nullptr;
+	}
+}
+
+FString UAnastasisSimulationDebugLibrary::GetChronicleText(const UObject* WorldContextObject)
+{
+	const UAnastasisSimulationSubsystem* Host = DebugHost(WorldContextObject);
+	return Host ? Host->GetChronicle().Render() : FString();
+}
+
+FString UAnastasisSimulationDebugLibrary::GetChronicleStatus(const UObject* WorldContextObject)
+{
+	const UAnastasisSimulationSubsystem* Host = DebugHost(WorldContextObject);
+	return Host ? Host->GetChronicle().StatusJson() : FString();
+}
+
+FString UAnastasisSimulationDebugLibrary::WriteChronicle(const UObject* WorldContextObject, const FString& FileName)
+{
+	const UAnastasisSimulationSubsystem* Host = DebugHost(WorldContextObject);
+	return Host ? Host->WriteChronicle(FileName) : FString();
 }
 
 double UAnastasisSimulationDebugLibrary::GetSimulationTime(const UObject* WorldContextObject)

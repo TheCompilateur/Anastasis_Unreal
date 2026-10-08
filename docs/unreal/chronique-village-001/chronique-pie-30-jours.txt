@@ -1,0 +1,161 @@
+CHRONIQUE DE VALMIRE
+Graine 12345. Du jour 1 au jour 30 ; 30 jours clos.
+Les noms sont provisoires : les familles et leurs vrais noms viendront avec la mission 2.
+
+EN BREF
+- 12 fondateurs, 0 arrivé, 0 parti ; 10 en vie à la fin.
+- 2 morts : 2 de soif.
+- 1 chantier mené à bout ; 0 encore ouvert.
+- Grenier vide 0 soir sur 30.
+- 8 amitiés nouées, 0 brouille.
+
+LES HABITANTS
+- Manuel : cultivateur ; vit dans la première maison ; ami de Theodora et Kassia.
+- Barbara : bâtisseuse ; sans maison à soi ; amie de Xene.
+- Gregorios : sans métier ; ancien ; mort le jour 5, de soif.
+- Xene : bâtisseuse ; ancienne ; sans maison à soi ; amie de Barbara.
+- Theodora : cultivatrice ; sans maison à soi ; amie de Manuel et Kassia.
+- Kassia : cultivatrice ; sans maison à soi ; amie de Manuel et Theodora.
+- Nikolaos : sans métier ; sans maison à soi ; ami de Theophano et Michael.
+- Theophano : sans métier ; sans maison à soi ; amie de Nikolaos et Michael.
+- Stephanos : sans métier ; mort le jour 6, de soif.
+- Michael : sans métier ; ancien ; sans maison à soi ; ami de Nikolaos et Theophano.
+- Martha : sans métier ; ancienne ; sans maison à soi ; amie de Pankratios.
+- Pankratios : sans métier ; sans maison à soi ; ami de Martha.
+
+JOUR 1
+  Le matin. Le village s'éveille. Ils sont 12 : Manuel, Barbara, Gregorios, Xene, Theodora, Kassia, Nikolaos, Theophano, Stephanos, Michael, Martha et Pankratios. Déjà debout : le puits, la première maison et le grenier. En chantier : la deuxième maison. Cultivent pour le grenier : Manuel, Theodora et Kassia. Bâtissent : Barbara et Xene. Sans métier : Gregorios, Nikolaos, Theophano, Stephanos, Michael, Martha et Pankratios. Manuel a une maison à soi.
+  La nuit. Barbara apporte du bois et de la pierre au chantier de la deuxième maison.
+  Bilan du soir : 12 habitants ; 1 maison debout ; 1 chantier ; grenier : 32 portions ; 11 sans toit.
+
+JOUR 2
+  À l'aube. Gregorios a soif : aucun chemin ne mène au puits depuis là où il se trouve.
+  La nuit. Manuel et Kassia deviennent amis.
+  La nuit. Gregorios a faim : le grenier a encore 91 portions, mais aucun chemin n'y mène depuis là où il se trouve.
+  La nuit. Xene met la main au chantier de la deuxième maison.
+  La nuit. Stephanos a faim : le grenier a encore 91 portions, mais aucun chemin n'y mène depuis là où il se trouve.
+  La nuit. Martha et Pankratios deviennent amis.
+  Bilan du soir : 12 habitants ; 1 maison debout ; 1 chantier ; grenier : 91 portions ; 11 sans toit.
+
+JOUR 3
+  La nuit. Nikolaos et Theophano deviennent amis.
+  La nuit. Theophano et Michael deviennent amis.
+  À l'aube. La deuxième maison est achevée, grâce à Barbara et Xene.
+  Le matin. Stephanos a soif : aucun chemin ne mène au puits depuis là où il se trouve.
+  La nuit. Barbara et Xene deviennent amies.
+  Bilan du soir : 12 habitants ; 2 maisons debout ; 0 chantier ; grenier : 153 portions ; 11 sans toit.
+
+JOUR 4
+  La nuit. Barbara trouve un abri pour la nuit dans la deuxième maison.
+  La nuit. Gregorios trouve un abri pour la nuit dans la deuxième maison.
+  La nuit. Gregorios s'affaiblit.
+  La nuit. Xene trouve un abri pour la nuit dans la deuxième maison.
+  La nuit. Stephanos s'affaiblit.
+  Bilan du soir : 12 habitants ; 2 maisons debout ; 0 chantier ; grenier : 223 portions ; 8 sans toit.
+
+JOUR 5
+  La nuit. Gregorios est mort de soif.
+  Bilan du soir : 11 habitants ; 2 maisons debout ; 0 chantier ; grenier : 245 portions ; 8 sans toit ; 1 mort.
+
+JOUR 6
+  La nuit. Stephanos est mort de soif.
+  La nuit. Theodora trouve un abri pour la nuit dans la deuxième maison.
+  Bilan du soir : 10 habitants ; 2 maisons debout ; 0 chantier ; grenier : 299 portions ; 6 sans toit ; 1 mort.
+
+JOURS 7 À 10
+  Rien de notable.
+  Bilan du soir : 10 habitants ; 2 maisons debout ; 0 chantier ; grenier : 294 portions ; 6 sans toit.
+
+JOUR 11
+  L'après-midi. Theodora et Kassia deviennent amies.
+  Bilan du soir : 10 habitants ; 2 maisons debout ; 0 chantier ; grenier : 288 portions ; 6 sans toit.
+
+JOURS 12 À 15
+  Rien de notable.
+  Bilan du soir : 10 habitants ; 2 maisons debout ; 0 chantier ; grenier : 288 portions ; 6 sans toit.
+
+JOUR 16
+  L'après-midi. Theodora et Manuel deviennent amis.
+  Bilan du soir : 10 habitants ; 2 maisons debout ; 0 chantier ; grenier : 299 portions ; 6 sans toit.
+
+JOURS 17 À 25
+  Rien de notable.
+  Bilan du soir : 10 habitants ; 2 maisons debout ; 0 chantier ; grenier : 283 portions ; 6 sans toit.
+
+JOUR 26
+  Le soir. Nikolaos et Michael deviennent amis.
+  Bilan du soir : 10 habitants ; 2 maisons debout ; 0 chantier ; grenier : 295 portions ; 6 sans toit.
+
+JOURS 27 À 30
+  Rien de notable.
+  Bilan du soir : 10 habitants ; 2 maisons debout ; 0 chantier ; grenier : 298 portions ; 6 sans toit.
+
+CE QU'A VÉCU CHACUN
+
+Manuel
+  Jour 1, le matin : Manuel vit dans la première maison et est cultivateur au grenier.
+  Jour 2, la nuit : Manuel et Kassia deviennent amis.
+  Jour 16, l'après-midi : Theodora et Manuel deviennent amis.
+
+Barbara
+  Jour 1, le matin : Barbara est bâtisseuse.
+  Jour 1, la nuit : Barbara apporte du bois et de la pierre au chantier de la deuxième maison.
+  Jour 3, à l'aube : La deuxième maison est achevée, grâce à Barbara et Xene.
+  Jour 3, la nuit : Barbara et Xene deviennent amies.
+  Jour 4, la nuit : Barbara trouve un abri pour la nuit dans la deuxième maison.
+
+Gregorios
+  Jour 1, le matin : Gregorios est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 2, à l'aube : Gregorios a soif : aucun chemin ne mène au puits depuis là où il se trouve.
+  Jour 2, la nuit : Gregorios a faim : le grenier a encore 91 portions, mais aucun chemin n'y mène depuis là où il se trouve.
+  Jour 4, la nuit : Gregorios trouve un abri pour la nuit dans la deuxième maison.
+  Jour 4, la nuit : Gregorios s'affaiblit.
+  Jour 5, la nuit : Gregorios est mort de soif.
+
+Xene
+  Jour 1, le matin : Xene est bâtisseuse.
+  Jour 2, la nuit : Xene met la main au chantier de la deuxième maison.
+  Jour 3, à l'aube : La deuxième maison est achevée, grâce à Barbara et Xene.
+  Jour 3, la nuit : Barbara et Xene deviennent amies.
+  Jour 4, la nuit : Xene trouve un abri pour la nuit dans la deuxième maison.
+
+Theodora
+  Jour 1, le matin : Theodora est cultivatrice au grenier.
+  Jour 6, la nuit : Theodora trouve un abri pour la nuit dans la deuxième maison.
+  Jour 11, l'après-midi : Theodora et Kassia deviennent amies.
+  Jour 16, l'après-midi : Theodora et Manuel deviennent amis.
+
+Kassia
+  Jour 1, le matin : Kassia est cultivatrice au grenier.
+  Jour 2, la nuit : Manuel et Kassia deviennent amis.
+  Jour 11, l'après-midi : Theodora et Kassia deviennent amies.
+
+Nikolaos
+  Jour 1, le matin : Nikolaos est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 3, la nuit : Nikolaos et Theophano deviennent amis.
+  Jour 26, le soir : Nikolaos et Michael deviennent amis.
+
+Theophano
+  Jour 1, le matin : Theophano est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 3, la nuit : Nikolaos et Theophano deviennent amis.
+  Jour 3, la nuit : Theophano et Michael deviennent amis.
+
+Stephanos
+  Jour 1, le matin : Stephanos est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 2, la nuit : Stephanos a faim : le grenier a encore 91 portions, mais aucun chemin n'y mène depuis là où il se trouve.
+  Jour 3, le matin : Stephanos a soif : aucun chemin ne mène au puits depuis là où il se trouve.
+  Jour 4, la nuit : Stephanos s'affaiblit.
+  Jour 6, la nuit : Stephanos est mort de soif.
+
+Michael
+  Jour 1, le matin : Michael est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 3, la nuit : Theophano et Michael deviennent amis.
+  Jour 26, le soir : Nikolaos et Michael deviennent amis.
+
+Martha
+  Jour 1, le matin : Martha est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 2, la nuit : Martha et Pankratios deviennent amis.
+
+Pankratios
+  Jour 1, le matin : Pankratios est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 2, la nuit : Martha et Pankratios deviennent amis.

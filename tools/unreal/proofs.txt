@@ -107,3 +107,5 @@ settlement-sensitivity-pie | tools/unreal/settlement-sensitivity-pie.py | SETTLE
 canopy-rain-pie | tools/unreal/canopy-rain-pie.py | CANOPY_RAIN_PIE PASS | CANOPY_RAIN_PIE FAIL|Traceback | 180 | -
 # settlement-morphogenesis-001 : 36 jours du village d'ouverture ; PASS = passage compte, sentiers nes d'un passage >= 14 et rendus, maison fondee, forme = biographie.
 settlement-morphogenesis-pie | tools/unreal/settlement-morphogenesis-pie.py | MORPH_PIE PASS | MORPH_PIE FAIL|Traceback | 1800 | ANASTASIS_MORPH_OUT=@Saved/SettlementEvidence/pie
+# CHRONIQUE_VILLAGE_001 : 30 jours du village du lancement (Advance 30d) ; PASS = fondation, 30 bilans, recit au-dela de la fondation, fichier ecrit. Pas un verdict sur l interet du recit.
+chronicle-pie | tools/unreal/chronicle-pie.py | CHRONICLE_PIE PASS | CHRONICLE_PIE FAIL|CHRONICLE_PIE_TIMEOUT|Traceback | 420 | -

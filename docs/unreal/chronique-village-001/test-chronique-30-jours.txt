@@ -1,0 +1,214 @@
+CHRONIQUE DE VALMIRE
+Graine 12345. Du jour 1 au jour 30 ; 30 jours clos.
+Les noms sont provisoires : les familles et leurs vrais noms viendront avec la mission 2.
+
+EN BREF
+- 12 fondateurs, 0 arrivé, 0 parti ; 9 en vie à la fin.
+- 3 morts : 1 de faim, 2 de soif.
+- 0 chantier mené à bout ; 1 encore ouvert.
+- Grenier vide 21 soirs sur 30.
+- 8 amitiés nouées, 0 brouille.
+
+LES HABITANTS
+- Manuel : cultivateur ; vit dans la première maison ; ami de Theodora.
+- Barbara : bâtisseuse ; sans maison à soi.
+- Kale : bâtisseuse ; morte le jour 12, de faim ; amie de Leon.
+- Leon : cultivateur ; sans maison à soi ; ami de Kale et Theodora.
+- Theodora : cultivatrice ; sans maison à soi ; amie de Manuel et Leon.
+- Isaakios : sans métier ; mort le jour 6, de soif.
+- Nikolaos : sans métier ; sans maison à soi ; ami de Stephanos.
+- Theophano : sans métier ; morte le jour 25, de soif ; amie de Stephanos.
+- Martha : sans métier ; sans maison à soi ; amie d'Euphemia.
+- Michael : sans métier ; sans maison à soi ; ami d'Euphemia.
+- Stephanos : sans métier ; sans maison à soi ; ami de Nikolaos, Theophano et Euphemia.
+- Euphemia : sans métier ; sans maison à soi ; amie de Martha, Michael et Stephanos.
+
+JOUR 1
+  Le matin. Le village s'éveille. Ils sont 12 : Manuel, Barbara, Kale, Leon, Theodora, Isaakios, Nikolaos, Theophano, Martha, Michael, Stephanos et Euphemia. Déjà debout : le puits, la première maison et le grenier. En chantier : la deuxième maison. Cultivent pour le grenier : Manuel, Leon et Theodora. Bâtissent : Barbara et Kale. Sans métier : Isaakios, Nikolaos, Theophano, Martha, Michael, Stephanos et Euphemia. Manuel a une maison à soi.
+  Le soir. Les réserves sont maigres : 8 portions pour 12 bouches.
+  Bilan du soir : 12 habitants ; 1 maison debout ; 1 chantier ; grenier : 8 portions ; 11 sans toit.
+
+JOUR 2
+  Le soir. Barbara apporte du bois et de la pierre au chantier de la deuxième maison.
+  La nuit. Isaakios a faim : le grenier a encore 37 portions, mais aucun chemin n'y mène depuis là où il se trouve.
+  Bilan du soir : 12 habitants ; 1 maison debout ; 1 chantier ; grenier : 37 portions ; 11 sans toit.
+
+JOUR 3
+  La nuit. Isaakios a soif : aucun chemin ne mène au puits depuis là où il se trouve.
+  À l'aube. Martha et Euphemia deviennent amies.
+  Bilan du soir : 12 habitants ; 1 maison debout ; 1 chantier ; grenier : 84 portions ; 11 sans toit.
+
+JOUR 4
+  La nuit. Stephanos et Euphemia deviennent amis.
+  À l'aube. Nikolaos et Stephanos deviennent amis.
+  Le soir. Isaakios s'affaiblit.
+  Le soir. Le chantier de la deuxième maison n'avance plus depuis 3 jours.
+  Bilan du soir : 12 habitants ; 1 maison debout ; 1 chantier ; grenier : 35 portions ; 11 sans toit.
+
+JOUR 5
+  Le matin. Theophano et Stephanos deviennent amis.
+  Bilan du soir : 12 habitants ; 1 maison debout ; 1 chantier ; grenier : 15 portions ; 11 sans toit.
+
+JOUR 6
+  La nuit. Isaakios est mort de soif.
+  À l'aube. Kale et Leon deviennent amis.
+  L'après-midi. Michael et Euphemia deviennent amis.
+  Le soir. Le grenier est vide.
+  Bilan du soir : 11 habitants ; 1 maison debout ; 1 chantier ; grenier vide ; 10 sans toit ; 1 mort.
+
+JOUR 7
+  À l'aube. Leon et Theodora deviennent amis.
+  L'après-midi. Kale a faim : le grenier est vide.
+  Bilan du soir : 11 habitants ; 1 maison debout ; 1 chantier ; grenier vide depuis 2 jours ; 10 sans toit.
+
+JOUR 8
+  Le matin. Kale a soif, alors que le puits est à sa portée.
+  Le soir. Le chantier de la deuxième maison n'avance plus depuis 7 jours.
+  Bilan du soir : 11 habitants ; 1 maison debout ; 1 chantier ; grenier vide depuis 3 jours ; 10 sans toit.
+
+JOUR 9
+  Le matin. Kale s'affaiblit.
+  Le soir. Le grenier a de nouveau de quoi : 6 portions.
+  Bilan du soir : 11 habitants ; 1 maison debout ; 1 chantier ; grenier : 6 portions ; 10 sans toit.
+
+JOUR 10
+  L'après-midi. Kale a pu boire.
+  Le soir. Le grenier est vide.
+  Bilan du soir : 11 habitants ; 1 maison debout ; 1 chantier ; grenier vide ; 10 sans toit.
+
+JOUR 11
+  Rien de notable.
+  Bilan du soir : 11 habitants ; 1 maison debout ; 1 chantier ; grenier vide depuis 2 jours ; 10 sans toit.
+
+JOUR 12
+  La nuit. Kale est morte de faim.
+  Bilan du soir : 10 habitants ; 1 maison debout ; 1 chantier ; grenier vide depuis 3 jours ; 9 sans toit ; 1 mort.
+
+JOUR 13
+  Le soir. Le grenier a de nouveau de quoi : 9 portions.
+  Bilan du soir : 10 habitants ; 1 maison debout ; 1 chantier ; grenier : 9 portions ; 9 sans toit.
+
+JOUR 14
+  Le soir. Le grenier est vide.
+  Bilan du soir : 10 habitants ; 1 maison debout ; 1 chantier ; grenier vide ; 9 sans toit.
+
+JOUR 15
+  Rien de notable.
+  Bilan du soir : 10 habitants ; 1 maison debout ; 1 chantier ; grenier vide depuis 2 jours ; 9 sans toit.
+
+JOUR 16
+  Le soir. Le chantier de la deuxième maison n'avance plus depuis 15 jours.
+  Bilan du soir : 10 habitants ; 1 maison debout ; 1 chantier ; grenier vide depuis 3 jours ; 9 sans toit.
+
+JOURS 17 À 20
+  Rien de notable.
+  Bilan du soir : 10 habitants ; 1 maison debout ; 1 chantier ; grenier vide depuis 7 jours ; 9 sans toit.
+
+JOUR 21
+  Le soir. Le grenier a de nouveau de quoi : 6 portions.
+  Bilan du soir : 10 habitants ; 1 maison debout ; 1 chantier ; grenier : 6 portions ; 9 sans toit.
+
+JOUR 22
+  À l'aube. Theophano a soif, alors que le puits est à sa portée.
+  Le soir. Le grenier est vide.
+  Bilan du soir : 10 habitants ; 1 maison debout ; 1 chantier ; grenier vide ; 9 sans toit.
+
+JOUR 23
+  La nuit. Theophano a faim : le grenier est vide.
+  Bilan du soir : 10 habitants ; 1 maison debout ; 1 chantier ; grenier vide depuis 2 jours ; 9 sans toit.
+
+JOUR 24
+  La nuit. Theophano s'affaiblit.
+  Bilan du soir : 10 habitants ; 1 maison debout ; 1 chantier ; grenier vide depuis 3 jours ; 9 sans toit.
+
+JOUR 25
+  La nuit. Theophano est morte de soif.
+  La nuit. Manuel et Theodora deviennent amis.
+  Bilan du soir : 9 habitants ; 1 maison debout ; 1 chantier ; grenier vide depuis 4 jours ; 8 sans toit ; 1 mort.
+
+JOUR 26
+  Rien de notable.
+  Bilan du soir : 9 habitants ; 1 maison debout ; 1 chantier ; grenier vide depuis 5 jours ; 8 sans toit.
+
+JOUR 27
+  Le soir. Le grenier a de nouveau de quoi : 14 portions.
+  Bilan du soir : 9 habitants ; 1 maison debout ; 1 chantier ; grenier : 14 portions ; 8 sans toit.
+
+JOUR 28
+  Le soir. Le grenier est vide.
+  Bilan du soir : 9 habitants ; 1 maison debout ; 1 chantier ; grenier vide ; 8 sans toit.
+
+JOURS 29 À 30
+  Rien de notable.
+  Bilan du soir : 9 habitants ; 1 maison debout ; 1 chantier ; grenier vide depuis 3 jours ; 8 sans toit.
+
+CE QU'A VÉCU CHACUN
+
+Manuel
+  Jour 1, le matin : Manuel vit dans la première maison et est cultivateur au grenier.
+  Jour 25, la nuit : Manuel et Theodora deviennent amis.
+
+Barbara
+  Jour 1, le matin : Barbara est bâtisseuse.
+  Jour 2, le soir : Barbara apporte du bois et de la pierre au chantier de la deuxième maison.
+  Jour 4, le soir : Le chantier de la deuxième maison n'avance plus depuis 3 jours.
+  Jour 8, le soir : Le chantier de la deuxième maison n'avance plus depuis 7 jours.
+  Jour 16, le soir : Le chantier de la deuxième maison n'avance plus depuis 15 jours.
+
+Kale
+  Jour 1, le matin : Kale est bâtisseuse.
+  Jour 6, à l'aube : Kale et Leon deviennent amis.
+  Jour 7, l'après-midi : Kale a faim : le grenier est vide.
+  Jour 8, le matin : Kale a soif, alors que le puits est à sa portée.
+  Jour 9, le matin : Kale s'affaiblit.
+  Jour 10, l'après-midi : Kale a pu boire.
+  Jour 12, la nuit : Kale est morte de faim.
+
+Leon
+  Jour 1, le matin : Leon est cultivateur au grenier.
+  Jour 6, à l'aube : Kale et Leon deviennent amis.
+  Jour 7, à l'aube : Leon et Theodora deviennent amis.
+
+Theodora
+  Jour 1, le matin : Theodora est cultivatrice au grenier.
+  Jour 7, à l'aube : Leon et Theodora deviennent amis.
+  Jour 25, la nuit : Manuel et Theodora deviennent amis.
+
+Isaakios
+  Jour 1, le matin : Isaakios est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 2, la nuit : Isaakios a faim : le grenier a encore 37 portions, mais aucun chemin n'y mène depuis là où il se trouve.
+  Jour 3, la nuit : Isaakios a soif : aucun chemin ne mène au puits depuis là où il se trouve.
+  Jour 4, le soir : Isaakios s'affaiblit.
+  Jour 6, la nuit : Isaakios est mort de soif.
+
+Nikolaos
+  Jour 1, le matin : Nikolaos est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 4, à l'aube : Nikolaos et Stephanos deviennent amis.
+
+Theophano
+  Jour 1, le matin : Theophano est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 5, le matin : Theophano et Stephanos deviennent amis.
+  Jour 22, à l'aube : Theophano a soif, alors que le puits est à sa portée.
+  Jour 23, la nuit : Theophano a faim : le grenier est vide.
+  Jour 24, la nuit : Theophano s'affaiblit.
+  Jour 25, la nuit : Theophano est morte de soif.
+
+Martha
+  Jour 1, le matin : Martha est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 3, à l'aube : Martha et Euphemia deviennent amies.
+
+Michael
+  Jour 1, le matin : Michael est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 6, l'après-midi : Michael et Euphemia deviennent amis.
+
+Stephanos
+  Jour 1, le matin : Stephanos est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 4, la nuit : Stephanos et Euphemia deviennent amis.
+  Jour 4, à l'aube : Nikolaos et Stephanos deviennent amis.
+  Jour 5, le matin : Theophano et Stephanos deviennent amis.
+
+Euphemia
+  Jour 1, le matin : Euphemia est parmi les fondateurs, sans métier ni maison à soi.
+  Jour 3, à l'aube : Martha et Euphemia deviennent amies.
+  Jour 4, la nuit : Stephanos et Euphemia deviennent amis.
+  Jour 6, l'après-midi : Michael et Euphemia deviennent amis.
