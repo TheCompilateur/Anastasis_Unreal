@@ -6,7 +6,6 @@ Mission 2 du jalon « Valmire pousse toute seule » (mandat d'Alexandre, 2026-10
 quatre familles fondatrices et un moine, chacune avec un passé, un objet et une dette morale ; le premier soir au
 feu raconté dans la chronique ; une base de répliques en français (reprise du JS et complétée).
 
-RELAIS: chronique-village-001
 
 ## FILES_OWNED
 
@@ -65,7 +64,7 @@ NOT_JUDGED — Alexandre lit la chronique du premier soir. Le joueur n'entre pas
 
 ## INTEGRATION_RISK
 
-- Relais : cette branche porte `chronique-village-001` (commits 3f8a861b, 2a316330). La verser après elle, ou dans le même lot en la nommant d'abord.
+- Rebasée le 2026-10-08 sur `main` (où `chronique-village-001` est versée, 8ced0261 / 0e96ef01) : plus de relais. `save-state-001` a changé le hacheur en parcours d'archive (`VisitState`) : l'identité et les foyers (écart n°44) y sont réécrits, donc aussi sauvés.
 - Écart n°44 : le numéro 43 est déjà pris par `labor-social-001`, non versé. Si une autre branche prend 44 avant, renuméroter.
 - Le village du lancement change : 14 fondateurs nommés au lieu de 12 anonymes (`anastasis.Village.Founders 0` rétablit l'ancien). `villager-pie` est adapté ; les preuves qui fixent `StartVillagers 12` (settlement-site, settlement-sensitivity, geography-concordance) mesurent le site, pas le nombre, mais leur village change : à surveiller au lot.
 - `FNpc` gagne six champs et `FVillage` deux, hachés par `StateDigest` : toute mission qui ajoute aussi des champs à `FNpc` touchera les mêmes lignes.
