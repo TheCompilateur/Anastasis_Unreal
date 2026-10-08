@@ -12,6 +12,7 @@
         "World": "pointeur: le monde lie, possede et hache par FAnastasisSimulation::StateDigest",
         "Grid": "cache: sim.spatial, reconstruite depuis les positions au debut de chaque boucle des habitants (Grid.Rebuild)",
         "CollectiveDecisionOverride": "pointeur: crochet de test (TFunction), jamais pose en jeu",
+        "RainCanopyCover": "pointeur: crochet hote (TFunction) pose par l incarnation Unreal pour lire la canopee rendue (ecart n°41, canopy-rain-shelter-001) ; son effet passe par l etat des habitants, deja hache",
         "Colony": "lacune: FColonyState du planificateur (priorites, rapport de stock, charte) ; pose seulement par RestoreColonyForHarness, jamais pour un village cree par le C++ (bHasColony, tresor et rayon sont lus) ; a lire avant toute sauvegarde",
         "MarketStock": "lacune: FOrderedMap du marche, meme condition que Colony"
       } },
