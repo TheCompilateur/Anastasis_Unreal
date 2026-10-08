@@ -16,7 +16,9 @@
         "RainCanopyCover": "pointeur: crochet hote (TFunction) pose par l incarnation Unreal pour lire la canopee rendue (ecart n°41, canopy-rain-shelter-001) ; son effet passe par l etat des habitants, deja hache",
         "Colony": "lacune: FColonyState du planificateur (priorites, rapport de stock, charte) ; pose seulement par RestoreColonyForHarness, jamais pour un village cree par le C++ (bHasColony, tresor et rayon sont lus) ; a lire avant toute sauvegarde",
         "MarketStock": "lacune: FOrderedMap du marche, meme condition que Colony",
-        "PassageCount": "observation: passages enregistres depuis Bind (settlement-morphogenesis-001), pour le rapport et les tests ; aucune regle ne le relit"
+        "PassageCount": "observation: passages enregistres depuis Bind (settlement-morphogenesis-001), pour le rapport et les tests ; aucune regle ne le relit",
+        "NavAgents": "cache: vue de travail (FNavAgent) remplie depuis FNpc avant un appel du service de navigation et videe par FlushNavAgents ; vide entre deux pas (AnastasisVillageNav.cpp)",
+        "NavSourceShared": "cache: source de navigation partagee (TSharedPtr mutable), reconstruite depuis Nav et le monde"
       } },
     { "nom": "FNpc", "entete": "Source/AnastasisSim/Public/Village/AnastasisVillage.h",
       "lecteur": { "fichier": "Source/AnastasisSim/Private/Village/AnastasisVillageStateDigest.cpp", "fonction": "void HashState(FStateWriter& Out, const FNpc& V)", "acces": "V." },
@@ -86,6 +88,20 @@
     { "nom": "FDirector", "entete": "Source/AnastasisSim/Public/Core/AnastasisSimBudget.h",
       "lecteur": { "fichier": "Source/AnastasisSim/Private/Village/AnastasisVillageStateDigest.cpp", "fonction": "void HashState(FStateWriter& Out, const AnastasisBudget::FDirector& V)", "acces": "V." } },
     { "nom": "FNavGrid", "entete": "Source/AnastasisSim/Public/World/AnastasisNavGrid.h",
-      "lecteur": { "fichier": "Source/AnastasisSim/Private/Village/AnastasisVillageStateDigest.cpp", "fonction": "void HashState(FStateWriter& Out, const AnastasisNav::FNavGrid& V)", "acces": "V." } }
+      "lecteur": { "fichier": "Source/AnastasisSim/Private/Village/AnastasisVillageStateDigest.cpp", "fonction": "void HashState(FStateWriter& Out, const AnastasisNav::FNavGrid& V)", "acces": "V." } },
+    { "nom": "FGoalExplainEntry", "entete": "Source/AnastasisSim/Public/Village/AnastasisVillage.h",
+      "lecteur": { "fichier": "Source/AnastasisSim/Private/Village/AnastasisVillageStateDigest.cpp", "fonction": "void HashState(FStateWriter& Out, const FGoalExplainEntry& V)", "acces": "V." } },
+    { "nom": "FGoalExplain", "entete": "Source/AnastasisSim/Public/Village/AnastasisVillage.h",
+      "lecteur": { "fichier": "Source/AnastasisSim/Private/Village/AnastasisVillageStateDigest.cpp", "fonction": "void HashState(FStateWriter& Out, const FGoalExplain& V)", "acces": "V." } },
+    { "nom": "FStreetDecision", "entete": "Source/AnastasisSim/Public/Village/AnastasisVillage.h",
+      "lecteur": { "fichier": "Source/AnastasisSim/Private/Village/AnastasisVillageStateDigest.cpp", "fonction": "void HashState(FStateWriter& Out, const FStreetDecision& V)", "acces": "V." } },
+    { "nom": "FNature", "entete": "Source/AnastasisSim/Public/Life/AnastasisNature.h",
+      "lecteur": { "fichier": "Source/AnastasisSim/Private/Village/AnastasisVillageStateDigest.cpp", "fonction": "void HashState(FStateWriter& Out, const AnastasisNature::FNature& V)", "acces": "V." } },
+    { "nom": "FNavJob", "entete": "Source/AnastasisSim/Public/World/AnastasisNavService.h",
+      "lecteur": { "fichier": "Source/AnastasisSim/Private/Village/AnastasisVillageStateDigest.cpp", "fonction": "void HashState(FStateWriter& Out, const AnastasisNavService::FNavJob& V)", "acces": "V." } },
+    { "nom": "FNavCacheEntry", "entete": "Source/AnastasisSim/Public/World/AnastasisNavService.h",
+      "lecteur": { "fichier": "Source/AnastasisSim/Private/Village/AnastasisVillageStateDigest.cpp", "fonction": "void HashState(FStateWriter& Out, const AnastasisNavService::FNavCacheEntry& V)", "acces": "V." } },
+    { "nom": "FNavService", "entete": "Source/AnastasisSim/Public/World/AnastasisNavService.h",
+      "lecteur": { "fichier": "Source/AnastasisSim/Private/Village/AnastasisVillageStateDigest.cpp", "fonction": "void HashState(FStateWriter& Out, const AnastasisNavService::FNavService& V)", "acces": "V." } }
   ]
 }

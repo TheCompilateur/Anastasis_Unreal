@@ -56,6 +56,13 @@ namespace AnastasisVillage
 		void HashState(FStateWriter& Out, const AnastasisWeatherBehavior::FSimWeather& V);
 		void HashState(FStateWriter& Out, const AnastasisBudget::FDirector& V);
 		void HashState(FStateWriter& Out, const AnastasisNav::FNavGrid& V);
+		void HashState(FStateWriter& Out, const FGoalExplainEntry& V);
+		void HashState(FStateWriter& Out, const FGoalExplain& V);
+		void HashState(FStateWriter& Out, const FStreetDecision& V);
+		void HashState(FStateWriter& Out, const AnastasisNature::FNature& V);
+		void HashState(FStateWriter& Out, const AnastasisNavService::FNavJob& V);
+		void HashState(FStateWriter& Out, const AnastasisNavService::FNavCacheEntry& V);
+		void HashState(FStateWriter& Out, const AnastasisNavService::FNavService& V);
 		void HashState(FStateWriter& Out, const AnastasisPlanner::FUrgencySnapshot& V);
 
 		template <typename T>
@@ -460,6 +467,119 @@ namespace AnastasisVillage
 			Out.EndObject();
 		}
 
+		void HashOptionalBool(FStateWriter& Out, const TOptional<bool>& V)
+		{
+			if (V.IsSet()) Out.Bool(V.GetValue()); else Out.Null();
+		}
+
+		void HashState(FStateWriter& Out, const FGoalExplainEntry& V)
+		{
+			Out.BeginObject();
+			Out.Key(TEXT("goal")).String(V.Goal);
+			Out.Key(TEXT("score")).Number(V.Score);
+			Out.Key(TEXT("cause")).String(V.Cause);
+			Out.Key(TEXT("causeKey")).String(V.CauseKey);
+			Out.Key(TEXT("causeValue")).Number(V.CauseValue);
+			Out.EndObject();
+		}
+
+		void HashState(FStateWriter& Out, const FGoalExplain& V)
+		{
+			Out.BeginObject();
+			Out.Key(TEXT("at")).Number(V.At);
+			Out.Key(TEXT("goal")).String(V.Goal);
+			Out.Key(TEXT("top"));
+			HashArray(Out, V.Top);
+			Out.Key(TEXT("line")).String(V.Line);
+			Out.EndObject();
+		}
+
+		void HashState(FStateWriter& Out, const FStreetDecision& V)
+		{
+			Out.BeginObject();
+			Out.Key(TEXT("at")).Number(V.At);
+			Out.Key(TEXT("until")).Number(V.Until);
+			Out.Key(TEXT("goal")).String(V.Goal);
+			Out.Key(TEXT("from")).String(V.From);
+			Out.Key(TEXT("margin")).Number(V.Margin);
+			Out.Key(TEXT("changed")).Bool(V.bChanged);
+			Out.Key(TEXT("tight")).Bool(V.bTight);
+			Out.Key(TEXT("cause")).String(V.Cause);
+			Out.EndObject();
+		}
+
+		void HashState(FStateWriter& Out, const AnastasisNature::FNature& V)
+		{
+			Out.BeginObject();
+			Out.Key(TEXT("corps")).Number(V.Corps);
+			Out.Key(TEXT("esprit")).Number(V.Esprit);
+			Out.Key(TEXT("coeur")).Number(V.Coeur);
+			Out.Key(TEXT("qualities"));
+			HashStrings(Out, V.Qualities);
+			Out.Key(TEXT("flaws"));
+			HashStrings(Out, V.Flaws);
+			Out.EndObject();
+		}
+
+		void HashState(FStateWriter& Out, const AnastasisNavService::FNavJob& V)
+		{
+			Out.BeginObject();
+			Out.Key(TEXT("actorId")).String(V.ActorId);
+			Out.Key(TEXT("start"));
+			HashState(Out, V.Start);
+			Out.Key(TEXT("destination"));
+			HashState(Out, V.Destination);
+			Out.Key(TEXT("goalKey")).String(V.GoalKey);
+			Out.Key(TEXT("priority")).Number(V.Priority);
+			Out.Key(TEXT("allowBlockedTarget")).Bool(V.bAllowBlockedTarget);
+			Out.Key(TEXT("requestedAt")).Number(V.RequestedAt);
+			Out.EndObject();
+		}
+
+		void HashState(FStateWriter& Out, const AnastasisNavService::FNavCacheEntry& V)
+		{
+			Out.BeginObject();
+			Out.Key(TEXT("path"));
+			HashArray(Out, V.Path);
+			Out.Key(TEXT("navVersion")).Number(V.NavVersion);
+			Out.Key(TEXT("storedAt")).Number(V.StoredAt);
+			Out.EndObject();
+		}
+
+		void HashState(FStateWriter& Out, const AnastasisNavService::FNavService& V)
+		{
+			Out.BeginObject();
+			Out.Key(TEXT("queue"));
+			HashArray(Out, V.Queue);
+			// Le cache garde l'ordre d'insertion (ses evictions suivent cet ordre) : on le lit tel quel.
+			const TArray<FString>& Keys = V.Cache.GetKeys();
+			Out.Key(TEXT("cache")).BeginArray(Keys.Num());
+			for (int32 I = 0; I < Keys.Num(); ++I)
+			{
+				Out.BeginArray(2);
+				Out.String(Keys[I]);
+				HashState(Out, V.Cache.GetEntry(I));
+				Out.EndArray();
+			}
+			Out.EndArray();
+			TArray<FString> Pending;
+			V.PendingByActor.GetKeys(Pending);
+			Pending.Sort();
+			Out.Key(TEXT("pendingByActor")).BeginArray(Pending.Num());
+			for (const FString& Id : Pending)
+			{
+				Out.BeginArray(2);
+				Out.String(Id).Number(V.PendingByActor[Id]);
+				Out.EndArray();
+			}
+			Out.EndArray();
+			Out.Key(TEXT("calcThisTick")).Number(V.CalcThisTick);
+			Out.Key(TEXT("maxCalcs")).Number(V.MaxCalcs);
+			Out.Key(TEXT("cacheTtl")).Number(V.CacheTtl);
+			Out.Key(TEXT("lastSweepAt")).Number(V.LastSweepAt);
+			Out.EndObject();
+		}
+
 		void HashState(FStateWriter& Out, const FNpc& V)
 		{
 			Out.BeginObject();
@@ -622,6 +742,43 @@ namespace AnastasisVillage
 			Out.Key(TEXT("reputation")).Number(V.Reputation);
 			Out.Key(TEXT("presence")).Number(V.Presence);
 			Out.Key(TEXT("idleSeconds")).Number(V.IdleSeconds);
+
+			// Champs arrives apres STATE_ORACLE_001 (nav-wiring-001, lifestyle-decision-001, premiere-pensee-001...),
+			// ranges par state-fields-tidy-001.
+			Out.Key(TEXT("pathFailStreak")).Number(V.PathFailStreak);
+			Out.Key(TEXT("navRequestedAt")).Number(V.NavRequestedAt);
+			Out.Key(TEXT("awaitingPath")).Bool(V.bAwaitingPath);
+			Out.Key(TEXT("navPath"));
+			HashArray(Out, V.NavPath);
+			Out.Key(TEXT("navPathIndex")).Number(V.NavPathIndex);
+			Out.Key(TEXT("doorQueueRole")).String(V.DoorQueueRole);
+			Out.Key(TEXT("doorQueueRank")).Number(V.DoorQueueRank);
+			Out.Key(TEXT("stuckTicks")).Number(V.StuckTicks);
+			Out.Key(TEXT("hasLastMoveDir")).Bool(V.bHasLastMoveDir);
+			Out.Key(TEXT("lastMoveDir"));
+			HashState(Out, V.LastMoveDir);
+			Out.Key(TEXT("hasHesitation")).Bool(V.bHasHesitation);
+			Out.Key(TEXT("hesitationTimer")).Number(V.HesitationTimer);
+			Out.Key(TEXT("hesitationCooldown")).Number(V.HesitationCooldown);
+			Out.Key(TEXT("trafficTimer")).Number(V.TrafficTimer);
+			Out.Key(TEXT("inventoryWood")).Number(V.InventoryWood);
+			Out.Key(TEXT("gatheredWood")).Number(V.GatheredWood);
+			Out.Key(TEXT("activitySince")).Number(V.ActivitySince);
+			Out.Key(TEXT("goalExplain"));
+			HashOptionalState(Out, V.GoalExplain);
+			Out.Key(TEXT("streetDecision"));
+			HashOptionalState(Out, V.StreetDecision);
+			Out.Key(TEXT("hasHungerAction")).Bool(V.bHasHungerAction);
+			Out.Key(TEXT("nocturnalIntent"));
+			HashOptionalBool(Out, V.NocturnalIntent);
+			Out.Key(TEXT("hasBuildBinding")).Bool(V.bHasBuildBinding);
+			Out.Key(TEXT("hasSocialSeekId")).Bool(V.bHasSocialSeekId);
+			Out.Key(TEXT("hasFailureStore")).Bool(V.bHasFailureStore);
+			Out.Key(TEXT("skillCare")).Number(V.SkillCare);
+			Out.Key(TEXT("nature"));
+			HashOptionalState(Out, V.Nature);
+			Out.Key(TEXT("gold"));
+			HashOptional(Out, V.Gold);
 			Out.EndObject();
 		}
 
@@ -829,6 +986,28 @@ namespace AnastasisVillage
 		HashArray(Out, FoodSources);
 		Out.Key(TEXT("mealSeq")).Number(MealSeq);
 		Out.Key(TEXT("reservationSweepAt")).Number(ReservationSweepAt);
+		{
+			TArray<int32> Soil;
+			SoilWaterByTile.GetKeys(Soil);
+			Soil.Sort();
+			Out.Key(TEXT("soilWaterByTile")).BeginArray(Soil.Num());
+			for (const int32 Index : Soil)
+			{
+				Out.BeginArray(2);
+				Out.Number(Index).Number(SoilWaterByTile[Index]);
+				Out.EndArray();
+			}
+			Out.EndArray();
+		}
+		Out.Key(TEXT("soilWaterEnabled")).Bool(bSoilWaterEnabled);
+		Out.Key(TEXT("navService"));
+		HashState(Out, NavService);
+		{
+			// Trafic par tuile (taille du monde) : une empreinte d'octets, pas un nombre par case.
+			AnastasisDigest::FFnv1a64 TrafficHash;
+			TrafficHash.Bytes(reinterpret_cast<const uint8*>(Traffic.GetData()), Traffic.Num() * static_cast<int32>(sizeof(int32)));
+			Out.Key(TEXT("traffic")).String(AnastasisDigest::ToHex(TrafficHash.Hash));
+		}
 		Out.Key(TEXT("buildings"));
 		HashArray(Out, Buildings.GetItems());
 		Out.Key(TEXT("actors"));
