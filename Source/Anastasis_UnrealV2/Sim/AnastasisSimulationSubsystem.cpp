@@ -1830,6 +1830,9 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisVillageDeliverSite(
 		if (!Host || Args.Num() < 3) return;
 		const int32 In = Host->GetSimulation().GetVillage().CreditSiteMaterials(Args[0], FCString::Atoi(*Args[1]), FCString::Atoi(*Args[2]));
 		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE deliver site %s: %d units in"), *Args[0], In);
+		// Le stock livre se voit tout de suite, comme apres FirstSite : sans cela il attend le prochain Tick du
+		// sous-systeme, et une frame lente (lot d'integration) laisse lire le chantier d'avant la livraison.
+		Host->SyncVillagePresentation();
 	}));
 
 FString UAnastasisSimulationDebugLibrary::GetGatherStatus(const UObject* WorldContextObject)

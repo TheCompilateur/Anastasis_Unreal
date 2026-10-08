@@ -49,7 +49,7 @@ archétype = programme de la biographie, `Anastasis.Village.SettlementReport`, p
 - `Source/Anastasis_UnrealV2/Village/AnastasisSettlement{Ledger,Paths}.{h,cpp}`, `AnastasisSettlementTests.cpp`,
   `AnastasisVillagePresentation.{h,cpp}`, `AnastasisVillageBuilding.{h,cpp}`, `AnastasisArchitecture.{h,cpp}`,
   `AnastasisArchitectureTests.cpp`
-- `Source/Anastasis_UnrealV2/Sim/AnastasisSimulationSubsystem.{h,cpp}`
+- `Source/Anastasis_UnrealV2/Sim/AnastasisSimulationSubsystem.{h,cpp}` (dont la resynchronisation apres `DeliverSite`)
 - `Content/Anastasis/VillageArchitecture/**` (régénéré par la mission d'origine), `tools/unreal/create-village-architecture.py`
 - `tools/unreal/settlement-morphogenesis-pie.{py,ps1}`, `tools/unreal/proofs.txt` (une ligne), `AGENTS.md` (index)
 - `tools/migration/state-fields.json`
@@ -72,6 +72,17 @@ voir `git log agent/relay-settlement-001` (un commit de relais sur `main` 423955
 - ECARTS: `node tools/migration/check-ecarts.mjs -base main -handoff docs/unreal/handoffs/relay-settlement-001.md` -> `ECARTS::PASS fiches=39 ouvertes=39 fail=0 warn=9`
 - STATE_FIELDS: `node tools/migration/check-state-fields.mjs -base main` -> `STATE_FIELDS::PASS structures=37 lacunes=2 warn=31`
 - Doublons index AGENTS.md / proofs.txt : aucun ; marqueurs de conflit : 0.
+- Lot 16 : relais ecarte sur `site-stock-visual-pie FAIL phase=one count=(0, 0) expected=(1, 1)` (stock simule 1/1, visuel
+  pas encore resynchronise). Non reproduit seul dans ce worktree (PASS). Cause retenue : `Anastasis.Village.DeliverSite`
+  (`AnastasisSimulationSubsystem.cpp`, commande `CmdAnastasisVillageDeliverSite`) credite le stock sans resynchroniser la
+  presentation ; le visuel attend le Tick suivant du sous-systeme. Dans le lot, les frames etaient affamees (frame 29 de
+  ~5 s : regeneration du stub Python, l'API exposee ayant change avec `GetSettlementStatus`) et la preuve a lu 1,3 s / 2
+  frames apres la livraison. Correction : `Host->SyncVillagePresentation()` apres le credit, comme apres `FirstSite`.
+  Preuve inchangee.
+- `editor-batch.ps1 -Proofs site-stock-visual-pie,settlement-morphogenesis-pie,architecture-pie` (worktree, un editeur,
+  MAIN_LOCK libre) : `EDITOR_BATCH::PASS 3/3` -- `SITE_STOCK_VISUAL_PIE PASS dry=0,0 one=1,1 full=3,3 consumed=yes
+  complete=0,0` ; `MORPH_PIE PASS 36 jours de vie : 5018 passages, 16 sentiers, 2 maisons fondees` ; `ARCH_PIE PASS
+  hameau a l echelle humaine, assises posees, 11 prises`.
 
 ## PROOFS
 
