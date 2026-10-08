@@ -678,9 +678,9 @@ namespace AnastasisChronicle
 			if (!State.bThirsty && Thirst >= ThirstAt)
 			{
 				State.bThirsty = true;
-				const int32 WellReach = Reach(Sim, Npc, AnastasisVillage::WellType);
-				const FString Why = WellReach == 0 ? FString(TEXT(" : il n'y a pas de puits"))
-					: WellReach == 1 ? FString::Printf(TEXT(" : aucun chemin ne mène au puits depuis là où %s se trouve"), bFemale ? TEXT("elle") : TEXT("il"))
+				const int32 WellAccess = Reach(Sim, Npc, AnastasisVillage::WellType);
+				const FString Why = WellAccess == 0 ? FString(TEXT(" : il n'y a pas de puits"))
+					: WellAccess == 1 ? FString::Printf(TEXT(" : aucun chemin ne mène au puits depuis là où %s se trouve"), bFemale ? TEXT("elle") : TEXT("il"))
 					: FString(TEXT(", alors que le puits est à sa portée"));
 				Add(Day, Hour, EKind::Thirst, { Npc.Id }, FString::Printf(TEXT("%s a soif%s."), *State.Name, *Why));
 			}
