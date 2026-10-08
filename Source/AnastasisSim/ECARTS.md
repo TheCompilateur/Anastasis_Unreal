@@ -628,7 +628,9 @@ Le même multiplicateur de la grille de navigation que lit l'A* devient le temps
 
 SetJob accepte woodcutter, qui decide et preleve localement dans les tuiles connues. Rendement chop 3/4, ancrage 0.42, periode/fatigue et stock minimal 4 pour une foret aux attributs crown/clearing absents sont portes. Le helper porte aussi le plancher profond 10 et l'exemption frontier, mais le runtime ne dispose pas de ces autorites et ne les invente pas. Pas de colonisation, densite forestiere, pression de chantier, depot bois, transfert chantier, vente, relais, regeneration, technique, boost joueur, changement d'outil ou tirage de rate. La recolte est restreinte au metier explicite ; score et rappel sont des sous-ensembles declares. Le sac reste conserve et la recolte cesse au seuil de transport existant (>9, nourriture incluse), sans faux credit a un depot. Filtre de disponibilite sur tuiles memorisees et arret observer remplacent exploration/livraison manquantes. Une session distante ne permet pas de couper hors voisinage. Pas de flux aleatoire ajoute.
 
-Le bois coupe n'a aucun puits : il reste dans `InventoryWood`, le planificateur ne le compte pas comme mobilisable, et aucun chemin nouveau ne le livre au chantier. Le seul transport de materiaux reste le porteur opt-in deja present sur main, qui garde sa propre charge ; le porteur n'est jamais traite comme bucheron (`IsWoodHarvester`), les deux flux ne partagent pas un habitant. Aucune fermeture d'un autre ecart n'est revendiquee.
+Avant labor-social-001, le bois coupe n'avait aucun puits : il restait dans `InventoryWood`, le planificateur ne le comptait pas comme mobilisable, et aucun chemin ne le livrait au chantier. Le porteur opt-in gardait sa propre charge ; le porteur n'est jamais traite comme bucheron (`IsWoodHarvester`), les deux flux ne partagent pas un habitant.
+
+Mise a jour labor-social-001 : le transfert direct du sac du bucheron a un chantier ouvert est desormais porte par l'ecart n°43. Les autres limites ci-dessus demeurent.
 
 ### n° 32 — Planificateur : la corvée de bois départage les égalités en ordre ordinal
 
@@ -813,3 +815,15 @@ ne sont pas portées : un sentier reste de sa classe de naissance. Pas de journa
 de nuit garde son rang 8 dans la file. Harnais : `traffic` n'est pas dans la projection JS (`Digest`) ni lu
 de la sauvegarde (`packTraffic`) ; il est haché par `StateDigest`, avec les sentiers et leurs efforts. Le
 sentier ne naît jamais sans l'activation de l'hôte ; la décroissance de minuit, fidèle, tourne partout.
+
+### n° 43 — Livraison du bois coupe vers un chantier reel
+
+- **classe** : REDUIT
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : labor-social-001
+- **reference** : `src/sim/npc.js` (`deliver`, `progressCraftGather`, `progressProduceWork`), `src/sim/transport/stockLedger.js` (`transferNpcToBuilding`)
+- **cpp** : `Village/AnastasisVillageWood.cpp`, `Village/AnastasisVillage.cpp`, `Public/Village/AnastasisVillage.h`
+- **harnais** : actors, buildings, tileDiff
+
+Le bucheron qui porte du bois peut choisir `deliver` pour un chantier ouvert dont le devis a un manque de bois, en concurrence avec ses besoins vitaux. Quand aucun chantier ouvert ne peut poser une piece et que son manque de bois bloque le devis, sa ligne `build` est ineligible : elle ne doit pas retenir le bucheron sur un chantier improductif. Il suit ensuite le seuil de batiment existant ; `Perform` traite son sac avant le repli generique vers l'approvisionnement alimentaire. Le bois passe de `InventoryWood` a `Materials.StockWood` uniquement a l'arrivee, dans la limite du manque et de la capacite du site. Le constructeur utilise ensuite les regles existantes de consommation et d'achevement. Aucun rendement de coupe ni devis n'est change ; aucune ressource n'est creditee sans retrait du sac. Ce lien direct vers le chantier est un sous-ensemble du transport JS, qui passe normalement par ses depots, jobs de haul et reservations. Il ne porte ni scierie, ni planches, ni vente, ni marche, ni politique de production generale. Le porteur opt-in garde son flux separe. À trancher : conserver ce lien direct comme mecanisme de jeu, ou porter la logistique complete de la reference.

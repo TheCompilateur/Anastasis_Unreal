@@ -2057,8 +2057,36 @@ namespace AnastasisVillage
 
 		// Fermier au grenier (ecart n°10) : ses lignes de travail sont calculees.
 		const bool bWorker = IsGranaryWorker(Npc);
+		// ecart n°43: a loaded woodcutter can answer a real open site's wood deficit.
+		bool bWoodDelivery = IsWoodHarvester(Npc) && Npc.InventoryWood > 0;
+		if (bWoodDelivery)
+		{
+			bWoodDelivery = false;
+			for (const FBuilding& Site : Buildings.GetItems())
+			{
+				if (!Site.IsCompleted() && Site.bHasMaterials && Site.AccessPoints.Num() > 0
+					&& Site.Materials.NeedWood > Site.Materials.ConsumedWood + Site.Materials.StockWood)
+				{
+					bWoodDelivery = true;
+					break;
+				}
+			}
+		}
 		// Un chantier ouvert : la ligne `build` de chacun lit le meme facteur de travail.
-		const bool bSite = ActiveSites().Num() > 0;
+		const TArray<const FBuilding*> OpenSites = ActiveSites();
+		const bool bSite = OpenSites.Num() > 0;
+		bool bWoodBlocksEverySite = bSite && IsWoodHarvester(Npc);
+		if (bWoodBlocksEverySite)
+		{
+			bool bNeedsWood = false;
+			for (const FBuilding* Site : OpenSites)
+			{
+				if (SitePieceReady(*Site)) { bWoodBlocksEverySite = false; break; }
+				bNeedsWood |= Site->bHasMaterials
+					&& Site->Materials.NeedWood > Site->Materials.ConsumedWood + Site->Materials.StockWood;
+			}
+			bWoodBlocksEverySite &= bNeedsWood;
+		}
 		// Le facteur de travail sert a toute ligne de travail calculee : celles du fermier, `build` d'un
 		// chantier ouvert, et `helpFarm` de chacun (help-farm-001).
 		FWorkRowContext Work;
@@ -2140,8 +2168,26 @@ namespace AnastasisVillage
 				Rows.Add(TPair<FString, double>(G, WoodRowScore(Npc, AnastasisRhythm::PhaseBias(Phase, Subject, G), Work, Noise)));
 				continue;
 			}
+			else if (G == GoalDeliver && bWoodDelivery)
+			{
+				// Same cargo incentive as the existing food-supply delivery line; vital needs
+				// still compete in adultScores and critical needs can interrupt the trip.
+				// Keep this row separate from the food-depot fallback below.
+				Score = (100.0 + 5.0 * Npc.InventoryWood)
+					* AnastasisGather::SurvivalWorkFactor(G, Work.WorkFactor, Work.bMealBlocked)
+					+ Noise + RhythmStatusLifestyle(Npc, Phase, Subject, G);
+				Rows.Add(TPair<FString, double>(G, Score));
+				continue;
+			}
 			else if ((bSite || Collective.bHasColony) && G == AnastasisBuild::GoalBuild)
 			{
+				// ecart n°43: a woodcutter cannot make a piece at any open site
+				// while its wood deficit blocks the bill. Let the existing wood row compete.
+				if (bWoodBlocksEverySite)
+				{
+					Rows.Add(TPair<FString, double>(G, -1000.0));
+					continue;
+				}
 				Rows.Add(TPair<FString, double>(G, BuildRowScore(Npc, RhythmStatusLifestyle(Npc, Phase, Subject, G), Work, Noise, Collective)));
 				continue;
 			}
@@ -2229,7 +2275,7 @@ namespace AnastasisVillage
 			ApplyAlgorithmicScoreBias(Npc, Rows);
 		}
 		// `applyGoalEligibility` : `deliver` n'est candidat qu'avec une charge.
-		if (Npc.InventoryFood <= 0)
+		if (Npc.InventoryFood <= 0 && !bWoodDelivery)
 		{
 			Rows.RemoveAll([](const TPair<FString, double>& Row) { return Row.Key == GoalDeliver; });
 		}
@@ -2603,6 +2649,7 @@ namespace AnastasisVillage
 		else if (Npc.Goal == GoalRelax) bFound = RelaxTarget(Npc, Target, Source);
 		else if (Npc.Goal == TEXT("gatherWood") && IsWoodHarvester(Npc)) bFound = WoodTarget(Npc, Target, Source);
 		else if (IsGranaryWorker(Npc) && Npc.Goal == GoalGatherFood) bFound = GatherTarget(Npc, Target, Source);
+		else if (IsWoodHarvester(Npc) && Npc.Goal == GoalDeliver && Npc.InventoryWood > 0) bFound = WoodDeliveryTarget(Npc, Target, Source);
 		else if (IsGranaryWorker(Npc) && Npc.Goal == GoalDeliver) bFound = DeliverTarget(Npc, Target, Source);
 		else if (Npc.Goal == TEXT("gatherFood") || Npc.Goal == TEXT("deliver")) bFound = FoodSupplyTarget(Npc, Target, Source);
 		else if (Npc.Goal == GoalShelterRain) bFound = ShelterRainTarget(Npc, Target, Source);
@@ -2954,6 +3001,9 @@ namespace AnastasisVillage
 
 	bool FVillage::Perform(FNpc& Npc)
 	{
+		// ecart n°43: wood cargo belongs to the site ledger, before the generic food-supply fallback.
+		if (Npc.Goal == GoalDeliver && IsWoodHarvester(Npc) && Npc.InventoryWood > 0)
+			return DeliverWoodToSite(Npc);
 		// Extension food-supply : tout habitant qui n'est pas le fermier du grenier.
 		if ((Npc.Goal == GoalGatherFood || Npc.Goal == GoalDeliver) && !IsGranaryWorker(Npc)) return PerformFoodSupply(Npc);
 		if (Npc.Goal == GoalDrink)

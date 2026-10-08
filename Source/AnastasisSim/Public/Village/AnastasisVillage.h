@@ -1214,6 +1214,9 @@ namespace AnastasisVillage
 
 		/** Fermier dont le poste est un grenier acheve : ses lignes gatherFood / deliver sont calculees. */
 		bool IsGranaryWorker(const FNpc& Npc) const;
+		/** Bucheron : le bois coupe peut etre livre a un chantier ouvert, jamais credite a distance. */
+		bool WoodDeliveryTarget(FNpc& Npc, FPoint& OutTarget, FString& OutSource);
+		bool DeliverWoodToSite(FNpc& Npc);
 
 		/**
 		 * `npc.jobId` sans poste (ecart n°18) : le batisseur de la reference n'a pas

@@ -44,6 +44,40 @@ bool FVillage::WoodTarget(const FNpc& Npc, FPoint& Out, FString& Source) const
     return Found;
 }
 
+// ecart n°43: bridge the existing woodcutter cargo to the existing construction
+// stock. The site remains the authority for material consumption.
+bool FVillage::WoodDeliveryTarget(FNpc& Npc, FPoint& Out, FString& Source)
+{
+    if (!IsWoodHarvester(Npc) || Npc.InventoryWood <= 0) return false;
+    for (FBuilding& Site : Buildings.GetItemsMutable())
+    {
+        if (Site.IsCompleted() || !Site.bHasMaterials) continue;
+        const int32 Missing = Site.Materials.NeedWood - Site.Materials.ConsumedWood - Site.Materials.StockWood;
+        if (Missing <= 0 || !BuildingAccessPoint(Site, &Npc, Out)) continue;
+        Npc.DestBuildingId = Site.Id;
+        Source = TEXT("wood_site");
+        return true;
+    }
+    return false;
+}
+
+bool FVillage::DeliverWoodToSite(FNpc& Npc)
+{
+    if (!IsWoodHarvester(Npc) || Npc.InventoryWood <= 0 || Npc.DestBuildingId.IsEmpty()) return false;
+    FBuilding* Site = Buildings.FindById(Npc.DestBuildingId);
+    if (!Site || Site->IsCompleted() || !Site->bHasMaterials) return false;
+    const int32 Missing = Site->Materials.NeedWood - Site->Materials.ConsumedWood - Site->Materials.StockWood;
+    if (Missing <= 0 || !Npc.bHasTarget ||
+        AnastasisMath::Dist(Npc.X, Npc.Y, Npc.Target.X, Npc.Target.Y) > ArrivalDistance) return false;
+    const int32 Credited = CreditSiteMaterials(Site->Id, FMath::Min(Npc.InventoryWood, Missing), 0);
+    if (Credited <= 0) return false;
+    Npc.InventoryWood -= Credited;
+    Npc.MaterialsDelivered += Credited;
+    ++Npc.Deliveries;
+    Npc.Activity = TEXT("livre bois");
+    return true;
+}
+
 double FVillage::WoodRowScore(const FNpc& Npc, double PhaseBias, const FWorkRowContext& Work, double Noise) const
 {
     FPoint Target; FString Source;
