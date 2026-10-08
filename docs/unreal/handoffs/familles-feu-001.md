@@ -61,7 +61,7 @@ NOT_JUDGED — Alexandre lit la chronique du premier soir. Le joueur n'entre pas
 
 ## ECARTS
 
-- ouvert : n° 44 — Foyers fondateurs posés par l'hôte : identité et parenté comme données, sans vie familiale (EXTENSION, A_TRANCHER)
+- ouvert : n° 44 — Foyers fondateurs posés par l'hôte : identité et parenté comme données, sans vie familiale (EXTENSION, ASSUME : « On ignore JS pour fonder Valmire », Alexandre, 2026-10-08)
 
 ## INTEGRATION_RISK
 

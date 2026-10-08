@@ -20,6 +20,7 @@ Ses choix, le même jour :
 | Base de répliques | **reprendre les ~1 300 répliques du JS et ajouter** |
 | Les quatre familles proposées | **« Oui, on part là-dessus »** |
 | Qui pose les trois questions au feu | **un moine de passage** (une 14e personne) |
+| Le JS et la fondation (après lecture de la chronique) | **« On ignore JS pour fonder Valmire »** : écart n°44 passé à `ASSUME` |
 
 ## Les fondateurs
 

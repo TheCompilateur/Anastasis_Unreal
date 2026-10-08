@@ -831,7 +831,8 @@ Le bucheron qui porte du bois peut choisir `deliver` pour un chantier ouvert don
 ### n° 44 — Foyers fondateurs posés par l'hôte : identité et parenté comme données, sans vie familiale
 
 - **classe** : EXTENSION
-- **destin** : A_TRANCHER
+- **destin** : ASSUME
+- **decision** : 2026-10-08 Alexandre — « On ignore JS pour fonder Valmire » (docs/unreal/FAMILLES_FEU_001.md, Décision)
 - **statut** : OUVERT
 - **entree** : familles-feu-001 (mandat d'Alexandre du 2026-10-08, `docs/unreal/FAMILLES_FEU_001.md`)
 - **activation** : seulement quand l'hôte Unreal pose les fondateurs de Valmire (`anastasis.Village.Founders 1`, défaut 1, `Content/Anastasis/Scenario/valmire-fondateurs.json`). `SpawnNpc` seul laisse l'identité vide et aucun foyer : le harnais n'en pose jamais.
@@ -840,7 +841,7 @@ Le bucheron qui porte du bois peut choisir `deliver` pour un chantier ouvert don
 - **harnais** : aucune
 - **fermeture** : à attribuer (`goals-family-001` du P3_PLAN porte la vie familiale de la référence)
 
-Les champs d'identité de `createNpc` sont portés tels quels, mais seulement comme données : aucune décision ne les lit encore (pas de `lifeStage`, pas d'enfant qui marche moins vite ou ne travaille pas, pas de `isFamilyWith` dans les liens, pas de couple ni de naissance). Le foyer reprend `adults`, `dependents` et `homeId` de `createFamily`, sans `births` ni `lastBirthDay`. Ce qui n'existe pas dans la référence : quatre foyers fondateurs de treize personnes et un moine au lieu des cinq fondateurs de `ROMAN_FOUNDERS` (l'invariant « trois hommes, deux femmes » tombe), des enfants, un frère, un pupille et un engagé dès le départ, un nom de foyer (`FFamily::Name`) et un rôle de parenté (`KinRole`). Le passé de chacun (où il était quand la Ville est tombée, ce qu'il a emporté, qui n'est pas venu) reste dans l'hôte, hors de la simulation. À trancher : garder ces foyers comme fondation d'ANÁSTASIS, ou porter d'abord `ROMAN_FOUNDERS` et la vie familiale de la référence.
+Les champs d'identité de `createNpc` sont portés tels quels, mais seulement comme données : aucune décision ne les lit encore (pas de `lifeStage`, pas d'enfant qui marche moins vite ou ne travaille pas, pas de `isFamilyWith` dans les liens, pas de couple ni de naissance). Le foyer reprend `adults`, `dependents` et `homeId` de `createFamily`, sans `births` ni `lastBirthDay`. Ce qui n'existe pas dans la référence : quatre foyers fondateurs de treize personnes et un moine au lieu des cinq fondateurs de `ROMAN_FOUNDERS` (l'invariant « trois hommes, deux femmes » tombe), des enfants, un frère, un pupille et un engagé dès le départ, un nom de foyer (`FFamily::Name`) et un rôle de parenté (`KinRole`). Le passé de chacun (où il était quand la Ville est tombée, ce qu'il a emporté, qui n'est pas venu) reste dans l'hôte, hors de la simulation. Tranché par Alexandre le 2026-10-08 : la fondation de Valmire ne suit pas la référence ; ces quatre foyers et le moine sont la fondation d'ANÁSTASIS. Reste ouvert, sans changer ce destin : la vie familiale de la référence (couples, naissances, parenté dans les liens).
 
 ### n° 45 — Sauvegarde de la simulation : format propre, parcours de l'empreinte d'état
 
