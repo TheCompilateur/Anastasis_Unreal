@@ -23,7 +23,7 @@ Le HEAD marqué par agent-worktree.ps1 finish.
 - BUILD: PASS — anastasis-unreal.ps1 build dans cosmic-comet-001, 2026-10-08, 22 actions, 185,53 s, Result: Succeeded.
 - MATERIAL: PASS technique — cosmic-sky-material.ps1 -Version 1 -Rebuild dans le worktree V1 déjà compilé ; M_AnastasisCosmicSkyV1 sauvegardé, COSMIC_MATERIAL_DONE, sortie 0. Copie identique SHA-256 dans cosmic-comet-001 ; la texture V1 et le matériau V0 ne changent pas.
 - SUITE: À REJOUER au finish de cosmic-comet-001.
-- PIE local : EN ATTENTE — editor-batch.ps1 -Proofs cosmic-night-pie dans cosmic-comet-001.
+- PIE LOCAL: PASS — editor-batch.ps1 -Proofs cosmic-night-pie dans cosmic-comet-001, 2026-10-08, 78,5 s. Parent MID = M_AnastasisCosmicSkyV1 ; MeteorStrength = 0,215 ; CometStrength = 0,55 à 23 h clair, puis 0 sous couverture totale. La preuve devra être rejouée au lot.
 
 ## PROOFS
 
