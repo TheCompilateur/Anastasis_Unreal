@@ -152,6 +152,28 @@ public:
 	/** Le pawn local suit-il l'habitant incarne (anastasis.Player.Pawn) ? */
 	bool IsPawnBound() const { return BoundPawn.IsValid(); }
 
+	/**
+	 * SAVE_STATE_001 -- sauve la partie dans Saved/SaveGames/<Slot>.sav : l'etat complet de la simulation
+	 * (FAnastasisSimulation::SaveState) et les verrous de l'hote. Rend faux sans simulation en cours.
+	 */
+	bool SaveGameToSlot(const FString& Slot, FString& OutMessage);
+
+	/**
+	 * Recharge une partie : la simulation est remplacee (refus = rien n'a change), les verrous de l'hote
+	 * reprennent, la presentation est retiree puis refaite depuis l'etat relu. Le monde exterieur est
+	 * relu depuis le scenario note a la sauvegarde.
+	 */
+	bool LoadGameFromSlot(const FString& Slot, FString& OutMessage);
+
+	/** JSON du dernier Save / Load (slot, octets, empreinte, presentation refaite). `{}` avant. */
+	const FString& GetSaveStatus() const { return SaveStatus; }
+
+	/** Le scenario exterieur charge par Anastasis.Geo.Load, pour qu'une sauvegarde sache le relire. */
+	void NoteGeoScenarioPath(const FString& Path) { GeoScenarioPath = Path; }
+
+	/** Lit et valide un scenario exterieur (AnastasisSimulationGeo.cpp) ; journalise chaque erreur. */
+	static bool ReadGeoScenarioFile(const FString& Path, AnastasisGeo::FScenario& Out);
+
 private:
 	void DrawOverlay() const;
 	/** Ligne JOUEUR de l'overlay : habitant incarne, presence, reputation, jours oisifs. */
@@ -209,6 +231,9 @@ private:
 	FString OpeningSiteId;
 	FString OpeningWorkId;
 	FIntPoint FarmerField = FIntPoint(-1, -1);
+	/** SAVE_STATE_001 : chemin du scenario exterieur charge (vide sans monde exterieur). */
+	FString GeoScenarioPath;
+	FString SaveStatus = TEXT("{}");
 	int32 LoggedDay = 0;
 	/** True only after OnWorldBeginPlay. Tests ResetCanonical without the engine ticker. */
 	bool bPumpFromEngineTick = false;
@@ -356,4 +381,12 @@ public:
 	/** geopolitical-world-001 : `Anastasis.Geo.Trace` en texte (arrivees, routes, cause, source). Vide sans hote. */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetGeoTrace(const UObject* WorldContextObject, const FString& NodeId, const FString& Pressure);
+
+	/**
+	 * SAVE_STATE_001, en JSON : empreinte d'etat de la simulation (hexadecimal), temps, jour, habitants et
+	 * batiments simules, acteurs de presentation, et le resultat du dernier Anastasis.Sim.Save / Load.
+	 * `{}` sans hote.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetSaveStatus(const UObject* WorldContextObject);
 };

@@ -2,6 +2,7 @@
 
 #include "Core/AnastasisJsNumeric.h"
 #include "Core/AnastasisSimClock.h"
+#include "Core/AnastasisStateArchive.h"
 #include "Core/AnastasisStateDigest.h"
 
 FAnastasisSimulation::FAnastasisSimulation() = default;
@@ -139,43 +140,248 @@ uint64 FAnastasisSimulation::TileFingerprint() const
 
 uint64 FAnastasisSimulation::StateDigest() const
 {
-	// Le monde ne change pas apres la generation (seul le harnais le reecrit) ; il entre quand meme,
-	// en entier, par une empreinte d'octets : une ecriture dans une tuile se verrait.
-	AnastasisDigest::FFnv1a64 WorldHash;
-	const auto Mix = [&WorldHash](const auto& Value)
+	AnastasisDigest::FStateWriter Out;
+	AnastasisArchive::FStateArchive Ar = AnastasisArchive::FStateArchive::ForHash(Out);
+	FString GeoScenarioId;
+	FString GeoJson;
+	// Le hachage ne fait que lire (Core/AnastasisStateArchive.h).
+	const_cast<FAnastasisSimulation*>(this)->ArchiveState(Ar, GeoScenarioId, GeoJson);
+	return Out.Digest();
+}
+
+void FAnastasisSimulation::ArchiveState(AnastasisArchive::FStateArchive& Ar, FString& GeoScenarioId, FString& GeoJson)
+{
+	Ar.BeginObject();
+	Ar.Key(TEXT("bootDeferred")).Bool(bBootDeferred);
+	Ar.Key(TEXT("seed")).Number(Seed);
+	Ar.Key(TEXT("time")).Number(Time);
+	Ar.Key(TEXT("day")).Number(Day);
+	Ar.Key(TEXT("newDayCount")).Number(NewDayCount);
+	Ar.Key(TEXT("deferredRemaining")).Number(DeferredRemaining);
+	Ar.Key(TEXT("deferredJobs"));
+	AnastasisArchive::VisitArray(Ar, DeferredJobs, [](AnastasisArchive::FStateArchive& A, int32& Job) { A.Number(Job); });
+	Ar.Key(TEXT("lastRegrownFields")).Number(LastRegrownFields);
+	Ar.Key(TEXT("accumulator")).Number(Accumulator);
+
+	Ar.Key(TEXT("world"));
+	if (Ar.IsHashing())
 	{
-		WorldHash.Bytes(reinterpret_cast<const uint8*>(&Value), static_cast<int32>(sizeof(Value)));
-	};
-	Mix(World.W);
-	Mix(World.H);
-	for (const AnastasisWorld::FTile& Tile : World.Tiles)
+		// Le monde ne change pas apres la generation (seul le harnais et le reseau d'eau le reecrivent) ; il
+		// entre quand meme, en entier, par une empreinte d'octets : une ecriture dans une tuile se verrait.
+		AnastasisDigest::FFnv1a64 WorldHash;
+		const auto Mix = [&WorldHash](const auto& Value)
+		{
+			WorldHash.Bytes(reinterpret_cast<const uint8*>(&Value), static_cast<int32>(sizeof(Value)));
+		};
+		Mix(World.W);
+		Mix(World.H);
+		for (const AnastasisWorld::FTile& Tile : World.Tiles)
+		{
+			Mix(Tile.X); Mix(Tile.Y); Mix(Tile.Type); Mix(Tile.Resource); Mix(Tile.Amount); Mix(Tile.Alt);
+			Mix(Tile.Shade); Mix(Tile.Shore); Mix(Tile.Wetness); Mix(Tile.FlowX); Mix(Tile.FlowZ); Mix(Tile.FlowAmt);
+			Mix(Tile.CropId); Mix(Tile.Fertility); Mix(Tile.ForestMargin); Mix(Tile.bHasForestMargin);
+		}
+		FString Hex = AnastasisDigest::ToHex(WorldHash.Hash);
+		Ar.String(Hex);
+	}
+	else
 	{
-		Mix(Tile.X); Mix(Tile.Y); Mix(Tile.Type); Mix(Tile.Resource); Mix(Tile.Amount); Mix(Tile.Alt);
-		Mix(Tile.Shade); Mix(Tile.Shore); Mix(Tile.Wetness); Mix(Tile.FlowX); Mix(Tile.FlowZ); Mix(Tile.FlowAmt);
-		Mix(Tile.CropId); Mix(Tile.Fertility); Mix(Tile.ForestMargin); Mix(Tile.bHasForestMargin);
+		// Sauve : chaque tuile, champ par champ. Relu : sur le monde que Reset a regenere a la meme taille
+		// (la generation peut changer entre deux versions du jeu ; la sauvegarde, elle, garde ses tuiles).
+		Ar.BeginObject();
+		int32 W = World.W;
+		int32 H = World.H;
+		Ar.Key(TEXT("w")).Number(W);
+		Ar.Key(TEXT("h")).Number(H);
+		Ar.Expect(W, World.W, TEXT("largeur du monde"));
+		Ar.Expect(H, World.H, TEXT("hauteur du monde"));
+		Ar.Key(TEXT("tiles"));
+		AnastasisArchive::VisitArray(Ar, World.Tiles, [](AnastasisArchive::FStateArchive& A, AnastasisWorld::FTile& Tile)
+		{
+			AnastasisArchive::VisitTile(A, Tile);
+		});
+		Ar.Expect(World.Tiles.Num(), World.W * World.H, TEXT("tuiles du monde"));
+		Ar.EndObject();
 	}
 
-	AnastasisDigest::FStateWriter Out;
-	Out.BeginObject();
-	Out.Key(TEXT("bootDeferred")).Bool(bBootDeferred);
-	Out.Key(TEXT("seed")).Number(Seed);
-	Out.Key(TEXT("time")).Number(Time);
-	Out.Key(TEXT("day")).Number(Day);
-	Out.Key(TEXT("newDayCount")).Number(NewDayCount);
-	Out.Key(TEXT("deferredRemaining")).Number(DeferredRemaining);
-	Out.Key(TEXT("deferredJobs")).BeginArray(DeferredJobs.Num());
-	for (const int32 Job : DeferredJobs) Out.Number(Job);
-	Out.EndArray();
-	Out.Key(TEXT("lastRegrownFields")).Number(LastRegrownFields);
-	Out.Key(TEXT("accumulator")).Number(Accumulator);
-	Out.Key(TEXT("world")).String(AnastasisDigest::ToHex(WorldHash.Hash));
-	Out.Key(TEXT("village")).String(AnastasisDigest::ToHex(Village.StateDigest()));
+	Ar.Key(TEXT("village"));
+	if (Ar.IsHashing())
+	{
+		FString Hex = AnastasisDigest::ToHex(Village.StateDigest());
+		Ar.String(Hex);
+	}
+	else
+	{
+		Village.ArchiveState(Ar);
+	}
+
 	// Le monde exterieur (geopolitical-world-001) : tout son etat vivant passe par SaveState, que son
 	// Digest hache ; le scenario charge n'y est pas, il se recharge depuis sa source.
-	Out.Key(TEXT("geoLoaded")).Bool(Geo.IsLoaded());
-	Out.Key(TEXT("geo")).String(AnastasisDigest::ToHex(Geo.Digest()));
-	Out.EndObject();
-	return Out.Digest();
+	bool bGeoLoaded = Geo.IsLoaded();
+	Ar.Key(TEXT("geoLoaded")).Bool(bGeoLoaded);
+	Ar.Key(TEXT("geo"));
+	if (Ar.IsHashing())
+	{
+		FString Hex = AnastasisDigest::ToHex(Geo.Digest());
+		Ar.String(Hex);
+	}
+	else
+	{
+		if (Ar.IsSaving())
+		{
+			GeoScenarioId = bGeoLoaded ? Geo.GetScenario().Id : FString();
+			GeoJson = bGeoLoaded ? Geo.SaveState() : FString();
+		}
+		Ar.BeginObject();
+		Ar.Key(TEXT("scenario")).String(GeoScenarioId);
+		Ar.Key(TEXT("state")).String(GeoJson);
+		Ar.EndObject();
+		if (Ar.IsLoading() && Ar.Ok() && !bGeoLoaded && !GeoJson.IsEmpty())
+		{
+			Ar.Fail(TEXT("etat exterieur present sans monde exterieur charge"));
+		}
+		if (Ar.IsLoading()) GeoScenarioId = bGeoLoaded ? GeoScenarioId : FString();
+	}
+	Ar.EndObject();
+}
+
+namespace
+{
+	// "ANSV" : ANastasis SaVe.
+	constexpr uint8 SaveMagic[4] = { 'A', 'N', 'S', 'V' };
+
+	void ArchiveHeader(AnastasisArchive::FStateArchive& Ar, FAnastasisSimulation::FSaveHeader& H)
+	{
+		Ar.BeginObject();
+		Ar.Key(TEXT("version")).Number(H.Version);
+		Ar.Key(TEXT("seed")).Number(H.Seed);
+		Ar.Key(TEXT("width")).Number(H.Width);
+		Ar.Key(TEXT("height")).Number(H.Height);
+		Ar.Key(TEXT("time")).Number(H.Time);
+		Ar.Key(TEXT("day")).Number(H.Day);
+		Ar.Key(TEXT("geoLoaded")).Bool(H.bGeoLoaded);
+		Ar.Key(TEXT("geoScenario")).String(H.GeoScenarioId);
+		Ar.EndObject();
+	}
+
+	/** Lit magie + en-tete ; rend la position du corps, ou INDEX_NONE. */
+	int32 ReadHeaderAt(const TArray<uint8>& Bytes, FAnastasisSimulation::FSaveHeader& OutHeader, FString& OutError)
+	{
+		if (Bytes.Num() < 4 || FMemory::Memcmp(Bytes.GetData(), SaveMagic, 4) != 0)
+		{
+			OutError = TEXT("pas une sauvegarde ANASTASIS (signature ANSV absente)");
+			return INDEX_NONE;
+		}
+		AnastasisArchive::FStateArchive Ar = AnastasisArchive::FStateArchive::ForLoad(Bytes, 4);
+		ArchiveHeader(Ar, OutHeader);
+		if (!Ar.Ok())
+		{
+			OutError = FString::Printf(TEXT("en-tete illisible : %s"), *Ar.GetError());
+			return INDEX_NONE;
+		}
+		if (OutHeader.Version != FAnastasisSimulation::SaveFormatVersion)
+		{
+			OutError = FString::Printf(TEXT("format %d, ce jeu lit le format %d"), OutHeader.Version, FAnastasisSimulation::SaveFormatVersion);
+			return INDEX_NONE;
+		}
+		if (OutHeader.Width <= 0 || OutHeader.Height <= 0 || OutHeader.Width > 4096 || OutHeader.Height > 4096)
+		{
+			OutError = FString::Printf(TEXT("monde de %d x %d"), OutHeader.Width, OutHeader.Height);
+			return INDEX_NONE;
+		}
+		return Ar.Tell();
+	}
+}
+
+// ecart n°45 : format propre (la reference sauve par serialize(sim), un JSON partiel), produit par le
+// parcours de StateDigest.
+void FAnastasisSimulation::SaveState(TArray<uint8>& OutBytes) const
+{
+	OutBytes.Reset();
+	OutBytes.Append(SaveMagic, 4);
+	FSaveHeader Header;
+	Header.Version = SaveFormatVersion;
+	Header.Seed = Seed;
+	Header.Width = World.W;
+	Header.Height = World.H;
+	Header.Time = Time;
+	Header.Day = Day;
+	Header.bGeoLoaded = Geo.IsLoaded();
+	Header.GeoScenarioId = Geo.IsLoaded() ? Geo.GetScenario().Id : FString();
+	AnastasisArchive::FStateArchive Ar = AnastasisArchive::FStateArchive::ForSave(OutBytes);
+	ArchiveHeader(Ar, Header);
+	FString GeoScenarioId;
+	FString GeoJson;
+	// La sauvegarde ne fait que lire l'etat (le parcours n'ecrit qu'en lecture d'archive).
+	const_cast<FAnastasisSimulation*>(this)->ArchiveState(Ar, GeoScenarioId, GeoJson);
+}
+
+bool FAnastasisSimulation::ReadSaveHeader(const TArray<uint8>& Bytes, FSaveHeader& OutHeader, FString& OutError)
+{
+	return ReadHeaderAt(Bytes, OutHeader, OutError) != INDEX_NONE;
+}
+
+bool FAnastasisSimulation::LoadState(const TArray<uint8>& Bytes, FString& OutError, const AnastasisGeo::FScenario* GeoScenario)
+{
+	// Une premiere lecture complete sur une simulation d'essai : un fichier refuse ne touche pas celle-ci.
+	{
+		TUniquePtr<FAnastasisSimulation> Probe = MakeUnique<FAnastasisSimulation>();
+		if (!Probe->LoadStateInto(Bytes, OutError, GeoScenario))
+		{
+			return false;
+		}
+	}
+	return LoadStateInto(Bytes, OutError, GeoScenario);
+}
+
+bool FAnastasisSimulation::LoadStateInto(const TArray<uint8>& Bytes, FString& OutError, const AnastasisGeo::FScenario* GeoScenario)
+{
+	FSaveHeader Header;
+	const int32 Body = ReadHeaderAt(Bytes, Header, OutError);
+	if (Body == INDEX_NONE)
+	{
+		return false;
+	}
+	if (Header.bGeoLoaded && (!GeoScenario || GeoScenario->Id != Header.GeoScenarioId))
+	{
+		OutError = FString::Printf(TEXT("la sauvegarde a un monde exterieur (scenario « %s ») : %s"), *Header.GeoScenarioId,
+			GeoScenario ? *FString::Printf(TEXT("scenario « %s » fourni"), *GeoScenario->Id) : TEXT("aucun scenario fourni"));
+		return false;
+	}
+
+	// Reset regenere le monde a la meme taille et lie le village ; tout le reste est relu par-dessus.
+	Reset(Header.Seed, Header.Width, Header.Height);
+	AnastasisArchive::FStateArchive Ar = AnastasisArchive::FStateArchive::ForLoad(Bytes, Body);
+	FString GeoScenarioId;
+	FString GeoJson;
+	ArchiveState(Ar, GeoScenarioId, GeoJson);
+	if (Ar.Ok() && !Ar.AtEnd())
+	{
+		Ar.Fail(FString::Printf(TEXT("%d octets en trop apres l'etat"), Bytes.Num() - Ar.Tell()));
+	}
+	if (!Ar.Ok())
+	{
+		OutError = Ar.GetError();
+		return false;
+	}
+	if (Seed != Header.Seed)
+	{
+		OutError = FString::Printf(TEXT("graine %u dans l'etat, %u dans l'en-tete"), Seed, Header.Seed);
+		return false;
+	}
+	Village.AfterStateLoaded();
+
+	Geo.Unload();
+	if (!GeoScenarioId.IsEmpty())
+	{
+		TArray<FString> Errors;
+		if (!Geo.LoadState(*GeoScenario, GeoJson, Errors))
+		{
+			OutError = FString::Printf(TEXT("monde exterieur : %s"), *FString::Join(Errors, TEXT(" ; ")));
+			return false;
+		}
+	}
+	return true;
 }
 
 void FAnastasisSimulation::OnNewDay(bool bDefer)

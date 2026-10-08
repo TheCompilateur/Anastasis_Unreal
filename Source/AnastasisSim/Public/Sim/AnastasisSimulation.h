@@ -125,7 +125,48 @@ public:
 	 */
 	uint64 StateDigest() const;
 
+	// --- SAVE_STATE_001 : la sauvegarde de la simulation -------------------------------------------------
+
+	/** Monte a chaque changement du parcours d'etat (un champ ajoute, retire, deplace ou retype). */
+	static constexpr int32 SaveFormatVersion = 1;
+
+	/** Ce qu'un hote doit savoir AVANT de charger : graine, taille, scenario exterieur a fournir. */
+	struct FSaveHeader
+	{
+		int32 Version = 0;
+		uint32 Seed = 0;
+		int32 Width = 0;
+		int32 Height = 0;
+		double Time = 0.0;
+		int32 Day = 0;
+		bool bGeoLoaded = false;
+		FString GeoScenarioId;
+	};
+
+	/**
+	 * Sauve TOUT l'etat qui decide du futur : le meme parcours que StateDigest (horloge, file de minuit,
+	 * monde tuile par tuile, village complet, monde exterieur par son propre SaveState). La presentation
+	 * n'y est pas : elle se reconstruit depuis cet etat. Le scenario exterieur non plus : il se recharge
+	 * depuis sa source.
+	 */
+	void SaveState(TArray<uint8>& OutBytes) const;
+
+	/** Lit l'en-tete seul. Faux si ce n'est pas une sauvegarde de ce format. */
+	static bool ReadSaveHeader(const TArray<uint8>& Bytes, FSaveHeader& OutHeader, FString& OutError);
+
+	/**
+	 * Recharge une sauvegarde : Reset sur sa graine, puis chaque champ relu. `GeoScenario` est exige si la
+	 * sauvegarde avait un monde exterieur (meme identifiant). Le fichier est d'abord relu entier sur une
+	 * simulation d'essai : refuse (format, version, fichier tronque, scenario manquant), il laisse
+	 * celle-ci INTACTE et rend l'erreur, avec le chemin du champ fautif.
+	 */
+	bool LoadState(const TArray<uint8>& Bytes, FString& OutError, const AnastasisGeo::FScenario* GeoScenario = nullptr);
+
 private:
+	/** Le parcours d'etat de la simulation (Core/AnastasisStateArchive.h). */
+	void ArchiveState(AnastasisArchive::FStateArchive& Ar, FString& GeoScenarioId, FString& GeoJson);
+	bool LoadStateInto(const TArray<uint8>& Bytes, FString& OutError, const AnastasisGeo::FScenario* GeoScenario);
+
 	void OnNewDay(bool bDefer);
 	void ProcessDayDeferred(int32 MaxJobs);
 	/** Tete de la file de minuit : `regrowFieldsDaily` (regrowForestDaily est sans effet dans la reference). */

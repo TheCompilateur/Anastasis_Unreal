@@ -827,3 +827,25 @@ sentier ne naît jamais sans l'activation de l'hôte ; la décroissance de minui
 - **harnais** : actors, buildings, tileDiff
 
 Le bucheron qui porte du bois peut choisir `deliver` pour un chantier ouvert dont le devis a un manque de bois, en concurrence avec ses besoins vitaux. Quand aucun chantier ouvert ne peut poser une piece et que son manque de bois bloque le devis, sa ligne `build` est ineligible : elle ne doit pas retenir le bucheron sur un chantier improductif. Il suit ensuite le seuil de batiment existant ; `Perform` traite son sac avant le repli generique vers l'approvisionnement alimentaire. Le bois passe de `InventoryWood` a `Materials.StockWood` uniquement a l'arrivee, dans la limite du manque et de la capacite du site. Le constructeur utilise ensuite les regles existantes de consommation et d'achevement. Aucun rendement de coupe ni devis n'est change ; aucune ressource n'est creditee sans retrait du sac. Ce lien direct vers le chantier est un sous-ensemble du transport JS, qui passe normalement par ses depots, jobs de haul et reservations. Il ne porte ni scierie, ni planches, ni vente, ni marche, ni politique de production generale. Le porteur opt-in garde son flux separe. À trancher : conserver ce lien direct comme mecanisme de jeu, ou porter la logistique complete de la reference.
+
+### n° 45 — Sauvegarde de la simulation : format propre, parcours de l'empreinte d'état
+
+- **classe** : EXTENSION
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : save-state-001 (chantier 4 d'IRON_CRUSADE_001)
+- **activation** : `FAnastasisSimulation::SaveState` / `LoadState`, appelés seulement par l'hôte (`Anastasis.Sim.Save` / `Anastasis.Sim.Load`) et par les tests `Anastasis.Sim.Sauvegarde.*`. Aucune règle de la simulation ne les appelle.
+- **reference** : `src/sim/simulation.js` (`serialize`, `deserialize`), `src/sim/save.js` (lecture seule côté C++ : `Harness/AnastasisJsSave.h`, inchangé)
+- **cpp** : `Core/AnastasisStateArchive.{h,cpp}` ; `Village/AnastasisVillageStateDigest.cpp` (`VisitState`, `FVillage::ArchiveState`, `AfterStateLoaded`) ; `Sim/AnastasisSimulation.cpp` (`ArchiveState`, `SaveState`, `ReadSaveHeader`, `LoadState`)
+- **harnais** : aucune
+- **fermeture** : à trancher (garder le format propre, ou écrire aussi le format JS)
+
+La référence sauve par `serialize(sim)`, un JSON qui ne garde qu'une partie de l'état (ni la file de minuit,
+ni la file de navigation, ni plusieurs caches qui décident pourtant du futur) et dont le C++ ne sait que lire
+une projection (`AnastasisJsSave`). Le C++ sauve autre chose : un flux binaire étiqueté (nom de chaque clé,
+taille de chaque nombre), produit par le **même parcours** que `StateDigest` (STATE_ORACLE_001). Il garde donc
+tout ce que l'oracle juge décisif, et `check-state-fields` interdit d'oublier un champ. Une sauvegarde
+JS ne se recharge pas par `LoadState`, ni l'inverse. Le hachage est inchangé, bit pour bit (test temporaire
+d'identité contre l'ancien hacheur, 13 points, consigné dans la fiche de save-state-001). Les deux lacunes
+du registre (`Colony`, `MarketStock`, posées seulement par `RestoreColonyForHarness`) ne sont pas sauvées.
+

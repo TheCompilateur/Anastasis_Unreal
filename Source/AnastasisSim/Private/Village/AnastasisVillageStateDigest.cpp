@@ -1,1018 +1,1081 @@
 #include "Village/AnastasisVillage.h"
 
+#include "Core/AnastasisStateArchive.h"
 #include "Core/AnastasisStateDigest.h"
 
 // STATE_ORACLE_001 -- l'empreinte d'ETAT du village, distincte de `Digest()`.
+// SAVE_STATE_001 -- et, par le meme parcours, sa sauvegarde.
 //
 // `Digest()` est la projection de parite JS : son perimetre est fige pour que les vecteurs de la
 // reference ne bougent pas, et il ne lit qu'une partie de l'etat (22 champs de FNpc sur ~110, 5 membres
 // de FVillage sur 46, ni `sim.rng`, ni la meteo, ni le joueur). IRON_CRUSADE_001 a montre que deux
 // villages d'empreinte egale peuvent avoir des futurs differents (une ecriture dans `Speed` ou `sim.rng`
 // diverge apres 8 a 9 s simulees). `StateDigest()` lit TOUT l'etat qui decide du futur : c'est l'oracle
-// des tests de determinisme et de non-ecriture. Il n'est pas un format de sauvegarde ni de parite.
+// des tests de determinisme et de non-ecriture. Il n'est pas un format de parite.
+//
+// Chaque `VisitState(FStateArchive&, T&)` ci-dessous decrit l'etat UNE fois (Core/AnastasisStateArchive.h) :
+// le meme parcours hache (`StateDigest`, bits inchanges depuis STATE_ORACLE_001), ecrit la sauvegarde
+// (`SaveState`) et la relit (`LoadState`). Un parcours ne lit l'etat qu'a travers `Ar` : en hachage il ne
+// l'ecrit jamais, ce qui rend sur le `const_cast` des points d'entree const.
 //
 // Contrat tenu par tools/migration/check-state-fields.mjs : chaque champ d'une structure du registre
-// tools/migration/state-fields.json est lu dans son `HashState`, ou y est classe hors etat avec sa raison.
+// tools/migration/state-fields.json est lu dans son `VisitState`, ou y est classe hors etat avec sa raison.
 // Ajouter un champ sans le lire ici ni le classer fait echouer `finish`.
 
 namespace AnastasisVillage
 {
 	namespace
 	{
-		using AnastasisDigest::FStateWriter;
+		using AnastasisArchive::FStateArchive;
 
-		// Toutes les surcharges declarees d'abord : HashArray / HashOptionalState les trouvent par
+		// Toutes les surcharges declarees d'abord : VisitStates / VisitOptionalState les trouvent par
 		// recherche ordinaire (la plupart des types vivent hors de ce namespace, l'ADL n'y suffirait pas).
-		void HashState(FStateWriter& Out, const FPoint& V);
-		void HashState(FStateWriter& Out, const AnastasisNeeds::FNeeds& V);
-		void HashState(FStateWriter& Out, const AnastasisWorld::FTile& V);
-		void HashState(FStateWriter& Out, const AnastasisBuild::FSiteMaterials& V);
-		void HashState(FStateWriter& Out, const AnastasisPlanner::FStockSlot& V);
-		void HashState(FStateWriter& Out, const FBuilding& V);
-		void HashState(FStateWriter& Out, const FFoodSource& V);
-		void HashState(FStateWriter& Out, const FMealReservation& V);
-		void HashState(FStateWriter& Out, const FHungerAction& V);
-		void HashState(FStateWriter& Out, const FStockBelief& V);
-		void HashState(FStateWriter& Out, const FResourceSpot& V);
-		void HashState(FStateWriter& Out, const FLastTalk& V);
-		void HashState(FStateWriter& Out, const FTalkFatigue& V);
-		void HashState(FStateWriter& Out, const FWorkSession& V);
-		void HashState(FStateWriter& Out, const FInside& V);
-		void HashState(FStateWriter& Out, const AnastasisWorkShift::FWorkShift& V);
-		void HashState(FStateWriter& Out, const AnastasisNous::FDecision& V);
-		void HashState(FStateWriter& Out, const AnastasisNous::FFoodContext& V);
-		void HashState(FStateWriter& Out, const AnastasisGenome::FPhenotype& V);
-		void HashState(FStateWriter& Out, const AnastasisConditioning::FConditioning& V);
-		void HashState(FStateWriter& Out, const AnastasisLifestyle::FLifestyle& V);
-		void HashState(FStateWriter& Out, const FNpc::FPlaceEntry& V);
-		void HashState(FStateWriter& Out, const AnastasisBonds::FPersonRow& V);
-		void HashState(FStateWriter& Out, const AnastasisBonds::FTomEntry& V);
-		void HashState(FStateWriter& Out, const AnastasisBonds::FMoodlet& V);
-		void HashState(FStateWriter& Out, const FNpc& V);
-		void HashState(FStateWriter& Out, const FPlayerGoalChoice& V);
-		void HashState(FStateWriter& Out, const FPlayerRefusal& V);
-		void HashState(FStateWriter& Out, const FPlayerGoalOption& V);
-		void HashState(FStateWriter& Out, const FVillage::FDeath& V);
-		void HashState(FStateWriter& Out, const AnastasisWeatherBehavior::FSimWeather& V);
-		void HashState(FStateWriter& Out, const AnastasisBudget::FDirector& V);
-		void HashState(FStateWriter& Out, const AnastasisNav::FNavGrid& V);
-		void HashState(FStateWriter& Out, const FGoalExplainEntry& V);
-		void HashState(FStateWriter& Out, const FGoalExplain& V);
-		void HashState(FStateWriter& Out, const FStreetDecision& V);
-		void HashState(FStateWriter& Out, const AnastasisNature::FNature& V);
-		void HashState(FStateWriter& Out, const AnastasisNavService::FNavJob& V);
-		void HashState(FStateWriter& Out, const AnastasisNavService::FNavCacheEntry& V);
-		void HashState(FStateWriter& Out, const AnastasisNavService::FNavService& V);
-		void HashState(FStateWriter& Out, const AnastasisPlanner::FUrgencySnapshot& V);
+		void VisitState(FStateArchive& Ar, FPoint& V);
+		void VisitState(FStateArchive& Ar, AnastasisNeeds::FNeeds& V);
+		void VisitState(FStateArchive& Ar, AnastasisWorld::FTile& V);
+		void VisitState(FStateArchive& Ar, AnastasisBuild::FSiteMaterials& V);
+		void VisitState(FStateArchive& Ar, AnastasisPlanner::FStockSlot& V);
+		void VisitState(FStateArchive& Ar, FBuilding& V);
+		void VisitState(FStateArchive& Ar, FFoodSource& V);
+		void VisitState(FStateArchive& Ar, FMealReservation& V);
+		void VisitState(FStateArchive& Ar, FHungerAction& V);
+		void VisitState(FStateArchive& Ar, FStockBelief& V);
+		void VisitState(FStateArchive& Ar, FResourceSpot& V);
+		void VisitState(FStateArchive& Ar, FLastTalk& V);
+		void VisitState(FStateArchive& Ar, FTalkFatigue& V);
+		void VisitState(FStateArchive& Ar, FWorkSession& V);
+		void VisitState(FStateArchive& Ar, FInside& V);
+		void VisitState(FStateArchive& Ar, AnastasisWorkShift::FWorkShift& V);
+		void VisitState(FStateArchive& Ar, AnastasisNous::FDecision& V);
+		void VisitState(FStateArchive& Ar, AnastasisNous::FFoodContext& V);
+		void VisitState(FStateArchive& Ar, AnastasisGenome::FPhenotype& V);
+		void VisitState(FStateArchive& Ar, AnastasisConditioning::FConditioning& V);
+		void VisitState(FStateArchive& Ar, AnastasisLifestyle::FLifestyle& V);
+		void VisitState(FStateArchive& Ar, FNpc::FPlaceEntry& V);
+		void VisitState(FStateArchive& Ar, AnastasisBonds::FPersonRow& V);
+		void VisitState(FStateArchive& Ar, AnastasisBonds::FTomEntry& V);
+		void VisitState(FStateArchive& Ar, AnastasisBonds::FMoodlet& V);
+		void VisitState(FStateArchive& Ar, FNpc& V);
+		void VisitState(FStateArchive& Ar, FPlayerGoalChoice& V);
+		void VisitState(FStateArchive& Ar, FPlayerRefusal& V);
+		void VisitState(FStateArchive& Ar, FPlayerGoalOption& V);
+		void VisitState(FStateArchive& Ar, FVillage::FDeath& V);
+		void VisitState(FStateArchive& Ar, AnastasisWeatherBehavior::FSimWeather& V);
+		void VisitState(FStateArchive& Ar, AnastasisBudget::FDirector& V);
+		void VisitState(FStateArchive& Ar, AnastasisNav::FNavGrid& V);
+		void VisitState(FStateArchive& Ar, FGoalExplainEntry& V);
+		void VisitState(FStateArchive& Ar, FGoalExplain& V);
+		void VisitState(FStateArchive& Ar, FStreetDecision& V);
+		void VisitState(FStateArchive& Ar, AnastasisNature::FNature& V);
+		void VisitState(FStateArchive& Ar, AnastasisNavService::FNavJob& V);
+		void VisitState(FStateArchive& Ar, AnastasisNavService::FNavCacheEntry& V);
+		void VisitState(FStateArchive& Ar, AnastasisNavService::FNavService& V);
+		void VisitState(FStateArchive& Ar, AnastasisPlanner::FUrgencySnapshot& V);
 
 		template <typename T>
-		void HashArray(FStateWriter& Out, const TArray<T>& Items)
+		void VisitStates(FStateArchive& Ar, TArray<T>& Items)
 		{
-			Out.BeginArray(Items.Num());
-			for (const T& Item : Items) HashState(Out, Item);
-			Out.EndArray();
+			AnastasisArchive::VisitArray(Ar, Items, [](FStateArchive& A, T& Item) { VisitState(A, Item); });
 		}
 
 		template <typename T>
-		void HashOptionalState(FStateWriter& Out, const TOptional<T>& V)
+		void VisitOptionalState(FStateArchive& Ar, TOptional<T>& V)
 		{
-			if (V.IsSet()) HashState(Out, V.GetValue()); else Out.Null();
+			AnastasisArchive::VisitOptional(Ar, V, [](FStateArchive& A, T& Item) { VisitState(A, Item); });
 		}
 
-		void HashState(FStateWriter& Out, const FPoint& V)
+		void VisitState(FStateArchive& Ar, FPoint& V)
 		{
-			Out.BeginObject();
-			Out.Key(TEXT("x")).Number(V.X);
-			Out.Key(TEXT("y")).Number(V.Y);
-			Out.EndObject();
+			Ar.BeginObject();
+			Ar.Key(TEXT("x")).Number(V.X);
+			Ar.Key(TEXT("y")).Number(V.Y);
+			Ar.EndObject();
 		}
 
-		void HashOptional(FStateWriter& Out, const TOptional<double>& V)
+		void VisitOptionalNumber(FStateArchive& Ar, TOptional<double>& V)
 		{
-			if (V.IsSet()) Out.Number(V.GetValue()); else Out.Null();
+			AnastasisArchive::VisitOptional(Ar, V, [](FStateArchive& A, double& D) { A.Number(D); });
 		}
 
-		void HashStrings(FStateWriter& Out, const TArray<FString>& Items)
+		void VisitOptionalBool(FStateArchive& Ar, TOptional<bool>& V)
 		{
-			Out.BeginArray(Items.Num());
-			for (const FString& S : Items) Out.String(S);
-			Out.EndArray();
+			AnastasisArchive::VisitOptional(Ar, V, [](FStateArchive& A, bool& B) { A.Bool(B); });
 		}
 
-		void HashNamedNumbers(FStateWriter& Out, const TArray<TPair<FString, double>>& Items)
+		void VisitStrings(FStateArchive& Ar, TArray<FString>& Items)
 		{
-			Out.BeginArray(Items.Num());
-			for (const TPair<FString, double>& P : Items)
+			AnastasisArchive::VisitArray(Ar, Items, [](FStateArchive& A, FString& S) { A.String(S); });
+		}
+
+		/** Une paire `[a, b]` : un tableau de deux, comme le hacheur l'a toujours ecrit. */
+		template <typename FVisit>
+		void VisitPair(FStateArchive& Ar, FVisit&& Visit)
+		{
+			int32 Two = 2;
+			Ar.BeginArray(Two);
+			Ar.Expect(Two, 2, TEXT("paire"));
+			if (Ar.Ok()) Visit(Ar);
+			Ar.EndArray();
+		}
+
+		void VisitNamedNumbers(FStateArchive& Ar, TArray<TPair<FString, double>>& Items)
+		{
+			AnastasisArchive::VisitArray(Ar, Items, [](FStateArchive& A, TPair<FString, double>& P)
 			{
-				Out.BeginArray(2);
-				Out.String(P.Key).Number(P.Value);
-				Out.EndArray();
-			}
-			Out.EndArray();
+				VisitPair(A, [&P](FStateArchive& B) { B.String(P.Key).Number(P.Value); });
+			});
 		}
 
-		void HashState(FStateWriter& Out, const AnastasisNeeds::FNeeds& V)
+		/**
+		 * TMap a cle entiere, en paires `[cle, valeur]` par cle croissante. En lecture, la table est
+		 * vide puis remplie dans cet ordre.
+		 */
+		template <typename TValue, typename FVisit>
+		void VisitSortedIntMap(FStateArchive& Ar, TMap<int32, TValue>& Map, FVisit&& VisitValue)
 		{
-			Out.BeginObject();
-			Out.Key(TEXT("hunger")).Number(V.Hunger);
-			Out.Key(TEXT("energy")).Number(V.Energy);
-			Out.Key(TEXT("social")).Number(V.Social);
-			Out.Key(TEXT("leisure")).Number(V.Leisure);
-			Out.Key(TEXT("hygiene")).Number(V.Hygiene);
-			Out.Key(TEXT("thirst")).Number(V.Thirst);
-			Out.Key(TEXT("health")).Number(V.Health);
-			Out.Key(TEXT("morale")).Number(V.Morale);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisWorld::FTile& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("x")).Number(V.X);
-			Out.Key(TEXT("y")).Number(V.Y);
-			Out.Key(TEXT("type")).Number(static_cast<int32>(V.Type));
-			Out.Key(TEXT("resource")).Number(static_cast<int32>(V.Resource));
-			Out.Key(TEXT("amount")).Number(V.Amount);
-			Out.Key(TEXT("alt")).Number(V.Alt);
-			Out.Key(TEXT("shade")).Number(V.Shade);
-			Out.Key(TEXT("shore")).Number(V.Shore);
-			Out.Key(TEXT("wetness")).Number(V.Wetness);
-			Out.Key(TEXT("flowX")).Number(V.FlowX);
-			Out.Key(TEXT("flowZ")).Number(V.FlowZ);
-			Out.Key(TEXT("flowAmt")).Number(V.FlowAmt);
-			Out.Key(TEXT("cropId")).Number(static_cast<int32>(V.CropId));
-			Out.Key(TEXT("fertility")).Number(V.Fertility);
-			Out.Key(TEXT("forestMargin")).Number(V.ForestMargin);
-			Out.Key(TEXT("hasForestMargin")).Bool(V.bHasForestMargin);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisBuild::FSiteMaterials& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("needWood")).Number(V.NeedWood);
-			Out.Key(TEXT("needStone")).Number(V.NeedStone);
-			Out.Key(TEXT("consumedWood")).Number(V.ConsumedWood);
-			Out.Key(TEXT("consumedStone")).Number(V.ConsumedStone);
-			Out.Key(TEXT("stockWood")).Number(V.StockWood);
-			Out.Key(TEXT("stockStone")).Number(V.StockStone);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisPlanner::FStockSlot& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("physical")).Number(V.Physical);
-			Out.Key(TEXT("reserved")).Number(V.Reserved);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const FBuilding& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("id")).String(V.Id);
-			Out.Key(TEXT("type")).String(V.Type);
-			Out.Key(TEXT("x")).Number(V.X);
-			Out.Key(TEXT("y")).Number(V.Y);
-			Out.Key(TEXT("progress")).Number(V.Progress);
-			Out.Key(TEXT("createdDay")).Number(V.CreatedDay);
-			Out.Key(TEXT("owner")).String(V.Owner);
-			Out.Key(TEXT("housePhase")).Number(V.HousePhase);
-			Out.Key(TEXT("accessPoints"));
-			HashArray(Out, V.AccessPoints);
-			Out.Key(TEXT("hasPlannerStock")).Bool(V.bHasPlannerStock);
-			Out.Key(TEXT("plannerStock")).BeginArray(V.PlannerStock.Num());
-			for (const TPair<FString, AnastasisPlanner::FStockSlot>& Slot : V.PlannerStock)
+			TArray<int32> Keys;
+			if (!Ar.IsLoading())
 			{
-				Out.BeginArray(2);
-				Out.String(Slot.Key);
-				HashState(Out, Slot.Value);
-				Out.EndArray();
-			}
-			Out.EndArray();
-			Out.Key(TEXT("foodPhysical")).Number(V.FoodPhysical);
-			Out.Key(TEXT("foodReserved")).Number(V.FoodReserved);
-			Out.Key(TEXT("laborToday")).Number(V.LaborToday);
-			Out.Key(TEXT("hasLaborToday")).Bool(V.bHasLaborToday);
-			Out.Key(TEXT("piecesPlaced")).Number(V.PiecesPlaced);
-			Out.Key(TEXT("hasMaterials")).Bool(V.bHasMaterials);
-			Out.Key(TEXT("materials"));
-			HashState(Out, V.Materials);
-			Out.Key(TEXT("builderId")).String(V.BuilderId);
-			Out.Key(TEXT("workers")).BeginArray(V.Workers.Num());
-			for (const TPair<FString, int32>& Worker : V.Workers)
-			{
-				Out.BeginArray(2);
-				Out.String(Worker.Key).Number(Worker.Value);
-				Out.EndArray();
-			}
-			Out.EndArray();
-			Out.Key(TEXT("completedDay")).Number(V.CompletedDay);
-			Out.Key(TEXT("completedById")).String(V.CompletedById);
-			Out.Key(TEXT("vacantSinceDay")).Number(V.VacantSinceDay);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const FFoodSource& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("tile")).Number(V.TileIndex);
-			Out.Key(TEXT("position"));
-			HashState(Out, V.Position);
-			Out.Key(TEXT("initial")).Number(V.Initial);
-			Out.Key(TEXT("remaining")).Number(V.Remaining);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const FMealReservation& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("id")).String(V.Id);
-			Out.Key(TEXT("npcId")).String(V.NpcId);
-			Out.Key(TEXT("buildingId")).String(V.BuildingId);
-			Out.Key(TEXT("source")).String(V.Source);
-			Out.Key(TEXT("amount")).Number(V.Amount);
-			Out.Key(TEXT("createdAt")).Number(V.CreatedAt);
-			Out.Key(TEXT("expiresAt")).Number(V.ExpiresAt);
-			Out.Key(TEXT("absoluteExpiresAt")).Number(V.AbsoluteExpiresAt);
-			Out.Key(TEXT("renewals")).Number(V.Renewals);
-			Out.Key(TEXT("lastProgressAt")).Number(V.LastProgressAt);
-			Out.Key(TEXT("lastDistance")).Number(V.LastDistance);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const FHungerAction& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("state")).String(V.State);
-			Out.Key(TEXT("targetId")).String(V.TargetId);
-			Out.Key(TEXT("startedAt")).Number(V.StartedAt);
-			Out.Key(TEXT("lastFailure")).String(V.LastFailure);
-			Out.Key(TEXT("cooldownUntil")).Number(V.CooldownUntil);
-			Out.Key(TEXT("progress")).Number(V.Progress);
-			Out.Key(TEXT("reservationId")).String(V.ReservationId);
-			Out.Key(TEXT("sourceBuildingId")).String(V.SourceBuildingId);
-			Out.Key(TEXT("excludedType")).String(V.ExcludedType);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const FStockBelief& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("key")).String(V.Key);
-			Out.Key(TEXT("resource")).String(V.Resource);
-			Out.Key(TEXT("buildingId")).String(V.BuildingId);
-			Out.Key(TEXT("kind")).String(V.Kind);
-			Out.Key(TEXT("x")).Number(V.X);
-			Out.Key(TEXT("y")).Number(V.Y);
-			Out.Key(TEXT("estimatedAmount")).Number(V.EstimatedAmount);
-			Out.Key(TEXT("confidence")).Number(V.Confidence);
-			Out.Key(TEXT("day")).Number(V.Day);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const FResourceSpot& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("key")).String(V.Key);
-			Out.Key(TEXT("x")).Number(V.X);
-			Out.Key(TEXT("y")).Number(V.Y);
-			Out.Key(TEXT("resource")).String(V.Resource);
-			Out.Key(TEXT("amount")).Number(V.Amount);
-			Out.Key(TEXT("day")).Number(V.Day);
-			Out.Key(TEXT("hearsay")).Bool(V.bHearsay);
-			Out.Key(TEXT("sourceId")).String(V.SourceId);
-			Out.Key(TEXT("originalSourceId")).String(V.OriginalSourceId);
-			Out.Key(TEXT("hopCount")).Number(V.HopCount);
-			Out.Key(TEXT("receivedDay")).Number(V.ReceivedDay);
-			Out.Key(TEXT("receivedAt")).Number(V.ReceivedAt);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const FLastTalk& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("valid")).Bool(V.bValid);
-			Out.Key(TEXT("withId")).String(V.WithId);
-			Out.Key(TEXT("at")).Number(V.At);
-			Out.Key(TEXT("refuse")).Bool(V.bRefuse);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const FTalkFatigue& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("id")).String(V.Id);
-			Out.Key(TEXT("count")).Number(V.Count);
-			Out.Key(TEXT("at")).Number(V.At);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const FWorkSession& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("active")).Bool(V.bActive);
-			Out.Key(TEXT("craftId")).String(V.CraftId);
-			Out.Key(TEXT("tileX")).Number(V.TileX);
-			Out.Key(TEXT("tileY")).Number(V.TileY);
-			Out.Key(TEXT("postIndex")).Number(V.PostIndex);
-			Out.Key(TEXT("arrivedAt")).Number(V.ArrivedAt);
-			Out.Key(TEXT("nextSwingAt")).Number(V.NextSwingAt);
-			Out.Key(TEXT("swingsDone")).Number(V.SwingsDone);
-			Out.Key(TEXT("lastSwingAt")).Number(V.LastSwingAt);
-			Out.Key(TEXT("buildingId")).String(V.BuildingId);
-			Out.Key(TEXT("actionAcc")).Number(V.ActionAcc);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const FInside& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("active")).Bool(V.bActive);
-			Out.Key(TEXT("buildingId")).String(V.BuildingId);
-			Out.Key(TEXT("activity")).String(V.Activity);
-			Out.Key(TEXT("goal")).String(V.Goal);
-			Out.Key(TEXT("enteredAt")).Number(V.EnteredAt);
-			Out.Key(TEXT("until")).Number(V.Until);
-			Out.Key(TEXT("exitX")).Number(V.ExitX);
-			Out.Key(TEXT("exitY")).Number(V.ExitY);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisWorkShift::FWorkShift& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("state")).Number(static_cast<int32>(V.State));
-			Out.Key(TEXT("goal")).String(V.Goal);
-			Out.Key(TEXT("startedAt")).Number(V.StartedAt);
-			Out.Key(TEXT("floorUntil")).Number(V.FloorUntil);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisNous::FDecision& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("type")).String(V.Type);
-			Out.Key(TEXT("targetId")).String(V.TargetId);
-			Out.Key(TEXT("score")).Number(V.Score);
-			Out.Key(TEXT("urgency")).Number(V.Urgency);
-			Out.Key(TEXT("reason")).String(V.Reason);
-			Out.Key(TEXT("createdAt")).Number(V.CreatedAt);
-			Out.Key(TEXT("expectedDuration")).Number(V.ExpectedDuration);
-			Out.Key(TEXT("raw")).Number(V.Raw);
-			Out.Key(TEXT("sourceBuildingId")).String(V.SourceBuildingId);
-			Out.Key(TEXT("travelSeconds")).Number(V.TravelSeconds);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisNous::FFoodContext& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("hunger")).Number(V.Hunger);
-			Out.Key(TEXT("inventoryFood")).Number(V.InventoryFood);
-			Out.Key(TEXT("believedFood")).Number(V.BelievedFood);
-			Out.Key(TEXT("bestSourceBuildingId")).String(V.BestSourceBuildingId);
-			Out.Key(TEXT("bestSourceDistance")).Number(V.BestSourceDistance);
-			Out.Key(TEXT("bestSourceEstimated")).Number(V.BestSourceEstimated);
-			Out.Key(TEXT("bestSourceConfidence")).Number(V.BestSourceConfidence);
-			Out.Key(TEXT("certainty")).Number(V.Certainty);
-			Out.Key(TEXT("dangerNear")).Bool(V.bDangerNear);
-			Out.Key(TEXT("gold")).Number(V.Gold);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisGenome::FPhenotype& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("loci")).BeginArray(AnastasisGenome::NumLoci);
-			for (int32 I = 0; I < AnastasisGenome::NumLoci; ++I) Out.Number(V.Loci[I]);
-			Out.EndArray();
-			Out.Key(TEXT("hydrationLossMultiplier")).Number(V.HydrationLossMultiplier);
-			Out.Key(TEXT("heatDissipationEfficiency")).Number(V.HeatDissipationEfficiency);
-			Out.Key(TEXT("metabolicDemandMultiplier")).Number(V.MetabolicDemandMultiplier);
-			Out.Key(TEXT("metabolicPeakRecoveryMultiplier")).Number(V.MetabolicPeakRecoveryMultiplier);
-			Out.Key(TEXT("fatigueRecoveryMultiplier")).Number(V.FatigueRecoveryMultiplier);
-			Out.Key(TEXT("fatigueRecoveryStrainCost")).Number(V.FatigueRecoveryStrainCost);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisConditioning::FConditioning& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("version")).Number(V.Version);
-			Out.Key(TEXT("workConditioning")).Number(V.WorkConditioning);
-			Out.Key(TEXT("fatigueAdaptation")).Number(V.FatigueAdaptation);
-			Out.Key(TEXT("recoveryConditioning")).Number(V.RecoveryConditioning);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisLifestyle::FLifestyle& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("id")).String(V.Id);
-			Out.Key(TEXT("sinceDay")).Number(V.SinceDay);
-			Out.Key(TEXT("rhythmScore")).Number(V.RhythmScore);
-			Out.Key(TEXT("lastNotedDay")).Number(V.LastNotedDay);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const FNpc::FPlaceEntry& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("buildingId")).String(V.BuildingId);
-			Out.Key(TEXT("type")).String(V.Type);
-			Out.Key(TEXT("score")).Number(V.Score);
-			Out.Key(TEXT("work")).Number(V.Work);
-			Out.Key(TEXT("social")).Number(V.Social);
-			Out.Key(TEXT("home")).Number(V.Home);
-			Out.Key(TEXT("talk")).Number(V.Talk);
-			Out.Key(TEXT("drink")).Number(V.Drink);
-			Out.Key(TEXT("activity")).Number(V.Activity);
-			Out.Key(TEXT("crisis")).Number(V.Crisis);
-			Out.Key(TEXT("decayDay")).Number(V.DecayDay);
-			Out.Key(TEXT("lastDay")).Number(V.LastDay);
-			Out.Key(TEXT("lifestyle"));
-			HashNamedNumbers(Out, V.Lifestyle);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisBonds::FPersonRow& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("id")).String(V.Id);
-			Out.Key(TEXT("trust")).Number(V.Trust);
-			Out.Key(TEXT("tag")).Number(static_cast<int32>(V.Tag));
-			Out.Key(TEXT("day")).Number(V.Day);
-			Out.Key(TEXT("meets")).Number(V.Meets);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisBonds::FTomEntry& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("id")).String(V.Id);
-			Out.Key(TEXT("estimatedGoal")).String(V.EstimatedGoal);
-			Out.Key(TEXT("attitude")).Number(V.Attitude);
-			Out.Key(TEXT("confidence")).Number(V.Confidence);
-			Out.Key(TEXT("day")).Number(V.Day);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisBonds::FMoodlet& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("id")).String(V.Id);
-			Out.Key(TEXT("at")).Number(V.At);
-			Out.Key(TEXT("until")).Number(V.Until);
-			Out.EndObject();
-		}
-
-		void HashOptionalBool(FStateWriter& Out, const TOptional<bool>& V)
-		{
-			if (V.IsSet()) Out.Bool(V.GetValue()); else Out.Null();
-		}
-
-		void HashState(FStateWriter& Out, const FGoalExplainEntry& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("goal")).String(V.Goal);
-			Out.Key(TEXT("score")).Number(V.Score);
-			Out.Key(TEXT("cause")).String(V.Cause);
-			Out.Key(TEXT("causeKey")).String(V.CauseKey);
-			Out.Key(TEXT("causeValue")).Number(V.CauseValue);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const FGoalExplain& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("at")).Number(V.At);
-			Out.Key(TEXT("goal")).String(V.Goal);
-			Out.Key(TEXT("top"));
-			HashArray(Out, V.Top);
-			Out.Key(TEXT("line")).String(V.Line);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const FStreetDecision& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("at")).Number(V.At);
-			Out.Key(TEXT("until")).Number(V.Until);
-			Out.Key(TEXT("goal")).String(V.Goal);
-			Out.Key(TEXT("from")).String(V.From);
-			Out.Key(TEXT("margin")).Number(V.Margin);
-			Out.Key(TEXT("changed")).Bool(V.bChanged);
-			Out.Key(TEXT("tight")).Bool(V.bTight);
-			Out.Key(TEXT("cause")).String(V.Cause);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisNature::FNature& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("corps")).Number(V.Corps);
-			Out.Key(TEXT("esprit")).Number(V.Esprit);
-			Out.Key(TEXT("coeur")).Number(V.Coeur);
-			Out.Key(TEXT("qualities"));
-			HashStrings(Out, V.Qualities);
-			Out.Key(TEXT("flaws"));
-			HashStrings(Out, V.Flaws);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisNavService::FNavJob& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("actorId")).String(V.ActorId);
-			Out.Key(TEXT("start"));
-			HashState(Out, V.Start);
-			Out.Key(TEXT("destination"));
-			HashState(Out, V.Destination);
-			Out.Key(TEXT("goalKey")).String(V.GoalKey);
-			Out.Key(TEXT("priority")).Number(V.Priority);
-			Out.Key(TEXT("allowBlockedTarget")).Bool(V.bAllowBlockedTarget);
-			Out.Key(TEXT("requestedAt")).Number(V.RequestedAt);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisNavService::FNavCacheEntry& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("path"));
-			HashArray(Out, V.Path);
-			Out.Key(TEXT("navVersion")).Number(V.NavVersion);
-			Out.Key(TEXT("storedAt")).Number(V.StoredAt);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const AnastasisNavService::FNavService& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("queue"));
-			HashArray(Out, V.Queue);
-			// Le cache garde l'ordre d'insertion (ses evictions suivent cet ordre) : on le lit tel quel.
-			const TArray<FString>& Keys = V.Cache.GetKeys();
-			Out.Key(TEXT("cache")).BeginArray(Keys.Num());
-			for (int32 I = 0; I < Keys.Num(); ++I)
-			{
-				Out.BeginArray(2);
-				Out.String(Keys[I]);
-				HashState(Out, V.Cache.GetEntry(I));
-				Out.EndArray();
-			}
-			Out.EndArray();
-			TArray<FString> Pending;
-			V.PendingByActor.GetKeys(Pending);
-			Pending.Sort();
-			Out.Key(TEXT("pendingByActor")).BeginArray(Pending.Num());
-			for (const FString& Id : Pending)
-			{
-				Out.BeginArray(2);
-				Out.String(Id).Number(V.PendingByActor[Id]);
-				Out.EndArray();
-			}
-			Out.EndArray();
-			Out.Key(TEXT("calcThisTick")).Number(V.CalcThisTick);
-			Out.Key(TEXT("maxCalcs")).Number(V.MaxCalcs);
-			Out.Key(TEXT("cacheTtl")).Number(V.CacheTtl);
-			Out.Key(TEXT("lastSweepAt")).Number(V.LastSweepAt);
-			Out.EndObject();
-		}
-
-		void HashState(FStateWriter& Out, const FNpc& V)
-		{
-			Out.BeginObject();
-			Out.Key(TEXT("id")).String(V.Id);
-			Out.Key(TEXT("x")).Number(V.X);
-			Out.Key(TEXT("y")).Number(V.Y);
-			Out.Key(TEXT("speed")).Number(V.Speed);
-			Out.Key(TEXT("needs"));
-			HashState(Out, V.Needs);
-			Out.Key(TEXT("goal")).String(V.Goal);
-			Out.Key(TEXT("activity")).String(V.Activity);
-			Out.Key(TEXT("hasTarget")).Bool(V.bHasTarget);
-			Out.Key(TEXT("target"));
-			HashState(Out, V.Target);
-			Out.Key(TEXT("workTimer")).Number(V.WorkTimer);
-			Out.Key(TEXT("aiThinkAt")).Number(V.AiThinkAt);
-			Out.Key(TEXT("failedActions")).Number(V.FailedActions);
-			Out.Key(TEXT("homeId")).String(V.HomeId);
-			Out.Key(TEXT("shelterId")).String(V.ShelterId);
-			Out.Key(TEXT("inside"));
-			HashState(Out, V.Inside);
-			Out.Key(TEXT("doorStuckAt")).Number(V.DoorStuckAt);
-			Out.Key(TEXT("doorApproachAt")).Number(V.DoorApproachAt);
-
-			Out.Key(TEXT("path"));
-			HashArray(Out, V.Path);
-			Out.Key(TEXT("pathStep")).Number(V.PathStep);
-			Out.Key(TEXT("hasPathGoal")).Bool(V.bHasPathGoal);
-			Out.Key(TEXT("pathGoal"));
-			HashState(Out, V.PathGoal);
-			Out.Key(TEXT("pathFailed")).Bool(V.bPathFailed);
-			Out.Key(TEXT("pathCooldown")).Number(V.PathCooldown);
-			Out.Key(TEXT("navTargetKey")).String(V.NavTargetKey);
-			Out.Key(TEXT("navVersion")).Number(V.NavVersion);
-			Out.Key(TEXT("destBuildingId")).String(V.DestBuildingId);
-			Out.Key(TEXT("stuckTimer")).Number(V.StuckTimer);
-			Out.Key(TEXT("stuckStage")).Number(V.StuckStage);
-			// `actor.trafficTimer` : decide quand tombe le prochain passage (relay-settlement-001).
-			Out.Key(TEXT("trafficTimer")).Number(V.TrafficTimer);
-
-			Out.Key(TEXT("inventoryFood")).Number(V.InventoryFood);
-			Out.Key(TEXT("materialCarry")).Number(V.MaterialCarry);
-			Out.Key(TEXT("materialResource")).Number(static_cast<int32>(V.MaterialResource));
-			Out.Key(TEXT("materialSourceIndex")).Number(V.MaterialSourceIndex);
-			Out.Key(TEXT("materialRetryAt")).Number(V.MaterialRetryAt);
-			Out.Key(TEXT("materialsDelivered")).Number(V.MaterialsDelivered);
-			Out.Key(TEXT("gatheredFood")).Number(V.GatheredFood);
-			Out.Key(TEXT("deliveredFood")).Number(V.DeliveredFood);
-			Out.Key(TEXT("foodSourceIndex")).Number(V.FoodSourceIndex);
-			{
-				TArray<int32> Keys;
-				V.KnownFoodSources.GetKeys(Keys);
+				Map.GetKeys(Keys);
 				Keys.Sort();
-				Out.Key(TEXT("knownFoodSources")).BeginArray(Keys.Num());
-				for (const int32 K : Keys)
-				{
-					Out.BeginArray(2);
-					Out.Number(K).Number(V.KnownFoodSources[K]);
-					Out.EndArray();
-				}
-				Out.EndArray();
 			}
-
-			Out.Key(TEXT("jobId")).String(V.JobId);
-			Out.Key(TEXT("workplaceId")).String(V.WorkplaceId);
-			Out.Key(TEXT("traitIndex")).Number(V.TraitIndex);
-			Out.Key(TEXT("skill")).Number(V.Skill);
-			Out.Key(TEXT("skillGather")).Number(V.SkillGather);
-			Out.Key(TEXT("skillTrade")).Number(V.SkillTrade);
-			Out.Key(TEXT("skillCraft")).Number(V.SkillCraft);
-			Out.Key(TEXT("buildBinding")).String(V.BuildBinding);
-			Out.Key(TEXT("piecesPlaced")).Number(V.PiecesPlaced);
-			Out.Key(TEXT("buildingsCompleted")).Number(V.BuildingsCompleted);
-			Out.Key(TEXT("spots"));
-			HashArray(Out, V.Spots);
-			Out.Key(TEXT("scanX")).Number(V.ScanX);
-			Out.Key(TEXT("scanY")).Number(V.ScanY);
-			Out.Key(TEXT("workSession"));
-			HashState(Out, V.WorkSession);
-			Out.Key(TEXT("craftMissAt")).Number(V.CraftMissAt);
-			Out.Key(TEXT("craftMissKind")).String(V.CraftMissKind);
-			Out.Key(TEXT("craftMissCraftId")).String(V.CraftMissCraftId);
-			Out.Key(TEXT("craftMissStampAt")).Number(V.CraftMissStampAt);
-			Out.Key(TEXT("deliveries")).Number(V.Deliveries);
-			Out.Key(TEXT("hungerAction"));
-			HashState(Out, V.HungerAction);
-			Out.Key(TEXT("knownStocks"));
-			HashArray(Out, V.KnownStocks);
-			Out.Key(TEXT("lastScan")).Number(V.LastScan);
+			int32 Count = Keys.Num();
+			Ar.BeginArray(Count);
+			if (Ar.IsLoading())
 			{
-				TArray<int32> Cells = V.KnownCells.Array();
-				Cells.Sort();
-				Out.Key(TEXT("knownCells")).BeginArray(Cells.Num());
-				for (const int32 C : Cells) Out.Number(C);
-				Out.EndArray();
+				if (!Ar.Ok()) return;
+				Map.Reset();
 			}
-			Out.Key(TEXT("cellCount")).Number(V.CellCount);
-			Out.Key(TEXT("villagePhase")).String(V.VillagePhase);
-			Out.Key(TEXT("goalSince")).Number(V.GoalSince);
-			Out.Key(TEXT("phaseChangedAt"));
-			HashOptional(Out, V.PhaseChangedAt);
-			Out.Key(TEXT("workShift"));
-			HashState(Out, V.WorkShift);
-			Out.Key(TEXT("hasAlgoDecision")).Bool(V.bHasAlgoDecision);
-			Out.Key(TEXT("algoDecision"));
-			HashState(Out, V.AlgoDecision);
-			Out.Key(TEXT("algoContext"));
-			HashState(Out, V.AlgoContext);
-			Out.Key(TEXT("algoInertiaKeep")).Bool(V.bAlgoInertiaKeep);
-			Out.Key(TEXT("algoInertiaReason")).String(V.AlgoInertiaReason);
-			Out.Key(TEXT("algoMappedGoal")).String(V.AlgoMappedGoal);
+			for (int32 I = 0; I < Count && Ar.Ok(); ++I)
+			{
+				VisitPair(Ar, [&](FStateArchive& A)
+				{
+					int32 K = A.IsLoading() ? 0 : Keys[I];
+					A.Number(K);
+					if (!A.Ok()) return;
+					TValue& Value = A.IsLoading() ? Map.Add(K) : Map[K];
+					VisitValue(A, Value);
+				});
+			}
+			Ar.EndArray();
+		}
 
-			Out.Key(TEXT("drinksTaken")).Number(V.DrinksTaken);
-			Out.Key(TEXT("restsTaken")).Number(V.RestsTaken);
-			Out.Key(TEXT("mealsTaken")).Number(V.MealsTaken);
-			Out.Key(TEXT("socialsTaken")).Number(V.SocialsTaken);
-			Out.Key(TEXT("relaxesTaken")).Number(V.RelaxesTaken);
-			Out.Key(TEXT("sheltersTaken")).Number(V.SheltersTaken);
-			Out.Key(TEXT("deedsHelped")).Number(V.DeedsHelped);
-			Out.Key(TEXT("shelterResumeGoal")).String(V.ShelterResumeGoal);
-			Out.Key(TEXT("shelterCooldownUntil")).Number(V.ShelterCooldownUntil);
-			Out.Key(TEXT("simBudgetAccum")).Number(V.SimBudgetAccum);
-			Out.Key(TEXT("hasSimBudgetAccum")).Bool(V.bHasSimBudgetAccum);
+		/** Meme chose, cle chaine (ordre lexical de FString::operator<, celui de TArray::Sort). */
+		template <typename TValue, typename FVisit>
+		void VisitSortedStringMap(FStateArchive& Ar, TMap<FString, TValue>& Map, FVisit&& VisitValue)
+		{
+			TArray<FString> Keys;
+			if (!Ar.IsLoading())
+			{
+				Map.GetKeys(Keys);
+				Keys.Sort();
+			}
+			int32 Count = Keys.Num();
+			Ar.BeginArray(Count);
+			if (Ar.IsLoading())
+			{
+				if (!Ar.Ok()) return;
+				Map.Reset();
+			}
+			for (int32 I = 0; I < Count && Ar.Ok(); ++I)
+			{
+				VisitPair(Ar, [&](FStateArchive& A)
+				{
+					FString K = A.IsLoading() ? FString() : Keys[I];
+					A.String(K);
+					if (!A.Ok()) return;
+					TValue& Value = A.IsLoading() ? Map.Add(K) : Map[K];
+					VisitValue(A, Value);
+				});
+			}
+			Ar.EndArray();
+		}
 
-			Out.Key(TEXT("phenotype"));
-			HashOptionalState(Out, V.Phenotype);
-			Out.Key(TEXT("conditioning"));
-			HashOptionalState(Out, V.Conditioning);
-			Out.Key(TEXT("lifestyle"));
-			HashOptionalState(Out, V.Lifestyle);
-			Out.Key(TEXT("placeEntries"));
-			HashArray(Out, V.PlaceEntries);
-			Out.Key(TEXT("favoriteBuildingId")).String(V.FavoriteBuildingId);
+		void VisitState(FStateArchive& Ar, AnastasisNeeds::FNeeds& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("hunger")).Number(V.Hunger);
+			Ar.Key(TEXT("energy")).Number(V.Energy);
+			Ar.Key(TEXT("social")).Number(V.Social);
+			Ar.Key(TEXT("leisure")).Number(V.Leisure);
+			Ar.Key(TEXT("hygiene")).Number(V.Hygiene);
+			Ar.Key(TEXT("thirst")).Number(V.Thirst);
+			Ar.Key(TEXT("health")).Number(V.Health);
+			Ar.Key(TEXT("morale")).Number(V.Morale);
+			Ar.EndObject();
+		}
 
-			Out.Key(TEXT("relations"));
-			HashNamedNumbers(Out, V.Relations);
-			Out.Key(TEXT("people"));
-			HashArray(Out, V.People);
-			Out.Key(TEXT("tom"));
-			HashArray(Out, V.Tom);
-			Out.Key(TEXT("moodlets"));
-			HashArray(Out, V.Moodlets);
-			Out.Key(TEXT("lastTalk"));
-			HashState(Out, V.LastTalk);
-			Out.Key(TEXT("talkFatigue"));
-			HashArray(Out, V.TalkFatigue);
-			Out.Key(TEXT("talkWithId")).String(V.TalkWithId);
-			Out.Key(TEXT("talkUntil")).Number(V.TalkUntil);
-			Out.Key(TEXT("talkTurn")).Number(V.TalkTurn);
-			Out.Key(TEXT("talkMaxTurns")).Number(V.TalkMaxTurns);
-			Out.Key(TEXT("talkStarterId")).String(V.TalkStarterId);
-			Out.Key(TEXT("talkNextAt")).Number(V.TalkNextAt);
-			Out.Key(TEXT("talkChain")).Bool(V.bTalkChain);
-			Out.Key(TEXT("talkAnchor")).Bool(V.bTalkAnchor);
-			Out.Key(TEXT("socialSeekId")).String(V.SocialSeekId);
-			Out.Key(TEXT("talksWithCompanion")).Number(V.TalksWithCompanion);
-			Out.Key(TEXT("rumorsHeard")).Number(V.RumorsHeard);
-			Out.Key(TEXT("rumorsShared")).Number(V.RumorsShared);
+		void VisitState(FStateArchive& Ar, AnastasisWorld::FTile& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("x")).Number(V.X);
+			Ar.Key(TEXT("y")).Number(V.Y);
+			Ar.Key(TEXT("type")).Number(V.Type);
+			Ar.Key(TEXT("resource")).Number(V.Resource);
+			Ar.Key(TEXT("amount")).Number(V.Amount);
+			Ar.Key(TEXT("alt")).Number(V.Alt);
+			Ar.Key(TEXT("shade")).Number(V.Shade);
+			Ar.Key(TEXT("shore")).Number(V.Shore);
+			Ar.Key(TEXT("wetness")).Number(V.Wetness);
+			Ar.Key(TEXT("flowX")).Number(V.FlowX);
+			Ar.Key(TEXT("flowZ")).Number(V.FlowZ);
+			Ar.Key(TEXT("flowAmt")).Number(V.FlowAmt);
+			Ar.Key(TEXT("cropId")).Number(V.CropId);
+			Ar.Key(TEXT("fertility")).Number(V.Fertility);
+			Ar.Key(TEXT("forestMargin")).Number(V.ForestMargin);
+			Ar.Key(TEXT("hasForestMargin")).Bool(V.bHasForestMargin);
+			Ar.EndObject();
+		}
 
-			Out.Key(TEXT("reputation")).Number(V.Reputation);
-			Out.Key(TEXT("presence")).Number(V.Presence);
-			Out.Key(TEXT("idleSeconds")).Number(V.IdleSeconds);
+		void VisitState(FStateArchive& Ar, AnastasisBuild::FSiteMaterials& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("needWood")).Number(V.NeedWood);
+			Ar.Key(TEXT("needStone")).Number(V.NeedStone);
+			Ar.Key(TEXT("consumedWood")).Number(V.ConsumedWood);
+			Ar.Key(TEXT("consumedStone")).Number(V.ConsumedStone);
+			Ar.Key(TEXT("stockWood")).Number(V.StockWood);
+			Ar.Key(TEXT("stockStone")).Number(V.StockStone);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisPlanner::FStockSlot& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("physical")).Number(V.Physical);
+			Ar.Key(TEXT("reserved")).Number(V.Reserved);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FBuilding& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("id")).String(V.Id);
+			Ar.Key(TEXT("type")).String(V.Type);
+			Ar.Key(TEXT("x")).Number(V.X);
+			Ar.Key(TEXT("y")).Number(V.Y);
+			Ar.Key(TEXT("progress")).Number(V.Progress);
+			Ar.Key(TEXT("createdDay")).Number(V.CreatedDay);
+			Ar.Key(TEXT("owner")).String(V.Owner);
+			Ar.Key(TEXT("housePhase")).Number(V.HousePhase);
+			Ar.Key(TEXT("accessPoints"));
+			VisitStates(Ar, V.AccessPoints);
+			Ar.Key(TEXT("hasPlannerStock")).Bool(V.bHasPlannerStock);
+			Ar.Key(TEXT("plannerStock"));
+			AnastasisArchive::VisitArray(Ar, V.PlannerStock, [](FStateArchive& A, TPair<FString, AnastasisPlanner::FStockSlot>& Slot)
+			{
+				VisitPair(A, [&Slot](FStateArchive& B) { B.String(Slot.Key); VisitState(B, Slot.Value); });
+			});
+			Ar.Key(TEXT("foodPhysical")).Number(V.FoodPhysical);
+			Ar.Key(TEXT("foodReserved")).Number(V.FoodReserved);
+			Ar.Key(TEXT("laborToday")).Number(V.LaborToday);
+			Ar.Key(TEXT("hasLaborToday")).Bool(V.bHasLaborToday);
+			Ar.Key(TEXT("piecesPlaced")).Number(V.PiecesPlaced);
+			Ar.Key(TEXT("hasMaterials")).Bool(V.bHasMaterials);
+			Ar.Key(TEXT("materials"));
+			VisitState(Ar, V.Materials);
+			Ar.Key(TEXT("builderId")).String(V.BuilderId);
+			Ar.Key(TEXT("workers"));
+			AnastasisArchive::VisitArray(Ar, V.Workers, [](FStateArchive& A, TPair<FString, int32>& Worker)
+			{
+				VisitPair(A, [&Worker](FStateArchive& B) { B.String(Worker.Key).Number(Worker.Value); });
+			});
+			Ar.Key(TEXT("completedDay")).Number(V.CompletedDay);
+			Ar.Key(TEXT("completedById")).String(V.CompletedById);
+			Ar.Key(TEXT("vacantSinceDay")).Number(V.VacantSinceDay);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FFoodSource& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("tile")).Number(V.TileIndex);
+			Ar.Key(TEXT("position"));
+			VisitState(Ar, V.Position);
+			Ar.Key(TEXT("initial")).Number(V.Initial);
+			Ar.Key(TEXT("remaining")).Number(V.Remaining);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FMealReservation& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("id")).String(V.Id);
+			Ar.Key(TEXT("npcId")).String(V.NpcId);
+			Ar.Key(TEXT("buildingId")).String(V.BuildingId);
+			Ar.Key(TEXT("source")).String(V.Source);
+			Ar.Key(TEXT("amount")).Number(V.Amount);
+			Ar.Key(TEXT("createdAt")).Number(V.CreatedAt);
+			Ar.Key(TEXT("expiresAt")).Number(V.ExpiresAt);
+			Ar.Key(TEXT("absoluteExpiresAt")).Number(V.AbsoluteExpiresAt);
+			Ar.Key(TEXT("renewals")).Number(V.Renewals);
+			Ar.Key(TEXT("lastProgressAt")).Number(V.LastProgressAt);
+			Ar.Key(TEXT("lastDistance")).Number(V.LastDistance);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FHungerAction& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("state")).String(V.State);
+			Ar.Key(TEXT("targetId")).String(V.TargetId);
+			Ar.Key(TEXT("startedAt")).Number(V.StartedAt);
+			Ar.Key(TEXT("lastFailure")).String(V.LastFailure);
+			Ar.Key(TEXT("cooldownUntil")).Number(V.CooldownUntil);
+			Ar.Key(TEXT("progress")).Number(V.Progress);
+			Ar.Key(TEXT("reservationId")).String(V.ReservationId);
+			Ar.Key(TEXT("sourceBuildingId")).String(V.SourceBuildingId);
+			Ar.Key(TEXT("excludedType")).String(V.ExcludedType);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FStockBelief& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("key")).String(V.Key);
+			Ar.Key(TEXT("resource")).String(V.Resource);
+			Ar.Key(TEXT("buildingId")).String(V.BuildingId);
+			Ar.Key(TEXT("kind")).String(V.Kind);
+			Ar.Key(TEXT("x")).Number(V.X);
+			Ar.Key(TEXT("y")).Number(V.Y);
+			Ar.Key(TEXT("estimatedAmount")).Number(V.EstimatedAmount);
+			Ar.Key(TEXT("confidence")).Number(V.Confidence);
+			Ar.Key(TEXT("day")).Number(V.Day);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FResourceSpot& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("key")).String(V.Key);
+			Ar.Key(TEXT("x")).Number(V.X);
+			Ar.Key(TEXT("y")).Number(V.Y);
+			Ar.Key(TEXT("resource")).String(V.Resource);
+			Ar.Key(TEXT("amount")).Number(V.Amount);
+			Ar.Key(TEXT("day")).Number(V.Day);
+			Ar.Key(TEXT("hearsay")).Bool(V.bHearsay);
+			Ar.Key(TEXT("sourceId")).String(V.SourceId);
+			Ar.Key(TEXT("originalSourceId")).String(V.OriginalSourceId);
+			Ar.Key(TEXT("hopCount")).Number(V.HopCount);
+			Ar.Key(TEXT("receivedDay")).Number(V.ReceivedDay);
+			Ar.Key(TEXT("receivedAt")).Number(V.ReceivedAt);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FLastTalk& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("valid")).Bool(V.bValid);
+			Ar.Key(TEXT("withId")).String(V.WithId);
+			Ar.Key(TEXT("at")).Number(V.At);
+			Ar.Key(TEXT("refuse")).Bool(V.bRefuse);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FTalkFatigue& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("id")).String(V.Id);
+			Ar.Key(TEXT("count")).Number(V.Count);
+			Ar.Key(TEXT("at")).Number(V.At);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FWorkSession& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("active")).Bool(V.bActive);
+			Ar.Key(TEXT("craftId")).String(V.CraftId);
+			Ar.Key(TEXT("tileX")).Number(V.TileX);
+			Ar.Key(TEXT("tileY")).Number(V.TileY);
+			Ar.Key(TEXT("postIndex")).Number(V.PostIndex);
+			Ar.Key(TEXT("arrivedAt")).Number(V.ArrivedAt);
+			Ar.Key(TEXT("nextSwingAt")).Number(V.NextSwingAt);
+			Ar.Key(TEXT("swingsDone")).Number(V.SwingsDone);
+			Ar.Key(TEXT("lastSwingAt")).Number(V.LastSwingAt);
+			Ar.Key(TEXT("buildingId")).String(V.BuildingId);
+			Ar.Key(TEXT("actionAcc")).Number(V.ActionAcc);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FInside& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("active")).Bool(V.bActive);
+			Ar.Key(TEXT("buildingId")).String(V.BuildingId);
+			Ar.Key(TEXT("activity")).String(V.Activity);
+			Ar.Key(TEXT("goal")).String(V.Goal);
+			Ar.Key(TEXT("enteredAt")).Number(V.EnteredAt);
+			Ar.Key(TEXT("until")).Number(V.Until);
+			Ar.Key(TEXT("exitX")).Number(V.ExitX);
+			Ar.Key(TEXT("exitY")).Number(V.ExitY);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisWorkShift::FWorkShift& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("state")).Number(V.State);
+			Ar.Key(TEXT("goal")).String(V.Goal);
+			Ar.Key(TEXT("startedAt")).Number(V.StartedAt);
+			Ar.Key(TEXT("floorUntil")).Number(V.FloorUntil);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisNous::FDecision& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("type")).String(V.Type);
+			Ar.Key(TEXT("targetId")).String(V.TargetId);
+			Ar.Key(TEXT("score")).Number(V.Score);
+			Ar.Key(TEXT("urgency")).Number(V.Urgency);
+			Ar.Key(TEXT("reason")).String(V.Reason);
+			Ar.Key(TEXT("createdAt")).Number(V.CreatedAt);
+			Ar.Key(TEXT("expectedDuration")).Number(V.ExpectedDuration);
+			Ar.Key(TEXT("raw")).Number(V.Raw);
+			Ar.Key(TEXT("sourceBuildingId")).String(V.SourceBuildingId);
+			Ar.Key(TEXT("travelSeconds")).Number(V.TravelSeconds);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisNous::FFoodContext& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("hunger")).Number(V.Hunger);
+			Ar.Key(TEXT("inventoryFood")).Number(V.InventoryFood);
+			Ar.Key(TEXT("believedFood")).Number(V.BelievedFood);
+			Ar.Key(TEXT("bestSourceBuildingId")).String(V.BestSourceBuildingId);
+			Ar.Key(TEXT("bestSourceDistance")).Number(V.BestSourceDistance);
+			Ar.Key(TEXT("bestSourceEstimated")).Number(V.BestSourceEstimated);
+			Ar.Key(TEXT("bestSourceConfidence")).Number(V.BestSourceConfidence);
+			Ar.Key(TEXT("certainty")).Number(V.Certainty);
+			Ar.Key(TEXT("dangerNear")).Bool(V.bDangerNear);
+			Ar.Key(TEXT("gold")).Number(V.Gold);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisGenome::FPhenotype& V)
+		{
+			Ar.BeginObject();
+			int32 NumLoci = AnastasisGenome::NumLoci;
+			Ar.Key(TEXT("loci")).BeginArray(NumLoci);
+			Ar.Expect(NumLoci, AnastasisGenome::NumLoci, TEXT("loci"));
+			for (int32 I = 0; I < AnastasisGenome::NumLoci && Ar.Ok(); ++I) Ar.Number(V.Loci[I]);
+			Ar.EndArray();
+			Ar.Key(TEXT("hydrationLossMultiplier")).Number(V.HydrationLossMultiplier);
+			Ar.Key(TEXT("heatDissipationEfficiency")).Number(V.HeatDissipationEfficiency);
+			Ar.Key(TEXT("metabolicDemandMultiplier")).Number(V.MetabolicDemandMultiplier);
+			Ar.Key(TEXT("metabolicPeakRecoveryMultiplier")).Number(V.MetabolicPeakRecoveryMultiplier);
+			Ar.Key(TEXT("fatigueRecoveryMultiplier")).Number(V.FatigueRecoveryMultiplier);
+			Ar.Key(TEXT("fatigueRecoveryStrainCost")).Number(V.FatigueRecoveryStrainCost);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisConditioning::FConditioning& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("version")).Number(V.Version);
+			Ar.Key(TEXT("workConditioning")).Number(V.WorkConditioning);
+			Ar.Key(TEXT("fatigueAdaptation")).Number(V.FatigueAdaptation);
+			Ar.Key(TEXT("recoveryConditioning")).Number(V.RecoveryConditioning);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisLifestyle::FLifestyle& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("id")).String(V.Id);
+			Ar.Key(TEXT("sinceDay")).Number(V.SinceDay);
+			Ar.Key(TEXT("rhythmScore")).Number(V.RhythmScore);
+			Ar.Key(TEXT("lastNotedDay")).Number(V.LastNotedDay);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FNpc::FPlaceEntry& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("buildingId")).String(V.BuildingId);
+			Ar.Key(TEXT("type")).String(V.Type);
+			Ar.Key(TEXT("score")).Number(V.Score);
+			Ar.Key(TEXT("work")).Number(V.Work);
+			Ar.Key(TEXT("social")).Number(V.Social);
+			Ar.Key(TEXT("home")).Number(V.Home);
+			Ar.Key(TEXT("talk")).Number(V.Talk);
+			Ar.Key(TEXT("drink")).Number(V.Drink);
+			Ar.Key(TEXT("activity")).Number(V.Activity);
+			Ar.Key(TEXT("crisis")).Number(V.Crisis);
+			Ar.Key(TEXT("decayDay")).Number(V.DecayDay);
+			Ar.Key(TEXT("lastDay")).Number(V.LastDay);
+			Ar.Key(TEXT("lifestyle"));
+			VisitNamedNumbers(Ar, V.Lifestyle);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisBonds::FPersonRow& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("id")).String(V.Id);
+			Ar.Key(TEXT("trust")).Number(V.Trust);
+			Ar.Key(TEXT("tag")).Number(V.Tag);
+			Ar.Key(TEXT("day")).Number(V.Day);
+			Ar.Key(TEXT("meets")).Number(V.Meets);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisBonds::FTomEntry& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("id")).String(V.Id);
+			Ar.Key(TEXT("estimatedGoal")).String(V.EstimatedGoal);
+			Ar.Key(TEXT("attitude")).Number(V.Attitude);
+			Ar.Key(TEXT("confidence")).Number(V.Confidence);
+			Ar.Key(TEXT("day")).Number(V.Day);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisBonds::FMoodlet& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("id")).String(V.Id);
+			Ar.Key(TEXT("at")).Number(V.At);
+			Ar.Key(TEXT("until")).Number(V.Until);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FGoalExplainEntry& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("goal")).String(V.Goal);
+			Ar.Key(TEXT("score")).Number(V.Score);
+			Ar.Key(TEXT("cause")).String(V.Cause);
+			Ar.Key(TEXT("causeKey")).String(V.CauseKey);
+			Ar.Key(TEXT("causeValue")).Number(V.CauseValue);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FGoalExplain& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("at")).Number(V.At);
+			Ar.Key(TEXT("goal")).String(V.Goal);
+			Ar.Key(TEXT("top"));
+			VisitStates(Ar, V.Top);
+			Ar.Key(TEXT("line")).String(V.Line);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FStreetDecision& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("at")).Number(V.At);
+			Ar.Key(TEXT("until")).Number(V.Until);
+			Ar.Key(TEXT("goal")).String(V.Goal);
+			Ar.Key(TEXT("from")).String(V.From);
+			Ar.Key(TEXT("margin")).Number(V.Margin);
+			Ar.Key(TEXT("changed")).Bool(V.bChanged);
+			Ar.Key(TEXT("tight")).Bool(V.bTight);
+			Ar.Key(TEXT("cause")).String(V.Cause);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisNature::FNature& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("corps")).Number(V.Corps);
+			Ar.Key(TEXT("esprit")).Number(V.Esprit);
+			Ar.Key(TEXT("coeur")).Number(V.Coeur);
+			Ar.Key(TEXT("qualities"));
+			VisitStrings(Ar, V.Qualities);
+			Ar.Key(TEXT("flaws"));
+			VisitStrings(Ar, V.Flaws);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisNavService::FNavJob& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("actorId")).String(V.ActorId);
+			Ar.Key(TEXT("start"));
+			VisitState(Ar, V.Start);
+			Ar.Key(TEXT("destination"));
+			VisitState(Ar, V.Destination);
+			Ar.Key(TEXT("goalKey")).String(V.GoalKey);
+			Ar.Key(TEXT("priority")).Number(V.Priority);
+			Ar.Key(TEXT("allowBlockedTarget")).Bool(V.bAllowBlockedTarget);
+			Ar.Key(TEXT("requestedAt")).Number(V.RequestedAt);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisNavService::FNavCacheEntry& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("path"));
+			VisitStates(Ar, V.Path);
+			Ar.Key(TEXT("navVersion")).Number(V.NavVersion);
+			Ar.Key(TEXT("storedAt")).Number(V.StoredAt);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, AnastasisNavService::FNavService& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("queue"));
+			VisitStates(Ar, V.Queue);
+			// Le cache garde l'ordre d'insertion (ses evictions suivent cet ordre) : on le lit tel quel.
+			// En lecture, le cache est vide puis rempli dans l'ordre sauve (`Set` ajoute une cle neuve a la fin).
+			{
+				const TArray<FString> Keys = Ar.IsLoading() ? TArray<FString>() : V.Cache.GetKeys();
+				int32 Count = Keys.Num();
+				Ar.Key(TEXT("cache")).BeginArray(Count);
+				if (Ar.IsLoading() && Ar.Ok()) V.Cache.Empty();
+				for (int32 I = 0; I < Count && Ar.Ok(); ++I)
+				{
+					VisitPair(Ar, [&](FStateArchive& A)
+					{
+						FString Key = A.IsLoading() ? FString() : Keys[I];
+						AnastasisNavService::FNavCacheEntry Entry = A.IsLoading() ? AnastasisNavService::FNavCacheEntry() : V.Cache.GetEntry(I);
+						A.String(Key);
+						VisitState(A, Entry);
+						if (A.IsLoading() && A.Ok()) V.Cache.Set(Key, Entry);
+					});
+				}
+				Ar.EndArray();
+			}
+			Ar.Key(TEXT("pendingByActor"));
+			VisitSortedStringMap(Ar, V.PendingByActor, [](FStateArchive& A, int32& N) { A.Number(N); });
+			Ar.Key(TEXT("calcThisTick")).Number(V.CalcThisTick);
+			Ar.Key(TEXT("maxCalcs")).Number(V.MaxCalcs);
+			Ar.Key(TEXT("cacheTtl")).Number(V.CacheTtl);
+			Ar.Key(TEXT("lastSweepAt")).Number(V.LastSweepAt);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FNpc& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("id")).String(V.Id);
+			Ar.Key(TEXT("x")).Number(V.X);
+			Ar.Key(TEXT("y")).Number(V.Y);
+			Ar.Key(TEXT("speed")).Number(V.Speed);
+			Ar.Key(TEXT("needs"));
+			VisitState(Ar, V.Needs);
+			Ar.Key(TEXT("goal")).String(V.Goal);
+			Ar.Key(TEXT("activity")).String(V.Activity);
+			Ar.Key(TEXT("hasTarget")).Bool(V.bHasTarget);
+			Ar.Key(TEXT("target"));
+			VisitState(Ar, V.Target);
+			Ar.Key(TEXT("workTimer")).Number(V.WorkTimer);
+			Ar.Key(TEXT("aiThinkAt")).Number(V.AiThinkAt);
+			Ar.Key(TEXT("failedActions")).Number(V.FailedActions);
+			Ar.Key(TEXT("homeId")).String(V.HomeId);
+			Ar.Key(TEXT("shelterId")).String(V.ShelterId);
+			Ar.Key(TEXT("inside"));
+			VisitState(Ar, V.Inside);
+			Ar.Key(TEXT("doorStuckAt")).Number(V.DoorStuckAt);
+			Ar.Key(TEXT("doorApproachAt")).Number(V.DoorApproachAt);
+
+			Ar.Key(TEXT("path"));
+			VisitStates(Ar, V.Path);
+			Ar.Key(TEXT("pathStep")).Number(V.PathStep);
+			Ar.Key(TEXT("hasPathGoal")).Bool(V.bHasPathGoal);
+			Ar.Key(TEXT("pathGoal"));
+			VisitState(Ar, V.PathGoal);
+			Ar.Key(TEXT("pathFailed")).Bool(V.bPathFailed);
+			Ar.Key(TEXT("pathCooldown")).Number(V.PathCooldown);
+			Ar.Key(TEXT("navTargetKey")).String(V.NavTargetKey);
+			Ar.Key(TEXT("navVersion")).Number(V.NavVersion);
+			Ar.Key(TEXT("destBuildingId")).String(V.DestBuildingId);
+			Ar.Key(TEXT("stuckTimer")).Number(V.StuckTimer);
+			Ar.Key(TEXT("stuckStage")).Number(V.StuckStage);
+			// `actor.trafficTimer` : decide quand tombe le prochain passage (relay-settlement-001).
+			Ar.Key(TEXT("trafficTimer")).Number(V.TrafficTimer);
+
+			Ar.Key(TEXT("inventoryFood")).Number(V.InventoryFood);
+			Ar.Key(TEXT("materialCarry")).Number(V.MaterialCarry);
+			Ar.Key(TEXT("materialResource")).Number(V.MaterialResource);
+			Ar.Key(TEXT("materialSourceIndex")).Number(V.MaterialSourceIndex);
+			Ar.Key(TEXT("materialRetryAt")).Number(V.MaterialRetryAt);
+			Ar.Key(TEXT("materialsDelivered")).Number(V.MaterialsDelivered);
+			Ar.Key(TEXT("gatheredFood")).Number(V.GatheredFood);
+			Ar.Key(TEXT("deliveredFood")).Number(V.DeliveredFood);
+			Ar.Key(TEXT("foodSourceIndex")).Number(V.FoodSourceIndex);
+			Ar.Key(TEXT("knownFoodSources"));
+			VisitSortedIntMap(Ar, V.KnownFoodSources, [](FStateArchive& A, int32& N) { A.Number(N); });
+
+			Ar.Key(TEXT("jobId")).String(V.JobId);
+			Ar.Key(TEXT("workplaceId")).String(V.WorkplaceId);
+			Ar.Key(TEXT("traitIndex")).Number(V.TraitIndex);
+			Ar.Key(TEXT("skill")).Number(V.Skill);
+			Ar.Key(TEXT("skillGather")).Number(V.SkillGather);
+			Ar.Key(TEXT("skillTrade")).Number(V.SkillTrade);
+			Ar.Key(TEXT("skillCraft")).Number(V.SkillCraft);
+			Ar.Key(TEXT("buildBinding")).String(V.BuildBinding);
+			Ar.Key(TEXT("piecesPlaced")).Number(V.PiecesPlaced);
+			Ar.Key(TEXT("buildingsCompleted")).Number(V.BuildingsCompleted);
+			Ar.Key(TEXT("spots"));
+			VisitStates(Ar, V.Spots);
+			Ar.Key(TEXT("scanX")).Number(V.ScanX);
+			Ar.Key(TEXT("scanY")).Number(V.ScanY);
+			Ar.Key(TEXT("workSession"));
+			VisitState(Ar, V.WorkSession);
+			Ar.Key(TEXT("craftMissAt")).Number(V.CraftMissAt);
+			Ar.Key(TEXT("craftMissKind")).String(V.CraftMissKind);
+			Ar.Key(TEXT("craftMissCraftId")).String(V.CraftMissCraftId);
+			Ar.Key(TEXT("craftMissStampAt")).Number(V.CraftMissStampAt);
+			Ar.Key(TEXT("deliveries")).Number(V.Deliveries);
+			Ar.Key(TEXT("hungerAction"));
+			VisitState(Ar, V.HungerAction);
+			Ar.Key(TEXT("knownStocks"));
+			VisitStates(Ar, V.KnownStocks);
+			Ar.Key(TEXT("lastScan")).Number(V.LastScan);
+			{
+				// TSet : cellules par ordre croissant ; en lecture, l'ensemble est refait dans cet ordre.
+				TArray<int32> Cells;
+				if (!Ar.IsLoading())
+				{
+					Cells = V.KnownCells.Array();
+					Cells.Sort();
+				}
+				Ar.Key(TEXT("knownCells"));
+				AnastasisArchive::VisitArray(Ar, Cells, [](FStateArchive& A, int32& C) { A.Number(C); });
+				if (Ar.IsLoading() && Ar.Ok())
+				{
+					V.KnownCells.Reset();
+					for (const int32 C : Cells) V.KnownCells.Add(C);
+				}
+			}
+			Ar.Key(TEXT("cellCount")).Number(V.CellCount);
+			Ar.Key(TEXT("villagePhase")).String(V.VillagePhase);
+			Ar.Key(TEXT("goalSince")).Number(V.GoalSince);
+			Ar.Key(TEXT("phaseChangedAt"));
+			VisitOptionalNumber(Ar, V.PhaseChangedAt);
+			Ar.Key(TEXT("workShift"));
+			VisitState(Ar, V.WorkShift);
+			Ar.Key(TEXT("hasAlgoDecision")).Bool(V.bHasAlgoDecision);
+			Ar.Key(TEXT("algoDecision"));
+			VisitState(Ar, V.AlgoDecision);
+			Ar.Key(TEXT("algoContext"));
+			VisitState(Ar, V.AlgoContext);
+			Ar.Key(TEXT("algoInertiaKeep")).Bool(V.bAlgoInertiaKeep);
+			Ar.Key(TEXT("algoInertiaReason")).String(V.AlgoInertiaReason);
+			Ar.Key(TEXT("algoMappedGoal")).String(V.AlgoMappedGoal);
+
+			Ar.Key(TEXT("drinksTaken")).Number(V.DrinksTaken);
+			Ar.Key(TEXT("restsTaken")).Number(V.RestsTaken);
+			Ar.Key(TEXT("mealsTaken")).Number(V.MealsTaken);
+			Ar.Key(TEXT("socialsTaken")).Number(V.SocialsTaken);
+			Ar.Key(TEXT("relaxesTaken")).Number(V.RelaxesTaken);
+			Ar.Key(TEXT("sheltersTaken")).Number(V.SheltersTaken);
+			Ar.Key(TEXT("deedsHelped")).Number(V.DeedsHelped);
+			Ar.Key(TEXT("shelterResumeGoal")).String(V.ShelterResumeGoal);
+			Ar.Key(TEXT("shelterCooldownUntil")).Number(V.ShelterCooldownUntil);
+			Ar.Key(TEXT("simBudgetAccum")).Number(V.SimBudgetAccum);
+			Ar.Key(TEXT("hasSimBudgetAccum")).Bool(V.bHasSimBudgetAccum);
+
+			Ar.Key(TEXT("phenotype"));
+			VisitOptionalState(Ar, V.Phenotype);
+			Ar.Key(TEXT("conditioning"));
+			VisitOptionalState(Ar, V.Conditioning);
+			Ar.Key(TEXT("lifestyle"));
+			VisitOptionalState(Ar, V.Lifestyle);
+			Ar.Key(TEXT("placeEntries"));
+			VisitStates(Ar, V.PlaceEntries);
+			Ar.Key(TEXT("favoriteBuildingId")).String(V.FavoriteBuildingId);
+
+			Ar.Key(TEXT("relations"));
+			VisitNamedNumbers(Ar, V.Relations);
+			Ar.Key(TEXT("people"));
+			VisitStates(Ar, V.People);
+			Ar.Key(TEXT("tom"));
+			VisitStates(Ar, V.Tom);
+			Ar.Key(TEXT("moodlets"));
+			VisitStates(Ar, V.Moodlets);
+			Ar.Key(TEXT("lastTalk"));
+			VisitState(Ar, V.LastTalk);
+			Ar.Key(TEXT("talkFatigue"));
+			VisitStates(Ar, V.TalkFatigue);
+			Ar.Key(TEXT("talkWithId")).String(V.TalkWithId);
+			Ar.Key(TEXT("talkUntil")).Number(V.TalkUntil);
+			Ar.Key(TEXT("talkTurn")).Number(V.TalkTurn);
+			Ar.Key(TEXT("talkMaxTurns")).Number(V.TalkMaxTurns);
+			Ar.Key(TEXT("talkStarterId")).String(V.TalkStarterId);
+			Ar.Key(TEXT("talkNextAt")).Number(V.TalkNextAt);
+			Ar.Key(TEXT("talkChain")).Bool(V.bTalkChain);
+			Ar.Key(TEXT("talkAnchor")).Bool(V.bTalkAnchor);
+			Ar.Key(TEXT("socialSeekId")).String(V.SocialSeekId);
+			Ar.Key(TEXT("talksWithCompanion")).Number(V.TalksWithCompanion);
+			Ar.Key(TEXT("rumorsHeard")).Number(V.RumorsHeard);
+			Ar.Key(TEXT("rumorsShared")).Number(V.RumorsShared);
+
+			Ar.Key(TEXT("reputation")).Number(V.Reputation);
+			Ar.Key(TEXT("presence")).Number(V.Presence);
+			Ar.Key(TEXT("idleSeconds")).Number(V.IdleSeconds);
 
 			// Champs arrives apres STATE_ORACLE_001 (nav-wiring-001, lifestyle-decision-001, premiere-pensee-001...),
 			// ranges par state-fields-tidy-001.
-			Out.Key(TEXT("pathFailStreak")).Number(V.PathFailStreak);
-			Out.Key(TEXT("navRequestedAt")).Number(V.NavRequestedAt);
-			Out.Key(TEXT("awaitingPath")).Bool(V.bAwaitingPath);
-			Out.Key(TEXT("navPath"));
-			HashArray(Out, V.NavPath);
-			Out.Key(TEXT("navPathIndex")).Number(V.NavPathIndex);
-			Out.Key(TEXT("doorQueueRole")).String(V.DoorQueueRole);
-			Out.Key(TEXT("doorQueueRank")).Number(V.DoorQueueRank);
-			Out.Key(TEXT("stuckTicks")).Number(V.StuckTicks);
-			Out.Key(TEXT("hasLastMoveDir")).Bool(V.bHasLastMoveDir);
-			Out.Key(TEXT("lastMoveDir"));
-			HashState(Out, V.LastMoveDir);
-			Out.Key(TEXT("hasHesitation")).Bool(V.bHasHesitation);
-			Out.Key(TEXT("hesitationTimer")).Number(V.HesitationTimer);
-			Out.Key(TEXT("hesitationCooldown")).Number(V.HesitationCooldown);
-			Out.Key(TEXT("trafficTimer")).Number(V.TrafficTimer);
-			Out.Key(TEXT("inventoryWood")).Number(V.InventoryWood);
-			Out.Key(TEXT("gatheredWood")).Number(V.GatheredWood);
-			Out.Key(TEXT("activitySince")).Number(V.ActivitySince);
-			Out.Key(TEXT("goalExplain"));
-			HashOptionalState(Out, V.GoalExplain);
-			Out.Key(TEXT("streetDecision"));
-			HashOptionalState(Out, V.StreetDecision);
-			Out.Key(TEXT("hasHungerAction")).Bool(V.bHasHungerAction);
-			Out.Key(TEXT("nocturnalIntent"));
-			HashOptionalBool(Out, V.NocturnalIntent);
-			Out.Key(TEXT("hasBuildBinding")).Bool(V.bHasBuildBinding);
-			Out.Key(TEXT("hasSocialSeekId")).Bool(V.bHasSocialSeekId);
-			Out.Key(TEXT("hasFailureStore")).Bool(V.bHasFailureStore);
-			Out.Key(TEXT("skillCare")).Number(V.SkillCare);
-			Out.Key(TEXT("nature"));
-			HashOptionalState(Out, V.Nature);
-			Out.Key(TEXT("gold"));
-			HashOptional(Out, V.Gold);
-			Out.EndObject();
+			Ar.Key(TEXT("pathFailStreak")).Number(V.PathFailStreak);
+			Ar.Key(TEXT("navRequestedAt")).Number(V.NavRequestedAt);
+			Ar.Key(TEXT("awaitingPath")).Bool(V.bAwaitingPath);
+			Ar.Key(TEXT("navPath"));
+			VisitStates(Ar, V.NavPath);
+			Ar.Key(TEXT("navPathIndex")).Number(V.NavPathIndex);
+			Ar.Key(TEXT("doorQueueRole")).String(V.DoorQueueRole);
+			Ar.Key(TEXT("doorQueueRank")).Number(V.DoorQueueRank);
+			Ar.Key(TEXT("stuckTicks")).Number(V.StuckTicks);
+			Ar.Key(TEXT("hasLastMoveDir")).Bool(V.bHasLastMoveDir);
+			Ar.Key(TEXT("lastMoveDir"));
+			VisitState(Ar, V.LastMoveDir);
+			Ar.Key(TEXT("hasHesitation")).Bool(V.bHasHesitation);
+			Ar.Key(TEXT("hesitationTimer")).Number(V.HesitationTimer);
+			Ar.Key(TEXT("hesitationCooldown")).Number(V.HesitationCooldown);
+			Ar.Key(TEXT("trafficTimer")).Number(V.TrafficTimer);
+			Ar.Key(TEXT("inventoryWood")).Number(V.InventoryWood);
+			Ar.Key(TEXT("gatheredWood")).Number(V.GatheredWood);
+			Ar.Key(TEXT("activitySince")).Number(V.ActivitySince);
+			Ar.Key(TEXT("goalExplain"));
+			VisitOptionalState(Ar, V.GoalExplain);
+			Ar.Key(TEXT("streetDecision"));
+			VisitOptionalState(Ar, V.StreetDecision);
+			Ar.Key(TEXT("hasHungerAction")).Bool(V.bHasHungerAction);
+			Ar.Key(TEXT("nocturnalIntent"));
+			VisitOptionalBool(Ar, V.NocturnalIntent);
+			Ar.Key(TEXT("hasBuildBinding")).Bool(V.bHasBuildBinding);
+			Ar.Key(TEXT("hasSocialSeekId")).Bool(V.bHasSocialSeekId);
+			Ar.Key(TEXT("hasFailureStore")).Bool(V.bHasFailureStore);
+			Ar.Key(TEXT("skillCare")).Number(V.SkillCare);
+			Ar.Key(TEXT("nature"));
+			VisitOptionalState(Ar, V.Nature);
+			Ar.Key(TEXT("gold"));
+			VisitOptionalNumber(Ar, V.Gold);
+			Ar.EndObject();
 		}
 
-		void HashState(FStateWriter& Out, const FPlayerGoalChoice& V)
+		void VisitState(FStateArchive& Ar, FPlayerGoalChoice& V)
 		{
-			Out.BeginObject();
-			Out.Key(TEXT("goal")).String(V.Goal);
-			Out.Key(TEXT("holds")).Number(V.Holds);
-			Out.Key(TEXT("yields")).Number(V.Yields);
-			Out.Key(TEXT("cedingFor")).String(V.CedingFor);
-			Out.EndObject();
+			Ar.BeginObject();
+			Ar.Key(TEXT("goal")).String(V.Goal);
+			Ar.Key(TEXT("holds")).Number(V.Holds);
+			Ar.Key(TEXT("yields")).Number(V.Yields);
+			Ar.Key(TEXT("cedingFor")).String(V.CedingFor);
+			Ar.EndObject();
 		}
 
-		void HashState(FStateWriter& Out, const FPlayerRefusal& V)
+		void VisitState(FStateArchive& Ar, FPlayerRefusal& V)
 		{
-			Out.BeginObject();
-			Out.Key(TEXT("wanted")).String(V.Wanted);
-			Out.Key(TEXT("reason")).String(V.Reason);
-			Out.Key(TEXT("applied")).String(V.Applied);
-			Out.Key(TEXT("day")).Number(V.Day);
-			Out.EndObject();
+			Ar.BeginObject();
+			Ar.Key(TEXT("wanted")).String(V.Wanted);
+			Ar.Key(TEXT("reason")).String(V.Reason);
+			Ar.Key(TEXT("applied")).String(V.Applied);
+			Ar.Key(TEXT("day")).Number(V.Day);
+			Ar.EndObject();
 		}
 
-		void HashState(FStateWriter& Out, const FPlayerGoalOption& V)
+		void VisitState(FStateArchive& Ar, FPlayerGoalOption& V)
 		{
-			Out.BeginObject();
-			Out.Key(TEXT("goal")).String(V.Goal);
-			Out.Key(TEXT("score")).Number(V.Score);
-			Out.EndObject();
+			Ar.BeginObject();
+			Ar.Key(TEXT("goal")).String(V.Goal);
+			Ar.Key(TEXT("score")).Number(V.Score);
+			Ar.EndObject();
 		}
 
-		void HashState(FStateWriter& Out, const FVillage::FDeath& V)
+		void VisitState(FStateArchive& Ar, FVillage::FDeath& V)
 		{
-			Out.BeginObject();
-			Out.Key(TEXT("npcId")).String(V.NpcId);
-			Out.Key(TEXT("cause")).String(V.Cause);
-			Out.Key(TEXT("day")).Number(V.Day);
-			Out.EndObject();
+			Ar.BeginObject();
+			Ar.Key(TEXT("npcId")).String(V.NpcId);
+			Ar.Key(TEXT("cause")).String(V.Cause);
+			Ar.Key(TEXT("day")).Number(V.Day);
+			Ar.EndObject();
 		}
 
-		void HashState(FStateWriter& Out, const AnastasisWeatherBehavior::FSimWeather& V)
+		void VisitState(FStateArchive& Ar, AnastasisWeatherBehavior::FSimWeather& V)
 		{
-			Out.BeginObject();
-			Out.Key(TEXT("rain")).Number(V.Rain);
-			Out.Key(TEXT("snow")).Number(V.Snow);
-			Out.Key(TEXT("wind")).Number(V.Wind);
-			Out.Key(TEXT("cover")).Number(V.Cover);
-			Out.Key(TEXT("season")).Number(static_cast<int32>(V.Season));
-			Out.Key(TEXT("clearing")).Number(V.Clearing);
-			Out.EndObject();
+			Ar.BeginObject();
+			Ar.Key(TEXT("rain")).Number(V.Rain);
+			Ar.Key(TEXT("snow")).Number(V.Snow);
+			Ar.Key(TEXT("wind")).Number(V.Wind);
+			Ar.Key(TEXT("cover")).Number(V.Cover);
+			Ar.Key(TEXT("season")).Number(V.Season);
+			Ar.Key(TEXT("clearing")).Number(V.Clearing);
+			Ar.EndObject();
 		}
 
-		void HashState(FStateWriter& Out, const AnastasisBudget::FDirector& V)
+		void VisitState(FStateArchive& Ar, AnastasisBudget::FDirector& V)
 		{
-			Out.BeginObject();
-			Out.Key(TEXT("pressure")).Number(V.Pressure);
-			Out.Key(TEXT("viewX")).Number(V.ViewX);
-			Out.Key(TEXT("viewY")).Number(V.ViewY);
-			Out.Key(TEXT("viewPinned")).Bool(V.bViewPinned);
-			Out.EndObject();
+			Ar.BeginObject();
+			Ar.Key(TEXT("pressure")).Number(V.Pressure);
+			Ar.Key(TEXT("viewX")).Number(V.ViewX);
+			Ar.Key(TEXT("viewY")).Number(V.ViewY);
+			Ar.Key(TEXT("viewPinned")).Bool(V.bViewPinned);
+			Ar.EndObject();
 		}
 
-		void HashState(FStateWriter& Out, const AnastasisNav::FNavGrid& V)
+		void VisitState(FStateArchive& Ar, AnastasisNav::FNavGrid& V)
 		{
-			Out.BeginObject();
-			Out.Key(TEXT("w")).Number(V.W);
-			Out.Key(TEXT("h")).Number(V.H);
-			// Grilles de la taille du monde : une empreinte de chaque, pas un nombre par case.
-			AnastasisDigest::FFnv1a64 Blocked;
-			Blocked.Bytes(V.Blocked.GetData(), V.Blocked.Num());
-			AnastasisDigest::FFnv1a64 Cost;
-			Cost.Bytes(reinterpret_cast<const uint8*>(V.MoveCost.GetData()), V.MoveCost.Num() * static_cast<int32>(sizeof(float)));
-			Out.Key(TEXT("blocked")).String(AnastasisDigest::ToHex(Blocked.Hash));
-			Out.Key(TEXT("moveCost")).String(AnastasisDigest::ToHex(Cost.Hash));
-			Out.EndObject();
+			Ar.BeginObject();
+			Ar.Key(TEXT("w")).Number(V.W);
+			Ar.Key(TEXT("h")).Number(V.H);
+			// Grilles de la taille du monde : le hacheur n'en garde qu'une empreinte, la sauvegarde chaque octet.
+			Ar.Key(TEXT("blocked")).Blob(V.Blocked);
+			Ar.Key(TEXT("moveCost")).Blob(V.MoveCost);
+			Ar.EndObject();
 		}
-		void HashState(FStateWriter& Out, const AnastasisPlanner::FUrgencySnapshot& V)
+		void VisitState(FStateArchive& Ar, AnastasisPlanner::FUrgencySnapshot& V)
 		{
-			Out.BeginObject();
-			Out.Key(TEXT("hydrationActive")).Bool(V.bHydrationActive);
-			Out.Key(TEXT("hydrationLevel")).Number(V.HydrationLevel);
-			Out.Key(TEXT("hydrationPlannedGap")).Number(V.HydrationPlannedGap);
-			Out.Key(TEXT("housingActive")).Bool(V.bHousingActive);
-			Out.Key(TEXT("housingLevel")).Number(V.HousingLevel);
-			Out.Key(TEXT("housingDeficit")).Number(V.HousingDeficit);
-			Out.Key(TEXT("housingVacancyActive")).Bool(V.bHousingVacancyActive);
-			Out.Key(TEXT("accessActive")).Bool(V.bAccessActive);
-			Out.Key(TEXT("accessLevel")).Number(V.AccessLevel);
-			Out.Key(TEXT("accessResource")).String(V.AccessResource);
-			Out.EndObject();
+			Ar.BeginObject();
+			Ar.Key(TEXT("hydrationActive")).Bool(V.bHydrationActive);
+			Ar.Key(TEXT("hydrationLevel")).Number(V.HydrationLevel);
+			Ar.Key(TEXT("hydrationPlannedGap")).Number(V.HydrationPlannedGap);
+			Ar.Key(TEXT("housingActive")).Bool(V.bHousingActive);
+			Ar.Key(TEXT("housingLevel")).Number(V.HousingLevel);
+			Ar.Key(TEXT("housingDeficit")).Number(V.HousingDeficit);
+			Ar.Key(TEXT("housingVacancyActive")).Bool(V.bHousingVacancyActive);
+			Ar.Key(TEXT("accessActive")).Bool(V.bAccessActive);
+			Ar.Key(TEXT("accessLevel")).Number(V.AccessLevel);
+			Ar.Key(TEXT("accessResource")).String(V.AccessResource);
+			Ar.EndObject();
 		}
 	}
 
 	uint64 FVillage::StateDigest() const
 	{
-		FStateWriter Out;
-		Out.BeginObject();
-		Out.Key(TEXT("playerPersonId")).String(PlayerPersonId);
-		Out.Key(TEXT("playerDrive"));
-		HashState(Out, PlayerDrive);
-		Out.Key(TEXT("hasPlayerChoice")).Bool(bHasPlayerChoice);
-		Out.Key(TEXT("playerChoice"));
-		HashState(Out, PlayerChoice);
-		Out.Key(TEXT("playerChoiceDirty")).Bool(bPlayerChoiceDirty);
-		Out.Key(TEXT("hasPlayerRefusal")).Bool(bHasPlayerRefusal);
-		Out.Key(TEXT("playerRefusal"));
-		HashState(Out, PlayerRefusal);
-		Out.Key(TEXT("playerOptions"));
-		HashArray(Out, PlayerOptions);
-
-		{
-			TArray<int32> Touched;
-			LiveTiles.GetKeys(Touched);
-			Touched.Sort();
-			Out.Key(TEXT("liveTiles")).BeginArray(Touched.Num());
-			for (const int32 Index : Touched)
-			{
-				Out.BeginArray(2);
-				Out.Number(Index);
-				HashState(Out, LiveTiles[Index]);
-				Out.EndArray();
-			}
-			Out.EndArray();
-		}
-		Out.Key(TEXT("regrownFood")).Number(static_cast<double>(RegrownFood));
-		Out.Key(TEXT("recentVillageEmits")).BeginArray(RecentVillageEmits.Num());
-		for (const double At : RecentVillageEmits) Out.Number(At);
-		Out.EndArray();
-		Out.Key(TEXT("villageRng")).Number(VillageRng.GetState());
-		Out.Key(TEXT("nav"));
-		HashState(Out, Nav);
-		Out.Key(TEXT("terrainTravelCostEnabled")).Bool(bTerrainTravelCostEnabled);
-		Out.Key(TEXT("materialCourierId")).String(MaterialCourierId);
-		Out.Key(TEXT("navVersion")).Number(NavVersion);
-		// `sim.traffic` et les sentiers qu'il fixe (ecart n°42) : la decroissance de minuit et l'effort de
-		// defrichage en dependent, l'A* lit le cout des sentiers.
-		Out.Key(TEXT("traffic")).BeginArray(Traffic.Num());
-		for (const float T : Traffic) Out.Number(static_cast<double>(T));
-		Out.EndArray();
-		Out.Key(TEXT("roadEvolutionEnabled")).Bool(bRoadEvolutionEnabled);
-		{
-			TArray<int32> RoadKeys;
-			Roads.GetKeys(RoadKeys);
-			RoadKeys.Sort();
-			Out.Key(TEXT("roads")).BeginArray(RoadKeys.Num());
-			for (const int32 Index : RoadKeys)
-			{
-				const AnastasisTraffic::FRoadTile& Road = Roads[Index];
-				Out.BeginArray(4);
-				Out.Number(Index);
-				Out.Number(static_cast<int32>(Road.Class));
-				Out.Number(Road.BuiltDay);
-				Out.Number(Road.TrafficAtBirth);
-				Out.EndArray();
-			}
-			Out.EndArray();
-			TArray<int32> EffortKeys;
-			RoadEfforts.GetKeys(EffortKeys);
-			EffortKeys.Sort();
-			Out.Key(TEXT("roadEfforts")).BeginArray(EffortKeys.Num());
-			for (const int32 Index : EffortKeys)
-			{
-				Out.BeginArray(2);
-				Out.Number(Index);
-				Out.Number(RoadEfforts[Index]);
-				Out.EndArray();
-			}
-			Out.EndArray();
-		}
-		Out.Key(TEXT("settlement"));
-		HashState(Out, Settlement);
-		Out.Key(TEXT("marketDx"));
-		HashOptional(Out, MarketDx);
-		Out.Key(TEXT("marketDy"));
-		HashOptional(Out, MarketDy);
-		Out.Key(TEXT("hasColony")).Bool(bHasColony);
-		Out.Key(TEXT("settlementClearRadius"));
-		HashOptional(Out, SettlementClearRadius);
-		Out.Key(TEXT("colonyTreasury"));
-		HashOptional(Out, ColonyTreasury);
-		// Le cache d'urgence est indexe par la seconde de jeu, pas par l'etat : deux villages egaux par
-		// ailleurs peuvent decider autrement dans la meme seconde. C'est donc de l'etat.
-		Out.Key(TEXT("urgencyBucket")).String(UrgencyBucket);
-		Out.Key(TEXT("urgencyCache"));
-		HashOptionalState(Out, UrgencyCache);
-		Out.Key(TEXT("nextBuildingId")).Number(NextBuildingId);
-		Out.Key(TEXT("deathLog"));
-		HashArray(Out, DeathLog);
-		Out.Key(TEXT("nextNpcId")).Number(NextNpcId);
-		Out.Key(TEXT("now")).Number(Now);
-		Out.Key(TEXT("weatherSeed")).Number(WeatherSeed);
-		Out.Key(TEXT("weatherSeeded")).Bool(bWeatherSeeded);
-		Out.Key(TEXT("forcedWeather")).Bool(bForcedWeather);
-		Out.Key(TEXT("forcedWeatherValue"));
-		HashState(Out, ForcedWeather);
-		Out.Key(TEXT("tickWeather"));
-		HashState(Out, TickWeather);
-		Out.Key(TEXT("tickDailyRain")).Number(TickDailyRain);
-		Out.Key(TEXT("budgetDirector"));
-		HashState(Out, BudgetDirector);
-		Out.Key(TEXT("simulationView")).Bool(bSimulationView);
-		Out.Key(TEXT("mealReservations"));
-		HashArray(Out, MealReservations);
-		Out.Key(TEXT("foodSources"));
-		HashArray(Out, FoodSources);
-		Out.Key(TEXT("mealSeq")).Number(MealSeq);
-		Out.Key(TEXT("reservationSweepAt")).Number(ReservationSweepAt);
-		{
-			TArray<int32> Soil;
-			SoilWaterByTile.GetKeys(Soil);
-			Soil.Sort();
-			Out.Key(TEXT("soilWaterByTile")).BeginArray(Soil.Num());
-			for (const int32 Index : Soil)
-			{
-				Out.BeginArray(2);
-				Out.Number(Index).Number(SoilWaterByTile[Index]);
-				Out.EndArray();
-			}
-			Out.EndArray();
-		}
-		Out.Key(TEXT("soilWaterEnabled")).Bool(bSoilWaterEnabled);
-		Out.Key(TEXT("navService"));
-		HashState(Out, NavService);
-		{
-			// Trafic par tuile (taille du monde) : une empreinte d'octets, pas un nombre par case.
-			AnastasisDigest::FFnv1a64 TrafficHash;
-			TrafficHash.Bytes(reinterpret_cast<const uint8*>(Traffic.GetData()), Traffic.Num() * static_cast<int32>(sizeof(int32)));
-			Out.Key(TEXT("traffic")).String(AnastasisDigest::ToHex(TrafficHash.Hash));
-		}
-		Out.Key(TEXT("buildings"));
-		HashArray(Out, Buildings.GetItems());
-		Out.Key(TEXT("actors"));
-		HashArray(Out, Actors.GetItems());
-		Out.EndObject();
+		AnastasisDigest::FStateWriter Out;
+		FStateArchive Ar = FStateArchive::ForHash(Out);
+		// Le hachage ne fait que lire (voir l'en-tete du fichier).
+		const_cast<FVillage*>(this)->ArchiveState(Ar);
 		return Out.Digest();
 	}
+
+	void FVillage::ArchiveState(FStateArchive& Ar)
+	{
+		Ar.BeginObject();
+		Ar.Key(TEXT("playerPersonId")).String(PlayerPersonId);
+		Ar.Key(TEXT("playerDrive"));
+		VisitState(Ar, PlayerDrive);
+		Ar.Key(TEXT("hasPlayerChoice")).Bool(bHasPlayerChoice);
+		Ar.Key(TEXT("playerChoice"));
+		VisitState(Ar, PlayerChoice);
+		Ar.Key(TEXT("playerChoiceDirty")).Bool(bPlayerChoiceDirty);
+		Ar.Key(TEXT("hasPlayerRefusal")).Bool(bHasPlayerRefusal);
+		Ar.Key(TEXT("playerRefusal"));
+		VisitState(Ar, PlayerRefusal);
+		Ar.Key(TEXT("playerOptions"));
+		VisitStates(Ar, PlayerOptions);
+
+		Ar.Key(TEXT("liveTiles"));
+		VisitSortedIntMap(Ar, LiveTiles, [](FStateArchive& A, AnastasisWorld::FTile& Tile) { VisitState(A, Tile); });
+		Ar.Key(TEXT("regrownFood")).Number(RegrownFood);
+		Ar.Key(TEXT("recentVillageEmits"));
+		AnastasisArchive::VisitArray(Ar, RecentVillageEmits, [](FStateArchive& A, double& At) { A.Number(At); });
+		{
+			uint32 RngState = VillageRng.GetState();
+			Ar.Key(TEXT("villageRng")).Number(RngState);
+			if (Ar.IsLoading() && Ar.Ok()) VillageRng.SetState(RngState);
+		}
+		Ar.Key(TEXT("nav"));
+		VisitState(Ar, Nav);
+		Ar.Key(TEXT("terrainTravelCostEnabled")).Bool(bTerrainTravelCostEnabled);
+		Ar.Key(TEXT("materialCourierId")).String(MaterialCourierId);
+		Ar.Key(TEXT("navVersion")).Number(NavVersion);
+		// `sim.traffic` et les sentiers qu'il fixe (ecart n°42) : la decroissance de minuit et l'effort de
+		// defrichage en dependent, l'A* lit le cout des sentiers.
+		Ar.Key(TEXT("traffic"));
+		AnastasisArchive::VisitArray(Ar, Traffic, [](FStateArchive& A, float& T) { A.Number(T); });
+		Ar.Key(TEXT("roadEvolutionEnabled")).Bool(bRoadEvolutionEnabled);
+		{
+			// Un sentier : `[tuile, classe, jour de naissance, trafic a la naissance]`.
+			TArray<int32> RoadKeys;
+			if (!Ar.IsLoading())
+			{
+				Roads.GetKeys(RoadKeys);
+				RoadKeys.Sort();
+			}
+			int32 Count = RoadKeys.Num();
+			Ar.Key(TEXT("roads")).BeginArray(Count);
+			if (Ar.IsLoading() && Ar.Ok()) Roads.Reset();
+			for (int32 I = 0; I < Count && Ar.Ok(); ++I)
+			{
+				int32 Four = 4;
+				Ar.BeginArray(Four);
+				Ar.Expect(Four, 4, TEXT("sentier"));
+				int32 Index = Ar.IsLoading() ? 0 : RoadKeys[I];
+				Ar.Number(Index);
+				AnastasisTraffic::FRoadTile Road = Ar.IsLoading() ? AnastasisTraffic::FRoadTile() : Roads[Index];
+				Ar.Number(Road.Class);
+				Ar.Number(Road.BuiltDay);
+				Ar.Number(Road.TrafficAtBirth);
+				if (Ar.IsLoading() && Ar.Ok()) Roads.Add(Index, Road);
+				Ar.EndArray();
+			}
+			Ar.EndArray();
+			Ar.Key(TEXT("roadEfforts"));
+			VisitSortedIntMap(Ar, RoadEfforts, [](FStateArchive& A, double& E) { A.Number(E); });
+		}
+		Ar.Key(TEXT("settlement"));
+		VisitState(Ar, Settlement);
+		Ar.Key(TEXT("marketDx"));
+		VisitOptionalNumber(Ar, MarketDx);
+		Ar.Key(TEXT("marketDy"));
+		VisitOptionalNumber(Ar, MarketDy);
+		Ar.Key(TEXT("hasColony")).Bool(bHasColony);
+		Ar.Key(TEXT("settlementClearRadius"));
+		VisitOptionalNumber(Ar, SettlementClearRadius);
+		Ar.Key(TEXT("colonyTreasury"));
+		VisitOptionalNumber(Ar, ColonyTreasury);
+		// Le cache d'urgence est indexe par la seconde de jeu, pas par l'etat : deux villages egaux par
+		// ailleurs peuvent decider autrement dans la meme seconde. C'est donc de l'etat.
+		Ar.Key(TEXT("urgencyBucket")).String(UrgencyBucket);
+		Ar.Key(TEXT("urgencyCache"));
+		VisitOptionalState(Ar, UrgencyCache);
+		Ar.Key(TEXT("nextBuildingId")).Number(NextBuildingId);
+		Ar.Key(TEXT("deathLog"));
+		VisitStates(Ar, DeathLog);
+		Ar.Key(TEXT("nextNpcId")).Number(NextNpcId);
+		Ar.Key(TEXT("now")).Number(Now);
+		Ar.Key(TEXT("weatherSeed")).Number(WeatherSeed);
+		Ar.Key(TEXT("weatherSeeded")).Bool(bWeatherSeeded);
+		Ar.Key(TEXT("forcedWeather")).Bool(bForcedWeather);
+		Ar.Key(TEXT("forcedWeatherValue"));
+		VisitState(Ar, ForcedWeather);
+		Ar.Key(TEXT("tickWeather"));
+		VisitState(Ar, TickWeather);
+		Ar.Key(TEXT("tickDailyRain")).Number(TickDailyRain);
+		Ar.Key(TEXT("budgetDirector"));
+		VisitState(Ar, BudgetDirector);
+		Ar.Key(TEXT("simulationView")).Bool(bSimulationView);
+		Ar.Key(TEXT("mealReservations"));
+		VisitStates(Ar, MealReservations);
+		Ar.Key(TEXT("foodSources"));
+		VisitStates(Ar, FoodSources);
+		Ar.Key(TEXT("mealSeq")).Number(MealSeq);
+		Ar.Key(TEXT("reservationSweepAt")).Number(ReservationSweepAt);
+		Ar.Key(TEXT("soilWaterByTile"));
+		VisitSortedIntMap(Ar, SoilWaterByTile, [](FStateArchive& A, double& W) { A.Number(W); });
+		Ar.Key(TEXT("soilWaterEnabled")).Bool(bSoilWaterEnabled);
+		Ar.Key(TEXT("navService"));
+		VisitState(Ar, NavService);
+		if (Ar.IsHashing())
+		{
+			// Trafic par tuile, une seconde fois en empreinte d'octets (STATE_ORACLE_001). Deja sauve plus haut,
+			// nombre par nombre : la sauvegarde ne le repete pas.
+			Ar.Key(TEXT("traffic")).Blob(Traffic);
+		}
+		Ar.Key(TEXT("buildings"));
+		VisitStates(Ar, Buildings.GetItemsMutable());
+		Ar.Key(TEXT("actors"));
+		VisitStates(Ar, Actors.GetItemsMutable());
+		Ar.EndObject();
+	}
+
+	void FVillage::AfterStateLoaded()
+	{
+		// Les champs classes `cache:` dans tools/migration/state-fields.json : ni haches ni sauves, ils se
+		// refont depuis l'etat relu. `Grid` se reconstruit au debut de chaque boucle des habitants.
+		NavSourceShared.Reset();
+		NavAgents.Reset();
+	}
+}
+
+void AnastasisArchive::VisitTile(FStateArchive& Ar, AnastasisWorld::FTile& Tile)
+{
+	AnastasisVillage::VisitState(Ar, Tile);
 }

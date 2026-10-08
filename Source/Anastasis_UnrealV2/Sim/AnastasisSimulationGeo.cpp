@@ -84,6 +84,11 @@ namespace
 	}
 }
 
+bool UAnastasisSimulationSubsystem::ReadGeoScenarioFile(const FString& Path, AnastasisGeo::FScenario& Out)
+{
+	return ReadScenario(Path, Out);
+}
+
 void UAnastasisSimulationSubsystem::LogGeoEvents()
 {
 	for (const FString& Line : Simulation.GetGeo().DrainEvents())
@@ -119,6 +124,7 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisGeoLoad(
 			}
 			return;
 		}
+		Host->NoteGeoScenarioPath(Path);
 		Sim.AdmitGeoMigration();
 		Host->LogGeoEvents();
 		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_GEO loaded %s from %s at day %d"), *Scenario.Id, *Path, Sim.GetDay());
@@ -132,6 +138,7 @@ static FAutoConsoleCommandWithWorld CmdAnastasisGeoUnload(
 		if (UAnastasisSimulationSubsystem* Host = RunningHost(World, TEXT("unload")))
 		{
 			Host->GetSimulation().GetGeo().Unload();
+			Host->NoteGeoScenarioPath(FString());
 			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_GEO unloaded"));
 		}
 	}));

@@ -228,9 +228,15 @@ des futurs différents (IRON_CRUSADE_001 : une écriture invisible dans `Speed` 
 `FAnastasisSimulation::StateDigest()` ou `FVillage::StateDigest()`.
 
 Un champ ajouté à une structure d'état (`FNpc`, `FBuilding`, `FVillage`, `FAnastasisSimulation`, et les
-types qu'ils portent) se lit dans son `HashState` (`Private/Village/AnastasisVillageStateDigest.cpp`), ou
+types qu'ils portent) se lit dans son `VisitState` (`Private/Village/AnastasisVillageStateDigest.cpp`), ou
 se classe dans `tools/migration/state-fields.json` (`cache:`, `derive:`, `pointeur:`, `observation:`,
 `lacune:`). `finish` le contrôle (`node tools/migration/check-state-fields.mjs`, `-liste` pour le détail).
+
+**Sauvegarde (SAVE_STATE_001).** Le même parcours `VisitState` / `ArchiveState` (`Core/AnastasisStateArchive.h`)
+hache l'empreinte d'état, écrit la sauvegarde et la relit : un champ lu là est sauvé, un champ oublié manque
+aux deux et le contrôle ci-dessus l'attrape. Changer ce parcours (champ ajouté, retiré, déplacé, retypé)
+change le format : monter `FAnastasisSimulation::SaveFormatVersion` dans le même commit. Une sauvegarde d'un
+autre format est refusée, avec le chemin du premier champ qui diffère, jamais lue de travers.
 
 ## Interdit
 
@@ -405,6 +411,7 @@ Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
 | `probe-demo.ps1` + `probe-demo.py` | preuve PIE : snapshot monde + capture par bookmark (défauts connus : `ATMOSPHERE_002.md`) |
 | `asset_agent_probe.py` | preuve PIE partagée par les missions d'asset, un bookmark par run |
 | `npc-life-pie.py` | preuve PIE du village initial sans scénario : foyer, travail alimentaire partagé, besoins, sommeil, matériaux portés du monde au chantier sec puis maison attribuée à un bâtisseur |
+| `save-load-pie.py` | preuve PIE de la sauvegarde (SAVE_STATE_001) : village du lancement + monde exterieur, simulation figee (`TimeScale 0`), `Advance 1d`, `Anastasis.Sim.Save`, `Advance 2d` (empreinte F), `Anastasis.Sim.Load` (empreinte de la sauvegarde, un acteur par batiment et une carte par habitant refaits), les memes `Advance 2d` (empreinte F : meme futur), slot absent refuse sans rien changer ; lecture par `get_save_status` -> `Saved/SaveStateEvidence/pie/save-load.json` ; au registre (`save-load-pie`) ; ecrit `Saved/SaveGames/save-state-pie.sav`, aucun asset |
 | `material-courier-pie.py` | preuve PIE d'un chantier explicitement ouvert a sec : un porteur preleve bois/pierre du monde, les livre, et la maison se termine sans stock injecte |
 | `site-stock-visual-pie.py` | preuve PIE numerique sans capture : piles absentes sur chantier sec, presentes apres livraisons, reduites par consommation puis absentes a l'achevement ; aucun asset sauve ; au registre (`site-stock-visual-pie`) |
 | `first-building-pie.py` | preuve PIE du premier bâtiment : pilote `Anastasis.Village.*` en console (puits, habitants, retraits), lecture par les lignes `ANASTASIS_VILLAGE` du log |

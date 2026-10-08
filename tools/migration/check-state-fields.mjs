@@ -5,7 +5,7 @@
 // (STATE_ORACLE_001). Cet oracle ne vaut que s'il suit les structures : IRON_CRUSADE_001 a montre
 // qu'une ecriture invisible dans `Speed` ou `sim.rng` change le futur en ~8 s simulees. Ce
 // controleur refuse donc un champ d'une structure du registre qui n'est pas :
-//   - lu dans le hacheur de sa structure (`<acces><Champ>` dans le corps de la fonction declaree) ;
+//   - lu dans le parcours d'etat de sa structure (`VisitState` / `ArchiveState`, qui hache ET sauve : `<acces><Champ>` dans le corps de la fonction declaree) ;
 //   - ou classe hors etat dans le registre, avec sa raison : `cache:`, `derive:`, `pointeur:`,
 //     `observation:` ou `lacune:` (etat reel pas encore lu : visible, compte, a fermer).
 // Il refuse aussi une entree perimee (champ disparu) ou contradictoire (classee ET lue).
@@ -163,7 +163,7 @@ function check(rev) {
     for (const f of parsed.fields) {
       const read = new RegExp(`${acces ? "" : "(?<![.\\w>])"}${esc}${f}\\b`).test(reader.body);
       const raison = hors[f];
-      if (read && raison !== undefined) problems.push(`${s.nom}.${f} : lu par le hacheur ET classe hors etat (« ${raison} ») -- retirer l'un des deux`);
+      if (read && raison !== undefined) problems.push(`${s.nom}.${f} : lu par le parcours d'etat ET classe hors etat (« ${raison} ») -- retirer l'un des deux`);
       else if (read) lus.push(f);
       else if (raison !== undefined) {
         const kind = String(raison).split(":")[0].trim();

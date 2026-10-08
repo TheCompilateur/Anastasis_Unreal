@@ -454,6 +454,7 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	FirstSiteId.Reset();
 	OpeningSiteId.Reset();
 	OpeningWorkId.Reset();
+	GeoScenarioPath.Reset();
 	Simulation.Reset(Seed, AnastasisWorldView::ReferenceWidth, AnastasisWorldView::ReferenceHeight);
 	// CHRONIQUE_VILLAGE_001 : une simulation neuve, une chronique neuve. Le nom provisoire d'un habitant
 	// s'accorde au portrait que la presentation lui donnera (meme tirage que SyncVillagers).

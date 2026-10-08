@@ -228,6 +228,7 @@
 #include "World/AnastasisWorld.h"
 
 namespace AnastasisWorld { struct FWorld; }
+namespace AnastasisArchive { class FStateArchive; }
 
 namespace AnastasisVillage
 {
@@ -1510,10 +1511,21 @@ namespace AnastasisVillage
 
 		/**
 		 * STATE_ORACLE_001 -- empreinte d'ETAT : tout ce qui decide du futur du village (sim.rng, meteo, joueur,
-		 * compteurs, memoire, liens...). Oracle des tests de determinisme et de non-ecriture ; ni parite, ni
-		 * format de sauvegarde. Ce qui n'y entre pas est classe dans tools/migration/state-fields.json.
+		 * compteurs, memoire, liens...). Oracle des tests de determinisme et de non-ecriture ; pas la parite.
+		 * Ce qui n'y entre pas est classe dans tools/migration/state-fields.json.
 		 */
 		uint64 StateDigest() const;
+
+		/**
+		 * SAVE_STATE_001 -- le parcours d'etat du village (Core/AnastasisStateArchive.h) : le meme hache
+		 * (`StateDigest`), sauve et relit. Appele par FAnastasisSimulation::SaveState / LoadState ; en
+		 * lecture, le village doit etre lie au monde (`Bind`) et `AfterStateLoaded` suit.
+		 */
+		void ArchiveState(AnastasisArchive::FStateArchive& Ar);
+
+		/** Apres une lecture : vide les caches classes `cache:` (state-fields.json) pour qu'ils se refassent. */
+		void AfterStateLoaded();
+
 
 	private:
 		void UpdateNpc(FNpc& Npc, double Dt);
