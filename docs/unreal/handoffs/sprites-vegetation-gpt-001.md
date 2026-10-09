@@ -50,6 +50,9 @@ PENDING
   - monde reel (`capture-slice.ps1 -Mode 1`, `ANASTASIS_TREE_TAXA_GPT`) avec les poids d'avant reglage : chene caducifolie 657,
     bouleau 370, pin sylvestre 983, saule 9, marronnier 3 sur 5 489 arbres ; poids du chene et du pin sylvestre baisses
     depuis (0,8 -> 0,6 et 0,9 -> 0,65), comptes non remesures
+  - 1er `finish` : `Anastasis.Terrain.HumanGeography.CollisionAndDressing` en echec (plafond de 30 m sur la hauteur des
+    arbres, pin sylvestre a 34 m) ; fourchette du pin sylvestre ramenee de 20-30 m a 18-24 m (plus haute essence existante :
+    platane, 24 m), registre regenere
 - COMMANDS:
   - `python tools/unreal/gpt-flora-cut.py` puis `gpt-flora-fit.py` puis `gpt-flora-preview.py` (hors editeur)
   - `tools\unreal\create-gpt-flora.ps1` (maillages, materiau, atlas, registre)

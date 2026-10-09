@@ -118,7 +118,7 @@ namespace
 	const FGptSpeciesDefault GptSpeciesDefaults[] = {
 		{TEXT("SM_Gpt_Chene"), EAnastasisTreeSpecies::DeciduousOak, EAnastasisFoliageFamily::Broadleaf, 14.0f, 22.0f},
 		{TEXT("SM_Gpt_Bouleau"), EAnastasisTreeSpecies::Birch, EAnastasisFoliageFamily::Broadleaf, 12.0f, 18.0f},
-		{TEXT("SM_Gpt_PinSylvestre"), EAnastasisTreeSpecies::ScotsPine, EAnastasisFoliageFamily::Conifer, 20.0f, 30.0f},
+		{TEXT("SM_Gpt_PinSylvestre"), EAnastasisTreeSpecies::ScotsPine, EAnastasisFoliageFamily::Conifer, 18.0f, 24.0f},
 		{TEXT("SM_Gpt_SaulePleureur"), EAnastasisTreeSpecies::Willow, EAnastasisFoliageFamily::Broadleaf, 10.0f, 16.0f},
 		{TEXT("SM_Gpt_MarronnierFleuri"), EAnastasisTreeSpecies::HorseChestnut, EAnastasisFoliageFamily::Broadleaf, 14.0f, 20.0f},
 		{TEXT("SM_Gpt_PinSombre"), EAnastasisTreeSpecies::BlackPine, EAnastasisFoliageFamily::Conifer, 15.0f, 23.0f},

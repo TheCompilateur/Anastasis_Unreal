@@ -101,7 +101,7 @@ if os.environ.get('ANASTASIS_LINEUP_SET', '') == 'gpt':
         ('SM_Gpt_Cypres', 1600.0, 'cypres 16 m'),
         ('SM_Gpt_Chene', 1700.0, 'chene 17 m'),
         ('SM_Gpt_PinSombre', 2000.0, 'pin sombre 20 m'),
-        ('SM_Gpt_PinSylvestre', 2400.0, 'pin sylvestre 24 m'),
+        ('SM_Gpt_PinSylvestre', 2100.0, 'pin sylvestre 21 m'),
     ]
     ARC_RADIUS = 6200.0
     ARC_SPACING = 1400.0

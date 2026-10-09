@@ -84,7 +84,7 @@ GPT_MATERIAL = "/Game/Anastasis/Materials/M_AnastasisGptFoliage"
 GPT_SPECIES = [
     ("SM_Gpt_Chene", "DECIDUOUS_OAK", "BROADLEAF", (14.0, 22.0)),
     ("SM_Gpt_Bouleau", "BIRCH", "BROADLEAF", (12.0, 18.0)),
-    ("SM_Gpt_PinSylvestre", "SCOTS_PINE", "CONIFER", (20.0, 30.0)),
+    ("SM_Gpt_PinSylvestre", "SCOTS_PINE", "CONIFER", (18.0, 24.0)),
     ("SM_Gpt_SaulePleureur", "WILLOW", "BROADLEAF", (10.0, 16.0)),
     ("SM_Gpt_MarronnierFleuri", "HORSE_CHESTNUT", "BROADLEAF", (14.0, 20.0)),
     ("SM_Gpt_PinSombre", "BLACK_PINE", "CONIFER", (15.0, 23.0)),
