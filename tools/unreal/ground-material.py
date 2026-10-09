@@ -67,6 +67,9 @@ TEX_PKG = PKG + '/GroundTextures'
 # l'echelle physique : un caillou de la photo a la taille d'un caillou.
 TEX_FAMILIES = (('Grass', 200.0), ('Litter', 300.0), ('Worked', 130.0), ('Rock', 300.0))
 CONTEXT_FAMILIES = (('Ruin', 200.0), ('Path', 220.0), ('Gravel', 290.0))
+# La photo proche s'arrete a 20 m, les touffes HISM a 105 m. Ces deux scans
+# remplissent uniquement cette plage sur les familles les plus communes.
+DISTANCE_FAMILIES = (('MeadowDistance', 200.0), ('ForestDistance', 300.0))
 # Inverse de DETAIL_MEAN de ground-textures.py : l'albedo de detail est stocke a une
 # moyenne de 0.4, le materiau le ramene a 1. Les deux nombres vont ensemble ;
 # import_textures() le verifie contre le manifeste a chaque import.
@@ -328,8 +331,9 @@ def import_textures():
                           'GroundTextures', 'packed')
     manifest_checked = False
     out = {}
-    for family, _ in TEX_FAMILIES + CONTEXT_FAMILIES:
-        for suffix, srgb in (('AH', True), ('NR', False)):
+    for family, _ in TEX_FAMILIES + CONTEXT_FAMILIES + DISTANCE_FAMILIES:
+        suffixes = (('AH', True),) if family in dict(DISTANCE_FAMILIES) else (('AH', True), ('NR', False))
+        for suffix, srgb in suffixes:
             path = tex_path(family, suffix)
             if TEX_REIMPORT or not eal.does_asset_exist(path):
                 if not manifest_checked:
@@ -493,6 +497,42 @@ TexRough = (nr.b - 0.5) * 2.0 * RoughnessStrength * Fade;
 return lerp(float3(1.0, 1.0, 1.0), detail, Fade);
 ''' % (body, context_body, 1.0 / TEX_DETAIL_MEAN, context_mix)
 
+
+
+def distance_ground_hlsl():
+    """Scan photographique sur la plage ou les HISM d'herbe disparaissent.
+
+    Les textures sont des details d'albedo neutres en moyenne. Le moteur choisit
+    les mips avec des derivees explicites ; le sampler Wrap partage est celui
+    d'Unreal, pour ne pas depasser les 16 samplers du materiau existant.
+    """
+    return '''
+float3 neutral = float3(1.0, 1.0, 1.0);
+float band = smoothstep(Start, Full, Depth) * (1.0 - smoothstep(FadeStart, FadeEnd, Depth));
+float open = (1.0 - saturate(Rock)) * smoothstep(0.55, 0.80, normalize(N).z);
+open *= (1.0 - saturate(Road)) * (1.0 - saturate(Gravel));
+float meadow = saturate(1.0 - RockW - Litter - Worked) * open;
+float forest = saturate(Litter) * open;
+float strength = saturate(Strength) * band;
+float2 warp = float2(Meso - 0.5, 0.5 - Meso) * 25.0;
+float2 meadowUV = (P.xy + warp) / max(MeadowSize, 100.0);
+float2 forestUV = (P.xy + warp) / max(ForestSize, 100.0);
+float2 meadowDx = ddx(meadowUV), meadowDy = ddy(meadowUV);
+float2 forestDx = ddx(forestUV), forestDy = ddy(forestUV);
+[branch] if (strength < 0.001 || meadow + forest < 0.002) return neutral;
+float3 factor = neutral;
+[branch] if (meadow > 0.002) {
+    float3 photo = Texture2DSampleGrad(MeadowAH, View.MaterialTextureBilinearWrapedSampler,
+                                       meadowUV, meadowDx, meadowDy).rgb * 2.5;
+    factor += meadow * (photo - neutral);
+}
+[branch] if (forest > 0.002) {
+    float3 photo = Texture2DSampleGrad(ForestAH, View.MaterialTextureBilinearWrapedSampler,
+                                       forestUV, forestDx, forestDy).rgb * 2.5;
+    factor += forest * (photo - neutral);
+}
+return lerp(neutral, clamp(factor, 0.55, 1.45), strength);
+'''
 
 
 def slope_surface_hlsl():
@@ -869,6 +909,32 @@ return saturate(Thin + Fine + matrix);
     g.link(g.scalar('SlopeSurface',1.0,P+'SoilHistory',-1700,3100),'',slope_surface,'Enabled')
     g.link(g.scalar('SlopeSurfaceSize',900.0,P+'SoilHistory',-1700,3160),'',slope_surface,'Size')
 
+    # Sous les touffes : la photo proche cesse a 20 m, les HISM s'effacent a
+    # 55/105 m. Ce facteur photographique couvre la jonction sans ajouter de
+    # geometrie et sans teinter les routes, berges de gravier ou rochers.
+    meadow_distance = g.node(unreal.MaterialExpressionTextureObjectParameter,
+                             -1700, 3920, parameter_name='TexMeadowDistanceAH',
+                             group=T, texture=textures[('MeadowDistance', 'AH')],
+                             sampler_type=SAMPLER_COLOR)
+    forest_distance = g.node(unreal.MaterialExpressionTextureObjectParameter,
+                             -1700, 4000, parameter_name='TexForestDistanceAH',
+                             group=T, texture=textures[('ForestDistance', 'AH')],
+                             sampler_type=SAMPLER_COLOR)
+    distance = g.custom(distance_ground_hlsl(), 'GroundDistance', CMOT_FLOAT3,
+        ('P', 'N', 'Depth', 'Rock', 'RockW', 'Litter', 'Worked', 'Road', 'Gravel',
+         'Meso', 'Start', 'Full', 'FadeStart', 'FadeEnd', 'Strength',
+         'MeadowSize', 'ForestSize', 'MeadowAH', 'ForestAH'), (), -950, 3880)
+    for name, src in (('P', wp), ('N', nws), ('Depth', depth), ('Rock', rock_mask),
+                      ('RockW', w_rock), ('Litter', w_litter), ('Worked', w_worked),
+                      ('Road', w_road), ('Gravel', w_bank_gravel), ('Meso', n_meso),
+                      ('MeadowAH', meadow_distance), ('ForestAH', forest_distance)):
+        g.link(src, '', distance, name)
+    for name, value in (('Start', 1200.0), ('Full', 7000.0),
+                        ('FadeStart', 18000.0), ('FadeEnd', 35000.0),
+                        ('Strength', 1.0), ('MeadowSize', 200.0), ('ForestSize', 300.0)):
+        g.link(g.scalar('TexDistance' + name, value, T + '|Distance', -1900, 3700),
+               '', distance, name)
+
     # ------------------------------------------------------------------------- albedo
     base = g.mask(vc, '', True, True, True, -1240, -240)
     base = g.lerp(base, '', g.mul(base, '', p_litter_tint, '', -1080, -200), '', w_litter, '', -920, -240)
@@ -929,6 +995,7 @@ return saturate(Thin + Fine + matrix);
     base = g.lerp(base, '', p_gap_soil, '', gap, '', 240, -160)
     # Detail photo : un facteur neutre en moyenne, pose APRES les teintes calees.
     base = g.mul(base, '', tex, '', 280, -240)
+    base = g.mul(base, '', distance, '', 320, -260)
 
     # Sol detrempe : plus sombre, comme un sol reellement mouille.
     dark = g.mul(base, '', p_damp_dark, '', 360, -120)

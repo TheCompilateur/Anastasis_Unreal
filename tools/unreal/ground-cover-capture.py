@@ -89,6 +89,10 @@ STATE_CMDS = {
     'gravel_before': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     'gravel_after': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     'gravel_control': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    # Sol commun sous les touffes : memes HISM et cameras, seule la MID change.
+    'distance_before': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'distance_after': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'distance_control': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     # MICRO_ECOLOGY_001. L'herbe, sa teinte et les rives vivantes restent. Seule cette couche bouge.
     'eco': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1',
             'anastasis.Dressing.MicroEcology 1', 'anastasis.MicroEcology.Soil 1'),
@@ -99,6 +103,7 @@ NO_TEXTURE = ('on_notex', 'bare_notex')
 CONTEXT_STATES = ('ruin_before', 'ruin_after', 'ruin_control',
                   'path_before', 'path_after', 'path_control',
                   'gravel_before', 'gravel_after', 'gravel_control')
+DISTANCE_STATES = ('distance_before', 'distance_after', 'distance_control')
 GROUND_MI = '/Game/Anastasis/Materials/MI_AnastasisGround'
 states = [x.strip() for x in os.environ.get('ANASTASIS_GROUND_STATES', 'on,off').split(',') if x.strip()]
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
@@ -160,7 +165,7 @@ try:
     def cmd(c):
         unreal.SystemLibrary.execute_console_command(world, c)
 
-    if natural_run or flower_run or cards_run or micro_run or any(s in CONTEXT_STATES for s in states):
+    if natural_run or flower_run or cards_run or micro_run or any(s in CONTEXT_STATES + DISTANCE_STATES for s in states):
         cmd('anastasis.Sky.Hour 11')
         if not woodland_run:
             cmd('anastasis.Dressing.WoodlandSequence 0')
@@ -173,7 +178,7 @@ try:
 
     def texture_state(state):
         # Apres CHAQUE incarnation : EmbodyCanonical repose le materiau de l'asset.
-        if state not in NO_TEXTURE and state not in CONTEXT_STATES:
+        if state not in NO_TEXTURE and state not in CONTEXT_STATES and state not in DISTANCE_STATES:
             return
         # Une MID par section, creee par le composant lui-meme (UFUNCTION exposee a Python).
         n = 0
@@ -189,7 +194,8 @@ try:
                 else:
                     family = state.split('_', 1)[0]
                     parameter = {'ruin': 'TexContextStrength', 'path': 'TexPathStrength',
-                                 'gravel': 'TexGravelStrength'}[family]
+                                 'gravel': 'TexGravelStrength',
+                                 'distance': 'TexDistanceStrength'}[family]
                     mid.set_scalar_parameter_value(parameter, 1.0 if state.endswith('_after') else 0.0)
                 # Un materiau sans le parametre l'ignore en silence et rendrait un faux A/B.
                 get = getattr(mid, 'k2_get_scalar_parameter_value', None) or mid.get_scalar_parameter_value

@@ -77,6 +77,12 @@ FAMILIES = {
     'Path': ('stony_dirt_path', 220.0, 'diff'),
     'Gravel': ('river_small_rocks', 290.0, 'diff'),
 }
+# Photos pour la couverture moyenne distance : couleur neutre seulement. Les cartes
+# PBR proches restent les familles ci-dessus ; leurs mips s'eteignent avant les HISM.
+DISTANCE_FAMILIES = {
+    'MeadowDistance': ('leafy_grass', 200.0, 'diff', 75.0),
+    'ForestDistance': ('forest_leaves_02', 300.0, 'diffuse', 100.0),
+}
 MAPS = (('color', 'jpg'), ('nor_dx', 'png'), ('rough', 'jpg'), ('disp', 'png'), ('ao', 'jpg'))
 
 
@@ -225,17 +231,52 @@ def pack(family, asset, size_cm, files):
     return paths, info
 
 
+def pack_distance(family, asset, size_cm, color_path, cutoff_cm):
+    """Couverture photo de 0.5-1 m, neutre en moyenne et sans ombre photographique.
+
+    Le passe-haut retire les taches propres a une tuile repetee, mais conserve les
+    amas vegetaux qui survivent au culling des touffes a 55-105 m.
+    """
+    color = srgb_to_lin(load01(color_path, 3))
+    sigma = cutoff_cm / size_cm * 2048.0 / 2.0
+    local = np.maximum(lowpass(color, sigma), 1e-4)
+    value = (color @ LUMA) / np.maximum(local @ LUMA, 1e-4)
+    chroma = (color / local) / np.maximum(value, 1e-4)[..., None]
+    detail = np.power(np.maximum(value, 1e-4), 0.60)[..., None]
+    detail = detail * np.power(np.maximum(chroma, 1e-4), 0.35) * DETAIL_MEAN
+    clipped = float((detail > 1.0).any(axis=-1).mean())
+    alpha = np.full(color.shape[:2], 255, dtype=np.uint8)
+    packed = np.dstack([to8(lin_to_srgb(detail)), alpha])
+    dst = os.path.join(PACKED, 'T_Ground_%s_AH.png' % family)
+    Image.fromarray(packed, 'RGBA').save(dst, optimize=False)
+    info = {'asset': asset, 'size_cm': size_cm, 'size': list(packed.shape[:2]),
+            'highpass_cm': cutoff_cm, 'albedo_clipped_fraction': round(clipped, 5),
+            'role': 'distance albedo detail; no near-field normal or height'}
+    print('GROUND_TEXTURES PACKED %s %s' % (family, json.dumps(info)))
+    return info
+
+
 def main():
     os.makedirs(RAW, exist_ok=True)
     os.makedirs(PACKED, exist_ok=True)
     manifest = {'license': 'CC0 1.0 (Poly Haven)', 'detail_mean': DETAIL_MEAN, 'chroma': CHROMA,
                 'highpass_cm': HIGHPASS_CM,
-                'families': {}}
+                'families': {}, 'distance_families': {}}
     selected = sys.argv[1:] or list(FAMILIES)
-    unknown = set(selected) - set(FAMILIES)
+    unknown = set(selected) - set(FAMILIES) - set(DISTANCE_FAMILIES)
     if unknown:
         raise ValueError('familles inconnues: ' + ', '.join(sorted(unknown)))
     for family in selected:
+        if family in DISTANCE_FAMILIES:
+            asset, size_cm, color_name, cutoff_cm = DISTANCE_FAMILIES[family]
+            url = url_for(asset, 'color', 'jpg', color_name)
+            dst = os.path.join(RAW, os.path.basename(url))
+            fetch(url, dst)
+            info = pack_distance(family, asset, size_cm, dst, cutoff_cm)
+            info['page'] = 'https://polyhaven.com/a/' + asset
+            info['sources'] = {'color': {'url': url, 'sha256': sha(dst), 'bytes': os.path.getsize(dst)}}
+            manifest['distance_families'][family] = info
+            continue
         asset, size_cm, color_name = FAMILIES[family]
         files, sources = {}, {}
         for kind, ext in MAPS:
