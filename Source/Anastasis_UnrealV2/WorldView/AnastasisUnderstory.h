@@ -18,7 +18,14 @@
  */
 namespace AnastasisUnderstory
 {
-enum class EKind : uint8 { Lentisk, KermesOak, Broom, Bramble, Rock, Count };
+enum class EKind : uint8
+{
+	Lentisk, KermesOak, Broom, Bramble, Rock,
+	// GPT_FLORA_001 -- les six petits sujets de la planche GPT (create-gpt-flora.py), apres Rock pour ne rien
+	// renumeroter. Poses seulement dans une cellule que le maquis, les ronces et les rochers laissent vide.
+	Juniper, Hazel, BerryShrub, Rhododendron, Fern, Meadow,
+	Count
+};
 inline constexpr int32 KindCount = static_cast<int32>(EKind::Count);
 inline constexpr int32 ShrubShapes = 3;
 
@@ -26,6 +33,8 @@ inline constexpr int32 ShrubShapes = 3;
 enum class ERock : uint8 { Boulder, Low, Split, Massive, Cluster, CliffFragment, Vertical, Count };
 inline constexpr int32 RockCount = static_cast<int32>(ERock::Count);
 
+/** Un des six sujets GPT : un seul maillage, pas de forme 1..3. */
+inline bool IsGptKind(EKind Kind) { return static_cast<int32>(Kind) >= static_cast<int32>(EKind::Juniper) && Kind != EKind::Count; }
 const TCHAR* KindName(EKind Kind);
 const TCHAR* RockName(ERock Rock);
 int32 RockVariants(ERock Rock);
@@ -53,6 +62,8 @@ struct FSettings
 	/** Sous les couronnes : cette part (ombre). */
 	double CanopyKeep = 0.2;
 	double BrambleDensity = 0.35;
+	/** GPT_FLORA_001 : multiplicateur de la densite des six sujets GPT (0 = aucun). */
+	double GptFloraDensity = 1.0;
 	/** Rochers : eparpilles sur le pre, avec la pente, sur la roche du sim, en altitude. */
 	double RockMeadowDensity = 0.006;
 	double RockSlopeDensity = 0.22;

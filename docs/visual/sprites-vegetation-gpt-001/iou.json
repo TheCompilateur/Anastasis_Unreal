@@ -1,15 +1,15 @@
 {
- "marronnier_fleuri": 0.807,
- "bouleau": 0.699,
- "chene": 0.584,
- "pin_sombre": 0.667,
- "pin_sylvestre": 0.481,
- "cypres": 0.67,
- "genevrier": 0.714,
- "noisetier": 0.662,
- "saule_pleureur": 0.735,
- "arbuste_baies": 0.761,
- "rhododendron": 0.8,
- "fougere": 0.503,
- "prairie_fleurie": 0.618
+ "marronnier_fleuri": 0.737,
+ "bouleau": 0.596,
+ "chene": 0.598,
+ "pin_sombre": 0.489,
+ "pin_sylvestre": 0.366,
+ "cypres": 0.708,
+ "genevrier": 0.355,
+ "noisetier": 0.618,
+ "saule_pleureur": 0.398,
+ "arbuste_baies": 0.526,
+ "rhododendron": 0.439,
+ "fougere": 0.355,
+ "prairie_fleurie": 0.49
 }

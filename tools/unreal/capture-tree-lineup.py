@@ -90,7 +90,6 @@ SUBJECTS = [
 GROUND_SCALE = 60.0
 if os.environ.get('ANASTASIS_LINEUP_SET', '') in ('gpt', 'gpt_low'):
     MESH_DIR = '/Game/Anastasis/Vegetation/Gpt/'
-    MATERIAL = '/Game/Anastasis/Materials/M_AnastasisGptFoliage'
     GROUND_SCALE = 300.0
 if os.environ.get('ANASTASIS_LINEUP_SET', '') == 'gpt':
     # les sept arbres, du plus petit au plus grand

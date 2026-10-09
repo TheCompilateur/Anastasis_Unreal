@@ -89,6 +89,59 @@ constexpr FRockSpec Rocks[] = {
 static_assert(static_cast<int32>(UE_ARRAY_COUNT(Rocks)) == RockCount, "one spec per ERock");
 
 constexpr const TCHAR* ShrubStems[] = {TEXT("SM_Shrub_Lentisk"), TEXT("SM_Shrub_KermesOak"), TEXT("SM_Shrub_Broom"), TEXT("SM_Shrub_Bramble")};
+
+/** Maillages de create-gpt-flora.py, dans l'ordre de EKind::Juniper... */
+constexpr const TCHAR* GptMeshes[] = {TEXT("SM_Gpt_Genevrier"), TEXT("SM_Gpt_Noisetier"), TEXT("SM_Gpt_ArbusteBaies"),
+	TEXT("SM_Gpt_Rhododendron"), TEXT("SM_Gpt_Fougere"), TEXT("SM_Gpt_PrairieFleurie")};
+constexpr int32 GptKindFirst = static_cast<int32>(EKind::Juniper);
+static_assert(static_cast<int32>(UE_ARRAY_COUNT(GptMeshes)) == static_cast<int32>(EKind::Count) - GptKindFirst, "one mesh per GPT kind");
+
+/** Le site d'une cellule, tel que les six sujets GPT le lisent. */
+struct FGptSite
+{
+	double Slope = 0.0, Alt = 0.0, Damp = 0.0, Shade = 0.0, Crown = 1e9, EdgeRing = 0.0, RiverBand = 0.0;
+	double Open = 0.0, Stone = 0.0, Grass = 0.0, MeadowPatch = 0.0, Reserve = 1.0;
+	bool bUnder = false;
+};
+
+/**
+ * Aptitude d'un sujet GPT dans une cellule de 4 m. Des aptitudes douces, comme le maquis : jamais un seuil
+ * par tuile. Chaque sujet a un habitat dit en une phrase :
+ *   fougere        ombre humide : sous les couronnes, dans l'humide, au frais
+ *   rhododendron   versants frais et humides sous couvert, ravins ; le rhododendron du Pont est un sous-bois d'ubac
+ *   noisetier      lisieres des couronnes, mi-pente, un peu d'humidite
+ *   arbuste a baies  haies : lisieres et bandes riveraines
+ *   genevrier      pentes seches et pierreuses, au soleil, en terrain ouvert
+ *   prairie fleurie  pres ouverts et frais, par plaques, au plat
+ */
+double GptWeight(EKind Kind, const FGptSite& S)
+{
+	const double SlopeOk = Fall(30.0, 38.0, S.Slope);
+	switch (Kind)
+	{
+	case EKind::Fern:
+		return 0.40 * Rise(0.30, 0.65, S.Damp) * (0.25 + 0.75 * Fall(0.9, 1.8, S.Crown)) * Fall(0.55, 0.85, S.Alt)
+			* SlopeOk * (1.0 - 0.6 * Rise(0.0, 0.8, S.Shade)) * S.Reserve;
+	case EKind::Rhododendron:
+		return 0.22 * Rise(0.35, 0.70, S.Damp) * Rise(0.20, 0.40, S.Alt) * Fall(0.65, 0.85, S.Alt)
+			* (0.25 + 0.75 * Fall(0.8, 1.8, S.Crown)) * (0.4 + 0.6 * Rise(5.0, 16.0, S.Slope))
+			* (1.0 - 0.7 * Rise(0.0, 0.8, S.Shade)) * SlopeOk * S.Reserve;
+	case EKind::Hazel:
+		return 0.22 * (0.85 * S.EdgeRing + (S.bUnder ? 0.15 : 0.0)) * Fall(0.50, 0.75, S.Alt)
+			* (0.35 + 0.65 * Rise(0.15, 0.50, S.Damp)) * SlopeOk * S.Reserve;
+	case EKind::BerryShrub:
+		return 0.24 * FMath::Max(0.7 * S.EdgeRing, 0.8 * S.RiverBand) * Fall(0.50, 0.75, S.Alt) * SlopeOk * S.Reserve;
+	case EKind::Juniper:
+		return 0.16 * Rise(0.18, 0.40, S.Alt) * Fall(0.80, 0.95, S.Alt) * (0.25 + 0.75 * FMath::Max(S.Stone, Rise(10.0, 24.0, S.Slope)))
+			* (1.0 - 0.85 * Rise(0.25, 0.65, S.Damp)) * (0.5 + 0.5 * Rise(-0.2, 0.7, S.Shade))
+			* (S.bUnder ? 0.15 : 1.0) * SlopeOk * S.Reserve;
+	case EKind::Meadow:
+		return 0.34 * S.MeadowPatch * S.Grass * Fall(8.0, 20.0, S.Slope) * Fall(0.50, 0.75, S.Alt)
+			* (0.35 + 0.65 * Rise(0.05, 0.45, S.Damp)) * (S.bUnder ? 0.05 : 1.0) * (0.3 + 0.7 * S.Open) * S.Reserve;
+	default:
+		return 0.0;
+	}
+}
 }
 
 const TCHAR* KindName(EKind Kind)
@@ -100,6 +153,12 @@ const TCHAR* KindName(EKind Kind)
 	case EKind::Broom: return TEXT("Broom");
 	case EKind::Bramble: return TEXT("Bramble");
 	case EKind::Rock: return TEXT("Rock");
+	case EKind::Juniper: return TEXT("Juniper");
+	case EKind::Hazel: return TEXT("Hazel");
+	case EKind::BerryShrub: return TEXT("BerryShrub");
+	case EKind::Rhododendron: return TEXT("Rhododendron");
+	case EKind::Fern: return TEXT("Fern");
+	case EKind::Meadow: return TEXT("Meadow");
 	default: return TEXT("Unknown");
 	}
 }
@@ -118,6 +177,11 @@ int32 RockVariants(ERock Rock)
 
 FString ShrubMeshPath(EKind Kind, int32 Variant)
 {
+	if (IsGptKind(Kind))
+	{
+		const TCHAR* Name = GptMeshes[static_cast<int32>(Kind) - GptKindFirst];
+		return FString::Printf(TEXT("/Game/Anastasis/Vegetation/Gpt/%s.%s"), Name, Name);
+	}
 	const int32 I = FMath::Clamp(static_cast<int32>(Kind), 0, 3);
 	const FString Name = FString::Printf(TEXT("%s_%02d"), ShrubStems[I], FMath::Clamp(Variant, 0, ShrubShapes - 1) + 1);
 	return FString::Printf(TEXT("/Game/Anastasis/Vegetation/%s.%s"), *Name, *Name);
@@ -143,7 +207,7 @@ bool Build(const FInputs& In, const FSettings& C, FPlan& Out, FString& Error)
 	const double Values[] = {C.CellUU, C.ProbeUU, C.WaterClearanceUU, C.MaxShrubSlopeDegrees, C.MaxRockSlopeDegrees,
 		C.MaquisDensity, C.MaquisPatchTiles, C.ScrubBoost, C.ValleyKeep, C.CanopyKeep, C.BrambleDensity,
 		C.RockMeadowDensity, C.RockSlopeDensity, C.RockStoneDensity, C.RockAltitudeDensity, C.RockClusterTiles,
-		C.BasinClearRadiusTiles, In.WaterPlaneZ, In.AltitudeSpanUU};
+		C.BasinClearRadiusTiles, C.GptFloraDensity, In.WaterPlaneZ, In.AltitudeSpanUU};
 	for (const double V : Values)
 	{
 		if (!FMath::IsFinite(V)) { Error = TEXT("Settings: non-finite value"); return false; }
@@ -282,9 +346,41 @@ bool Build(const FInputs& In, const FSettings& C, FPlan& Out, FString& Error)
 				P.HeightM = FMath::Lerp(Low, High, Size) * (bUnder ? 0.8 : 1.0) * (1.0 - 0.2 * Rise(20.0, 35.0, Slope));
 				P.Variant = static_cast<int32>(Hash(S.Seed, GX, GY, 6) % ShrubShapes);
 			}
-			else
+				else
 			{
-				continue;
+				// GPT_FLORA_001 : la cellule est vide pour le maquis, les ronces et les rochers (leurs tirages
+				// ci-dessus sont inchanges). Les six sujets GPT s'y posent, avec leurs propres sels de hachage.
+				if (C.GptFloraDensity <= 0.0) continue;
+				FGptSite G;
+				G.Slope = Slope; G.Alt = Alt; G.Damp = Damp; G.Shade = FMath::Clamp(Tile->Shade, -1.0, 1.0);
+				G.Crown = Crown; G.EdgeRing = EdgeRing; G.RiverBand = RiverBand; G.Open = Open; G.Stone = Stone;
+				G.Grass = TypeShare(S, TX, TY, ETileType::Grass);
+				G.MeadowPatch = Rise(0.55, 0.80, Noise(S.Seed, TX / 2.5, TY / 2.5, 40));
+				G.Reserve = Reserve; G.bUnder = bUnder;
+				double W[6];
+				double WTotal = 0.0;
+				for (int32 K = 0; K < 6; ++K)
+				{
+					W[K] = C.GptFloraDensity * GptWeight(static_cast<EKind>(GptKindFirst + K), G);
+					WTotal += W[K];
+				}
+				if (!(WTotal > 0.0)) continue;
+				const double Scale2 = FMath::Min(1.0, 0.95 / FMath::Max(WTotal, 0.95));
+				double Draw2 = Unit(Hash(S.Seed, GX, GY, 21)) / Scale2;
+				int32 Chosen = INDEX_NONE;
+				for (int32 K = 0; K < 6; ++K)
+				{
+					if (Draw2 < W[K]) { Chosen = K; break; }
+					Draw2 -= W[K];
+				}
+				if (Chosen == INDEX_NONE) continue;
+				P.Kind = static_cast<EKind>(GptKindFirst + Chosen);
+				const double Size2 = Unit(Hash(S.Seed, GX, GY, 22));
+				// Hauteur adulte en m (fourchette de l'espece), un peu plus basse sous couvert.
+				static const double Low[6] = {2.5, 3.0, 1.5, 2.0, 0.6, 0.7};
+				static const double High[6] = {5.0, 6.0, 3.0, 4.0, 1.2, 1.2};
+				P.HeightM = FMath::Lerp(Low[Chosen], High[Chosen], Size2) * (bUnder ? 0.9 : 1.0);
+				P.Variant = 0;
 			}
 			P.Ground = FVector(X, Y, Z);
 			P.Normal = Normal;

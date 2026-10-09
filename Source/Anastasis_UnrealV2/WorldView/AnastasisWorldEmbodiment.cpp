@@ -1202,7 +1202,9 @@ void AAnastasisWorldEmbodiment::PlaceUnderstory(const AnastasisWorldView::FWorld
 			Hism->SetCastShadow(true);
 			// Coupe par instance : maquis lisible a 300 m (la texture des versants), ronces 150 m,
 			// rochers 400 m. Le fondu commence aux trois quarts.
-			const int32 CullEnd = bRock ? 40000 : (P.Kind == US::EKind::Bramble ? 15000 : 30000);
+			// GPT_FLORA_001 : fougere et prairie fleurie sont petites (un metre) : coupees plus tot, a 120 m.
+			const bool bGroundPlant = P.Kind == US::EKind::Fern || P.Kind == US::EKind::Meadow;
+			const int32 CullEnd = bRock ? 40000 : (P.Kind == US::EKind::Bramble ? 15000 : (bGroundPlant ? 12000 : 30000));
 			Hism->SetCullDistances(CullEnd * 3 / 4, CullEnd);
 			if (bRock && RockMaterial)
 			{
@@ -1247,7 +1249,11 @@ void AAnastasisWorldEmbodiment::PlaceUnderstory(const AnastasisWorldView::FWorld
 			Hism->SetCustomDataValue(Index, 1, static_cast<float>(P.Jitter * 2.0 - 1.0), false);
 		}
 		// L'herbe s'ecarte des buissons et ne traverse pas les rochers.
-		Canopy.Add(FVector(P.Ground.X, P.Ground.Y, 0.5 * FVector2D(Size.X, Size.Y).GetMax() * Scale3.X * (bRock ? 0.7 : 0.9)));
+		// La prairie fleurie ne chasse pas l'herbe : c'est de l'herbe fleurie.
+		if (P.Kind != US::EKind::Meadow)
+		{
+			Canopy.Add(FVector(P.Ground.X, P.Ground.Y, 0.5 * FVector2D(Size.X, Size.Y).GetMax() * Scale3.X * (bRock ? 0.7 : 0.9)));
+		}
 		++Placed;
 	}
 	for (UHierarchicalInstancedStaticMeshComponent* M : UnderstoryMeshes)
@@ -1260,6 +1266,12 @@ void AAnastasisWorldEmbodiment::PlaceUnderstory(const AnastasisWorldView::FWorld
 		UnderPlan.Counts[static_cast<int32>(US::EKind::Broom)], UnderPlan.Counts[static_cast<int32>(US::EKind::Bramble)],
 		UnderPlan.Counts[static_cast<int32>(US::EKind::Rock)], Placed, UnderPlan.Cells, UnderPlan.RejectedWater, UnderPlan.RejectedReserved,
 		UnderstoryMeshes.Num(), MissingPaths.Num(), UnderPlan.bTruncated ? 1 : 0, PlanMs, (FPlatformTime::Seconds() - Start) * 1000.0);
+	// GPT_FLORA_001 : les six sujets de la planche GPT, sur une ligne a part (le format ci-dessus est lu par des preuves).
+	UE_LOG(LogAnastasis_UnrealV2, Display,
+		TEXT("ANASTASIS_UNDERSTORY_GPT juniper=%d hazel=%d berry_shrub=%d rhododendron=%d fern=%d meadow=%d"),
+		UnderPlan.Counts[static_cast<int32>(US::EKind::Juniper)], UnderPlan.Counts[static_cast<int32>(US::EKind::Hazel)],
+		UnderPlan.Counts[static_cast<int32>(US::EKind::BerryShrub)], UnderPlan.Counts[static_cast<int32>(US::EKind::Rhododendron)],
+		UnderPlan.Counts[static_cast<int32>(US::EKind::Fern)], UnderPlan.Counts[static_cast<int32>(US::EKind::Meadow)]);
 }
 
 void AAnastasisWorldEmbodiment::PlaceTrunkContact(const AnastasisWorldView::FWorldVisualSnapshot& CanonicalSource,

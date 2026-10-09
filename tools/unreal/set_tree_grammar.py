@@ -80,7 +80,6 @@ SPECIES = [
 # hauteur adulte en m). Pin sombre et cypres sont une forme de plus des essences BlackPine et Cypress.
 # Memes valeurs que GptSpeciesDefaults dans AnastasisPresentationRegistry.cpp.
 GPT_MESH_DIR = "/Game/Anastasis/Vegetation/Gpt/"
-GPT_MATERIAL = "/Game/Anastasis/Materials/M_AnastasisGptFoliage"
 GPT_SPECIES = [
     ("SM_Gpt_Chene", "DECIDUOUS_OAK", "BROADLEAF", (14.0, 22.0)),
     ("SM_Gpt_Bouleau", "BIRCH", "BROADLEAF", (12.0, 18.0)),
@@ -160,10 +159,6 @@ def build_variants():
             variant.set_editor_property("species", enum_value("AnastasisTreeSpecies", species_name))
             variant.set_editor_property("height_range_m", unreal.Vector2D(low, high))
             out.append(variant)
-    gpt_material = unreal.EditorAssetLibrary.load_asset(GPT_MATERIAL)
-    if gpt_material is None:
-        raise Exception("materiau introuvable %s -- lancer d'abord "
-                        "tools/unreal/create-gpt-flora.ps1" % GPT_MATERIAL)
     for mesh_name, species_name, family_name, (low, high) in GPT_SPECIES:
         mesh = unreal.EditorAssetLibrary.load_asset(GPT_MESH_DIR + mesh_name)
         if mesh is None:
@@ -171,7 +166,7 @@ def build_variants():
                             "tools/unreal/create-gpt-flora.ps1" % (GPT_MESH_DIR, mesh_name))
         variant = unreal.AnastasisPresentationVariant()
         variant.set_editor_property("mesh", mesh)
-        variant.set_editor_property("material_override", gpt_material)
+        variant.set_editor_property("material_override", material)
         variant.set_editor_property("additional_material_overrides", [bark])
         variant.set_editor_property("stature", enum_value("AnastasisStatureClass", "ANY"))
         variant.set_editor_property("family", enum_value("AnastasisFoliageFamily", family_name))

@@ -124,8 +124,6 @@ namespace
 		{TEXT("SM_Gpt_PinSombre"), EAnastasisTreeSpecies::BlackPine, EAnastasisFoliageFamily::Conifer, 15.0f, 23.0f},
 		{TEXT("SM_Gpt_Cypres"), EAnastasisTreeSpecies::Cypress, EAnastasisFoliageFamily::Conifer, 12.0f, 20.0f},
 	};
-	const TCHAR* GptFoliageMaterialPath = TEXT("/Game/Anastasis/Materials/M_AnastasisGptFoliage.M_AnastasisGptFoliage");
-
 	FAnastasisPresentationEntry MakeDefaultEntry(
 		EAnastasisSemanticType SemanticType,
 		const TCHAR* ArchetypeId,
@@ -215,7 +213,7 @@ UAnastasisPresentationRegistry* UAnastasisPresentationRegistry::CreateCodeDefaul
 	{
 		const FString Path = FString::Printf(TEXT("/Game/Anastasis/Vegetation/Gpt/%s.%s"), Row.MeshName, Row.MeshName);
 		FAnastasisPresentationVariant Variant = MakeVariant(*Path, EAnastasisStatureClass::Any, Row.Family, 1.0f,
-			GptFoliageMaterialPath, BarkMaterialPath);
+			VegetationMaterialPath, BarkMaterialPath);
 		Variant.Species = Row.Species;
 		Variant.HeightRangeM = FVector2D(Row.MinHeightM, Row.MaxHeightM);
 		Forest.Variants.Add(MoveTemp(Variant));

@@ -145,7 +145,9 @@ bool FAnastasisUnderstoryEdges::RunTest(const FString&)
 	for (const FInstance& I : W.Instances)
 	{
 		const double Rel = Relative(I.Ground.X, I.Ground.Y);
-		const bool bShrub = I.Kind != AnastasisUnderstory::EKind::Bramble && I.Kind != AnastasisUnderstory::EKind::Rock;
+		// Le maquis d'origine : les sujets GPT (fougere, rhododendron...) aiment l'ombre et ne comptent pas ici.
+		const bool bShrub = I.Kind == AnastasisUnderstory::EKind::Lentisk || I.Kind == AnastasisUnderstory::EKind::KermesOak
+			|| I.Kind == AnastasisUnderstory::EKind::Broom;
 		if (I.Kind == AnastasisUnderstory::EKind::Bramble) { Ring += Rel >= 1.0 && Rel <= 2.6 ? 1 : 0; Far += Rel > 4.0 ? 1 : 0; }
 		if (bShrub && Rel < 0.75) ++UnderShrubs;
 		if (bShrub && Rel > 4.0) ++OpenShrubs;
@@ -195,6 +197,104 @@ bool FAnastasisUnderstoryEdges::RunTest(const FString&)
 		Ring, Far, UnderShrubs / UnderCells, OpenShrubs / OpenCells, Bank, Dry,
 		Count(Low, AnastasisUnderstory::EKind::Lentisk), Count(Low, AnastasisUnderstory::EKind::KermesOak), Count(Low, AnastasisUnderstory::EKind::Broom),
 		Count(Rocky, AnastasisUnderstory::EKind::KermesOak), Count(Rocky, AnastasisUnderstory::EKind::Lentisk)));
+	return true;
+}
+
+// GPT_FLORA_001 -- les six sujets de la planche GPT : un habitat chacun, et le plan d'avant n'est pas touche.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisUnderstoryGptFlora, "Anastasis.Understory.GptFlora",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisUnderstoryGptFlora::RunTest(const FString&)
+{
+	using namespace AnastasisUnderstoryTestDetail;
+	using AnastasisUnderstory::EKind;
+	FSettings C;
+	FString E;
+	const auto WorldWith = [](ETileType Type, double Wetness)
+	{
+		auto S = AnastasisWorldView::CaptureCanonicalWorld(12345u);
+		for (auto& T : S.Tiles) { T.Type = Type; T.Wetness = Wetness; T.Shade = 0.0; }
+		return S;
+	};
+	const auto DampGrass = WorldWith(ETileType::Grass, 0.8);
+	const auto DryGrass = WorldWith(ETileType::Grass, 0.0);
+	const auto DryStone = WorldWith(ETileType::Stone, 0.0);
+
+	// Humidite : la fougere et le rhododendron vivent de l'humide, jamais au sec.
+	AnastasisUnderstory::FPlan Damp, Dry;
+	if (!TestTrue(TEXT("damp build"), Build(Inputs(DampGrass, 0.36), C, Damp, E))) return false;
+	TestTrue(TEXT("dry build"), Build(Inputs(DryGrass, 0.36), C, Dry, E));
+	TestTrue(TEXT("ferns live on damp ground"), Count(Damp, EKind::Fern) > 100);
+	TestTrue(TEXT("rhododendrons live on damp ground"), Count(Damp, EKind::Rhododendron) > 30);
+	TestEqual(TEXT("no fern on dry ground"), Count(Dry, EKind::Fern), 0);
+	TestEqual(TEXT("no rhododendron on dry ground"), Count(Dry, EKind::Rhododendron), 0);
+	TestTrue(TEXT("the flowering meadow is fresher than dry"), Count(Damp, EKind::Meadow) > Count(Dry, EKind::Meadow));
+
+	// Pres : par plaques, au plat, jamais sur la pente.
+	AnastasisUnderstory::FPlan Steep;
+	TestTrue(TEXT("steep build"), Build(Inputs(DryGrass, 0.36, 30.0), C, Steep, E));
+	TestTrue(TEXT("flowering meadows cover open flat ground"), Count(Dry, EKind::Meadow) > 50);
+	TestTrue(TEXT("and thin out on a slope"), Count(Steep, EKind::Meadow) * 5 < Count(Dry, EKind::Meadow));
+
+	// Genevrier : la pente seche et pierreuse, pas le pre humide.
+	AnastasisUnderstory::FPlan Rocky;
+	TestTrue(TEXT("rocky build"), Build(Inputs(DryStone, 0.4, 20.0), C, Rocky, E));
+	TestTrue(TEXT("juniper holds dry rocky slopes"), Count(Rocky, EKind::Juniper) > 5 * Count(Damp, EKind::Juniper) + 20);
+
+	// Lisieres : noisetier et arbuste a baies tiennent l'anneau des couronnes, jamais le grand ouvert.
+	AnastasisUnderstory::FInputs Wood = Inputs(DampGrass, 0.36);
+	for (int32 I = 4; I < 15; ++I)
+		for (int32 J = 4; J < 15; ++J)
+			Wood.Canopy.Add(FVector((I + 0.5) * 2000.0, (J + 0.5) * 2000.0, 600.0));
+	AnastasisUnderstory::FPlan W;
+	if (!TestTrue(TEXT("wood build"), Build(Wood, C, W, E))) return false;
+	const auto Relative = [&Wood](double X, double Y)
+	{
+		double Rel = TNumericLimits<double>::Max();
+		for (const FVector& Crown : Wood.Canopy) Rel = FMath::Min(Rel, FVector2D::Distance(FVector2D(X, Y), FVector2D(Crown.X, Crown.Y)) / Crown.Z);
+		return Rel;
+	};
+	int32 EdgeHazel = 0, FarHazel = 0, EdgeBerry = 0, FarBerry = 0, UnderFern = 0, OpenFern = 0;
+	for (const FInstance& I : W.Instances)
+	{
+		const double Rel = Relative(I.Ground.X, I.Ground.Y);
+		if (I.Kind == EKind::Hazel) { EdgeHazel += Rel >= 0.8 && Rel <= 3.0 ? 1 : 0; FarHazel += Rel > 4.0 ? 1 : 0; }
+		if (I.Kind == EKind::BerryShrub) { EdgeBerry += Rel >= 0.8 && Rel <= 3.0 ? 1 : 0; FarBerry += Rel > 4.0 ? 1 : 0; }
+		if (I.Kind == EKind::Fern) { UnderFern += Rel < 0.9 ? 1 : 0; OpenFern += Rel > 3.0 ? 1 : 0; }
+	}
+	double UnderCells = 0.0, OpenCells = 0.0;
+	for (int32 GY = 0; GY < 192; ++GY)
+		for (int32 GX = 0; GX < 192; ++GX)
+		{
+			const double Rel = Relative((GX + 0.5) * 200.0, (GY + 0.5) * 200.0);
+			const double Share = 200.0 * 200.0 / (C.CellUU * C.CellUU);
+			UnderCells += Rel < 0.9 ? Share : 0.0;
+			OpenCells += Rel > 3.0 ? Share : 0.0;
+		}
+	TestTrue(TEXT("hazels line the forest edge"), EdgeHazel > 50);
+	TestEqual(TEXT("and never stand in the open"), FarHazel, 0);
+	TestTrue(TEXT("berry shrubs hedge the forest edge"), EdgeBerry > 50);
+	TestEqual(TEXT("and never stand in the open either"), FarBerry, 0);
+	TestTrue(TEXT("ferns prefer the shade of the crowns"), UnderFern / UnderCells > 2.0 * OpenFern / OpenCells);
+
+	// Le plan d'avant n'est pas touche : sans les six sujets, maquis, ronces et rochers sont les memes.
+	FSettings Off = C;
+	Off.GptFloraDensity = 0.0;
+	AnastasisUnderstory::FPlan With, Without;
+	TestTrue(TEXT("with build"), Build(Inputs(DampGrass, 0.36), C, With, E));
+	TestTrue(TEXT("without build"), Build(Inputs(DampGrass, 0.36), Off, Without, E));
+	for (const EKind Old : {EKind::Lentisk, EKind::KermesOak, EKind::Broom, EKind::Bramble, EKind::Rock})
+	{
+		TestEqual(*FString::Printf(TEXT("%s count is unchanged by the GPT subjects"), KindName(Old)), Count(With, Old), Count(Without, Old));
+	}
+	for (const EKind Fresh : {EKind::Juniper, EKind::Hazel, EKind::BerryShrub, EKind::Rhododendron, EKind::Fern, EKind::Meadow})
+	{
+		TestEqual(*FString::Printf(TEXT("%s is off at density 0"), KindName(Fresh)), Count(Without, Fresh), 0);
+		TestTrue(*FString::Printf(TEXT("%s has a mesh path"), KindName(Fresh)), ShrubMeshPath(Fresh, 0).Contains(TEXT("SM_Gpt_")));
+	}
+	AddInfo(FString::Printf(TEXT("UNDERSTORY_GPT damp fern=%d rhodo=%d meadow=%d | dry meadow=%d | steep meadow=%d | rocky juniper=%d vs damp %d | edge hazel=%d berry=%d | fern under=%.3f open=%.3f"),
+		Count(Damp, EKind::Fern), Count(Damp, EKind::Rhododendron), Count(Damp, EKind::Meadow), Count(Dry, EKind::Meadow),
+		Count(Steep, EKind::Meadow), Count(Rocky, EKind::Juniper), Count(Damp, EKind::Juniper), EdgeHazel, EdgeBerry,
+		UnderFern / UnderCells, OpenFern / OpenCells));
 	return true;
 }
 #endif
