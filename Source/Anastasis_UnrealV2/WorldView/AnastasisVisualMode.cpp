@@ -5,7 +5,7 @@
 static TAutoConsoleVariable<int32> CVarVisualMode(
 	TEXT("anastasis.Visual.Mode"),
 	1,
-	TEXT("Presentation mode: 0=None, 1=Debug (HISMC metrology), 2=Player (unimplemented)."),
+	TEXT("Presentation mode: 0=None, 1=Debug (HISMC metrology), 2=Player (same world, the player-inhabitant always arrives at the start of play; player-start-001)."),
 	ECVF_Default);
 
 namespace AnastasisVisualMode

@@ -11,6 +11,8 @@ rappels retires, variables du travail suivant posees. A la fin seulement, l'edit
 
 Avant chaque preuve, les CVars de rythme (TimeScale, Speed, Warp, WarpBudgetMs) reprennent leur valeur
 du demarrage : une preuve qui accelere le temps ne l'impose pas a la suivante.
+Et `anastasis.Player.AutoArrive 0` : aucune preuve ne trouve un habitant-joueur au debut du PIE sans le
+demander (player-start-001).
 
 Lignes du log, lues par editor-batch.ps1 :
     EDITOR_BATCH_JOB_BEGIN <nom>
@@ -58,6 +60,9 @@ for _name in RHYTHM_CVARS:
 def _restore_rhythm():
     for name, value in _rhythm.items():
         unreal.SystemLibrary.execute_console_command(None, '%s %g' % (name, value))
+    # player-start-001 : chaque preuve demarre en observateur (pas d'habitant-joueur au debut du PIE), quelle
+    # que soit la ligne de commande et ce qu'a pose la preuve precedente ; player-start-pie remet 1 elle-meme.
+    unreal.SystemLibrary.execute_console_command(None, 'anastasis.Player.AutoArrive 0')
 
 
 def _job_done(reason):

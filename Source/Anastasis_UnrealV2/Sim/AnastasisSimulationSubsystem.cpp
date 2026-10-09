@@ -251,6 +251,8 @@ void UAnastasisSimulationSubsystem::TryStartVillage(float DeltaTime)
     }
     UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE start village: %s + %d inhabitants site=(%d,%d)"),
         *WellId, Village.GetActors().Num(), X, Y);
+    // player-start-001 : Play = debut du jeu. Le joueur arrive dans le village qui vient d'etre pose.
+    if (!WellId.IsEmpty()) TryAutoArrive();
 }
 
 FString UAnastasisSimulationSubsystem::SeedStartVillage(int32 NpcCount, int32 TileX, int32 TileY)
@@ -396,6 +398,8 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	bPendingStartVillage = false;
 	StartVillageWait = 0.0;
 	SettlementSiteReport = TEXT("{\"status\":\"reset\"}");
+	bArrivedAtStart = false;
+	bFaceVillagePending = false;
 	FirstSiteId.Reset();
 	GeoScenarioPath.Reset();
 	// Le grenier et le champ du dernier FirstFarmer : sans cette remise, get_gather_status lisait un

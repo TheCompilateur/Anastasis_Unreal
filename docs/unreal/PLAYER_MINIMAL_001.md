@@ -99,7 +99,7 @@ du joueur compte.
 - Les options affichées sont celles de la dernière décision du joueur (rafraîchies à chaque pensée) :
   aucune lecture d'interface ne recalcule la table, à dessein (piège payé deux fois par la référence).
 - La réputation des autres habitants (actes, envie, rivalité, jalousie, vols) : non portée.
-- Le mode visuel `PLAYER` du GameMode, et un pawn propre au jeu : le pawn est celui du template.
+- Un pawn et un rendu propres au joueur : le pawn est celui du template. Le debut de partie en joueur (Play = incarne au village, mode visuel `PLAYER`) est fait par player-start-001 : `PLAYER_START_001.md`.
 - Le témoin vit dans l'hôte ; la présence et l'oisiveté sont sur la personne, pas dans l'empreinte
   (`Digest`) ni dans une sauvegarde.
 

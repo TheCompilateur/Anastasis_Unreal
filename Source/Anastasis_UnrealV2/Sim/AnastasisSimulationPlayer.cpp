@@ -16,16 +16,94 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Life/AnastasisBonds.h"
 #include "Village/AnastasisVillagerVisual.h"
+#include "WorldView/AnastasisVisualMode.h"
 
 static TAutoConsoleVariable<int32> CVarPlayerPawn(
 	TEXT("anastasis.Player.Pawn"),
 	1,
 	TEXT("player-minimal-001: 1 = the local pawn follows the incarnated inhabitant (its input drives the simulated body, it is placed on it, its portrait card is hidden). 0 = the pawn walks on its own; the inhabitant is driven only by Anastasis.Player.Move."),
 	ECVF_Default);
+
+// player-start-001 (mandat d'Alexandre, 2026-10-08) : appuyer sur Play = debut du jeu. Nom distinct de la commande
+// Anastasis.Player.Arrive (le ConsoleManager ignore la casse : meme nom = Fatal au chargement de la DLL).
+static TAutoConsoleVariable<int32> CVarPlayerAutoArrive(
+	TEXT("anastasis.Player.AutoArrive"),
+	1,
+	TEXT("player-start-001: 1 = when play begins, once the start village is seeded, the player-inhabitant arrives in it (the "
+		"Anastasis.Player.Arrive path) and the pawn faces the well; anastasis.Visual.Mode 2 forces it. 0 = observer start, as "
+		"before (scripted editors launched by tools/unreal get 0: Start-AnastasisEditor, editor-batch). Read when the start village is seeded."),
+	ECVF_Default);
+
+FString UAnastasisSimulationSubsystem::ArrivePlayer(double TileX, double TileY, const TCHAR* Why)
+{
+	AnastasisVillage::FVillage& Village = Simulation.GetVillage();
+	const FString Id = Village.ArriveAsPlayer(TileX, TileY);
+	// voix-conseil-001 : dans un village de foyers, le joueur a un nom, que les autres disent dans son dos (et un age :
+	// sans lui, la chronique le prend pour un ancien). « Nikolaos », le nom que la chronique lui donnait deja. Ici et non dans
+	// la commande : l'arrivee du debut de partie (TryAutoArrive) passe par la meme fonction.
+	if (!Id.IsEmpty() && !Village.GetFamilies().IsEmpty())
+	{
+		const AnastasisVillage::FNpc* Arrived = Village.FindNpc(Id);
+		if (Arrived && Arrived->Name.IsEmpty()) Village.SetIdentity(Id, TEXT("Nikolaos"), FString(), TEXT("male"), 30.0);
+	}
+	const AnastasisVillage::FNpc* Player = Village.FindNpc(Id);
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER arrive %s at (%.2f,%.2f), %d inhabitants (%s)"),
+		Id.IsEmpty() ? TEXT("refused") : *Id, Player ? Player->X : -1.0, Player ? Player->Y : -1.0, Village.GetActors().Num(), Why);
+	return Id;
+}
+
+void UAnastasisSimulationSubsystem::TryAutoArrive()
+{
+	const bool bForced = AnastasisVisualMode::Get() == EAnastasisVisualMode::Player;
+	if (CVarPlayerAutoArrive.GetValueOnGameThread() == 0 && !bForced)
+	{
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER_START off (anastasis.Player.AutoArrive 0): observer start"));
+		return;
+	}
+	if (Simulation.GetVillage().PlayerActor())
+	{
+		return; // deja incarne (une sauvegarde, une commande) : on ne cree pas un second joueur.
+	}
+	const FString Id = ArrivePlayer(-1.0, -1.0, TEXT("start of play"));
+	bArrivedAtStart = !Id.IsEmpty();
+	bFaceVillagePending = bArrivedAtStart;
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER_START %s %s"),
+		bArrivedAtStart ? TEXT("arrived") : TEXT("refused"), bArrivedAtStart ? *Id : TEXT("(no free ground)"));
+}
+
+void UAnastasisSimulationSubsystem::FacePawnTowardVillage(APawn& Pawn)
+{
+	bFaceVillagePending = false;
+	const AnastasisVillage::FVillage& Village = Simulation.GetVillage();
+	double TX = Village.GetSettlement().X;
+	double TY = Village.GetSettlement().Y;
+	for (const AnastasisVillage::FBuilding& Building : Village.GetBuildings())
+	{
+		if (Building.Type == AnastasisVillage::WellType)
+		{
+			TX = Building.X + 0.5;
+			TY = Building.Y + 0.5;
+			break;
+		}
+	}
+	const FVector Target = FAnastasisVillagePresentation::SimToUnreal(Simulation.GetWorld(), TX, TY, GetWorld());
+	const FVector From = Pawn.GetActorLocation();
+	const double Yaw = FMath::RadiansToDegrees(FMath::Atan2(Target.Y - From.Y, Target.X - From.X));
+	// Regard un peu plonge : la placette et le puits a hauteur d'yeux, pas le ciel.
+	const FRotator Look(-6.0, Yaw, 0.0);
+	if (AController* Controller = Pawn.GetController())
+	{
+		Controller->SetControlRotation(Look);
+	}
+	Pawn.SetActorRotation(FRotator(0.0, Yaw, 0.0));
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER_START facing village yaw=%.1f distance=%.0f m"),
+		Yaw, FVector::Dist2D(From, Target) / 100.0);
+}
 
 void UAnastasisSimulationSubsystem::SetScriptedDrive(double DX, double DY)
 {
@@ -127,6 +205,10 @@ void UAnastasisSimulationSubsystem::PlacePlayerPawn()
 	}
 	const FVector Feet = FAnastasisVillagePresentation::SimToUnreal(Simulation.GetWorld(), Player->X, Player->Y, World);
 	Pawn->SetActorLocation(Feet + FVector(0.0, 0.0, HalfHeight), false, nullptr, ETeleportType::TeleportPhysics);
+	if (bFaceVillagePending)
+	{
+		FacePawnTowardVillage(*Pawn);
+	}
 	if (AAnastasisVillagerVisual* Card = VillagePresentation.FindVillager(Player->Id))
 	{
 		Card->SetActorHiddenInGame(true);
@@ -268,21 +350,11 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisPlayerArrive(
 	{
 		if (UAnastasisSimulationSubsystem* Host = PlayerHost(World))
 		{
-			AnastasisVillage::FVillage& Village = Host->GetSimulation().GetVillage();
 			const bool bAt = Args.Num() >= 2;
-			const FString Id = Village.ArriveAsPlayer(
+			Host->ArrivePlayer(
 				bAt ? FCString::Atoi(*Args[0]) + 0.5 : -1.0,
-				bAt ? FCString::Atoi(*Args[1]) + 0.5 : -1.0);
-			// voix-conseil-001 : dans un village de foyers, le joueur a un nom, que les autres disent dans son dos (et un age :
-			// sans lui, la chronique le prend pour un ancien). « Nikolaos », le nom que la chronique lui donnait deja.
-			if (!Id.IsEmpty() && !Village.GetFamilies().IsEmpty())
-			{
-				const AnastasisVillage::FNpc* Arrived = Village.FindNpc(Id);
-				if (Arrived && Arrived->Name.IsEmpty()) Village.SetIdentity(Id, TEXT("Nikolaos"), FString(), TEXT("male"), 30.0);
-			}
-			const AnastasisVillage::FNpc* Player = Village.FindNpc(Id);
-			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER arrive %s at (%.2f,%.2f), %d inhabitants"),
-				Id.IsEmpty() ? TEXT("refused") : *Id, Player ? Player->X : -1.0, Player ? Player->Y : -1.0, Village.GetActors().Num());
+				bAt ? FCString::Atoi(*Args[1]) + 0.5 : -1.0,
+				TEXT("console"));
 		}
 	}));
 
@@ -400,9 +472,34 @@ FString UAnastasisSimulationDebugLibrary::GetPlayerStatus(const UObject* WorldCo
 	if (!Host || !Host->GetSimulation().IsRunning()) return TEXT("{}");
 	const AnastasisVillage::FVillage& Village = Host->GetSimulation().GetVillage();
 	const AnastasisVillage::FNpc* Player = Village.PlayerActor();
+	// player-start-001 : ce que le debut de partie a fait, et ou le pawn se tient par rapport au puits.
+	const int32 AutoArrive = CVarPlayerAutoArrive.GetValueOnGameThread();
+	double WellX = Village.GetSettlement().X, WellY = Village.GetSettlement().Y;
+	bool bWell = false;
+	for (const AnastasisVillage::FBuilding& Building : Village.GetBuildings())
+	{
+		if (Building.Type == AnastasisVillage::WellType) { WellX = Building.X + 0.5; WellY = Building.Y + 0.5; bWell = true; break; }
+	}
+	const FVector Well = FAnastasisVillagePresentation::SimToUnreal(Host->GetSimulation().GetWorld(), WellX, WellY, const_cast<UWorld*>(World));
+	const APawn* LocalPawn = UGameplayStatics::GetPlayerPawn(World, 0);
+	const FVector PawnAt = LocalPawn ? LocalPawn->GetActorLocation() : FVector::ZeroVector;
+	double FacingErr = 180.0;
+	if (LocalPawn)
+	{
+		const FRotator View = LocalPawn->GetController() ? LocalPawn->GetController()->GetControlRotation() : LocalPawn->GetActorRotation();
+		const double ToWell = FMath::RadiansToDegrees(FMath::Atan2(Well.Y - PawnAt.Y, Well.X - PawnAt.X));
+		FacingErr = FMath::Abs(FRotator::NormalizeAxis(View.Yaw - ToWell));
+	}
+	const FString Start = FString::Printf(
+		TEXT("\"autoArrive\":%d,\"visualMode\":\"%s\",\"arrivedAtStart\":%s,\"well\":%s,\"wx\":%.1f,\"wy\":%.1f,\"wz\":%.1f,")
+		TEXT("\"pawnPresent\":%s,\"px\":%.1f,\"py\":%.1f,\"pz\":%.1f,\"pawnToWellM\":%.2f,\"facingErrDeg\":%.1f"),
+		AutoArrive, AnastasisVisualMode::Name(AnastasisVisualMode::Get()), Host->HasArrivedAtStart() ? TEXT("true") : TEXT("false"),
+		bWell ? TEXT("true") : TEXT("false"), Well.X, Well.Y, Well.Z,
+		LocalPawn ? TEXT("true") : TEXT("false"), PawnAt.X, PawnAt.Y, PawnAt.Z,
+		LocalPawn ? FVector::Dist2D(PawnAt, Well) / 100.0 : -1.0, FacingErr);
 	if (!Player)
 	{
-		return FString::Printf(TEXT("{\"player\":\"\",\"npcs\":%d}"), Village.GetActors().Num());
+		return FString::Printf(TEXT("{\"player\":\"\",\"npcs\":%d,%s}"), Village.GetActors().Num(), *Start);
 	}
 	const FVector Body = FAnastasisVillagePresentation::SimToUnreal(Host->GetSimulation().GetWorld(), Player->X, Player->Y, const_cast<UWorld*>(World));
 	// player-goals-001 : l'intention, le dernier refus et la table du joueur.
@@ -422,7 +519,7 @@ FString UAnastasisSimulationDebugLibrary::GetPlayerStatus(const UObject* WorldCo
 		TEXT("\"idleDays\":%.4f,\"thirst\":%.2f,\"hunger\":%.2f,\"energy\":%.2f,\"body\":\"%s\",\"drinks\":%d,\"meals\":%d,\"pawn\":%s,\"seenBy\":%d,\"npcs\":%d,")
 		TEXT("\"bag\":%d,\"gathered\":%d,\"delivered\":%d,\"foodRemaining\":%d,\"foodStock\":%d,")
 		TEXT("\"choice\":\"%s\",\"holds\":%d,\"yields\":%d,\"refusal\":\"%s\",\"options\":[%s],")
-		TEXT("\"ux\":%.1f,\"uy\":%.1f,\"uz\":%.1f}"),
+		TEXT("\"ux\":%.1f,\"uy\":%.1f,\"uz\":%.1f,%s}"),
 		*Player->Id, Player->X, Player->Y, *Player->Goal, *Player->Activity, Player->Presence, Player->Reputation,
 		Player->IdleSeconds / FAnastasisSimulation::DayLength, Player->Needs.Thirst, Player->Needs.Hunger, Player->Needs.Energy, *BodyAsks(*Player),
 		Player->DrinksTaken, Player->MealsTaken,
@@ -430,7 +527,7 @@ FString UAnastasisSimulationDebugLibrary::GetPlayerStatus(const UObject* WorldCo
 		Player->InventoryFood, Player->GatheredFood, Player->DeliveredFood, FoodRemaining, FoodStock,
 		Choice ? *Choice->Goal : TEXT(""), Choice ? Choice->Holds : 0, Choice ? Choice->Yields : 0,
 		Refusal ? *Refusal->Reason : TEXT(""), *FString::Join(Options, TEXT(",")),
-		Body.X, Body.Y, Body.Z);
+		Body.X, Body.Y, Body.Z, *Start);
 }
 
 // --- voix-conseil-001 (ecart n°54) : le joueur vote, repond, batit et demande, avec les memes regles que les autres ---

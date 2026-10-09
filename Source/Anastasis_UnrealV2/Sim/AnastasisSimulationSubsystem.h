@@ -179,6 +179,19 @@ public:
 	bool IsPawnBound() const { return BoundPawn.IsValid(); }
 
 	/**
+	 * player-minimal-001 -- un habitant ordinaire arrive et il est incarne (FVillage::ArriveAsPlayer) ; tuile
+	 * negative = settlement + (2, 3). Le seul chemin d'arrivee : `Anastasis.Player.Arrive` et le debut de partie
+	 * (player-start-001) passent tous deux ici. Rend l'id, vide si refuse.
+	 */
+	FString ArrivePlayer(double TileX, double TileY, const TCHAR* Why);
+
+	/** player-start-001 -- vrai si l'habitant-joueur a ete incarne au debut de la partie (anastasis.Player.AutoArrive). */
+	bool HasArrivedAtStart() const { return bArrivedAtStart; }
+
+	/** Le pawn local lie a l'habitant incarne (nul sinon). */
+	const APawn* GetBoundPawn() const { return BoundPawn.Get(); }
+
+	/**
 	 * SAVE_STATE_001 -- sauve la partie dans Saved/SaveGames/<Slot>.sav : l'etat complet de la simulation
 	 * (FAnastasisSimulation::SaveState) et les verrous de l'hote. Rend faux sans simulation en cours.
 	 */
@@ -226,6 +239,15 @@ private:
 	void PlacePlayerPawn();
 	/** Le pawn retrouve sa marche Unreal. */
 	void UnbindPawn();
+	/**
+	 * player-start-001 -- Play = debut du jeu : une fois le village du lancement pose, l'habitant-joueur y arrive
+	 * (meme chemin qu'Anastasis.Player.Arrive), si anastasis.Player.AutoArrive ou anastasis.Visual.Mode 2.
+	 */
+	void TryAutoArrive();
+	/** Oriente la camera du pawn vers le puits du village, une fois, a la premiere pose apres l'arrivee. */
+	void FacePawnTowardVillage(APawn& Pawn);
+	bool bArrivedAtStart = false;
+	bool bFaceVillagePending = false;
 	void LogDayIfChanged();
 	/** CHRONIQUE_VILLAGE_001 : la chronique lit la simulation, si anastasis.Chronicle.Enabled. */
 	void ObserveChronicle();

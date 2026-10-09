@@ -4,7 +4,8 @@
 
 /**
  * Explicit presentation mode. DEBUG is diagnostic HISMC cubes.
- * PLAYER is reserved and unimplemented. NONE spawns no world embodiment.
+ * PLAYER embodies the same world and forces the player's arrival at the start of play
+ * (player-start-001). NONE spawns no world embodiment.
  */
 enum class EAnastasisVisualMode : uint8
 {

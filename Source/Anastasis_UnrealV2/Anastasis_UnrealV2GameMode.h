@@ -8,7 +8,9 @@
 
 /**
  * GameMode bootstrap. World embodiment spawn follows anastasis.Visual.Mode
- * (NONE / DEBUG / PLAYER). DEBUG is diagnostic only; PLAYER is unimplemented.
+ * (NONE / DEBUG / PLAYER). DEBUG and PLAYER embody the same world; PLAYER also forces the
+ * player-inhabitant's arrival at the start of play (player-start-001), which DEBUG leaves to
+ * anastasis.Player.AutoArrive.
  */
 UCLASS(abstract)
 class AAnastasis_UnrealV2GameMode : public AGameModeBase

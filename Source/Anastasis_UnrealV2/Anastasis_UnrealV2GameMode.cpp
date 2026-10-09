@@ -26,11 +26,9 @@ void AAnastasis_UnrealV2GameMode::BeginPlay()
 		return;
 	}
 
-	if (Mode == EAnastasisVisualMode::Player)
-	{
-		UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VISUAL_MODE PLAYER is unimplemented; no world renderer spawned"));
-		return;
-	}
+	// player-start-001 (mandat d'Alexandre, 2026-10-08) : PLAYER incarne le meme monde que DEBUG, et le debut de
+	// partie y fait arriver l'habitant-joueur sans condition (UAnastasisSimulationSubsystem::TryAutoArrive). En DEBUG,
+	// la meme arrivee suit anastasis.Player.AutoArrive (1 par defaut). Pas de rendu propre au joueur : le monde est un.
 
 	if (UWorld* World = GetWorld())
 	{

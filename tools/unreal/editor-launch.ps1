@@ -249,11 +249,32 @@ function Invoke-AnastasisEditorGated {
   }
 }
 
+# player-start-001 : appuyer sur Play fait arriver l'habitant-joueur au village (anastasis.Player.AutoArrive 1).
+# Un editeur pilote par script (preuve, capture, generateur : `py` dans -ExecCmds, -ExecutePythonScript) demarre
+# en observateur, comme avant : une preuve qui accelere le temps avec un joueur incarne change sa reputation et
+# le village (AGENTS.md, Temps accelere). Une preuve qui veut le joueur pose `anastasis.Player.AutoArrive 1` en
+# console (priorite console > ligne de commande) ; une ligne de commande qui nomme deja la CVar est laissee telle quelle.
+function Add-AnastasisScriptedCVars([string[]]$ArgumentList) {
+  $joined = $ArgumentList -join ' '
+  if ($joined -notmatch '(?i)ExecCmds="?py\s|ExecutePythonScript' -or $joined -match '(?i)anastasis\.Player\.AutoArrive') {
+    return $ArgumentList
+  }
+  $out = @()
+  $added = $false
+  foreach ($a in $ArgumentList) {
+    if (-not $added -and $a -match '(?i)^-dpcvars=') { $out += ($a + ',anastasis.Player.AutoArrive=0'); $added = $true }
+    else { $out += $a }
+  }
+  if (-not $added) { $out += '-dpcvars=anastasis.Player.AutoArrive=0' }
+  return $out
+}
+
 function Start-AnastasisEditor {
   param(
     [Parameter(Mandatory = $true)][string]$FilePath,
     [string[]]$ArgumentList = @()
   )
+  $ArgumentList = Add-AnastasisScriptedCVars $ArgumentList
   $p = Invoke-AnastasisEditorGated -Headless:(Test-AnastasisHeadlessArgs ($ArgumentList -join ' ')) {
     if ($env:ANASTASIS_EDITOR_VISIBLE -eq '1') {
       Start-Process $FilePath -ArgumentList $ArgumentList -PassThru
