@@ -27,7 +27,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FAnastasisArchitectureScaleTest::RunTest(const FString& Parameters)
 {
 	using namespace AnastasisArchitecture;
-	TestEqual(TEXT("sept archetypes"), All().Num(), static_cast<int32>(EVariant::Count));
+	TestEqual(TEXT("huit archetypes"), All().Num(), static_cast<int32>(EVariant::Count));
 	const double Limit = ParcelCm * 0.5 - ParcelMarginCm;
 	for (const FArchetype& A : All())
 	{
@@ -37,7 +37,8 @@ bool FAnastasisArchitectureScaleTest::RunTest(const FString& Parameters)
 			A.Footprint.Min.X >= -Limit && A.Footprint.Min.Y >= -Limit && A.Footprint.Max.X <= Limit && A.Footprint.Max.Y <= Limit);
 		// La parcelle n'est plus vide : l'emprise couvre au moins le cinquieme de la case (l ancienne maison : 2,8 %).
 		const double Share = A.Footprint.GetArea() / (ParcelCm * ParcelCm);
-		if (A.Variant != EVariant::Well)
+		// Le puits, et la cabane du joueur, petite par mandat (ma-cabane-001), ne remplissent pas leur parcelle.
+		if (A.Variant != EVariant::Well && A.Variant != EVariant::Cabin)
 		{
 			TestTrue(FString::Printf(TEXT("%s : occupe sa parcelle (%.0f %%)"), *Name, Share * 100.0), Share >= 0.20);
 		}
@@ -159,6 +160,7 @@ bool FAnastasisArchitectureVariantTest::RunTest(const FString& Parameters)
 	EVariant V;
 	TestTrue(TEXT("puits"), ChooseVariant(TEXT("well"), 1, TEXT("building-1"), V) && V == EVariant::Well);
 	TestTrue(TEXT("grenier"), ChooseVariant(TEXT("granary"), 1, TEXT("building-2"), V) && V == EVariant::Storehouse);
+	TestTrue(TEXT("cabane"), ChooseVariant(TEXT("cabin"), 1, TEXT("building-4"), V) && V == EVariant::Cabin);
 	TestFalse(TEXT("type inconnu"), ChooseVariant(TEXT("tavern"), 1, TEXT("building-3"), V));
 	// settlement-morphogenesis-001 : plus de graine. Deux maisons de meme phase ont la meme forme de repli,
 	// quel que soit leur identifiant ; seule la phase de la reference fait grandir.

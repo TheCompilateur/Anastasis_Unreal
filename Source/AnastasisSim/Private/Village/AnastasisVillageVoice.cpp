@@ -86,7 +86,8 @@ namespace AnastasisVillage
 		{
 			if (Building.OwnerFamilyId == FamilyId && Building.Progress < 1.0) return FString();
 		}
-		return OpenFamilySiteNear(FamilyId, *Actors.FindById(PlayerPersonId));
+		// ecart n°56 (ma-cabane-001) : « seul, une cabane » (Alexandre, 2026-10-09) -- une piece, levee de ses mains.
+		return OpenFamilySiteNear(FamilyId, *Actors.FindById(PlayerPersonId), CabinType);
 	}
 
 	bool FVillage::PlayerAskHelp(const FString& NpcId, FHelpAnswer& OutAnswer)

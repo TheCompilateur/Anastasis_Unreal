@@ -51,6 +51,7 @@ namespace AnastasisChronicle
 			if (Type == AnastasisVillage::HouseType) { OutNoun = TEXT("maison"); bOutFeminine = true; }
 			else if (Type == AnastasisVillage::WellType) { OutNoun = TEXT("puits"); }
 			else if (Type == AnastasisVillage::GranaryType) { OutNoun = TEXT("grenier"); }
+			else if (Type == AnastasisVillage::CabinType) { OutNoun = TEXT("cabane"); bOutFeminine = true; }
 			else { OutNoun = Type; }
 		}
 

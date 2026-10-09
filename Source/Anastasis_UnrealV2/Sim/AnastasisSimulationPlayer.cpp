@@ -11,6 +11,7 @@
 
 #include "Anastasis_UnrealV2.h"
 #include "Components/CapsuleComponent.h"
+#include "Dom/JsonObject.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
@@ -20,8 +21,16 @@
 #include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Life/AnastasisBonds.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
+#include "Village/AnastasisArchitecture.h"
+#include "Village/AnastasisVillageBuilding.h"
 #include "Village/AnastasisVillagerVisual.h"
+#include "Work/AnastasisBuild.h"
 #include "WorldView/AnastasisVisualMode.h"
+
+/** ma-cabane-001 : ou le corps se tient dans sa cabane, cm locaux (a cote du banc-lit, loin du foyer). */
+static const FVector2D CabinRestSpot(-110.0, -60.0);
 
 static TAutoConsoleVariable<int32> CVarPlayerPawn(
 	TEXT("anastasis.Player.Pawn"),
@@ -203,11 +212,33 @@ void UAnastasisSimulationSubsystem::PlacePlayerPawn()
 	{
 		HalfHeight = Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	}
-	const FVector Feet = FAnastasisVillagePresentation::SimToUnreal(Simulation.GetWorld(), Player->X, Player->Y, World);
+	FVector Feet = FAnastasisVillagePresentation::SimToUnreal(Simulation.GetWorld(), Player->X, Player->Y, World);
+	// ma-cabane-001 : la simulation le dit dedans (il dort, il mange) ; le corps passe la porte et se tient pres du banc,
+	// sur le sol de la piece. Ailleurs, il reste au seuil comme avant.
+	bool bIndoors = false;
+	if (Player->Inside.bActive)
+	{
+		const AnastasisVillage::FBuilding* Home = Simulation.GetVillage().FindBuilding(Player->Inside.BuildingId);
+		const AAnastasisVillageBuilding* Actor = VillagePresentation.FindActor(Player->Inside.BuildingId);
+		if (Home && Actor && Home->Type == AnastasisVillage::CabinType && Actor->HasArchitecture())
+		{
+			const AnastasisArchitecture::FArchetype& A = AnastasisArchitecture::Get(Actor->GetVariant());
+			const double Floor = A.Rooms.Num() > 0 ? A.Rooms[0].FloorCm : A.DoorLocal.Z;
+			Feet = Actor->GetActorTransform().TransformPosition(
+				FVector(CabinRestSpot.X, CabinRestSpot.Y, Floor + Actor->GetPadOffset()));
+			bIndoors = true;
+		}
+	}
 	Pawn->SetActorLocation(Feet + FVector(0.0, 0.0, HalfHeight), false, nullptr, ETeleportType::TeleportPhysics);
 	if (bFaceVillagePending)
 	{
 		FacePawnTowardVillage(*Pawn);
+	}
+	if (bIndoors != bPawnIndoors)
+	{
+		bPawnIndoors = bIndoors;
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER pawn %s %s at %s"), bIndoors ? TEXT("inside") : TEXT("outside"),
+			Player->Inside.bActive ? *Player->Inside.BuildingId : TEXT("-"), *Feet.ToCompactString());
 	}
 	if (AAnastasisVillagerVisual* Card = VillagePresentation.FindVillager(Player->Id))
 	{
@@ -530,6 +561,116 @@ FString UAnastasisSimulationDebugLibrary::GetPlayerStatus(const UObject* WorldCo
 		Body.X, Body.Y, Body.Z, *Start);
 }
 
+FString UAnastasisSimulationDebugLibrary::GetCabinStatus(const UObject* WorldContextObject)
+{
+	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	const UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+	if (!Host || !Host->GetSimulation().IsRunning()) return TEXT("{}");
+	const AnastasisVillage::FVillage& Village = Host->GetSimulation().GetVillage();
+	const AnastasisVillage::FNpc* Player = Village.PlayerActor();
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	Root->SetStringField(TEXT("player"), Player ? Player->Id : FString());
+	Root->SetNumberField(TEXT("day"), Host->GetSimulation().GetDay());
+	const AnastasisVillage::FBuilding* Site = nullptr;
+	for (const AnastasisVillage::FBuilding& Building : Village.GetBuildings())
+	{
+		if (Player && Building.Type == AnastasisVillage::CabinType && Building.Owner == Player->Id) Site = &Building;
+	}
+	Root->SetStringField(TEXT("site"), Site ? Site->Id : FString());
+	auto Vec = [](const FVector& V)
+	{
+		TArray<TSharedPtr<FJsonValue>> A;
+		A.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(V.X)));
+		A.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(V.Y)));
+		A.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(V.Z)));
+		return A;
+	};
+	if (Player)
+	{
+		Root->SetNumberField(TEXT("x"), Player->X);
+		Root->SetNumberField(TEXT("y"), Player->Y);
+		Root->SetStringField(TEXT("home"), Player->HomeId);
+		Root->SetStringField(TEXT("family"), Player->FamilyId);
+		Root->SetBoolField(TEXT("inside"), Player->Inside.bActive);
+		Root->SetStringField(TEXT("inside_building"), Player->Inside.bActive ? Player->Inside.BuildingId : FString());
+		Root->SetStringField(TEXT("activity"), Player->Activity);
+		Root->SetStringField(TEXT("goal"), Player->Goal);
+		Root->SetNumberField(TEXT("energy"), Player->Needs.Energy);
+		Root->SetBoolField(TEXT("pawn_indoors"), Host->IsPawnIndoors());
+		if (const APawn* Pawn = Host->GetBoundPawn()) Root->SetArrayField(TEXT("pawn"), Vec(Pawn->GetActorLocation()));
+	}
+	if (Site)
+	{
+		Root->SetStringField(TEXT("type"), Site->Type);
+		Root->SetNumberField(TEXT("progress"), Site->Progress);
+		Root->SetNumberField(TEXT("pieces"), Site->PiecesPlaced);
+		Root->SetNumberField(TEXT("piece_total"), AnastasisBuild::PieceTotal);
+		Root->SetStringField(TEXT("owner"), Site->Owner);
+		Root->SetNumberField(TEXT("tile_x"), Site->X);
+		Root->SetNumberField(TEXT("tile_y"), Site->Y);
+		Root->SetNumberField(TEXT("created_day"), Site->CreatedDay);
+		Root->SetNumberField(TEXT("completed_day"), Site->CompletedDay);
+		Root->SetNumberField(TEXT("need_wood"), Site->Materials.NeedWood);
+		Root->SetNumberField(TEXT("need_stone"), Site->Materials.NeedStone);
+		TArray<TSharedPtr<FJsonValue>> Workers;
+		for (const TPair<FString, int32>& Worker : Site->Workers)
+		{
+			Workers.Add(MakeShared<FJsonValueString>(FString::Printf(TEXT("%s:%d"), *Worker.Key, Worker.Value)));
+		}
+		Root->SetArrayField(TEXT("workers"), Workers);
+		TArray<TSharedPtr<FJsonValue>> Others;
+		for (const FString& Id : Village.InsideOf(Site->Id))
+		{
+			if (!Player || Id != Player->Id) Others.Add(MakeShared<FJsonValueString>(Id));
+		}
+		Root->SetArrayField(TEXT("others_inside"), Others);
+		TArray<TSharedPtr<FJsonValue>> Lodgers;
+		for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
+		{
+			if (Player && Npc.Id == Player->Id) continue;
+			if (Npc.HomeId == Site->Id || Npc.ShelterId == Site->Id) Lodgers.Add(MakeShared<FJsonValueString>(Npc.Id));
+		}
+		Root->SetArrayField(TEXT("others_lodged"), Lodgers);
+		if (const AAnastasisVillageBuilding* Actor = Host->GetVillagePresentation().FindActor(Site->Id))
+		{
+			const FTransform Xf = Actor->GetActorTransform();
+			Root->SetBoolField(TEXT("actor"), true);
+			Root->SetBoolField(TEXT("architecture"), Actor->HasArchitecture());
+			Root->SetArrayField(TEXT("location"), Vec(Xf.GetLocation()));
+			Root->SetNumberField(TEXT("yaw"), Xf.Rotator().Yaw);
+			Root->SetNumberField(TEXT("pad"), Actor->GetPadOffset());
+			if (Actor->HasArchitecture())
+			{
+				const AnastasisArchitecture::FArchetype& A = AnastasisArchitecture::Get(Actor->GetVariant());
+				const FVector Pad(0.0, 0.0, Actor->GetPadOffset());
+				Root->SetStringField(TEXT("archetype"), A.Id);
+				Root->SetArrayField(TEXT("door"), Vec(Xf.TransformPosition(A.DoorLocal + Pad)));
+				Root->SetArrayField(TEXT("entry"), Vec(Xf.TransformPosition(A.EntryLocal + Pad)));
+				Root->SetArrayField(TEXT("hearth"), Vec(Xf.TransformPosition(A.HearthLocal + Pad)));
+				TArray<TSharedPtr<FJsonValue>> Foot;
+				Foot.Add(MakeShared<FJsonValueNumber>(A.Footprint.Min.X));
+				Foot.Add(MakeShared<FJsonValueNumber>(A.Footprint.Min.Y));
+				Foot.Add(MakeShared<FJsonValueNumber>(A.Footprint.Max.X));
+				Foot.Add(MakeShared<FJsonValueNumber>(A.Footprint.Max.Y));
+				Root->SetArrayField(TEXT("footprint"), Foot);
+				Root->SetNumberField(TEXT("floor"), A.Rooms.Num() > 0 ? A.Rooms[0].FloorCm + Actor->GetPadOffset() : Actor->GetPadOffset());
+				if (const APawn* Pawn = Host->GetBoundPawn())
+				{
+					Root->SetArrayField(TEXT("pawn_local"), Vec(Xf.InverseTransformPosition(Pawn->GetActorLocation())));
+				}
+			}
+		}
+		else
+		{
+			Root->SetBoolField(TEXT("actor"), false);
+		}
+	}
+	FString Out;
+	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Out);
+	FJsonSerializer::Serialize(Root, Writer);
+	return Out;
+}
+
 // --- voix-conseil-001 (ecart n°54) : le joueur vote, repond, batit et demande, avec les memes regles que les autres ---
 
 namespace
@@ -586,8 +727,9 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisPlayerHelp(
 
 static FAutoConsoleCommandWithWorld CmdAnastasisPlayerBuild(
 	TEXT("Anastasis.Player.Build"),
-	TEXT("Anastasis.Player.Build - the player decides to build his house: he becomes the head of his own household and his "
-		"plot is traced near him, like a family's. voix-conseil-001."),
+	TEXT("Anastasis.Player.Build - the player decides to build his home: he becomes the head of his own household and his "
+		"cabin is traced near him -- one room, one sleeper, his alone, raised by his own hands (choose 'build'). "
+		"voix-conseil-001, ma-cabane-001."),
 	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
 	{
 		UAnastasisSimulationSubsystem* Host = PlayerHost(World);
@@ -596,7 +738,8 @@ static FAutoConsoleCommandWithWorld CmdAnastasisPlayerBuild(
 		const FString Me = Village.GetPlayerPersonId();
 		const FString Name = Me.IsEmpty() ? FString() : FString::Printf(TEXT("la maison de %s"), *Host->GetChronicle().NameOf(Me));
 		const FString Site = Village.PlayerBuildHome(Name);
-		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER build -> %s"), Site.IsEmpty() ? TEXT("refused (no ground, or already building)") : *Site);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER build -> %s"), Site.IsEmpty() ? TEXT("refused (no ground, a roof already, or already building)") : *Site);
+		if (!Site.IsEmpty()) UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER cabin %s"), *UAnastasisSimulationDebugLibrary::GetCabinStatus(World));
 	}));
 
 static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisPlayerAsk(

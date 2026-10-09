@@ -1149,6 +1149,52 @@ def house_poor(seed=11):
     return m
 
 
+def cabin(seed=23):
+    """Cabane (ma-cabane-001) : la maison qu'un homme seul leve en quelques jours. Une piece de 4,2 x 4 m sous
+    planches lestees, sur un soubassement de pierre seche a hauteur de genou ; murs de planches, sol de terre,
+    foyer de pierres au sol, banquette pour dormir, un coffre. Dehors, son bois et son billot. Pas d'appentis,
+    pas de courette : un seul, une piece."""
+    rng = random.Random(seed)
+    m = Mesh()
+    x0, x1, y0, y1 = -260.0, 260.0, -300.0, 200.0
+    T = 50.0
+    socle = 60.0
+    plate = 248.0
+    floor = 18.0
+    W = _rect_walls(x0, x1, y0, y1)
+    dw, dh = 96.0, 192.0
+    door_s = (x1 - x0) / 2 - dw / 2
+    openings_front = [(door_s, door_s + dw, floor, floor + dh)]
+    openings_back = [(235, 281, 128, 174)]
+    for key, (a, b) in W.items():
+        ops = openings_front if key == 'front' else openings_back if key == 'back' else []
+        rubble_wall(m, a, b, -15, socle, T, [o for o in ops if o[2] < socle], rng, render=0.0,
+                    inner=C_MORTAR, quoin_ends=(True, False))
+        plank_wall(m, a, b, socle, plate, 20.0, ops, rng)
+    u = (-1.0, 0.0, 0.0)
+    door(m, (x1 - door_s - dw / 2, y1 + T / 2, 0), u, (0, 1, 0), dw, dh, floor, rng, thick=T, leaf_open=80)
+    window(m, (x0 + 258, y0 - 10, 0), (1, 0, 0), (0, -1, 0), 46, 46, 128, rng, thick=20, open_angles=(25, 90))
+    earth_floor(m, x0 + T / 2, x1 - T / 2, y0 + T / 2, y1 - T / 2, floor, rng)
+    m.meta['floors'].append(dict(z=floor, kind='earth'))
+    ze, zr = roof(m, 'gable', x0, x1, y0, y1, plate, 30.0, 55.0, 'board', rng)
+    for x, o in ((x0, -1), (x1, 1)):
+        gable_infill(m, x, y0, y1, plate, zr - 18, rng, kind='plank', outward=o)
+    m.meta['ceilings'].append(dict(room='piece', z=plate + 8 - 9, floor=floor))
+    # interieur : foyer de pierres au fond, banquette le long du mur gauche, coffre pres de la porte
+    hearth(m, 110, y0 + T / 2 + 46, floor, 90, rng, hood=False)
+    sedir(m, x0 + T / 2 + 2, x0 + T / 2 + 92, y0 + T / 2 + 2, y1 - T / 2 - 70, floor, rng)
+    chest(m, x1 - 70, y1 - 100, floor, 180, rng, w=80)
+    basket(m, 30, -40, floor, rng)
+    shelf(m, (x0 + 140, y0 + T / 2 + 6, 0), (x0 + 230, y0 + T / 2 + 6, 0), 150, 24, rng)
+    m.meta['rooms'].append(dict(name='piece', use='vie+sommeil+foyer', area_m2=round((x1 - x0 - 2 * T) * (y1 - y0 - 2 * T) / 1e4, 1),
+                                floor=floor, ceiling=plate - 1))
+    # dehors : le bois contre le pignon droit, le billot devant
+    woodpile(m, x1 + 20, y0 + 50, 0, 220, 45, 110, rng, yaw=90)
+    chopping_block(m, x1 + 70, y1 + 130, 0, rng)
+    m.meta['entry'] = [x1 - door_s - dw / 2, y1 + 160, 0]
+    return m
+
+
 def two_storey(m, rng, x0, x1, y0, y1, roof_kind='hip', cover='tile', gallery=True, stair_side='right',
                chimney_side='left', ground_use='etable'):
     """Maison a deux niveaux (reference) : rez de pierre (reserve, etable), etage a pan de bois enduit,
@@ -1617,6 +1663,7 @@ def footing(body, seed, margin=70.0):
 
 
 BUILDINGS = {
+    'SM_Arch_Cabin_01': (cabin, 'cabin', 1),
     'SM_Arch_House_Poor_01': (house_poor, 'house', 1),
     'SM_Arch_House_Medium_01': (house_medium, 'house', 2),
     'SM_Arch_House_Farm_01': (house_farm, 'house', 3),
@@ -2065,12 +2112,13 @@ def create():
         u.log('ARCH COMPLETE geometry-only')
         return
     mat = build_material(u)
-    for name, (body, foot, kind, tier) in geometry().items():
+    only = [n for n in os.environ.get('ANASTASIS_ARCH_ONLY', '').split(',') if n]
+    for name, (body, foot, kind, tier) in geometry(only or None).items():
         a, note = write_mesh(u, PKG + '/' + name, body.finish(), mat, complex_collision=True)
         u.log('ARCH ASSET ' + json.dumps(dict(path=PKG + '/' + name, tris=len(body.t), lods=note)))
         fa, fnote = write_mesh(u, PKG + '/' + name + '_Footing', foot.finish(), mat, complex_collision=True, lods=False)
         u.log('ARCH ASSET ' + json.dumps(dict(path=PKG + '/' + name + '_Footing', tris=len(foot.t), lods=fnote)))
-    for name, fn in kit_pieces().items():
+    for name, fn in ({} if only else kit_pieces()).items():
         m = _kit(fn)
         a, note = write_mesh(u, PKG + '/Kit/' + name, m.finish(), mat, complex_collision=True, lods=False)
         u.log('ARCH KIT ' + json.dumps(dict(path=PKG + '/Kit/' + name, tris=len(m.t))))

@@ -23,14 +23,14 @@ namespace AnastasisVillage
 		int32 AccessBudget(const FString& Type)
 		{
 			if (Type == WellType) return 4;
-			if (Type == HouseType) return 2;
+			if (Type == HouseType || Type == CabinType) return 2; // cabane : ecart n°56
 			return 3; // `ACCESS_BUDGET.default`
 		}
 
 		/** Types connus du catalogue porte (`BUILDINGS[type]` existe). */
 		bool IsKnownType(const FString& Type)
 		{
-			return Type == WellType || Type == HouseType || Type == GranaryType;
+			return Type == WellType || Type == HouseType || Type == GranaryType || Type == CabinType; // cabane : ecart n°56
 		}
 
 		/** `DOMESTIC_GOALS` restreint aux buts portes : rest, eat, relax. */
@@ -131,6 +131,8 @@ namespace AnastasisVillage
 	{
 		// sim/batiments/catalog.js : house `housing: 3`. Le puits n'abrite personne.
 		if (Type == HouseType) return 3;
+		// ecart n°56 : la cabane du joueur, un seul dormeur.
+		if (Type == CabinType) return 1;
 		return 0;
 	}
 
@@ -849,6 +851,7 @@ namespace AnastasisVillage
 		{
 			if (B.Progress < 1.0 || HousingOfType(B.Type) <= 0) continue;
 			if (B.Type == HouseType && !B.Owner.IsEmpty() && B.Owner != Npc.Id) continue;
+			if (IsClosedCabin(B.Type, B.Owner, Npc.Id)) continue; // ecart n°56
 			const double DX = (B.X + 0.5) - Npc.X;
 			const double DY = (B.Y + 0.5) - Npc.Y;
 			const double D = DX * DX + DY * DY;
@@ -872,6 +875,7 @@ namespace AnastasisVillage
 			if (!IsEnterableHousing(B)) continue;
 			// Maison d'un autre foyer : pas d'intrusion (les maisons du joueur restent cedables).
 			if (B.Type == HouseType && !B.Owner.IsEmpty() && B.Owner != Npc.Id && B.Owner != TEXT("player")) continue;
+			if (IsClosedCabin(B.Type, B.Owner, Npc.Id)) continue; // ecart n°56
 			const int32 Occupants = CountShelterOccupants(B.Id);
 			const int32 Cap = ShelterCapacity(B);
 			if (Occupants >= Cap && Living != B.Id) continue;
@@ -891,7 +895,8 @@ namespace AnastasisVillage
 	{
 		FBuilding* House = Buildings.FindById(HouseId);
 		FNpc* Npc = Actors.FindById(NpcId);
-		if (!House || !Npc || House->Type != HouseType || !House->IsCompleted())
+		// ecart n°56 : la cabane du joueur se donne comme une maison.
+		if (!House || !Npc || (House->Type != HouseType && House->Type != CabinType) || !House->IsCompleted())
 		{
 			return false;
 		}
@@ -1041,7 +1046,7 @@ namespace AnastasisVillage
 		}
 		// `BUILDINGS[type].jobs.length` : dans le catalogue de la reference, seule la maison n'a pas
 		// de metier (`catalog.js`).
-		bool TypeHasJobs(const FString& Type) { return !Type.IsEmpty() && Type != HouseType; }
+		bool TypeHasJobs(const FString& Type) { return !Type.IsEmpty() && Type != HouseType && Type != CabinType; } // cabane : ecart n°56
 	}
 
 	void FVillage::NotePlaceUse(FNpc& Npc, const FString& Kind, double Amount)
@@ -1161,6 +1166,8 @@ namespace AnastasisVillage
 		const FBuilding* Building = BuildingNearActor(Npc, IndoorBuildingRadius);
 		if (!Building || Building->Progress < 1.0) return nullptr;
 		if (!IsKnownType(Building->Type)) return nullptr;
+		// ecart n°56 : la reference n'a aucun controle de proprietaire ; la cabane du joueur n'est qu'a lui.
+		if (IsClosedCabin(Building->Type, Building->Owner, Npc.Id)) return nullptr;
 		const bool bAtOwn = !Living.IsEmpty() && Living == Building->Id;
 		// AUCUN controle de proprietaire ni de capacite : c'est la reference.
 		if (Goal == GoalEat)
@@ -6406,7 +6413,8 @@ namespace AnastasisVillage
 
 	bool FVillage::AwaitsHelp(const FBuilding& Site) const
 	{
-		if (Site.OwnerFamilyId.IsEmpty() || Site.Progress < FamilyRoofAt) return false;
+		// ecart n°56 : une cabane se leve seul, son toit n'attend personne.
+		if (Site.OwnerFamilyId.IsEmpty() || Site.Type == CabinType || Site.Progress < FamilyRoofAt) return false;
 		for (const FString& Id : Site.AllowedBuilders)
 		{
 			const FNpc* Builder = Actors.FindById(Id);
@@ -6422,7 +6430,7 @@ namespace AnastasisVillage
 
 	bool FVillage::AwaitsHelpFor(const FBuilding& Site, const FNpc& Npc) const
 	{
-		if (Site.OwnerFamilyId.IsEmpty() || Site.Progress < FamilyRoofAt) return false;
+		if (Site.OwnerFamilyId.IsEmpty() || Site.Type == CabinType || Site.Progress < FamilyRoofAt) return false;
 		if (Npc.FamilyId != Site.OwnerFamilyId) return false;
 		for (const TPair<FString, int32>& Worker : Site.Workers)
 		{
@@ -6637,7 +6645,7 @@ namespace AnastasisVillage
 		return Result;
 	}
 
-	FString FVillage::OpenFamilySiteNear(const FString& FamilyId, const FNpc& Chef)
+	FString FVillage::OpenFamilySiteNear(const FString& FamilyId, const FNpc& Chef, const FString& Type)
 	{
 		FFamily* Family = Families.FindByPredicate([&FamilyId](const FFamily& F) { return F.Id == FamilyId; });
 		if (!Family || !World) return FString();
@@ -6675,7 +6683,7 @@ namespace AnastasisVillage
 			const int32 Y = CY + DY;
 			if (X < 2 || Y < 2 || X > Nav.W - 3 || Y > Nav.H - 3) continue;
 			if (LiveTileAt(X, Y).Resource != AnastasisWorld::EResource::None || IsFootBlocked(X + 0.5, Y + 0.5)) continue;
-			const FString Id = OpenSite(HouseType, X, Y, /*bDelivered=*/true);
+			const FString Id = OpenSite(Type, X, Y, /*bDelivered=*/true);
 			if (Id.IsEmpty()) continue;
 			FBuilding* Site = Buildings.FindById(Id);
 			bool bReach = false;
@@ -6698,6 +6706,8 @@ namespace AnastasisVillage
 		FBuilding* Own = Buildings.FindById(SiteId);
 		Own->OwnerFamilyId = Family->Id;
 		for (const FString& Id : Family->Adults) Own->AllowedBuilders.Add(Id);
+		// ecart n°56 : la cabane est a son batisseur des le trace ; personne d'autre n'y dormira.
+		if (Type == CabinType) Own->Owner = Chef.Id;
 		return SiteId;
 	}
 

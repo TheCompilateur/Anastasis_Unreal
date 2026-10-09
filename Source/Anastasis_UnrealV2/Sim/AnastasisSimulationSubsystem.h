@@ -177,6 +177,8 @@ public:
 
 	/** Le pawn local suit-il l'habitant incarne (anastasis.Player.Pawn) ? */
 	bool IsPawnBound() const { return BoundPawn.IsValid(); }
+	/** ma-cabane-001 : le corps du joueur est-il pose dans sa cabane ? */
+	bool IsPawnIndoors() const { return bPawnIndoors; }
 
 	/**
 	 * player-minimal-001 -- un habitant ordinaire arrive et il est incarne (FVillage::ArriveAsPlayer) ; tuile
@@ -312,6 +314,8 @@ private:
 	/** player-minimal-001. La personne que le temoin regarde ; vide sans joueur. */
 	FString WitnessPersonId;
 	TWeakObjectPtr<APawn> BoundPawn;
+	/** ma-cabane-001 : le corps du joueur est-il dans sa cabane (pour ne journaliser que le passage de la porte) ? */
+	bool bPawnIndoors = false;
 	bool bScriptedDrive = false;
 	FVector2D ScriptedDrive = FVector2D::ZeroVector;
 };
@@ -449,6 +453,14 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetPlayerStatus(const UObject* WorldContextObject);
+
+	/**
+	 * ma-cabane-001, en JSON : la cabane du joueur (chantier, pieces, batisseurs, proprietaire), son foyer, s'il est dedans
+	 * et a quoi, ou se tient son corps (monde et repere de la cabane), la porte, l'entree, et qui d'autre y loge ou y est
+	 * entre. `{}` sans hote, `"site":""` sans cabane.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetCabinStatus(const UObject* WorldContextObject);
 
 	/** Etat instrumental de la scene et des demandes, sans pretendre juger la lisibilite de l'image. */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))

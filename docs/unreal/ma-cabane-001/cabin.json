@@ -1,0 +1,320 @@
+{
+ "ok": true,
+ "reason": "built_days=1 pieces=22/22 workers=['npc-14:22'] checks=traced_cabin=1,standing=1,built_alone=1,few_days=1,his_home=1,sleeps_inside=1,body_inside=1,his_alone=1,shots=1",
+ "cabin": {
+  "player": "npc-14",
+  "day": 2,
+  "site": "building-4",
+  "x": 40.31453582280294,
+  "y": 20.5,
+  "home": "building-4",
+  "family": "family-4",
+  "inside": true,
+  "inside_building": "building-4",
+  "activity": "dort",
+  "goal": "rest",
+  "energy": 42.5209999999999,
+  "pawn_indoors": true,
+  "pawn": [
+   80940,
+   43110,
+   1378
+  ],
+  "type": "cabin",
+  "progress": 1,
+  "pieces": 22,
+  "piece_total": 22,
+  "owner": "npc-14",
+  "tile_x": 40,
+  "tile_y": 21,
+  "created_day": 1,
+  "completed_day": 2,
+  "need_wood": 8,
+  "need_stone": 2,
+  "workers": [
+   "npc-14:22"
+  ],
+  "others_inside": [],
+  "others_lodged": [],
+  "actor": true,
+  "architecture": true,
+  "location": [
+   81000,
+   43000,
+   1263
+  ],
+  "yaw": -90.00000000000001,
+  "pad": 1.3443264892575826,
+  "archetype": "cabin",
+  "door": [
+   81225,
+   43000,
+   1282
+  ],
+  "entry": [
+   81360,
+   43000,
+   1264
+  ],
+  "hearth": [
+   80771,
+   42890,
+   1322
+  ],
+  "footprint": [
+   -391,
+   -429,
+   432,
+   432
+  ],
+  "floor": 19.344326489257583,
+  "pawn_local": [
+   -110,
+   -60,
+   115
+  ]
+ },
+ "traced": {
+  "player": "npc-14",
+  "day": 1,
+  "site": "building-4",
+  "x": 38.5,
+  "y": 23.5,
+  "home": "",
+  "family": "family-4",
+  "inside": false,
+  "inside_building": "",
+  "activity": "attend",
+  "goal": "idle",
+  "energy": 69.99133333333333,
+  "pawn_indoors": false,
+  "pawn": [
+   77000,
+   47000,
+   1427
+  ],
+  "type": "cabin",
+  "progress": 0,
+  "pieces": 0,
+  "piece_total": 22,
+  "owner": "npc-14",
+  "tile_x": 40,
+  "tile_y": 21,
+  "created_day": 1,
+  "completed_day": -1,
+  "need_wood": 8,
+  "need_stone": 2,
+  "workers": [],
+  "others_inside": [],
+  "others_lodged": [],
+  "actor": false
+ },
+ "asleep": {
+  "player": "npc-14",
+  "day": 2,
+  "site": "building-4",
+  "x": 40.31453582280294,
+  "y": 20.5,
+  "home": "building-4",
+  "family": "family-4",
+  "inside": true,
+  "inside_building": "building-4",
+  "activity": "dort",
+  "goal": "rest",
+  "energy": 42.5209999999999,
+  "pawn_indoors": true,
+  "pawn": [
+   80940,
+   43110,
+   1378
+  ],
+  "type": "cabin",
+  "progress": 1,
+  "pieces": 22,
+  "piece_total": 22,
+  "owner": "npc-14",
+  "tile_x": 40,
+  "tile_y": 21,
+  "created_day": 1,
+  "completed_day": 2,
+  "need_wood": 8,
+  "need_stone": 2,
+  "workers": [
+   "npc-14:22"
+  ],
+  "others_inside": [],
+  "others_lodged": [],
+  "actor": true,
+  "architecture": true,
+  "location": [
+   81000,
+   43000,
+   1263
+  ],
+  "yaw": -90.00000000000001,
+  "pad": 1.3443264892575826,
+  "archetype": "cabin",
+  "door": [
+   81225,
+   43000,
+   1282
+  ],
+  "entry": [
+   81360,
+   43000,
+   1264
+  ],
+  "hearth": [
+   80771,
+   42890,
+   1322
+  ],
+  "footprint": [
+   -391,
+   -429,
+   432,
+   432
+  ],
+  "floor": 19.344326489257583,
+  "pawn_local": [
+   -110,
+   -60,
+   115
+  ]
+ },
+ "samples": [
+  {
+   "step": 2,
+   "day": 1,
+   "pieces": 0,
+   "goal": "build",
+   "progress": 0
+  },
+  {
+   "step": 4,
+   "day": 1,
+   "pieces": 0,
+   "goal": "build",
+   "progress": 0
+  },
+  {
+   "step": 6,
+   "day": 1,
+   "pieces": 0,
+   "goal": "build",
+   "progress": 0
+  },
+  {
+   "step": 8,
+   "day": 1,
+   "pieces": 0,
+   "goal": "build",
+   "progress": 0
+  },
+  {
+   "step": 10,
+   "day": 1,
+   "pieces": 1,
+   "goal": "build",
+   "progress": 0.045454545454545456
+  },
+  {
+   "step": 12,
+   "day": 1,
+   "pieces": 1,
+   "goal": "build",
+   "progress": 0.045454545454545456
+  },
+  {
+   "step": 14,
+   "day": 1,
+   "pieces": 3,
+   "goal": "build",
+   "progress": 0.13636363636363635
+  },
+  {
+   "step": 16,
+   "day": 2,
+   "pieces": 4,
+   "goal": "build",
+   "progress": 0.18181818181818182
+  },
+  {
+   "step": 18,
+   "day": 2,
+   "pieces": 5,
+   "goal": "build",
+   "progress": 0.22727272727272727
+  },
+  {
+   "step": 20,
+   "day": 2,
+   "pieces": 5,
+   "goal": "build",
+   "progress": 0.22727272727272727
+  },
+  {
+   "step": 22,
+   "day": 2,
+   "pieces": 6,
+   "goal": "build",
+   "progress": 0.2727272727272727
+  },
+  {
+   "step": 24,
+   "day": 2,
+   "pieces": 6,
+   "goal": "eat",
+   "progress": 0.2727272727272727
+  },
+  {
+   "step": 26,
+   "day": 2,
+   "pieces": 6,
+   "goal": "rest",
+   "progress": 0.2727272727272727
+  },
+  {
+   "step": 28,
+   "day": 2,
+   "pieces": 9,
+   "goal": "drink",
+   "progress": 0.4090909090909091
+  },
+  {
+   "step": 30,
+   "day": 2,
+   "pieces": 16,
+   "goal": "build",
+   "progress": 0.7272727272727273
+  },
+  {
+   "step": 31,
+   "day": 2,
+   "pieces": 22,
+   "progress": 1.0
+  }
+ ],
+ "shots": [
+  {
+   "file": "01-chantier.png",
+   "written": true
+  },
+  {
+   "file": "02-cabane.png",
+   "written": true
+  },
+  {
+   "file": "03-porte.png",
+   "written": true
+  },
+  {
+   "file": "04-dedans-nuit.png",
+   "written": true
+  },
+  {
+   "file": "05-dehors-nuit.png",
+   "written": true
+  }
+ ]
+}

@@ -36,6 +36,8 @@ namespace AnastasisBuild
 		if (Type == TEXT("well")) { Out = { 10, 18 }; return true; }
 		if (Type == TEXT("house")) { Out = { 24, 8 }; return true; }
 		if (Type == TEXT("granary")) { Out = { 26, 16 }; return true; }
+		// ecart n°56 : la cabane du joueur, hors catalogue : un tiers d'une maison en bois, un quart en pierre.
+		if (Type == TEXT("cabin")) { Out = { 8, 2 }; return true; }
 		Out = FBuildCost();
 		return false;
 	}

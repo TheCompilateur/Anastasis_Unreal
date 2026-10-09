@@ -2,7 +2,8 @@
 # maisonnees a l'echelle humaine (corps + assise), le kit de 23 pieces et M_AnastasisArchitecture.
 # Editeur dedie sur la carte vide du moteur, discret, qui se ferme. Voir create-village-architecture.py.
 #   -Rebuild   regenere aussi le materiau (les meshes sont toujours reecrits : le generateur fait foi)
-param([switch]$Rebuild, [int]$TimeoutSec = 2400)
+#   -Only      n'ecrit que ces maisonnees (ex. SM_Arch_Cabin_01), ni le kit ni les autres ; le materiau est relu tel quel
+param([switch]$Rebuild, [string]$Only = '', [int]$TimeoutSec = 2400)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
@@ -13,6 +14,7 @@ $log = Join-Path $dir 'create-village-architecture.log'
 if (Test-Path $log) { Remove-Item $log }
 $env:ANASTASIS_ARCH_REBUILD = if ($Rebuild) { '1' } else { '0' }
 $env:ANASTASIS_ARCH_GEOMETRY_ONLY = '0'
+$env:ANASTASIS_ARCH_ONLY = $Only
 $py = (Join-Path $Root 'tools\unreal\create-village-architecture.py').Replace('\', '/')
 $launchArgs = @(
   ('"' + (Join-Path $Root 'Anastasis_UnrealV2.uproject') + '"'),

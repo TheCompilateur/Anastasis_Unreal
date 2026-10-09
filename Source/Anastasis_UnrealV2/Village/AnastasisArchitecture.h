@@ -26,6 +26,8 @@ namespace AnastasisArchitecture
 		Well,
 		Workshop,
 		Chapel,
+		/** ma-cabane-001 : la cabane du joueur, une piece levee seul (type de simulation `cabin`). */
+		Cabin,
 		Count
 	};
 

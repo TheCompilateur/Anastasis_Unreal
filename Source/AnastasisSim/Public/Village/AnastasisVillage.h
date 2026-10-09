@@ -239,6 +239,17 @@ namespace AnastasisVillage
 	inline const TCHAR* const WellType = TEXT("well");
 	inline const TCHAR* const HouseType = TEXT("house");
 	inline const TCHAR* const GranaryType = TEXT("granary");
+	/**
+	 * ecart n°56 (ma-cabane-001) : la cabane du joueur, une piece pour un seul dormeur, levee seul. Absente du
+	 * catalogue de la reference ; elle n'est ouverte que par `PlayerBuildHome`.
+	 */
+	inline const TCHAR* const CabinType = TEXT("cabin");
+
+	/** ecart n°56 : une cabane a un proprietaire ne s'ouvre a personne d'autre (ni dormir, ni manger, ni abri). */
+	inline bool IsClosedCabin(const FString& Type, const FString& Owner, const FString& NpcId)
+	{
+		return Type == CabinType && !Owner.IsEmpty() && Owner != NpcId;
+	}
 
 	/** `MORTALITY.famineHunger` (life/mortality.js). */
 	inline constexpr double MortalityFamineHunger = 88.0;
@@ -1587,8 +1598,11 @@ namespace AnastasisVillage
 		 * suffit pas) ; un aidant, lui, n'attend personne.
 		 */
 		bool AwaitsHelpFor(const FBuilding& Site, const FNpc& Npc) const;
-		/** Trace la parcelle d'une famille pres de son chef, sans couper personne du puits. Rend le chantier, vide sinon. */
-		FString OpenFamilySiteNear(const FString& FamilyId, const FNpc& Chef);
+		/**
+		 * Trace la parcelle d'une famille pres de son chef, sans couper personne du puits. Rend le chantier, vide sinon.
+		 * `Type` : une maison (le toit attend un aidant), ou la cabane du joueur (ecart n°56 : il la leve seul, elle est a lui).
+		 */
+		FString OpenFamilySiteNear(const FString& FamilyId, const FNpc& Chef, const FString& Type = HouseType);
 
 		/** Ce chantier admet-il cet habitant ? (Vide : tout le monde.) */
 		static bool CanBuildAt(const FBuilding& Site, const FString& NpcId) { return Site.AllowedBuilders.IsEmpty() || Site.AllowedBuilders.Contains(NpcId); }
@@ -1686,9 +1700,9 @@ namespace AnastasisVillage
 		bool AnswerPlayerAsk(bool bYes);
 
 		/**
-		 * Le joueur decide de batir : il devient chef d'un foyer a lui (`FamilyName`), et sa parcelle se trace pres de
-		 * lui comme celle d'un chef de famille. Rend l'identifiant du chantier, vide si aucun sol ne convient ou s'il a
-		 * deja un foyer qui batit.
+		 * Le joueur decide de batir : il devient chef d'un foyer a lui (`FamilyName`), et sa cabane se trace pres de lui
+		 * (ecart n°56 : une piece, un dormeur, levee seul ; elle est a lui des le trace). Rend l'identifiant du chantier,
+		 * vide si aucun sol ne convient, s'il a deja un toit ou s'il batit deja.
 		 */
 		FString PlayerBuildHome(const FString& FamilyName);
 		/** Le joueur va demander de l'aide a un habitant pour son chantier : la reponse tombe tout de suite, avec sa raison. */

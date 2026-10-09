@@ -29,6 +29,12 @@ namespace AnastasisSettlement
 			OutCause = TEXT("grenier commun : reserve maconnee et fenil, a l'echelle du village");
 			return true;
 		}
+		if (Type == AnastasisVillage::CabinType)
+		{
+			OutProgram = EVariant::Cabin;
+			OutCause = TEXT("cabane levee seul : une piece, un foyer, un lit");
+			return true;
+		}
 		if (Type != AnastasisVillage::HouseType)
 		{
 			return false;

@@ -5,7 +5,8 @@ Lance PIE sur Lvl_AnastasisSlice : Valmire fondee, le monde exterieur charge ave
 difficile : il dort, boit ou mange quand son corps le demande, sinon il va parler ; il dit non au premier
 conseil, oui aux suivants (`Anastasis.Player.Vote`) ; il refuse la premiere demande d'aide, laisse la deuxieme
 sans reponse, accepte les autres (`Anastasis.Player.Help`) ; au jour 20 il decide de batir (`Anastasis.Player.Build`)
-et va demander de l'aide a deux habitants par jour (`Anastasis.Player.Ask`). Puis la chronique et le carnet sont
+et va demander de l'aide a deux habitants par jour pendant quatre jours (`Anastasis.Player.Ask`), avant de lever sa
+cabane (ma-cabane-001 : seul, elle monte en quelques heures). Puis la chronique et le carnet sont
 ecrits dans Saved/Chronicle/, et l'etat des arrivants et du joueur dans Saved/VoiceEvidence/pie/voice.json.
 
 Verdict VOIX_PIE PASS si (le « fini quand » d'Alexandre, VOIX_CONSEIL_001.md) :
@@ -28,6 +29,7 @@ DAYS = int(os.environ.get('ANASTASIS_VOICE_DAYS', '60'))
 SECONDS = float(os.environ.get('ANASTASIS_VOICE_SECONDS', '540'))
 OUT = os.path.join(unreal.Paths.project_saved_dir(), 'VoiceEvidence', 'pie')
 BUILD_DAY = 20
+ASK_DAYS = 4
 
 les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 ues = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
@@ -70,8 +72,9 @@ def act(world):
         goal = 'drink'
     elif player.get('hunger', 0) >= 40:
         goal = 'eat'
-    elif 'build' in player.get('options', []) and step % 2 == 0:
-        # Il a dit oui a quelqu'un (ou il batit chez lui) : il va au chantier, une fois sur deux.
+    elif 'build' in player.get('options', []) and step % 2 == 0 and not (BUILD_DAY <= day <= BUILD_DAY + ASK_DAYS):
+        # Il a dit oui a quelqu'un (ou il batit chez lui) : il va au chantier, une fois sur deux. Sa cabane se leve
+        # seul en quelques heures (ma-cabane-001) : il va d'abord demander, puis il batit.
         goal = 'build'
     else:
         goal = 'socialize'
@@ -93,7 +96,7 @@ def act(world):
     # Sa maison : il decide au jour 20, puis demande a deux habitants chaque matin.
     if day == BUILD_DAY and step % 4 == 0:
         cmd(world, 'Anastasis.Player.Build')
-    if day > BUILD_DAY and step % 4 == 1:
+    if BUILD_DAY < day <= BUILD_DAY + ASK_DAYS and step % 4 == 1:
         for _ in range(2):
             cmd(world, 'Anastasis.Player.Ask npc-%d' % (asked[0] % 14))
             asked[0] += 1

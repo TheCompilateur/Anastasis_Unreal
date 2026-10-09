@@ -18,6 +18,101 @@
  },
  "buildings": [
   {
+   "name": "SM_Arch_Cabin_01",
+   "kind": "cabin",
+   "tier": 1,
+   "size_cm": [
+    683,
+    721,
+    414
+   ],
+   "bounds": [
+    [
+     -321,
+     -359,
+     -15
+    ],
+    [
+     362,
+     362,
+     399
+    ]
+   ],
+   "footprint": [
+    -391,
+    -429,
+    432,
+    432
+   ],
+   "height_humans": 2.35,
+   "triangles": 11364,
+   "footing_triangles": 12522,
+   "doors": [
+    {
+     "name": "door",
+     "width": 96.0,
+     "clear": 192.0,
+     "at": [
+      0,
+      225,
+      18
+     ]
+    }
+   ],
+   "rooms": [
+    {
+     "name": "piece",
+     "use": "vie+sommeil+foyer",
+     "area_m2": 16.8,
+     "floor": 18.0,
+     "ceiling": 247.0
+    }
+   ],
+   "hearths": [
+    [
+     110,
+     -229,
+     58
+    ]
+   ],
+   "sleep_slots": 3,
+   "storage": 1,
+   "work": [
+    {
+     "kind": "chop",
+     "at": [
+      330,
+      400,
+      0
+     ]
+    }
+   ],
+   "roof": [
+    {
+     "kind": "gable",
+     "cover": "board",
+     "pitch": 30.0,
+     "ridge": 392
+    }
+   ],
+   "entry": [
+    0,
+    360,
+    0
+   ],
+   "classes": [
+    "ashlar",
+    "earth",
+    "fiber",
+    "iron",
+    "plank",
+    "rubble",
+    "tile",
+    "wood"
+   ],
+   "errors": []
+  },
+  {
    "name": "SM_Arch_House_Poor_01",
    "kind": "house",
    "tier": 1,

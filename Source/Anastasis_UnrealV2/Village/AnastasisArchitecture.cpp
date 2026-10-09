@@ -72,6 +72,16 @@ namespace AnastasisArchitecture
 				false, FVector::ZeroVector, 0, 0, 1,
 				{{TEXT("nef"), TEXT("culte+assemblee"), 55.1, 10.0, 559.0}},
 				{30, 90, 20}, 4.0});
+			// ma-cabane-001 : la cabane du joueur. Une piece de 16,8 m2 a foyer, un dormeur, levee seul : plus petite
+			// que sa parcelle (17,7 %), c'est voulu (« Elle doit etre petite », Alexandre, 2026-10-09).
+			C.Add({EVariant::Cabin, TEXT("cabin"), TEXT("cabin"), 1,
+				TEXT("/Game/Anastasis/VillageArchitecture/SM_Arch_Cabin_01.SM_Arch_Cabin_01"),
+				TEXT("/Game/Anastasis/VillageArchitecture/SM_Arch_Cabin_01_Footing.SM_Arch_Cabin_01_Footing"),
+				FBox2D(FVector2D(-391, -429), FVector2D(432, 432)), 399.0,
+				FVector(0, 225, 18), 96.0, 192.0, FVector(0, 360, 0),
+				true, FVector(110, -229, 58), 1, 4, 1,
+				{{TEXT("piece"), TEXT("vie+sommeil+foyer"), 16.8, 18.0, 247.0}},
+				{8, 2, 0}, 3.0});
 			check(C.Num() == static_cast<int32>(EVariant::Count));
 			for (int32 I = 0; I < C.Num(); ++I)
 			{
@@ -107,6 +117,11 @@ namespace AnastasisArchitecture
 		if (SimType == AnastasisVillage::GranaryType)
 		{
 			OutVariant = EVariant::Storehouse;
+			return true;
+		}
+		if (SimType == AnastasisVillage::CabinType)
+		{
+			OutVariant = EVariant::Cabin;
 			return true;
 		}
 		if (SimType != AnastasisVillage::HouseType)
@@ -164,7 +179,7 @@ namespace AnastasisArchitecture
 		R.Rooms = A.Rooms.Num();
 		R.Materials = A.Materials;
 		R.MaintenanceDaysPerYear = A.MaintenanceDaysPerYear;
-		if (Building.Type == AnastasisVillage::HouseType)
+		if (Building.Type == AnastasisVillage::HouseType || Building.Type == AnastasisVillage::CabinType)
 		{
 			// La capacite qui compte est celle de la simulation ; l'archetype dit combien de couchages il offre.
 			R.Capacity = Village.ShelterCapacity(Building);

@@ -61,7 +61,8 @@ namespace
 			OutKind = EAnastasisVillageBuildingKind::Well;
 			return true;
 		}
-		if (Type == AnastasisVillage::HouseType)
+		// La cabane du joueur (ma-cabane-001) se presente comme une maison : on y dort.
+		if (Type == AnastasisVillage::HouseType || Type == AnastasisVillage::CabinType)
 		{
 			OutKind = EAnastasisVillageBuildingKind::House;
 			return true;
@@ -259,7 +260,7 @@ int32 FAnastasisVillagePresentation::Sync(
 	const auto ApplyMetabolism = [&](AAnastasisVillageBuilding& Actor, const AnastasisVillage::FBuilding& Building)
 	{
 		AnastasisMetabolism::FInput In;
-		In.bDwelling = Building.Type == AnastasisVillage::HouseType;
+		In.bDwelling = Building.Type == AnastasisVillage::HouseType || Building.Type == AnastasisVillage::CabinType;
 		In.bCompleted = Building.IsCompleted();
 		In.Daylight = Daylight;
 		if (In.bDwelling && In.bCompleted)
