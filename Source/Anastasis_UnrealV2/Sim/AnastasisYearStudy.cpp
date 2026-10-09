@@ -337,7 +337,7 @@ namespace AnastasisYearStudy
 
 static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisYearStudy(
 	TEXT("Anastasis.Etude.Annee"),
-	TEXT("Anastasis.Etude.Annee [jours=240] [releve=10] [graines=12345[+7+...]] - annee-valmire-001 : le village du lancement sans rendu, "
+	TEXT("Anastasis.Etude.Annee [jours=240] [releve=10] [graines=12345[+7+...]] [quit] - annee-valmire-001 : le village du lancement sans rendu, "
 		"quatre scenarios (sans joueur, joueur qui survit, joueur qui travaille, village ferme), un releve economique et social "
 		"tous les N jours -> Saved/YearStudy/<horodatage>/seed-<graine>/ (csv, chroniques, summary.json). Ne touche pas au monde courant."),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld*)
@@ -369,4 +369,9 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisYearStudy(
 		}
 		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("YEAR_STUDY %s dir=%s seeds=%d files=%d"),
 			bAllSeeded && Files > 0 ? TEXT("COMPLETE") : TEXT("FAIL"), *Root, SeedArgs.Num(), Files);
+		// `quit` : l'editeur sans rendu de year-study.ps1 se ferme de lui-meme (un `Quit` d'ExecCmds n'y passait pas).
+		if (Args.IsValidIndex(3) && Args[3].Equals(TEXT("quit"), ESearchCase::IgnoreCase))
+		{
+			FPlatformMisc::RequestExit(false);
+		}
 	}));

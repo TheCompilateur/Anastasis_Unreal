@@ -52,8 +52,23 @@ Voir `git log main..agent/annee-valmire-001`.
 ## MEC
 
 - BUILD: PASS (worktree)
-- TESTS: RESULTAT_TESTS
-- Étude de deux années (240 jours, 4 scénarios, graines 12345, 7, 42, 1204) : ~2 min sans rendu, `YEAR_STUDY COMPLETE`.
+- TESTS: `tools\unreal\report-tests.ps1 -Filter 'Anastasis.Village.Etude'` → PASS 1 / KNOWN_EXPECTED_FAILURE 0 / FAIL 0
+  (`Anastasis.Village.Etude.Instrument` : quatre scénarios posés, relevés aux jours 0, 3, 6, joueur là où il faut, même graine
+  = même csv).
+- Étude de deux années sur `main` `0deaa7bf7` (après les arrivants, les bâtiments communs et la voix au conseil ; 240 jours,
+  4 scénarios, graines 12345, 7, 42, 1204) : ~8 min sans rendu, `YEAR_STUDY COMPLETE`. Moyennes des mondes 12345, 7, 42
+  (1204 meurt en quelques jours : soif, puis faim) :
+
+  | Scénario | Habitants | Morts | Arrivants | Maisons | Soirs à grenier vide | Dernier bâtiment |
+  |---|---|---|---|---|---|---|
+  | sans joueur | 18,3 | 2,0 | 10 | 8,3 | 12,3 | jour 60 |
+  | joueur qui survit | 17,7 | 2,7 | 10 | 7,3 | 37,7 | jour 107 |
+  | joueur qui travaille | 17,3 | 2,3 | 10 | 7,3 | 37,7 | jour 77 |
+  | village fermé | 13,7 | 0,3 | 0 | 6,0 | 0 | jour 23 |
+
+  Les arrivants font la croissance (14 → 18) et la faim (12 soirs vides contre 0). **Le joueur scripté meurt dans les six
+  parties** (soif ou faim, jours 7 à 188) : jouer seulement par buts (touches) ne le garde pas en vie — à vérifier avec les
+  mains (mains-joueur-001), qui donnent boire et manger directs.
 
 ## PROOFS
 

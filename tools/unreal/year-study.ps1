@@ -30,7 +30,7 @@ $launchArgs = @(
   '/Engine/Maps/Entry', '-nullrhi', '-nosound',
   '-unattended', '-nopause', '-nosplash', '-NoLiveCoding',
   ('-abslog="' + $log + '"'),
-  ('-ExecCmds="Anastasis.Etude.Annee ' + $Days + ' ' + $Every + ' ' + (($Seeds.Trim()) -replace '[, ]+', '+') + ', Quit"')
+  ('-ExecCmds="Anastasis.Etude.Annee ' + $Days + ' ' + $Every + ' ' + (($Seeds.Trim()) -replace '[, ]+', '+') + ' quit"')
 )
 $p = Start-AnastasisEditor "$Engine\Engine\Binaries\Win64\UnrealEditor-Cmd.exe" $launchArgs
 $t0 = Get-Date
