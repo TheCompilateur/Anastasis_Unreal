@@ -129,6 +129,7 @@ bool FAnastasisRiverbankPaint::RunTest(const FString&)
 			Geo.Colors.Add(FLinearColor(Grass.R, Grass.G, Grass.B, Z < 0.0 ? 1.0f : 0.0f));
 			Geo.UV0.Add(FVector2D::ZeroVector);
 			Geo.UV1.Add(FVector2D::ZeroVector);
+			Geo.UV2.Add(FVector2D::ZeroVector);
 		}
 	}
 	// L'eau des sommets secs pres de la rive est celle du chenal (0) ; loin, la sentinelle sol - 1 m.
@@ -142,6 +143,7 @@ bool FAnastasisRiverbankPaint::RunTest(const FString&)
 	TestTrue(TEXT("mud on the calm bank"), R.MudVertices > 0);
 	TestTrue(TEXT("gravel on the fast bank"), R.GravelVertices > 0);
 	int32 Touched = 0, Submerged = 0, Far = 0, Alpha = 0, CalmLighter = 0, FastDarkerNoRock = 0, Wet = 0;
+	int32 FastPhoto = 0, FalsePhoto = 0;
 	for (int32 I = 0; I < Geo.Vertices.Num(); ++I)
 	{
 		const double Free = Geo.Vertices[I].Z - Geo.WaterVertices[I].Z;
@@ -150,6 +152,11 @@ bool FAnastasisRiverbankPaint::RunTest(const FString&)
 		Alpha += Geo.Colors[I].A != Before[I].A ? 1 : 0;
 		if (Free < 0.0) Submerged += bChanged ? 1 : 0;
 		if (Free >= 110.0) Far += bChanged ? 1 : 0;
+		if (Geo.UV2[I].Y > 0.02)
+		{
+			if (Geo.Vertices[I].X > 0.0 && Free >= 0.0 && Free < 110.0) ++FastPhoto;
+			else ++FalsePhoto;
+		}
 		if (Free >= 0.0 && Free < 20.0)
 		{
 			const double Luma = Geo.Colors[I].R + Geo.Colors[I].G + Geo.Colors[I].B, Base = Grass.R + Grass.G + Grass.B;
@@ -171,6 +178,8 @@ bool FAnastasisRiverbankPaint::RunTest(const FString&)
 	TestEqual(TEXT("calm waterline darker than grass (mud)"), CalmLighter, 0);
 	TestTrue(TEXT("calm waterline shines (wetness above DampStart)"), Wet > 0);
 	TestEqual(TEXT("fast waterline lighter and stony (gravel)"), FastDarkerNoRock, 0);
+	TestTrue(TEXT("fast dry bank exports gravel photo weight"), FastPhoto > 0);
+	TestEqual(TEXT("no gravel photo on calm, submerged or distant ground"), FalsePhoto, 0);
 	return true;
 }
 

@@ -2107,9 +2107,12 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
             // pu remplacer Geometry par un maillage tessele, ces canaux doivent avoir
             // suivi la subdivision : c'est AnastasisTerrainForge::Apply qui s'en charge.
             // bCreateCollision=true : c'est ce qui empeche le pawn de tomber a travers.
-            // UV0/UV1 portent la morphologie lue par le materiau de sol (cf. FGeometry).
-            // La surcharge a quatre canaux est la seule qui les accepte ; UV2/UV3 restent
-            // vides parce que rien d'honnete ne reste a y mettre.
+            // UV0/UV1 portent les familles et l'humidite ; UV2 le passage reel de
+            // HumanGeography et le gravier peint par Riverbank, sans nouveau type
+            // de tuile ni mutation de simulation. La surcharge a quatre canaux
+            // transporte ces signaux au materiau de sol.
+            if (Geometry.UV2.Num() != Geometry.Vertices.Num())
+                Geometry.UV2.Init(FVector2D::ZeroVector, Geometry.Vertices.Num());
             // RIVERBANK_LIFE_001 : bandes de rive peintes dans la couleur de sommet AVANT la
             // section de sol -- la teinte sous l'herbe la relit ensuite depuis la section.
             // Seulement si la grille du drainage actif est bien celle de ce sol.
@@ -2130,7 +2133,7 @@ bool AAnastasisWorldEmbodiment::EmbodyCrop(uint32 Seed, int32 OriginX, int32 Ori
                 }
             }
             ExperimentalSurface->CreateMeshSection_LinearColor(0, Geometry.Vertices, Geometry.Triangles,
-                Geometry.Normals, Geometry.UV0, Geometry.UV1, TArray<FVector2D>{}, TArray<FVector2D>{},
+                Geometry.Normals, Geometry.UV0, Geometry.UV1, Geometry.UV2, TArray<FVector2D>{},
                 Geometry.Colors, TArray<FProcMeshTangent>{}, true);
             // Section 1 : nappe d'eau plate au niveau de la mer, encastree dans le relief.
             ExperimentalSurface->ClearMeshSection(1);

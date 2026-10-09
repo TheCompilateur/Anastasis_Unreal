@@ -151,6 +151,7 @@ void AnastasisHumanGeography::Apply(const AnastasisWorldView::FWorldVisualSnapsh
     const double Scale=S.SpatialScale;
     const double Sea=AnastasisTerrainSurface::WaterPlaneZ;
     G.RiverFlow.SetNumZeroed(G.Vertices.Num());
+    G.UV2.Init(FVector2D::ZeroVector, G.Vertices.Num());
     for(int32 I=0;I<G.Vertices.Num();++I)
     {
         FVector& P=G.Vertices[I];
@@ -159,6 +160,7 @@ void AnastasisHumanGeography::Apply(const AnastasisWorldView::FWorldVisualSnapsh
         P.Z=Sea+(V.Height*100.0-Sea)*Scale;
         G.WaterVertices[I].Z=Sea+(V.WaterHeight*100.0-Sea)*Scale;
         G.RiverFlow[I]=static_cast<float>(V.RiverWeight);
+        G.UV2[I].X=static_cast<float>(FMath::Clamp(V.RoadWeight,0.0,1.0));
         // New dry alluvium is presentation, not a mutation of source tile fertility/type.
         if(V.ValleyWeight>0 && V.Height>V.WaterHeight)
         {

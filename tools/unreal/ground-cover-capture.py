@@ -80,6 +80,12 @@ STATE_CMDS = {
     'ruin_before': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     'ruin_after': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     'ruin_control': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'path_before': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'path_after': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'path_control': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'gravel_before': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'gravel_after': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'gravel_control': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     # MICRO_ECOLOGY_001. L'herbe, sa teinte et les rives vivantes restent. Seule cette couche bouge.
     'eco': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1',
             'anastasis.Dressing.MicroEcology 1', 'anastasis.MicroEcology.Soil 1'),
@@ -87,7 +93,9 @@ STATE_CMDS = {
               'anastasis.Dressing.MicroEcology 0', 'anastasis.MicroEcology.Soil 0'),
 }
 NO_TEXTURE = ('on_notex', 'bare_notex')
-CONTEXT_STATES = ('ruin_before', 'ruin_after', 'ruin_control')
+CONTEXT_STATES = ('ruin_before', 'ruin_after', 'ruin_control',
+                  'path_before', 'path_after', 'path_control',
+                  'gravel_before', 'gravel_after', 'gravel_control')
 GROUND_MI = '/Game/Anastasis/Materials/MI_AnastasisGround'
 states = [x.strip() for x in os.environ.get('ANASTASIS_GROUND_STATES', 'on,off').split(',') if x.strip()]
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
@@ -173,11 +181,14 @@ try:
                     mid.set_scalar_parameter_value('TexFadeStart', 0.0)
                     mid.set_scalar_parameter_value('TexFadeEnd', 1.0)
                 else:
-                    mid.set_scalar_parameter_value('TexContextStrength', 1.0 if state == 'ruin_after' else 0.0)
+                    family = state.split('_', 1)[0]
+                    parameter = {'ruin': 'TexContextStrength', 'path': 'TexPathStrength',
+                                 'gravel': 'TexGravelStrength'}[family]
+                    mid.set_scalar_parameter_value(parameter, 1.0 if state.endswith('_after') else 0.0)
                 # Un materiau sans le parametre l'ignore en silence et rendrait un faux A/B.
                 get = getattr(mid, 'k2_get_scalar_parameter_value', None) or mid.get_scalar_parameter_value
-                parameter = 'TexFadeEnd' if state in NO_TEXTURE else 'TexContextStrength'
-                expected = 1.0 if state in NO_TEXTURE or state == 'ruin_after' else 0.0
+                parameter = 'TexFadeEnd' if state in NO_TEXTURE else parameter
+                expected = 1.0 if state in NO_TEXTURE or state.endswith('_after') else 0.0
                 if abs(get(parameter) - expected) > 1e-4:
                     raise RuntimeError('MI_AnastasisGround sans %s : rien a basculer' % parameter)
                 n += 1
@@ -301,6 +312,9 @@ try:
         ('riviere_eye', (49.5, 55.2), 170, (50.5, 58.4), 0),
         ('lisiere_eye', (37.0, 57.0), 170, (28.0, 58.0), 600),
         ('vallee_b_eye', (37.0, 27.0), 170, (28.0, 21.0), 300),
+        # Noeud du passage auteur (42,33) : une camera a hauteur humaine regarde
+        # la matiere a 3 m, sans confondre le sol avec une carte vue du ciel.
+        ('pass_ground', (42.0, 33.0), 170, (42.12, 33.12), 0),
         ('oblique', (40.0, 44.0), 3500, (50.0, 58.0), 0),
         # Vue d'ensemble a ~300 m : l'herbe est coupee a 108 m, ce qu'on voit d'ici c'est le
         # SOL -- la mosaique prairie / laiches / lande de la vue aerienne d'EZ5.
@@ -348,6 +362,37 @@ try:
         dx, dy = 48.0 - at_tile[0], 48.0 - at_tile[1]
         d = math.hypot(dx, dy) or 1.0
         plan.append((name, at_tile, lift, (at_tile[0] + dx / d * 3.0, at_tile[1] + dy / d * 3.0), 120))
+
+    if any(s.startswith('gravel_') for s in states):
+        # Un galet de berge vive est un temoin de site, pas la preuve du masque
+        # peint. On vise son sol voisin puis l'A/B confirme la photo sous-jacente.
+        candidates = []
+        for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
+            if not comp.get_name().startswith('Riverbank_Cobble_'):
+                continue
+            for i in range(0, comp.get_instance_count(), max(1, comp.get_instance_count() // 300)):
+                got = comp.get_instance_transform(i, True)
+                xf = got[1] if isinstance(got, tuple) else got
+                x, y, z = xf.translation.x, xf.translation.y, xf.translation.z
+                if 8*T < x < 88*T and 8*T < y < 88*T:
+                    candidates.append((math.hypot(x-50*T, y-56*T), x, y, z))
+        if not candidates:
+            raise RuntimeError('no riverbank cobble site for gravel capture')
+        chosen = None
+        for _, x, y, z in sorted(candidates)[:200]:
+            for dx, dy in ((200, 0), (-200, 0), (0, 200), (0, -200)):
+                eye_z = ground(x+dx, y+dy)
+                if eye_z is not None and abs(eye_z-z) < 110:
+                    chosen = (x, y, z, x+dx, y+dy, eye_z)
+                    break
+            if chosen:
+                break
+        if chosen is None:
+            raise RuntimeError('no human-height gravel site beside riverbank cobbles')
+        x, y, z, ex, ey, ez = chosen
+        plan.append(('bank_ground', (ex/T, ey/T, ez+170), 0,
+                     (x/T, y/T, z), 0))
+        unreal.log('GROUND_CAPTURE_BANK_SITE x=%.1f y=%.1f' % (x, y))
 
     outside = find_instance('GroundCover_MeadowTall_Far', lambda tx, ty: valley_distance(tx, ty) > 3.0)
     if outside:

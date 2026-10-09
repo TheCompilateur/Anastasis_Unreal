@@ -195,6 +195,10 @@ struct FGeometry
      */
     TArray<FVector2D> UV0;
     TArray<FVector2D> UV1;
+    /** UV2 = (passage tasse de HumanGeography, gravier de berge rapide).
+     * Ces poids de presentation sont remplis sur le maillage final et ne changent
+     * ni les types de tuiles ni la simulation. Zero hors des deux contextes. */
+    TArray<FVector2D> UV2;
 
     /** Nappe d'eau plate : les memes sommets que le relief, Z fige a WaterPlaneZ. */
     TArray<FVector> WaterVertices;

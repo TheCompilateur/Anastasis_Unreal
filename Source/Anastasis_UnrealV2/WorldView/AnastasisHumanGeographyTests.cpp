@@ -117,6 +117,20 @@ bool FHumanGeographyScale::RunTest(const FString&)
     AnastasisTerrainForge::FMesh M;
     if(!TestTrue(TEXT("scaled surface builds"),AnastasisTerrainSurface::Build(S,G)))return false;
     if(!TestTrue(TEXT("human layer builds"),AnastasisTerrainForge::Apply(S,G,M)))return false;
+    TestEqual(TEXT("one context UV per fine vertex"),M.Geometry.UV2.Num(),M.Geometry.Vertices.Num());
+    int32 StrongRoad=0, OffRoad=0;
+    if (M.Geometry.UV2.Num()==M.Geometry.Vertices.Num())
+    {
+        const double Unit=TileWorldSize*S.SpatialScale;
+        for(int32 I=0;I<M.Geometry.Vertices.Num();++I)
+        {
+            const double X=M.Geometry.Vertices[I].X/Unit,Y=M.Geometry.Vertices[I].Y/Unit;
+            if(X>41.5 && X<42.5 && Y>32.5 && Y<33.5 && M.Geometry.UV2[I].X>0.9) ++StrongRoad;
+            if(X<15 && Y<15 && M.Geometry.UV2[I].X>0.001) ++OffRoad;
+        }
+    }
+    TestTrue(TEXT("authored pass exports a strong road photo weight"),StrongRoad>0);
+    TestEqual(TEXT("road photo absent outside authored pass"),OffRoad,0);
     double Error=0;
     for(int32 I=0;I<G.Triangles.Num();I+=3*317)
     {

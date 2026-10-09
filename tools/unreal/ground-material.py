@@ -26,13 +26,14 @@ CE QUE LE MATERIAU LIT, ET D'OU CA VIENT (AnastasisTerrainSurface::Build) :
   TexCoord0.x/.y   poids de famille Rock / Litter
   TexCoord1.x      poids de famille Worked           (l'herbe est le reste : 1-R-L-W)
   TexCoord1.y      Wetness [0,1], champ de proximite d'eau du simulateur
+  TexCoord2.x/.y   passage tasse de HumanGeography / gravier de berge rapide
   VertexNormalWS   la pente, qui n'a pas besoin d'etre exportee : elle EST la normale
   WorldPosition    l'altitude et la place dans le monde, pour la meme raison
 
 Aucune de ces entrees n'est inventee ici. Le materiau projette, il ne simule pas.
 
-TEXTURES PHOTO (GROUND_TEXTURE_001, PONTIC_GROUND_ASSETS_001). Dix textures CC0 :
-les huit de base et deux pour les ruines, importees dans
+TEXTURES PHOTO (GROUND_TEXTURE_001, PONTIC_GROUND_ASSETS_001/002). Quatorze textures
+CC0 : huit de base et six de contexte Ruin, Path, Gravel, importees dans
 /Game/Anastasis/Materials/GroundTextures depuis Saved/GroundTextures/packed, que produit
 tools/unreal/ground-textures.py (Python systeme, a lancer AVANT). Elles portent ce que la
 geometrie a un sommet par metre ne peut pas porter : le detail sous le metre. Elles ne
@@ -42,7 +43,7 @@ importees, ce script ne les reimporte plus, sauf ANASTASIS_GROUND_TEXTURES_REIMP
 
 Variables d'environnement :
   ANASTASIS_GROUND_REBUILD             "1" regenere les deux assets (ecrase l'existant)
-  ANASTASIS_GROUND_TEXTURES_REIMPORT   "1" reimporte les dix textures depuis packed/
+  ANASTASIS_GROUND_TEXTURES_REIMPORT   "1" reimporte les quatorze textures depuis packed/
 """
 import json
 import os
@@ -65,7 +66,7 @@ TEX_PKG = PKG + '/GroundTextures'
 # Taille = cote reel de la photo en cm (fiche Poly Haven), donc l'echelle par defaut est
 # l'echelle physique : un caillou de la photo a la taille d'un caillou.
 TEX_FAMILIES = (('Grass', 200.0), ('Litter', 300.0), ('Worked', 130.0), ('Rock', 300.0))
-CONTEXT_FAMILIES = (('Ruin', 200.0),)
+CONTEXT_FAMILIES = (('Ruin', 200.0), ('Path', 220.0), ('Gravel', 290.0))
 # Inverse de DETAIL_MEAN de ground-textures.py : l'albedo de detail est stocke a une
 # moyenne de 0.4, le materiau le ramene a 1. Les deux nombres vont ensemble ;
 # import_textures() le verifie contre le manifeste a chaque import.
@@ -409,23 +410,23 @@ def _family_hlsl(i, family, comp):
     return '\n'.join(lines)
 
 
-def _ruin_hlsl():
-    # Une ruine est un site local, pas une cinquieme famille diffuse du monde.
-    # Ses joints gardent une echelle de pierre lisible a hauteur humaine.
-    lines = ['float4 RA=0, RR=0; float3 RN=0;',
-             'float RuinMix=saturate(Worked*10.0)*saturate((RockW-0.60)*4.0)*saturate(ContextStrength);',
-             '[branch] if (RuinMix > 0.001) {',
-             'float t=1.0/TexSizeRuin;']
+def _context_hlsl(family, mask):
+    # Les contextes sont des photos locales pilotees par des poids deja produits
+    # par la geometrie. Aucun scan ne devient une cinquieme famille diffuse.
+    lines = ['float4 %sA=0, %sR=0; float3 %sN=0;' % (family, family, family),
+             'float %sMix=%s;' % (family, mask),
+             '[branch] if (%sMix > 0.001) {' % family,
+             'float t=1.0/TexSize%s;' % family]
     for w, sign, uv, grad, tn, swizzle in _AXES:
         lines += ['[branch] if (%s > 0.01) {' % w,
                   'float2 uv=%s*t,gx=%s*t,gy=%s*t;' % (uv, grad.format(d='dPx'), grad.format(d='dPy')),
-                  'float4 a=Texture2DSampleGrad(RuinAH,RuinAHSampler,uv,gx,gy);',
-                  'float4 n=Texture2DSampleGrad(RuinNR,RuinNRSampler,uv,gx,gy);',
+                  'float4 a=Texture2DSampleGrad(%sAH,%sAHSampler,uv,gx,gy);' % (family, family),
+                  'float4 n=Texture2DSampleGrad(%sNR,%sNRSampler,uv,gx,gy);' % (family, family),
                   'float2 xy=(n.xy*2.0-1.0)*NormalStrength*0.75; xy.x *= %s;' % sign,
                   'float z=sqrt(saturate(1.0-dot(xy,xy)));',
-                  'RA+=a*%s; RR+=n*%s; RN+=(%s).%s*%s;' % (w, w, tn, swizzle, w),
+                  '%sA+=a*%s; %sR+=n*%s; %sN+=(%s).%s*%s;' % (family, w, family, w, family, tn, swizzle, w),
                   '}']
-    lines += ['RN=normalize(RN);', '}']
+    lines += ['%sN=normalize(%sN);' % (family, family), '}']
     return '\n'.join(lines)
 
 
@@ -443,7 +444,16 @@ def ground_texture_hlsl():
     """
     comps = 'xyzw'
     body = '\n'.join(_family_hlsl(i, f, comps[i]) for i, (f, _) in enumerate(TEX_FAMILIES))
-    ruin_body = _ruin_hlsl()
+    contexts = (
+        ('Ruin', 'saturate(Worked*10.0)*saturate((RockW-0.60)*4.0)*saturate(ContextStrength)'),
+        ('Path', 'smoothstep(0.72,0.98,Road)*saturate(PathStrength)*(1.0-RuinMix)'),
+        ('Gravel', 'saturate(BankGravel)*saturate(GravelStrength)*(1.0-RuinMix)'),
+    )
+    context_body = '\n'.join(_context_hlsl(family, mask) for family, mask in contexts)
+    context_mix = '\n'.join(
+        'alb=lerp(alb,%sA.rgb*%.6f,%sMix); nr=lerp(nr,%sR,%sMix); nw=normalize(lerp(nw,%sN,%sMix));' %
+        (family, 1.0 / TEX_DETAIL_MEAN, family, family, family, family, family)
+        for family, _ in contexts)
     return '''TexNormal = normalize(N);
 TexRough = 0.0;
 [branch] if (Fade < 0.001) { return float3(1.0, 1.0, 1.0); }
@@ -475,15 +485,13 @@ float3 alb = (b.x * A0.rgb + b.y * A1.rgb + b.z * A2.rgb + b.w * A3.rgb) * %.6f;
 float4 nr = b.x * R0 + b.y * R1 + b.z * R2 + b.w * R3;
 float3 nw = b.x * N0 + b.y * N1 + b.z * N2 + b.w * N3;
 nw = dot(nw, nw) > 1e-8 ? normalize(nw) : Nn;
-alb = lerp(alb, RA.rgb * %.6f, RuinMix);
-nr = lerp(nr, RR, RuinMix);
-nw = normalize(lerp(nw, RN, RuinMix));
+%s
 float ao = lerp(1.0, nr.a * 2.0, AOStrength);
 float3 detail = lerp(float3(1.0, 1.0, 1.0), alb, AlbedoStrength) * ao;
 TexNormal = normalize(lerp(Nn, nw, Fade));
 TexRough = (nr.b - 0.5) * 2.0 * RoughnessStrength * Fade;
 return lerp(float3(1.0, 1.0, 1.0), detail, Fade);
-''' % (body, ruin_body, 1.0 / TEX_DETAIL_MEAN, 1.0 / TEX_DETAIL_MEAN)
+''' % (body, context_body, 1.0 / TEX_DETAIL_MEAN, context_mix)
 
 
 
@@ -536,12 +544,15 @@ def build_master(textures):
     vc = g.node(unreal.MaterialExpressionVertexColor, -2600, -200)
     uv0 = g.node(unreal.MaterialExpressionTextureCoordinate, -2600, 60, coordinate_index=0)
     uv1 = g.node(unreal.MaterialExpressionTextureCoordinate, -2600, 180, coordinate_index=1)
+    uv2 = g.node(unreal.MaterialExpressionTextureCoordinate, -2600, 300, coordinate_index=2)
     nws = g.node(unreal.MaterialExpressionVertexNormalWS, -2600, 300)
     wp = g.node(unreal.MaterialExpressionWorldPosition, -2600, 420)
 
     w_rock = g.mask(uv0, '', True, False, False, -2380, 40)
     w_litter = g.mask(uv0, '', False, True, False, -2380, 120)
     w_worked = g.mask(uv1, '', True, False, False, -2380, 200)
+    w_road = g.mask(uv2, '', True, False, False, -2380, 320)
+    w_bank_gravel = g.mask(uv2, '', False, True, False, -2380, 380)
     wetness = g.mask(uv1, '', False, True, False, -2380, 280)
     # Pas de lecture de VertexColor.A ici, et pas de branche eau du tout : la nappe d'eau
     # est une AUTRE section de maillage, et elle recoit son propre materiau (cf.
@@ -816,6 +827,8 @@ return saturate(Thin + Fine + matrix);
         'BlendDepth': g.scalar('TexBlendDepth', 0.2, T, -1900, 1660),
     }
     tex_params['ContextStrength'] = g.scalar('TexContextStrength', 1.0, T, -1900, 1690)
+    tex_params['PathStrength'] = g.scalar('TexPathStrength', 1.0, T, -1900, 1740)
+    tex_params['GravelStrength'] = g.scalar('TexGravelStrength', 1.0, T, -1900, 1780)
     for i, (family, size) in enumerate(TEX_FAMILIES + CONTEXT_FAMILIES):
         tex_params['TexSize' + family] = g.scalar('TexSize' + family, size, T, -1900, 1720 + 60 * i)
     # Pleine a 4 m, absente a 20 m. Le talus du cadrage a 1,7 m perd sa photo
@@ -825,7 +838,7 @@ return saturate(Thin + Fine + matrix);
     tex_fade = g.one_minus(
         g.smoothstep(p_tex_near, '', p_tex_far, '', depth, '', -1540, 1960), '', -1380, 1960)
 
-    tex_inputs = ['P', 'N', 'RockMask', 'RockW', 'Litter', 'Worked', 'Fade'] + list(tex_params.keys())
+    tex_inputs = ['P', 'N', 'RockMask', 'RockW', 'Litter', 'Worked', 'Road', 'BankGravel', 'Fade'] + list(tex_params.keys())
     tex_objects = {}
     for family, _ in TEX_FAMILIES + CONTEXT_FAMILIES:
         for suffix, sampler in (('AH', SAMPLER_COLOR), ('NR', SAMPLER_LINEAR_COLOR)):
@@ -838,7 +851,8 @@ return saturate(Thin + Fine + matrix);
     tex = g.custom(ground_texture_hlsl(), 'GroundTexture', CMOT_FLOAT3, tex_inputs,
                    (('TexNormal', CMOT_FLOAT3), ('TexRough', CMOT_FLOAT1)), -1100, 1500)
     for name, src in (('P', wp), ('N', nws), ('RockMask', rock_mask), ('RockW', w_rock),
-                      ('Litter', w_litter), ('Worked', texture_worked), ('Fade', tex_fade)):
+                      ('Litter', w_litter), ('Worked', texture_worked), ('Road', w_road),
+                      ('BankGravel', w_bank_gravel), ('Fade', tex_fade)):
         g.link(src, '', tex, name)
     for name, src in tex_params.items():
         g.link(src, '', tex, name)

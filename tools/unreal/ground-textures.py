@@ -4,6 +4,7 @@ SE LANCE HORS UNREAL, avec le Python du systeme (Pillow + numpy) :
 
     python tools/unreal/ground-textures.py
     python tools/unreal/ground-textures.py Ruin  # seulement la nouvelle variante
+    python tools/unreal/ground-textures.py Path Gravel
 
 Il prepare les images que tools/unreal/ground-material.py importe ensuite dans
 /Game/Anastasis/Materials/GroundTextures. Rien n'est ecrit dans Content/ ici.
@@ -17,6 +18,8 @@ artistique P1.6 (ecologie pontique humide, "Mediterranean dryness" interdite) :
   Worked  brown_mud_02       1.3 m   terre compacte humide
   Rock    mossy_rock         3.0 m   roche moussue, lichen
   Ruin    cobblestone_floor_13 2.0 m  pierres usees en terre, sites remanies
+  Path    stony_dirt_path   2.2 m  terre tassee et cailloux du passage
+  Gravel  river_small_rocks 2.9 m  galets de rive a courant rapide
 
 Les fichiers bruts vont dans Saved/GroundTextures/raw (ignore par git), les images
 empaquetees dans Saved/GroundTextures/packed. Les assets importes, eux, sont versionnes :
@@ -71,6 +74,8 @@ FAMILIES = {
     'Worked': ('brown_mud_02', 130.0, 'diff'),
     'Rock': ('mossy_rock', 300.0, 'diff'),
     'Ruin': ('cobblestone_floor_13', 200.0, 'diff'),
+    'Path': ('stony_dirt_path', 220.0, 'diff'),
+    'Gravel': ('river_small_rocks', 290.0, 'diff'),
 }
 MAPS = (('color', 'jpg'), ('nor_dx', 'png'), ('rough', 'jpg'), ('disp', 'png'), ('ao', 'jpg'))
 
@@ -152,7 +157,7 @@ def pack(family, asset, size_cm, files):
     # bruit macro/meso du materiau, qui ne se repete pas a l'echelle du monde.
     # Les joints et galets de la ruine portent une forme plus large que les
     # grains naturels. Leur passe-haut reste local au site, jamais a la vallee.
-    cutoff_cm = 35.0 if family == 'Ruin' else HIGHPASS_CM
+    cutoff_cm = 35.0 if family == 'Ruin' else 30.0 if family in ('Path', 'Gravel') else HIGHPASS_CM
     sigma = cutoff_cm / size_cm * 2048.0 / 2.0
     color = srgb_to_lin(load01(files['color'], 3))
     mean = color.reshape(-1, 3).mean(axis=0)
@@ -164,6 +169,11 @@ def pack(family, asset, size_cm, files):
     lum = color @ LUMA
     value = lum / np.maximum(local @ LUMA, 1e-4)
     chroma = (color / local) / np.maximum(value, 1e-4)[..., None]
+    # Le chemin contient des eclats de calcaire presque blancs. Leur ratio local
+    # depassait 1 sur 11 % des pixels apres calibrage : ecretage en jeu et
+    # scintillement en vue oblique. Comprimer leur seul contraste haute frequence.
+    if family == 'Path':
+        value = np.power(value, 0.45)
     detail = value[..., None] * np.power(np.maximum(chroma, 1e-4), CHROMA) * DETAIL_MEAN
     clipped = float((detail > 1.0).any(axis=-1).mean())
 

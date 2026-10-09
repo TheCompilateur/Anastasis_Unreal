@@ -282,7 +282,7 @@ AnastasisRiverbank::FPaintResult AnastasisRiverbank::PaintBanks(const FSpeedFiel
 	// riviere, gris froid : un gravier beige se confondait avec le sol sableux des berges (v1).
 	// Lineaires, comme toute la couleur de sommet du sol.
 	const FLinearColor Mud(0.060f, 0.052f, 0.040f), Gravel(0.150f, 0.148f, 0.140f);
-	const bool bUV0 = Geo.UV0.Num() == N, bUV1 = Geo.UV1.Num() == N;
+	const bool bUV0 = Geo.UV0.Num() == N, bUV1 = Geo.UV1.Num() == N, bUV2 = Geo.UV2.Num() == N;
 	const double Top = FMath::Max(S.MudBandUU, S.GravelBandUU);
 	for (int32 I = 0; I < N; ++I)
 	{
@@ -308,6 +308,7 @@ AnastasisRiverbank::FPaintResult AnastasisRiverbank::PaintBanks(const FSpeedFiel
 			C = FMath::Lerp(C, Gravel, static_cast<float>(0.85 * GravelW));
 			// Grain de pierre : poids de roche du materiau de sol.
 			if (bUV0) Geo.UV0[I].X = FMath::Max(Geo.UV0[I].X, 0.9 * GravelW);
+			if (bUV2) Geo.UV2[I].Y = FMath::Max(Geo.UV2[I].Y, GravelW);
 			++Result.GravelVertices;
 		}
 		C.A = A;
