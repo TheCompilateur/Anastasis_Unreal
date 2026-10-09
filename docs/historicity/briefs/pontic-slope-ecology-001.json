@@ -1,0 +1,21 @@
+{
+  "mission": "pontic-slope-ecology-001",
+  "target_period": "1204-1225",
+  "setting": "arriere_pays_pontique_fictif",
+  "model_ids": ["PONT-ECO-01"],
+  "claim": "Sur les versants rendus, une humidite elevee peut soutenir un couvert boise sans imposer le meme couvert au fond plat de la vallee.",
+  "basis": "hypothese_de_conception",
+  "source_ids": ["ECO-01", "ECO-02"],
+  "inference": "Les etudes modernes appuient des gradients de vegetation avec l'exposition et l'altitude, pas le coefficient de placement choisi ici ni l'etat exact des bois en 1204. Le seuil 8-24 degres est un outil artistique reversible.",
+  "current": "Le code applique la meme penalite de Wetness aux terrains plats et aux versants dans AnastasisEcologicalDressing.cpp; les six images fournies montrent des collines peu couvertes mais ne prouvent pas l'etat de la carte actuelle.",
+  "target": "Donner une chance accrue de couvert aux pentes humides plantees, conserver les fonds ouverts et les exclusions de l'eau, des routes et du village.",
+  "causal_effect": "Une vegetation de versant plus lisible doit relier visuellement pente et humidite au bassin, sans deplacer le relief, l'eau ni les trajets.",
+  "owner_paths": ["Source/Anastasis_UnrealV2/WorldView/AnastasisEcologicalDressing.cpp", "Source/Anastasis_UnrealV2/WorldView/AnastasisPonticSlopeEcologyTests.cpp"],
+  "evidence_plan": {
+    "mec": "Build, test A/B du placement sous CVar 0/1, comptage des arbres en pente et controle des exclusions.",
+    "scn": "Meme carte, graine, camera, heure et exposition avec CVar 0/1/0; vues de versant et de fond de vallee, mesure et inspection des images.",
+    "ply": "UNKNOWN tant qu'une traversée joueur du versant au fond de vallee n'est pas rejouee."
+  },
+  "verdict": "PROPOSE",
+  "evidence_paths": []
+}

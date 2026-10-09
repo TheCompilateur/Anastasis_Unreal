@@ -1,9 +1,14 @@
 #include "WorldView/AnastasisEcologicalDressing.h"
 #include "WorldView/AnastasisTerrainSurface.h"
 #include "WorldView/AnastasisHumanGeography.h"
+#include "HAL/IConsoleManager.h"
 
 namespace AnastasisEcologicalDressing
 {
+static TAutoConsoleVariable<int32> CVarPonticSlopeEcology(
+    TEXT("anastasis.Dressing.PonticSlopeEcology"), 1,
+    TEXT("1: wet, drained hillsides may hold more woodland; 0: previous uniform wetness penalty."),
+    ECVF_Default);
 namespace
 {
 using namespace AnastasisWorldView;
@@ -211,6 +216,7 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
         Error = TEXT("Rendered: missing height sampler or invalid basin"); return false;
     }
     const bool bMacro = Rendered != nullptr;
+    const bool bPonticSlopeEcology = bMacro && CVarPonticSlopeEcology.GetValueOnAnyThread() != 0;
     FPlan Result;
     const double TileUU = TileWorldSize * S.SpatialScale;
     if (!FMath::IsFinite(TileUU) || TileUU <= 0.0) { Error=TEXT("Source.SpatialScale: invalid scale"); return false; }
@@ -316,8 +322,14 @@ bool Build(const FWorldVisualSnapshot& S, const FAnastasisForestDressingSettings
             const double Patch = Smooth((Cluster(S.Seed, X / Span, Y / Span)
                 - C.ClearingThreshold) / (1.0 - C.ClearingThreshold));
             const double CanopyCover = bMacro ? FMath::Sqrt(Patch) : Patch;
+            // Wetness on a drained hillside is not the same habitat as saturated
+            // valley ground. Keep the old penalty below 8 degrees; relax it only
+            // across the rendered 8-24 degree shoulder, without changing water,
+            // human reserves, trunk spacing, or the tile-mode reference.
+            const double DrainedShoulder = bPonticSlopeEcology ? Smooth((Slope - 8.0) / 16.0) : 0.0;
+            const double EffectiveWetnessPenalty = C.WetnessPenalty * (1.0 - 0.60 * DrainedShoulder);
             double Probability = Support > 0 ? C.Density * FMath::Sqrt(Support) * CanopyCover * Opening
-                * (1.0 - C.WetnessPenalty * Wetness) : 0.0;
+                * (1.0 - EffectiveWetnessPenalty * Wetness) : 0.0;
             // Lisiere en degrade, peuplement plus ou moins serre, clairieres.
             if (bMacro) Probability *= Fringe * Stand * (1.0 - P2::GladeDepth * Glade);
             // Sans arbre isole (hors macro, ou hors de toute prairie), le tirage reste bit a bit

@@ -35,6 +35,8 @@ pontic-water-micro-capture | tools/unreal/ground-cover-capture.py | PONTIC_MICRO
 # Asset Protocol V2: saved candidate plus old/new/old comparison at unchanged placements.
 asset-contract-horsetail-v2 | tools/unreal/asset-contract-validate.py | ASSET_CONTRACT PASS id=asset-protocol-v2-horsetail assets=1 | ASSET_CONTRACT FAIL|Traceback | 180 | ANASTASIS_ASSET_CONTRACT=@docs/unreal/assets/contracts/pontic-horsetail-v2.json
 pontic-horsetail-v2-capture | tools/unreal/ground-cover-capture.py | PONTIC_HORSETAIL_ABA PASS | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING|Traceback | 600 | ANASTASIS_GROUND_OUT=@Saved/PonticHorsetailV2Evidence/capture;ANASTASIS_GROUND_STATES=horsetail_old,horsetail_new,horsetail_old2;ANASTASIS_GROUND_VIEWS=micro_horsetail,riviere_eye
+# Wet rendered slopes only. PASS certifies a repeatable A/B/A capture, not artistic quality.
+pontic-slope-ecology-capture | tools/pontic-slope-ecology/capture.py | PONTIC_SLOPE_CAPTURE PASS | PONTIC_SLOPE_CAPTURE FAIL|Traceback | 900 | ANASTASIS_PONTIC_SLOPE_OUT=@Saved/PonticSlopeEcologyEvidence/batch
 # Existing material only. Numeric BumpStrength .16/0/.16; no material regeneration.
 soil-matrix-normal-capture | tools/soil-crusade/capture.py | GROUND_CAPTURE_COMPLETE | GROUND_CAPTURE_FAIL|GROUND_CAPTURE_TIMEOUT|GROUND_SHOT_MISSING|Traceback | 600 | ANASTASIS_GROUND_OUT=@Saved/SoilEvidence/matrix-normal-batch;ANASTASIS_GROUND_STATES=soil_before,soil_after,soil_control;ANASTASIS_SOIL_CONTACT=0;ANASTASIS_SOIL_PARAMETER=BumpStrength;ANASTASIS_SOIL_BEFORE=0.16;ANASTASIS_SOIL_AFTER=0;ANASTASIS_SOIL_VIEWS=prairie_ground,rive_ground,prairie_eye
 # LEAFCARDS_001 : memes arbres, chene vert en lames puis en cartes (anastasis.Dressing.TreeCards 0 / 1), ciel a 11 h.
