@@ -16,6 +16,18 @@ vaut **0** par défaut. `1` choisit le nouveau mesh aux mêmes instances. Le
 contrat et la capture V2 se limitent à ce candidat. La V1 reste archivée pour
 tracer ce qui a été corrigé.
 
+## Responsabilités bornées
+
+| Rôle | Livre et s'arrête quand |
+|---|---|
+| Agent asset Unreal | Source rejouable, `.uasset` dans son worktree, contrat et mesures MEC. N'écrit que ses assets déclarés. |
+| Agent C++ consommateur | Route l'asset à un emplacement réel derrière une CVar, garde le témoin et la simulation inchangés. |
+| Agent preuve | Exécute la validation et l'A/B/A, rapporte valeurs, images inspectées, KEEP/REJECT/UNKNOWN. Il ne choisit pas la stratégie suivante. |
+| Intégrateur désigné | Rejoue les preuves déclarées dans la file unique, puis décide l'admission du commit marqué par `finish`. |
+
+Une personne peut remplir plusieurs rôles sur un ticket étroit ; les fichiers
+possédés et le SHA du commit restent explicites dans la fiche de passation.
+
 ## Contrat minimal
 
 Copier `contracts/_TEMPLATE_V2.json`. Définir une seule fonction visuelle,
@@ -77,7 +89,9 @@ une vérification statique, pas une preuve d'exécution.
   Si la machine est saturée, le GPU est `UNKNOWN` et la décision reste ouverte.
 
 Le script `create-pontic-horsetail-v2.ps1` fabrique le candidat dans son
-worktree. Puis `editor-batch.ps1 -Proofs
+worktree sur carte vide, avec `-nullrhi` ; un échec de création dans ce mode
+reste un échec à diagnostiquer, jamais un asset présumé sauvé. Puis
+`editor-batch.ps1 -Proofs
 asset-contract-horsetail-v2,pontic-horsetail-v2-capture` rejoue les deux
 preuves. Les images et mesures restent sous `Saved/`, avec leurs chemins et
 valeurs dans la fiche de passation. Le lot d'intégration rejoue les preuves

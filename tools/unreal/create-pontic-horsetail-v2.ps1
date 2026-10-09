@@ -11,7 +11,7 @@ if(Test-Path $log){Remove-Item -LiteralPath $log}
 $py=(Join-Path $Root 'tools\unreal\create-pontic-horsetail-v2.py').Replace('\','/')
 $launchArgs=@(
  ('"'+(Join-Path $Root 'Anastasis_UnrealV2.uproject')+'"'),
- '/Engine/Maps/Entry','-windowed','-resx=1280','-resy=720','-nosplash','-NoLiveCoding',
+ '/Engine/Maps/Entry','-nullrhi','-nosound','-unattended','-nopause','-nosplash','-NoLiveCoding',
  ('-abslog="'+$log+'"'),('-ExecCmds="py '+$py+'"')
 )
 $p=Start-AnastasisEditor $Editor $launchArgs
