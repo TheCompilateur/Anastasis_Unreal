@@ -72,6 +72,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Villagers")
 	float GetBodyHeading() const { return BodyHeading; }
 
+	/**
+	 * dormir-couche-001 : allonge le corps sur le dos, les pieds a `Feet`, la tete vers `Head` (monde), immobile ;
+	 * faux le remet debout, la ou ses pieds sont. Sans corps, rien.
+	 */
+	void SetLying(bool bInLying, const FVector& Feet = FVector::ZeroVector, const FVector& Head = FVector::ZeroVector);
+
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Villagers")
+	bool IsLying() const { return bLying; }
+
 	/** Toggles the 3D body; editor-only reference lineups may reveal the portrait card. */
 	UFUNCTION(BlueprintCallable, Category = "Anastasis|Villagers")
 	void ShowBody(bool bBody);
@@ -104,4 +113,5 @@ private:
 	float BodyHeading = 0.0f;
 	bool bHasLastFeet = false;
 	FVector LastFeet = FVector::ZeroVector;
+	bool bLying = false;
 };

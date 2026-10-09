@@ -144,6 +144,34 @@ bool FAnastasisArchitectureReportTest::RunTest(const FString& Parameters)
 				&& FVector::Dist(FVector(At[0]->AsNumber(), At[1]->AsNumber(), At[2]->AsNumber()), A.DoorLocal) <= 1.5;
 		}
 		TestTrue(FString::Printf(TEXT("%s : porte principale au rapport"), A.Id), bDoor);
+		// dormir-couche-001 : banquettes et volume habite, les memes que le generateur.
+		const TArray<TSharedPtr<FJsonValue>>* Benches = nullptr;
+		if (B->TryGetArrayField(TEXT("benches"), Benches))
+		{
+			TestEqual(FString::Printf(TEXT("%s : banquettes"), A.Id), Benches->Num(), A.Benches.Num());
+			for (int32 I = 0; I < FMath::Min(Benches->Num(), A.Benches.Num()); ++I)
+			{
+				const TSharedPtr<FJsonObject> O = (*Benches)[I]->AsObject();
+				const TArray<TSharedPtr<FJsonValue>>& Box = O->GetArrayField(TEXT("box"));
+				const FBench& Bench = A.Benches[I];
+				TestTrue(FString::Printf(TEXT("%s : banquette %d identique"), A.Id, I),
+					FMath::IsNearlyEqual(Box[0]->AsNumber(), Bench.Box.Min.X, 1.0) && FMath::IsNearlyEqual(Box[1]->AsNumber(), Bench.Box.Min.Y, 1.0)
+					&& FMath::IsNearlyEqual(Box[2]->AsNumber(), Bench.Box.Max.X, 1.0) && FMath::IsNearlyEqual(Box[3]->AsNumber(), Bench.Box.Max.Y, 1.0)
+					&& FMath::IsNearlyEqual(O->GetNumberField(TEXT("z")), Bench.TopCm, 1.0));
+			}
+		}
+		const TArray<TSharedPtr<FJsonValue>>* Interior = nullptr;
+		if (B->TryGetArrayField(TEXT("interior"), Interior) && Interior->Num() == 6)
+		{
+			const FBox Box(FVector((*Interior)[0]->AsNumber(), (*Interior)[1]->AsNumber(), (*Interior)[4]->AsNumber()),
+				FVector((*Interior)[2]->AsNumber(), (*Interior)[3]->AsNumber(), (*Interior)[5]->AsNumber()));
+			TestTrue(FString::Printf(TEXT("%s : volume habite identique"), A.Id),
+				A.Interior.IsValid && Box.Min.Equals(A.Interior.Min, 1.0) && Box.Max.Equals(A.Interior.Max, 1.0));
+		}
+		else
+		{
+			TestFalse(FString::Printf(TEXT("%s : pas de volume habite"), A.Id), static_cast<bool>(A.Interior.IsValid));
+		}
 		TestEqual(FString::Printf(TEXT("%s : rapport sans erreur d'echelle"), A.Id), B->GetArrayField(TEXT("errors")).Num(), 0);
 	}
 	return true;
@@ -203,6 +231,49 @@ bool FAnastasisArchitecturePadTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("25 echantillons"), Slope.Num() == 25);
 	TestTrue(TEXT("pente : cour au milieu"), FMath::Abs(Pad) < 1.0);
 	TestTrue(TEXT("pente : soutenement suffisant a l'aval"), Pad - FMath::Min(Slope) < 480.0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAnastasisArchitectureSleepSpotsTest,
+	"Anastasis.Village.Architecture.Couchages",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAnastasisArchitectureSleepSpotsTest::RunTest(const FString& Parameters)
+{
+	using namespace AnastasisArchitecture;
+	// dormir-couche-001 : chaque logis couche ses dormeurs sur ses banquettes puis au sol, dans la piece, sans les empiler.
+	for (const FArchetype& A : All())
+	{
+		const FString Name(A.Id);
+		const bool bDwelling = A.Variant == EVariant::HousePoor || A.Variant == EVariant::HouseMedium
+			|| A.Variant == EVariant::HouseFarm || A.Variant == EVariant::Cabin;
+		TestEqual(Name + TEXT(" : un logis a ses banquettes"), A.Benches.Num() > 0, bDwelling);
+		if (!bDwelling)
+		{
+			TestEqual(Name + TEXT(" : pas de couchage hors d'un logis"), SleepSpots(A, 4).Num(), 0);
+			continue;
+		}
+		const TArray<FSleepSpot> Spots = SleepSpots(A, 6);
+		TestTrue(FString::Printf(TEXT("%s : %d places pour six"), *Name, Spots.Num()), Spots.Num() >= 4);
+		TestTrue(Name + TEXT(" : le premier dort sur une banquette"), Spots.Num() > 0 && Spots[0].bOnBench);
+		for (int32 I = 0; I < Spots.Num(); ++I)
+		{
+			const FSleepSpot& S = Spots[I];
+			TestTrue(FString::Printf(TEXT("%s/%d : allonge sur 185 cm"), *Name, I),
+				FMath::IsNearlyEqual(FVector::Dist(S.Feet, S.Head), SleeperLengthCm, 0.5) && FMath::IsNearlyEqual(S.Feet.Z, S.Head.Z));
+			const FVector Mid = 0.5 * (S.Feet + S.Head);
+			TestTrue(FString::Printf(TEXT("%s/%d : dans la piece"), *Name, I),
+				Mid.X > A.Interior.Min.X && Mid.X < A.Interior.Max.X && Mid.Y > A.Interior.Min.Y && Mid.Y < A.Interior.Max.Y
+				&& Mid.Z >= A.Interior.Min.Z && Mid.Z < A.Interior.Max.Z);
+			for (int32 J = 0; J < I; ++J)
+			{
+				TestTrue(FString::Printf(TEXT("%s/%d et %d : deux places distinctes"), *Name, I, J),
+					FVector::Dist(Mid, 0.5 * (Spots[J].Feet + Spots[J].Head)) >= 60.0);
+			}
+		}
+	}
+	TestEqual(TEXT("la cabane : une place sur sa banquette"), SleepSpots(Get(EVariant::Cabin), 1).Num(), 1);
 	return true;
 }
 

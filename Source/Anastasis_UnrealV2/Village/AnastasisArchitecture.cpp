@@ -82,6 +82,22 @@ namespace AnastasisArchitecture
 				true, FVector(110, -229, 58), 1, 4, 1,
 				{{TEXT("piece"), TEXT("vie+sommeil+foyer"), 16.8, 18.0, 247.0}},
 				{8, 2, 0}, 3.0});
+			// dormir-couche-001 : banquettes et volume habite des logis, releves du meme rapport (`benches`, `interior`).
+			auto Dwelling = [&C](EVariant V, TArray<FBench> Benches, const FBox& Interior)
+			{
+				C[static_cast<int32>(V)].Benches = MoveTemp(Benches);
+				C[static_cast<int32>(V)].Interior = Interior;
+			};
+			Dwelling(EVariant::HousePoor, {{FBox2D(FVector2D(-290, -440), FVector2D(-206, -58)), 64.0}},
+				FBox(FVector(-295, -445, 18), FVector(295, 25, 265)));
+			Dwelling(EVariant::HouseMedium, {{FBox2D(FVector2D(-437, -683), FVector2D(54, -603)), 346.0},
+				{FBox2D(FVector2D(92, -683), FVector2D(457, -593)), 346.0}},
+				FBox(FVector(-450, -690, 14), FVector(450, -70, 555)));
+			Dwelling(EVariant::HouseFarm, {{FBox2D(FVector2D(-757, -723), FVector2D(-324, -643)), 346.0},
+				{FBox2D(FVector2D(-286, -723), FVector2D(37, -633)), 346.0}},
+				FBox(FVector(-770, -730, 14), FVector(30, -130, 555)));
+			Dwelling(EVariant::Cabin, {{FBox2D(FVector2D(-230, -270), FVector2D(-146, 102)), 64.0}},
+				FBox(FVector(-235, -275, 18), FVector(235, 175, 248)));
 			check(C.Num() == static_cast<int32>(EVariant::Count));
 			for (int32 I = 0; I < C.Num(); ++I)
 			{
@@ -134,6 +150,62 @@ namespace AnastasisArchitecture
 		const int32 Tier = FMath::Clamp(HousePhase, 1, 6) <= 2 ? 0 : (HousePhase <= 4 ? 1 : 2);
 		OutVariant = Tier == 0 ? EVariant::HousePoor : (Tier == 1 ? EVariant::HouseMedium : EVariant::HouseFarm);
 		return true;
+	}
+
+	TArray<FSleepSpot> SleepSpots(const FArchetype& A, int32 Count)
+	{
+		TArray<FSleepSpot> Out;
+		if (Count <= 0 || A.Benches.IsEmpty()) return Out;
+		// Une rangee de couchages le long d'un axe : autant de places de 185 cm qu'il en tient, centrees dans leur part.
+		auto Row = [&Out, Count](bool bAlongX, double From, double To, double Across, double Z, bool bOnBench)
+		{
+			const double L = To - From;
+			const int32 N = FMath::FloorToInt32(L / SleeperLengthCm);
+			if (N <= 0) return;
+			const double Slot = L / N;
+			for (int32 I = 0; I < N && Out.Num() < Count; ++I)
+			{
+				const double S0 = From + I * Slot + 0.5 * (Slot - SleeperLengthCm);
+				const double S1 = S0 + SleeperLengthCm;
+				FSleepSpot Spot;
+				Spot.Feet = bAlongX ? FVector(S0, Across, Z) : FVector(Across, S0, Z);
+				Spot.Head = bAlongX ? FVector(S1, Across, Z) : FVector(Across, S1, Z);
+				Spot.bOnBench = bOnBench;
+				Out.Add(Spot);
+			}
+		};
+		for (const FBench& B : A.Benches)
+		{
+			const FVector2D Size = B.Box.GetSize();
+			const bool bAlongX = Size.X >= Size.Y;
+			const FVector2D C = B.Box.GetCenter();
+			// Une banquette plus courte qu'un dormeur porte quand meme un dormeur (jambes repliees).
+			const double From = bAlongX ? B.Box.Min.X : B.Box.Min.Y;
+			const double To = FMath::Max(bAlongX ? B.Box.Max.X : B.Box.Max.Y, From + SleeperLengthCm);
+			Row(bAlongX, From, To, bAlongX ? C.Y : C.X, B.TopCm, true);
+		}
+		if (Out.Num() >= Count || !A.Interior.IsValid) return Out;
+		// Des nattes au sol, rang apres rang le long de la premiere banquette, vers le milieu de la piece.
+		const FBench& B = A.Benches[0];
+		const FVector2D Size = B.Box.GetSize();
+		const bool bAlongX = Size.X >= Size.Y;
+		const double Floor = B.TopCm - 46.0;
+		const double BenchMid = bAlongX ? B.Box.GetCenter().Y : B.Box.GetCenter().X;
+		const double BenchHalf = 0.5 * (bAlongX ? Size.Y : Size.X);
+		const double RoomMid = bAlongX ? A.Interior.GetCenter().Y : A.Interior.GetCenter().X;
+		const double Dir = RoomMid >= BenchMid ? 1.0 : -1.0;
+		const double Lo = (bAlongX ? A.Interior.Min.Y : A.Interior.Min.X) + 35.0;
+		const double Hi = (bAlongX ? A.Interior.Max.Y : A.Interior.Max.X) - 35.0;
+		// Dans le long de la banquette seulement : une cloison peut couper la piece au-dela (maison a etage).
+		const double From = bAlongX ? B.Box.Min.X : B.Box.Min.Y;
+		const double To = FMath::Max(bAlongX ? B.Box.Max.X : B.Box.Max.Y, From + SleeperLengthCm);
+		for (int32 R = 0; Out.Num() < Count; ++R)
+		{
+			const double Across = BenchMid + Dir * (BenchHalf + 50.0 + 75.0 * R);
+			if (Across < Lo || Across > Hi) break;
+			Row(bAlongX, From, To, Across, Floor, false);
+		}
+		return Out;
 	}
 
 	double PadLevel(TArray<double> Samples)

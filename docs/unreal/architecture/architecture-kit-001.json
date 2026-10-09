@@ -76,6 +76,25 @@
     ]
    ],
    "sleep_slots": 3,
+   "benches": [
+    {
+     "box": [
+      -230,
+      -270,
+      -146,
+      102
+     ],
+     "z": 64
+    }
+   ],
+   "interior": [
+    -235,
+    -275,
+    235,
+    175,
+    18,
+    248
+   ],
    "storage": 1,
    "work": [
     {
@@ -171,6 +190,25 @@
     ]
    ],
    "sleep_slots": 3,
+   "benches": [
+    {
+     "box": [
+      -290,
+      -440,
+      -206,
+      -58
+     ],
+     "z": 64
+    }
+   ],
+   "interior": [
+    -295,
+    -445,
+    295,
+    25,
+    18,
+    265
+   ],
    "storage": 2,
    "work": [
     {
@@ -310,6 +348,34 @@
     ]
    ],
    "sleep_slots": 7,
+   "benches": [
+    {
+     "box": [
+      -437,
+      -683,
+      54,
+      -603
+     ],
+     "z": 346
+    },
+    {
+     "box": [
+      92,
+      -683,
+      457,
+      -593
+     ],
+     "z": 346
+    }
+   ],
+   "interior": [
+    -450,
+    -690,
+    450,
+    -70,
+    14,
+    555
+   ],
    "storage": 7,
    "work": [
     {
@@ -482,6 +548,34 @@
     ]
    ],
    "sleep_slots": 6,
+   "benches": [
+    {
+     "box": [
+      -757,
+      -723,
+      -324,
+      -643
+     ],
+     "z": 346
+    },
+    {
+     "box": [
+      -286,
+      -723,
+      37,
+      -633
+     ],
+     "z": 346
+    }
+   ],
+   "interior": [
+    -770,
+    -730,
+    30,
+    -130,
+    14,
+    555
+   ],
    "storage": 8,
    "work": [
     {
@@ -603,6 +697,8 @@
    ],
    "hearths": [],
    "sleep_slots": 0,
+   "benches": [],
+   "interior": [],
    "storage": 11,
    "work": [
     {
@@ -673,6 +769,8 @@
    "rooms": [],
    "hearths": [],
    "sleep_slots": 0,
+   "benches": [],
+   "interior": [],
    "storage": 0,
    "work": [
     {
@@ -755,6 +853,8 @@
    ],
    "hearths": [],
    "sleep_slots": 0,
+   "benches": [],
+   "interior": [],
    "storage": 0,
    "work": [
     {
@@ -844,6 +944,8 @@
    ],
    "hearths": [],
    "sleep_slots": 0,
+   "benches": [],
+   "interior": [],
    "storage": 0,
    "work": [],
    "roof": [

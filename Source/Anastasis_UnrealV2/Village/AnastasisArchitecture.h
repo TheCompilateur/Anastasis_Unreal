@@ -40,6 +40,21 @@ namespace AnastasisArchitecture
 		double CeilingCm;
 	};
 
+	/** dormir-couche-001 : une banquette-lit (sedir), dessus de la natte, cm locaux. */
+	struct FBench
+	{
+		FBox2D Box;
+		double TopCm = 0.0;
+	};
+
+	/** Ou un dormeur s'allonge : pieds et tete, cm locaux (sur une banquette, ou une natte au sol). */
+	struct FSleepSpot
+	{
+		FVector Feet;
+		FVector Head;
+		bool bOnBench = true;
+	};
+
 	struct FConstructionMaterials
 	{
 		int32 Wood = 0;
@@ -74,7 +89,21 @@ namespace AnastasisArchitecture
 		FConstructionMaterials Materials;
 		/** Journees de travail par an pour tenir le batiment (toiture, enduit, torchis). */
 		double MaintenanceDaysPerYear;
+		/** dormir-couche-001 : les banquettes-lits (rapport du generateur, `benches`). */
+		TArray<FBench> Benches;
+		/** dormir-couche-001 : le volume habite, entre les murs, du sol au plafond (`interior`) ; invalide sans logis. */
+		FBox Interior = FBox(ForceInit);
 	};
+
+	/** Longueur d'un dormeur allonge, natte comprise (un adulte de 170 cm). */
+	inline constexpr double SleeperLengthCm = 185.0;
+
+	/**
+	 * Les `Count` premieres places pour dormir d'un logis, dans l'ordre : sur les banquettes, dans leur long, une
+	 * place par 185 cm ; puis des nattes au sol, rang par rang le long de la premiere banquette, vers le milieu de la
+	 * piece, sans sortir du volume habite. Moins de `Count` places si la piece est pleine.
+	 */
+	TArray<FSleepSpot> SleepSpots(const FArchetype& Archetype, int32 Count);
 
 	/** Convention d'echelle (ARCHITECTURE_SCALE_001, section 4). */
 	inline constexpr double HumanCm = 170.0;

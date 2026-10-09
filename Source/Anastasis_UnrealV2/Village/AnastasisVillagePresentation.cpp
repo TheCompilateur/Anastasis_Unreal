@@ -277,6 +277,7 @@ int32 FAnastasisVillagePresentation::Sync(
 		}
 		const AnastasisMetabolism::FState State = AnastasisMetabolism::Derive(In, Mode);
 		Actor.SetHearth(State.Hearth);
+		Actor.SetInteriorDaylight(Daylight);
 		Actor.SetNeglect(State.Neglect);
 	};
 
@@ -612,11 +613,46 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_VILLAGE villager %s (%s) -> look %s at %s body=%s"),
 				*Npc.Id, *Job.ToString(), *LookId.ToString(), *Feet.ToCompactString(), TEXT("3d"));
 		}
-		Actor->MoveFeetTo(Feet);
-		// Dedans : la simulation garde la position du seuil ; cacher le corps au lieu de le laisser au seuil.
-		Actor->SetActorHiddenInGame(Npc.Inside.bActive);
+		// Dedans : la simulation garde la position du seuil. Qui dort est couche a sa place dans le logis
+		// (dormir-couche-001) ; les autres activites d'interieur cachent encore le corps au lieu de le laisser au seuil.
+		FVector SleepFeet;
+		FVector SleepHead;
+		const bool bAsleep = Npc.Inside.bActive && SleepSpotFor(Village, Npc.Id, SleepFeet, SleepHead);
+		if (!bAsleep) Actor->MoveFeetTo(Feet);
+		Actor->SetLying(bAsleep, SleepFeet, SleepHead);
+		Actor->SetActorHiddenInGame(Npc.Inside.bActive && !bAsleep);
 	}
 	return Changes;
+}
+
+bool FAnastasisVillagePresentation::IsLyingActivity(const FString& Activity)
+{
+	return Activity == TEXT("dort") || Activity == TEXT("repose");
+}
+
+bool FAnastasisVillagePresentation::SleepSpotFor(const AnastasisVillage::FVillage& Village, const FString& NpcId,
+	FVector& OutFeet, FVector& OutHead) const
+{
+	const AnastasisVillage::FNpc* Npc = Village.FindNpc(NpcId);
+	if (!Npc || !Npc->Inside.bActive || !IsLyingActivity(Npc->Inside.Activity)) return false;
+	const AAnastasisVillageBuilding* Actor = FindActor(Npc->Inside.BuildingId);
+	if (!Actor || !Actor->HasArchitecture()) return false;
+	const AnastasisArchitecture::FArchetype& A = AnastasisArchitecture::Get(Actor->GetVariant());
+	TArray<FString> Sleepers;
+	for (const FString& Id : Village.InsideOf(Npc->Inside.BuildingId))
+	{
+		const AnastasisVillage::FNpc* Other = Village.FindNpc(Id);
+		if (Other && IsLyingActivity(Other->Inside.Activity)) Sleepers.Add(Id);
+	}
+	Sleepers.Sort();
+	const int32 Index = Sleepers.IndexOfByKey(NpcId);
+	const TArray<AnastasisArchitecture::FSleepSpot> Spots = AnastasisArchitecture::SleepSpots(A, Sleepers.Num());
+	if (!Spots.IsValidIndex(Index)) return false;
+	const FTransform Xf = Actor->GetActorTransform();
+	const FVector Pad(0.0, 0.0, Actor->GetPadOffset());
+	OutFeet = Xf.TransformPosition(Spots[Index].Feet + Pad);
+	OutHead = Xf.TransformPosition(Spots[Index].Head + Pad);
+	return true;
 }
 
 AAnastasisVillagerVisual* FAnastasisVillagePresentation::FindVillager(const FString& NpcId) const

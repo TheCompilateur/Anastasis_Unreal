@@ -125,3 +125,4 @@ arrivants-pie | tools/unreal/arrivants-pie.py | ARRIVANTS_PIE PASS | ARRIVANTS_P
 # voix-conseil-001 : 60 jours avec un joueur difficile ; PASS = une voix du joueur au conseil, un refus du joueur, une aide refusee au joueur pour ses actes, une histoire sur lui entendue dans son dos, joueur vivant, fichiers ecrits. Pas un verdict sur l interet du recit.
 voix-pie | tools/unreal/voix-pie.py | VOIX_PIE PASS | VOIX_PIE FAIL|VOIX_PIE_TIMEOUT|Traceback | 660 | -
 cabane-pie | tools/unreal/cabane-pie.py | CABANE_PIE PASS | CABANE_PIE FAIL|Traceback | 660 | -
+sommeil-pie | tools/unreal/sommeil-pie.py | SOMMEIL_PIE PASS | SOMMEIL_PIE FAIL|Traceback | 720 | -

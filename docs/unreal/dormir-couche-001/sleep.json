@@ -1,0 +1,457 @@
+{
+ "ok": true,
+ "reason": "sleepers=2 house=building-1 bad=[] player_tilt=-2.5444437451708134e-14 checks=player_lying=1,house_sleepers=1,all_lying=1,interior_night_ev=1,shots=1",
+ "cabin": {
+  "player": "npc-14",
+  "day": 2,
+  "site": "building-4",
+  "x": 40.236390195178785,
+  "y": 20.4999175180367,
+  "home": "building-4",
+  "family": "family-4",
+  "inside": false,
+  "inside_building": "",
+  "activity": "attend",
+  "goal": "idle",
+  "energy": 26.58949999999985,
+  "pawn_indoors": false,
+  "pawn": [
+   80473,
+   41000,
+   1394
+  ],
+  "type": "cabin",
+  "progress": 1,
+  "pieces": 22,
+  "piece_total": 22,
+  "owner": "npc-14",
+  "tile_x": 40,
+  "tile_y": 21,
+  "created_day": 1,
+  "completed_day": 2,
+  "need_wood": 8,
+  "need_stone": 2,
+  "workers": [
+   "npc-14:22"
+  ],
+  "others_inside": [],
+  "others_lodged": [],
+  "actor": true,
+  "architecture": true,
+  "location": [
+   81000,
+   43000,
+   1263
+  ],
+  "yaw": -90.00000000000001,
+  "pad": 1.3443264892575826,
+  "archetype": "cabin",
+  "door": [
+   81225,
+   43000,
+   1282
+  ],
+  "entry": [
+   81360,
+   43000,
+   1264
+  ],
+  "hearth": [
+   80771,
+   42890,
+   1322
+  ],
+  "footprint": [
+   -391,
+   -429,
+   432,
+   432
+  ],
+  "floor": 19.344326489257583,
+  "pawn_local": [
+   2000,
+   -527,
+   132
+  ]
+ },
+ "house": {
+  "id": "building-1",
+  "type": "house",
+  "archetype": "house_farm",
+  "progress": 1,
+  "inside": 1,
+  "hearth": 1,
+  "interior_light": true,
+  "interior_ev": 5.5,
+  "view_inside": false,
+  "view": [
+   80890,
+   43188,
+   1346
+  ],
+  "box_min": [
+   62270,
+   46970,
+   1293
+  ],
+  "box_max": [
+   62870,
+   47770,
+   1834
+  ],
+  "location": [
+   63000,
+   47000,
+   1279
+  ],
+  "yaw": -90.00000000000001,
+  "pad": 0,
+  "interior": [
+   -770,
+   -730,
+   14,
+   30,
+   -130,
+   555
+  ],
+  "bench": [
+   62317,
+   47541,
+   1625
+  ],
+  "bench_local": [
+   -540,
+   -683,
+   346
+  ],
+  "bench_along_x": true
+ },
+ "sleep": {
+  "day": 2,
+  "inside": [
+   {
+    "id": "npc-0",
+    "building": "building-1",
+    "activity": "dort",
+    "player": false,
+    "spot": true,
+    "feet": [
+     62317,
+     47741,
+     1625
+    ],
+    "head": [
+     62317,
+     47556,
+     1625
+    ],
+    "lying": true,
+    "visible": true,
+    "tilt": -1.2722218725854067e-14,
+    "body": [
+     62317,
+     47741,
+     1635
+    ]
+   },
+   {
+    "id": "npc-1",
+    "building": "building-3",
+    "activity": "dort",
+    "player": false,
+    "spot": true,
+    "feet": [
+     60357,
+     29407,
+     2101
+    ],
+    "head": [
+     60357,
+     29222,
+     2101
+    ],
+    "lying": true,
+    "visible": true,
+    "tilt": -1.2722218725854067e-14,
+    "body": [
+     60357,
+     29407,
+     2112
+    ]
+   },
+   {
+    "id": "npc-14",
+    "building": "building-4",
+    "activity": "dort",
+    "player": true,
+    "spot": true,
+    "feet": [
+     80731,
+     43188,
+     1328
+    ],
+    "head": [
+     80916,
+     43188,
+     1328
+    ],
+    "lying": true,
+    "visible": true,
+    "tilt": -2.5444437451708134e-14,
+    "body": [
+     80731,
+     43188,
+     1339
+    ]
+   }
+  ],
+  "homes": [
+   {
+    "id": "building-1",
+    "type": "house",
+    "archetype": "house_farm",
+    "progress": 1,
+    "inside": 1,
+    "hearth": 1,
+    "interior_light": true,
+    "interior_ev": 5.5,
+    "view_inside": false,
+    "view": [
+     80890,
+     43188,
+     1346
+    ],
+    "box_min": [
+     62270,
+     46970,
+     1293
+    ],
+    "box_max": [
+     62870,
+     47770,
+     1834
+    ],
+    "location": [
+     63000,
+     47000,
+     1279
+    ],
+    "yaw": -90.00000000000001,
+    "pad": 0,
+    "interior": [
+     -770,
+     -730,
+     14,
+     30,
+     -130,
+     555
+    ],
+    "bench": [
+     62317,
+     47541,
+     1625
+    ],
+    "bench_local": [
+     -540,
+     -683,
+     346
+    ],
+    "bench_along_x": true
+   },
+   {
+    "id": "building-3",
+    "type": "house",
+    "archetype": "house_medium",
+    "progress": 1,
+    "inside": 1,
+    "hearth": 1,
+    "interior_light": true,
+    "interior_ev": 5.5,
+    "view_inside": false,
+    "view": [
+     80890,
+     43188,
+     1346
+    ],
+    "box_min": [
+     60310,
+     28550,
+     1769
+    ],
+    "box_max": [
+     60930,
+     29450,
+     2310
+    ],
+    "location": [
+     61000,
+     29000,
+     1751
+    ],
+    "yaw": -90.00000000000001,
+    "pad": 4.482687133789113,
+    "interior": [
+     -450,
+     -690,
+     14,
+     450,
+     -70,
+     555
+    ],
+    "bench": [
+     60357,
+     29192,
+     2101
+    ],
+    "bench_local": [
+     -191,
+     -643,
+     346
+    ],
+    "bench_along_x": true
+   },
+   {
+    "id": "building-4",
+    "type": "cabin",
+    "archetype": "cabin",
+    "progress": 1,
+    "inside": 1,
+    "hearth": 1,
+    "interior_light": true,
+    "interior_ev": 5.5,
+    "view_inside": true,
+    "view": [
+     80890,
+     43188,
+     1346
+    ],
+    "box_min": [
+     80725,
+     42765,
+     1282
+    ],
+    "box_max": [
+     81175,
+     43235,
+     1512
+    ],
+    "location": [
+     81000,
+     43000,
+     1263
+    ],
+    "yaw": -90.00000000000001,
+    "pad": 1.3443264892575826,
+    "interior": [
+     -235,
+     -275,
+     18,
+     235,
+     175,
+     248
+    ],
+    "bench": [
+     80916,
+     43188,
+     1328
+    ],
+    "bench_local": [
+     -188,
+     -84,
+     64
+    ],
+    "bench_along_x": false
+   },
+   {
+    "id": "building-5",
+    "type": "house",
+    "archetype": "house_poor",
+    "progress": 0.5,
+    "inside": 0,
+    "hearth": 0,
+    "interior_light": true,
+    "interior_ev": 5.5,
+    "view_inside": false,
+    "view": [
+     80890,
+     43188,
+     1346
+    ],
+    "box_min": [
+     76705,
+     34975,
+     1343
+    ],
+    "box_max": [
+     77295,
+     35445,
+     1590
+    ],
+    "location": [
+     77000,
+     35000,
+     1327
+    ],
+    "yaw": 180,
+    "pad": -1.785036425780163,
+    "interior": [
+     -295,
+     -445,
+     18,
+     295,
+     25,
+     265
+    ],
+    "bench": [
+     77248,
+     35249,
+     1389
+    ],
+    "bench_local": [
+     -248,
+     -249,
+     64
+    ],
+    "bench_along_x": false
+   }
+  ]
+ },
+ "shots": [
+  {
+   "file": "01-maison-nuit-avant.png",
+   "written": true
+  },
+  {
+   "file": "02-maison-nuit.png",
+   "written": true
+  },
+  {
+   "file": "03-cabane-nuit.png",
+   "written": true
+  },
+  {
+   "file": "ev-1-cabane.png",
+   "written": true
+  },
+  {
+   "file": "ev-1-maison.png",
+   "written": true
+  },
+  {
+   "file": "ev-12-cabane.png",
+   "written": true
+  },
+  {
+   "file": "ev-12-maison.png",
+   "written": true
+  },
+  {
+   "file": "ev-reset.png",
+   "written": true
+  },
+  {
+   "file": "04-maison-dehors-nuit.png",
+   "written": true
+  }
+ ]
+}

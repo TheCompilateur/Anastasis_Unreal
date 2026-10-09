@@ -31,6 +31,8 @@ namespace
 	constexpr float TurnRate = 300.0f;
 	/** The Epic mannequins face +Y in mesh space: the actor's +X is their -90 yaw. */
 	constexpr float MeshYawOffset = -90.0f;
+	/** dormir-couche-001 : du dessus de la couche a l'axe des chevilles d'un corps allonge sur le dos, cm (taille 1). */
+	constexpr float LyingBackCm = 11.0f;
 }
 
 AAnastasisVillagerVisual::AAnastasisVillagerVisual()
@@ -169,6 +171,29 @@ bool AAnastasisVillagerVisual::HasBody() const
 	return Body && Body->GetSkeletalMeshAsset() != nullptr;
 }
 
+void AAnastasisVillagerVisual::SetLying(bool bInLying, const FVector& Feet, const FVector& Head)
+{
+	bInLying = bInLying && HasBody() && FVector::DistSquared(Feet, Head) > 1.0;
+	if (!bInLying)
+	{
+		if (bLying)
+		{
+			bLying = false;
+			Body->SetRelativeLocation(FVector::ZeroVector);
+			bHasLastFeet = false;
+		}
+		return;
+	}
+	bLying = true;
+	SetActorLocation(Feet);
+	// Le haut du maillage (+Z, la tete) vers la tete de la couche, le devant (+Y) vers le ciel : sur le dos.
+	const FVector Along = (Head - Feet).GetSafeNormal();
+	const FRotator Pose = FRotationMatrix::MakeFromZY(Along, FVector::UpVector).Rotator();
+	Body->SetWorldLocationAndRotation(Feet + FVector(0.0, 0.0, LyingBackCm * BodyScale), Pose);
+	BodySpeed = 0.0f;
+	bHasLastFeet = false;
+}
+
 void AAnastasisVillagerVisual::ShowBody(bool bBody)
 {
 	bBody = bBody && HasBody();
@@ -211,8 +236,17 @@ void AAnastasisVillagerVisual::UpdateBodyMotion(float DeltaSeconds)
 void AAnastasisVillagerVisual::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	UpdateBodyMotion(DeltaSeconds);
 	ShowBody(CVarVillageBodies.GetValueOnGameThread() != 0);
+	if (bLying)
+	{
+		// Allonge : ni cap ni marche, le souffle du repos seulement (blend space a l'arret).
+		if (UAnimSingleNodeInstance* Single = Body->GetSingleNodeInstance())
+		{
+			Single->SetBlendSpacePosition(FVector::ZeroVector);
+		}
+		return;
+	}
+	UpdateBodyMotion(DeltaSeconds);
 	if (bShowingBody)
 	{
 		Body->SetWorldRotation(FRotator(0.0, BodyHeading + MeshYawOffset, 0.0));

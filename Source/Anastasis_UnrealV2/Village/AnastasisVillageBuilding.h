@@ -6,6 +6,8 @@
 #include "Village/AnastasisVillageTags.h"
 #include "AnastasisVillageBuilding.generated.h"
 
+class UBoxComponent;
+class UPostProcessComponent;
 class USmartObjectComponent;
 class USmartObjectDefinition;
 class UMaterialInstanceDynamic;
@@ -50,6 +52,20 @@ public:
 	 * simulation (SimToUnreal), le corps, l'assise et le foyer descendent ou montent ensemble (ARCH-10).
 	 */
 	void SetPadOffset(double OffsetCm);
+
+	/**
+	 * dormir-couche-001 : dans le volume habite d'un logis, l'exposition n'est pas celle du dehors (le clair de lune,
+	 * le plein soleil) mais celle d'une piece eclairee par son foyer, ou par sa porte le jour. `Daylight` 0..1 du ciel.
+	 * Sans volume habite (puits, grenier) ou `anastasis.Village.InteriorLight 0`, rien.
+	 */
+	void SetInteriorDaylight(double Daylight);
+	/** L'exposition (EV100) que voit une camera dans le logis ; NoInteriorEV si rien n'est pose. */
+	static constexpr double NoInteriorEV = -99.0;
+	double GetInteriorExposure() const { return InteriorEV; }
+	bool IsInteriorLightOn() const;
+	/** Instrument : ce point (une camera) est-il dans le volume habite, au sens du post-process ? Et ses bornes monde. */
+	bool InteriorEncompasses(const FVector& Point) const;
+	FBox GetInteriorWorldBox() const;
 
 	/**
 	 * SETTLEMENT_MORPHOGENESIS_001 : la patine de l'age (0..1), tiree des jours ecoules depuis l'achevement
@@ -118,6 +134,16 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis|Site Stock")
 	TObjectPtr<UInstancedStaticMeshComponent> StoneStockVisual;
+
+	/** dormir-couche-001 : le volume habite (boite) et l'exposition qui y regne (post-process borne par la boite). */
+	UPROPERTY(VisibleAnywhere, Category = "Anastasis")
+	TObjectPtr<UBoxComponent> InteriorBox;
+
+	UPROPERTY(VisibleAnywhere, Category = "Anastasis")
+	TObjectPtr<UPostProcessComponent> InteriorLight;
+
+	FVector InteriorCenter = FVector::ZeroVector;
+	double InteriorEV = NoInteriorEV;
 
 	/** Cree pour tout batiment, mais allume seulement pour une maison (SetHearth). */
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis")

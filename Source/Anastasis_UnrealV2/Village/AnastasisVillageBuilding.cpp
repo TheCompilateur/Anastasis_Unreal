@@ -1,7 +1,9 @@
 #include "Village/AnastasisVillageBuilding.h"
 
 #include "Anastasis_UnrealV2.h"
+#include "Components/BoxComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Components/PostProcessComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -19,6 +21,24 @@ namespace
 		TEXT("anastasis.Village.HearthCandela"),
 		400.f,
 		TEXT("ICEBERG_001 : intensite (cd) du foyer d'une maison habitee, a pleine nuit."),
+		ECVF_Default);
+
+	// dormir-couche-001 : l'exposition dans le volume habite d'un logis. La nuit, le ciel est expose pour la lune
+	// (EV100 autour de -1) : le foyer, a deux metres, y brulait tout en blanc. Dedans, l'oeil s'accoutume au feu.
+	TAutoConsoleVariable<int32> CVarInteriorLight(
+		TEXT("anastasis.Village.InteriorLight"),
+		1,
+		TEXT("dormir-couche-001 : 1 = dans un logis, exposition d'interieur (anastasis.Village.InteriorNightEV / DayEV) ; 0 = celle du dehors."),
+		ECVF_Default);
+	TAutoConsoleVariable<float> CVarInteriorNightEV(
+		TEXT("anastasis.Village.InteriorNightEV"),
+		5.5f,
+		TEXT("dormir-couche-001 : EV100 dans un logis la nuit (piece eclairee par son foyer)."),
+		ECVF_Default);
+	TAutoConsoleVariable<float> CVarInteriorDayEV(
+		TEXT("anastasis.Village.InteriorDayEV"),
+		9.0f,
+		TEXT("dormir-couche-001 : EV100 dans un logis en plein jour (piece eclairee par sa porte et sa fenetre)."),
 		ECVF_Default);
 
 	/** Dans le volume de la maison : la lumiere sort par la porte (+Y d'auteur) et la fenetre, pas par les murs. */
@@ -90,6 +110,65 @@ AAnastasisVillageBuilding::AAnastasisVillageBuilding()
 	Hearth->SetVolumetricScatteringIntensity(0.f);
 	Hearth->SetIntensity(0.f);
 	Hearth->SetVisibility(false);
+
+	InteriorBox = CreateDefaultSubobject<UBoxComponent>(TEXT("InteriorBox"));
+	InteriorBox->SetupAttachment(SmartObject);
+	// Requete seulement, aucun canal : le post-process mesure la distance de la camera a la boite par sa collision
+	// (UPostProcessComponent::EncompassesPoint) ; sans collision, la boite ne contient personne.
+	InteriorBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	InteriorBox->SetCollisionResponseToAllChannels(ECR_Ignore);
+	InteriorBox->SetGenerateOverlapEvents(false);
+	InteriorBox->SetCanEverAffectNavigation(false);
+	InteriorBox->SetMobility(EComponentMobility::Movable);
+	InteriorBox->SetHiddenInGame(true);
+	InteriorBox->SetBoxExtent(FVector(1.0));
+	InteriorLight = CreateDefaultSubobject<UPostProcessComponent>(TEXT("InteriorLight"));
+	// Borne par sa boite parente ; passe devant le volume d'exposition du ciel (non borne, priorite 0).
+	InteriorLight->SetupAttachment(InteriorBox);
+	InteriorLight->bUnbound = false;
+	InteriorLight->Priority = 10.0f;
+	InteriorLight->BlendRadius = 60.0f;
+	InteriorLight->BlendWeight = 1.0f;
+	InteriorLight->bEnabled = false;
+}
+
+bool AAnastasisVillageBuilding::IsInteriorLightOn() const
+{
+	return InteriorLight && InteriorLight->bEnabled;
+}
+
+bool AAnastasisVillageBuilding::InteriorEncompasses(const FVector& Point) const
+{
+	return InteriorLight && InteriorLight->EncompassesPoint(Point, 0.f, nullptr);
+}
+
+FBox AAnastasisVillageBuilding::GetInteriorWorldBox() const
+{
+	return InteriorBox ? InteriorBox->Bounds.GetBox() : FBox(ForceInit);
+}
+
+void AAnastasisVillageBuilding::SetInteriorDaylight(const double Daylight)
+{
+	if (!InteriorLight || !bHasArchitecture) return;
+	const AnastasisArchitecture::FArchetype& A = AnastasisArchitecture::Get(Variant);
+	const bool bOn = A.Interior.IsValid && CVarInteriorLight.GetValueOnGameThread() != 0;
+	if (InteriorLight->bEnabled != bOn) InteriorLight->bEnabled = bOn;
+	if (!bOn)
+	{
+		InteriorEV = NoInteriorEV;
+		return;
+	}
+	const double EV = FMath::Lerp(static_cast<double>(CVarInteriorNightEV.GetValueOnGameThread()),
+		static_cast<double>(CVarInteriorDayEV.GetValueOnGameThread()), FMath::Clamp(Daylight, 0.0, 1.0));
+	if (InteriorEV == NoInteriorEV || FMath::Abs(EV - InteriorEV) > 0.01)
+	{
+		InteriorEV = EV;
+		FPostProcessSettings& S = InteriorLight->Settings;
+		S.bOverride_AutoExposureMinBrightness = true;
+		S.bOverride_AutoExposureMaxBrightness = true;
+		S.AutoExposureMinBrightness = static_cast<float>(EV);
+		S.AutoExposureMaxBrightness = static_cast<float>(EV);
+	}
 }
 
 void AAnastasisVillageBuilding::SetNeglect(const double Level)
@@ -207,6 +286,13 @@ bool AAnastasisVillageBuilding::ApplyArchitecture(AnastasisArchitecture::EVarian
 	}
 	// Le foyer dans l'atre, 60 cm au-dessus de la sole : la lumiere sort par la porte, les fenetres, la galerie.
 	HearthAuthored = A.bHasHearth ? A.HearthLocal + FVector(0.0, 60.0, 40.0) : HearthLocal;
+	// dormir-couche-001 : la boite du volume habite (l'exposition s'y regle a SetInteriorDaylight).
+	if (InteriorBox)
+	{
+		InteriorCenter = A.Interior.IsValid ? A.Interior.GetCenter() : FVector::ZeroVector;
+		InteriorBox->SetBoxExtent(A.Interior.IsValid ? A.Interior.GetExtent() : FVector(1.0));
+		if (!A.Interior.IsValid && InteriorLight) InteriorLight->bEnabled = false;
+	}
 	SetPadOffset(PadOffset);
 	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_ARCH %s archetype=%s tier=%d body=%s footing=%d"),
 		*SimId.ToString(), A.Id, A.Tier, *BodyMesh->GetName(), FootMesh ? 1 : 0);
@@ -263,6 +349,7 @@ void AAnastasisVillageBuilding::SetPadOffset(const double OffsetCm)
 	if (Body) Body->SetRelativeLocation(Offset);
 	if (Footing) Footing->SetRelativeLocation(Offset);
 	if (Hearth) Hearth->SetRelativeLocation(HearthAuthored + Offset);
+	if (InteriorBox) InteriorBox->SetRelativeLocation(InteriorCenter + Offset);
 }
 
 void AAnastasisVillageBuilding::SetConstructionProgress(double Progress)

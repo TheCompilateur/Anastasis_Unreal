@@ -105,6 +105,14 @@ public:
 		bool bStepped = true);
 
 	AAnastasisVillagerVisual* FindVillager(const FString& NpcId) const;
+
+	/**
+	 * dormir-couche-001 : ou cet habitant est couche, s'il dort dans un logis (activite « dort » ou « repose ») : les
+	 * dormeurs du logis, par identifiant, prennent dans l'ordre les places de son archetype (banquettes, puis nattes au
+	 * sol). Pieds et tete en coordonnees monde. Faux s'il ne dort pas dedans, ou s'il n'y a plus de place.
+	 */
+	bool SleepSpotFor(const AnastasisVillage::FVillage& Village, const FString& NpcId, FVector& OutFeet, FVector& OutHead) const;
+	static bool IsLyingActivity(const FString& Activity);
 	int32 NumVillagers() const { return Villagers.Num(); }
 
 	/**

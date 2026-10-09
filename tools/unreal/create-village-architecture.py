@@ -92,7 +92,7 @@ class Mesh:
     def __init__(self):
         self.v, self.t, self.c, self.uv = [], [], [], []
         self.meta = dict(doors=[], floors=[], rooms=[], hearths=[], sleep=[], storage=[], work=[],
-                         walls=[], roofs=[], windows=[], ceilings=[])
+                         walls=[], roofs=[], windows=[], ceilings=[], benches=[], interior=[])
 
     # -- primitives ------------------------------------------------------------------------
     def _frame(self, n, uaxis):
@@ -845,6 +845,8 @@ def sedir(m, x0, x1, y0, y1, z, rng, color=C_WOOL):
     m.box((x0 + 3, y0 + 3, z + 38), (x1 - 3, y1 - 3, z + 46), tint(C_LINEN, rng.uniform(.8, 1.0)))
     L = max(x1 - x0, y1 - y0)
     along_x = (x1 - x0) >= (y1 - y0)
+    # dormir-couche-001 : la couche ou l'on s'allonge, dans le sens de la banquette (dessus de la natte).
+    m.meta['benches'].append(dict(box=[x0 + 3, y0 + 3, x1 - 3, y1 - 3], z=z + 46))
     k = 0.0
     while k < L - 80:
         if along_x:
@@ -1127,6 +1129,8 @@ def house_poor(seed=11):
     low_table(m, 10, -180, floor, rng)
     m.meta['rooms'].append(dict(name='piece', use='vie+sommeil+foyer', area_m2=round((x1 - x0 - 2 * T) * (y1 - y0 - 2 * T) / 1e4, 1),
                                 floor=floor, ceiling=plate - 1))
+    # dormir-couche-001 : le volume habite (entre les murs, du sol au plafond), ou l'oeil s'accoutume au foyer.
+    m.meta['interior'] = [x0 + T / 2, y0 + T / 2, x1 - T / 2, y1 - T / 2, floor, plate]
     m.meta['work'].append(dict(kind='spin', at=[-100, -60, floor]))
     # appentis a bois sur le pignon droit
     lean_x0, lean_x1 = x1, x1 + 190
@@ -1188,6 +1192,8 @@ def cabin(seed=23):
     shelf(m, (x0 + 140, y0 + T / 2 + 6, 0), (x0 + 230, y0 + T / 2 + 6, 0), 150, 24, rng)
     m.meta['rooms'].append(dict(name='piece', use='vie+sommeil+foyer', area_m2=round((x1 - x0 - 2 * T) * (y1 - y0 - 2 * T) / 1e4, 1),
                                 floor=floor, ceiling=plate - 1))
+    # dormir-couche-001 : le volume habite (entre les murs, du sol au plafond), ou l'oeil s'accoutume au foyer.
+    m.meta['interior'] = [x0 + T / 2, y0 + T / 2, x1 - T / 2, y1 - T / 2, floor, plate]
     # dehors : le bois contre le pignon droit, le billot devant
     woodpile(m, x1 + 20, y0 + 50, 0, 220, 45, 110, rng, yaw=90)
     chopping_block(m, x1 + 70, y1 + 130, 0, rng)
@@ -1336,6 +1342,8 @@ def two_storey(m, rng, x0, x1, y0, y1, roof_kind='hip', cover='tile', gallery=Tr
     m.meta['rooms'].append(dict(name='chambre', use='sommeil', area_m2=round((x1 - part_x - 22) * (y1 - y0 - 44) / 1e4, 1),
                                 floor=u_floor, ceiling=plate - 1))
     m.meta['ceilings'].append(dict(room='etage', z=plate - 1, floor=u_floor))
+    # dormir-couche-001 : le volume habite, du rez au plafond de l'etage.
+    m.meta['interior'] = [x0 + T / 2, y0 + T / 2, x1 - T / 2, y1 - T / 2, g_floor, plate]
     # --- rez : reserve et etable ---
     if ground_use == 'etable':
         m.box((x0 + 40, y0 + 40, g_floor), (x0 + 360, y0 + 110, g_floor + 70), tint(C_PLANK, .7))
@@ -1796,6 +1804,8 @@ def describe(name, body, foot, kind, tier):
         doors=[dict(name=d['name'], width=d['width'], clear=d['clear'], at=[round(v) for v in d['at']]) for d in body.meta['doors']],
         rooms=body.meta['rooms'], hearths=[[round(v) for v in h['at']] for h in body.meta['hearths']],
         sleep_slots=len(body.meta['sleep']), storage=len(body.meta['storage']),
+        benches=[dict(box=[round(v) for v in b['box']], z=round(b['z'])) for b in body.meta['benches']],
+        interior=[round(v) for v in body.meta['interior']],
         work=[dict(kind=w['kind'], at=[round(v) for v in w['at']]) for w in body.meta['work']],
         roof=[dict(kind=r['kind'], cover=r['cover'], pitch=r['pitch'], ridge=round(r['z_ridge'])) for r in roofs],
         entry=[round(v) for v in body.meta.get('entry', [0, 0, 0])],

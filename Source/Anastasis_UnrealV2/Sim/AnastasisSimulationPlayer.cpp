@@ -11,12 +11,14 @@
 
 #include "Anastasis_UnrealV2.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Dom/JsonObject.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Pawn.h"
+#include "Camera/PlayerCameraManager.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -26,6 +28,10 @@
 #include "Village/AnastasisArchitecture.h"
 #include "Village/AnastasisVillageBuilding.h"
 #include "Village/AnastasisVillagerVisual.h"
+#include "Animation/AnimSingleNodeInstance.h"
+#include "Animation/BlendSpace.h"
+#include "WorldView/AnastasisPresentationRegistry.h"
+#include "WorldView/AnastasisPresentationResolver.h"
 #include "Work/AnastasisBuild.h"
 #include "WorldView/AnastasisVisualMode.h"
 
@@ -215,8 +221,17 @@ void UAnastasisSimulationSubsystem::PlacePlayerPawn()
 	FVector Feet = FAnastasisVillagePresentation::SimToUnreal(Simulation.GetWorld(), Player->X, Player->Y, World);
 	// ma-cabane-001 : la simulation le dit dedans (il dort, il mange) ; le corps passe la porte et se tient pres du banc,
 	// sur le sol de la piece. Ailleurs, il reste au seuil comme avant.
+	// dormir-couche-001 : s'il dort, dans sa cabane ou dans n'importe quel logis, il est couche a sa place.
 	bool bIndoors = false;
-	if (Player->Inside.bActive)
+	FVector SleepFeet;
+	FVector SleepHead;
+	const bool bAsleep = VillagePresentation.SleepSpotFor(Simulation.GetVillage(), Player->Id, SleepFeet, SleepHead);
+	if (bAsleep)
+	{
+		Feet = 0.5 * (SleepFeet + SleepHead);
+		bIndoors = true;
+	}
+	else if (Player->Inside.bActive)
 	{
 		const AnastasisVillage::FBuilding* Home = Simulation.GetVillage().FindBuilding(Player->Inside.BuildingId);
 		const AAnastasisVillageBuilding* Actor = VillagePresentation.FindActor(Player->Inside.BuildingId);
@@ -233,6 +248,48 @@ void UAnastasisSimulationSubsystem::PlacePlayerPawn()
 	if (bFaceVillagePending)
 	{
 		FacePawnTowardVillage(*Pawn);
+	}
+	// dormir-couche-001 : son corps (le maillage du personnage) s'allonge sur le dos, pieds et tete a sa place ; au
+	// reveil il reprend sa pose debout dans la capsule.
+	if (ACharacter* Character = Cast<ACharacter>(Pawn))
+	{
+		USkeletalMeshComponent* Mesh = Character->GetMesh();
+		if (Mesh && !bHasPawnMeshPose)
+		{
+			PawnMeshPose = Mesh->GetRelativeTransform();
+			bHasPawnMeshPose = true;
+		}
+		if (Mesh && bAsleep && !bPawnLying)
+		{
+			// Couche, le personnage ne joue plus son anim de marche (elle le croit en chute : un genou leve) :
+			// le repos a l'arret des habitants, le meme squelette.
+			if (UBlendSpace* Rest = AnastasisPresentation::GetRegistry().VillagerLocomotion.LoadSynchronous())
+			{
+				Mesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+				Mesh->PlayAnimation(Rest, true);
+				if (UAnimSingleNodeInstance* Single = Mesh->GetSingleNodeInstance())
+				{
+					Single->SetBlendSpacePosition(FVector::ZeroVector);
+				}
+			}
+		}
+		if (Mesh && bAsleep)
+		{
+			const FVector Along = (SleepHead - SleepFeet).GetSafeNormal();
+			Mesh->SetWorldLocationAndRotation(SleepFeet + FVector(0.0, 0.0, 11.0),
+				FRotationMatrix::MakeFromZY(Along, FVector::UpVector).Rotator(), false, nullptr, ETeleportType::TeleportPhysics);
+		}
+		else if (Mesh && bPawnLying)
+		{
+			Mesh->SetRelativeTransform(PawnMeshPose, false, nullptr, ETeleportType::TeleportPhysics);
+			Mesh->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+		}
+		if (bAsleep != bPawnLying)
+		{
+			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER pawn %s in %s"), bAsleep ? TEXT("lies down") : TEXT("gets up"),
+				Player->Inside.bActive ? *Player->Inside.BuildingId : TEXT("-"));
+		}
+		bPawnLying = bAsleep && Mesh != nullptr;
 	}
 	if (bIndoors != bPawnIndoors)
 	{
@@ -665,6 +722,131 @@ FString UAnastasisSimulationDebugLibrary::GetCabinStatus(const UObject* WorldCon
 			Root->SetBoolField(TEXT("actor"), false);
 		}
 	}
+	FString Out;
+	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Out);
+	FJsonSerializer::Serialize(Root, Writer);
+	return Out;
+}
+
+FString UAnastasisSimulationDebugLibrary::GetSleepStatus(const UObject* WorldContextObject)
+{
+	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	const UAnastasisSimulationSubsystem* Host = World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+	if (!Host || !Host->GetSimulation().IsRunning()) return TEXT("{}");
+	const AnastasisVillage::FVillage& Village = Host->GetSimulation().GetVillage();
+	const FAnastasisVillagePresentation& Presentation = Host->GetVillagePresentation();
+	auto Vec = [](const FVector& V)
+	{
+		TArray<TSharedPtr<FJsonValue>> A;
+		A.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(V.X)));
+		A.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(V.Y)));
+		A.Add(MakeShared<FJsonValueNumber>(FMath::RoundToDouble(V.Z)));
+		return A;
+	};
+	// L'angle du corps avec l'horizontale : 0 = allonge, 90 = debout (axe pieds -> tete du maillage).
+	auto Tilt = [](const USceneComponent* Body)
+	{
+		const FVector Up = Body->GetComponentQuat().GetAxisZ();
+		return FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(Up.Z, -1.0, 1.0)));
+	};
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	Root->SetNumberField(TEXT("day"), Host->GetSimulation().GetDay());
+	const AnastasisVillage::FNpc* Player = Village.PlayerActor();
+	TArray<TSharedPtr<FJsonValue>> Inside;
+	for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
+	{
+		if (!Npc.Inside.bActive) continue;
+		TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+		O->SetStringField(TEXT("id"), Npc.Id);
+		O->SetStringField(TEXT("building"), Npc.Inside.BuildingId);
+		O->SetStringField(TEXT("activity"), Npc.Inside.Activity);
+		const bool bPlayer = Player && Npc.Id == Player->Id;
+		O->SetBoolField(TEXT("player"), bPlayer);
+		FVector Feet;
+		FVector Head;
+		const bool bSpot = Presentation.SleepSpotFor(Village, Npc.Id, Feet, Head);
+		O->SetBoolField(TEXT("spot"), bSpot);
+		if (bSpot)
+		{
+			O->SetArrayField(TEXT("feet"), Vec(Feet));
+			O->SetArrayField(TEXT("head"), Vec(Head));
+		}
+		if (bPlayer)
+		{
+			const ACharacter* Character = Cast<ACharacter>(Host->GetBoundPawn());
+			O->SetBoolField(TEXT("lying"), Host->IsPawnLying());
+			O->SetBoolField(TEXT("visible"), Character != nullptr);
+			if (Character && Character->GetMesh())
+			{
+				O->SetNumberField(TEXT("tilt"), Tilt(Character->GetMesh()));
+				O->SetArrayField(TEXT("body"), Vec(Character->GetMesh()->GetComponentLocation()));
+			}
+		}
+		else if (const AAnastasisVillagerVisual* Visual = Presentation.FindVillager(Npc.Id))
+		{
+			O->SetBoolField(TEXT("lying"), Visual->IsLying());
+			O->SetBoolField(TEXT("visible"), !Visual->IsHidden() && Visual->IsShowingBody());
+			TArray<USkeletalMeshComponent*> Bodies;
+			Visual->GetComponents(Bodies);
+			if (Bodies.Num() > 0)
+			{
+				O->SetNumberField(TEXT("tilt"), Tilt(Bodies[0]));
+				O->SetArrayField(TEXT("body"), Vec(Bodies[0]->GetComponentLocation()));
+			}
+		}
+		Inside.Add(MakeShared<FJsonValueObject>(O));
+	}
+	Root->SetArrayField(TEXT("inside"), Inside);
+	TArray<TSharedPtr<FJsonValue>> Homes;
+	for (const AnastasisVillage::FBuilding& Building : Village.GetBuildings())
+	{
+		const AAnastasisVillageBuilding* Actor = Presentation.FindActor(Building.Id);
+		if (!Actor || !Actor->HasArchitecture()) continue;
+		const AnastasisArchitecture::FArchetype& A = AnastasisArchitecture::Get(Actor->GetVariant());
+		if (!A.Interior.IsValid) continue;
+		TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+		O->SetStringField(TEXT("id"), Building.Id);
+		O->SetStringField(TEXT("type"), Building.Type);
+		O->SetStringField(TEXT("archetype"), A.Id);
+		O->SetNumberField(TEXT("progress"), Building.Progress);
+		O->SetNumberField(TEXT("inside"), Village.InsideOf(Building.Id).Num());
+		O->SetNumberField(TEXT("hearth"), Actor->GetHearth());
+		O->SetBoolField(TEXT("interior_light"), Actor->IsInteriorLightOn());
+		O->SetNumberField(TEXT("interior_ev"), Actor->GetInteriorExposure());
+		// Instrument : la camera qui rend la vue est-elle dans ce logis, au sens du post-process ?
+		if (const APlayerController* PC = World->GetFirstPlayerController())
+		{
+			if (PC->PlayerCameraManager)
+			{
+				const FVector View = PC->PlayerCameraManager->GetCameraLocation();
+				O->SetBoolField(TEXT("view_inside"), Actor->InteriorEncompasses(View));
+				O->SetArrayField(TEXT("view"), Vec(View));
+			}
+		}
+		const FBox WorldBox = Actor->GetInteriorWorldBox();
+		O->SetArrayField(TEXT("box_min"), Vec(WorldBox.Min));
+		O->SetArrayField(TEXT("box_max"), Vec(WorldBox.Max));
+		const FTransform Xf = Actor->GetActorTransform();
+		const FVector Pad(0.0, 0.0, Actor->GetPadOffset());
+		O->SetArrayField(TEXT("location"), Vec(Xf.GetLocation()));
+		O->SetNumberField(TEXT("yaw"), Xf.Rotator().Yaw);
+		O->SetNumberField(TEXT("pad"), Actor->GetPadOffset());
+		TArray<TSharedPtr<FJsonValue>> Box;
+		for (const double V : { A.Interior.Min.X, A.Interior.Min.Y, A.Interior.Min.Z, A.Interior.Max.X, A.Interior.Max.Y, A.Interior.Max.Z })
+		{
+			Box.Add(MakeShared<FJsonValueNumber>(V));
+		}
+		O->SetArrayField(TEXT("interior"), Box);
+		if (A.Benches.Num() > 0)
+		{
+			const FVector2D C = A.Benches[0].Box.GetCenter();
+			O->SetArrayField(TEXT("bench"), Vec(Xf.TransformPosition(FVector(C.X, C.Y, A.Benches[0].TopCm) + Pad)));
+			O->SetArrayField(TEXT("bench_local"), Vec(FVector(C.X, C.Y, A.Benches[0].TopCm)));
+			O->SetBoolField(TEXT("bench_along_x"), A.Benches[0].Box.GetSize().X >= A.Benches[0].Box.GetSize().Y);
+		}
+		Homes.Add(MakeShared<FJsonValueObject>(O));
+	}
+	Root->SetArrayField(TEXT("homes"), Homes);
 	FString Out;
 	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Out);
 	FJsonSerializer::Serialize(Root, Writer);

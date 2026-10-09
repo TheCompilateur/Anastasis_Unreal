@@ -179,6 +179,7 @@ public:
 	bool IsPawnBound() const { return BoundPawn.IsValid(); }
 	/** ma-cabane-001 : le corps du joueur est-il pose dans sa cabane ? */
 	bool IsPawnIndoors() const { return bPawnIndoors; }
+	bool IsPawnLying() const { return bPawnLying; }
 
 	/**
 	 * player-minimal-001 -- un habitant ordinaire arrive et il est incarne (FVillage::ArriveAsPlayer) ; tuile
@@ -316,6 +317,10 @@ private:
 	TWeakObjectPtr<APawn> BoundPawn;
 	/** ma-cabane-001 : le corps du joueur est-il dans sa cabane (pour ne journaliser que le passage de la porte) ? */
 	bool bPawnIndoors = false;
+	/** dormir-couche-001 : le corps du pawn est couche ; sa pose debout (relative a la capsule), a rendre au reveil. */
+	bool bPawnLying = false;
+	bool bHasPawnMeshPose = false;
+	FTransform PawnMeshPose;
 	bool bScriptedDrive = false;
 	FVector2D ScriptedDrive = FVector2D::ZeroVector;
 };
@@ -461,6 +466,14 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetCabinStatus(const UObject* WorldContextObject);
+
+	/**
+	 * dormir-couche-001, en JSON : chaque habitant dedans (logis, activite, couche ou cache, pieds et tete du corps
+	 * couche, angle du corps avec l'horizontale), le joueur (pawn couche), et chaque logis (exposition d'interieur,
+	 * foyer, dormeurs). `{}` sans hote.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetSleepStatus(const UObject* WorldContextObject);
 
 	/** Etat instrumental de la scene et des demandes, sans pretendre juger la lisibilite de l'image. */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
