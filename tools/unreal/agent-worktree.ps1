@@ -858,9 +858,13 @@ switch ($Command) {
         continue
       }
       $ancestryOk = $true
+      $tip = (Invoke-Git -C $integ rev-parse $b).Out | Select-Object -First 1
       foreach ($ancestor in $ancestors.Out) {
         if ($ancestor -eq $b -or $ancestor -notmatch '^agent/([a-z0-9][a-z0-9._-]*)$') { continue }
         $other = $Matches[1]
+        # Une branche ouverte sur le sommet meme de la mission (aucun commit propre) n'est pas un
+        # ancetre : c'est une descendante qui n'a pas encore commence (ma-cabane-001 sur relay-valmire-001).
+        if (((Invoke-Git -C $integ rev-parse $ancestor).Out | Select-Object -First 1) -eq $tip) { continue }
         if ($alreadyApplied -contains $other) { continue }
         $pending = Invoke-Git -C $integ cherry HEAD $ancestor
         if ($pending.Code -ne 0) { $ancestryOk = $false; break }

@@ -423,6 +423,14 @@ $null = NewMission 'ra-r2' @({ param($w)
 $null = AW finish -Mission ra-r2
 $r = AW integrate-batch -Missions 'ra-r2'
 Check 'S28 relais declare, preuves reprises : la mission portee est admise et versee' ($r.Code -eq 0 -and $r.Out -match 'RELAY_ADMITTED::ra-r2 porte ra-a \(preuves : aucune\)' -and $r.Out -match 'BATCH_INTEGRATED::ra-r2' -and (G show 'main:doc-ra-a.md') -eq 'a') $r.Out
+# 28b. Une branche ouverte sur le sommet meme d'une mission, sans commit propre, n'en fait pas une
+#      mission heritee : la mission passe (ma-cabane-001 ouverte sur relay-valmire-001, 2026-10-09).
+G checkout -q -f main | Out-Null; G clean -fdq | Out-Null
+$null = NewMission 'st-a' @({ param($w) Set-Content "$w\doc-st-a.md" 'a' })
+$null = AW finish -Mission st-a
+G branch 'agent/st-clone' 'agent/st-a' | Out-Null
+$r = AW integrate-batch -Missions 'st-a'
+Check 'S28b branche au meme sommet : pas une mission heritee, versee' ($r.Code -eq 0 -and $r.Out -match 'BATCH_INTEGRATED::st-a' -and $r.Out -notmatch 'heritee') $r.Out
 
 # 29. prune par contenu : une copie versee dont l'union de proofs.txt a retouche le diff n'est plus
 #     reconnue par git cherry ; rejouee sur main elle ne change rien, prune la supprime.
