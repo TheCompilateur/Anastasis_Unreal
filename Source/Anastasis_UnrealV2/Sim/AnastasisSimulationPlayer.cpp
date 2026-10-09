@@ -402,7 +402,7 @@ void UAnastasisSimulationSubsystem::DrawPlayerOverlay() const
 		0xA51A54,
 		0.0f,
 		Refusal ? FColor::Orange : FColor::Cyan,
-		TEXT("BUTS") + Options + TEXT("  0 rien") + Intent);
+		TEXT("BUTS (Maj +)") + Options + TEXT("  0 rien") + Intent);
 	if (!Village.GetFoodSources().IsEmpty())
 	{
 		int32 Remaining = 0;

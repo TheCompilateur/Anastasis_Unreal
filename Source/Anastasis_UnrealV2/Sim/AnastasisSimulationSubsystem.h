@@ -188,6 +188,20 @@ public:
 	bool IsPawnIndoors() const { return bPawnIndoors; }
 	bool IsPawnLying() const { return bPawnLying; }
 
+	// --- mains-joueur-001 (ecart n°57) : les mains du joueur ----------------------------------------------
+	/** Clic gauche maintenu : le geste offert par ce qui est vise se fait, et se refait tant qu'on tient. */
+	void SetHandHeld(bool bHeld);
+	/** Clic droit : utiliser la case choisie (la nourriture se mange). */
+	void UseSelectedSlot();
+	/** Case choisie de la barre (0 a 7), et la molette. */
+	void SelectHandSlot(int32 Slot);
+	void CycleHandSlot(int32 Delta);
+	/** Le geste vise, fait une fois, sans attendre (preuves et agents). Rend le compte rendu, vide si rien. */
+	FString UseFocusedHandOnce();
+	/** JSON : sac, case choisie, cible visee, geste offert, dernier message (preuves). */
+	FString GetPlayerHandsStatus() const;
+	static constexpr int32 HandSlots = 8;
+
 	/**
 	 * player-minimal-001 -- un habitant ordinaire arrive et il est incarne (FVillage::ArriveAsPlayer) ; tuile
 	 * negative = settlement + (2, 3). Le seul chemin d'arrivee : `Anastasis.Player.Arrive` et le debut de partie
@@ -233,6 +247,25 @@ private:
 	FString HelpPanelText() const;
 	bool FindHelpFocus(FString& OutSiteId, FString& OutPersonId) const;
 	TSharedPtr<SWidget> HelpPanel;
+	// mains-joueur-001 : ce que la main vise, la barre de 8 cases, le maintien en cours.
+	void UpdatePlayerHands(float DeltaSeconds);
+	void EnsureHandsPanel();
+	bool ResolveHandFocus(FString& OutBuildingId, int32& OutTileX, int32& OutTileY) const;
+	FString HandsPromptText() const;
+	FString HandSlotText(int32 Slot) const;
+	float HandHoldFraction() const;
+	void NoteHand(const FString& Message);
+	TSharedPtr<SWidget> HandsPanel;
+	bool bHandHeld = false;
+	float HandHeldSeconds = 0.0f;
+	int32 HandSlot = 0;
+	FString HandFocusBuilding;
+	int32 HandFocusX = -1;
+	int32 HandFocusY = -1;
+	uint8 HandFocusOffer = 0;
+	bool bHandFocusInReach = false;
+	FString HandMessage;
+	double HandMessageUntil = 0.0;
 	FString HelpFeedback;
 	bool bHelpSceneActive = false;
 	bool bHelpNotebookOpen = false;
@@ -483,6 +516,17 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetSleepStatus(const UObject* WorldContextObject);
+
+	/** mains-joueur-001, en JSON : sac, case choisie, cible visee, geste offert et a portee, dernier message. `{}` sans hote. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetPlayerHandsStatus(const UObject* WorldContextObject);
+
+	/**
+	 * mains-joueur-001, pour viser dans une preuve : les batiments acheves ou en chantier, et les tuiles de nourriture,
+	 * de bois et de pierre les plus proches du joueur (12 tuiles), avec leur point Unreal (centre, au sol). `{}` sans joueur.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetPlayerHandTargets(const UObject* WorldContextObject);
 
 	/** Etat instrumental de la scene et des demandes, sans pretendre juger la lisibilite de l'image. */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))

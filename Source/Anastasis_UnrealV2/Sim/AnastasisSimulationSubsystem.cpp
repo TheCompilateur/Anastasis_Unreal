@@ -493,6 +493,7 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 {
 	TryStartVillage(DeltaTime);
 	EnsureHelpPanel();
+	EnsureHandsPanel(); // mains-joueur-001
 	BindRainCanopy();
 	if (!Simulation.IsRunning())
 	{
@@ -515,6 +516,8 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 	const double Multiplier = FMath::Max(1.0, AnastasisJs::NumberOr(Speed, 1.0)) * Warp;
 	// player-minimal-001 : la direction du pawn conduit le corps incarne pendant les pas de cette frame.
 	ApplyPlayerInput();
+	// mains-joueur-001 : ce que la main vise, et le geste quand la barre est pleine.
+	UpdatePlayerHands(DeltaTime);
 
 	int32 Steps = 0;
 	double StepAlpha = 1.0;

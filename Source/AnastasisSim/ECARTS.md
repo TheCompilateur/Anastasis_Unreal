@@ -1047,3 +1047,16 @@ Deux règles. **La soif d'abord** : à soif mortelle (`ParchedAt`, 88), si boire
 - **harnais** : aucune
 
 Chaque soir, s'il reste dans les greniers moins de deux jours de nourriture (un repas par personne et par jour), l'adulte sans métier le plus affamé (16 ans et plus, ni joueur, ni porteur) qui atteint le grenier devient cultivateur du grenier où travaillent déjà les autres (`AssignWorkplace`, comme les recrues de l'ouverture). Un par soir ; jamais plus de la moitié du village aux champs ; personne n'est rendu à son ancien état quand le grenier se remplit. Vu par l'étude d'une année (annee-valmire-001) : trois cultivateurs pour quatorze bouches, six à dix adultes sans métier pour toujours, un grenier vide dès le premier hiver et des familles mortes de faim à côté de champs pleins. Le compteur `FieldHandsHired` et le drapeau sont dans le parcours d'état (`SaveFormatVersion` 7). À trancher : la règle (seuil, nombre, retour au foyer quand le grenier déborde), ou porter `ensureWorkplacesDaily`.
+
+### n° 57 — Les mains du joueur : des gestes directs, les verbes des habitants
+
+- **classe** : EXTENSION
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : mains-joueur-001 (demande d'Alexandre du 2026-10-09 : « on a donné son corps, mais pas la capacité de ses mains » ; « comme Medieval Dynasty, un peu comme Minecraft ; simplifier, pour le joueur humain comme pour le joueur IA »)
+- **activation** : hôte seulement — `FVillage::PlayerHandDo`, appelé pour le joueur incarné quand il maintient le clic sur ce qu'il vise (ou par `Anastasis.Player.Use`). Aucun scénario du harnais n'incarne de joueur ni n'appelle ces gestes ; sans appel, rien ne change au bit près.
+- **reference** : aucune — dans `src/sim/simulation.js`, le joueur n'agit qu'en posant un but (`choosePlayerGoal`) que son corps exécute (écart n°20).
+- **cpp** : `Village/AnastasisVillageHands.cpp` (`PlayerHandOffer`, `PlayerHandDo`, `PlayerHandLabel`, `PlayerStone`) ; `Public/Village/AnastasisVillage.h` (`EPlayerHand`, `FPlayerHandResult`, `PlayerHandReach`, `PlayerBagCap`) ; hôte `Sim/AnastasisPlayerHands.cpp`
+- **harnais** : aucune
+
+Le joueur vise un bâtiment ou une tuile, et le geste se fait sur place, sans but ni trajet, à portée (1,6 tuile du seuil ou du centre de la case) : boire au puits, récolter une portion d'une tuile de nourriture, couper une bûche d'une tuile de bois (plancher forestier du bûcheron), tailler une pierre, déposer sa nourriture au grenier ou y prendre une portion libre, donner au chantier le bois et la pierre qui manquent au devis, poser une pièce (`WorkConstruction`, réservé aux admis du chantier), manger une portion du sac. Chaque geste reprend la règle de l'habitant qui fait la même chose (`TakeFromTile`, `DepleteTile`, `CreditFood`, `FoodAvailable`, `CreditSiteMaterials`, `SatisfyDrink`, `SatisfyEat`) : rien ne se crée ni ne se perd. Un geste retire l'intention posée, comme conduire le corps. Le sac est celui du corps (`InventoryFood`, `InventoryWood`, la pierre dans `MaterialCarry`), borné à 10 de chaque : aucun champ nouveau, le format de sauvegarde ne change pas. À trancher : garder ces gestes comme les mains du jeu, en ajouter (dormir, parler), ou les porter dans la référence.

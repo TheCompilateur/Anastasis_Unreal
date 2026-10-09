@@ -75,7 +75,38 @@ void AAnastasis_UnrealV2Character::SetupPlayerInputComponent(UInputComponent* Pl
 	PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &AAnastasis_UnrealV2Character::BuildHelpSceneInput);
 	PlayerInputComponent->BindKey(EKeys::X, IE_Pressed, this, &AAnastasis_UnrealV2Character::StopHelpSceneInput);
 	PlayerInputComponent->BindKey(EKeys::J, IE_Pressed, this, &AAnastasis_UnrealV2Character::ToggleHelpNotebookInput);
+
+	// mains-joueur-001 : les mains du joueur.
+	PlayerInputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this, &AAnastasis_UnrealV2Character::HandPressedInput);
+	PlayerInputComponent->BindKey(EKeys::LeftMouseButton, IE_Released, this, &AAnastasis_UnrealV2Character::HandReleasedInput);
+	PlayerInputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this, &AAnastasis_UnrealV2Character::UseSlotInput);
+	PlayerInputComponent->BindKey(EKeys::MouseScrollDown, IE_Pressed, this, &AAnastasis_UnrealV2Character::NextSlotInput);
+	PlayerInputComponent->BindKey(EKeys::MouseScrollUp, IE_Pressed, this, &AAnastasis_UnrealV2Character::PreviousSlotInput);
+	// 8 et 9 restent au temps (TIME_WARP_001, demande d'Alexandre) : la 8e case se prend a la molette.
+	const FKey SlotKeys[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six, EKeys::Seven };
+	for (int32 Slot = 0; Slot < UE_ARRAY_COUNT(SlotKeys); ++Slot)
+	{
+		FInputKeyBinding Binding(FInputChord(SlotKeys[Slot]), IE_Pressed);
+		Binding.KeyDelegate.GetDelegateForManualSet().BindUObject(this, &AAnastasis_UnrealV2Character::SelectSlotInput, Slot);
+		PlayerInputComponent->KeyBindings.Add(Binding);
+	}
 }
+
+namespace
+{
+	UAnastasisSimulationSubsystem* HandsHost(const AActor* Actor)
+	{
+		UWorld* World = Actor ? Actor->GetWorld() : nullptr;
+		return World ? World->GetSubsystem<UAnastasisSimulationSubsystem>() : nullptr;
+	}
+}
+
+void AAnastasis_UnrealV2Character::HandPressedInput() { if (UAnastasisSimulationSubsystem* Host = HandsHost(this)) Host->SetHandHeld(true); }
+void AAnastasis_UnrealV2Character::HandReleasedInput() { if (UAnastasisSimulationSubsystem* Host = HandsHost(this)) Host->SetHandHeld(false); }
+void AAnastasis_UnrealV2Character::UseSlotInput() { if (UAnastasisSimulationSubsystem* Host = HandsHost(this)) Host->UseSelectedSlot(); }
+void AAnastasis_UnrealV2Character::NextSlotInput() { if (UAnastasisSimulationSubsystem* Host = HandsHost(this)) Host->CycleHandSlot(1); }
+void AAnastasis_UnrealV2Character::PreviousSlotInput() { if (UAnastasisSimulationSubsystem* Host = HandsHost(this)) Host->CycleHandSlot(-1); }
+void AAnastasis_UnrealV2Character::SelectSlotInput(int32 Slot) { if (UAnastasisSimulationSubsystem* Host = HandsHost(this)) Host->SelectHandSlot(Slot); }
 
 void AAnastasis_UnrealV2Character::StartHelpSceneInput()
 {

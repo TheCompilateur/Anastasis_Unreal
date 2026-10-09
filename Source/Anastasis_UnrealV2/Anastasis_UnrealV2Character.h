@@ -94,6 +94,14 @@ protected:
 	void StopHelpSceneInput();
 	void ToggleHelpNotebookInput();
 
+	// mains-joueur-001 : clic gauche maintenu = le geste vise ; clic droit = la case choisie ; molette / 1 a 8 = la case.
+	void HandPressedInput();
+	void HandReleasedInput();
+	void UseSlotInput();
+	void NextSlotInput();
+	void PreviousSlotInput();
+	void SelectSlotInput(int32 Slot);
+
 protected:
 
 	/** Set up input action bindings */

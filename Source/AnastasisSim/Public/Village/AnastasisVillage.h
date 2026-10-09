@@ -1370,6 +1370,52 @@ namespace AnastasisVillage
 		 */
 		void UpdateReputationDaily();
 
+		// --- Les mains du joueur (mains-joueur-001, ecart n°57) ------------------------------------
+		//
+		// Les gestes directs : le joueur vise, maintient, et le geste se fait sur place, sans but ni
+		// trajet. Chaque geste est celui d'un habitant (memes tuiles, meme grenier, memes chantiers) ;
+		// la simulation verifie la portee et rend ce qui a ete fait. Le sac est celui du corps
+		// (`InventoryFood`, `InventoryWood`, `MaterialCarry` de pierre) : aucun etat nouveau.
+
+		enum class EPlayerHand : uint8
+		{
+			None,
+			Drink,      // au puits
+			Gather,     // une portion d'une tuile de nourriture
+			Chop,       // une buche d'une tuile de bois
+			Quarry,     // une pierre d'une tuile de pierre
+			Deposit,    // le sac de nourriture au grenier
+			Take,       // une portion du grenier
+			Supply,     // bois et pierre du sac au chantier
+			Build,      // une piece posee au chantier
+			Eat,        // une portion du sac
+		};
+
+		/** Ce que le geste a fait : `bDone` (et combien), sinon pourquoi rien (texte court, pour l'ecran). */
+		struct FPlayerHandResult
+		{
+			bool bDone = false;
+			int32 Amount = 0;
+			FString Refusal;
+		};
+
+		/** Portee d'un geste, en tuiles, du corps au seuil du batiment ou au centre de la tuile. */
+		static constexpr double PlayerHandReach = 1.6;
+		/** Le sac porte au plus tant de chaque chose. */
+		static constexpr int32 PlayerBagCap = 10;
+
+		/**
+		 * Le geste qu'un batiment ou une tuile offre au joueur, tel qu'il est maintenant (sac, stock,
+		 * chantier). `BuildingId` vide = la tuile (TileX, TileY). None si rien a faire.
+		 */
+		EPlayerHand PlayerHandOffer(const FString& BuildingId, int32 TileX, int32 TileY) const;
+		/** Fait le geste, une fois. Meme cible que l'offre. */
+		FPlayerHandResult PlayerHandDo(EPlayerHand Hand, const FString& BuildingId, int32 TileX, int32 TileY);
+		/** Le libelle francais d'un geste (« boire », « couper du bois »...). */
+		static const TCHAR* PlayerHandLabel(EPlayerHand Hand);
+		/** La pierre que porte le joueur (`MaterialCarry` quand la ressource portee est la pierre). */
+		int32 PlayerStone() const;
+
 		// --- La main du joueur (player-goals-001, simulation.js « La main du joueur ») ------------
 
 		/**
