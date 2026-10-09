@@ -44,12 +44,15 @@ débogage de player-goals-001 passent de 1–5 / 0 à **Maj + 1–5 / Maj + 0** 
 
 ## COMMIT
 
-Voir `git log main..agent/mains-joueur-001`, base `main` = `7f7e29fbd`.
+Voir `git log main..agent/mains-joueur-001`, base `main` = `16623526e`.
 
 ## MEC
 
 - BUILD: PASS (worktree)
-- TESTS: `tools\unreal\report-tests.ps1 -Filter 'Anastasis.Sim.Joueur'` → RESULTAT_TESTS
+- TESTS: `tools\unreal\report-tests.ps1 -Filter 'Anastasis.Sim.Joueur'` → PASS 8 / KNOWN_EXPECTED_FAILURE 0 / FAIL 0 ;
+  `Anastasis.Sim.Joueur.Mains` : boire, récolter jusqu'à épuisement, couper, tailler, trop loin refusé, déposer et prendre
+  au grenier (conservation), manger, donner au chantier (ce que le sac perd, le chantier le gagne), poser une pièce
+  (`pieces=0->1`). Rebasée sur `main` après player-start-002 (l'arrivée au Play) : suite complète jouée par `finish`.
 - `check-ecarts` : `ECARTS::PASS fiches=51` ; `check-state-fields` : `STATE_FIELDS::PASS structures=46 lacunes=2` (aucun champ
   nouveau : le sac est celui du corps) ; index `tools/unreal/` à jour.
 - Format de sauvegarde **inchangé**.
