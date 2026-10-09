@@ -620,6 +620,7 @@ int32 FAnastasisVillagePresentation::SyncVillagers(
 		const bool bAsleep = Npc.Inside.bActive && SleepSpotFor(Village, Npc.Id, SleepFeet, SleepHead);
 		if (!bAsleep) Actor->MoveFeetTo(Feet);
 		Actor->SetLying(bAsleep, SleepFeet, SleepHead);
+		Actor->SetCarriedFood(Npc.InventoryFood);
 		Actor->SetActorHiddenInGame(Npc.Inside.bActive && !bAsleep);
 	}
 	return Changes;

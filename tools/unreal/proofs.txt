@@ -56,6 +56,7 @@ material-courier-pie | tools/unreal/material-courier-pie.py | MATERIAL_COURIER_P
 labor-social-pie | tools/unreal/labor-social-pie.py | LABOR_SOCIAL_PIE PASS | LABOR_SOCIAL_PIE FAIL|LABOR_SOCIAL_EXCEPTION|Traceback | 280 | -
 # site-stock-visual-001: physical instances must follow the site's wood and stone ledger, no image verdict.
 site-stock-visual-pie | tools/unreal/site-stock-visual-pie.py | SITE_STOCK_VISUAL_PIE PASS | SITE_STOCK_VISUAL_PIE FAIL|Traceback | 240 | -
+food-basket-pie | tools/unreal/food-basket-pie.py | FOOD_BASKET_PIE PASS | FOOD_BASKET_PIE FAIL|Traceback | 480 | ANASTASIS_FOOD_BASKET_OUT=@Saved/FoodBasketEvidence/pie
 # geography-concordance-001: acquisition and partition integrity, not geographic agreement or NPC travel.
 geography-concordance-pie | tools/unreal/geography-concordance-pie.py | GEOGRAPHY_CONCORDANCE INSTRUMENT_PASS | GEOGRAPHY_CONCORDANCE FAIL|Traceback | 300 | -
 

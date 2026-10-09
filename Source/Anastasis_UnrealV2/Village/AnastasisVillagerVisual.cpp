@@ -3,18 +3,27 @@
 #include "Animation/AnimSingleNodeInstance.h"
 #include "Animation/BlendSpace.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "ProceduralMeshComponent.h"
 #include "Village/AnastasisVillagerLooks.h"
+#include "UObject/UObjectGlobals.h"
 
 static TAutoConsoleVariable<int32> CVarVillageBodies(
 	TEXT("anastasis.Village.Bodies"),
 	2,
 	TEXT("3D villagers in game: 0 hides bodies for diagnosis; 1 or 2 shows bodies at every distance. Portrait cards are editor previews only."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarVillageFoodBasket(
+	TEXT("anastasis.Village.FoodBasket"),
+	1,
+	TEXT("1=show a carried wicker basket only while a villager's simulated InventoryFood is positive; 0=hide for visual A/B."),
 	ECVF_Default);
 
 namespace
@@ -33,6 +42,9 @@ namespace
 	constexpr float MeshYawOffset = -90.0f;
 	/** dormir-couche-001 : du dessus de la couche a l'axe des chevilles d'un corps allonge sur le dos, cm (taille 1). */
 	constexpr float LyingBackCm = 11.0f;
+	/** Height of SM_Food_Basket_01's handle over its base, in cm. */
+	constexpr float BasketHandleCm = 48.85f;
+	const FName LeftHandBone(TEXT("hand_l"));
 }
 
 AAnastasisVillagerVisual::AAnastasisVillagerVisual()
@@ -63,6 +75,14 @@ AAnastasisVillagerVisual::AAnastasisVillagerVisual()
 	Body->CastShadow = true;
 	Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
 	Body->SetVisibility(false);
+
+	FoodBasket = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FoodBasket"));
+	FoodBasket->SetupAttachment(FeetRoot);
+	FoodBasket->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	FoodBasket->SetCanEverAffectNavigation(false);
+	FoodBasket->SetGenerateOverlapEvents(false);
+	FoodBasket->CastShadow = true;
+	FoodBasket->SetVisibility(false);
 }
 
 void AAnastasisVillagerVisual::BuildCard()
@@ -163,6 +183,16 @@ bool AAnastasisVillagerVisual::SetBody(USkeletalMesh* Mesh, UBlendSpace* Locomot
 	{
 		Body->SetMaterial(Slot, Dress);
 	}
+	UStaticMesh* BasketMesh = LoadObject<UStaticMesh>(nullptr,
+		TEXT("/Game/Anastasis/CarriedFood/SM_Food_Basket_01.SM_Food_Basket_01"));
+	if (BasketMesh)
+	{
+		FoodBasket->SetStaticMesh(BasketMesh);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("FOOD_BASKET missing StaticMesh /Game/Anastasis/CarriedFood/SM_Food_Basket_01"));
+	}
 	return true;
 }
 
@@ -182,6 +212,7 @@ void AAnastasisVillagerVisual::SetLying(bool bInLying, const FVector& Feet, cons
 			Body->SetRelativeLocation(FVector::ZeroVector);
 			bHasLastFeet = false;
 		}
+		UpdateFoodBasket();
 		return;
 	}
 	bLying = true;
@@ -192,6 +223,36 @@ void AAnastasisVillagerVisual::SetLying(bool bInLying, const FVector& Feet, cons
 	Body->SetWorldLocationAndRotation(Feet + FVector(0.0, 0.0, LyingBackCm * BodyScale), Pose);
 	BodySpeed = 0.0f;
 	bHasLastFeet = false;
+	UpdateFoodBasket();
+}
+
+void AAnastasisVillagerVisual::SetCarriedFood(int32 Amount)
+{
+	CarriedFood = FMath::Max(0, Amount);
+	UpdateFoodBasket();
+}
+
+bool AAnastasisVillagerVisual::HasFoodBasketMesh() const
+{
+	return FoodBasket && FoodBasket->GetStaticMesh() != nullptr;
+}
+
+bool AAnastasisVillagerVisual::IsFoodBasketVisible() const
+{
+	return FoodBasket && FoodBasket->IsVisible() && !IsHidden();
+}
+
+void AAnastasisVillagerVisual::UpdateFoodBasket()
+{
+	if (!FoodBasket) return;
+	const bool bShow = CarriedFood > 0 && bShowingBody && !bLying && HasFoodBasketMesh()
+		&& CVarVillageFoodBasket.GetValueOnGameThread() != 0 && Body && Body->DoesSocketExist(LeftHandBone);
+	FoodBasket->SetVisibility(bShow);
+	if (!bShow) return;
+	// Follow the animated hand, while gravity keeps the basket upright. The mesh's handle apex meets the hand.
+	FoodBasket->SetWorldScale3D(FVector(BodyScale));
+	FoodBasket->SetWorldLocation(Body->GetSocketLocation(LeftHandBone) - FVector(0.0, 0.0, BasketHandleCm * BodyScale));
+	FoodBasket->SetWorldRotation(FRotator(0.0, BodyHeading, 0.0));
 }
 
 void AAnastasisVillagerVisual::ShowBody(bool bBody)
@@ -203,6 +264,7 @@ void AAnastasisVillagerVisual::ShowBody(bool bBody)
 	}
 	bShowingBody = bBody;
 	Body->SetVisibility(bBody);
+	UpdateFoodBasket();
 	// A missing 3D asset must not silently turn a villager into a painted billboard.
 	const UWorld* World = GetWorld();
 	Card->SetVisibility(!bBody && PortraitMaterial != nullptr && World && !World->IsGameWorld());
@@ -259,4 +321,5 @@ void AAnastasisVillagerVisual::Tick(float DeltaSeconds)
 			Single->SetBlendSpacePosition(FVector(0.0, BodySpeed / BodyScale, 0.0));
 		}
 	}
+	UpdateFoodBasket();
 }

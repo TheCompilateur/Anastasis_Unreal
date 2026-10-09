@@ -10,6 +10,7 @@ class UMaterialInterface;
 class UProceduralMeshComponent;
 class USkeletalMesh;
 class USkeletalMeshComponent;
+class UStaticMeshComponent;
 class UTexture2D;
 namespace AnastasisVillagerLooks { struct FBodyLook; }
 
@@ -78,6 +79,18 @@ public:
 	 */
 	void SetLying(bool bInLying, const FVector& Feet = FVector::ZeroVector, const FVector& Head = FVector::ZeroVector);
 
+	/** Presentation only: the simulated inventory remains authoritative. */
+	void SetCarriedFood(int32 Amount);
+
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Villagers")
+	int32 GetCarriedFood() const { return CarriedFood; }
+
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Villagers")
+	bool HasFoodBasketMesh() const;
+
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Villagers")
+	bool IsFoodBasketVisible() const;
+
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Villagers")
 	bool IsLying() const { return bLying; }
 
@@ -91,6 +104,7 @@ private:
 	void BuildCard();
 	/** Speed and heading from the feet's motion since the last frame. */
 	void UpdateBodyMotion(float DeltaSeconds);
+	void UpdateFoodBasket();
 
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis|Villagers")
 	TObjectPtr<USceneComponent> FeetRoot;
@@ -104,6 +118,9 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis|Villagers")
 	TObjectPtr<USkeletalMeshComponent> Body;
 
+	UPROPERTY(VisibleAnywhere, Category = "Anastasis|Villagers")
+	TObjectPtr<UStaticMeshComponent> FoodBasket;
+
 	FName LookId;
 	bool bMirrored = false;
 
@@ -114,4 +131,5 @@ private:
 	bool bHasLastFeet = false;
 	FVector LastFeet = FVector::ZeroVector;
 	bool bLying = false;
+	int32 CarriedFood = 0;
 };
