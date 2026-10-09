@@ -38,14 +38,19 @@ PENDING — le commit marqué par le dernier `finish` fait foi.
 
 ## MEC
 
-- Syntaxe Python et JSON : à reporter avec commandes et résultats.
+- Syntaxe Python (`python -m py_compile` sur générateur, validateur et
+  capture), JSON et empreintes sources normalisées : PASS.
 - Génération Unreal `-nullrhi` : `PONTIC_HORSETAIL_V2 PASS`,
   `SM_Pontic_Horsetail_02`, trois LOD **420/133/48 triangles**, bounds
   `[-23.0,-18.3,-1.0]..[21.6,21.4,61.1]` cm. Fichier sauvé de 38 860 octets,
   filtre Git LFS confirmé ; log `Saved/PonticHorsetailV2Evidence/create-pontic-horsetail-v2.log`.
-- Contrat MEC en éditeur neuf (`asset-contract-horsetail-v2`) : en attente de
-  son exécution ; les valeurs du générateur ne remplacent pas cette lecture.
-- Build C++ et suite sans rendu : à reporter après `finish`.
+- `tools/unreal/validate-asset-contract.ps1` dans un **nouvel éditeur** :
+  `ASSET_CONTRACT PASS id=asset-protocol-v2-horsetail assets=1 stage=scene`.
+  Mesh rechargé : 420/133/48 triangles, dimensions 44,64 × 39,65 × 62,12 cm,
+  Z minimal −1 cm, `M_AnastasisGrass`, référence C++ source présente.
+  Log `Saved/AssetContractEvidence/validate-asset-contract.log`.
+- `tools/unreal/anastasis-unreal.ps1 build` : `BUILD::PASS`, quatre actions,
+  136,16 s. Suite sans rendu : à reporter après `finish`.
 
 ## PROOFS
 
