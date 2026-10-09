@@ -66,6 +66,10 @@ d'etat ajoute (`bArrivedAtStart`, `bFaceVillagePending` vivent dans l'hote Unrea
   l'integrateur le souhaite (la fonction ajoutee ne touche pas la porte memoire).
 - Le joueur arrive a `settlement + (2, 3)` tuiles (72,1 m du puits mesures en PIE le 2026-10-09), comme `Arrive` : pas sous la placette.
 
+## CORRECTION DE player-pie
+
+Le premier lot (2026-10-09) a joue `player-start-pie` PASS mais `player-pie` FAIL, pour deux raisons anterieures a cette mission : `build` n'est plus refuse (la simulation ouvre un chantier des le debut, opening-in-sim-001), et le joueur laisse une semaine sans rien faire meurt (mortalite). `player-pie` teste maintenant le refus avec `craft` et vit la semaine par tranches de 6 h (besoin le plus pressant). Rejoue seul : `PROOF::PASS player-pie (125.4s)`, `PLAYER_PIE PASS checks=22 failed=0` (semaine : presence 0,0304, 7,0000 jours oisifs, seenBy 0, reputation 30,1).
+
 ## STOP
 
 - Parole dirigee, pawn et rendu propres au joueur, menu de debut : NOT_IMPLEMENTED.

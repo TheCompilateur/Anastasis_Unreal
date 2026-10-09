@@ -6,9 +6,12 @@ attendant le temps SIMULE (jamais l'horloge murale) :
     1. anastasis.Sim.TimeScale 1 ; Anastasis.Player.Arrive      un habitant arrive et est incarne
     2. 3 s simulees : il attend (but idle), immobile ; le pawn est pose sur lui
     3. Anastasis.Player.Move 1 0, 2 s simulees : il marche vers +X, le pawn le suit ; Move 0 0
-    3b. Anastasis.Player.Goal build (pas de chantier) : refuse `hors-table`, il attend, l'intention reste
+    3b. Anastasis.Player.Goal craft (but non porte) : refuse `hors-table`, il attend, l'intention reste
+        (`build` n'est plus un refus : la simulation ouvre un chantier des le debut, opening-in-sim-001)
     3c. Anastasis.Player.Goal drink : il marche au puits et boit (<= 60 s simulees) ; Goal none
-    4. Anastasis.Sim.Advance 7d : une semaine sautee -> presence ~3 %, 7 jours oisifs, plus personne ne le voit
+    4. une semaine sautee par tranches de 6 h (Anastasis.Sim.Advance 6h, il boit, mange ou dort entre deux : un
+       joueur qui ne fait rien pendant sept jours meurt, la mortalite existe) -> presence ~3 %, 7 jours oisifs,
+       plus personne ne le voit
     5. Anastasis.Sim.Advance 1d : un minuit de plus -> reputation sous 50
     6. Anastasis.Player.Release : observateur, le pawn retrouve sa marche
 
@@ -70,6 +73,23 @@ def status(world, label):
     s = json.loads(raw) if raw else {}
     samples[label] = s
     return s
+
+
+def live_week(world):
+    """Sept jours en tranches de six heures : le besoin le plus pressant (boire, manger, dormir) sinon rien. Le temps
+    saute compte comme oisif quoi qu'il fasse (TIME_WARP_001) ; mais il doit rester en vie pour qu'on le mesure."""
+    for _ in range(28):
+        s = json.loads(DBG.get_player_status(world) or '{}')
+        goal, worst = 'none', 40.0
+        if s.get('thirst', 0) >= worst:
+            goal, worst = 'drink', s.get('thirst', 0)
+        if s.get('hunger', 0) >= worst:
+            goal, worst = 'eat', s.get('hunger', 0)
+        if 100.0 - s.get('energy', 100.0) >= max(worst, 70.0):
+            goal = 'rest'
+        unreal.SystemLibrary.execute_console_command(world, 'Anastasis.Player.Goal ' + goal)
+        unreal.SystemLibrary.execute_console_command(world, 'Anastasis.Sim.Advance 6h')
+    unreal.SystemLibrary.execute_console_command(world, 'Anastasis.Player.Goal none')
 
 
 def pawn_gap(world, s):
@@ -154,15 +174,15 @@ def _tick():
         gap = pawn_gap(world, s)
         check('pawn follows the body', gap < 5.0, 'gap=%.1f uu' % gap)
         cmd(world, 'Anastasis.Player.Move 0 0')
-        # player-goals-001 : la main du joueur. Batir sans chantier ouvert : refuse, et il attend.
-        cmd(world, 'Anastasis.Player.Goal build')
+        # player-goals-001 : la main du joueur. Un but que ce portage ne sait pas faire : refuse, et il attend.
+        cmd(world, 'Anastasis.Player.Goal craft')
         mark = t
         step = 31
     elif step == 31 and t - mark > 2.0:
         s = status(world, 'goal_refused')
-        check('build without a site: refused hors-table', s.get('refusal') == 'hors-table', s.get('refusal'))
+        check('an unported goal (craft): refused hors-table', s.get('refusal') == 'hors-table', s.get('refusal'))
         check('refused: he waits, Nous does not pick', s.get('goal') == 'idle', s.get('goal'))
-        check('refused: the intention is kept', s.get('choice') == 'build' and s.get('yields', 0) >= 1, '%s yields=%s' % (s.get('choice'), s.get('yields')))
+        check('refused: the intention is kept', s.get('choice') == 'craft' and s.get('yields', 0) >= 1, '%s yields=%s' % (s.get('choice'), s.get('yields')))
         check('the player reads a table of goals', 'drink' in s.get('options', []), ','.join(s.get('options', [])))
         samples['drinks_before'] = s.get('drinks', 0)
         cmd(world, 'Anastasis.Player.Goal drink')
@@ -175,8 +195,7 @@ def _tick():
             check('drink chosen: he walks to the well and drinks', s.get('drinks', 0) > samples['drinks_before'],
                   'drinks %s -> %s in %.1f s sim' % (samples['drinks_before'], s.get('drinks'), t - mark))
             check('drink chosen: the intention held', s.get('choice') == 'drink' and s.get('holds', 0) >= 1, 'holds=%s' % s.get('holds'))
-            cmd(world, 'Anastasis.Player.Goal none')
-            cmd(world, 'Anastasis.Sim.Advance 7d')
+            live_week(world)
             step = 4
     elif step == 4:
         s = status(world, 'week_skipped')
