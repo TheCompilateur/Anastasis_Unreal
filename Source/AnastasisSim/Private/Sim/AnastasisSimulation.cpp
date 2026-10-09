@@ -123,8 +123,26 @@ int32 FAnastasisSimulation::AdmitGeoMigration()
 	{
 		const AnastasisGeo::FMigrationBatch& Batch = Geo.GetMigrationBatches()[BatchIndex];
 		const double Angle = GeoArrivalAngleStep * static_cast<double>(BatchIndex);
+		// ecart n°49 : ce qu'ils fuient (le recit du choc, a defaut son nom) et d'ou ils viennent.
+		FString Cause;
+		if (const AnastasisGeo::FShockDef* Shock = Geo.GetShocks().FindByPredicate([&Batch](const AnastasisGeo::FShockDef& S) { return S.Id == Batch.CauseId; }))
+		{
+			Cause = Shock->Telling.IsEmpty() ? Shock->Label : Shock->Telling;
+		}
+		FString Origin = Batch.OriginNode;
+		if (const AnastasisGeo::FNode* Node = Geo.GetScenario().FindNode(Batch.OriginNode))
+		{
+			// « Paipert (Bayburt), ville caravaniere » -> « Paipert » : le nom que l'on dit.
+			Origin = Node->Label;
+			for (const TCHAR* Cut : { TEXT(" ("), TEXT(" :"), TEXT(",") })
+			{
+				const int32 At = Origin.Find(Cut);
+				if (At > 0) Origin.LeftInline(At);
+			}
+			Origin.RemoveFromStart(TEXT("Bandon de "));
+		}
 		const TArray<FString> Ids = Village.IsBound()
-			? Village.AdmitExternalArrivals(Batch.Persons, GeoArrivalRadius, Angle)
+			? Village.AdmitExternalArrivals(Batch.Persons, GeoArrivalRadius, Angle, Cause, Origin, Day)
 			: TArray<FString>();
 		Created += Ids.Num();
 		Geo.RecordAdmission(BatchIndex, Ids);
@@ -465,6 +483,8 @@ void FAnastasisSimulation::RunDayJob(int32 Job)
 		// `runLifeRelationsPhase` -> `applyEpisodeFeelings` : le souvenir a le dernier mot (ecart n°47 : ni
 		// rencontres ni frictions avant lui).
 		Village.ApplyEpisodeFeelingsDaily();
+		// ecart n°49 (EXTENSION) : les arrivants de la veille passent au conseil des chefs de famille.
+		Village.UpdateArrivalCouncilDaily(Geo.IsLoaded() ? Geo.GetVillageExposure().Pressure[static_cast<int32>(AnastasisGeo::EPressure::Insecurity)] : 0.0, Day);
 		// ecart n°48 (EXTENSION) : les familles sans maison decident de batir, et vont demander de l'aide.
 		Village.UpdateFamilyHousesDaily();
 	}

@@ -1,4 +1,5 @@
 #include "Sim/AnastasisSimulationSubsystem.h"
+#include "Sim/AnastasisArrivals.h"
 #include "Sim/AnastasisBuildingCapacity.h"
 
 #include "Anastasis_UnrealV2.h"
@@ -267,6 +268,7 @@ FString UAnastasisSimulationSubsystem::SeedStartVillage(int32 NpcCount, int32 Ti
 		if (Scenario) TellFounding(*Scenario);
 		// valmire-grows-001 (ecart n°50) : le village du jeu grandit de lui-meme.
 		Simulation.GetVillage().SetGrowthEnabled(CVarVillageGrowth.GetValueOnGameThread() != 0);
+		if (Scenario) OpenValmireToTheWorld();
 	}
 	return WellId;
 }
@@ -1602,6 +1604,12 @@ FString UAnastasisSimulationDebugLibrary::GetNotebookText(const UObject* WorldCo
 {
 	const UAnastasisSimulationSubsystem* Host = DebugHost(WorldContextObject);
 	return Host ? Host->GetNotebook().Render() : FString();
+}
+
+FString UAnastasisSimulationDebugLibrary::GetArrivalsStatus(const UObject* WorldContextObject)
+{
+	const UAnastasisSimulationSubsystem* Host = DebugHost(WorldContextObject);
+	return Host ? AnastasisArrivals::StatusJson(Host->GetSimulation()) : FString();
 }
 
 FString UAnastasisSimulationDebugLibrary::GetNotebookStatus(const UObject* WorldContextObject)

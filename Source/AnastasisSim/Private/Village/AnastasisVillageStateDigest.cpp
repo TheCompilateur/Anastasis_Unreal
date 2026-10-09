@@ -62,6 +62,10 @@ namespace AnastasisVillage
 		void VisitState(FStateArchive& Ar, FVillage::FDeath& V);
 		void VisitState(FStateArchive& Ar, FVillage::FFamily& V);
 		void VisitState(FStateArchive& Ar, FVillage::FHelpAnswer& V);
+		void VisitState(FStateArchive& Ar, FVillage::FArrivalMember& V);
+		void VisitState(FStateArchive& Ar, FVillage::FArrivalGroup& V);
+		void VisitState(FStateArchive& Ar, FVillage::FWelcomeVote& V);
+		void VisitState(FStateArchive& Ar, FVillage::FCouncil& V);
 		void VisitState(FStateArchive& Ar, AnastasisEpisodes::FEpisode& V);
 		void VisitState(FStateArchive& Ar, AnastasisEpisodes::FChronicle& V);
 		void VisitState(FStateArchive& Ar, AnastasisWeatherBehavior::FSimWeather& V);
@@ -972,6 +976,56 @@ namespace AnastasisVillage
 			Ar.Key(TEXT("dependents"));
 			VisitStrings(Ar, V.Dependents);
 			Ar.Key(TEXT("homeId")).String(V.HomeId);
+			// ecart n°49 : un groupe d'arrivants en attente, ou reparti.
+			Ar.Key(TEXT("guest")).Bool(V.bGuest);
+			Ar.Key(TEXT("left")).Bool(V.bLeft);
+			Ar.Key(TEXT("arrivedDay")).Number(V.ArrivedDay);
+			Ar.Key(TEXT("cause")).String(V.Cause);
+			Ar.Key(TEXT("origin")).String(V.Origin);
+			Ar.EndObject();
+		}
+
+		// ecart n°49 : les arrivants que l'hote tient prets, et le conseil du soir.
+		void VisitState(FStateArchive& Ar, FVillage::FArrivalMember& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("name")).String(V.Name);
+			Ar.Key(TEXT("gender")).String(V.Gender);
+			Ar.Key(TEXT("age")).Number(V.Age);
+			Ar.Key(TEXT("kinRole")).String(V.KinRole);
+			Ar.Key(TEXT("adult")).Bool(V.bAdult);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FVillage::FArrivalGroup& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("familyName")).String(V.FamilyName);
+			Ar.Key(TEXT("members"));
+			VisitStates(Ar, V.Members);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FVillage::FWelcomeVote& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("voterId")).String(V.VoterId);
+			Ar.Key(TEXT("yes")).Bool(V.bYes);
+			Ar.Key(TEXT("reason")).String(V.Reason);
+			Ar.Key(TEXT("score")).Number(V.Score);
+			Ar.Key(TEXT("terms")).String(V.Terms);
+			Ar.EndObject();
+		}
+
+		void VisitState(FStateArchive& Ar, FVillage::FCouncil& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("day")).Number(V.Day);
+			Ar.Key(TEXT("familyId")).String(V.FamilyId);
+			Ar.Key(TEXT("cause")).String(V.Cause);
+			Ar.Key(TEXT("votes"));
+			VisitStates(Ar, V.Votes);
+			Ar.Key(TEXT("accepted")).Bool(V.bAccepted);
 			Ar.EndObject();
 		}
 
@@ -1176,6 +1230,11 @@ namespace AnastasisVillage
 		VisitStates(Ar, Families);
 		Ar.Key(TEXT("helpLog"));
 		VisitStates(Ar, HelpLog);
+		Ar.Key(TEXT("arrivalPool"));
+		VisitStates(Ar, ArrivalPool);
+		Ar.Key(TEXT("nextArrivalGroup")).Number(NextArrivalGroup);
+		Ar.Key(TEXT("councilLog"));
+		VisitStates(Ar, CouncilLog);
 		Ar.Key(TEXT("nextFamilyId")).Number(NextFamilyId);
 		Ar.Key(TEXT("nextNpcId")).Number(NextNpcId);
 		Ar.Key(TEXT("now")).Number(Now);

@@ -15,6 +15,7 @@
 //   Anastasis.Geo.Save <nom> / Anastasis.Geo.Restore <nom>   etat vivant dans Saved/GeoState/<nom>.json
 
 #include "Sim/AnastasisSimulationSubsystem.h"
+#include "Sim/AnastasisArrivals.h"
 
 #include "Anastasis_UnrealV2.h"
 #include "Engine/World.h"
@@ -26,6 +27,13 @@ static TAutoConsoleVariable<FString> CVarGeoScenarioPath(
 	TEXT("anastasis.Geo.ScenarioPath"),
 	TEXT("Anastasis/Scenario/geo-pontos-1204.json"),
 	TEXT("geopolitical-world-001: scenario du monde exterieur lu par Anastasis.Geo.Load sans argument, relatif a Content/ (ou absolu)."),
+	ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarGeoAutoLoad(
+	TEXT("anastasis.Geo.AutoLoad"),
+	1,
+	TEXT("arrivants-001 (ecart n°49) : 1 = quand les fondateurs de Valmire sont poses, le monde exterieur (anastasis.Geo.ScenarioPath) "
+		"se charge avec eux, et ses groupes d'arrivants passent au conseil du soir. 0 = le village reste ferme, comme avant."),
 	ECVF_Default);
 
 namespace
@@ -89,6 +97,43 @@ bool UAnastasisSimulationSubsystem::ReadGeoScenarioFile(const FString& Path, Ana
 	return ReadScenario(ResolveScenarioPath(Path), Out);
 }
 
+bool UAnastasisSimulationSubsystem::LoadGeoScenario(const FString& Given)
+{
+	// Le chemin tel que donne (relatif a Content/ par defaut) : c'est lui que retient une sauvegarde,
+	// pour se recharger depuis n'importe quelle copie du jeu.
+	const FString Kept = Given.IsEmpty() ? CVarGeoScenarioPath.GetValueOnGameThread() : Given;
+	const FString Path = ResolveScenarioPath(Kept);
+	AnastasisGeo::FScenario Scenario;
+	if (!ReadScenario(Path, Scenario))
+	{
+		return false;
+	}
+	TArray<FString> Errors;
+	if (!Simulation.GetGeo().Load(Scenario, Simulation.GetDay(), Errors))
+	{
+		for (const FString& E : Errors)
+		{
+			UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_GEO load refused: %s"), *E);
+		}
+		return false;
+	}
+	NoteGeoScenarioPath(Kept);
+	Simulation.AdmitGeoMigration();
+	LogGeoEvents();
+	UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_GEO loaded %s from %s at day %d"), *Scenario.Id, *Path, Simulation.GetDay());
+	return true;
+}
+
+void UAnastasisSimulationSubsystem::OpenValmireToTheWorld()
+{
+	// ecart n°49 : les noms des groupes qui viendront, puis le monde d'ou ils viendront.
+	Simulation.GetVillage().SetArrivalPool(AnastasisArrivals::DefaultPool());
+	if (CVarGeoAutoLoad.GetValueOnGameThread() != 0 && !Simulation.GetGeo().IsLoaded())
+	{
+		LoadGeoScenario(FString());
+	}
+}
+
 void UAnastasisSimulationSubsystem::LogGeoEvents()
 {
 	for (const FString& Line : Simulation.GetGeo().DrainEvents())
@@ -108,29 +153,7 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisGeoLoad(
 		{
 			return;
 		}
-		// Le chemin tel que donne (relatif a Content/ par defaut) : c'est lui que retient une sauvegarde,
-		// pour se recharger depuis n'importe quelle copie du jeu.
-		const FString Given = Args.IsValidIndex(0) ? Args[0] : CVarGeoScenarioPath.GetValueOnGameThread();
-		const FString Path = ResolveScenarioPath(Given);
-		AnastasisGeo::FScenario Scenario;
-		if (!ReadScenario(Path, Scenario))
-		{
-			return;
-		}
-		FAnastasisSimulation& Sim = Host->GetSimulation();
-		TArray<FString> Errors;
-		if (!Sim.GetGeo().Load(Scenario, Sim.GetDay(), Errors))
-		{
-			for (const FString& E : Errors)
-			{
-				UE_LOG(LogAnastasis_UnrealV2, Error, TEXT("ANASTASIS_GEO load refused: %s"), *E);
-			}
-			return;
-		}
-		Host->NoteGeoScenarioPath(Given);
-		Sim.AdmitGeoMigration();
-		Host->LogGeoEvents();
-		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_GEO loaded %s from %s at day %d"), *Scenario.Id, *Path, Sim.GetDay());
+		Host->LoadGeoScenario(Args.IsValidIndex(0) ? Args[0] : FString());
 	}));
 
 static FAutoConsoleCommandWithWorld CmdAnastasisGeoUnload(

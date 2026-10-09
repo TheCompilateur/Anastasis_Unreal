@@ -108,10 +108,29 @@
       "provenance": { "source": "BRY75", "ref": "HP-001 §3, §6", "status": "PLAUSIBLE", "confidence": 0.4, "note": "Pression systematique attestee surtout apres 1277 : en 1204, leger anachronisme assume comme possibilite." } }
   ],
   "shocks": [
-    { "id": "fall-of-constantinople-1204", "label": "Constantinople prise par les Latins", "source": "constantinople", "actor": "latin-empire",
+    { "id": "fall-of-constantinople-1204", "label": "Constantinople prise par les Latins", "recit": "la prise de la Ville par les Latins",
+      "source": "constantinople", "actor": "latin-empire",
       "startDay": 1, "durationDays": 30,
       "emissions": { "TradeDisruption": 0.5, "Migration": 0.4 }, "information": 1,
       "tags": ["1204", "chute-de-la-ville", "latins"],
-      "provenance": { "source": "VRY71", "ref": "p. 130-131", "status": "VERIFIED", "confidence": 0.9, "note": "L'evenement est VERIFIED ; ses intensites et la fuite de gens jusqu'au Pont sont PLAUSIBLE, non sourcees." } }
+      "provenance": { "source": "VRY71", "ref": "p. 130-131", "status": "VERIFIED", "confidence": 0.9, "note": "L'evenement est VERIFIED ; ses intensites et la fuite de gens jusqu'au Pont sont PLAUSIBLE, non sourcees." } },
+    { "id": "paipert-hamlets-raid-1204", "label": "Un seigneur des marches pille les hameaux hauts de Paipert", "recit": "le pillage des hameaux hauts de Paipert",
+      "source": "paipert", "actor": "marcher-lords",
+      "startDay": 4, "durationDays": 5,
+      "emissions": { "Insecurity": 0.6, "Migration": 0.6 }, "information": 0.8,
+      "tags": ["1204", "raid", "marches", "captifs"],
+      "provenance": { "source": "BW85", "ref": "p. 301-303 ; BRY75", "status": "PLAUSIBLE", "confidence": 0.5, "note": "arrivants-001 : les dynastes des marches de Chaldie qui vivent du pillage de leurs voisins sont attestes (Clavijo, 1404) ; ce raid du printemps 1204, ses intensites et la fuite jusqu'au village sont une hypothese de conception. Le raid enleve des gens, il ne rase pas (HP-001 §5)." } },
+    { "id": "cheriana-pastures-1204", "label": "Les paturages d'ete disputes : des bergers chasses des hauts de Cheriana", "recit": "la dispute des hauts pâturages de Cheriana",
+      "source": "cheriana",
+      "startDay": 2, "durationDays": 4,
+      "emissions": { "Insecurity": 0.3, "Migration": 0.7 }, "information": 0.5,
+      "tags": ["1204", "paturages", "mai", "bergers"],
+      "provenance": { "source": "BW85", "ref": "p. 251, 165, 172-173 ; BRY75 p. 139", "status": "PLAUSIBLE", "confidence": 0.5, "note": "arrivants-001 : les paturages sont « annually disputed in May » et des bergers disparaissent ; Cheriana est le district que l'empereur ne protege pas. Le choc de ce jour et ses intensites sont une hypothese de conception." } },
+    { "id": "trebizond-levy-1204", "label": "Les Grands Comnenes levent des hommes a Trebizonde", "recit": "la levée d'hommes de Trébizonde",
+      "source": "trebizond", "actor": "grand-komnenoi",
+      "startDay": 40, "durationDays": 6,
+      "emissions": { "Military": 0.4, "Migration": 0.5 }, "information": 0.6,
+      "tags": ["1204", "levee", "komnenoi"],
+      "provenance": { "source": "VRY71", "ref": "p. 130-131", "status": "PLAUSIBLE", "confidence": 0.4, "note": "arrivants-001 : les Comnenes s'etablissent a Trebizonde en 1204 et doivent conquerir leur part par les armes ; une levee d'hommes est plausible, la fuite de familles devant elle jusqu'au village est une hypothese de conception, non sourcee." } }
   ]
 }

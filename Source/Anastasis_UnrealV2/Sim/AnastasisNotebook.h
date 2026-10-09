@@ -62,5 +62,7 @@ namespace AnastasisNotebook
 		TMap<FString, TSet<FString>> Seen;
 		TArray<FNote> Notes;
 		FString PlayerId;
+		/** ecart n°49 : les conseils deja lus ; le joueur entend ceux auxquels il assiste (vivant, au village). */
+		int32 CouncilSeen = 0;
 	};
 }

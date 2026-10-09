@@ -1,5 +1,6 @@
 #include "Sim/AnastasisNotebook.h"
 
+#include "Sim/AnastasisArrivals.h"
 #include "Sim/AnastasisDialogueLines.h"
 #include "Sim/AnastasisSimulation.h"
 #include "Sim/AnastasisVillageChronicle.h"
@@ -29,6 +30,7 @@ namespace AnastasisNotebook
 		Seen.Reset();
 		Notes.Reset();
 		PlayerId.Reset();
+		CouncilSeen = 0;
 	}
 
 	void FPlayerNotebook::Observe(const FAnastasisSimulation& Sim, const AnastasisDialogue::FLibrary& Lines, TFunctionRef<FString(const FString&)> NameOf)
@@ -72,6 +74,26 @@ namespace AnastasisNotebook
 				Note.Text = Capitalize(Lines.TellerVersion(Event, Origin));
 			}
 		}
+		// ecart n°49 : le conseil du soir se tient au feu, devant tout le village ; le joueur l'entend s'il est la.
+		const TArray<AnastasisVillage::FVillage::FCouncil>& Councils = Village.GetCouncilLog();
+		for (; CouncilSeen < Councils.Num(); ++CouncilSeen)
+		{
+			if (!Me) continue;
+			const AnastasisVillage::FVillage::FCouncil& Council = Councils[CouncilSeen];
+			for (const AnastasisVillage::FVillage::FWelcomeVote& Vote : Council.Votes)
+			{
+				FNote& Note = Notes.AddDefaulted_GetRef();
+				Note.Day = Day;
+				Note.Hour = Hour;
+				Note.TellerId = Vote.VoterId;
+				Note.TellerName = NameOf(Vote.VoterId);
+				Note.ListenerName = TEXT("au conseil");
+				Note.RootId = FString::Printf(TEXT("conseil-%s"), *Council.FamilyId);
+				Note.Kind = TEXT("conseil");
+				const FString Said = AnastasisArrivals::VoteLine(Lines, Sim.GetSeed(), Vote, Council.Cause, CouncilSeen);
+				Note.Text = FString::Printf(TEXT("%s.%s"), Vote.bYes ? TEXT("Oui") : TEXT("Non"), Said.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" %s"), *Said));
+			}
+		}
 	}
 
 	FString FPlayerNotebook::Render() const
@@ -105,7 +127,7 @@ namespace AnastasisNotebook
 				if (Note.TellerId != TellerId) continue;
 				Out += FString::Printf(TEXT("  Jour %d, %s, %s : « %s »%s\n"), Note.Day,
 					*AnastasisChronicle::HourLabel(Note.Hour),
-					Note.bToMe ? TEXT("à moi") : *FString::Printf(TEXT("à %s"), *Note.ListenerName),
+					Note.bToMe ? TEXT("à moi") : (Note.Kind == TEXT("conseil") ? TEXT("au conseil") : *FString::Printf(TEXT("à %s"), *Note.ListenerName)),
 					*Note.Text, Note.bLegend ? TEXT(" (une légende : plus personne ne l'a vécue)") : TEXT(""));
 			}
 		}
@@ -114,7 +136,8 @@ namespace AnastasisNotebook
 		TArray<FString> Roots;
 		for (const FNote& Note : Notes)
 		{
-			if (!Roots.Contains(Note.RootId)) Roots.Add(Note.RootId);
+			// Une voix au conseil n'est pas une histoire qui court.
+			if (Note.Kind != TEXT("conseil") && !Roots.Contains(Note.RootId)) Roots.Add(Note.RootId);
 		}
 		Out += TEXT("\nLES HISTOIRES, VERSION PAR VERSION\n");
 		for (const FString& Root : Roots)

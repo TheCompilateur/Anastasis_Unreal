@@ -6676,11 +6676,14 @@ namespace AnastasisVillage
 		bool bRooflessWaiting = false;
 		for (const FFamily& Family : Families)
 		{
+			// ecart n°49 : un groupe en attente du conseil, ou reparti, ne batit pas.
+			if (Family.bGuest || Family.bLeft) continue;
 			bool bAll = false;
 			if (RoofsOf(Family, bAll) == 0 && !bAll && !OwnSiteOf(Family) && ChefOf(Family)) bRooflessWaiting = true;
 		}
 		for (FFamily& Family : Families)
 		{
+			if (Family.bGuest || Family.bLeft) continue;
 			FNpc* Chef = ChefOf(Family);
 			if (!Chef) continue;
 			bool bHoused = false;
@@ -6744,6 +6747,8 @@ namespace AnastasisVillage
 			for (const FNpc& Other : Actors.GetItems())
 			{
 				if (Other.Id == Chef->Id || Other.FamilyId == Family.Id || Other.Id == PlayerPersonId) continue;
+				// ecart n°49 : on ne demande pas ses bras a qui attend encore de savoir s'il reste.
+				if (const FFamily* OtherFamily = Other.FamilyId.IsEmpty() ? nullptr : FindFamily(Other.FamilyId); OtherFamily && OtherFamily->bGuest) continue;
 				if (Other.Age > 0.0 && Other.Age < 16.0) continue;
 				if (Own->AskedIds.Contains(Other.Id)) continue;
 				Candidates.Add(&Other);

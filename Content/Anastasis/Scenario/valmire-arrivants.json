@@ -1,0 +1,72 @@
+{
+  "_doc": "arrivants-001 (ecart n°49) : les groupes qui arrivent a Valmire par la route, dans l'ordre ou ils arrivent. Le monde exterieur (geo-pontos-1204.json) dit quand, combien et ce qu'ils fuient ; ce fichier dit qui ils sont. Un groupe de N personnes prend les N premiers membres (le premier parle pour les siens). Lu par l'hote au premier soir (AnastasisArrivals).",
+  "historicite": "Prenoms grecs byzantins courants (Theophilos, Lazaros, Xene, Petros, Kalliope) et une famille armenienne : des Armeniens vivent dans le Pont et en Chaldie aux XIe-XIIIe s. (PLAUSIBLE, HP-001 ne les etudie pas). Les liens et les ages sont des choix de conception (ABSTRACTION).",
+  "groupes": [
+    {
+      "nom": "la famille de Theophilos",
+      "membres": [
+        { "prenom": "Theophilos", "sexe": "M", "age": 46, "lien": "chef" },
+        { "prenom": "Anna", "sexe": "F", "age": 40, "lien": "epouse" },
+        { "prenom": "Ioannikios", "sexe": "M", "age": 17, "lien": "fils" },
+        { "prenom": "Kyranna", "sexe": "F", "age": 8, "lien": "fille" },
+        { "prenom": "Stephanos", "sexe": "M", "age": 71, "lien": "pere" },
+        { "prenom": "Eirene", "sexe": "F", "age": 5, "lien": "fille" }
+      ]
+    },
+    {
+      "nom": "les bergers de Lazaros",
+      "membres": [
+        { "prenom": "Lazaros", "sexe": "M", "age": 33, "lien": "chef" },
+        { "prenom": "Gregorios", "sexe": "M", "age": 29, "lien": "frere" },
+        { "prenom": "Photeine", "sexe": "F", "age": 27, "lien": "epouse" },
+        { "prenom": "Demetrios", "sexe": "M", "age": 14, "lien": "neveu" },
+        { "prenom": "Akakios", "sexe": "M", "age": 22, "lien": "compagnon" },
+        { "prenom": "Sophia", "sexe": "F", "age": 3, "lien": "fille" }
+      ]
+    },
+    {
+      "nom": "la veuve Xene et les siens",
+      "membres": [
+        { "prenom": "Xene", "sexe": "F", "age": 52, "lien": "chef" },
+        { "prenom": "Kosmas", "sexe": "M", "age": 24, "lien": "fils" },
+        { "prenom": "Agathe", "sexe": "F", "age": 19, "lien": "belle-fille" },
+        { "prenom": "Nikon", "sexe": "M", "age": 3, "lien": "petit-fils" },
+        { "prenom": "Damianos", "sexe": "M", "age": 30, "lien": "fils" },
+        { "prenom": "Theodote", "sexe": "F", "age": 11, "lien": "fille" }
+      ]
+    },
+    {
+      "nom": "la maison d'Hovhannes",
+      "membres": [
+        { "prenom": "Hovhannes", "sexe": "M", "age": 38, "lien": "chef" },
+        { "prenom": "Mariam", "sexe": "F", "age": 34, "lien": "epouse" },
+        { "prenom": "Smbat", "sexe": "M", "age": 12, "lien": "fils" },
+        { "prenom": "Anahit", "sexe": "F", "age": 6, "lien": "fille" },
+        { "prenom": "Vardan", "sexe": "M", "age": 41, "lien": "frere" },
+        { "prenom": "Shushan", "sexe": "F", "age": 63, "lien": "mere" }
+      ]
+    },
+    {
+      "nom": "le diacre Petros et sa soeur",
+      "membres": [
+        { "prenom": "Petros", "sexe": "M", "age": 30, "lien": "chef" },
+        { "prenom": "Thekla", "sexe": "F", "age": 26, "lien": "soeur" },
+        { "prenom": "Markos", "sexe": "M", "age": 19, "lien": "compagnon" },
+        { "prenom": "Pelagia", "sexe": "F", "age": 45, "lien": "tante" },
+        { "prenom": "Loukas", "sexe": "M", "age": 9, "lien": "neveu" },
+        { "prenom": "Maximos", "sexe": "M", "age": 50, "lien": "oncle" }
+      ]
+    },
+    {
+      "nom": "les gens de Kalliope",
+      "membres": [
+        { "prenom": "Kalliope", "sexe": "F", "age": 44, "lien": "chef" },
+        { "prenom": "Manuel", "sexe": "M", "age": 20, "lien": "fils" },
+        { "prenom": "Euthymia", "sexe": "F", "age": 15, "lien": "fille" },
+        { "prenom": "Philippos", "sexe": "M", "age": 47, "lien": "beau-frere" },
+        { "prenom": "Zenobia", "sexe": "F", "age": 39, "lien": "belle-soeur" },
+        { "prenom": "Christophoros", "sexe": "M", "age": 7, "lien": "neveu" }
+      ]
+    }
+  ]
+}

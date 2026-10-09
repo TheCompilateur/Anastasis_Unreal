@@ -191,6 +191,7 @@ namespace AnastasisGeo
 		{
 			Out.Id = R.Str(S, TEXT("id"), Where, true);
 			Out.Label = R.Str(S, TEXT("label"), Where, false, Out.Id);
+			Out.Telling = R.Str(S, TEXT("recit"), Where, false);
 			Out.SourceNode = R.Str(S, TEXT("source"), Where, true);
 			Out.ActorId = R.Str(S, TEXT("actor"), Where, false);
 			Out.ParentCauseId = R.Str(S, TEXT("parent"), Where, false);
@@ -250,6 +251,7 @@ namespace AnastasisGeo
 			FValue O = FValue::MakeObject();
 			O.Set(TEXT("id"), Str(S.Id));
 			O.Set(TEXT("label"), Str(S.Label));
+			if (!S.Telling.IsEmpty()) O.Set(TEXT("recit"), Str(S.Telling));
 			O.Set(TEXT("source"), Str(S.SourceNode));
 			O.Set(TEXT("actor"), Str(S.ActorId));
 			O.Set(TEXT("parent"), Str(S.ParentCauseId));

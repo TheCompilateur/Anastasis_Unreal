@@ -305,6 +305,98 @@
       "J'ai déjà un chantier sur les bras.",
       "Les pierres m'attendent ailleurs.",
       "Pas avant d'avoir fini là où je suis."
+    ],
+    "accueil.demande": [
+      "Nous avons fui {cause}. Nous ne demandons qu'un coin de terre et de l'eau.",
+      "Laissez-nous rester. Nous travaillerons comme vous.",
+      "Nous n'avons plus rien, que nos bras. Ils sont à vous, si vous nous gardez.",
+      "On nous a dit qu'ici, on ne fermait pas la porte."
+    ],
+    "accueil.moine": [
+      "Je ne décide pas. Mais souvenez-vous de la route qui vous a menés ici.",
+      "L'étranger qui frappe à la porte, c'est parfois le Christ qui frappe.",
+      "Le grain se compte ; la charité, non. Décidez, et vivez avec.",
+      "J'ai vu tomber la Ville. Ceux-là ont vu tomber autre chose. Écoutez-les."
+    ],
+    "accueil.oui.nous_aussi": [
+      "Nous aussi, nous sommes arrivés sans rien.",
+      "Il n'y a pas si longtemps, c'était nous, sur la route.",
+      "Qui a fui sa maison ne ferme pas la sienne."
+    ],
+    "accueil.oui.remords": [
+      "La dernière fois, nous les avons laissés repartir. Pas deux fois.",
+      "Je pense encore à ceux qu'on a renvoyés. Qu'ils restent, ceux-là.",
+      "J'ai dit non une fois. Je ne le dirai plus."
+    ],
+    "accueil.oui.leur_histoire": [
+      "J'ai entendu ce qu'ils ont vécu. Qu'ils restent.",
+      "Il m'a raconté sa route. On ne renvoie pas un homme qui a vu ça.",
+      "Après ce qu'ils ont traversé, je ne dirai pas non."
+    ],
+    "accueil.oui.bras": [
+      "Des bras de plus pour les champs. Qu'ils restent.",
+      "Il nous manque des mains, pas de la terre.",
+      "Le village a besoin de monde. Oui."
+    ],
+    "accueil.oui.grenier_plein": [
+      "Le grenier est plein. Il y a de quoi.",
+      "Nous avons de quoi les nourrir jusqu'à la moisson.",
+      "Il y a du grain. Qu'ils mangent."
+    ],
+    "accueil.non.grenier": [
+      "Le grenier ne nourrira pas tout le monde.",
+      "Une bouche de plus, et ce sont nos enfants qui jeûneront.",
+      "Nous comptons déjà chaque mesure d'orge. Non."
+    ],
+    "accueil.non.peur": [
+      "Avec ce qui se passe sur les routes, qui sait qui ils sont ?",
+      "On ne sait pas qui ils amènent derrière eux.",
+      "Les raids ne sont pas loin. Je ne veux pas d'inconnus au feu."
+    ],
+    "accueil.non.nombre": [
+      "Ils sont trop nombreux.",
+      "Un ou deux, peut-être. Pas tant de monde.",
+      "Autant de bouches d'un coup, c'est trop."
+    ],
+    "accueil.non.toits": [
+      "Nos propres familles dorment encore dehors.",
+      "Levons d'abord nos toits. Ensuite, on verra.",
+      "Nous n'avons pas fini de nous loger nous-mêmes."
+    ],
+    "accueil.non.inconnu": [
+      "Je ne les connais pas.",
+      "Personne ici ne sait d'où ils viennent vraiment.",
+      "Des étrangers. Je dis non."
+    ],
+    "episodes.EPISODE_LINES.fled.firsthand": [
+      "nous avons fui {note}",
+      "j'ai tout laissé derrière moi : {note}",
+      "je pense encore, la nuit, à {note}"
+    ],
+    "episodes.EPISODE_LINES.fled.legend": [
+      "on raconte que la route amène des gens qui ont tout perdu",
+      "on dit que des familles entières ont fui les hameaux d'en haut",
+      "les anciens parlent d'une année où les routes étaient pleines de fuyards"
+    ],
+    "episodes.EPISODE_LINES.hosting.firsthand": [
+      "j'ai dit oui pour {who}, au conseil",
+      "on a ouvert la porte à {who} et aux siens",
+      "{who} et les siens sont restés parce que nous l'avons voulu"
+    ],
+    "episodes.EPISODE_LINES.hosting.legend": [
+      "on dit qu'à Valmire, on ne laisse personne sur la route",
+      "on raconte qu'un soir, le village a gardé des inconnus",
+      "les anciens disent que Valmire s'est faite d'étrangers"
+    ],
+    "episodes.EPISODE_LINES.hostingRefusal.firsthand": [
+      "j'ai dit non à {who}, au conseil",
+      "on a renvoyé {who} sur la route",
+      "je repense à {who}, qu'on a laissé repartir"
+    ],
+    "episodes.EPISODE_LINES.hostingRefusal.legend": [
+      "on dit qu'un soir, Valmire a fermé sa porte",
+      "on raconte des gens renvoyés sur la route, une nuit de conseil",
+      "les anciens n'aiment pas parler de ceux qu'on a laissés partir"
     ]
   }
 }

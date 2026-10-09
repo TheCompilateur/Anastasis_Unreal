@@ -199,6 +199,10 @@ public:
 
 	/** Lit et valide un scenario exterieur, chemin relatif a Content/ ou absolu (AnastasisSimulationGeo.cpp) ; journalise chaque erreur. */
 	static bool ReadGeoScenarioFile(const FString& Path, AnastasisGeo::FScenario& Out);
+	/** Charge le monde exterieur (chemin relatif a Content/ ; vide = anastasis.Geo.ScenarioPath). Faux si refuse, chaque erreur au log. */
+	bool LoadGeoScenario(const FString& Given);
+	/** arrivants-001 (ecart n°49) : Valmire fondee, les groupes qui viendront et le monde d'ou ils viennent (anastasis.Geo.AutoLoad). */
+	void OpenValmireToTheWorld();
 
 private:
 	void DrawOverlay() const;
@@ -322,6 +326,10 @@ public:
 	/** memoire-decisions-001 : le carnet du joueur (texte complet), vide sans simulation. */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetNotebookText(const UObject* WorldContextObject);
+
+	/** arrivants-001 : les groupes venus par la route et chaque conseil du soir, en JSON (AnastasisArrivals::StatusJson). */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetArrivalsStatus(const UObject* WorldContextObject);
 
 	/** memoire-decisions-001 : resume JSON du carnet (choses entendues, histoires, conteurs, legendes). */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))

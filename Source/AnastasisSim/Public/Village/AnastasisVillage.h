@@ -1274,6 +1274,12 @@ namespace AnastasisVillage
 		 * crees (moins que `Count` si le sol libre manque, vide sans monde).
 		 */
 		TArray<FString> AdmitExternalArrivals(int32 Count, double Radius, double StartAngle);
+		/**
+		 * ecart n°49 (arrivants-001) : la meme arrivee, mais dans un village de familles. Le groupe recoit un nom et
+		 * des identites (`ArrivalPool`, dans l'ordre), devient une famille *en attente* (`FFamily::bGuest`), et chacun
+		 * de ses adultes se souvient de ce qu'il a fui (`fled`, `Cause`). Le conseil du soir decidera.
+		 */
+		TArray<FString> AdmitExternalArrivals(int32 Count, double Radius, double StartAngle, const FString& Cause, const FString& Origin, int32 OnDay);
 
 		/**
 		 * EXTENSION — ecart n°40 (opening-in-sim-001). Le village d'ouverture du jeu Unreal, une fois le puits
@@ -1479,6 +1485,14 @@ namespace AnastasisVillage
 			TArray<FString> Adults;
 			TArray<FString> Dependents;
 			FString HomeId;
+			/** ecart n°49 : un groupe d'arrivants que le conseil n'a pas encore accueilli. */
+			bool bGuest = false;
+			/** ecart n°49 : refuse par le conseil, il a repris la route (le foyer reste, vide, pour la memoire). */
+			bool bLeft = false;
+			/** ecart n°49 : le jour de son arrivee, ce qu'il fuyait (« le raid sur les hameaux de Paipert ») et d'ou il venait. */
+			int32 ArrivedDay = 0;
+			FString Cause;
+			FString Origin;
 		};
 
 		/** Pose un foyer vide et rend son identifiant (`family-N`). */
@@ -1578,6 +1592,65 @@ namespace AnastasisVillage
 		static bool CanBuildAt(const FBuilding& Site, const FString& NpcId) { return Site.AllowedBuilders.IsEmpty() || Site.AllowedBuilders.Contains(NpcId); }
 
 		const TArray<FHelpAnswer>& GetHelpLog() const { return HelpLog; }
+
+		// --- Les arrivants et le conseil du soir (arrivants-001, ecart n°49) -----------------------------------
+
+		/** Une personne d'un groupe d'arrivants, telle que l'hote la decrit (`valmire-arrivants.json`). */
+		struct FArrivalMember
+		{
+			FString Name;
+			FString Gender;
+			double Age = 0.0;
+			FString KinRole;
+			bool bAdult = true;
+		};
+
+		/** Un groupe d'arrivants : son nom de foyer, et ses membres dans l'ordre (le chef d'abord). */
+		struct FArrivalGroup
+		{
+			FString FamilyName;
+			TArray<FArrivalMember> Members;
+		};
+
+		/** Les groupes que l'hote tient prets ; le N-ieme groupe arrive prend le N-ieme (puis des inconnus). */
+		void SetArrivalPool(const TArray<FArrivalGroup>& Pool) { ArrivalPool = Pool; }
+		const TArray<FArrivalGroup>& GetArrivalPool() const { return ArrivalPool; }
+
+		/** La voix d'un chef de famille au conseil : oui ou non, la raison dominante, et la somme. */
+		struct FWelcomeVote
+		{
+			FString VoterId;
+			bool bYes = false;
+			/** nous_aussi, remords, grenier_plein, bras ; grenier, peur, nombre, toits, inconnu. */
+			FString Reason;
+			double Score = 0.0;
+			/** Le detail de la somme, pour qui demande pourquoi : « nous_aussi=25 grenier=-20 inconnu=-10 ». */
+			FString Terms;
+		};
+
+		/** Un conseil : quel groupe, ce qu'il fuyait, les voix dans l'ordre des foyers, et le verdict. */
+		struct FCouncil
+		{
+			int32 Day = 0;
+			FString FamilyId;
+			FString Cause;
+			TArray<FWelcomeVote> Votes;
+			bool bAccepted = false;
+		};
+
+		/**
+		 * Phase « vie » de minuit, avant les maisons : chaque groupe arrive la veille passe au conseil. Chaque chef
+		 * de famille deja accueillie vote ; la majorite stricte accueille (egalite : non, on garde le grain). Accueilli,
+		 * le groupe devient une famille comme les autres, et batira. Refuse, il repart au matin : ceux qui le voient
+		 * partir s'en souviennent (`departure`), ceux qui ont dit non aussi (`hostingRefusal`), et ce remords pesera au
+		 * conseil suivant. `Insecurity` : l'insecurite que le village subit du monde exterieur (0 sans monde charge).
+		 */
+		void UpdateArrivalCouncilDaily(double Insecurity, int32 Today);
+		/** Une voix : la somme des raisons (Bible §29), la plus forte dans le sens du vote. */
+		FWelcomeVote EvaluateWelcome(const FNpc& Chief, const FFamily& Guests, double Insecurity) const;
+		const TArray<FCouncil>& GetCouncilLog() const { return CouncilLog; }
+		/** Les portions au grenier pour chaque bouche, nouveaux venus compris. */
+		double PortionsPerMouth(int32 ExtraMouths) const;
 
 		/** `episodeGoalBias(npc, goal)` : borne, nul sans souvenir. */
 		double EpisodeGoalBiasOf(const FNpc& Npc, const FString& Goal) const { return AnastasisEpisodes::GoalBias(Npc.Chronicle, Goal); }
@@ -2261,6 +2334,10 @@ namespace AnastasisVillage
 		TArray<FDeath> DeathLog;
 		/** ecart n°48 : toutes les demandes d'aide et leurs reponses, dans l'ordre. */
 		TArray<FHelpAnswer> HelpLog;
+		/** ecart n°49 : les groupes d'arrivants que l'hote tient prets, le prochain a donner, et chaque conseil. */
+		TArray<FArrivalGroup> ArrivalPool;
+		int32 NextArrivalGroup = 0;
+		TArray<FCouncil> CouncilLog;
 		/** ecart n°44 : les foyers poses par l'hote, et le compteur de leurs identifiants. */
 		TArray<FFamily> Families;
 		int32 NextFamilyId = 0;

@@ -1,0 +1,26 @@
+{
+  "mission": "arrivants-001",
+  "target_period": "1204-1225",
+  "setting": "arriere_pays_pontique_fictif",
+  "model_ids": ["PONT-HIS-02"],
+  "claim": "Au printemps 1204, des groupes arrivent dans la vallée fictive de Valmire en fuyant des chocs plausibles de l'arrière-pays (un dynaste des marches qui pille les hameaux hauts de Paipert, des bergers chassés des pâturages disputés de Cheriana en mai, la levée d'hommes des Comnènes à Trébizonde, la prise de la Ville) ; le village, sans seigneur, décide de les garder ou non au conseil des chefs de famille.",
+  "basis": "hypothese_de_conception",
+  "source_ids": ["HIS-03", "HIS-04", "HIS-05", "HIS-06"],
+  "inference": "HIS-05 atteste des dynastes des marches de Chaldie qui vivent du pillage de leurs voisins (Clavijo, 1404, donc deux siècles plus tard), des pâturages « annually disputed in May » et des bergers qui disparaissent, et fait de Cheriana un district sans protecteur impérial ; HIS-04 rappelle que le raid enlève des gens, il ne rase pas, et que « ce qui manque, ce sont les hommes, pas la terre » ; HIS-03 situe l'établissement des Comnènes à Trébizonde en 1204 ; HIS-06 décrit une paix relative avec Konya après 1204, d'où l'absence de choc seldjoukide ou turkmène dans le scénario. Que ces chocs aient eu lieu ce printemps-là, avec ces intensités, et qu'ils aient poussé des familles jusqu'à un hameau de l'arrière-pays, est une hypothèse de conception (provenance PLAUSIBLE dans geo-pontos-1204.json). Le conseil des chefs de famille est un choix d'Alexandre (2026-10-08) : HIS-05 ne documente pas les anciens de village, Bryer les évoque (« peacemaking elders ») sans source dans les actes ; c'est donc une institution de jeu, pas un fait. Les prénoms sont grecs byzantins courants, plus une famille arménienne (des Arméniens vivent en Chaldie, PLAUSIBLE, non étudié par HP-001).",
+  "current": "Avant la mission, le monde extérieur (écart n°38) n'était chargé qu'à la main, et ses arrivants devenaient des habitants anonymes sans que personne en décide ; dans Valmire fondée, rien n'arrivait après le jour 7 (docs/unreal/memoire-decisions-001/chronique-30-jours.txt).",
+  "target": "Monde extérieur chargé avec Valmire ; trois chocs datés de plus dans le scénario, chacun avec sa provenance ; chaque groupe nommé, racontant ce qu'il fuit, et passé au conseil du soir où chaque chef dit oui ou non avec sa raison (écart n°49).",
+  "causal_effect": "Un groupe accueilli devient un foyer qui bâtit et demande de l'aide comme les fondateurs (écart n°48) ; un groupe refusé repart, et le remords des chefs qui ont dit non pèse au conseil suivant ; ce que les arrivants ont fui court de bouche en bouche (écart n°47).",
+  "owner_paths": [
+    "Content/Anastasis/Scenario/geo-pontos-1204.json",
+    "Content/Anastasis/Scenario/valmire-arrivants.json",
+    "Content/Anastasis/Dialogue/repliques-valmire.json",
+    "Source/AnastasisSim/Private/Village/AnastasisVillageArrivals.cpp"
+  ],
+  "evidence_plan": {
+    "mec": "Tests Anastasis.Sim.Arrivants.* (conseil, refus, remords, accueil puis maison, sans foyer rien ne change) et Anastasis.Arrivants.* (groupes nommés, soixante jours) ; preuve PIE arrivants-pie.",
+    "scn": "UNKNOWN : aucune capture ; la mission ne revendique rien de visuel.",
+    "ply": "UNKNOWN : le joueur n'assiste au conseil que par son carnet ; il ne vote pas. Le verdict est la lecture de la chronique par Alexandre."
+  },
+  "verdict": "PROPOSE",
+  "evidence_paths": []
+}

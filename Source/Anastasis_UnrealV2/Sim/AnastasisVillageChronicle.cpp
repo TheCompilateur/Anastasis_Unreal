@@ -2,7 +2,9 @@
 
 #include "Algo/StableSort.h"
 #include "Life/AnastasisBonds.h"
+#include "Sim/AnastasisArrivals.h"
 #include "Sim/AnastasisDialogueLines.h"
+#include "Sim/AnastasisValmireFounders.h"
 #include "Sim/AnastasisSimulation.h"
 #include "Village/AnastasisVillage.h"
 #include "World/AnastasisPathfinding.h"
@@ -164,6 +166,10 @@ namespace AnastasisChronicle
 		case EKind::HouseDecided: return TEXT("HouseDecided");
 		case EKind::HelpGiven: return TEXT("HelpGiven");
 		case EKind::HelpRefused: return TEXT("HelpRefused");
+		case EKind::GroupArrival: return TEXT("GroupArrival");
+		case EKind::Council: return TEXT("Council");
+		case EKind::Welcomed: return TEXT("Welcomed");
+		case EKind::TurnedAway: return TEXT("TurnedAway");
 		case EKind::Stalled: return TEXT("Stalled");
 		}
 		return TEXT("Unknown");
@@ -201,6 +207,8 @@ namespace AnastasisChronicle
 		FamilyViews.Reset();
 		LegendRoots.Reset();
 		HelpSeen = 0;
+		CouncilSeen = 0;
+		GroupsTold.Reset();
 	}
 
 	FString FVillageChronicle::Quote(const FString& SpeakerId, const TCHAR* Pool, int32 Rank, const TMap<FString, FString>& Holes) const
@@ -410,6 +418,7 @@ namespace AnastasisChronicle
 		CurrentDay = Day;
 		DeathsSeen = Village.GetDeaths().Num();
 		HelpSeen = Village.GetHelpLog().Num();
+		CouncilSeen = Village.GetCouncilLog().Num();
 		ReadFamilies(Sim);
 
 		TArray<FString> Ids;
@@ -718,6 +727,9 @@ namespace AnastasisChronicle
 			if (!People.Contains(Npc.Id))
 			{
 				FPersonState& Newcomer = Meet(Npc, Day);
+				// ecart n°49 : un groupe venu par la route se raconte ensemble, plus bas.
+				const AnastasisVillage::FVillage::FFamily* Group = Npc.FamilyId.IsEmpty() ? nullptr : Village.FindFamily(Npc.FamilyId);
+				if (Group && Group->ArrivedDay > 0) continue;
 				Add(Day, Hour, EKind::Arrival, { Npc.Id },
 					FString::Printf(TEXT("%s arrive au village."), *Newcomer.Name));
 				continue;
@@ -930,6 +942,80 @@ namespace AnastasisChronicle
 				*NameOf(Answer.ToId), Answer.bAccepted ? TEXT("accepte") : TEXT("refuse"),
 				Said.IsEmpty() ? TEXT(".") : *FString::Printf(TEXT(" : « %s »"), *Said));
 			Add(Day, Hour, Answer.bAccepted ? EKind::HelpGiven : EKind::HelpRefused, { Answer.FromId, Answer.ToId }, Text);
+		}
+
+		// ecart n°49 : les groupes arrives par la route, puis le conseil du soir.
+		for (const AnastasisVillage::FVillage::FFamily& Group : Village.GetFamilies())
+		{
+			if (Group.ArrivedDay <= 0 || GroupsTold.Contains(Group.Id)) continue;
+			GroupsTold.Add(Group.Id);
+			TArray<FString> Members = Group.Adults;
+			Members.Append(Group.Dependents);
+			if (Members.IsEmpty()) continue;
+			const FString Road = Group.Origin.IsEmpty() ? FString(TEXT("Par la route")) : FString::Printf(TEXT("Par la route %s"), *De(Group.Origin));
+			const bool bAlone = Members.Num() == 1;
+			FString Text = bAlone
+				? FString::Printf(TEXT("%s, %s arrive seul%s."), *Road, *NameOf(Members[0]), E(People.Contains(Members[0]) && People[Members[0]].Look.bFemale))
+				: FString::Printf(TEXT("%s, un groupe arrive : %s, %s."), *Road, *Names(Members), *Group.Name);
+			const bool bFemale = bAlone && People.Contains(Members[0]) && People[Members[0]].Look.bFemale;
+			if (!Group.Cause.IsEmpty()) Text += FString::Printf(TEXT(" %s %s."), bAlone ? (bFemale ? TEXT("Elle fuit") : TEXT("Il fuit")) : TEXT("Ils fuient"), *Group.Cause);
+			Text += FString::Printf(TEXT(" %s demande à rester :%s"), *NameOf(Members[0]),
+				*Quote(Members[0], TEXT("accueil.demande"), Day, { { TEXT("cause"), Group.Cause } }));
+			Add(Day, Hour, EKind::GroupArrival, Members, Text);
+		}
+		const TArray<AnastasisVillage::FVillage::FCouncil>& Councils = Village.GetCouncilLog();
+		for (; CouncilSeen < Councils.Num(); ++CouncilSeen)
+		{
+			const AnastasisVillage::FVillage::FCouncil& Council = Councils[CouncilSeen];
+			const AnastasisVillage::FVillage::FFamily* Group = Village.FindFamily(Council.FamilyId);
+			FString GroupName = Group ? Group->Name : FString(TEXT("les nouveaux venus"));
+			// Une personne seule a un nom, pas un nom de groupe.
+			if (Group && Group->Adults.Num() + Group->Dependents.Num() == 1)
+			{
+				GroupName = NameOf(Group->Adults.Num() ? Group->Adults[0] : Group->Dependents[0]);
+			}
+			// Le moine parle, mais ne decide pas (Alexandre, 2026-10-08).
+			FString Monk;
+			if (const AnastasisFounders::FScenario* Founding = AnastasisFounders::FScenario::Get())
+			{
+				for (const FString& Id : PersonOrder)
+				{
+					const FPersonState& State = People[Id];
+					if (State.bAlive && !State.bGone && State.Name == Founding->Monk.Given) Monk = Id;
+				}
+			}
+			FString Opening = FString::Printf(TEXT("Au feu, les chefs de famille parlent %s."), *De(GroupName));
+			if (!Monk.IsEmpty()) Opening += FString::Printf(TEXT(" %s :%s"), *NameOf(Monk), *Quote(Monk, TEXT("accueil.moine"), CouncilSeen));
+			TArray<FString> Voters;
+			for (const AnastasisVillage::FVillage::FWelcomeVote& Vote : Council.Votes) Voters.Add(Vote.VoterId);
+			Add(Day, Hour, EKind::Council, Voters, Opening);
+			for (const AnastasisVillage::FVillage::FWelcomeVote& Vote : Council.Votes)
+			{
+				const FString Said = Lines ? AnastasisArrivals::VoteLine(*Lines, Seed, Vote, Council.Cause, CouncilSeen) : FString();
+				Add(Day, Hour, EKind::Council, { Vote.VoterId }, FString::Printf(TEXT("%s : %s.%s"), *NameOf(Vote.VoterId),
+					Vote.bYes ? TEXT("oui") : TEXT("non"), Said.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" « %s »"), *Said)));
+			}
+			int32 Yes = 0;
+			for (const AnastasisVillage::FVillage::FWelcomeVote& Vote : Council.Votes) Yes += Vote.bYes ? 1 : 0;
+			const FString Count = FString::Printf(TEXT("%d oui, %d non"), Yes, Council.Votes.Num() - Yes);
+			if (Council.bAccepted)
+			{
+				Add(Day, Hour, EKind::Welcomed, Voters, FString::Printf(TEXT("%s : Valmire garde %s."), *Count, *GroupName));
+				continue;
+			}
+			// Refuses : ils repartent au matin ; on ne les dit pas partis un par un.
+			TArray<FString> Gone;
+			for (const FString& Id : PersonOrder)
+			{
+				FPersonState& State = People[Id];
+				if (State.bAlive && !State.bGone && State.FamilyName == GroupName && !Village.FindNpc(Id))
+				{
+					State.bGone = true;
+					Gone.Add(Id);
+				}
+			}
+			Add(Day, Hour, EKind::TurnedAway, Gone, FString::Printf(TEXT("%s : le conseil refuse %s. Au matin, %s la route, sans savoir où aller."),
+				*Count, *GroupName, Gone.Num() == 1 ? TEXT("il reprend") : TEXT("ils reprennent")));
 		}
 
 		// 4. Ceux qui ne sont plus la sans etre morts : ils sont partis.

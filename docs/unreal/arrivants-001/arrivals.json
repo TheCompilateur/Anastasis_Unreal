@@ -1,0 +1,298 @@
+{
+ "arrivals": {
+  "geo_loaded": true,
+  "day": 61,
+  "people": 21,
+  "groups": [
+   {
+    "family": "family-4",
+    "name": "la famille de Theophilos",
+    "arrived_day": 10,
+    "cause": "le pillage des hameaux hauts de Paipert",
+    "origin": "Parcharia",
+    "guest": false,
+    "left": false,
+    "members": 3,
+    "house_done": true
+   },
+   {
+    "family": "family-5",
+    "name": "les bergers de Lazaros",
+    "arrived_day": 14,
+    "cause": "la dispute des hauts pâturages de Cheriana",
+    "origin": "Parcharia",
+    "guest": false,
+    "left": false,
+    "members": 3,
+    "house_done": true
+   },
+   {
+    "family": "family-6",
+    "name": "la veuve Xene et les siens",
+    "arrived_day": 25,
+    "cause": "la prise de la Ville par les Latins",
+    "origin": "Matzouka",
+    "guest": false,
+    "left": false,
+    "members": 1,
+    "house_done": true
+   },
+   {
+    "family": "family-7",
+    "name": "la maison d'Hovhannes",
+    "arrived_day": 44,
+    "cause": "la levée d'hommes de Trébizonde",
+    "origin": "Matzouka",
+    "guest": false,
+    "left": true,
+    "members": 0,
+    "house_done": false
+   }
+  ],
+  "councils": [
+   {
+    "day": 11,
+    "family": "family-4",
+    "cause": "le pillage des hameaux hauts de Paipert",
+    "accepted": true,
+    "votes": [
+     {
+      "voter": "npc-6",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 0.11835326915073452,
+      "terms": "nous_aussi=25 bras=8 peur=-23 inconnu=-10"
+     },
+     {
+      "voter": "npc-0",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 0.11835326915073452,
+      "terms": "nous_aussi=25 bras=8 peur=-23 inconnu=-10"
+     },
+     {
+      "voter": "npc-1",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 0.11835326915073452,
+      "terms": "nous_aussi=25 bras=8 peur=-23 inconnu=-10"
+     },
+     {
+      "voter": "npc-10",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 0.11835326915073452,
+      "terms": "nous_aussi=25 bras=8 peur=-23 inconnu=-10"
+     }
+    ]
+   },
+   {
+    "day": 15,
+    "family": "family-5",
+    "cause": "la dispute des hauts pâturages de Cheriana",
+    "accepted": true,
+    "votes": [
+     {
+      "voter": "npc-6",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 2.470684271204618,
+      "terms": "nous_aussi=25 bras=8 peur=-16 toits=-5 inconnu=-10"
+     },
+     {
+      "voter": "npc-0",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 2.470684271204618,
+      "terms": "nous_aussi=25 bras=8 peur=-16 toits=-5 inconnu=-10"
+     },
+     {
+      "voter": "npc-1",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 2.470684271204618,
+      "terms": "nous_aussi=25 bras=8 peur=-16 toits=-5 inconnu=-10"
+     },
+     {
+      "voter": "npc-10",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 2.470684271204618,
+      "terms": "nous_aussi=25 bras=8 peur=-16 toits=-5 inconnu=-10"
+     },
+     {
+      "voter": "npc-14",
+      "yes": false,
+      "reason": "toits",
+      "score": -0.5293157287953818,
+      "terms": "nous_aussi=25 leur_histoire=12 bras=8 peur=-16 toits=-20 inconnu=-10"
+     }
+    ]
+   },
+   {
+    "day": 26,
+    "family": "family-6",
+    "cause": "la prise de la Ville par les Latins",
+    "accepted": true,
+    "votes": [
+     {
+      "voter": "npc-6",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 6.156348261335342,
+      "terms": "nous_aussi=25 peur=-9 inconnu=-10"
+     },
+     {
+      "voter": "npc-0",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 6.156348261335342,
+      "terms": "nous_aussi=25 peur=-9 inconnu=-10"
+     },
+     {
+      "voter": "npc-1",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 6.156348261335342,
+      "terms": "nous_aussi=25 peur=-9 inconnu=-10"
+     },
+     {
+      "voter": "npc-10",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 6.156348261335342,
+      "terms": "nous_aussi=25 peur=-9 inconnu=-10"
+     },
+     {
+      "voter": "npc-14",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 6.156348261335342,
+      "terms": "nous_aussi=25 peur=-9 inconnu=-10"
+     },
+     {
+      "voter": "npc-17",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 18.156348261335342,
+      "terms": "nous_aussi=25 leur_histoire=12 peur=-9 inconnu=-10"
+     }
+    ]
+   },
+   {
+    "day": 45,
+    "family": "family-7",
+    "cause": "la levée d'hommes de Trébizonde",
+    "accepted": false,
+    "votes": [
+     {
+      "voter": "npc-6",
+      "yes": false,
+      "reason": "inconnu",
+      "score": -9.5612697780371,
+      "terms": "bras=8 peur=-8 inconnu=-10"
+     },
+     {
+      "voter": "npc-0",
+      "yes": false,
+      "reason": "inconnu",
+      "score": -9.5612697780371,
+      "terms": "bras=8 peur=-8 inconnu=-10"
+     },
+     {
+      "voter": "npc-1",
+      "yes": false,
+      "reason": "inconnu",
+      "score": -9.5612697780371,
+      "terms": "bras=8 peur=-8 inconnu=-10"
+     },
+     {
+      "voter": "npc-10",
+      "yes": false,
+      "reason": "inconnu",
+      "score": -9.5612697780371,
+      "terms": "bras=8 peur=-8 inconnu=-10"
+     },
+     {
+      "voter": "npc-14",
+      "yes": false,
+      "reason": "inconnu",
+      "score": -9.5612697780371,
+      "terms": "bras=8 peur=-8 inconnu=-10"
+     },
+     {
+      "voter": "npc-17",
+      "yes": false,
+      "reason": "inconnu",
+      "score": -9.5612697780371,
+      "terms": "bras=8 peur=-8 inconnu=-10"
+     },
+     {
+      "voter": "npc-20",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 15.4387302219629,
+      "terms": "nous_aussi=25 bras=8 peur=-8 inconnu=-10"
+     }
+    ]
+   }
+  ]
+ },
+ "chronicle": {
+  "started": true,
+  "seed": 12345,
+  "first_day": 1,
+  "last_closed_day": 60,
+  "days_closed": 60,
+  "entries": 449,
+  "people": 24,
+  "alive": 21,
+  "kinds": {
+   "Founding": 19,
+   "Arrival": 0,
+   "Departure": 0,
+   "Death": 0,
+   "SiteOpened": 0,
+   "BuildingPlaced": 0,
+   "Helped": 14,
+   "BuildingDone": 8,
+   "BuildingGone": 0,
+   "Home": 20,
+   "HomeLost": 0,
+   "Shelter": 0,
+   "Job": 0,
+   "Friendship": 14,
+   "Quarrel": 0,
+   "Hunger": 26,
+   "Fed": 26,
+   "Thirst": 10,
+   "Drank": 10,
+   "Weak": 3,
+   "Recovered": 3,
+   "FoodOut": 0,
+   "FoodBack": 0,
+   "FoodLow": 0,
+   "Scene": 34,
+   "Rumor": 164,
+   "Legend": 1,
+   "HouseDecided": 7,
+   "HelpGiven": 16,
+   "HelpRefused": 30,
+   "GroupArrival": 4,
+   "Council": 26,
+   "Welcomed": 3,
+   "TurnedAway": 1,
+   "Stalled": 10
+  }
+ },
+ "checks": {
+  "geo_loaded": true,
+  "groups": true,
+  "councils": true,
+  "welcomed": true,
+  "refused": true,
+  "arrival_house": true,
+  "legend": true,
+  "file": true
+ }
+}
