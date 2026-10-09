@@ -86,6 +86,17 @@ hauteur vient de `AnastasisTectonics` (`WorldView/AnastasisTectonics.{h,cpp}`), 
   simulation. Une nouvelle composante s'ajoute à `AnastasisTectonics::Evaluate` (et à `FBreakdown`), avec son
   test de structure.
 
+### Reliefs 3D pontiques (PONTIC_MOUNTAINS_001)
+
+Huit `StaticMesh` fermés sous `/Game/Anastasis/PonticMountains/` traduisent les silhouettes de la
+planche `docs/visual/reference/pontic-mountain-assets.png` en volumes distincts. Le script d'autorité
+`tools/unreal/create-pontic-mountains.py` règle la forme et l'albédo de chaque mesh ; la planche
+ne contient aucune géométrie importable. Ces assets sont **des sources d'auteur**, non des instances
+dans la carte : cinq essais de pose et de modification de l'anneau ont été rejetés après captures
+à hauteur humaine. Le code expérimental a été retiré. Aucun verdict SCN ou PLY positif ne découle
+de l'existence des assets. Repartir de la géométrie globale de l'anneau et de références de terrain
+documentées avant de proposer une nouvelle intégration visuelle.
+
 ## Vérifier
 
 | Quoi | Comment |
