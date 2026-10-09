@@ -1,5 +1,11 @@
 # HANDOFF: asset-protocol-v1
 
+> **STOP INTÉGRATION — V1 RETIRÉE.** Alexandre a demandé une V2 après
+> critique. Ne pas admettre le commit `faaf242178e7b002f21c5e1151b8955ca50189f5`
+> ni son ancien marqueur `nounreal` dans un lot. La V1 n'a créé aucun asset,
+> et son validateur n'a jamais tourné dans Unreal. Cette fiche sera remplacée
+> par le handoff V2 et un nouveau `finish` sur un nouveau commit.
+
 ## MISSION
 
 Installer le protocole asset V1 : contrat JSON réutilisable, validateur Unreal
