@@ -62,7 +62,11 @@ que le harnais ne le compte plus comme un bug.
 ## Pendant une mission : ce que fait l'agent
 
 1. **Il porte.** S'il saute une branche, invente un repli ou ajoute un comportement :
-   - il ouvre une fiche dans `ECARTS.md`, avec le prochain numéro libre (jamais un numéro réutilisé) ;
+   - il **réserve** son numéro par `tools\unreal\agent-worktree.ps1 ecart -Mission <m>` (ECARTS_UNION_001 :
+     le plus grand numéro de `main`, des branches `agent/*` et des réservations, plus un), puis ouvre sa fiche
+     **à la fin** de `ECARTS.md` sous ce numéro — jamais un numéro réutilisé, jamais un « max + 1 » deviné :
+     deux missions parallèles prenaient le même. Le registre fusionne par union (`.gitattributes`) ; deux
+     fiches au même numéro sont refusées au lot ;
    - il pose la marque `ecart n°N` en commentaire à l'endroit du code ;
    - il choisit `A_FERMER` s'il sait quelle mission le fermera, sinon `A_TRANCHER`. **Jamais
      `ASSUME`.**

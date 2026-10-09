@@ -19,7 +19,9 @@ fiche **est** le détail.
 ## Format d'une fiche
 
 Titre `### n° N — titre`, puis une liste de champs `- **cle** : valeur`, puis 2 à 6 lignes de texte.
-Les numéros ne se réutilisent jamais ; un écart fermé garde sa fiche (`statut : FERME`).
+Les numéros ne se réutilisent jamais ; un écart fermé garde sa fiche (`statut : FERME`). Un numéro nouveau
+se **réserve** (`tools\unreal\agent-worktree.ps1 ecart -Mission <m>`) et la fiche s'ajoute **à la fin** : ce
+fichier fusionne par union (ECARTS_UNION_001), deux missions parallèles n'y entrent plus en conflit.
 
 | Champ | Valeurs | Requis |
 |---|---|---|

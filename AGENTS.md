@@ -58,6 +58,7 @@ Cycle de vie, un outil unique : `tools\unreal\agent-worktree.ps1`
 | `integrate -Mission <m>` | rôle intégrateur, **une mission déjà prouvée** (`proved` / `nounreal`) : prend le verrou de `main`, avance rapide de **`main`** (jamais de la branche extraite du canonique), après avoir rejoué index et lancements Unreal sur l'arbre versé ; canonique hors `main` → copie de travail intacte. Refuse une mission `queued` (elle passe par le lot) et refuse pendant un lot (`MAIN_LOCK::TENU`). Si `main` a avancé : rejoue la branche sur `main` et la verse si la règle de retest le permet (point 6 ci-dessous), sinon `RETEST::REQUIS` |
 | `integrate-batch -Missions a,b,c` | rôle intégrateur, **file groupée — la voie normale** : prend le verrou de `main` (personne ne la déplace pendant le lot), admet les missions dont `finish` a passé sur le commit actuel, les empile sur `main` dans le worktree d'intégration persistant `ANASTASIS_WORKTREES\_integration` (`ANASTASIS_INTEGRATION_DIR` le déplace si ce chemin devient inscriptible) (une mission en conflit est écartée, les autres passent), **un seul** portail (index, lancements, build + suite si le lot touche Unreal), puis **toutes les preuves PIE déclarées par le lot dans un seul éditeur** (`editor-batch.ps1` ; une preuve en échec désigne sa mission, `main` intact), puis avance rapide de `main`. Une mission qui porte les commits d'une autre non versée est refusée, sauf **relais déclaré** : sa fiche écrit `RELAIS: a, b` et son `PROOFS:` reprend toutes les preuves de ces fiches (`RELAY_ADMITTED::`) |
 
+| `ecart -Mission <m>` | réserve le prochain numéro d'écart (ECARTS_UNION_001) : `ECART_RESERVE::<n>` ; réservations dans `ANASTASIS_WORKTREES\.ecarts\reserved.txt` |
 | `prune -Mission <m>` | après versement : worktree, branche et enregistrement MCP local supprimés ; refuse si un commit manque à `main` (par contenu : une copie versée par lot compte ; une copie au diff retouché par l'union de `proofs.txt` aussi, si rejouer la branche sur `main` ne change rien : `PRUNE::PAR_CONTENU`) ou si le worktree n'est pas propre |
 | `preflight` | avant un `verify`/seal : dit ce qui bloque et **ouvre une fenêtre** d'observation |
 | `postflight` | après : échoue si source, config ou `HEAD` ont bougé pendant la fenêtre |
@@ -212,6 +213,10 @@ ou évolution voulue. Donc, dans `Source/AnastasisSim/` :
 - tout comportement qui n'est pas la copie fidèle de la référence (branche sautée, repli inventé,
   flux aléatoire propre, extension) a une fiche dans `Source/AnastasisSim/ECARTS.md` **dans le
   commit qui l'introduit**, et la marque `ecart n°N` à l'endroit du code ;
+- **le numéro se réserve, il ne se devine pas** (ECARTS_UNION_001, Alexandre, 2026-10-09) :
+  `tools\unreal\agent-worktree.ps1 ecart -Mission <m>` rend le prochain numéro libre (main, toutes les branches
+  `agent/*`, réservations). La fiche s'ajoute **à la fin** du registre, qui fusionne par union : deux missions
+  parallèles n'y entrent plus en conflit ; deux fiches au même numéro sont refusées au lot ;
 - la passation a une section `## ECARTS` : numéros ouverts, modifiés, fermés, ou `AUCUN — <preuve>` ;
 - seul Alexandre passe un écart à `ASSUME` (évolution définitive) ; un agent écrit `A_TRANCHER`.
 

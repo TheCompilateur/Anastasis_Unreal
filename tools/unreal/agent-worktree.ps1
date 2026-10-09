@@ -26,9 +26,10 @@
 #   agent-worktree.ps1 postflight
 #   agent-worktree.ps1 mcp        -Mission world-slice-007
 #   agent-worktree.ps1 prune      -Mission world-slice-007
+#   agent-worktree.ps1 ecart      -Mission world-slice-007          (reserve le prochain numero d'ecart)
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet('create', 'status', 'finish', 'integrate', 'integrate-batch', 'preflight', 'postflight', 'mcp', 'prune')]
+  [ValidateSet('create', 'status', 'finish', 'integrate', 'integrate-batch', 'preflight', 'postflight', 'mcp', 'prune', 'ecart')]
   [string]$Command,
   [string]$Mission,
   [string[]]$Missions,
@@ -466,6 +467,35 @@ function Canonical-State {
 # Le verrou de main est rendu quoi qu'il arrive : `exit` (Fail) execute aussi ce finally.
 try {
 switch ($Command) {
+
+  # ECARTS_UNION_001 (2026-10-09) : un numero d'ecart se reserve, il ne se devine plus. Deux missions
+  # paralleles prenaient le meme « max + 1 » de main et se heurtaient au versement (sept relais le
+  # 2026-10-08/09). Le registre fusionne par union (.gitattributes) ; le numero vient d'ici : max des
+  # numeros de main, de toutes les branches agent/* et des reservations deja faites, plus un.
+  'ecart' {
+    Require-Mission
+    $reg = 'Source/AnastasisSim/ECARTS.md'
+    $dir = Join-Path $WorktreeRoot '.ecarts'
+    New-Item -ItemType Directory -Force $dir | Out-Null
+    $book = Join-Path $dir 'reserved.txt'
+    $mutex = New-Object System.Threading.Mutex($false, 'Global\AnastasisEcartReserve')
+    try { [void]$mutex.WaitOne() } catch [System.Threading.AbandonedMutexException] { }
+    try {
+      $used = New-Object 'System.Collections.Generic.HashSet[int]'
+      $refs = @('main') + @((Invoke-Git -C $Canonical for-each-ref --format='%(refname:short)' 'refs/heads/agent/').Out)
+      foreach ($ref in $refs) {
+        $t = Invoke-Git -C $Canonical show "${ref}:$reg"
+        if ($t.Code -ne 0) { continue }
+        foreach ($l in $t.Out) { if ($l -match '^###\s*n\S{0,3}\s*(\d+)\b') { [void]$used.Add([int]$Matches[1]) } }
+      }
+      if (Test-Path $book) {
+        foreach ($l in Get-Content $book) { if ($l -match '^(\d+)\s') { [void]$used.Add([int]$Matches[1]) } }
+      }
+      $n = 1; if ($used.Count) { $n = ([int](($used | Measure-Object -Maximum).Maximum)) + 1 }
+      Add-Content -Path $book -Value ('{0} {1} {2:yyyy-MM-ddTHH:mm:ss}' -f $n, $Mission, (Get-Date)) -Encoding UTF8
+      Write-Output "ECART_RESERVE::$n (mission $Mission) -- fiche '### n<deg> $n -- titre' dans $reg, marque 'ecart n<deg>$n' dans le code"
+    } finally { $mutex.ReleaseMutex() }
+  }
 
   'create' {
     Require-Mission
@@ -929,7 +959,15 @@ switch ($Command) {
     }
     $dup = @(Get-DuplicateProofs $integ)
     if ($dup.Count -gt 0) { Write-Output ('FAIL: tools/unreal/proofs.txt du lot inscrit deux fois : ' + ($dup -join ', ') + ' (union des deux versions d une ligne : rien n a bouge, main intacte)'); exit 1 }
-    Write-Output 'CHECKS::PASS index tools/unreal, lancements Unreal'
+    # ECARTS_UNION_001 : le registre fusionne par union ; deux fiches au meme numero (numero non reserve
+    # par `ecart`) se voient ici, avant tout build.
+    $regPath = Join-Path $integ 'Source\AnastasisSim\ECARTS.md'
+    if (Test-Path $regPath) {
+      $nums = @(Get-Content $regPath -Encoding UTF8 | ForEach-Object { if ($_ -match '^###\s*n\S{0,3}\s*(\d+)\b') { [int]$Matches[1] } })
+      $twice = @($nums | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
+      if ($twice.Count -gt 0) { Write-Output ('FAIL: ECARTS.md du lot porte deux fiches au meme numero : ' + ($twice -join ', ') + ' -- la mission la plus recente reserve un numero (agent-worktree.ps1 ecart) et renumerote ; main intacte'); exit 1 }
+    }
+    Write-Output 'CHECKS::PASS index tools/unreal, lancements Unreal, numeros d ecart'
     # Le lot sert tous les agents : ses editeurs passent en tete de la file de la porte memoire.
     $env:ANASTASIS_EDITOR_PRIORITY = '0'
     $owner = @{}

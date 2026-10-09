@@ -30,7 +30,8 @@ tools\unreal\anastasis-unreal.ps1 build                         # premier build 
 - Un nouveau script dans `tools/unreal/` → une ligne dans l'index d'`AGENTS.md` (`finish` refuse sinon).
 - Commits : message dans un fichier, `git commit -F <fichier>` (les `"` cassent `-m` sous PS 5.1).
 - Portage dans `Source/AnastasisSim/` : ce qui n'est pas fidèle à la référence JS se déclare **dans le
-  même commit** : fiche dans `Source/AnastasisSim/ECARTS.md` (prochain numéro libre, `A_FERMER` ou
+  même commit** : fiche à la fin de `Source/AnastasisSim/ECARTS.md` (numéro **réservé** par
+  `agent-worktree.ps1 ecart -Mission <m>`, jamais deviné ; `A_FERMER` ou
   `A_TRANCHER`, jamais `ASSUME`), marque `ecart n°N` dans le code. Ce que tu portes enfin : fiche
   `FERME`, marques retirées. `docs/migration/PROTOCOLE_ECARTS.md`.
 

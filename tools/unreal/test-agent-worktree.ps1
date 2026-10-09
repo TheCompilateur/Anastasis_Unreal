@@ -431,7 +431,34 @@ $null = AW finish -Mission st-a
 G branch 'agent/st-clone' 'agent/st-a' | Out-Null
 $r = AW integrate-batch -Missions 'st-a'
 Check 'S28b branche au meme sommet : pas une mission heritee, versee' ($r.Code -eq 0 -and $r.Out -match 'BATCH_INTEGRATED::st-a' -and $r.Out -notmatch 'heritee') $r.Out
-
+# 28c. ECARTS_UNION_001 : le numero d'ecart se reserve (max de main, des branches, des reservations, + 1) ;
+#      deux missions qui ajoutent chacune leur fiche fusionnent par union ; deux fiches au meme numero
+#      sont refusees au lot avant tout build.
+G checkout -q -f main | Out-Null; G clean -fdq | Out-Null
+$deg = [char]0xB0; $regRel = 'Source\AnastasisSim\ECARTS.md'; $utf8 = New-Object System.Text.UTF8Encoding($false)
+$top = (@([IO.File]::ReadAllLines((Join-Path $repo $regRel), $utf8) | ForEach-Object { if ($_ -match '^###\s*n\S{0,3}\s*(\d+)\b') { [int]$Matches[1] } }) | Measure-Object -Maximum).Maximum
+function Fiche($n, $t) { "`n### n$deg $n " + [char]0x2014 + " $t`n`n- **classe** : REFERENCE`n- **destin** : A_TRANCHER`n- **statut** : OUVERT`n- **entree** : banc`n- **reference** : aucune`n- **cpp** : aucun`n- **harnais** : aucune`n`nFiche du banc d'essai.`n" }
+function AddFiche($w, $n, $t) {
+  [IO.File]::AppendAllText((Join-Path $w $regRel), (Fiche $n $t), $utf8)
+  [IO.File]::AppendAllText((Join-Path $w "docs\unreal\handoffs\$(Split-Path $w -Leaf).md"), "`n## ECARTS`n`nn$deg $n ouvert.`n", $utf8)
+}
+AdvanceMain 'ga28c' { param($w) Set-Content "$w\.gitattributes" "tools/unreal/proofs.txt merge=union`nSource/AnastasisSim/ECARTS.md merge=union" }
+$r1 = AW ecart -Mission eu-a; $r2 = AW ecart -Mission eu-b
+Check 'S28c reservation : max de main + 1, puis le suivant' ($r1.Out -match "ECART_RESERVE::$($top + 1) " -and $r2.Out -match "ECART_RESERVE::$($top + 2) ") ($r1.Out + "`n" + $r2.Out)
+$null = NewMission 'eu-a' @({ param($w) AddFiche $w ($top + 1) 'banc a' })
+$null = NewMission 'eu-b' @({ param($w) AddFiche $w ($top + 2) 'banc b' })
+# Une fiche sous Source/ est un changement Unreal : le build (impossible ici) suit les controles du lot.
+# Les marqueurs de passation sont poses a la main ; on juge l'empilement et les controles, pas le build.
+function Mark($m) { Set-Content (Join-Path $wtRoot ".handoff\$m.txt") ((G rev-parse "agent/$m") + ' proved') }
+Mark eu-a; Mark eu-b; $fa = [PSCustomObject]@{ Out = '' }
+$r = AW integrate-batch -Missions 'eu-a,eu-b'
+Check 'S28c deux fiches ajoutees au registre : union, empilees sans conflit, controles passes' ($r.Out -match 'BATCH_STACKED::eu-a \(\d+\), eu-b \(\d+\)' -and $r.Out -match 'CHECKS::PASS .*numeros d ecart') $r.Out
+$null = NewMission 'eu-c' @({ param($w) AddFiche $w ($top + 3) 'banc c' })
+$null = NewMission 'eu-d' @({ param($w) AddFiche $w ($top + 3) 'banc d' })
+Mark eu-c; Mark eu-d
+$mainAvant = (G rev-parse main)
+$r = AW integrate-batch -Missions 'eu-c,eu-d'
+Check 'S28c meme numero dans deux missions : lot refuse, main intacte' ($r.Code -ne 0 -and $r.Out -match "deux fiches au meme numero : $($top + 3)" -and (G rev-parse main) -eq $mainAvant) $r.Out
 # 29. prune par contenu : une copie versee dont l'union de proofs.txt a retouche le diff n'est plus
 #     reconnue par git cherry ; rejouee sur main elle ne change rien, prune la supprime.
 $null = NewMission 'pz' @({ param($w) Add-Content "$w\tools\unreal\proofs.txt" 'banc-pz | tools/unreal/smoke-pie.py | PZ PASS | PZ FAIL | 60 | -' })
