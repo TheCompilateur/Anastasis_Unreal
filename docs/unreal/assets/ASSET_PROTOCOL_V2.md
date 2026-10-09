@@ -68,8 +68,10 @@ une vérification statique, pas une preuve d'exécution.
 - KEEP : silhouette de prêle plus lisible dans la vue proche, différence
   localisée sur la prêle et supérieure à la dérive ancien/ancien répété ;
   aucune régression visible de rive ; coût GPU médian de la pose ≤ ancien
-  +0,2 ms et hausse ≤ 5 % si ancien ≥ 4 ms. Le seuil vaut pour cette machine
-  et cette scène, pas pour un jeu packagé.
+  +0,2 ms et hausse ≤ 5 % si ancien ≥ 4 ms. Si les deux mesures GPU anciennes
+  divergent elles-mêmes de plus de 0,2 ms, déclarer `UNKNOWN` et refaire la
+  mesure sur machine calme. Le seuil vaut pour cette machine et cette scène,
+  pas pour un jeu packagé.
 - REJECT : un placement ou autre mesh change, retour ancien divergent,
   dépassement MEC/GPU, silhouette moins lisible, ou absence d'écart fiable.
   Si la machine est saturée, le GPU est `UNKNOWN` et la décision reste ouverte.
