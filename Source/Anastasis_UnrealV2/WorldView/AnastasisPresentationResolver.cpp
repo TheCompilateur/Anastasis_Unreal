@@ -248,7 +248,8 @@ namespace
 	constexpr EAnastasisTreeSpecies AllSpecies[] = {
 		EAnastasisTreeSpecies::AleppoPine, EAnastasisTreeSpecies::Cypress, EAnastasisTreeSpecies::HolmOak,
 		EAnastasisTreeSpecies::Olive, EAnastasisTreeSpecies::PlaneTree, EAnastasisTreeSpecies::BlackPine,
-		EAnastasisTreeSpecies::GreekFir};
+		EAnastasisTreeSpecies::GreekFir, EAnastasisTreeSpecies::DeciduousOak, EAnastasisTreeSpecies::Birch,
+		EAnastasisTreeSpecies::ScotsPine, EAnastasisTreeSpecies::Willow, EAnastasisTreeSpecies::HorseChestnut};
 	constexpr int32 SpeciesCount = static_cast<int32>(UE_ARRAY_COUNT(AllSpecies));
 }
 
@@ -284,6 +285,22 @@ double SpeciesSuitability(EAnastasisTreeSpecies Species, const FTreeSite& Site)
 	case EAnastasisTreeSpecies::GreekFir:
 		// The fir keeps the cool faces: exposure (Shade > 0) thins it.
 		return 1.1 * Rise(0.58, 0.8, A) * (1.0 - 0.35 * Sh);
+	case EAnastasisTreeSpecies::DeciduousOak:
+		// GPT_FLORA_001 : le chene caducifolie des fonds de vallee et des bas versants ; l'humidite
+		// de la berge le gene un peu (le platane et le saule la tiennent), la pente raide l'exclut.
+		return 0.6 * Rise(0.05, 0.25, A) * Fall(0.5, 0.75, A) * (1.0 - 0.3 * Rise(0.5, 0.9, R)) * Fall(25.0, 40.0, S);
+	case EAnastasisTreeSpecies::Birch:
+		// Pionnier des versants frais : ni la plaine chaude, ni les sommets ; l'humidite l'aide.
+		return 0.6 * Rise(0.25, 0.45, A) * Fall(0.7, 0.9, A) * (0.5 + 0.5 * Rise(0.2, 0.6, Damp));
+	case EAnastasisTreeSpecies::ScotsPine:
+		// Le pin montagnard : entre le pin d'Alep et le sapin des sommets, plutot sec.
+		return 0.65 * Rise(0.30, 0.50, A) * Fall(0.70, 0.90, A) * (1.0 - 0.5 * Rise(0.4, 0.8, Damp));
+	case EAnastasisTreeSpecies::Willow:
+		// Le saule ne vit qu'au bord de l'eau : sans riviere, rien.
+		return 0.6 * Rise(0.35, 0.80, R) * Fall(0.25, 0.50, A) * Fall(10.0, 20.0, S);
+	case EAnastasisTreeSpecies::HorseChestnut:
+		// Rare par construction : poids faible, vallees fraiches et humides seulement.
+		return 0.10 * Rise(0.1, 0.4, R) * Fall(0.3, 0.6, A) * Fall(15.0, 30.0, S);
 	case EAnastasisTreeSpecies::Any:
 	default:
 		return 0.0;
@@ -334,10 +351,15 @@ EAnastasisFoliageFamily FamilyOfSpecies(EAnastasisTreeSpecies Species)
 	case EAnastasisTreeSpecies::Cypress:
 	case EAnastasisTreeSpecies::BlackPine:
 	case EAnastasisTreeSpecies::GreekFir:
+	case EAnastasisTreeSpecies::ScotsPine:
 		return EAnastasisFoliageFamily::Conifer;
 	case EAnastasisTreeSpecies::HolmOak:
 	case EAnastasisTreeSpecies::Olive:
 	case EAnastasisTreeSpecies::PlaneTree:
+	case EAnastasisTreeSpecies::DeciduousOak:
+	case EAnastasisTreeSpecies::Birch:
+	case EAnastasisTreeSpecies::Willow:
+	case EAnastasisTreeSpecies::HorseChestnut:
 		return EAnastasisFoliageFamily::Broadleaf;
 	case EAnastasisTreeSpecies::Any:
 	default:
@@ -356,6 +378,11 @@ const TCHAR* SpeciesName(EAnastasisTreeSpecies Species)
 	case EAnastasisTreeSpecies::PlaneTree: return TEXT("plane_tree");
 	case EAnastasisTreeSpecies::BlackPine: return TEXT("black_pine");
 	case EAnastasisTreeSpecies::GreekFir: return TEXT("greek_fir");
+	case EAnastasisTreeSpecies::DeciduousOak: return TEXT("deciduous_oak");
+	case EAnastasisTreeSpecies::Birch: return TEXT("birch");
+	case EAnastasisTreeSpecies::ScotsPine: return TEXT("scots_pine");
+	case EAnastasisTreeSpecies::Willow: return TEXT("willow");
+	case EAnastasisTreeSpecies::HorseChestnut: return TEXT("horse_chestnut");
 	case EAnastasisTreeSpecies::Any:
 	default: return TEXT("any");
 	}

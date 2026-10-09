@@ -637,6 +637,14 @@ bool FAnastasisPresentationTreeSpecies::RunTest(const FString&)
 	TestEqual(TEXT("holm oak is a broadleaf"), static_cast<int32>(FamilyOfSpecies(EAnastasisTreeSpecies::HolmOak)), static_cast<int32>(EAnastasisFoliageFamily::Broadleaf));
 	TestEqual(TEXT("olive is a broadleaf"), static_cast<int32>(FamilyOfSpecies(EAnastasisTreeSpecies::Olive)), static_cast<int32>(EAnastasisFoliageFamily::Broadleaf));
 	TestEqual(TEXT("plane is a broadleaf"), static_cast<int32>(FamilyOfSpecies(EAnastasisTreeSpecies::PlaneTree)), static_cast<int32>(EAnastasisFoliageFamily::Broadleaf));
+	// GPT_FLORA_001
+	TestEqual(TEXT("Scots pine is a conifer"), static_cast<int32>(FamilyOfSpecies(EAnastasisTreeSpecies::ScotsPine)), static_cast<int32>(EAnastasisFoliageFamily::Conifer));
+	for (const EAnastasisTreeSpecies Broad : {EAnastasisTreeSpecies::DeciduousOak, EAnastasisTreeSpecies::Birch,
+		EAnastasisTreeSpecies::Willow, EAnastasisTreeSpecies::HorseChestnut})
+	{
+		TestEqual(*FString::Printf(TEXT("%s is a broadleaf"), SpeciesName(Broad)),
+			static_cast<int32>(FamilyOfSpecies(Broad)), static_cast<int32>(EAnastasisFoliageFamily::Broadleaf));
+	}
 	return true;
 }
 
@@ -652,6 +660,8 @@ bool FAnastasisPresentationTreeZoning::RunTest(const FString&)
 		Out.AltitudeFraction = A; Out.SlopeDegrees = S; Out.Riparian = R; Out.Wetness = W; Out.Shade = Sh;
 		return Out;
 	};
+	// La palette d'origine : les parts ci-dessous mesurent ces sept essences entre elles. Les cinq de
+	// GPT_FLORA_001 s'ajoutent au tirage reel (SelectTreeSpecies) et ont leurs propres assertions plus bas.
 	const ESp All[] = {ESp::AleppoPine, ESp::Cypress, ESp::HolmOak, ESp::Olive, ESp::PlaneTree, ESp::BlackPine, ESp::GreekFir};
 	auto Share = [&](const FTreeSite& At, std::initializer_list<ESp> Group)
 	{
@@ -683,6 +693,22 @@ bool FAnastasisPresentationTreeZoning::RunTest(const FString&)
 	TestTrue(TEXT("the fir keeps the cool faces"),
 		SpeciesSuitability(ESp::GreekFir, Site(0.9, 20.0, 0.0, 0.08, -0.6)) > SpeciesSuitability(ESp::GreekFir, Site(0.9, 20.0, 0.0, 0.08, 0.6)));
 
+	// GPT_FLORA_001 -- les cinq essences de la planche GPT.
+	TestEqual(TEXT("no willow away from water"), SpeciesSuitability(ESp::Willow, Site(0.1, 5.0, 0.0)), 0.0);
+	TestTrue(TEXT("the willow lives on a low riverbank"), SpeciesSuitability(ESp::Willow, Site(0.1, 4.0, 0.9)) > 0.3);
+	TestEqual(TEXT("no willow on the summits"), SpeciesSuitability(ESp::Willow, Site(0.95, 5.0, 0.9)), 0.0);
+	TestEqual(TEXT("no birch on the hot lowland"), SpeciesSuitability(ESp::Birch, Site(0.05, 5.0, 0.0)), 0.0);
+	TestEqual(TEXT("no birch on the summits"), SpeciesSuitability(ESp::Birch, Site(0.95, 5.0, 0.0)), 0.0);
+	TestTrue(TEXT("birch holds the cool middle slopes"), SpeciesSuitability(ESp::Birch, Site(0.5, 12.0, 0.0)) > 0.2);
+	TestEqual(TEXT("no Scots pine on the lowland"), SpeciesSuitability(ESp::ScotsPine, Site(0.05, 5.0, 0.0)), 0.0);
+	TestEqual(TEXT("no Scots pine on the summits"), SpeciesSuitability(ESp::ScotsPine, Site(0.95, 25.0, 0.0)), 0.0);
+	TestTrue(TEXT("Scots pine holds the montane slopes"), SpeciesSuitability(ESp::ScotsPine, Site(0.55, 15.0, 0.0)) > 0.35);
+	TestTrue(TEXT("the deciduous oak lives on the valley floor"), SpeciesSuitability(ESp::DeciduousOak, Site(0.2, 5.0, 0.0)) > 0.4);
+	TestEqual(TEXT("no deciduous oak on the summits"), SpeciesSuitability(ESp::DeciduousOak, Site(0.95, 25.0, 0.0)), 0.0);
+	TestTrue(TEXT("the horse chestnut stays rare next to the plane"),
+		SpeciesSuitability(ESp::HorseChestnut, Site(0.1, 4.0, 0.9)) < 0.1 * SpeciesSuitability(ESp::PlaneTree, Site(0.1, 4.0, 0.9)) + 0.05);
+	TestEqual(TEXT("no horse chestnut away from water"), SpeciesSuitability(ESp::HorseChestnut, Site(0.1, 5.0, 0.0)), 0.0);
+
 	// Gradual, not a contour: the lowland share never drops by more than a step's worth.
 	double Previous = Share(Site(0.0, 10.0, 0.0), {ESp::Olive, ESp::AleppoPine, ESp::Cypress});
 	double WorstStep = 0.0;
@@ -704,7 +730,20 @@ bool FAnastasisPresentationTreeZoning::RunTest(const FString&)
 		TestEqual(TEXT("the draw is reproducible"), static_cast<int32>(Drawn), static_cast<int32>(SelectTreeSpecies(At, 12345u + I, I % 96, I / 96)));
 		Seen.Add(static_cast<int32>(Drawn));
 	}
-	TestEqual(TEXT("all seven species are reachable"), Seen.Num(), 7);
+	for (int32 Original = static_cast<int32>(ESp::AleppoPine); Original <= static_cast<int32>(ESp::GreekFir); ++Original)
+	{
+		TestTrue(*FString::Printf(TEXT("the original species %d stays reachable"), Original), Seen.Contains(Original));
+	}
+	// Les cinq nouvelles : atteignables quelque part sur une grille de sites, par leur aptitude (un tirage
+	// de 400 sites ne garantit pas une essence a 10 % de poids).
+	for (const ESp Fresh : {ESp::DeciduousOak, ESp::Birch, ESp::ScotsPine, ESp::Willow, ESp::HorseChestnut})
+	{
+		bool bReachable = false;
+		for (int32 A = 0; A <= 20 && !bReachable; ++A)
+			for (int32 R = 0; R <= 10 && !bReachable; ++R)
+				bReachable = SpeciesSuitability(Fresh, Site(A / 20.0, 8.0, R / 10.0)) > 0.0;
+		TestTrue(*FString::Printf(TEXT("%s is reachable somewhere"), SpeciesName(Fresh)), bReachable);
+	}
 	const double Nan = std::numeric_limits<double>::quiet_NaN();
 	TestTrue(TEXT("a NaN site still draws a species"), SelectTreeSpecies(Site(Nan, Nan, Nan, Nan, Nan), 1u, 0, 0) != ESp::Any);
 	AddInfo(FString::Printf(TEXT("TREE_ZONING worst_step=%.3f species_seen=%d"), WorstStep, Seen.Num()));

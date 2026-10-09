@@ -112,6 +112,16 @@ enum class EAnastasisTreeSpecies : uint8
 	BlackPine = 6,
 	/** Abies cephalonica -- the summits, conical tiers. */
 	GreekFir = 7,
+	/** GPT_FLORA_001 -- Quercus robur/petraea: the deciduous oak of valley floors and low slopes. */
+	DeciduousOak = 8,
+	/** GPT_FLORA_001 -- Betula: pioneer of the cool middle slopes and damp ground. */
+	Birch = 9,
+	/** GPT_FLORA_001 -- Pinus sylvestris: the montane pine, between the Aleppo pine and the summit fir. */
+	ScotsPine = 10,
+	/** GPT_FLORA_001 -- Salix: only on the river bank, drooping crown. */
+	Willow = 11,
+	/** GPT_FLORA_001 -- Aesculus hippocastanum: rare, damp valleys. Anachronism for 1204, left to Alexandre's call. */
+	HorseChestnut = 12,
 };
 
 /** One interchangeable look for an archetype. Adding a second entry here is how FOREST gets a second tree. */

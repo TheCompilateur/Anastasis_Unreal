@@ -662,7 +662,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
             const bool bSpecies = CVarTreeSpecies.GetValueOnGameThread() != 0;
             const double AltitudeSpan = FMath::Max(ActiveFootprintBounds.IsValid
                 ? ActiveFootprintBounds.Max.Z - AnastasisTerrainSurface::WaterPlaneZ : 0.0, 100.0);
-            int32 SpeciesCounts[8] = {};
+            int32 SpeciesCounts[16] = {};   // GPT_FLORA_001 : les valeurs de l'enum montent a 12, le masque a 15
             int32 RealHeightTrees = 0;
             struct FHeld
             {
@@ -760,7 +760,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 Tree.MassBounds = MeshBounds;
                 Tree.HeightCm = (MeshBounds.Max.Z - MinZ) * Pose.GetScale3D().Z;
                 Held.Add(Tree);
-                ++SpeciesCounts[static_cast<uint8>(R.Species) & 7];
+                ++SpeciesCounts[static_cast<uint8>(R.Species) & 15];
                 ++ForestLayerCounts[static_cast<uint8>(P.Layer)];
                 ++StatureCounts[static_cast<uint8>(Stature)];
                 ++FamilyCounts[static_cast<uint8>(Family)];
@@ -1006,6 +1006,15 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::GreekFir)],
                 SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::Any)],
                 RealHeightTrees, AltitudeSpan);
+            // GPT_FLORA_001 : les essences tirees de la planche GPT, sur une ligne a part (le format
+            // ci-dessus est lu par des preuves existantes).
+            UE_LOG(LogAnastasis_UnrealV2, Display,
+                TEXT("ANASTASIS_TREE_TAXA_GPT deciduous_oak=%d birch=%d scots_pine=%d willow=%d horse_chestnut=%d"),
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::DeciduousOak)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::Birch)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::ScotsPine)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::Willow)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::HorseChestnut)]);
         }
     }
     UE_LOG(LogAnastasis_UnrealV2, Display,

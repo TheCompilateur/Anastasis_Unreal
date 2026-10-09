@@ -85,6 +85,41 @@ SUBJECTS = [
     ('SM_Tree_Conifer_Emergent_01', 624.0, 'emergent conifere 6.2 m'),
 ]
 
+# GPT_FLORA_001 -- planche des treize especes tirees de la planche GPT (ANASTASIS_LINEUP_SET=gpt), a la
+# hauteur adulte posee par gpt-flora-fit.py (le registre de presentation la reprendra : memes valeurs).
+GROUND_SCALE = 60.0
+if os.environ.get('ANASTASIS_LINEUP_SET', '') in ('gpt', 'gpt_low'):
+    MESH_DIR = '/Game/Anastasis/Vegetation/Gpt/'
+    MATERIAL = '/Game/Anastasis/Materials/M_AnastasisGptFoliage'
+    GROUND_SCALE = 300.0
+if os.environ.get('ANASTASIS_LINEUP_SET', '') == 'gpt':
+    # les sept arbres, du plus petit au plus grand
+    SUBJECTS = [
+        ('SM_Gpt_MarronnierFleuri', 1400.0, 'marronnier 14 m'),
+        ('SM_Gpt_SaulePleureur', 1400.0, 'saule pleureur 14 m'),
+        ('SM_Gpt_Bouleau', 1500.0, 'bouleau 15 m'),
+        ('SM_Gpt_Cypres', 1600.0, 'cypres 16 m'),
+        ('SM_Gpt_Chene', 1700.0, 'chene 17 m'),
+        ('SM_Gpt_PinSombre', 2000.0, 'pin sombre 20 m'),
+        ('SM_Gpt_PinSylvestre', 2400.0, 'pin sylvestre 24 m'),
+    ]
+    ARC_RADIUS = 6200.0
+    ARC_SPACING = 1400.0
+    CAM_HEIGHT = 900.0
+elif os.environ.get('ANASTASIS_LINEUP_SET', '') == 'gpt_low':
+    # les six petits sujets, avec un adulte de 1,80 m pour l'echelle
+    SUBJECTS = [
+        ('SM_Gpt_Fougere', 100.0, 'fougere 1 m'),
+        ('SM_Gpt_PrairieFleurie', 110.0, 'prairie fleurie 1.1 m'),
+        ('SM_Gpt_ArbusteBaies', 250.0, 'arbuste a baies 2.5 m'),
+        ('SM_Gpt_Rhododendron', 300.0, 'rhododendron 3 m'),
+        ('SM_Gpt_Genevrier', 450.0, 'genevrier 4.5 m'),
+        ('SM_Gpt_Noisetier', 500.0, 'noisetier 5 m'),
+    ]
+    ARC_RADIUS = 1500.0
+    ARC_SPACING = 330.0
+    CAM_HEIGHT = 160.0
+
 # Temoins d'echelle : la ruine telle qu'elle est reellement posee (mediane
 # mesuree 91 uu) et un adulte de 1.80 m.
 WITNESSES = [
@@ -140,6 +175,10 @@ CAM_LOC = unreal.Vector(STAGE.x, STAGE.y + ARC_RADIUS, CAM_HEIGHT)
 CAM_ROT = unreal.Rotator(0.0, 0.0, -90.0)
 
 ROW = [(MESH_DIR + n, h, None, l) for n, h, l in SUBJECTS]
+if os.environ.get('ANASTASIS_LINEUP_SET', '') == 'gpt':
+    WITNESSES = []
+elif os.environ.get('ANASTASIS_LINEUP_SET', '') == 'gpt_low':
+    WITNESSES = WITNESSES[1:]
 ROW = [(p, h, r, l) for p, h, r, l in WITNESSES] + ROW  # temoins a gauche, puis du plus petit au plus grand
 
 step = 2.0 * math.degrees(math.asin(min(1.0, ARC_SPACING * 0.5 / ARC_RADIUS)))
@@ -150,7 +189,7 @@ log('ARC radius=%.0f step=%.2f deg spread=%.1f deg' % (ARC_RADIUS, step, step * 
 # biome qu'elle traverse.
 ground = spawn_mesh(
     unreal.EditorAssetLibrary.load_asset('/Engine/BasicShapes/Plane.Plane'),
-    unreal.Vector(STAGE.x, STAGE.y, 0.0), unreal.Vector(60.0, 60.0, 1.0), 'Lineup_Ground')
+    unreal.Vector(STAGE.x, STAGE.y, 0.0), unreal.Vector(GROUND_SCALE, GROUND_SCALE, 1.0), 'Lineup_Ground')
 try:
     grey = unreal.EditorAssetLibrary.load_asset('/Engine/BasicShapes/BasicShapeMaterial')
     mid = unreal.MaterialLibrary.create_dynamic_material_instance(world, grey)

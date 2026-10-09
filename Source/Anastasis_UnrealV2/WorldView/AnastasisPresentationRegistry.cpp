@@ -102,6 +102,30 @@ namespace
 		{TEXT("SM_Tree_GreekFir"), EAnastasisTreeSpecies::GreekFir, EAnastasisFoliageFamily::Conifer, 14.0f, 22.0f},
 	};
 
+	/**
+	 * GPT_FLORA_001 -- the trees drawn from the GPT plate (create-gpt-flora.py), one shape each.
+	 * Kept equal to GPT_SPECIES in tools/unreal/set_tree_grammar.py. Pin sombre and cypres join the
+	 * existing BlackPine and Cypress species as a further shape; the three others are new species.
+	 */
+	struct FGptSpeciesDefault
+	{
+		const TCHAR* MeshName;
+		EAnastasisTreeSpecies Species;
+		EAnastasisFoliageFamily Family;
+		float MinHeightM;
+		float MaxHeightM;
+	};
+	const FGptSpeciesDefault GptSpeciesDefaults[] = {
+		{TEXT("SM_Gpt_Chene"), EAnastasisTreeSpecies::DeciduousOak, EAnastasisFoliageFamily::Broadleaf, 14.0f, 22.0f},
+		{TEXT("SM_Gpt_Bouleau"), EAnastasisTreeSpecies::Birch, EAnastasisFoliageFamily::Broadleaf, 12.0f, 18.0f},
+		{TEXT("SM_Gpt_PinSylvestre"), EAnastasisTreeSpecies::ScotsPine, EAnastasisFoliageFamily::Conifer, 20.0f, 30.0f},
+		{TEXT("SM_Gpt_SaulePleureur"), EAnastasisTreeSpecies::Willow, EAnastasisFoliageFamily::Broadleaf, 10.0f, 16.0f},
+		{TEXT("SM_Gpt_MarronnierFleuri"), EAnastasisTreeSpecies::HorseChestnut, EAnastasisFoliageFamily::Broadleaf, 14.0f, 20.0f},
+		{TEXT("SM_Gpt_PinSombre"), EAnastasisTreeSpecies::BlackPine, EAnastasisFoliageFamily::Conifer, 15.0f, 23.0f},
+		{TEXT("SM_Gpt_Cypres"), EAnastasisTreeSpecies::Cypress, EAnastasisFoliageFamily::Conifer, 12.0f, 20.0f},
+	};
+	const TCHAR* GptFoliageMaterialPath = TEXT("/Game/Anastasis/Materials/M_AnastasisGptFoliage.M_AnastasisGptFoliage");
+
 	FAnastasisPresentationEntry MakeDefaultEntry(
 		EAnastasisSemanticType SemanticType,
 		const TCHAR* ArchetypeId,
@@ -185,6 +209,16 @@ UAnastasisPresentationRegistry* UAnastasisPresentationRegistry::CreateCodeDefaul
 			Variant.HeightRangeM = FVector2D(Row.MinHeightM, Row.MaxHeightM);
 			Forest.Variants.Add(MoveTemp(Variant));
 		}
+	}
+
+	for (const FGptSpeciesDefault& Row : GptSpeciesDefaults)
+	{
+		const FString Path = FString::Printf(TEXT("/Game/Anastasis/Vegetation/Gpt/%s.%s"), Row.MeshName, Row.MeshName);
+		FAnastasisPresentationVariant Variant = MakeVariant(*Path, EAnastasisStatureClass::Any, Row.Family, 1.0f,
+			GptFoliageMaterialPath, BarkMaterialPath);
+		Variant.Species = Row.Species;
+		Variant.HeightRangeM = FVector2D(Row.MinHeightM, Row.MaxHeightM);
+		Forest.Variants.Add(MoveTemp(Variant));
 	}
 
 	// Ruin is unchanged, lean included: a wall stub is a manufactured thing and stands plumb.

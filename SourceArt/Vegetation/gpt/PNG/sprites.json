@@ -1,0 +1,80 @@
+[
+ {
+  "name": "marronnier_fleuri",
+  "w": 319,
+  "h": 399,
+  "pivot_x": 0.476
+ },
+ {
+  "name": "bouleau",
+  "w": 296,
+  "h": 389,
+  "pivot_x": 0.505
+ },
+ {
+  "name": "chene",
+  "w": 392,
+  "h": 389,
+  "pivot_x": 0.507
+ },
+ {
+  "name": "pin_sombre",
+  "w": 288,
+  "h": 407,
+  "pivot_x": 0.478
+ },
+ {
+  "name": "pin_sylvestre",
+  "w": 253,
+  "h": 395,
+  "pivot_x": 0.515
+ },
+ {
+  "name": "cypres",
+  "w": 239,
+  "h": 416,
+  "pivot_x": 0.496
+ },
+ {
+  "name": "genevrier",
+  "w": 368,
+  "h": 356,
+  "pivot_x": 0.531
+ },
+ {
+  "name": "noisetier",
+  "w": 306,
+  "h": 398,
+  "pivot_x": 0.504
+ },
+ {
+  "name": "saule_pleureur",
+  "w": 395,
+  "h": 384,
+  "pivot_x": 0.494
+ },
+ {
+  "name": "arbuste_baies",
+  "w": 328,
+  "h": 291,
+  "pivot_x": 0.494
+ },
+ {
+  "name": "rhododendron",
+  "w": 349,
+  "h": 284,
+  "pivot_x": 0.509
+ },
+ {
+  "name": "fougere",
+  "w": 373,
+  "h": 258,
+  "pivot_x": 0.495
+ },
+ {
+  "name": "prairie_fleurie",
+  "w": 348,
+  "h": 273,
+  "pivot_x": 0.503
+ }
+]

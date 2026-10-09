@@ -75,6 +75,23 @@ SPECIES = [
 ]
 
 
+# GPT_FLORA_001 -- les arbres tires de la planche GPT (create-gpt-flora.py), une forme chacun, dans
+# /Game/Anastasis/Vegetation/Gpt/, avec leur propre materiau de feuillage. (maillage, espece, famille,
+# hauteur adulte en m). Pin sombre et cypres sont une forme de plus des essences BlackPine et Cypress.
+# Memes valeurs que GptSpeciesDefaults dans AnastasisPresentationRegistry.cpp.
+GPT_MESH_DIR = "/Game/Anastasis/Vegetation/Gpt/"
+GPT_MATERIAL = "/Game/Anastasis/Materials/M_AnastasisGptFoliage"
+GPT_SPECIES = [
+    ("SM_Gpt_Chene", "DECIDUOUS_OAK", "BROADLEAF", (14.0, 22.0)),
+    ("SM_Gpt_Bouleau", "BIRCH", "BROADLEAF", (12.0, 18.0)),
+    ("SM_Gpt_PinSylvestre", "SCOTS_PINE", "CONIFER", (20.0, 30.0)),
+    ("SM_Gpt_SaulePleureur", "WILLOW", "BROADLEAF", (10.0, 16.0)),
+    ("SM_Gpt_MarronnierFleuri", "HORSE_CHESTNUT", "BROADLEAF", (14.0, 20.0)),
+    ("SM_Gpt_PinSombre", "BLACK_PINE", "CONIFER", (15.0, 23.0)),
+    ("SM_Gpt_Cypres", "CYPRESS", "CONIFER", (12.0, 20.0)),
+]
+
+
 def log(msg):
     unreal.log("[set_tree_grammar] " + str(msg))
 
@@ -143,6 +160,25 @@ def build_variants():
             variant.set_editor_property("species", enum_value("AnastasisTreeSpecies", species_name))
             variant.set_editor_property("height_range_m", unreal.Vector2D(low, high))
             out.append(variant)
+    gpt_material = unreal.EditorAssetLibrary.load_asset(GPT_MATERIAL)
+    if gpt_material is None:
+        raise Exception("materiau introuvable %s -- lancer d'abord "
+                        "tools/unreal/create-gpt-flora.ps1" % GPT_MATERIAL)
+    for mesh_name, species_name, family_name, (low, high) in GPT_SPECIES:
+        mesh = unreal.EditorAssetLibrary.load_asset(GPT_MESH_DIR + mesh_name)
+        if mesh is None:
+            raise Exception("mesh introuvable %s%s -- lancer d'abord "
+                            "tools/unreal/create-gpt-flora.ps1" % (GPT_MESH_DIR, mesh_name))
+        variant = unreal.AnastasisPresentationVariant()
+        variant.set_editor_property("mesh", mesh)
+        variant.set_editor_property("material_override", gpt_material)
+        variant.set_editor_property("additional_material_overrides", [bark])
+        variant.set_editor_property("stature", enum_value("AnastasisStatureClass", "ANY"))
+        variant.set_editor_property("family", enum_value("AnastasisFoliageFamily", family_name))
+        variant.set_editor_property("scale_bias", 1.0)
+        variant.set_editor_property("species", enum_value("AnastasisTreeSpecies", species_name))
+        variant.set_editor_property("height_range_m", unreal.Vector2D(low, high))
+        out.append(variant)
     return out
 
 
@@ -233,18 +269,19 @@ def verify():
             continue
         variants = entry.get_editor_property("variants")
         log("VERIFY FOREST %s" % describe(entry))
-        expected = len(VARIANTS) + SHAPES_PER_SPECIES * len(SPECIES)
+        expected = len(VARIANTS) + SHAPES_PER_SPECIES * len(SPECIES) + len(GPT_SPECIES)
         statures = {str(v.get_editor_property("stature")) for v in variants}
         families = {str(v.get_editor_property("family")) for v in variants}
         species = {str(v.get_editor_property("species")) for v in variants}
         slots = {len(v.get_editor_property("additional_material_overrides")) for v in variants}
-        # 4 statures pontiques + ANY des essences ; 7 essences + ANY de la grille pontique.
+        # 4 statures pontiques + ANY des essences ; 7 essences + 5 nouvelles (GPT) + ANY de la grille pontique.
+        gpt_new = len({s for _m, s, _f, _h in GPT_SPECIES} - {s for _p, s, _f, _h in SPECIES})
         ok = (len(variants) == expected and len(statures) == 5 and len(families) == 2
-              and len(species) == len(SPECIES) + 1 and slots == {1})
+              and len(species) == len(SPECIES) + gpt_new + 1 and slots == {1})
         log("VERIFY variants=%d attendu=%d statures=%d attendu=5 familles=%d attendu=2 "
             "especes=%d attendu=%d slots_supplementaires=%s attendu={1} -> %s"
             % (len(variants), expected, len(statures), len(families), len(species),
-               len(SPECIES) + 1, sorted(slots), "OK" if ok else "MAUVAIS"))
+               len(SPECIES) + gpt_new + 1, sorted(slots), "OK" if ok else "MAUVAIS"))
         return ok
     log("VERIFY::FAIL entree FOREST disparue")
     return False
