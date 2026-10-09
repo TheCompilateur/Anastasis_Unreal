@@ -6,14 +6,15 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-// valmire-grows-001 (ecart n°50) -- le village grandit de lui-meme.
+// valmire-grows-001 (ecart n°50) -- le village decide de ses batiments communs.
 //
-// Un village nu de douze habitants (puits, grenier, champs ouverts), la croissance allumee :
-//   1. des habitants ouvrent d'eux-memes des chantiers (`tryOpenNewConstruction`), chacun avec sa raison ;
-//   2. deux parties identiques restent identiques (StateDigest) ;
-//   3. croissance eteinte : rien de tout cela (le harnais et les scenarios ne sont pas touches).
-// Ce village nu n'est pas viable (sans croissance non plus : tout le monde y meurt en huit jours, sans
-// fermiers ni familles) : la vie sur trente jours se juge sur le vrai village du lancement, dans l'hote
+// La decision du soir (`UpdateCommonBuildingsDaily`), regle par regle, sur un village nu :
+//   1. sans grenier, le village en ouvre un ; trop d'ames pour un puits, il ouvre un puits ; le grenier
+//      plein, il en ouvre un second ; chaque fois un habitant en trace l'emplacement, avec la raison ;
+//   2. rien ne manque, ou les creneaux sont pleins : rien ne s'ouvre ;
+//   3. deux parties identiques restent identiques (StateDigest) ;
+//   4. croissance eteinte (harnais, scenarios) : rien de tout cela, meme a minuit.
+// La vie sur trente jours se juge sur le vrai village du lancement, dans l'hote
 // (`Anastasis.Village.Croissance.Valmire`).
 
 namespace AnastasisVillageGrowthTest
@@ -23,12 +24,11 @@ namespace AnastasisVillageGrowthTest
 	constexpr double Dt = 1.0 / 60.0;
 	constexpr int32 TicksPerDay = static_cast<int32>(FAnastasisSimulation::DayLength * 60.0);
 
-	void Populate(FAnastasisSimulation& Sim, bool bGrowth)
+	/** Puits (et grenier si demande) sur les premieres cases libres pres du centre, `Count` habitants. */
+	void Populate(FAnastasisSimulation& Sim, bool bGrowth, bool bGranary, int32 Count)
 	{
 		Sim.Reset(12345u, 96, 96);
 		FVillage& Village = Sim.GetVillage();
-		Village.SetTerrainTravelCostEnabled(true);
-		Village.SetRoadEvolutionEnabled(true);
 		const FPoint Centre = Village.GetSettlement();
 		const int32 CX = FMath::FloorToInt32(Centre.X), CY = FMath::FloorToInt32(Centre.Y);
 		const auto Spiral = [CX, CY](int32 MinR, TFunctionRef<bool(int32, int32)> Try)
@@ -44,75 +44,93 @@ namespace AnastasisVillageGrowthTest
 		};
 		// Le centre du monde 12345 n'est pas constructible : le puits sur la premiere case libre.
 		Spiral(0, [&Village](int32 X, int32 Y) { return !Village.AddBuilding(WellType, X, Y).IsEmpty(); });
-		Spiral(3, [&Village](int32 X, int32 Y) { return !Village.AddBuilding(GranaryType, X, Y).IsEmpty(); });
-		int32 Fields = 0;
-		Spiral(4, [&Village, &Fields](int32 X, int32 Y) { if (Village.ActivateFoodSource(X, Y)) ++Fields; return Fields >= 8; });
+		if (bGranary) Spiral(3, [&Village](int32 X, int32 Y) { return !Village.AddBuilding(GranaryType, X, Y).IsEmpty(); });
 		int32 Spawned = 0;
-		for (int32 R = 2; R <= 8 && Spawned < 12; ++R)
-		for (int32 DY = -R; DY <= R && Spawned < 12; DY += 2)
-		for (int32 DX = -R; DX <= R && Spawned < 12; DX += 2)
+		for (int32 R = 2; R <= 10 && Spawned < Count; ++R)
+		for (int32 DY = -R; DY <= R && Spawned < Count; DY += 2)
+		for (int32 DX = -R; DX <= R && Spawned < Count; DX += 2)
 		{
 			if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) != R) continue;
 			const double X = CX + DX + 0.5, Y = CY + DY + 0.5;
 			if (Village.IsFootBlocked(X, Y)) continue;
-			AnastasisNeeds::FNeeds Needs;
-			Needs.Thirst = 20.0 + 2.0 * Spawned;
-			Needs.Hunger = 10.0 + 2.0 * Spawned;
-			Village.SpawnNpc(X, Y, Needs);
+			Village.SpawnNpc(X, Y, AnastasisNeeds::FNeeds());
 			++Spawned;
 		}
 		Village.SetGrowthEnabled(bGrowth);
 	}
 
-	struct FOutcome
+	const FBuilding* Opened(const FVillage& Village, const FString& Id)
 	{
-		int32 SitesOpened = 0;
-		int32 OpenedDone = 0;
-		int32 Deaths = 0;
-		int32 Npcs = 0;
-		int32 Buildings = 0;
-		TArray<FString> Lines;
-		uint64 Digest = 0;
-	};
-
-	FOutcome Run(FAnastasisSimulation& Sim, int32 Days)
-	{
-		for (int32 I = 0; I < TicksPerDay * Days; ++I) Sim.Tick(Dt);
-		FOutcome Out;
-		const FVillage& Village = Sim.GetVillage();
-		Out.SitesOpened = Village.GetGrowthSitesOpened();
-		Out.Deaths = Village.GetDeaths().Num();
-		Out.Npcs = Village.GetActors().Num();
-		Out.Buildings = Village.GetBuildings().Num();
-		for (const FBuilding& B : Village.GetBuildings())
-		{
-			if (B.OpenedById.IsEmpty()) continue;
-			if (B.Progress >= 1.0) ++Out.OpenedDone;
-			Out.Lines.Add(FString::Printf(TEXT("%s %s par %s (%s) %.0f%%"), *B.Id, *B.Type, *B.OpenedById, *B.OpenCause, B.Progress * 100.0));
-		}
-		Out.Digest = Sim.StateDigest();
-		return Out;
+		const FBuilding* B = Village.FindBuilding(Id);
+		return B && !B->OpenedById.IsEmpty() ? B : nullptr;
 	}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FAnastasisVillageGrowthTest,
-	"Anastasis.Sim.Village.Croissance.Ouverture",
+	FAnastasisVillageCommonBuildingsTest,
+	"Anastasis.Sim.Village.Croissance.BatimentsCommuns",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FAnastasisVillageGrowthTest::RunTest(const FString&)
+bool FAnastasisVillageCommonBuildingsTest::RunTest(const FString&)
 {
 	using namespace AnastasisVillageGrowthTest;
-	FAnastasisSimulation Sim;
-	Populate(Sim, true);
-	TestTrue(TEXT("croissance allumee"), Sim.GetVillage().IsGrowthEnabled());
-	TestEqual(TEXT("puits et grenier poses"), Sim.GetVillage().GetBuildings().Num(), 2);
-	const FOutcome O = Run(Sim, 6);
-	for (const FString& Line : O.Lines) AddInfo(TEXT("VALMIRE_GROWTH site ") + Line);
-	AddInfo(FString::Printf(TEXT("VALMIRE_GROWTH days=6 sites_opened=%d opened_done=%d deaths=%d npcs=%d buildings=%d last=\"%s\""),
-		O.SitesOpened, O.OpenedDone, O.Deaths, O.Npcs, O.Buildings, *Sim.GetVillage().GetLastBuildDecision()));
-	TestTrue(TEXT("des habitants ouvrent d'eux-memes des chantiers"), O.SitesOpened >= 2);
-	TestTrue(TEXT("chaque chantier ouvert dit pourquoi"), !O.Lines.ContainsByPredicate([](const FString& L) { return L.Contains(TEXT("()")); }));
+	{
+		// Sans grenier : le village en ouvre un.
+		FAnastasisSimulation Sim;
+		Populate(Sim, true, false, 8);
+		FVillage& V = Sim.GetVillage();
+		const FString Id = V.UpdateCommonBuildingsDaily(1);
+		const FBuilding* B = Opened(V, Id);
+		if (TestNotNull(TEXT("sans grenier : un chantier ouvert par le village"), B))
+		{
+			TestEqual(TEXT("... un grenier"), B->Type, FString(GranaryType));
+			TestTrue(TEXT("... et pourquoi"), B->OpenCause.StartsWith(TEXT("aucun grenier")));
+			TestTrue(TEXT("... chantier sec, en cours"), B->Progress < 1.0 && B->bHasMaterials);
+			TestEqual(TEXT("... trace par un habitant, qui en est le batisseur"), B->BuilderId, B->OpenedById);
+		}
+		TestTrue(TEXT("un creneau pris : le soir suivant, rien de plus (un seul grenier en chantier)"), V.UpdateCommonBuildingsDaily(2).IsEmpty());
+		AddInfo(TEXT("VALMIRE_GROWTH granary ") + V.GetLastBuildDecision());
+	}
+	{
+		// Seize ames pour un puits : un puits de plus.
+		FAnastasisSimulation Sim;
+		Populate(Sim, true, true, 16);
+		FVillage& V = Sim.GetVillage();
+		TestEqual(TEXT("seize habitants poses"), V.GetActors().Num(), 16);
+		const FString Id = V.UpdateCommonBuildingsDaily(1);
+		const FBuilding* B = Opened(V, Id);
+		if (TestNotNull(TEXT("seize ames pour un puits : un chantier ouvert"), B))
+		{
+			TestEqual(TEXT("... un puits"), B->Type, FString(WellType));
+			TestEqual(TEXT("... et pourquoi"), B->OpenCause, FString(TEXT("16 ames pour 1 puits")));
+		}
+		AddInfo(TEXT("VALMIRE_GROWTH well ") + V.GetLastBuildDecision());
+	}
+	{
+		// Le grenier plein : un second grenier.
+		FAnastasisSimulation Sim;
+		Populate(Sim, true, true, 8);
+		FVillage& V = Sim.GetVillage();
+		FString GranaryId;
+		for (const FBuilding& B : V.GetBuildings()) if (B.Type == GranaryType) GranaryId = B.Id;
+		TestTrue(TEXT("grenier rempli"), V.CreditFood(GranaryId, GranaryFoodCap) >= static_cast<int32>(0.9 * GranaryFoodCap));
+		const FString Id = V.UpdateCommonBuildingsDaily(1);
+		const FBuilding* B = Opened(V, Id);
+		if (TestNotNull(TEXT("grenier plein : un chantier ouvert"), B))
+		{
+			TestEqual(TEXT("... un second grenier"), B->Type, FString(GranaryType));
+			TestTrue(TEXT("... et pourquoi"), B->OpenCause.StartsWith(TEXT("le grenier deborde")));
+		}
+		AddInfo(TEXT("VALMIRE_GROWTH full ") + V.GetLastBuildDecision());
+	}
+	{
+		// Rien ne manque : rien ne s'ouvre.
+		FAnastasisSimulation Sim;
+		Populate(Sim, true, true, 8);
+		FVillage& V = Sim.GetVillage();
+		TestTrue(TEXT("rien ne manque : aucun chantier"), V.UpdateCommonBuildingsDaily(1).IsEmpty());
+		TestTrue(TEXT("... et la decision le dit"), V.GetLastBuildDecision().Contains(TEXT("rien ne manque")));
+	}
 	return true;
 }
 
@@ -125,12 +143,12 @@ bool FAnastasisVillageGrowthDeterminismTest::RunTest(const FString&)
 {
 	using namespace AnastasisVillageGrowthTest;
 	FAnastasisSimulation A, B;
-	Populate(A, true);
-	Populate(B, true);
-	const FOutcome OA = Run(A, 8);
-	const FOutcome OB = Run(B, 8);
-	TestEqual(TEXT("deux parties identiques : meme etat complet a huit jours"), OA.Digest, OB.Digest);
-	TestEqual(TEXT("... memes chantiers ouverts"), OA.SitesOpened, OB.SitesOpened);
+	Populate(A, true, false, 8);
+	Populate(B, true, false, 8);
+	for (int32 I = 0; I < TicksPerDay * 3; ++I) { A.Tick(Dt); B.Tick(Dt); }
+	TestEqual(TEXT("deux parties identiques : meme etat complet a trois jours"), A.StateDigest(), B.StateDigest());
+	TestTrue(TEXT("... et le village y a bien decide un grenier"), A.GetVillage().GetGrowthSitesOpened() >= 1);
+	TestEqual(TEXT("... dans les deux"), A.GetVillage().GetGrowthSitesOpened(), B.GetVillage().GetGrowthSitesOpened());
 	return true;
 }
 
@@ -143,20 +161,15 @@ bool FAnastasisVillageGrowthOffTest::RunTest(const FString&)
 {
 	using namespace AnastasisVillageGrowthTest;
 	FAnastasisSimulation Sim;
-	Populate(Sim, false);
-	TestFalse(TEXT("croissance eteinte par defaut dans ce village"), Sim.GetVillage().IsGrowthEnabled());
-	const FOutcome O = Run(Sim, 8);
-	TestEqual(TEXT("aucun chantier ouvert par un habitant"), O.SitesOpened, 0);
-	TestEqual(TEXT("aucun chantier ne porte d'ouvreur"), O.Lines.Num(), 0);
-
-	// Allumer puis eteindre rend le village a son etat sans colonie.
-	FAnastasisSimulation Toggled;
-	Populate(Toggled, false);
-	Toggled.GetVillage().SetGrowthEnabled(true);
-	Toggled.GetVillage().SetGrowthEnabled(false);
-	FAnastasisSimulation Plain;
-	Populate(Plain, false);
-	TestEqual(TEXT("allumer puis eteindre ne laisse rien"), Toggled.StateDigest(), Plain.StateDigest());
+	Populate(Sim, false, false, 8);
+	TestFalse(TEXT("croissance eteinte dans ce village"), Sim.GetVillage().IsGrowthEnabled());
+	TestTrue(TEXT("la decision du soir ne fait rien"), Sim.GetVillage().UpdateCommonBuildingsDaily(1).IsEmpty());
+	for (int32 I = 0; I < TicksPerDay * 3; ++I) Sim.Tick(Dt);
+	TestEqual(TEXT("trois minuits plus tard : aucun chantier commun"), Sim.GetVillage().GetGrowthSitesOpened(), 0);
+	for (const FBuilding& B : Sim.GetVillage().GetBuildings())
+	{
+		TestTrue(TEXT("aucun chantier ne porte d'ouvreur"), B.OpenedById.IsEmpty());
+	}
 	return true;
 }
 

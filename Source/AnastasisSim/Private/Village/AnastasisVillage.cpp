@@ -184,7 +184,7 @@ namespace AnastasisVillage
 		bRoadEvolutionEnabled = false;
 		Biographies.Reset();
 		bBiographyEnabled = false;
-		// ecart n°50 : la croissance s'eteint ; la colonie qu'elle avait posee part avec elle.
+		// ecart n°50 : la decision des batiments communs s'eteint.
 		SetGrowthEnabled(false);
 		GrowthSitesOpened = 0;
 		LastBuildDecision.Reset();
@@ -2301,12 +2301,6 @@ namespace AnastasisVillage
 		}
 		WritePlannerView(View);
 		Out.BuildingNeedScore = D.BuildingNeedScore;
-		// ecart n°50 : la colonie que la croissance donne au village du jeu ne sert qu'a decider de BATIR (le
-		// besoin de chantier de `buildScore`, ci-dessus). Ses biais, planchers et urgences sur les autres buts
-		// restent eteints : allumes, ils detournaient cultivateurs et batisseurs de boire et de manger (trois
-		// morts de soif en trente jours, grenier vide quatorze jours, mesure du 2026-10-08) ; la reference les
-		// equilibre par des systemes non portes (passe quotidienne, crises, ordres).
-		if (bGrowthColony) return Out;
 		Out.GoalBias = D.GoalBias;
 		Out.GoalFloor = D.GoalFloor;
 		Out.UrgencyBias = D.UrgencyBias;
@@ -6782,9 +6776,8 @@ namespace AnastasisVillage
 	int32 FVillage::ProgressBuildWork(FNpc& Npc, double Dt)
 	{
 		namespace B = AnastasisBuild;
-		// `tryOpenNewConstruction` : porte seulement quand l'hote fait grandir le village (ecart n°50) ;
-		// sinon l'ouverture reste celle de l'hote (ecart n°18), aucun creneau.
-		if (bGrowthEnabled) TryOpenNewConstruction(Npc);
+		// `tryOpenNewConstruction` : l'ouverture n'est pas portee (ecart n°18), aucun creneau. Les batiments
+		// communs sont decides par le village le soir (ecart n°50), les maisons par les familles (n°48).
 		// Preference, pas epinglage : on garde l'objet de l'intention tant qu'il est posable.
 		FBuilding* Bound = BoundBuildSite(Npc);
 		FBuilding* Site = (Bound && SitePieceReady(*Bound)) ? Bound : PickBuildSite(Npc);

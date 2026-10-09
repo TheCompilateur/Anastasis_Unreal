@@ -448,6 +448,12 @@ void FAnastasisSimulation::RunDayJob(int32 Job)
 	{
 		RunLandRegen();
 	}
+	else if (Job == DayJobCollective)
+	{
+		// `updateCollectivePrioritiesDaily` n'est pas porte (ecart n°27) ; a sa place, le village decide de ses
+		// batiments communs, seulement s'il grandit (ecart n°50).
+		Village.UpdateCommonBuildingsDaily(Day);
+	}
 	else if (Job == DayJobRoadEvolution)
 	{
 		LastRoadsBuilt = Village.UpdateRoadEvolutionDaily(Day);

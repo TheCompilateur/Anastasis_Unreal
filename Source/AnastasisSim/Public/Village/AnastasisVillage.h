@@ -438,9 +438,8 @@ namespace AnastasisVillage
 		AnastasisBuild::FSiteMaterials Materials;
 		FString BuilderId;
 		/**
-		 * ecart n°50 (valmire-grows-001) : l'habitant qui a ouvert ce chantier de lui-meme
-		 * (`tryOpenNewConstruction`), et pourquoi (la raison de `pickCollectiveBuilding`, lisible). Vides pour
-		 * un chantier ouvert par l'hote ou un scenario.
+		 * ecart n°50 (valmire-grows-001) : l'habitant qui a trace ce batiment commun quand le village l'a
+		 * decide, et pourquoi (lisible). Vides pour un chantier ouvert par l'hote, un scenario ou une famille.
 		 */
 		FString OpenedById;
 		FString OpenCause;
@@ -1605,18 +1604,17 @@ namespace AnastasisVillage
 		int32 UpdateRoadEvolutionDaily(int32 Day);
 
 		/**
-		 * ecart n°50 (valmire-grows-001) -- le village grandit de lui-meme. Active par l'hote seulement (le
-		 * village C++ nu et le harnais restent a faux) :
-		 *  - une colonie lui est donnee si elle manque (tresor vide : le travail d'ouverture est collectif),
-		 *    et ses habitants pesent le besoin de batir (`buildScore`) ;
-		 *  - un habitant au but `build` sans chantier a travailler en ouvre un (`tryOpenNewConstruction`) :
-		 *    type par `pickCollectiveBuilding` (grenier tenu pour la ferme), emplacement par `findBuildSpot`
-		 *    (repli de 80 tirages), chantier sec que porteurs et bucherons approvisionnent ;
-		 * Les arrivants ne sont pas portes ici : ils viennent du monde exterieur (arrivants-001).
+		 * ecart n°50 (valmire-grows-001) -- le village decide de ses batiments communs. Active par l'hote
+		 * seulement, pour le village du lancement (le village C++ nu, le harnais et les scenarios restent a
+		 * faux). Chaque soir (`UpdateCommonBuildingsDaily`, travail `collective` de la file de minuit), s'il
+		 * manque un grenier (aucun, ou tous pleins) ou un puits (trop d'ames par puits), un habitant en trace
+		 * l'emplacement et le chantier s'ouvre sec. Les maisons restent l'affaire des familles (ecart n°48).
 		 */
 		void SetGrowthEnabled(bool bEnabled);
 		bool IsGrowthEnabled() const { return bGrowthEnabled; }
-		/** Chantiers que les habitants ont ouverts d'eux-memes depuis Bind. */
+		/** ecart n°50 : la decision du soir ; rend l'identifiant du chantier ouvert, ou vide. */
+		FString UpdateCommonBuildingsDaily(int32 InDay);
+		/** Chantiers communs que le village a ouverts de lui-meme depuis Bind. */
 		int32 GetGrowthSitesOpened() const { return GrowthSitesOpened; }
 		/** La derniere decision de `pickCollectiveBuilding` (type vide = aucun), pour les rapports. */
 		const FString& GetLastBuildDecision() const { return LastBuildDecision; }
@@ -2064,10 +2062,8 @@ namespace AnastasisVillage
 		// Chantier (npc.js progressBuildWork, simulation.js workConstruction).
 		/** `progressBuildWork` : 0 = echec, 1 = au travail, 2 = fini. */
 		int32 ProgressBuildWork(FNpc& Npc, double Dt);
-		/** ecart n°50 : `tryOpenNewConstruction` ; vrai si un chantier vient d'etre ouvert par `Npc`. */
-		bool TryOpenNewConstruction(FNpc& Npc);
-		/** ecart n°50 : `pickCollectiveBuilding` sur le catalogue du port (maison, grenier, puits). */
-		FString PickCollectiveBuilding(FString& OutCause);
+		/** ecart n°50 : le batiment commun qui manque (grenier, puits), et pourquoi ; vide si rien ne manque. */
+		FString PickCommonBuilding(FString& OutCause);
 		/** ecart n°50 : `findBuildSpot` (repli de la reference : 80 tirages autour du village). */
 		bool FindBuildSpot(const FString& Type, FIntPoint& OutSpot);
 		/** `constructionOpenSlots`, le grenier tenant lieu de ferme (ecart n°50). */
@@ -2233,8 +2229,6 @@ namespace AnastasisVillage
 		bool bRoadEvolutionEnabled = false;
 		/** ecart n°50 (valmire-grows-001). */
 		bool bGrowthEnabled = false;
-		/** La colonie a ete posee par `SetGrowthEnabled` (et non par le harnais) : `Bind` et la desactivation la retirent. */
-		bool bGrowthColony = false;
 		int32 GrowthSitesOpened = 0;
 		FString LastBuildDecision;
 		/** ecart n°46 : biographies par identifiant de batiment ; un batiment demoli garde la sienne. */

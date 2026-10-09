@@ -1118,7 +1118,6 @@ namespace AnastasisVillage
 		Ar.Key(TEXT("roadEvolutionEnabled")).Bool(bRoadEvolutionEnabled);
 		// ecart n°50 : la croissance du village (valmire-grows-001).
 		Ar.Key(TEXT("growthEnabled")).Bool(bGrowthEnabled);
-		Ar.Key(TEXT("growthColony")).Bool(bGrowthColony);
 		Ar.Key(TEXT("growthSitesOpened")).Number(GrowthSitesOpened);
 		Ar.Key(TEXT("lastBuildDecision")).String(LastBuildDecision);
 		{

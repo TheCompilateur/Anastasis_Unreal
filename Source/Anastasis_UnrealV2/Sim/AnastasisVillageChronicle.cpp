@@ -67,24 +67,19 @@ namespace AnastasisChronicle
 		FString HumanOpenCause(const FString& Cause)
 		{
 			if (Cause.StartsWith(TEXT("aucun grenier"))) return TEXT("la récolte n'a pas où aller");
-			if (Cause.StartsWith(TEXT("crise du logement")))
+			if (Cause.StartsWith(TEXT("le grenier deborde"))) return TEXT("le grenier déborde");
+			// « 17 ames pour 1 puits »
+			TArray<FString> Words;
+			Cause.ParseIntoArray(Words, TEXT(" "));
+			if (Words.Num() >= 5 && Words[1] == TEXT("ames") && Words[4] == TEXT("puits"))
 			{
-				// « crise du logement : 14 ames pour 11 places[, aucune maison planifiee] »
-				TArray<FString> Words;
-				Cause.ParseIntoArray(Words, TEXT(" "));
-				int32 Souls = -1, Places = -1;
-				for (int32 I = 0; I + 1 < Words.Num(); ++I)
-				{
-					if (Words[I + 1] == TEXT("ames")) Souls = FCString::Atoi(*Words[I]);
-					if (Words[I + 1].StartsWith(TEXT("places"))) Places = FCString::Atoi(*Words[I]);
-				}
-				if (Souls >= 0 && Places >= 0)
-				{
-					return FString::Printf(TEXT("il n'y a pas assez de toits, %d âmes pour %d places"), Souls, Places);
-				}
-				return TEXT("il n'y a pas assez de toits");
+				const int32 Souls = FCString::Atoi(*Words[0]);
+				const int32 Wells = FCString::Atoi(*Words[3]);
+				return Wells <= 1
+					? FString::Printf(TEXT("%d âmes pour un seul puits"), Souls)
+					: FString::Printf(TEXT("%d âmes pour %d puits"), Souls, Wells);
 			}
-			return TEXT("le village en a besoin");
+			return TEXT("il en manque un");
 		}
 
 		/** « le grenier » -> « au grenier ». */
@@ -690,9 +685,9 @@ namespace AnastasisChronicle
 			}
 			else if (!Building.OpenedById.IsEmpty())
 			{
-				// valmire-grows-001 : un habitant l'ouvre de lui-meme, et la chronique dit pourquoi.
-				Add(Day, Hour, EKind::SiteOpened, { Building.OpenedById }, FString::Printf(TEXT("%s ouvre le chantier %s : %s."),
-					*NameOf(Building.OpenedById), *De(State.Label), *HumanOpenCause(Building.OpenCause)));
+				// valmire-grows-001 : le village decide d'un batiment commun, un habitant en trace l'emplacement.
+				Add(Day, Hour, EKind::SiteOpened, { Building.OpenedById }, FString::Printf(TEXT("Le village décide de bâtir %s : %s. %s en trace l'emplacement."),
+					*State.Label, *HumanOpenCause(Building.OpenCause), *NameOf(Building.OpenedById)));
 			}
 			else
 			{

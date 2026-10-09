@@ -1,8 +1,8 @@
-// valmire-grows-001 (ecart n°50) -- Valmire continue de pousser : le vrai village du lancement (les quatre
-// familles et le moine, l'ouverture), trente jours sans rendu, croissance allumee puis eteinte (temoin).
+// valmire-grows-001 (ecart n°50) -- le village decide de ses batiments communs : le vrai village du lancement
+// (les quatre familles et le moine, l'ouverture, les maisons de famille), trente jours sans rendu, decision
+// allumee puis eteinte (temoin).
 // Les deux chroniques sont ecrites dans Saved/Chronicle/ pour etre lues ; le verdict, c'est Alexandre qui
-// le lit. Le test ne retient que des faits : chantiers ouverts par les habitants, acheves, et pas plus de
-// morts que sans croissance.
+// le lit. Le test retient que la decision ne prend rien aux familles (maisons, vies) et dit ce qu'elle a fait.
 
 #include "Misc/AutomationTest.h"
 
@@ -142,11 +142,10 @@ bool FAnastasisVillageGrowthValmireTest::RunTest(const FString&)
 	AddInfo(FString::Printf(TEXT("VALMIRE_GROWS witness sites_opened=%d opened_done=%d deaths=%d npcs=%d buildings=%d houses=%d chronicle=%s"),
 		Witness.SitesOpened, Witness.OpenedDone, Witness.Deaths, Witness.Npcs, Witness.Buildings, Witness.Houses, *Witness.Path));
 
-	TestEqual(TEXT("temoin : personne n'ouvre de chantier de lui-meme"), Witness.SitesOpened, 0);
-	TestTrue(TEXT("les habitants ouvrent d'eux-memes des chantiers"), Grown.SitesOpened >= 2);
-	TestTrue(TEXT("au moins un de ces chantiers s'acheve en trente jours"), Grown.OpenedDone >= 1);
+	TestEqual(TEXT("temoin : le village ne decide d'aucun batiment commun"), Witness.SitesOpened, 0);
+	// Les maisons sont l'affaire des familles (ecart n°48) : decider des batiments communs ne doit rien leur prendre.
+	TestTrue(TEXT("pas moins de maisons que le temoin"), Grown.Houses >= Witness.Houses);
 	TestTrue(TEXT("pas plus de morts que le temoin"), Grown.Deaths <= Witness.Deaths);
-	TestTrue(TEXT("le village a plus de batiments que le temoin"), Grown.Buildings > Witness.Buildings);
 	return true;
 }
 
