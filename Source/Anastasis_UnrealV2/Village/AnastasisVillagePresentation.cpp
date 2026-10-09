@@ -770,6 +770,9 @@ void FAnastasisVillagePresentation::DrawDebug(UWorld* World, const AnastasisVill
 
 	for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
 	{
+		// Le corps du joueur est la camera (pawn lie, vue premiere personne) : sa sphere de 3,6 m centree a 5 m de
+		// haut debordait a hauteur d'yeux, avec son etiquette, et collait a l'ecran. Le joueur ne se dessine pas.
+		if (Village.IsPlayer(Npc)) continue;
 		const FVector Pos = SimToUnreal(SimWorld, Npc.X, Npc.Y, World) + FVector(0, 0, Tile * 0.25);
 		const float Thirst01 = static_cast<float>(FMath::Clamp(Npc.Needs.Thirst / 100.0, 0.0, 1.0));
 		// Dedans : bleu, petite sphere au seuil (la position reste celle de l'entree).
