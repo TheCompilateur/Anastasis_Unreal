@@ -468,6 +468,7 @@ void FAnastasisSimulation::RunDayJob(int32 Job)
 		Village.ForgetStaleDaily(Day);
 		Village.FadeEpisodesDaily(Day);
 	}
+
 }
 
 void FAnastasisSimulation::RunLandRegen()

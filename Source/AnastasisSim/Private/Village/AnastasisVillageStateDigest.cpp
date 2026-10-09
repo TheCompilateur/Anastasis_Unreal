@@ -281,6 +281,9 @@ namespace AnastasisVillage
 			Ar.Key(TEXT("materials"));
 			VisitState(Ar, V.Materials);
 			Ar.Key(TEXT("builderId")).String(V.BuilderId);
+			// ecart n°50 : qui l'a ouvert de lui-meme, et pourquoi.
+			Ar.Key(TEXT("openedById")).String(V.OpenedById);
+			Ar.Key(TEXT("openCause")).String(V.OpenCause);
 			Ar.Key(TEXT("workers"));
 			AnastasisArchive::VisitArray(Ar, V.Workers, [](FStateArchive& A, TPair<FString, int32>& Worker)
 			{
@@ -1113,6 +1116,11 @@ namespace AnastasisVillage
 		Ar.Key(TEXT("traffic"));
 		AnastasisArchive::VisitArray(Ar, Traffic, [](FStateArchive& A, float& T) { A.Number(T); });
 		Ar.Key(TEXT("roadEvolutionEnabled")).Bool(bRoadEvolutionEnabled);
+		// ecart n°50 : la croissance du village (valmire-grows-001).
+		Ar.Key(TEXT("growthEnabled")).Bool(bGrowthEnabled);
+		Ar.Key(TEXT("growthColony")).Bool(bGrowthColony);
+		Ar.Key(TEXT("growthSitesOpened")).Number(GrowthSitesOpened);
+		Ar.Key(TEXT("lastBuildDecision")).String(LastBuildDecision);
 		{
 			// Un sentier : `[tuile, classe, jour de naissance, trafic a la naissance]`.
 			TArray<int32> RoadKeys;

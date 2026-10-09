@@ -60,6 +60,33 @@ namespace AnastasisChronicle
 			return TEXT("de ") + Label;
 		}
 
+		/**
+		 * valmire-grows-001 (ecart n°50) : la raison d'un chantier qu'un habitant ouvre de lui-meme, telle que
+		 * la simulation la donne (`FBuilding::OpenCause`, sans accents), dite en clair.
+		 */
+		FString HumanOpenCause(const FString& Cause)
+		{
+			if (Cause.StartsWith(TEXT("aucun grenier"))) return TEXT("la récolte n'a pas où aller");
+			if (Cause.StartsWith(TEXT("crise du logement")))
+			{
+				// « crise du logement : 14 ames pour 11 places[, aucune maison planifiee] »
+				TArray<FString> Words;
+				Cause.ParseIntoArray(Words, TEXT(" "));
+				int32 Souls = -1, Places = -1;
+				for (int32 I = 0; I + 1 < Words.Num(); ++I)
+				{
+					if (Words[I + 1] == TEXT("ames")) Souls = FCString::Atoi(*Words[I]);
+					if (Words[I + 1].StartsWith(TEXT("places"))) Places = FCString::Atoi(*Words[I]);
+				}
+				if (Souls >= 0 && Places >= 0)
+				{
+					return FString::Printf(TEXT("il n'y a pas assez de toits, %d âmes pour %d places"), Souls, Places);
+				}
+				return TEXT("il n'y a pas assez de toits");
+			}
+			return TEXT("le village en a besoin");
+		}
+
 		/** « le grenier » -> « au grenier ». */
 		FString A(const FString& Label)
 		{
@@ -660,6 +687,12 @@ namespace AnastasisChronicle
 				Add(Day, Hour, EKind::HouseDecided, OwnerFamily->Members, bPartly
 					? FString::Printf(TEXT("%s est à l'étroit, les siens dorment chez les autres : %s décide de bâtir pour eux et trace la parcelle %s."), *Family, *Who, *De(State.Label))
 					: FString::Printf(TEXT("%s n'a pas encore de toit à soi : %s décide de bâtir et trace la parcelle %s."), *Family, *Who, *De(State.Label)));
+			}
+			else if (!Building.OpenedById.IsEmpty())
+			{
+				// valmire-grows-001 : un habitant l'ouvre de lui-meme, et la chronique dit pourquoi.
+				Add(Day, Hour, EKind::SiteOpened, { Building.OpenedById }, FString::Printf(TEXT("%s ouvre le chantier %s : %s."),
+					*NameOf(Building.OpenedById), *De(State.Label), *HumanOpenCause(Building.OpenCause)));
 			}
 			else
 			{

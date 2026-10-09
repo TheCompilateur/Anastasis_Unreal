@@ -112,6 +112,14 @@ namespace AnastasisVillage
 		return static_cast<double>(H % 1000u) / 1000.0 * ThinkEvery;
 	}
 
+	/** Faim, soif, fatigue ou sante critiques : les seuils de `needsCritical`, sans les besoins secondaires. */
+	bool SurvivalCritical(const AnastasisNeeds::FNeeds& N)
+	{
+		namespace T = AnastasisNeeds::Constants;
+		return N.Hunger >= T::HungerCritical || N.Thirst >= T::ThirstCritical
+			|| N.Energy <= 100.0 - T::FatigueCritical || N.Health <= T::HealthCritical;
+	}
+
 	bool NeedsCritical(const AnastasisNeeds::FNeeds& N)
 	{
 		// Une seule formule : `needsCritical` est porte et prouve dans le module des besoins
@@ -176,6 +184,10 @@ namespace AnastasisVillage
 		bRoadEvolutionEnabled = false;
 		Biographies.Reset();
 		bBiographyEnabled = false;
+		// ecart n°50 : la croissance s'eteint ; la colonie qu'elle avait posee part avec elle.
+		SetGrowthEnabled(false);
+		GrowthSitesOpened = 0;
+		LastBuildDecision.Reset();
 		PassageCount = 0;
 		// ecart n°40 : un monde neuf n'a pas de chantier d'ouverture.
 		OpeningSiteId.Reset();
@@ -2013,8 +2025,10 @@ namespace AnastasisVillage
 			return;
 		}
 		// Extension de portage materiel (ecart n°18), inactive dans le harnais JS.
-		// La faim/soif/fatigue critiques gardent la decision ordinaire prioritaire.
-		if (Npc.Id == MaterialCourierId && !NeedsCritical(Npc.Needs) && ProgressMaterialCourier(Npc, Dt)) return;
+		// La faim/soif/fatigue critiques (et la sante) gardent la decision ordinaire prioritaire. Les besoins
+		// secondaires (solitude, ennui, hygiene, moral) n'interrompent plus le portage : devenus critiques apres
+		// quelques jours de travail, ils arretaient le porteur pour toujours, chantiers a 0 % (valmire-grows-001).
+		if (Npc.Id == MaterialCourierId && !SurvivalCritical(Npc.Needs) && ProgressMaterialCourier(Npc, Dt)) return;
 
 		// `syncVillagePhase` : la bascule de phase force une pensee. La phase est PERSONNELLE
 		// (`villagePhaseFor`, reconsider-001) : le mode de vie decale l'horloge ; sans mode de vie
@@ -2286,13 +2300,19 @@ namespace AnastasisVillage
 			}
 		}
 		WritePlannerView(View);
+		Out.BuildingNeedScore = D.BuildingNeedScore;
+		// ecart n°50 : la colonie que la croissance donne au village du jeu ne sert qu'a decider de BATIR (le
+		// besoin de chantier de `buildScore`, ci-dessus). Ses biais, planchers et urgences sur les autres buts
+		// restent eteints : allumes, ils detournaient cultivateurs et batisseurs de boire et de manger (trois
+		// morts de soif en trente jours, grenier vide quatorze jours, mesure du 2026-10-08) ; la reference les
+		// equilibre par des systemes non portes (passe quotidienne, crises, ordres).
+		if (bGrowthColony) return Out;
 		Out.GoalBias = D.GoalBias;
 		Out.GoalFloor = D.GoalFloor;
 		Out.UrgencyBias = D.UrgencyBias;
 		Out.bWoodBootstrapDraftee = D.bWoodBootstrapDraftee;
 		Out.bFoodRush = D.bFoodRush;
 		Out.FarmStaffingGap = D.FarmStaffingGap;
-		Out.BuildingNeedScore = D.BuildingNeedScore;
 		return Out;
 	}
 
@@ -6762,7 +6782,9 @@ namespace AnastasisVillage
 	int32 FVillage::ProgressBuildWork(FNpc& Npc, double Dt)
 	{
 		namespace B = AnastasisBuild;
-		// `tryOpenNewConstruction` : l'ouverture n'est pas portee (ecart n°18), aucun creneau.
+		// `tryOpenNewConstruction` : porte seulement quand l'hote fait grandir le village (ecart n°50) ;
+		// sinon l'ouverture reste celle de l'hote (ecart n°18), aucun creneau.
+		if (bGrowthEnabled) TryOpenNewConstruction(Npc);
 		// Preference, pas epinglage : on garde l'objet de l'intention tant qu'il est posable.
 		FBuilding* Bound = BoundBuildSite(Npc);
 		FBuilding* Site = (Bound && SitePieceReady(*Bound)) ? Bound : PickBuildSite(Npc);

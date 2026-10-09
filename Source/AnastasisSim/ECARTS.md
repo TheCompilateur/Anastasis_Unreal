@@ -951,3 +951,32 @@ le prend. Une tuile devenue eau perd sa ressource ; une tuile d'eau rendue à la
 juste au-dessus de la mer. `Shore` et `Wetness` sont recalculés sur la nouvelle eau avec les formules
 de la génération ; l'humidité de fond (`Moist`) et les types qui en découlent (champs, forêt) ne sont
 pas refaits. `FlowX` / `FlowZ` / `FlowAmt` restent ceux de la référence.
+### n° 50 — Le village grandit de lui-même : des habitants ouvrent les chantiers, réduits au catalogue du port
+
+- **classe** : REDUIT
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : valmire-grows-001 (jalon « Valmire pousse toute seule », « Valmire continue de pousser », choix d'Alexandre du 2026-10-08)
+- **activation** : `FVillage::SetGrowthEnabled(true)`, posé par l'hôte Unreal pour le village du lancement seulement (`SeedStartVillage`, CVar `anastasis.Village.Growth`, défaut 1). Le village C++ nu, le harnais et les scénarios de preuve (`First*`, `FoodSupply`, `Hamlet`) restent à faux.
+- **reference** : `src/sim/npc.js` (`progressBuildWork`, `tryOpenNewConstruction`, `tryBuild`, `buildScore`), `src/sim/collectivePriorities.js` (`pickCollectiveBuilding`, `hardGateBuilding`, `constructionSlotsFull`), `src/sim/simulation.js` (`findBuildSpot`, `constructionOpenSlots`)
+- **cpp** : `Village/AnastasisVillageGrowth.cpp` (`SetGrowthEnabled`, `GrowthOpenSlots`, `FindBuildSpot`, `PickCollectiveBuilding`, `TryOpenNewConstruction`) ; `Village/AnastasisVillage.{h,cpp}` (appel en tête de `ProgressBuildWork`, colonie réduite dans `CollectiveDecisionOf`, remise à zéro dans `Bind`, `FBuilding::OpenedById` / `OpenCause`) ; `Village/AnastasisVillageStateDigest.cpp`
+- **harnais** : aucune
+- **fermeture** : à trancher (porter `rankBuildSpots`, la graine d'ouverture et les livraisons, `farm`, la passe quotidienne qui équilibre les biais collectifs)
+
+La référence ouvre ses chantiers par l'IA d'un habitant : celui dont le but est `build`, et qui ne trouve
+rien à travailler, en ouvre un. Rien de cela n'était porté : passé la première semaine, plus personne
+n'ouvrait de chantier. Porté sur le catalogue du port (maison, grenier, puits), avec ces réductions :
+- **La colonie ne sert qu'à décider de bâtir.** Le village du jeu reçoit une colonie, avec un trésor vide.
+  Les biais, planchers et urgences qu'elle pose sur les autres buts restent éteints : allumés, ils
+  détournaient cultivateurs et bâtisseurs de boire et de manger. Mesure du 2026-10-08 : 3 morts de soif en
+  30 jours et le grenier vide 14 jours, contre 0 mort sans croissance.
+- **Le grenier tient lieu de ferme** : le jeu n'a pas de bâtiment `farm`, le fermier travaille au grenier.
+  La porte « aucune ferme » devient « aucun grenier », et les créneaux montent à deux dès qu'un grenier
+  est achevé.
+- **Emplacement** : seul le repli de `findBuildSpot` est porté (80 tirages autour du village), sans le
+  classement urbain. Une case qui couperait un habitant du puits est refusée.
+- **Chantier ouvert sec** : ni graine de 10 %, ni salaire. Le porteur et les bûcherons l'approvisionnent ;
+  à défaut de porteur, celui qui l'ouvre le devient. Le crochet `houseMaterialsReachable` est tenu pour
+  ouvert.
+
+Les arrivants ne sont pas portés ici (`maybeImmigrate`) : ils viennent du monde extérieur, par arrivants-001.

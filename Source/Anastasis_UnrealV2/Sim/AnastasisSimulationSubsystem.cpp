@@ -114,6 +114,12 @@ static TAutoConsoleVariable<int32> CVarVillageSiteSource(
     TEXT("anastasis.Village.SiteSource"), 1,
     TEXT("Opening site read from: 1 = the simulation's tiles (default; render CVars cannot move the village, the rendered survey is only reported), 0 = the rendered relief (previous behaviour, for A/B)."), ECVF_Default);
 
+static TAutoConsoleVariable<int32> CVarVillageGrowth(
+	TEXT("anastasis.Village.Growth"),
+	1,
+	TEXT("valmire-grows-001 (ecart n°50) : 1 = le village grandit de lui-meme (les habitants ouvrent maison, grenier ou puits quand il en manque, des arrivants viennent quand il y a de la place et de quoi manger) ; 0 = seuls l'hote et les scenarios ouvrent des chantiers. Lu au demarrage de la simulation."),
+	ECVF_Default);
+
 static TAutoConsoleVariable<int32> CVarVillageRoadEvolution(
 	TEXT("anastasis.Village.RoadEvolution"),
 	1,
@@ -259,6 +265,8 @@ FString UAnastasisSimulationSubsystem::SeedStartVillage(int32 NpcCount, int32 Ti
 		// simulation (FVillage::SeedOpeningVillage, ecart n°40) ; l'hote ne fait que le dire.
 		LogOpeningReport(Simulation.GetVillage().SeedOpeningVillage(Simulation.GetDay(), CVarVillageOpeningConstruction.GetValueOnGameThread() != 0));
 		if (Scenario) TellFounding(*Scenario);
+		// valmire-grows-001 (ecart n°50) : le village du jeu grandit de lui-meme.
+		Simulation.GetVillage().SetGrowthEnabled(CVarVillageGrowth.GetValueOnGameThread() != 0);
 	}
 	return WellId;
 }
@@ -440,6 +448,9 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	Simulation.GetVillage().SetRoadEvolutionEnabled(CVarVillageRoadEvolution.GetValueOnGameThread() != 0);
 	// ecart n°46 : la biographie des batiments est observee par la simulation (save-history-001).
 	Simulation.GetVillage().SetBiographyEnabled(true);
+	// ecart n°50 : la croissance s'allume pour le village du lancement seulement (SeedStartVillage) ; les
+	// scenarios de preuve (First*, FoodSupply, Hamlet) restent ceux qu'ils etaient.
+	Simulation.GetVillage().SetGrowthEnabled(false);
 	LoggedDay = Simulation.GetDay();
 	UE_LOG(
 		LogAnastasis_UnrealV2,
