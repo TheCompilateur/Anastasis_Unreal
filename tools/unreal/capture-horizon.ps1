@@ -12,7 +12,8 @@
 # proprietes de l'atmosphere apres Apply() (rien n'est sauve) pour attribuer le voile des montagnes lointaines.
 # -Mode skyline (CONTINENTAL_001) : huit vues a hauteur d'oeil depuis le bassin, tous les 45 degres,
 # pour juger la ligne de crete du continent dans toutes les directions (sortie S<azimut>_<A|B>.png).
-param([string]$Label='ring', [string]$PreCmds='', [ValidateSet('AB','B')][string]$States='AB', [ValidateSet('standard','skyline')][string]$Mode='standard', [switch]$Atmosphere, [string]$AtmoProps='', [int]$TimeoutSec=480)
+# -View S045 : une seule vue nommee pour un diagnostic borne ; sans cette option, toutes les vues.
+param([string]$Label='ring', [string]$PreCmds='', [ValidateSet('AB','B')][string]$States='AB', [ValidateSet('standard','skyline')][string]$Mode='standard', [string]$View='', [switch]$Atmosphere, [string]$AtmoProps='', [int]$TimeoutSec=480)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'editor-launch.ps1')
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')).TrimEnd('\')
@@ -24,6 +25,12 @@ $py=(Join-Path $Root 'tools\unreal\capture-horizon.py').Replace('\','/')
 # aplatit @(,@('1','B')) en '1','B' -- l'etat devenait une chaine et le suffixe d'image, vide.
 $plan = @(@('0','A'), @('1','B'))
 if ($States -eq 'B') { $plan = @(,$plan[1]) }
+$viewNames = @('H1_bassin_vers_le_bord','H2_point_haut_vers_l_exterieur','H3_bord_regard_dehors','H4_vue_generale','H5_altitude_vers_le_coin')
+if ($Mode -eq 'skyline') { $viewNames = @(0,45,90,135,180,225,270,315 | ForEach-Object { 'S{0:000}' -f $_ }) }
+if ($View) {
+ if ($View -notin $viewNames) { throw "CAPTURE::FAIL vue inconnue: $View" }
+ $viewNames = @($View)
+}
 foreach ($state in $plan) {
  $log=Join-Path $dir "capture_$($state[1]).log"
  if(Test-Path $log){Remove-Item $log}
@@ -32,6 +39,7 @@ foreach ($state in $plan) {
  $env:ANASTASIS_HORIZON_TAG=$state[1]
  $env:ANASTASIS_HORIZON_PRE=$PreCmds
  $env:ANASTASIS_HORIZON_MODE=$Mode
+ $env:ANASTASIS_HORIZON_VIEW=$View
  $env:ANASTASIS_HORIZON_ATMO_PROPS=$AtmoProps
  $env:ANASTASIS_HORIZON_ATMOSPHERE= if ($Atmosphere) { '1' } else { '0' }
  $launchArgs=@(
@@ -56,8 +64,6 @@ foreach ($state in $plan) {
 # les plus denses (sous-bois de H2) -- comparer A et B, pas lire une valeur seule.
 Add-Type -AssemblyName System.Drawing
 $missing=0
-$viewNames = @('H1_bassin_vers_le_bord','H2_point_haut_vers_l_exterieur','H3_bord_regard_dehors','H4_vue_generale','H5_altitude_vers_le_coin')
-if ($Mode -eq 'skyline') { $viewNames = @(0,45,90,135,180,225,270,315 | ForEach-Object { 'S{0:000}' -f $_ }) }
 foreach ($view in $viewNames) {
  foreach ($state in $plan) {
   $shot=Join-Path $dir "$($view)_$($state[1]).png"

@@ -16,6 +16,11 @@ dont les caméras regardent ton sujet ; n'en écrire un nouveau que si aucun ne 
 Le principe d'un A/B : **une seule variable change**. Même binaire, même carte, même graine, mêmes
 caméras, même soleil. La variable passe par une CVar (`-PreCmds`, `-States`) plutôt que par deux builds.
 
+Pour un diagnostic borne de l'horizon, `capture-horizon.ps1 -Mode skyline -View S045 -States B`
+ne capture qu'une direction. Sans `-View`, les huit directions restent obligatoires pour un verdict
+sur tout l'horizon. Le journal indique aussi combien d'acteurs `AnastasisWorldEmbodiment` existaient
+avant la capture et lequel a ete reconstruit.
+
 ```powershell
 tools\unreal\capture-slice.ps1 -Mode 2 -Out avant.png -PreCmds 'anastasis.X 0'
 tools\unreal\capture-slice.ps1 -Mode 2 -Out apres.png -PreCmds 'anastasis.X 1'

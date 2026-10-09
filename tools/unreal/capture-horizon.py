@@ -47,8 +47,10 @@ for c in ['ShowFlag.Sprites 0', 'ShowFlag.Grid 0', 'viewmode lit', 'anastasis.Te
 
 cls = unreal.load_class(None, '/Script/Anastasis_UnrealV2.AnastasisWorldEmbodiment')
 found = unreal.GameplayStatics.get_all_actors_of_class(world, cls)
+unreal.log('HORIZON_ACTORS existing=%d names=%s' % (len(found), ','.join(a.get_name() for a in found)))
 actor = found[0] if len(found) > 0 else eas.spawn_actor_from_class(cls, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
 actor.call_method('EmbodyCanonical', args=(12345,))
+unreal.log('HORIZON_ACTOR_SELECTED %s' % actor.get_name())
 
 # ANASTASIS_HORIZON_ATMOSPHERE=1 : l'atmosphere du JEU, pas celle du niveau. En PIE, le
 # GameMode fait Apply() (soleil, ciel, brume, exposition du profil DA_AnastasisAtmosphere)
@@ -134,6 +136,12 @@ if os.environ.get('ANASTASIS_HORIZON_MODE', 'standard') == 'skyline':
     # La ligne de crete du continent, dans toutes les directions, a 1,7 m du sol du bassin.
     eye = unreal.Vector(basin.x, basin.y, ground(basin.x, basin.y) + 170.0)
     views = [('S%03d' % a, eye, level(float(a), 3.0)) for a in range(0, 360, 45)]
+
+only_view = os.environ.get('ANASTASIS_HORIZON_VIEW', '')
+if only_view:
+    views = [entry for entry in views if entry[0] == only_view]
+    if not views:
+        raise ValueError('Vue horizon inconnue: ' + only_view)
 
 for n, l, r in views:
     unreal.log('HORIZON_VIEW %s loc=(%.0f,%.0f,%.0f) pitch=%.1f yaw=%.1f' % (n, l.x, l.y, l.z, r.pitch, r.yaw))
