@@ -81,4 +81,24 @@ bool FAnastasisCanonicalWaterTest::RunTest(const FString&)
 	return true;
 }
 
+// drainage-lac-vide-001 -- deux mondes ou un lac minuscule disparaissait sous le flou du contour : la cote du lac
+// lisait une liste vide et le jeu plantait au lancement (annee-valmire-001, graines 99 et 2026).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisCanonicalTinyLakeTest, "Anastasis.WaterNetwork.LacMinuscule",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisCanonicalTinyLakeTest::RunTest(const FString&)
+{
+	for (const uint32 Seed : {99u, 2026u})
+	{
+		const auto G = AnastasisCanonicalGeography::Compute(Seed);
+		if (!TestTrue(FString::Printf(TEXT("monde %u : geographie calculee, sans plantage"), Seed), G.bValid))
+		{
+			AddInfo(G.Error);
+			continue;
+		}
+		TestTrue(FString::Printf(TEXT("monde %u : de l'eau aux centres des tuiles"), Seed), G.WaterTiles > 0);
+		AddInfo(FString::Printf(TEXT("WATER_TINY_LAKE seed=%u water=%d rivers=%d lakes=%d"), Seed, G.WaterTiles, G.Rivers, G.Lakes));
+	}
+	return true;
+}
+
 #endif

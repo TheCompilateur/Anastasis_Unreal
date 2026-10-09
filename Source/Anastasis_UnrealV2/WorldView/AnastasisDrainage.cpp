@@ -613,7 +613,10 @@ bool AnastasisDrainage::Apply(
 			}
 			// Un lac que le flou efface presque entierement garde son masque : mieux anguleux qu'absent.
 			KeepLargestComponent(G, Cells);
-			if (Cells.Num() < Lake.Cells.Num() / 4) continue;
+			// drainage-lac-vide-001 : en entiers, `Num() / 4` vaut 0 pour un lac de moins de quatre cases, que le
+			// flou peut effacer en entier ; il gardait alors un lac vide, et la cote du lac lisait une liste vide
+			// (mondes 99 et 2026 : plantage). Un lac efface garde son masque, comme les autres.
+			if (Cells.Num() == 0 || Cells.Num() * 4 < Lake.Cells.Num()) continue;
 			for (const int32 I : Lake.Cells) { LakeOf[I] = INDEX_NONE; LeftLake[I] = L; }
 			for (const int32 I : Cells) { LakeOf[I] = L; LeftLake[I] = INDEX_NONE; }
 			Lake.Cells = MoveTemp(Cells);
@@ -710,7 +713,7 @@ bool AnastasisDrainage::Apply(
 			TArray<double> Levels;
 			for (const int32 I : Lake.Cells) Levels.Add(Wz0[I]);
 			Levels.Sort();
-			Lake.Level = Levels[Levels.Num() / 2];
+			Lake.Level = Levels.Num() ? Levels[Levels.Num() / 2] : SeaZ;
 			continue;
 		}
 		TSet<int32> InLake(Lake.Cells);
