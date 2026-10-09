@@ -46,7 +46,9 @@ une vérification statique, pas une preuve d'exécution.
 2. **Fabriquer dans un worktree.** Garder le script ou la source 3D, son origine,
    ses droits et sa version. Le générateur n'écrit que ses assets déclarés.
    Aucun `.uasset` n'est édité comme du texte. Inspecter les fichiers LFS.
-3. **Contrôler MEC dans un éditeur neuf.** Lancer le validateur enregistré. Il
+3. **Contrôler MEC dans un éditeur neuf.** Lancer
+   `tools/unreal/validate-asset-contract.ps1 -Contract <contrat>` sans rendu,
+   puis faire rejouer le validateur enregistré au lot. Il
    vérifie le projet, le SHA des générateurs, le mesh sauvé, LOD, budgets,
    matériaux, bounds et référence C++ source. Il ne garantit pas la
    reproductibilité binaire du `.uasset`, la collision ni l'image.

@@ -23,6 +23,7 @@ ancien/nouveau/ancien aux mêmes placements. La V2 est détaillée dans
 - `docs/unreal/assets/contracts/_TEMPLATE.json`, `_TEMPLATE_V2.json`,
   `pontic-micro-v1.json`, `pontic-horsetail-v2.json`
 - `tools/unreal/asset-contract-validate.py`
+- `tools/unreal/validate-asset-contract.ps1`
 - `tools/unreal/create-pontic-horsetail-v2.py`, `.ps1`
 - `tools/unreal/ground-cover-capture.py` (états V2 uniquement)
 - `Source/Anastasis_UnrealV2/WorldView/AnastasisPonticWaterMicro.cpp`
@@ -38,8 +39,12 @@ PENDING — le commit marqué par le dernier `finish` fait foi.
 ## MEC
 
 - Syntaxe Python et JSON : à reporter avec commandes et résultats.
-- Nouveau `.uasset`, empreintes sources, LOD/bounds/matériau : à reporter
-  après génération et `asset-contract-horsetail-v2` dans un éditeur neuf.
+- Génération Unreal `-nullrhi` : `PONTIC_HORSETAIL_V2 PASS`,
+  `SM_Pontic_Horsetail_02`, trois LOD **420/133/48 triangles**, bounds
+  `[-23.0,-18.3,-1.0]..[21.6,21.4,61.1]` cm. Fichier sauvé de 38 860 octets,
+  filtre Git LFS confirmé ; log `Saved/PonticHorsetailV2Evidence/create-pontic-horsetail-v2.log`.
+- Contrat MEC en éditeur neuf (`asset-contract-horsetail-v2`) : en attente de
+  son exécution ; les valeurs du générateur ne remplacent pas cette lecture.
 - Build C++ et suite sans rendu : à reporter après `finish`.
 
 ## PROOFS
