@@ -33,7 +33,7 @@ bool FAnastasisPonticSlopeEcology::RunTest(const FString&)
     FAnastasisForestDressingSettings Settings;
     Settings.Density = 0.40f;
     Settings.WetnessPenalty = 0.80f;
-    FRenderedHabitat Habitat;
+    AnastasisEcologicalDressing::FRenderedHabitat Habitat;
     Habitat.SampleWaterHeight = [](double, double, double& Z)
     {
         Z = -10000.0;
@@ -41,18 +41,18 @@ bool FAnastasisPonticSlopeEcology::RunTest(const FString&)
     };
 
     const auto BuildPair = [&](TFunction<bool(double, double, double&)> Height,
-        FPlan& Old, FPlan& New) -> bool
+        AnastasisEcologicalDressing::FPlan& Old, AnastasisEcologicalDressing::FPlan& New) -> bool
     {
         Habitat.SampleHeight = MoveTemp(Height);
         FString Error;
         Switch->Set(0, ECVF_SetByCode);
-        if (!Build(Snapshot, Settings, Old, Error, &Habitat))
+        if (!AnastasisEcologicalDressing::Build(Snapshot, Settings, Old, Error, &Habitat))
         {
             AddError(FString::Printf(TEXT("reference build: %s"), *Error));
             return false;
         }
         Switch->Set(1, ECVF_SetByCode);
-        if (!Build(Snapshot, Settings, New, Error, &Habitat))
+        if (!AnastasisEcologicalDressing::Build(Snapshot, Settings, New, Error, &Habitat))
         {
             AddError(FString::Printf(TEXT("Pontic build: %s"), *Error));
             return false;
@@ -60,7 +60,7 @@ bool FAnastasisPonticSlopeEcology::RunTest(const FString&)
         return true;
     };
 
-    FPlan FlatOld, FlatNew;
+    AnastasisEcologicalDressing::FPlan FlatOld, FlatNew;
     if (!BuildPair([](double, double, double& Z) { Z = 50000.0; return true; }, FlatOld, FlatNew)) return false;
     TestTrue(TEXT("wet flatland has trees to compare"), FlatOld.Instances.Num() > 0);
     TestEqual(TEXT("flat wetland count remains identical"), FlatNew.Instances.Num(), FlatOld.Instances.Num());
@@ -68,7 +68,7 @@ bool FAnastasisPonticSlopeEcology::RunTest(const FString&)
         TestTrue(TEXT("flat wetland positions remain identical"),
             FlatOld.Instances[Index].Ground == FlatNew.Instances[Index].Ground);
 
-    FPlan SlopeOld, SlopeNew;
+    AnastasisEcologicalDressing::FPlan SlopeOld, SlopeNew;
     if (!BuildPair([](double X, double, double& Z)
         {
             Z = 50000.0 + X * FMath::Tan(FMath::DegreesToRadians(20.0));
@@ -76,7 +76,7 @@ bool FAnastasisPonticSlopeEcology::RunTest(const FString&)
         }, SlopeOld, SlopeNew)) return false;
     TestTrue(TEXT("wet 20-degree slope gains woodland"),
         SlopeNew.Instances.Num() > SlopeOld.Instances.Num());
-    for (const FPlacement& Tree : SlopeNew.Instances)
+    for (const AnastasisEcologicalDressing::FPlacement& Tree : SlopeNew.Instances)
     {
         TestTrue(TEXT("slope bounded by planting rule"), Tree.SlopeDegrees <= Settings.HillsideMaxSlope);
         TestTrue(TEXT("forest stays within forest habitat"),
