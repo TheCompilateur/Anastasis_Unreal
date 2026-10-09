@@ -201,7 +201,7 @@ public:
 	static bool ReadGeoScenarioFile(const FString& Path, AnastasisGeo::FScenario& Out);
 	/** Charge le monde exterieur (chemin relatif a Content/ ; vide = anastasis.Geo.ScenarioPath). Faux si refuse, chaque erreur au log. */
 	bool LoadGeoScenario(const FString& Given);
-	/** arrivants-001 (ecart n°49) : Valmire fondee, les groupes qui viendront et le monde d'ou ils viennent (anastasis.Geo.AutoLoad). */
+	/** arrivants-001 (ecart n°53) : Valmire fondee, les groupes qui viendront et le monde d'ou ils viennent (anastasis.Geo.AutoLoad). */
 	void OpenValmireToTheWorld();
 
 private:

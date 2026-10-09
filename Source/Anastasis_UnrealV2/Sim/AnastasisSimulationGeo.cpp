@@ -32,7 +32,7 @@ static TAutoConsoleVariable<FString> CVarGeoScenarioPath(
 static TAutoConsoleVariable<int32> CVarGeoAutoLoad(
 	TEXT("anastasis.Geo.AutoLoad"),
 	1,
-	TEXT("arrivants-001 (ecart n°49) : 1 = quand les fondateurs de Valmire sont poses, le monde exterieur (anastasis.Geo.ScenarioPath) "
+	TEXT("arrivants-001 (ecart n°53) : 1 = quand les fondateurs de Valmire sont poses, le monde exterieur (anastasis.Geo.ScenarioPath) "
 		"se charge avec eux, et ses groupes d'arrivants passent au conseil du soir. 0 = le village reste ferme, comme avant."),
 	ECVF_Default);
 
@@ -126,7 +126,7 @@ bool UAnastasisSimulationSubsystem::LoadGeoScenario(const FString& Given)
 
 void UAnastasisSimulationSubsystem::OpenValmireToTheWorld()
 {
-	// ecart n°49 : les noms des groupes qui viendront, puis le monde d'ou ils viendront.
+	// ecart n°53 : les noms des groupes qui viendront, puis le monde d'ou ils viendront.
 	Simulation.GetVillage().SetArrivalPool(AnastasisArrivals::DefaultPool());
 	if (CVarGeoAutoLoad.GetValueOnGameThread() != 0 && !Simulation.GetGeo().IsLoaded())
 	{

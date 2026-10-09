@@ -6,7 +6,7 @@
 #include "World/AnastasisPathfinding.h"
 #include "World/AnastasisWorld.h"
 
-// ecart n°50 (valmire-grows-001) -- le village decide de ses batiments communs.
+// ecart n°52 (valmire-grows-001) -- le village decide de ses batiments communs.
 //
 // Les maisons sont l'affaire des familles : chacune decide de batir la sienne et demande de l'aide (ecart
 // n°48, relay-memoire-001). Le village, lui, decide ensemble, chaque soir, des batiments COMMUNS quand il en
@@ -36,9 +36,9 @@ namespace AnastasisVillage
 		constexpr int32 MaxActiveSites = 2;
 		/** `villageStruct().plazaRadius || 3`. */
 		constexpr double PlazaRadius = 3.0;
-		/** Regle propre (ecart n°50) : au-dela, le village veut un puits de plus. */
+		/** Regle propre (ecart n°52) : au-dela, le village veut un puits de plus. */
 		constexpr int32 SoulsPerWell = 15;
-		/** Regle propre (ecart n°50) : un grenier rempli a ce point deborde. */
+		/** Regle propre (ecart n°52) : un grenier rempli a ce point deborde. */
 		constexpr double GranaryFullShare = 0.9;
 	}
 

@@ -184,7 +184,7 @@ namespace AnastasisVillage
 		bRoadEvolutionEnabled = false;
 		Biographies.Reset();
 		bBiographyEnabled = false;
-		// ecart n°50 : la decision des batiments communs s'eteint.
+		// ecart n°52 : la decision des batiments communs s'eteint.
 		SetGrowthEnabled(false);
 		GrowthSitesOpened = 0;
 		LastBuildDecision.Reset();
@@ -6485,7 +6485,7 @@ namespace AnastasisVillage
 		}
 		Terms.Emplace(TEXT("dette_rendue"), Owed);
 		Terms.Emplace(TEXT("refus_rendu"), Refused);
-		// ecart n°50 -- ce qu'on dit de lui : les refus qu'on lui prete, la porte qu'il a fermee au conseil.
+		// ecart n°54 -- ce qu'on dit de lui : les refus qu'on lui prete, la porte qu'il a fermee au conseil.
 		double Hearsay = 0.0;
 		double ClosedDoor = 0.0;
 		for (const E::FEpisode& Event : Asked.Chronicle.Events)
@@ -6704,7 +6704,7 @@ namespace AnastasisVillage
 	void FVillage::UpdateFamilyHousesDaily()
 	{
 		if (Families.IsEmpty() || !World) return;
-		// ecart n°50 : une demande faite au joueur et restee sans reponse jusqu'a ce soir est un refus -- le silence.
+		// ecart n°54 : une demande faite au joueur et restee sans reponse jusqu'a ce soir est un refus -- le silence.
 		for (FPlayerAsk& Ask : PlayerAsks)
 		{
 			if (Ask.bAnswered || Ask.Day >= Day()) continue;
@@ -6760,7 +6760,7 @@ namespace AnastasisVillage
 		bool bRooflessWaiting = false;
 		for (const FFamily& Family : Families)
 		{
-			// ecart n°49 : un groupe en attente du conseil, ou reparti, ne batit pas.
+			// ecart n°53 : un groupe en attente du conseil, ou reparti, ne batit pas.
 			if (Family.bGuest || Family.bLeft) continue;
 			bool bAll = false;
 			if (RoofsOf(Family, bAll) == 0 && !bAll && !OwnSiteOf(Family) && ChefOf(Family)) bRooflessWaiting = true;
@@ -6770,7 +6770,7 @@ namespace AnastasisVillage
 			if (Family.bGuest || Family.bLeft) continue;
 			FNpc* Chef = ChefOf(Family);
 			if (!Chef) continue;
-			// ecart n°50 : le foyer du joueur decide et demande par sa main (PlayerBuildHome, PlayerAskHelp).
+			// ecart n°54 : le foyer du joueur decide et demande par sa main (PlayerBuildHome, PlayerAskHelp).
 			if (Chef->Id == PlayerPersonId) continue;
 			bool bHoused = false;
 			const int32 Roofed = RoofsOf(Family, bHoused);
@@ -6792,7 +6792,7 @@ namespace AnastasisVillage
 			for (const FNpc& Other : Actors.GetItems())
 			{
 				if (Other.Id == Chef->Id || Other.FamilyId == Family.Id) continue;
-				// ecart n°49 : on ne demande pas ses bras a qui attend encore de savoir s'il reste.
+				// ecart n°53 : on ne demande pas ses bras a qui attend encore de savoir s'il reste.
 				if (const FFamily* OtherFamily = Other.FamilyId.IsEmpty() ? nullptr : FindFamily(Other.FamilyId); OtherFamily && OtherFamily->bGuest) continue;
 				if (Other.Age > 0.0 && Other.Age < 16.0) continue;
 				if (Own->AskedIds.Contains(Other.Id)) continue;
@@ -6804,7 +6804,7 @@ namespace AnastasisVillage
 			for (int32 I = 0; I < Candidates.Num() && I < HelpAsksPerDay; ++I)
 			{
 				const FNpc& Asked = *Candidates[I];
-				// ecart n°50 : le joueur repond lui-meme ; la demande l'attend jusqu'au soir suivant.
+				// ecart n°54 : le joueur repond lui-meme ; la demande l'attend jusqu'au soir suivant.
 				if (Asked.Id == PlayerPersonId)
 				{
 					Own->AskedIds.Add(Asked.Id);
@@ -6837,7 +6837,7 @@ namespace AnastasisVillage
 	{
 		namespace B = AnastasisBuild;
 		// `tryOpenNewConstruction` : l'ouverture n'est pas portee (ecart n°18), aucun creneau. Les batiments
-		// communs sont decides par le village le soir (ecart n°50), les maisons par les familles (n°48).
+		// communs sont decides par le village le soir (ecart n°52), les maisons par les familles (n°48).
 		// Preference, pas epinglage : on garde l'objet de l'intention tant qu'il est posable.
 		FBuilding* Bound = BoundBuildSite(Npc);
 		FBuilding* Site = (Bound && SitePieceReady(*Bound)) ? Bound : PickBuildSite(Npc);

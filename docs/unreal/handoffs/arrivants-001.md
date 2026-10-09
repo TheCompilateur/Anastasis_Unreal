@@ -12,7 +12,7 @@ RELAIS: relay-memoire-001
 ## FILES_OWNED
 
 - `Source/AnastasisSim/Private/Village/AnastasisVillageArrivals.cpp` (nouveau) ; `Public/Village/AnastasisVillage.h` (familles en attente, groupes, conseil) ; `Private/Village/AnastasisVillage.cpp` (familles en attente ou reparties : ni maison, ni sollicitées) ; `Private/Village/AnastasisVillageStateDigest.cpp` ; `Private/Life/AnastasisEpisodes.cpp` (`fled`) ; `Private/Sim/AnastasisSimulation.cpp` (cause et origine des arrivants, conseil dans `lifeDaily`) ; `Public/Sim/AnastasisSimulation.h` (`SaveFormatVersion` 5) ; `Public/Geo/AnastasisGeo.h`, `Private/Geo/AnastasisGeo.cpp` (`recit`)
-- `Source/AnastasisSim/Private/Tests/AnastasisArrivalsTests.cpp` (nouveau), `Source/AnastasisSim/ECARTS.md` (n°49, n°38 modifié)
+- `Source/AnastasisSim/Private/Tests/AnastasisArrivalsTests.cpp` (nouveau), `Source/AnastasisSim/ECARTS.md` (n°53, n°38 modifié)
 - `Source/Anastasis_UnrealV2/Sim/AnastasisArrivals.{h,cpp}`, `AnastasisArrivalsHostTests.cpp` (nouveaux) ; `AnastasisSimulationGeo.cpp` (`LoadGeoScenario`, `OpenValmireToTheWorld`, `anastasis.Geo.AutoLoad`) ; `AnastasisSimulationSubsystem.{h,cpp}` (`get_arrivals_status`) ; `AnastasisVillageChronicle.{h,cpp}` (arrivée, conseil, verdict) ; `AnastasisNotebook.{h,cpp}` (le joueur entend le conseil)
 - `Content/Anastasis/Scenario/valmire-arrivants.json` (nouveau), `geo-pontos-1204.json` (trois chocs, `recit`), `Content/Anastasis/Dialogue/repliques-valmire.json` (paroles du conseil, souvenirs `fled`, `hosting`, `hostingRefusal`)
 - `tools/unreal/arrivants-pie.py` (nouveau), `tools/unreal/proofs.txt`, `AGENTS.md` (deux lignes d'index)
@@ -50,7 +50,7 @@ NOT_JUDGED — Alexandre lit la chronique. Le joueur ne vote pas ; il entend le 
 
 ## ECARTS
 
-- ouvert : n° 49 — Les arrivants et le conseil du soir (EXTENSION, A_TRANCHER)
+- ouvert : n° 53 — Les arrivants et le conseil du soir (EXTENSION, A_TRANCHER)
 - modifié : n° 38 — le monde extérieur se charge avec les fondateurs de Valmire (`anastasis.Geo.AutoLoad 1`)
 - relayé : n° 47, n° 48 — mémoire épisodique, maison de famille et demande d'aide (relay-memoire-001)
 
@@ -59,7 +59,7 @@ NOT_JUDGED — Alexandre lit la chronique. Le joueur ne vote pas ; il entend le 
 - Relais : porte `relay-memoire-001` (le relais de `memoire-decisions-001` sur `main`, écarts 47 et 48). La verser avant, ou dans le même lot en la nommant d'abord. Rebasée le 2026-10-08 sur `agent/relay-memoire-001` (23b3b354) : écart 48 → 49, `SaveFormatVersion` 5 ; `familles-feu-001` est déjà sur `main`.
 - `anastasis.Geo.AutoLoad 1` : toute partie fondée par les fondateurs de Valmire charge maintenant le monde extérieur ; les chroniques de `chronicle-pie` et `memory-pie` changent (des groupes y arrivent). La preuve `geo-remote-crisis-pie` charge son scénario elle-même : un monde déjà chargé y est rechargé par `Anastasis.Geo.Load`.
 - `SaveFormatVersion` 5 (4 par `relay-memoire-001`) : une sauvegarde d'avant est refusée, comme prévu.
-- Numéro d'écart 49 : à renuméroter si une autre branche le prend avant.
+- Numéro d'écart 53 : à renuméroter si une autre branche le prend avant.
 
 ## STOP
 

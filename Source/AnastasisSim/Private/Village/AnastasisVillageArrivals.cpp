@@ -1,6 +1,6 @@
 // arrivants-001 -- les arrivants et le conseil du soir.
 //
-// EXTENSION — ecart n°49. La reference n'a ni arrivees venues d'une cause (`maybeImmigrate` n'est pas porte), ni
+// EXTENSION — ecart n°53. La reference n'a ni arrivees venues d'une cause (`maybeImmigrate` n'est pas porte), ni
 // conseil de village : son seul accueil est celui d'un foyer qui prend un hote (`tryHostGuest`, et la decision du
 // joueur de `kosmos1204UneBouchePlus.js`). Ici, dans un village de familles (ecart n°44), un groupe venu du monde
 // exterieur (ecart n°38) devient une famille en attente ; le soir suivant, chaque chef de famille dit oui ou non
@@ -187,12 +187,12 @@ namespace AnastasisVillage
 					if (Member->KinRole == TEXT("chef")) { Chief = Member; break; }
 					if (!Chief) Chief = Member;
 				}
-				// ecart n°50 : le joueur ne vote que par sa main (CastPlayerVote), meme chef d'un foyer.
+				// ecart n°54 : le joueur ne vote que par sa main (CastPlayerVote), meme chef d'un foyer.
 				if (!Chief || Chief->Id == PlayerPersonId) continue;
 				const FWelcomeVote Vote = EvaluateWelcome(*Chief, *Guests, Insecurity);
 				Council.Votes.Add(Vote);
 			}
-			// ecart n°50 : la voix du joueur, s'il l'a donnee pour ce groupe ; une demi-voix tant qu'il n'est pas eprouve.
+			// ecart n°54 : la voix du joueur, s'il l'a donnee pour ce groupe ; une demi-voix tant qu'il n'est pas eprouve.
 			const FNpc* Player = PlayerPersonId.IsEmpty() ? nullptr : Actors.FindById(PlayerPersonId);
 			if (Player && PlayerVoteFamilyId == GuestFamilyId)
 			{

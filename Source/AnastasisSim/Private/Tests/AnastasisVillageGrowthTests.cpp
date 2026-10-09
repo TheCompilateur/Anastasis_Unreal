@@ -6,7 +6,7 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
-// valmire-grows-001 (ecart n°50) -- le village decide de ses batiments communs.
+// valmire-grows-001 (ecart n°52) -- le village decide de ses batiments communs.
 //
 // La decision du soir (`UpdateCommonBuildingsDaily`), regle par regle, sur un village nu :
 //   1. sans grenier, le village en ouvre un ; trop d'ames pour un puits, il ouvre un puits ; le grenier

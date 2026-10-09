@@ -182,7 +182,7 @@ namespace AnastasisGeo
 	{
 		FString Id;
 		FString Label;
-		/** ecart n°49 : comment ceux qui l'ont fui le racontent (« le raid sur les hameaux de Paipert ») ; facultatif. */
+		/** ecart n°53 : comment ceux qui l'ont fui le racontent (« le raid sur les hameaux de Paipert ») ; facultatif. */
 		FString Telling;
 		FString SourceNode;
 		/** Acteur responsable, ou vide. */

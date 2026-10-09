@@ -1,4 +1,4 @@
-// arrivants-001 -- qui sont les arrivants, et ce qu'on dit au conseil du soir (hote, ecart n°49).
+// arrivants-001 -- qui sont les arrivants, et ce qu'on dit au conseil du soir (hote, ecart n°53).
 //
 // La simulation decide (`FVillage::UpdateArrivalCouncilDaily`) ; l'hote donne les noms des groupes
 // (`Content/Anastasis/Scenario/valmire-arrivants.json`) et les mots du conseil (`repliques-valmire.json`).

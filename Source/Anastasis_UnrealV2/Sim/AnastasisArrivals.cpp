@@ -1,4 +1,4 @@
-// arrivants-001 -- qui sont les arrivants, et ce qu'on dit au conseil du soir (hote, ecart n°49).
+// arrivants-001 -- qui sont les arrivants, et ce qu'on dit au conseil du soir (hote, ecart n°53).
 
 #include "Sim/AnastasisArrivals.h"
 
@@ -132,7 +132,7 @@ namespace AnastasisArrivals
 			Councils.Add(MakeShared<FJsonValueObject>(C));
 		}
 		Root->SetArrayField(TEXT("councils"), Councils);
-		// voix-conseil-001 (ecart n°50) : ce que le joueur a fait et ce qu'on lui a repondu.
+		// voix-conseil-001 (ecart n°54) : ce que le joueur a fait et ce qu'on lui a repondu.
 		const FString& Player = Village.GetPlayerPersonId();
 		const TSharedRef<FJsonObject> Me = MakeShared<FJsonObject>();
 		Me->SetStringField(TEXT("id"), Player);

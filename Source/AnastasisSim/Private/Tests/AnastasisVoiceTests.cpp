@@ -1,4 +1,4 @@
-// voix-conseil-001 (ecart n°50) -- le joueur vote au conseil (une demi-voix tant qu'il n'est pas eprouve), on lui
+// voix-conseil-001 (ecart n°54) -- le joueur vote au conseil (une demi-voix tant qu'il n'est pas eprouve), on lui
 // demande de l'aide (son silence est un refus), et quand il demande a son tour, on lui repond selon ce qu'on dit de lui.
 
 #include "Misc/AutomationTest.h"

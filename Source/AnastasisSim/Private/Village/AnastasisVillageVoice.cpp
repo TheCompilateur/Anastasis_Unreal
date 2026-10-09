@@ -1,6 +1,6 @@
 // voix-conseil-001 -- une voix au conseil : le joueur entre dans les decisions du village.
 //
-// EXTENSION — ecart n°50. Mandat d'Alexandre (2026-10-09) : le joueur est un habitant, pas le seigneur ; il vote au
+// EXTENSION — ecart n°54. Mandat d'Alexandre (2026-10-09) : le joueur est un habitant, pas le seigneur ; il vote au
 // conseil, on lui demande de l'aide et il en demande, avec les memes regles que les autres (`EvaluateHelp`,
 // `EvaluateWelcome`) ; il arrive en etranger a eprouver (demi-voix, `nouveau`), et le village le juge sur ses actes,
 // en face (la raison d'un refus) et dans son dos (ses votes et ses refus deviennent des histoires qui courent).

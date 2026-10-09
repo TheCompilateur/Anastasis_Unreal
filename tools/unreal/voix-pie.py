@@ -1,4 +1,4 @@
-"""Preuve PIE d'une voix au conseil (voix-conseil-001, ecart n°50).
+"""Preuve PIE d'une voix au conseil (voix-conseil-001, ecart n°54).
 
 Lance PIE sur Lvl_AnastasisSlice : Valmire fondee, le monde exterieur charge avec elle. Le joueur arrive
 (`Anastasis.Player.Arrive`) et vit soixante jours par pas de six heures (`Anastasis.Sim.Advance 6h`) en joueur

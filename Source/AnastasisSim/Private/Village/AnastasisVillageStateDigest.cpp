@@ -286,7 +286,7 @@ namespace AnastasisVillage
 			Ar.Key(TEXT("materials"));
 			VisitState(Ar, V.Materials);
 			Ar.Key(TEXT("builderId")).String(V.BuilderId);
-			// ecart n°50 : qui l'a ouvert de lui-meme, et pourquoi.
+			// ecart n°52 : qui l'a ouvert de lui-meme, et pourquoi.
 			Ar.Key(TEXT("openedById")).String(V.OpenedById);
 			Ar.Key(TEXT("openCause")).String(V.OpenCause);
 			Ar.Key(TEXT("workers"));
@@ -977,7 +977,7 @@ namespace AnastasisVillage
 			Ar.Key(TEXT("dependents"));
 			VisitStrings(Ar, V.Dependents);
 			Ar.Key(TEXT("homeId")).String(V.HomeId);
-			// ecart n°49 : un groupe d'arrivants en attente, ou reparti.
+			// ecart n°53 : un groupe d'arrivants en attente, ou reparti.
 			Ar.Key(TEXT("guest")).Bool(V.bGuest);
 			Ar.Key(TEXT("left")).Bool(V.bLeft);
 			Ar.Key(TEXT("arrivedDay")).Number(V.ArrivedDay);
@@ -986,7 +986,7 @@ namespace AnastasisVillage
 			Ar.EndObject();
 		}
 
-		// ecart n°49 : les arrivants que l'hote tient prets, et le conseil du soir.
+		// ecart n°53 : les arrivants que l'hote tient prets, et le conseil du soir.
 		void VisitState(FStateArchive& Ar, FVillage::FArrivalMember& V)
 		{
 			Ar.BeginObject();
@@ -1019,7 +1019,7 @@ namespace AnastasisVillage
 			Ar.EndObject();
 		}
 
-		// ecart n°50 : une demande d'aide faite au joueur.
+		// ecart n°54 : une demande d'aide faite au joueur.
 		void VisitState(FStateArchive& Ar, FVillage::FPlayerAsk& V)
 		{
 			Ar.BeginObject();
@@ -1184,7 +1184,7 @@ namespace AnastasisVillage
 		Ar.Key(TEXT("traffic"));
 		AnastasisArchive::VisitArray(Ar, Traffic, [](FStateArchive& A, float& T) { A.Number(T); });
 		Ar.Key(TEXT("roadEvolutionEnabled")).Bool(bRoadEvolutionEnabled);
-		// ecart n°50 : la croissance du village (valmire-grows-001).
+		// ecart n°52 : la croissance du village (valmire-grows-001).
 		Ar.Key(TEXT("growthEnabled")).Bool(bGrowthEnabled);
 		Ar.Key(TEXT("growthSitesOpened")).Number(GrowthSitesOpened);
 		Ar.Key(TEXT("lastBuildDecision")).String(LastBuildDecision);

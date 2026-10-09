@@ -63,7 +63,7 @@ namespace AnastasisChronicle
 		}
 
 		/**
-		 * valmire-grows-001 (ecart n°50) : la raison d'un chantier qu'un habitant ouvre de lui-meme, telle que
+		 * valmire-grows-001 (ecart n°52) : la raison d'un chantier qu'un habitant ouvre de lui-meme, telle que
 		 * la simulation la donne (`FBuilding::OpenCause`, sans accents), dite en clair.
 		 */
 		FString HumanOpenCause(const FString& Cause)
@@ -730,7 +730,7 @@ namespace AnastasisChronicle
 			if (!People.Contains(Npc.Id))
 			{
 				FPersonState& Newcomer = Meet(Npc, Day);
-				// ecart n°49 : un groupe venu par la route se raconte ensemble, plus bas.
+				// ecart n°53 : un groupe venu par la route se raconte ensemble, plus bas.
 				const AnastasisVillage::FVillage::FFamily* Group = Npc.FamilyId.IsEmpty() ? nullptr : Village.FindFamily(Npc.FamilyId);
 				if (Group && Group->ArrivedDay > 0) continue;
 				Add(Day, Hour, EKind::Arrival, { Npc.Id },
@@ -936,7 +936,7 @@ namespace AnastasisChronicle
 		for (; HelpSeen < Help.Num(); ++HelpSeen)
 		{
 			const AnastasisVillage::FVillage::FHelpAnswer& Answer = Help[HelpSeen];
-			// ecart n°50 : la reponse du joueur lui-meme -- il ne parle pas encore ; son silence compte.
+			// ecart n°54 : la reponse du joueur lui-meme -- il ne parle pas encore ; son silence compte.
 			if (!Player.IsEmpty() && Answer.ToId == Player)
 			{
 				const FString Reply = Answer.Reason == TEXT("silence")
@@ -955,7 +955,7 @@ namespace AnastasisChronicle
 				const FString ByTrade = Asked ? FString::Printf(TEXT("aide.refuse.occupe.%s"), *Asked->JobId) : FString();
 				if (!ByTrade.IsEmpty() && Lines->HasPool(ByTrade)) Pool = ByTrade;
 			}
-			// ecart n°50 : on dit en face ce qu'on reproche -- qui il a laisse sans bras, a qui il a ferme la porte.
+			// ecart n°54 : on dit en face ce qu'on reproche -- qui il a laisse sans bras, a qui il a ferme la porte.
 			TMap<FString, FString> Holes;
 			if (const AnastasisVillage::FNpc* Asked = Village.FindNpc(Answer.ToId))
 			{
@@ -978,7 +978,7 @@ namespace AnastasisChronicle
 			Add(Day, Hour, Answer.bAccepted ? EKind::HelpGiven : EKind::HelpRefused, { Answer.FromId, Answer.ToId }, Text);
 		}
 
-		// ecart n°49 : les groupes arrives par la route, puis le conseil du soir.
+		// ecart n°53 : les groupes arrives par la route, puis le conseil du soir.
 		for (const AnastasisVillage::FVillage::FFamily& Group : Village.GetFamilies())
 		{
 			if (Group.ArrivedDay <= 0 || GroupsTold.Contains(Group.Id)) continue;

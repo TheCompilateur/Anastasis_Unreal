@@ -25,7 +25,7 @@ que sur la faim, la soif, la fatigue ou la santé, comme son commentaire le disa
 - `Source/AnastasisSim/Public/Sim/AnastasisSimulation.h`, `Private/Sim/AnastasisSimulation.cpp` : travail de minuit 1
   `collective` (`DayJobCollective`), `SaveFormatVersion` 5
 - `Source/AnastasisSim/Private/Tests/AnastasisVillageGrowthTests.cpp` (nouveau) : `Anastasis.Sim.Village.Croissance.*`
-- `Source/AnastasisSim/ECARTS.md` : fiche n° 50
+- `Source/AnastasisSim/ECARTS.md` : fiche n° 52
 - `Source/Anastasis_UnrealV2/Sim/AnastasisSimulationSubsystem.cpp` : CVar `anastasis.Village.Growth` ; allumée dans
   `SeedStartVillage` seulement, éteinte dans `ResetCanonical` (les scénarios de preuve restent tels quels)
 - `Source/Anastasis_UnrealV2/Sim/AnastasisVillageChronicle.cpp` : « Le village décide de bâtir … », la raison en clair
@@ -74,8 +74,8 @@ NOT_JUDGED — Alexandre lit la chronique.
 
 ## ECARTS
 
-- n° 50 — nouvelle, OUVERT, A_TRANCHER, EXTENSION : le village décide de ses bâtiments communs (grenier, puits),
-  par des règles propres. Marques `ecart n°50` dans `AnastasisVillageGrowth.cpp`, `AnastasisVillage.{h,cpp}`,
+- n° 52 — nouvelle, OUVERT, A_TRANCHER, EXTENSION : le village décide de ses bâtiments communs (grenier, puits),
+  par des règles propres. Marques `ecart n°52` dans `AnastasisVillageGrowth.cpp`, `AnastasisVillage.{h,cpp}`,
   `AnastasisVillageStateDigest.cpp`, `AnastasisSimulation.{h,cpp}`.
 - modifié : n° 18 — le porteur de matériaux (extension opt-in) ne s'arrête plus que sur les besoins vitaux.
 
@@ -83,7 +83,7 @@ NOT_JUDGED — Alexandre lit la chronique.
 
 - **`SaveFormatVersion`** 5 (`main` = 4). `arrivants-001` et `opening-in-sim-001` le montent aussi à 5 : la mission
   versée en second prend 6 (rebase mécanique, je le fais pour les miennes).
-- **Numéros d'écart** : n°49 pris par `arrivants-001`, n°50 ici, n°51 par `water-network-001`.
+- **Numéros d'écart** : n°53 pris par `arrivants-001` (49 à l'origine), n°52 ici (50 à l'origine), n°51 par `water-network-001`.
 - **Le porteur** (`SurvivalCritical`) change le comportement de `npc-life-pie` et de `material-courier-pie`
   (déclarées).
 - **Avec `arrivants-001`** : c'est elle qui fera grossir le village. Au-delà de 15 âmes, le village décidera

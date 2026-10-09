@@ -1,4 +1,4 @@
-// valmire-grows-001 (ecart n°50) -- le village decide de ses batiments communs : le vrai village du lancement
+// valmire-grows-001 (ecart n°52) -- le village decide de ses batiments communs : le vrai village du lancement
 // (les quatre familles et le moine, l'ouverture, les maisons de famille), trente jours sans rendu, decision
 // allumee puis eteinte (temoin).
 // Les deux chroniques sont ecrites dans Saved/Chronicle/ pour etre lues ; le verdict, c'est Alexandre qui

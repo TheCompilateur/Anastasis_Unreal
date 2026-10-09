@@ -13,7 +13,7 @@ RELAIS: arrivants-001
 ## FILES_OWNED
 
 - `Source/AnastasisSim/Private/Village/AnastasisVillageVoice.cpp` (nouveau) ; `Private/Village/AnastasisVillageArrivals.cpp` (la voix du joueur au conseil, voix pesées) ; `Private/Village/AnastasisVillage.cpp` (`OpenFamilySiteNear` extrait, demandes faites au joueur, silence, `on_dit`, `porte_fermee`, `nouveau`) ; `Public/Village/AnastasisVillage.h` ; `Private/Village/AnastasisVillageStateDigest.cpp` ; `Private/Life/AnastasisEpisodes.cpp` (`votedYes`, `votedNo`) ; `Public/Sim/AnastasisSimulation.h` (`SaveFormatVersion` 6)
-- `Source/AnastasisSim/Private/Tests/AnastasisVoiceTests.cpp` (nouveau) ; `Source/AnastasisSim/ECARTS.md` (n°50)
+- `Source/AnastasisSim/Private/Tests/AnastasisVoiceTests.cpp` (nouveau) ; `Source/AnastasisSim/ECARTS.md` (n°54)
 - `Source/Anastasis_UnrealV2/Sim/AnastasisSimulationPlayer.cpp` (`Anastasis.Player.Vote`, `.Help`, `.Build`, `.Ask` ; le joueur s'appelle Nikolaos dans un village de foyers) ; `AnastasisVillageChronicle.{h,cpp}` (demandes au joueur, ses réponses, sa voix, les reproches avec qui / quel groupe) ; `AnastasisNotebook.{h,cpp}` (« ce que j'ai fait », « ce qu'on dit de moi ») ; `AnastasisArrivals.cpp` (état du joueur dans `get_arrivals_status`)
 - `Content/Anastasis/Dialogue/repliques-valmire.json` (`aide.refuse.on_dit`, `.porte_fermee`, `.nouveau`, souvenirs `votedYes` / `votedNo`)
 - `tools/unreal/voix-pie.py` (nouveau), `tools/unreal/proofs.txt`, `AGENTS.md` (une ligne d'index)
@@ -52,8 +52,8 @@ NOT_JUDGED — le joueur a des commandes, pas d'interface. Alexandre lit la chro
 
 ## ECARTS
 
-- ouvert : n° 50 — Une voix au conseil (EXTENSION, A_TRANCHER)
-- relayé : n° 49 — Les arrivants et le conseil du soir (arrivants-001)
+- ouvert : n° 54 — Une voix au conseil (EXTENSION, A_TRANCHER)
+- relayé : n° 53 — Les arrivants et le conseil du soir (arrivants-001)
 - relayé : n° 47, n° 48 — mémoire épisodique, maison de famille et demande d'aide (relay-memoire-001, par arrivants-001)
 
 ## INTEGRATION_RISK
@@ -62,7 +62,7 @@ NOT_JUDGED — le joueur a des commandes, pas d'interface. Alexandre lit la chro
 - Porte une copie du commit de `player-goal-stall-001` (cherry-pick, même contenu) : la verser avant ou dans le même lot, en la nommant d'abord ; la copie devient alors vide et disparaît à l'empilement.
 - `EvaluateHelp` gagne `on_dit`, `porte_fermee` et `nouveau` pour tout demandeur : un groupe d'arrivants accueilli qui demande de l'aide hésite davantage (`nouveau`). `arrivants-pie` reste PASS à la mesure du lot.
 - `SaveFormatVersion` 6 (5 par `arrivants-001`).
-- Numéro d'écart 50 : à renuméroter si une autre branche le prend avant.
+- Numéro d'écart 54 : à renuméroter si une autre branche le prend avant.
 
 ## STOP
 

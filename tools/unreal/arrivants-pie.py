@@ -1,4 +1,4 @@
-"""Preuve PIE des arrivants et du conseil du soir (arrivants-001, ecart n°49).
+"""Preuve PIE des arrivants et du conseil du soir (arrivants-001, ecart n°53).
 
 Lance PIE sur Lvl_AnastasisSlice : Valmire est fondee, et avec elle le monde exterieur se charge
 (`anastasis.Geo.AutoLoad 1`). Saute soixante jours (`Anastasis.Sim.Advance 1d`, jour par jour, sans joueur :

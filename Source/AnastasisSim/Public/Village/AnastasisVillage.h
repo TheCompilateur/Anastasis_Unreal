@@ -438,7 +438,7 @@ namespace AnastasisVillage
 		AnastasisBuild::FSiteMaterials Materials;
 		FString BuilderId;
 		/**
-		 * ecart n°50 (valmire-grows-001) : l'habitant qui a trace ce batiment commun quand le village l'a
+		 * ecart n°52 (valmire-grows-001) : l'habitant qui a trace ce batiment commun quand le village l'a
 		 * decide, et pourquoi (lisible). Vides pour un chantier ouvert par l'hote, un scenario ou une famille.
 		 */
 		FString OpenedById;
@@ -1275,7 +1275,7 @@ namespace AnastasisVillage
 		 */
 		TArray<FString> AdmitExternalArrivals(int32 Count, double Radius, double StartAngle);
 		/**
-		 * ecart n°49 (arrivants-001) : la meme arrivee, mais dans un village de familles. Le groupe recoit un nom et
+		 * ecart n°53 (arrivants-001) : la meme arrivee, mais dans un village de familles. Le groupe recoit un nom et
 		 * des identites (`ArrivalPool`, dans l'ordre), devient une famille *en attente* (`FFamily::bGuest`), et chacun
 		 * de ses adultes se souvient de ce qu'il a fui (`fled`, `Cause`). Le conseil du soir decidera.
 		 */
@@ -1485,11 +1485,11 @@ namespace AnastasisVillage
 			TArray<FString> Adults;
 			TArray<FString> Dependents;
 			FString HomeId;
-			/** ecart n°49 : un groupe d'arrivants que le conseil n'a pas encore accueilli. */
+			/** ecart n°53 : un groupe d'arrivants que le conseil n'a pas encore accueilli. */
 			bool bGuest = false;
-			/** ecart n°49 : refuse par le conseil, il a repris la route (le foyer reste, vide, pour la memoire). */
+			/** ecart n°53 : refuse par le conseil, il a repris la route (le foyer reste, vide, pour la memoire). */
 			bool bLeft = false;
-			/** ecart n°49 : le jour de son arrivee, ce qu'il fuyait (« le raid sur les hameaux de Paipert ») et d'ou il venait. */
+			/** ecart n°53 : le jour de son arrivee, ce qu'il fuyait (« le raid sur les hameaux de Paipert ») et d'ou il venait. */
 			int32 ArrivedDay = 0;
 			FString Cause;
 			FString Origin;
@@ -1595,7 +1595,7 @@ namespace AnastasisVillage
 
 		const TArray<FHelpAnswer>& GetHelpLog() const { return HelpLog; }
 
-		// --- Les arrivants et le conseil du soir (arrivants-001, ecart n°49) -----------------------------------
+		// --- Les arrivants et le conseil du soir (arrivants-001, ecart n°53) -----------------------------------
 
 		/** Une personne d'un groupe d'arrivants, telle que l'hote la decrit (`valmire-arrivants.json`). */
 		struct FArrivalMember
@@ -1628,7 +1628,7 @@ namespace AnastasisVillage
 			double Score = 0.0;
 			/** Le detail de la somme, pour qui demande pourquoi : « nous_aussi=25 grenier=-20 inconnu=-10 ». */
 			FString Terms;
-			/** ecart n°50 : le poids de la voix ; un nouveau pas encore eprouve (le joueur) ne compte que pour une demi-voix. */
+			/** ecart n°54 : le poids de la voix ; un nouveau pas encore eprouve (le joueur) ne compte que pour une demi-voix. */
 			double Weight = 1.0;
 		};
 
@@ -1656,7 +1656,7 @@ namespace AnastasisVillage
 		/** Les portions au grenier pour chaque bouche, nouveaux venus compris. */
 		double PortionsPerMouth(int32 ExtraMouths) const;
 
-		// --- Une voix au conseil : le joueur dans les decisions du village (voix-conseil-001, ecart n°50) -----------
+		// --- Une voix au conseil : le joueur dans les decisions du village (voix-conseil-001, ecart n°54) -----------
 		//
 		// Mandat d'Alexandre (2026-10-09) : le joueur est un habitant, pas le seigneur ; il entre dans les memes
 		// decisions, avec les memes regles ; il arrive en etranger a eprouver, et le village le juge sur ses actes,
@@ -1719,7 +1719,7 @@ namespace AnastasisVillage
 		int32 UpdateRoadEvolutionDaily(int32 Day);
 
 		/**
-		 * ecart n°50 (valmire-grows-001) -- le village decide de ses batiments communs. Active par l'hote
+		 * ecart n°52 (valmire-grows-001) -- le village decide de ses batiments communs. Active par l'hote
 		 * seulement, pour le village du lancement (le village C++ nu, le harnais et les scenarios restent a
 		 * faux). Chaque soir (`UpdateCommonBuildingsDaily`, travail `collective` de la file de minuit), s'il
 		 * manque un grenier (aucun, ou tous pleins) ou un puits (trop d'ames par puits), un habitant en trace
@@ -1727,7 +1727,7 @@ namespace AnastasisVillage
 		 */
 		void SetGrowthEnabled(bool bEnabled);
 		bool IsGrowthEnabled() const { return bGrowthEnabled; }
-		/** ecart n°50 : la decision du soir ; rend l'identifiant du chantier ouvert, ou vide. */
+		/** ecart n°52 : la decision du soir ; rend l'identifiant du chantier ouvert, ou vide. */
 		FString UpdateCommonBuildingsDaily(int32 InDay);
 		/** Chantiers communs que le village a ouverts de lui-meme depuis Bind. */
 		int32 GetGrowthSitesOpened() const { return GrowthSitesOpened; }
@@ -2177,11 +2177,11 @@ namespace AnastasisVillage
 		// Chantier (npc.js progressBuildWork, simulation.js workConstruction).
 		/** `progressBuildWork` : 0 = echec, 1 = au travail, 2 = fini. */
 		int32 ProgressBuildWork(FNpc& Npc, double Dt);
-		/** ecart n°50 : le batiment commun qui manque (grenier, puits), et pourquoi ; vide si rien ne manque. */
+		/** ecart n°52 : le batiment commun qui manque (grenier, puits), et pourquoi ; vide si rien ne manque. */
 		FString PickCommonBuilding(FString& OutCause);
-		/** ecart n°50 : `findBuildSpot` (repli de la reference : 80 tirages autour du village). */
+		/** ecart n°52 : `findBuildSpot` (repli de la reference : 80 tirages autour du village). */
 		bool FindBuildSpot(const FString& Type, FIntPoint& OutSpot);
-		/** `constructionOpenSlots`, le grenier tenant lieu de ferme (ecart n°50). */
+		/** `constructionOpenSlots`, le grenier tenant lieu de ferme (ecart n°52). */
 		int32 GrowthOpenSlots() const;
 		bool WorkConstruction(FBuilding& Site, FNpc& Npc);
 		FBuilding* BoundBuildSite(FNpc& Npc);
@@ -2342,7 +2342,7 @@ namespace AnastasisVillage
 		TMap<int32, AnastasisTraffic::FRoadTile> Roads;
 		TMap<int32, double> RoadEfforts;
 		bool bRoadEvolutionEnabled = false;
-		/** ecart n°50 (valmire-grows-001). */
+		/** ecart n°52 (valmire-grows-001). */
 		bool bGrowthEnabled = false;
 		int32 GrowthSitesOpened = 0;
 		FString LastBuildDecision;
@@ -2376,11 +2376,11 @@ namespace AnastasisVillage
 		TArray<FDeath> DeathLog;
 		/** ecart n°48 : toutes les demandes d'aide et leurs reponses, dans l'ordre. */
 		TArray<FHelpAnswer> HelpLog;
-		/** ecart n°49 : les groupes d'arrivants que l'hote tient prets, le prochain a donner, et chaque conseil. */
+		/** ecart n°53 : les groupes d'arrivants que l'hote tient prets, le prochain a donner, et chaque conseil. */
 		TArray<FArrivalGroup> ArrivalPool;
 		int32 NextArrivalGroup = 0;
 		TArray<FCouncil> CouncilLog;
-		/** ecart n°50 : la voix posee par le joueur pour un groupe, et les demandes d'aide qu'on lui a faites. */
+		/** ecart n°54 : la voix posee par le joueur pour un groupe, et les demandes d'aide qu'on lui a faites. */
 		FString PlayerVoteFamilyId;
 		bool bPlayerVoteYes = false;
 		TArray<FPlayerAsk> PlayerAsks;

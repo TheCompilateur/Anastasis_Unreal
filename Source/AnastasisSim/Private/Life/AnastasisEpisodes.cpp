@@ -42,9 +42,9 @@ namespace AnastasisEpisodes
 			// EXTENSION (ecart n°47) -- l'aide demandee (Bible §29) : on se souvient de qui est venu, et de qui a refuse.
 			{ TEXT("helped"), { 1.0, 26.0, 0.6 } },
 			{ TEXT("refusedHelp"), { -1.0, 22.0, 0.65 } },
-			// EXTENSION (ecart n°49) -- ce qu'un arrivant a fui (un raid, une disette) : il le raconte, et ca court.
+			// EXTENSION (ecart n°53) -- ce qu'un arrivant a fui (un raid, une disette) : il le raconte, et ca court.
 			{ TEXT("fled"), { -1.0, 28.0, 0.8 } },
-			// EXTENSION (ecart n°50) -- ce que le joueur a dit au conseil : on l'a entendu, et on le repete.
+			// EXTENSION (ecart n°54) -- ce que le joueur a dit au conseil : on l'a entendu, et on le repete.
 			{ TEXT("votedYes"), { 1.0, 16.0, 0.5 } },
 			{ TEXT("votedNo"), { -1.0, 20.0, 0.7 } },
 		};

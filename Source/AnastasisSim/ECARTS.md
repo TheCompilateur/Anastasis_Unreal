@@ -740,7 +740,7 @@ Un réservoir indiciel par champ reçoit la pluie normalisée du jour précéden
 - **destin** : A_TRANCHER
 - **statut** : OUVERT
 - **entree** : geopolitical-world-001
-- **activation** : hôte seulement — `FAnastasisSimulation::GetGeo().Load(scenario)`, appelé par la commande Unreal `Anastasis.Geo.Load`, et, depuis arrivants-001 (écart n°49), avec les fondateurs de Valmire (`anastasis.Geo.AutoLoad 1`) ; sans fondateurs, déchargé. Aucun scénario du harnais ne charge de monde extérieur ; déchargé, `OnNewDay` ne fait rien de plus, au bit près (`Anastasis.Sim.Geo.CalmeSansEffet`).
+- **activation** : hôte seulement — `FAnastasisSimulation::GetGeo().Load(scenario)`, appelé par la commande Unreal `Anastasis.Geo.Load`, et, depuis arrivants-001 (écart n°53), avec les fondateurs de Valmire (`anastasis.Geo.AutoLoad 1`) ; sans fondateurs, déchargé. Aucun scénario du harnais ne charge de monde extérieur ; déchargé, `OnNewDay` ne fait rien de plus, au bit près (`Anastasis.Sim.Geo.CalmeSansEffet`).
 - **reference** : aucune — demande d'Alexandre du 2026-10-07 (mission ANASTASIS_GEOPOLITICAL_WORLD_V1). Le plus proche dans la référence : `src/life/historicalRumors.js` (nouvelles datées sans effet mécanique) et `maybeImmigrate` de `src/sim/simulation.js` (arrivées sans cause), tous deux non portés.
 - **cpp** : `Geo/AnastasisGeo.{h,cpp}` (module pur), `Sim/AnastasisSimulation.cpp` (`OnNewDay`, `AdmitGeoMigration`, `Reset`), `Village/AnastasisVillageGeo.cpp` (`AdmitExternalArrivals`)
 - **harnais** : aucune
@@ -952,7 +952,7 @@ juste au-dessus de la mer. `Shore` et `Wetness` sont recalculés sur la nouvelle
 de la génération ; l'humidité de fond (`Moist`) et les types qui en découlent (champs, forêt) ne sont
 pas refaits. `FlowX` / `FlowZ` / `FlowAmt` restent ceux de la référence.
 
-### n° 50 — Le village décide de ses bâtiments communs : grenier et puits, par des règles propres
+### n° 52 — Le village décide de ses bâtiments communs : grenier et puits, par des règles propres
 
 - **classe** : EXTENSION
 - **destin** : A_TRANCHER
@@ -980,7 +980,7 @@ grenier est achevé, les maisons de famille comprises) et le repli de `findBuild
 village). Une case qui couperait un habitant du puits est refusée. Les maisons ne sont pas ouvertes ici,
 et les arrivants viennent du monde extérieur (arrivants-001).
 
-### n° 49 — Les arrivants et le conseil du soir : accueillir ou renvoyer un groupe venu du monde extérieur
+### n° 53 — Les arrivants et le conseil du soir : accueillir ou renvoyer un groupe venu du monde extérieur
 
 - **classe** : EXTENSION
 - **destin** : A_TRANCHER
@@ -993,13 +993,13 @@ et les arrivants viennent du monde extérieur (arrivants-001).
 
 Un groupe venu du monde extérieur reçoit les noms que l'hôte tient prêts (`valmire-arrivants.json`, dans l'ordre), devient une famille *en attente*, et chacun de ses adultes se souvient de ce qu'il a fui (`fled`, le récit du choc). Le minuit suivant, chaque chef d'une famille accueillie vote ; une voix est une somme (Bible §29), la raison dominante gardée et le détail écrit : `nous_aussi` +25 (il a vécu l'exil : `fall`, `leftBehind`, `carried`, `fled`), `remords` +25 par refus vécu, +8 entendu (au plus 40), `leur_histoire` +12 (il a entendu l'un d'eux raconter), `bras` +8 (deux adultes ou plus), `grenier_plein` +12 (15 portions par bouche, nouveaux venus compris) ; `grenier` −20 sous 8 portions, −45 sous 4 (×1,5 pour qui a des enfants), `peur` −50 × l'insécurité que le village subit du dehors, `nombre` −6 par personne au-delà de trois, `toits` −20 si sa propre famille dort dehors et −5 par autre famille sans toit, `inconnu` −10. La majorité stricte accueille (égalité : non). Accueilli, le groupe devient un foyer qui bâtira (écart n°48) ; ceux qui ont dit oui retiennent `hosting`, et chacun d'eux, puis chaque adulte des groupes accueillis avant, raconte à l'un des nouveaux ce que le village se raconte (l'histoire entendue qui a déjà le plus voyagé, puis la plus lourde) et que l'autre ignore (`TellEpisode`, la déformation de `retell`) : c'est par les vagues d'arrivants que les histoires du village atteignent trois bouches. Refusé, il repart au matin : ceux qui ont dit non retiennent `hostingRefusal`, les témoins `departure`, et ses habitants sont retirés. Le moine ne vote pas (il parle, dans la chronique de l'hôte). Aucun tirage. À trancher : ce conseil et ses poids comme institution de Valmire, ou une décision par foyer (`tryHostGuest`).
 
-### n° 50 — Une voix au conseil : le joueur vote, répond, bâtit et demande, et le village le juge sur ses actes
+### n° 54 — Une voix au conseil : le joueur vote, répond, bâtit et demande, et le village le juge sur ses actes
 
 - **classe** : EXTENSION
 - **destin** : A_TRANCHER
 - **statut** : OUVERT
 - **entree** : voix-conseil-001 (mandat d'Alexandre du 2026-10-09, `docs/unreal/VOIX_CONSEIL_001.md` : « étranger à éprouver », la critique « en face » et « dans le dos » ; mandat de la parole du joueur, `PLAYER` minimal jusque-là)
-- **activation** : seulement avec un joueur incarné (`PlayerPersonId`) ; ses commandes (`Anastasis.Player.Vote`, `.Help`, `.Build`, `.Ask`) sont de l'hôte. Les deux termes nouveaux de `EvaluateHelp` (`on_dit`, `porte_fermee`) et `nouveau` valent pour tout demandeur, mais ne lisent que des souvenirs (`refusedHelp` entendu, `votedNo`) et des arrivants (écart n°49) qui n'existent que dans un village de foyers : le harnais n'est pas touché.
+- **activation** : seulement avec un joueur incarné (`PlayerPersonId`) ; ses commandes (`Anastasis.Player.Vote`, `.Help`, `.Build`, `.Ask`) sont de l'hôte. Les deux termes nouveaux de `EvaluateHelp` (`on_dit`, `porte_fermee`) et `nouveau` valent pour tout demandeur, mais ne lisent que des souvenirs (`refusedHelp` entendu, `votedNo`) et des arrivants (écart n°53) qui n'existent que dans un village de foyers : le harnais n'est pas touché.
 - **reference** : aucune. Le plus proche : la décision du joueur de `src/life/kosmos1204UneBouchePlus.js` (accueillir ou refuser un hôte) et `decideGoal` (le joueur décide par la même table que Noûs, écart n°20).
 - **cpp** : `Village/AnastasisVillageVoice.cpp` (`IsUnproven`, `CastPlayerVote`, `AnswerPlayerAsk`, `PlayerBuildHome`, `PlayerAskHelp`) ; `Village/AnastasisVillageArrivals.cpp` (la voix du joueur au conseil, une demi-voix tant qu'il n'est pas éprouvé, la majorité des voix pesées, `votedYes` / `votedNo` retenus par les chefs) ; `Village/AnastasisVillage.{h,cpp}` (`FWelcomeVote::Weight`, `FPlayerAsk`, `PlayerAsks`, `PlayerVoteFamilyId` ; `OpenFamilySiteNear` extrait d'`UpdateFamilyHousesDaily` ; le joueur est sollicité comme les autres, sa demande attend sa réponse jusqu'au soir suivant, le silence est un refus ; son foyer ne décide ni ne demande seul ; `EvaluateHelp` gagne `on_dit` −12 par refus entendu de lui (−36 au plus), `porte_fermee` −10 vécu / −5 entendu par « non » au conseil (−20 au plus), `nouveau` −10 tant qu'il n'a posé aucune pièce sur la maison achevée d'une autre famille) ; `Life/AnastasisEpisodes.cpp` (`votedYes`, `votedNo`) ; `Village/AnastasisVillageStateDigest.cpp`
 - **harnais** : aucune

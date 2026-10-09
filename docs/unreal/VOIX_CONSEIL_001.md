@@ -16,7 +16,7 @@ critiques envers moi »**. C'est aussi le mandat de la parole du joueur (jusqu'i
 > **Hors sujet** : le rendu, une interface graphique (des commandes pour commencer), le combat.
 > **Fini quand** : la chronique de 60 jours raconte un vote du joueur au conseil, une aide qu'il a refusée et qu'on lui reproche plus tard, une rumeur à son sujet entendue dans son dos, et une demande d'aide du joueur refusée à cause de ce qu'il a fait.
 
-## Ce que le joueur peut faire (écart n°50)
+## Ce que le joueur peut faire (écart n°54)
 
 | Commande | Effet |
 |---|---|

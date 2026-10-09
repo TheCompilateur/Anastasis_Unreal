@@ -1,4 +1,4 @@
-// arrivants-001 (ecart n°49) -- soixante jours de Valmire ouverte au monde : des groupes arrivent par la route, le
+// arrivants-001 (ecart n°53) -- soixante jours de Valmire ouverte au monde : des groupes arrivent par la route, le
 // conseil du soir les accueille ou les renvoie, les accueillis batissent, et leurs histoires courent.
 
 #include "Misc/AutomationTest.h"

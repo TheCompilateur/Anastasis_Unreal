@@ -1,4 +1,4 @@
-// arrivants-001 (ecart n°49) -- un groupe arrive par la route ; le conseil du soir l'accueille ou le renvoie,
+// arrivants-001 (ecart n°53) -- un groupe arrive par la route ; le conseil du soir l'accueille ou le renvoie,
 // et ce qu'on a fait la derniere fois pese sur la fois suivante.
 
 #include "Misc/AutomationTest.h"

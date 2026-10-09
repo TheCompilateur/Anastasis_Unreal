@@ -433,7 +433,7 @@ FString UAnastasisSimulationDebugLibrary::GetPlayerStatus(const UObject* WorldCo
 		Body.X, Body.Y, Body.Z);
 }
 
-// --- voix-conseil-001 (ecart n°50) : le joueur vote, repond, batit et demande, avec les memes regles que les autres ---
+// --- voix-conseil-001 (ecart n°54) : le joueur vote, repond, batit et demande, avec les memes regles que les autres ---
 
 namespace
 {

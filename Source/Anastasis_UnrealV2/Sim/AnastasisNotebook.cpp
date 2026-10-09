@@ -76,7 +76,7 @@ namespace AnastasisNotebook
 				Note.Text = Capitalize(Lines.TellerVersion(Event, Origin));
 			}
 		}
-		// ecart n°49 : le conseil du soir se tient au feu, devant tout le village ; le joueur l'entend s'il est la.
+		// ecart n°53 : le conseil du soir se tient au feu, devant tout le village ; le joueur l'entend s'il est la.
 		const TArray<AnastasisVillage::FVillage::FCouncil>& Councils = Village.GetCouncilLog();
 		for (; CouncilSeen < Councils.Num(); ++CouncilSeen)
 		{
@@ -84,7 +84,7 @@ namespace AnastasisNotebook
 			const AnastasisVillage::FVillage::FCouncil& Council = Councils[CouncilSeen];
 			for (const AnastasisVillage::FVillage::FWelcomeVote& Vote : Council.Votes)
 			{
-				// ecart n°50 : sa propre voix est un acte, pas une chose entendue.
+				// ecart n°54 : sa propre voix est un acte, pas une chose entendue.
 				if (Vote.VoterId == Player)
 				{
 					FNote& Deed = Notes.AddDefaulted_GetRef();
@@ -110,7 +110,7 @@ namespace AnastasisNotebook
 				Note.Text = FString::Printf(TEXT("%s.%s"), Vote.bYes ? TEXT("Oui") : TEXT("Non"), Said.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" %s"), *Said));
 			}
 		}
-		// ecart n°50 : ce que le joueur a fait des demandes d'aide, et ce qu'on a fait des siennes.
+		// ecart n°54 : ce que le joueur a fait des demandes d'aide, et ce qu'on a fait des siennes.
 		const TArray<AnastasisVillage::FVillage::FHelpAnswer>& Help = Village.GetHelpLog();
 		for (; HelpSeen < Help.Num(); ++HelpSeen)
 		{
@@ -167,7 +167,7 @@ namespace AnastasisNotebook
 		}
 		Out += FString::Printf(TEXT("%d chose%s entendue%s.\n"), Notes.Num(), Notes.Num() > 1 ? TEXT("s") : TEXT(""), Notes.Num() > 1 ? TEXT("s") : TEXT(""));
 
-		// ecart n°50 : ce que j'ai fait, puis ce qu'on dit de moi quand on ne me voit pas.
+		// ecart n°54 : ce que j'ai fait, puis ce qu'on dit de moi quand on ne me voit pas.
 		Out += TEXT("\nCE QUE J'AI FAIT\n");
 		bool bAnyDeed = false;
 		for (const FNote& Note : Notes)

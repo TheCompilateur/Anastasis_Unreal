@@ -118,7 +118,7 @@ static TAutoConsoleVariable<int32> CVarVillageSiteSource(
 static TAutoConsoleVariable<int32> CVarVillageGrowth(
 	TEXT("anastasis.Village.Growth"),
 	1,
-	TEXT("valmire-grows-001 (ecart n°50) : 1 = le village grandit de lui-meme (les habitants ouvrent maison, grenier ou puits quand il en manque, des arrivants viennent quand il y a de la place et de quoi manger) ; 0 = seuls l'hote et les scenarios ouvrent des chantiers. Lu au demarrage de la simulation."),
+	TEXT("valmire-grows-001 (ecart n°52) : 1 = le village grandit de lui-meme (les habitants ouvrent maison, grenier ou puits quand il en manque, des arrivants viennent quand il y a de la place et de quoi manger) ; 0 = seuls l'hote et les scenarios ouvrent des chantiers. Lu au demarrage de la simulation."),
 	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarVillageRoadEvolution(
@@ -266,7 +266,7 @@ FString UAnastasisSimulationSubsystem::SeedStartVillage(int32 NpcCount, int32 Ti
 		// simulation (FVillage::SeedOpeningVillage, ecart n°40) ; l'hote ne fait que le dire.
 		LogOpeningReport(Simulation.GetVillage().SeedOpeningVillage(Simulation.GetDay(), CVarVillageOpeningConstruction.GetValueOnGameThread() != 0));
 		if (Scenario) TellFounding(*Scenario);
-		// valmire-grows-001 (ecart n°50) : le village du jeu grandit de lui-meme.
+		// valmire-grows-001 (ecart n°52) : le village du jeu grandit de lui-meme.
 		Simulation.GetVillage().SetGrowthEnabled(CVarVillageGrowth.GetValueOnGameThread() != 0);
 		if (Scenario) OpenValmireToTheWorld();
 	}
@@ -450,7 +450,7 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	Simulation.GetVillage().SetRoadEvolutionEnabled(CVarVillageRoadEvolution.GetValueOnGameThread() != 0);
 	// ecart n°46 : la biographie des batiments est observee par la simulation (save-history-001).
 	Simulation.GetVillage().SetBiographyEnabled(true);
-	// ecart n°50 : la croissance s'allume pour le village du lancement seulement (SeedStartVillage) ; les
+	// ecart n°52 : la croissance s'allume pour le village du lancement seulement (SeedStartVillage) ; les
 	// scenarios de preuve (First*, FoodSupply, Hamlet) restent ceux qu'ils etaient.
 	Simulation.GetVillage().SetGrowthEnabled(false);
 	LoggedDay = Simulation.GetDay();

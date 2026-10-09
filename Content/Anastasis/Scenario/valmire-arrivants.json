@@ -1,5 +1,5 @@
 {
-  "_doc": "arrivants-001 (ecart n°49) : les groupes qui arrivent a Valmire par la route, dans l'ordre ou ils arrivent. Le monde exterieur (geo-pontos-1204.json) dit quand, combien et ce qu'ils fuient ; ce fichier dit qui ils sont. Un groupe de N personnes prend les N premiers membres (le premier parle pour les siens). Lu par l'hote au premier soir (AnastasisArrivals).",
+  "_doc": "arrivants-001 (ecart n°53) : les groupes qui arrivent a Valmire par la route, dans l'ordre ou ils arrivent. Le monde exterieur (geo-pontos-1204.json) dit quand, combien et ce qu'ils fuient ; ce fichier dit qui ils sont. Un groupe de N personnes prend les N premiers membres (le premier parle pour les siens). Lu par l'hote au premier soir (AnastasisArrivals).",
   "historicite": "Prenoms grecs byzantins courants (Theophilos, Lazaros, Xene, Petros, Kalliope) et une famille armenienne : des Armeniens vivent dans le Pont et en Chaldie aux XIe-XIIIe s. (PLAUSIBLE, HP-001 ne les etudie pas). Les liens et les ages sont des choix de conception (ABSTRACTION).",
   "groupes": [
     {

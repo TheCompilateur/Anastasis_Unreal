@@ -41,7 +41,7 @@ public:
 	 */
 	static constexpr int32 DayDeferredJobCount = 17;
 	static constexpr int32 DayJobLandRegen = 0;
-	/** `collective` : ici, la decision des batiments communs (ecart n°50), quand l'hote fait grandir le village. */
+	/** `collective` : ici, la decision des batiments communs (ecart n°52), quand l'hote fait grandir le village. */
 	static constexpr int32 DayJobCollective = 1;
 	/** `lifeDaily` (updateLifeDaily) : porte reduit a la mort certaine (ecart n°28). */
 	static constexpr int32 DayJobLifeDaily = 10;

@@ -35,12 +35,12 @@ provenance (`docs/historicity/briefs/arrivants-001.json`) et la façon dont ceux
 
 La pression voyage de nœud en nœud ; un groupe arrive des jours plus tard (vers les jours 10, 14, 25, 44).
 
-### 2. L'arrivée (écart n°49)
+### 2. L'arrivée (écart n°53)
 
 Le groupe devient une famille **en attente** : nommée, avec ses membres, et chacun de ses adultes se souvient de
 ce qu'il a fui (`fled`). Il passe sa journée au village : il boit, mange, et peut raconter ce qu'il a vécu.
 
-### 3. Le conseil du soir (écart n°49)
+### 3. Le conseil du soir (écart n°53)
 
 Le minuit suivant, chaque chef d'une famille accueillie vote. Une voix est une somme de raisons, et la plus forte
 est celle que dit le chef :

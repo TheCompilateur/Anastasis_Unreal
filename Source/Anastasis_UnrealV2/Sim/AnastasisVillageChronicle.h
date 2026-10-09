@@ -72,7 +72,7 @@ namespace AnastasisChronicle
 		HelpGiven,
 		/** On a demande de l'aide, et on a dit non : la raison. */
 		HelpRefused,
-		/** arrivants-001 (ecart n°49) : un groupe arrive par la route, et demande a rester. */
+		/** arrivants-001 (ecart n°53) : un groupe arrive par la route, et demande a rester. */
 		GroupArrival,
 		/** Le conseil du soir : le moine parle, chaque chef de famille dit oui ou non. */
 		Council,
@@ -80,7 +80,7 @@ namespace AnastasisChronicle
 		Welcomed,
 		/** Le conseil refuse : le groupe reprend la route. */
 		TurnedAway,
-		/** voix-conseil-001 (ecart n°50) : un habitant vient demander de l'aide au joueur. */
+		/** voix-conseil-001 (ecart n°54) : un habitant vient demander de l'aide au joueur. */
 		AskedPlayer,
 		/** Un chantier qui n'avance plus depuis 3, 7, 15 ou 30 jours. Toujours le dernier : StatusJson s'arrete la. */
 		Stalled,
@@ -269,10 +269,10 @@ namespace AnastasisChronicle
 		TSet<FString> LegendRoots;
 		/** Les demandes d'aide deja racontees (`FVillage::GetHelpLog`). */
 		int32 HelpSeen = 0;
-		/** ecart n°49 : les conseils deja racontes (`FVillage::GetCouncilLog`), et les groupes dont on a dit l'arrivee. */
+		/** ecart n°53 : les conseils deja racontes (`FVillage::GetCouncilLog`), et les groupes dont on a dit l'arrivee. */
 		int32 CouncilSeen = 0;
 		TSet<FString> GroupsTold;
-		/** ecart n°50 : les demandes faites au joueur deja racontees (`FVillage::GetPlayerAsks`). */
+		/** ecart n°54 : les demandes faites au joueur deja racontees (`FVillage::GetPlayerAsks`). */
 		int32 PlayerAsksSeen = 0;
 		TArray<FString> PersonOrder;
 		TMap<FString, FPersonState> People;
