@@ -118,3 +118,5 @@ chronicle-pie | tools/unreal/chronicle-pie.py | CHRONICLE_PIE PASS | CHRONICLE_P
 memory-pie | tools/unreal/memory-pie.py | MEMORY_PIE PASS | MEMORY_PIE FAIL|MEMORY_PIE_TIMEOUT|Traceback | 480 | -
 # arrivants-001 : 60 jours sans joueur, monde exterieur charge avec Valmire ; PASS = des groupes arrivent, chacun passe au conseil, un accueilli et un refuse, une maison des arrivants, une legende. Pas un verdict sur l interet du recit.
 arrivants-pie | tools/unreal/arrivants-pie.py | ARRIVANTS_PIE PASS | ARRIVANTS_PIE FAIL|ARRIVANTS_PIE_TIMEOUT|Traceback | 600 | -
+# voix-conseil-001 : 60 jours avec un joueur difficile ; PASS = une voix du joueur au conseil, un refus du joueur, une aide refusee au joueur pour ses actes, une histoire sur lui entendue dans son dos, joueur vivant, fichiers ecrits. Pas un verdict sur l interet du recit.
+voix-pie | tools/unreal/voix-pie.py | VOIX_PIE PASS | VOIX_PIE FAIL|VOIX_PIE_TIMEOUT|Traceback | 660 | -

@@ -1587,6 +1587,8 @@ namespace AnastasisVillage
 		 * suffit pas) ; un aidant, lui, n'attend personne.
 		 */
 		bool AwaitsHelpFor(const FBuilding& Site, const FNpc& Npc) const;
+		/** Trace la parcelle d'une famille pres de son chef, sans couper personne du puits. Rend le chantier, vide sinon. */
+		FString OpenFamilySiteNear(const FString& FamilyId, const FNpc& Chef);
 
 		/** Ce chantier admet-il cet habitant ? (Vide : tout le monde.) */
 		static bool CanBuildAt(const FBuilding& Site, const FString& NpcId) { return Site.AllowedBuilders.IsEmpty() || Site.AllowedBuilders.Contains(NpcId); }
@@ -1626,6 +1628,8 @@ namespace AnastasisVillage
 			double Score = 0.0;
 			/** Le detail de la somme, pour qui demande pourquoi : « nous_aussi=25 grenier=-20 inconnu=-10 ». */
 			FString Terms;
+			/** ecart n°50 : le poids de la voix ; un nouveau pas encore eprouve (le joueur) ne compte que pour une demi-voix. */
+			double Weight = 1.0;
 		};
 
 		/** Un conseil : quel groupe, ce qu'il fuyait, les voix dans l'ordre des foyers, et le verdict. */
@@ -1651,6 +1655,44 @@ namespace AnastasisVillage
 		const TArray<FCouncil>& GetCouncilLog() const { return CouncilLog; }
 		/** Les portions au grenier pour chaque bouche, nouveaux venus compris. */
 		double PortionsPerMouth(int32 ExtraMouths) const;
+
+		// --- Une voix au conseil : le joueur dans les decisions du village (voix-conseil-001, ecart n°50) -----------
+		//
+		// Mandat d'Alexandre (2026-10-09) : le joueur est un habitant, pas le seigneur ; il entre dans les memes
+		// decisions, avec les memes regles ; il arrive en etranger a eprouver, et le village le juge sur ses actes,
+		// en face et dans son dos. Sans joueur incarne, rien de ce qui suit ne s'execute.
+
+		/**
+		 * Un nouveau pas encore eprouve : arrive apres la fondation (le joueur, ou un groupe d'arrivants), il n'a encore
+		 * pose aucune piece sur la maison achevee d'une autre famille. Sa voix au conseil compte pour moitie, et qui on
+		 * lui demande de l'aide hesite (`nouveau`).
+		 */
+		bool IsUnproven(const FNpc& Npc) const;
+
+		/** La voix du joueur au prochain conseil : sur le plus ancien groupe en attente. Rend sa famille, vide sans groupe. */
+		FString CastPlayerVote(bool bYes);
+
+		/** Une demande d'aide faite au joueur : elle attend sa reponse jusqu'au soir suivant (le silence est un refus). */
+		struct FPlayerAsk
+		{
+			int32 Day = 0;
+			FString FromId;
+			FString SiteId;
+			bool bAnswered = false;
+			bool bAccepted = false;
+		};
+		const TArray<FPlayerAsk>& GetPlayerAsks() const { return PlayerAsks; }
+		/** Le joueur repond a la plus ancienne demande en attente. Faux s'il n'y en a pas. */
+		bool AnswerPlayerAsk(bool bYes);
+
+		/**
+		 * Le joueur decide de batir : il devient chef d'un foyer a lui (`FamilyName`), et sa parcelle se trace pres de
+		 * lui comme celle d'un chef de famille. Rend l'identifiant du chantier, vide si aucun sol ne convient ou s'il a
+		 * deja un foyer qui batit.
+		 */
+		FString PlayerBuildHome(const FString& FamilyName);
+		/** Le joueur va demander de l'aide a un habitant pour son chantier : la reponse tombe tout de suite, avec sa raison. */
+		bool PlayerAskHelp(const FString& NpcId, FHelpAnswer& OutAnswer);
 
 		/** `episodeGoalBias(npc, goal)` : borne, nul sans souvenir. */
 		double EpisodeGoalBiasOf(const FNpc& Npc, const FString& Goal) const { return AnastasisEpisodes::GoalBias(Npc.Chronicle, Goal); }
@@ -2338,6 +2380,10 @@ namespace AnastasisVillage
 		TArray<FArrivalGroup> ArrivalPool;
 		int32 NextArrivalGroup = 0;
 		TArray<FCouncil> CouncilLog;
+		/** ecart n°50 : la voix posee par le joueur pour un groupe, et les demandes d'aide qu'on lui a faites. */
+		FString PlayerVoteFamilyId;
+		bool bPlayerVoteYes = false;
+		TArray<FPlayerAsk> PlayerAsks;
 		/** ecart n°44 : les foyers poses par l'hote, et le compteur de leurs identifiants. */
 		TArray<FFamily> Families;
 		int32 NextFamilyId = 0;

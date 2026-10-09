@@ -1,0 +1,655 @@
+CARNET
+237 choses entendues.
+
+CE QUE J'AI FAIT
+  Jour 11, la nuit : Au conseil, j'ai dit non pour la famille de Theophilos (une demi-voix : on ne me connaît pas encore).
+  Jour 15, la nuit : Au conseil, j'ai dit oui pour les bergers de Lazaros (une demi-voix : on ne me connaît pas encore).
+  Jour 18, le matin : Theophilos m'a demandé de l'aide ; j'ai dit non.
+  Jour 21, le soir : J'ai demandé de l'aide à Georgios : non, j'ai fermé la porte à d'autres, au conseil.
+  Jour 21, le soir : J'ai demandé de l'aide à Niketas : non, j'ai fermé la porte à d'autres, au conseil.
+  Jour 22, le soir : J'ai demandé de l'aide à Leon : non, je suis nouveau ici, je n'ai encore levé aucun toit.
+  Jour 22, le soir : J'ai demandé de l'aide à Ioannes : non, il ne me connaît pas.
+  Jour 23, la nuit : Lazaros m'a demandé de l'aide ; je n'ai pas répondu.
+  Jour 23, le soir : J'ai demandé de l'aide à Theodora : non, je suis nouveau ici, je n'ai encore levé aucun toit.
+  Jour 23, le soir : J'ai demandé de l'aide à Basileios : oui, par amitié.
+  Jour 26, la nuit : Au conseil, j'ai dit oui pour la veuve Xene et les siens (une demi-voix : on ne me connaît pas encore).
+  Jour 45, la nuit : Au conseil, j'ai dit oui pour la maison d'Hovhannes (une demi-voix : on ne me connaît pas encore).
+  Jour 50, le matin : Mariam m'a demandé de l'aide ; j'ai dit oui.
+
+CE QU'ON DIT DE MOI
+  Jour 11, l'après-midi, Georgios à Ioannes : « J'ai entendu Nikolaos fermer la porte à la famille de Theophilos »
+  Jour 11, le soir, Konstantinos à Michael : « Nikolaos a dit non pour la famille de Theophilos, au conseil »
+  Jour 12, le soir, Konstantinos à Sabas : « Nikolaos a dit non pour la famille de Theophilos, au conseil »
+  Jour 14, le soir, Georgios à Theodora : « J'ai entendu Nikolaos fermer la porte à la famille de Theophilos »
+  Jour 15, le soir, Maria à Zoe : « Au feu, Nikolaos a parlé pour les bergers de Lazaros »
+  Jour 15, le soir, Konstantinos à Sabas : « Nikolaos a dit oui pour les bergers de Lazaros, au conseil »
+  Jour 16, le soir, Niketas à Leon : « Au feu, Nikolaos a parlé pour les bergers de Lazaros »
+  Jour 16, le soir, Konstantinos à Michael : « Nikolaos a dit oui pour les bergers de Lazaros, au conseil »
+  Jour 17, le soir, Georgios à Theodora : « Nikolaos a voulu garder les bergers de Lazaros »
+  Jour 20, le matin, Anna à Ioannikios : « J'ai entendu Theophilos dire : “j'ai demandé à Nikolaos, et la réponse a été non” »
+  Jour 23, le soir, Photeine à Gregorios : « J'ai entendu Lazaros dire : “Nikolaos a refusé de m'aider” »
+  Jour 23, le soir, Lazaros à Photeine : « Nikolaos a refusé de m'aider »
+  Jour 26, le soir, Niketas à Leon : « Nikolaos a dit oui pour la veuve Xene et les siens, au conseil »
+  Jour 26, le soir, Georgios à Theodora : « Nikolaos a dit oui pour la veuve Xene et les siens, au conseil »
+  Jour 26, le soir, Maria à Zoe : « Au feu, Nikolaos a parlé pour la veuve Xene et les siens »
+  Jour 26, le soir, Konstantinos à Sabas : « Nikolaos a voulu garder la veuve Xene et les siens »
+  Jour 27, le soir, Konstantinos à Michael : « Nikolaos a voulu garder la veuve Xene et les siens »
+  Jour 45, la nuit, Maria à Mariam : « Au feu, Nikolaos a parlé pour la maison d'Hovhannes »
+  Jour 45, le soir, Lazaros à Photeine : « Nikolaos a voulu garder la maison d'Hovhannes »
+  Jour 47, le matin, Georgios à Theodora : « Au feu, Nikolaos a parlé pour la maison d'Hovhannes »
+  Jour 50, l'après-midi, Mariam à Smbat : « Je dois 9 coups de marteau à Nikolaos »
+
+CE QUE CHACUN M'A DIT
+
+Basileios
+  Jour 1, l'après-midi, à moi : « Georgios m'a raconté : “Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru.” »
+  Jour 1, l'après-midi, à moi : « Konstantinos m'a raconté : “nous avons dû laisser la mère d'Eudokia sur la route” »
+  Jour 1, l'après-midi, à moi : « Niketas disait : “Au fort, sur le col. La solde a cessé d'arriver, et puis les ordres aussi.” »
+  Jour 1, l'après-midi, à moi : « Maria disait : “Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires.” »
+  Jour 1, l'après-midi, à moi : « Georgios m'a raconté : “je pense encore à mon père, chaque soir” »
+  Jour 1, l'après-midi, à moi : « Konstantinos m'a raconté : “Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues.” »
+  Jour 1, l'après-midi, à moi : « Maria disait : “je pense encore à mon fils aîné, chaque soir” »
+  Jour 1, l'après-midi, à moi : « J'ai entendu Niketas dire : “nous avons dû laisser mes hommes sur la route” »
+  Jour 2, le soir, à moi : « J'ai entendu Niketas dire : “nous avons dû laisser mes hommes sur la route” »
+  Jour 4, le matin, à moi : « Konstantinos m'a raconté : “nous avons dû laisser la mère d'Eudokia sur la route” »
+  Jour 44, la nuit, à moi : « J'ai vu quelqu'un arriver a Valmire »
+
+Konstantinos
+  Jour 2, la nuit, à Michael : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  Jour 2, la nuit, à Sabas : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  Jour 4, la nuit, à Michael : « Je dois 9 coups de marteau à Sabas »
+  Jour 7, le soir, à Sabas : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  Jour 9, l'après-midi, à Michael : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  Jour 11, la nuit, à Theophilos : « Niketas disait : “Au fort, sur le col. La solde a cessé d'arriver, et puis les ordres aussi.” »
+  Jour 11, la nuit, au conseil : « Oui. Il n'y a pas si longtemps, c'était nous, sur la route. »
+  Jour 11, le soir, à Michael : « Theophilos et les siens sont restés parce que nous l'avons voulu »
+  Jour 11, le soir, à Michael : « Nikolaos a dit non pour la famille de Theophilos, au conseil »
+  Jour 12, le soir, à Sabas : « Theophilos et les siens sont restés parce que nous l'avons voulu »
+  Jour 12, le soir, à Sabas : « Nikolaos a dit non pour la famille de Theophilos, au conseil »
+  Jour 15, la nuit, à Lazaros : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+  Jour 15, la nuit, au conseil : « Oui. Qui a fui sa maison ne ferme pas la sienne. »
+  Jour 15, le soir, à Michael : « On a ouvert la porte à Lazaros et aux siens »
+  Jour 15, le soir, à Sabas : « On a ouvert la porte à Lazaros et aux siens »
+  Jour 15, le soir, à Sabas : « Nikolaos a dit oui pour les bergers de Lazaros, au conseil »
+  Jour 16, le soir, à Michael : « Nikolaos a dit oui pour les bergers de Lazaros, au conseil »
+  Jour 20, le soir, à Michael : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+  Jour 20, le soir, à Sabas : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+  Jour 21, le soir, à Michael : « Je pense encore à la mère d'Eudokia, chaque soir »
+  Jour 23, la nuit, à Sabas : « Je pense encore à la mère d'Eudokia, chaque soir »
+  Jour 26, la nuit, au conseil : « Non. Nos propres familles dorment encore dehors. »
+  Jour 26, le soir, à Sabas : « J'ai pose la derniere pierre d'un ouvrage »
+  Jour 26, le soir, à Sabas : « Je repense à Xene, qu'on a laissé repartir »
+  Jour 26, le soir, à Sabas : « Nikolaos a voulu garder la veuve Xene et les siens »
+  Jour 27, le soir, à Michael : « J'ai pose la derniere pierre d'un ouvrage »
+  Jour 27, le soir, à Michael : « Nikolaos a voulu garder la veuve Xene et les siens »
+  Jour 27, le soir, à Michael : « Je repense à Xene, qu'on a laissé repartir »
+  Jour 45, la nuit, au conseil : « Oui. J'ai dit non une fois. Je ne le dirai plus. »
+  Jour 45, la nuit, à Sabas : « On a ouvert la porte à Hovhannes et aux siens »
+
+Niketas
+  Jour 2, le matin, à Leon : « J'ai porté une hache et la corne du fort jusqu'ici »
+  Jour 8, la nuit, à Leon : « J'ai porté une hache et la corne du fort jusqu'ici »
+  Jour 9, le soir, à Leon : « Je dois 6 coups de marteau à Eudokia »
+  Jour 11, la nuit, à Ioannikios : « Sans Konstantinos, ma maison serait encore par terre : 4 coups de marteau de sa main »
+  Jour 11, la nuit, au conseil : « Oui. Qui a fui sa maison ne ferme pas la sienne. »
+  Jour 15, la nuit, au conseil : « Oui. Il n'y a pas si longtemps, c'était nous, sur la route. »
+  Jour 16, le soir, à Leon : « Au feu, Nikolaos a parlé pour les bergers de Lazaros »
+  Jour 26, la nuit, au conseil : « Non. Levons d'abord nos toits. Ensuite, on verra. »
+  Jour 26, le soir, à Leon : « Je repense à Xene, qu'on a laissé repartir »
+  Jour 26, le soir, à Leon : « Nikolaos a dit oui pour la veuve Xene et les siens, au conseil »
+  Jour 45, la nuit, au conseil : « Oui. La dernière fois, nous les avons laissés repartir. Pas deux fois. »
+
+Arsenios
+  Jour 2, le matin, à moi : « Georgios m'a raconté : “je pense encore à mon père, chaque soir” »
+  Jour 3, la nuit, à moi : « Georgios m'a raconté : “Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru.” »
+  Jour 49, la nuit, à moi : « Je porte encore le nom de Hovhannes dans la bouche »
+
+Euphrosyne
+  Jour 3, le matin, à moi : « Maria disait : “je pense encore à mon fils aîné, chaque soir” »
+
+Maria
+  Jour 3, l'après-midi, à Leon : « De tout ce que j'avais, j'ai gardé deux mules »
+  Jour 4, l'après-midi, à Leon : « Zoe a donné 14 coups de marteau à ma maison »
+  Jour 6, la nuit, à Georgios : « Zoe a donné 14 coups de marteau à ma maison »
+  Jour 7, le soir, à Zoe : « De tout ce que j'avais, j'ai gardé deux mules »
+  Jour 11, la nuit, à Theophilos : « Konstantinos m'a raconté : “Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues.” »
+  Jour 11, la nuit, au conseil : « Oui. Qui a fui sa maison ne ferme pas la sienne. »
+  Jour 15, la nuit, à Lazaros : « Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires. »
+  Jour 15, la nuit, au conseil : « Oui. Il n'y a pas si longtemps, c'était nous, sur la route. »
+  Jour 15, le soir, à Zoe : « Au feu, Nikolaos a parlé pour les bergers de Lazaros »
+  Jour 25, le soir, à Zoe : « Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires. »
+  Jour 26, la nuit, au conseil : « Non. Levons d'abord nos toits. Ensuite, on verra. »
+  Jour 26, le soir, à Zoe : « Au feu, Nikolaos a parlé pour la veuve Xene et les siens »
+  Jour 27, le soir, à Zoe : « On a renvoyé Xene sur la route »
+  Jour 27, le soir, à Zoe : « J'ai acheve un chantier »
+  Jour 45, la nuit, à Mariam : « Au feu, Nikolaos a parlé pour la maison d'Hovhannes »
+  Jour 45, la nuit, au conseil : « Oui. Je pense encore à ceux qu'on a renvoyés. Qu'ils restent, ceux-là. »
+  Jour 47, le soir, à Zoe : « J'ai dit oui pour Hovhannes, au conseil »
+
+Georgios
+  Jour 10, l'après-midi, à Theodora : « Maria disait : “je dois 18 coups de marteau à Zoe” »
+  Jour 11, la nuit, à Anna : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  Jour 11, la nuit, au conseil : « Oui. Qui a fui sa maison ne ferme pas la sienne. »
+  Jour 11, l'après-midi, à Theodora : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  Jour 11, l'après-midi, à Ioannes : « J'ai entendu Nikolaos fermer la porte à la famille de Theophilos »
+  Jour 12, l'après-midi, à Theodora : « Je pense encore à mon père, chaque soir »
+  Jour 13, le soir, à Theodora : « Konstantinos a refusé de m'aider »
+  Jour 14, le soir, à Theodora : « J'ai entendu Nikolaos fermer la porte à la famille de Theophilos »
+  Jour 15, la nuit, à Gregorios : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  Jour 15, la nuit, au conseil : « Oui. Il n'y a pas si longtemps, c'était nous, sur la route. »
+  Jour 15, le matin, à Theodora : « On a ouvert la porte à Lazaros et aux siens »
+  Jour 16, le matin, à Ioannes : « Konstantinos a refusé de m'aider »
+  Jour 17, l'après-midi, à Theodora : « Konstantinos a refusé de m'aider »
+  Jour 17, l'après-midi, à Ioannes : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  Jour 17, le soir, à Theodora : « Nikolaos a voulu garder les bergers de Lazaros »
+  Jour 19, l'après-midi, à Theodora : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  Jour 20, l'après-midi, à Theodora : « Je pense encore à mon père, chaque soir »
+  Jour 25, l'après-midi, à Ioannes : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  Jour 26, la nuit, au conseil : « Non. Nos propres familles dorment encore dehors. »
+  Jour 26, le soir, à Theodora : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  Jour 26, le soir, à Theodora : « Je repense à Xene, qu'on a laissé repartir »
+  Jour 26, le soir, à Theodora : « Nikolaos a dit oui pour la veuve Xene et les siens, au conseil »
+  Jour 45, la nuit, à Mariam : « J'ai dit oui pour Hovhannes, au conseil »
+  Jour 45, la nuit, au conseil : « Oui. Je pense encore à ceux qu'on a renvoyés. Qu'ils restent, ceux-là. »
+  Jour 47, le matin, à Theodora : « Au feu, Nikolaos a parlé pour la maison d'Hovhannes »
+
+Theodora
+  Jour 10, le soir, à Ioannes : « Georgios m'a raconté : “sans Eudokia, ma maison serait encore par terre : 35 coups de marteau de sa main” »
+
+Michael
+  Jour 10, le soir, à Konstantinos : « Ioannikios disait : “nous avons fui le pillage des hameaux hauts de Paipert” »
+
+Ioannikios
+  Jour 11, le soir, à Anna : « Niketas disait : “Konstantinos a donné 5 coups de marteau à ma maison” »
+
+Theophilos
+  Jour 12, la nuit, à Anna : « Georgios a refusé de m'aider »
+  Jour 12, la nuit, à Anna : « J'ai demandé à Niketas, et la réponse a été non »
+  Jour 13, la nuit, à Anna : « Je n'oublie pas que Ioannes m'a laissé seul avec mes poutres »
+  Jour 13, la nuit, à Anna : « Leon a refusé de m'aider »
+  Jour 15, la nuit, au conseil : « Non. Levons d'abord nos toits. Ensuite, on verra. »
+  Jour 16, la nuit, à Anna : « Je n'oublie pas que Zoe m'a laissé seul avec mes poutres »
+  Jour 16, la nuit, à Anna : « Theodora a refusé de m'aider »
+  Jour 16, la nuit, à Anna : « Je n'oublie pas que Konstantinos m'a laissé seul avec mes poutres »
+  Jour 17, la nuit, à Anna : « J'ai demandé à Maria, et la réponse a été non »
+  Jour 17, le matin, à Anna : « Je n'oublie pas que Sabas m'a laissé seul avec mes poutres »
+  Jour 17, l'après-midi, à Anna : « Lazaros a refusé de m'aider »
+  Jour 20, la nuit, à Anna : « J'ai demandé à Gregorios, et la réponse a été non »
+  Jour 20, la nuit, à Anna : « J'ai demandé à Photeine, et la réponse a été non »
+  Jour 20, la nuit, à Anna : « Lazaros a refusé de m'aider »
+  Jour 23, le matin, à Anna : « Eudokia a refusé de m'aider »
+  Jour 23, le matin, à Anna : « Je n'oublie pas que Basileios m'a laissé seul avec mes poutres »
+  Jour 24, la nuit, à Anna : « J'ai demandé à Georgios, et la réponse a été non »
+  Jour 25, le matin, à Anna : « Je n'oublie pas que Leon m'a laissé seul avec mes poutres »
+  Jour 25, le matin, à Anna : « Je n'oublie pas que Theodora m'a laissé seul avec mes poutres »
+  Jour 26, la nuit, au conseil : « Non. Nous n'avons pas fini de nous loger nous-mêmes. »
+  Jour 26, le soir, à Anna : « Je dois 8 coups de marteau à Konstantinos »
+  Jour 45, la nuit, à Mariam : « Je dois 8 coups de marteau à Konstantinos »
+  Jour 45, la nuit, au conseil : « Non. Personne ici ne sait d'où ils viennent vraiment. »
+  Jour 46, l'après-midi, à Anna : « Je dois 8 coups de marteau à Konstantinos »
+
+Anna
+  Jour 12, le soir, à Ioannikios : « Theophilos m'a raconté : “Niketas a refusé de m'aider” »
+  Jour 13, la nuit, à Ioannikios : « Theophilos m'a raconté : “Georgios a refusé de m'aider” »
+  Jour 13, le soir, à Ioannikios : « Theophilos m'a raconté : “j'ai demandé à Leon, et la réponse a été non” »
+  Jour 13, le soir, à Ioannikios : « Theophilos m'a raconté : “j'ai demandé à Ioannes, et la réponse a été non” »
+  Jour 14, le matin, à Photeine : « Theophilos m'a raconté : “Niketas a refusé de m'aider” »
+  Jour 14, l'après-midi, à Ioannikios : « Photeine disait : “j'ai tout laissé derrière moi : la dispute des hauts pâturages de Cheriana” »
+  Jour 14, le soir, à Ioannikios : « Theophilos m'a raconté : “Niketas a refusé de m'aider” »
+  Jour 15, la nuit, à Lazaros : « Theophilos m'a raconté : “j'ai demandé à Ioannes, et la réponse a été non” »
+  Jour 16, le matin, à Ioannikios : « Theophilos m'a raconté : “je n'oublie pas que Theodora m'a laissé seul avec mes poutres” »
+  Jour 16, le matin, à Ioannikios : « Theophilos m'a raconté : “Konstantinos a refusé de m'aider” »
+  Jour 17, le matin, à Ioannikios : « Theophilos m'a raconté : “je n'oublie pas que Zoe m'a laissé seul avec mes poutres” »
+  Jour 18, le matin, à Ioannikios : « J'ai entendu Theophilos dire : “je n'oublie pas que Sabas m'a laissé seul avec mes poutres” »
+  Jour 19, le matin, à Ioannikios : « J'ai entendu Theophilos dire : “Maria a refusé de m'aider” »
+  Jour 19, le matin, à Ioannikios : « Theophilos m'a raconté : “je n'oublie pas que Arsenios m'a laissé seul avec mes poutres” »
+  Jour 20, le matin, à Ioannikios : « J'ai entendu Theophilos dire : “j'ai demandé à Nikolaos, et la réponse a été non” »
+  Jour 20, le matin, à Ioannikios : « Theophilos disait : “Gregorios a refusé de m'aider” »
+  Jour 20, le matin, à Ioannikios : « Theophilos disait : “je n'oublie pas que Photeine m'a laissé seul avec mes poutres” »
+  Jour 21, le soir, à Ioannikios : « Photeine disait : “j'ai tout laissé derrière moi : la dispute des hauts pâturages de Cheriana” »
+  Jour 22, la nuit, à Ioannikios : « J'ai entendu Theophilos dire : “j'ai demandé à Lazaros, et la réponse a été non” »
+  Jour 23, la nuit, à Ioannikios : « Photeine disait : “j'ai tout laissé derrière moi : la dispute des hauts pâturages de Cheriana” »
+  Jour 24, le matin, à Ioannikios : « Theophilos disait : “Eudokia a refusé de m'aider” »
+  Jour 24, le matin, à Ioannikios : « J'ai entendu Theophilos dire : “j'ai demandé à Georgios, et la réponse a été non” »
+  Jour 24, le matin, à Ioannikios : « Theophilos disait : “je n'oublie pas que Basileios m'a laissé seul avec mes poutres” »
+  Jour 25, la nuit, à Xene : « J'ai entendu Theophilos dire : “j'ai demandé à Georgios, et la réponse a été non” »
+  Jour 25, l'après-midi, à Xene : « Theophilos disait : “je n'oublie pas que Leon m'a laissé seul avec mes poutres” »
+  Jour 25, l'après-midi, à Xene : « Theophilos m'a raconté : “je n'oublie pas que Niketas m'a laissé seul avec mes poutres” »
+  Jour 28, la nuit, à Ioannikios : « Theophilos disait : “Zoe a refusé de m'aider” »
+  Jour 29, le soir, à Ioannikios : « Theophilos disait : “je dois 10 coups de marteau à Konstantinos” »
+  Jour 30, le soir, à Ioannikios : « Theophilos disait : “je n'oublie pas que Leon m'a laissé seul avec mes poutres” »
+  Jour 35, le soir, à Ioannikios : « Xene m'a raconté : “nous avons fui la prise de la Ville par les Latins” »
+
+Nikolaos
+  Jour 15, le matin, à Basileios : « J'ai dit oui pour Lazaros, au conseil »
+  Jour 22, le matin, à Basileios : « Niketas a refusé de m'aider »
+  Jour 22, le soir, à Basileios : « Je n'oublie pas que Leon m'a laissé seul avec mes poutres »
+  Jour 22, le soir, à Basileios : « Je n'oublie pas que Ioannes m'a laissé seul avec mes poutres »
+  Jour 22, le soir, à Basileios : « Georgios a refusé de m'aider »
+  Jour 24, le matin, à Basileios : « J'ai demandé à Theodora, et la réponse a été non »
+  Jour 31, le soir, à Arsenios : « Je dois 3 coups de marteau à Basileios »
+  Jour 32, le matin, à Basileios : « Georgios a refusé de m'aider »
+  Jour 32, le matin, à Basileios : « Niketas a refusé de m'aider »
+  Jour 33, le matin, à Basileios : « Je n'oublie pas que Ioannes m'a laissé seul avec mes poutres »
+  Jour 33, le soir, à Basileios : « Je n'oublie pas que Leon m'a laissé seul avec mes poutres »
+  Jour 35, la nuit, à Basileios : « J'ai demandé à Theodora, et la réponse a été non »
+  Jour 37, l'après-midi, à Arsenios : « J'ai demandé à Theodora, et la réponse a été non »
+  Jour 40, l'après-midi, à Euphrosyne : « Je dois 3 coups de marteau à Basileios »
+  Jour 45, le matin, à Basileios : « J'ai dit oui pour Hovhannes, au conseil »
+  Jour 51, le matin, à Arsenios : « Un toit de plus s'est leve sous mes mains »
+  Jour 53, la nuit, à Arsenios : « J'ai dit oui pour Hovhannes, au conseil »
+  Jour 53, l'après-midi, à Basileios : « Un toit de plus s'est leve sous mes mains »
+
+Photeine
+  Jour 16, la nuit, à Lazaros : « Niketas disait : “Konstantinos a donné 5 coups de marteau à ma maison” »
+  Jour 16, la nuit, à Gregorios : « Lazaros m'a raconté : “Theophilos a refusé de m'aider” »
+  Jour 16, la nuit, à Gregorios : « Niketas disait : “Konstantinos a donné 5 coups de marteau à ma maison” »
+  Jour 16, la nuit, à Gregorios : « J'ai entendu Theophilos dire : “je pense encore, la nuit, à le pillage des hameaux hauts de Paipert” »
+  Jour 18, le soir, à Gregorios : « Lazaros disait : “Leon a refusé de m'aider” »
+  Jour 19, la nuit, à Gregorios : « J'ai entendu Lazaros dire : “Basileios a refusé de m'aider” »
+  Jour 19, le matin, à Gregorios : « Lazaros disait : “Theodora a refusé de m'aider” »
+  Jour 19, l'après-midi, à Gregorios : « Lazaros m'a raconté : “Eudokia a refusé de m'aider” »
+  Jour 19, l'après-midi, à Gregorios : « J'ai entendu Lazaros dire : “j'ai demandé à Konstantinos, et la réponse a été non” »
+  Jour 20, le matin, à Gregorios : « Lazaros disait : “je n'oublie pas que Maria m'a laissé seul avec mes poutres” »
+  Jour 23, le soir, à Gregorios : « Lazaros m'a raconté : “Ioannes a refusé de m'aider” »
+  Jour 23, le soir, à Gregorios : « J'ai entendu Lazaros dire : “Nikolaos a refusé de m'aider” »
+  Jour 25, la nuit, à Gregorios : « Lazaros m'a raconté : “j'ai demandé à Anna, et la réponse a été non” »
+  Jour 25, la nuit, à Gregorios : « Lazaros m'a raconté : “j'ai demandé à Theophilos, et la réponse a été non” »
+  Jour 25, le matin, à Gregorios : « Lazaros m'a raconté : “j'ai demandé à Ioannikios, et la réponse a été non” »
+  Jour 25, le matin, à Gregorios : « J'ai entendu Lazaros dire : “je n'oublie pas que Zoe m'a laissé seul avec mes poutres” »
+  Jour 26, la nuit, à Gregorios : « Lazaros m'a raconté : “j'ai demandé à Konstantinos, et la réponse a été non” »
+  Jour 27, la nuit, à Gregorios : « Lazaros disait : “j'ai demandé à Niketas, et la réponse a été non” »
+  Jour 27, l'après-midi, à Gregorios : « Lazaros disait : “je n'oublie pas que Theodora m'a laissé seul avec mes poutres” »
+  Jour 27, le soir, à Gregorios : « Lazaros m'a raconté : “Ioannes a refusé de m'aider” »
+  Jour 28, le soir, à Gregorios : « Lazaros m'a raconté : “sans Maria, ma maison serait encore par terre : 18 coups de marteau de sa main” »
+  Jour 30, le soir, à Gregorios : « Lazaros disait : “j'ai demandé à Niketas, et la réponse a été non” »
+
+Lazaros
+  Jour 16, la nuit, à Photeine : « J'ai demandé à Theophilos, et la réponse a été non »
+  Jour 16, le soir, à Photeine : « Konstantinos a refusé de m'aider »
+  Jour 17, le soir, à Photeine : « Georgios a refusé de m'aider »
+  Jour 18, la nuit, à Photeine : « Je n'oublie pas que Theodora m'a laissé seul avec mes poutres »
+  Jour 19, la nuit, à Photeine : « J'ai demandé à Basileios, et la réponse a été non »
+  Jour 19, la nuit, à Photeine : « Konstantinos a refusé de m'aider »
+  Jour 19, le matin, à Photeine : « Eudokia a refusé de m'aider »
+  Jour 23, le matin, à Photeine : « J'ai demandé à Ioannes, et la réponse a été non »
+  Jour 23, le soir, à Photeine : « Nikolaos a refusé de m'aider »
+  Jour 23, le soir, à Photeine : « Ioannikios a refusé de m'aider »
+  Jour 24, la nuit, à Photeine : « Je n'oublie pas que Anna m'a laissé seul avec mes poutres »
+  Jour 25, la nuit, à Photeine : « Je n'oublie pas que Theophilos m'a laissé seul avec mes poutres »
+  Jour 25, la nuit, à Photeine : « Ioannikios a refusé de m'aider »
+  Jour 26, la nuit, au conseil : « Non. Levons d'abord nos toits. Ensuite, on verra. »
+  Jour 26, le matin, à Photeine : « J'ai demandé à Konstantinos, et la réponse a été non »
+  Jour 26, le matin, à Photeine : « Je n'oublie pas que Niketas m'a laissé seul avec mes poutres »
+  Jour 27, la nuit, à Photeine : « J'ai demandé à Theodora, et la réponse a été non »
+  Jour 27, la nuit, à Photeine : « Je n'oublie pas que Georgios m'a laissé seul avec mes poutres »
+  Jour 27, le matin, à Photeine : « J'ai demandé à Ioannes, et la réponse a été non »
+  Jour 27, le soir, à Photeine : « Maria a donné 14 coups de marteau à ma maison »
+  Jour 45, la nuit, au conseil : « Non. Des étrangers. Je dis non. »
+  Jour 45, le soir, à Photeine : « Nikolaos a voulu garder la maison d'Hovhannes »
+  Jour 47, le soir, à Photeine : « Maria a donné 14 coups de marteau à ma maison »
+
+Xene
+  Jour 25, la nuit, à Anna : « Nous avons fui la prise de la Ville par les Latins »
+
+Mariam
+  Jour 47, l'après-midi, à Georgios : « Nous avons fui la levée d'hommes de Trébizonde »
+  Jour 50, la nuit, à Smbat : « Georgios a refusé de m'aider »
+  Jour 50, l'après-midi, à Smbat : « Je dois 9 coups de marteau à Nikolaos »
+  Jour 60, le soir, à Smbat : « Georgios a refusé de m'aider »
+
+Sabas
+  Jour 50, le soir, à Konstantinos : « Depuis que Hovhannes n'est plus, la maison sonne creux »
+
+LES HISTOIRES, VERSION PAR VERSION
+
+Une histoire entendue 9 fois
+  1. Jour 1, Basileios (2 bouches) : « Georgios m'a raconté : “Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru.” »
+  2. Jour 3, Arsenios (2 bouches) : « Georgios m'a raconté : “Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru.” »
+  3. Jour 11, Georgios (1 bouche) : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. » -- racontée autrement
+  4. Jour 11, Georgios (1 bouche) : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  5. Jour 15, Georgios (1 bouche) : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  6. Jour 17, Georgios (1 bouche) : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  7. Jour 19, Georgios (1 bouche) : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  8. Jour 25, Georgios (1 bouche) : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+  9. Jour 26, Georgios (1 bouche) : « Chez nous, plus bas dans la vallée. La nouvelle est arrivée à l'automne, par un moine. On n'y a pas cru. »
+
+Une histoire entendue 4 fois
+  1. Jour 1, Basileios (2 bouches) : « Konstantinos m'a raconté : “nous avons dû laisser la mère d'Eudokia sur la route” »
+  2. Jour 4, Basileios (2 bouches) : « Konstantinos m'a raconté : “nous avons dû laisser la mère d'Eudokia sur la route” »
+  3. Jour 21, Konstantinos (1 bouche) : « Je pense encore à la mère d'Eudokia, chaque soir » -- racontée autrement
+  4. Jour 23, Konstantinos (1 bouche) : « Je pense encore à la mère d'Eudokia, chaque soir »
+
+Une histoire entendue 2 fois
+  1. Jour 1, Basileios (2 bouches) : « Niketas disait : “Au fort, sur le col. La solde a cessé d'arriver, et puis les ordres aussi.” »
+  2. Jour 11, Konstantinos (2 bouches) : « Niketas disait : “Au fort, sur le col. La solde a cessé d'arriver, et puis les ordres aussi.” »
+
+Une histoire entendue 3 fois
+  1. Jour 1, Basileios (2 bouches) : « Maria disait : “Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires.” »
+  2. Jour 15, Maria (1 bouche) : « Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires. » -- racontée autrement
+  3. Jour 25, Maria (1 bouche) : « Sur le plateau, à vendre du sel. Les nouvelles de la Ville arrivaient avec chaque caravane, toujours pires. »
+
+Une histoire entendue 4 fois
+  1. Jour 1, Basileios (2 bouches) : « Georgios m'a raconté : “je pense encore à mon père, chaque soir” »
+  2. Jour 2, Arsenios (2 bouches) : « Georgios m'a raconté : “je pense encore à mon père, chaque soir” »
+  3. Jour 12, Georgios (1 bouche) : « Je pense encore à mon père, chaque soir » -- racontée autrement
+  4. Jour 20, Georgios (1 bouche) : « Je pense encore à mon père, chaque soir »
+
+Une histoire entendue 5 fois
+  1. Jour 1, Basileios (2 bouches) : « Konstantinos m'a raconté : “Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues.” »
+  2. Jour 11, Maria (2 bouches) : « Konstantinos m'a raconté : “Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues.” »
+  3. Jour 15, Konstantinos (1 bouche) : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. » -- racontée autrement
+  4. Jour 20, Konstantinos (1 bouche) : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+  5. Jour 20, Konstantinos (1 bouche) : « Dans la Ville. J'écrivais des actes pour un marchand quand les cloches se sont tues. »
+
+Une histoire entendue 2 fois
+  1. Jour 1, Basileios (2 bouches) : « Maria disait : “je pense encore à mon fils aîné, chaque soir” »
+  2. Jour 3, Euphrosyne (2 bouches) : « Maria disait : “je pense encore à mon fils aîné, chaque soir” »
+
+Une histoire entendue 2 fois
+  1. Jour 1, Basileios (2 bouches) : « J'ai entendu Niketas dire : “nous avons dû laisser mes hommes sur la route” »
+  2. Jour 2, Basileios (2 bouches) : « J'ai entendu Niketas dire : “nous avons dû laisser mes hommes sur la route” »
+
+Une histoire entendue 4 fois
+  1. Jour 2, Konstantinos (1 bouche) : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  2. Jour 2, Konstantinos (1 bouche) : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  3. Jour 7, Konstantinos (1 bouche) : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+  4. Jour 9, Konstantinos (1 bouche) : « De tout ce que j'avais, j'ai gardé une icône de la Vierge »
+
+Une histoire entendue 2 fois
+  1. Jour 2, Niketas (1 bouche) : « J'ai porté une hache et la corne du fort jusqu'ici »
+  2. Jour 8, Niketas (1 bouche) : « J'ai porté une hache et la corne du fort jusqu'ici »
+
+Une histoire entendue 2 fois
+  1. Jour 3, Maria (1 bouche) : « De tout ce que j'avais, j'ai gardé deux mules »
+  2. Jour 7, Maria (1 bouche) : « De tout ce que j'avais, j'ai gardé deux mules »
+
+Une histoire entendue 3 fois
+  1. Jour 4, Maria (1 bouche) : « Zoe a donné 14 coups de marteau à ma maison »
+  2. Jour 6, Maria (1 bouche) : « Zoe a donné 14 coups de marteau à ma maison »
+  3. Jour 10, Georgios (2 bouches) : « Maria disait : “je dois 18 coups de marteau à Zoe” » -- racontée autrement
+
+Une histoire entendue 1 fois
+  1. Jour 4, Konstantinos (1 bouche) : « Je dois 9 coups de marteau à Sabas »
+
+Une histoire entendue 1 fois
+  1. Jour 9, Niketas (1 bouche) : « Je dois 6 coups de marteau à Eudokia »
+
+Une histoire entendue 1 fois
+  1. Jour 10, Theodora (2 bouches) : « Georgios m'a raconté : “sans Eudokia, ma maison serait encore par terre : 35 coups de marteau de sa main” »
+
+Une histoire entendue 2 fois
+  1. Jour 10, Michael (2 bouches) : « Ioannikios disait : “nous avons fui le pillage des hameaux hauts de Paipert” »
+  2. Jour 16, Photeine (2 bouches) : « J'ai entendu Theophilos dire : “je pense encore, la nuit, à le pillage des hameaux hauts de Paipert” » -- racontée autrement
+
+Une histoire entendue 4 fois
+  1. Jour 11, Niketas (1 bouche) : « Sans Konstantinos, ma maison serait encore par terre : 4 coups de marteau de sa main »
+  2. Jour 11, Ioannikios (2 bouches) : « Niketas disait : “Konstantinos a donné 5 coups de marteau à ma maison” » -- racontée autrement
+  3. Jour 16, Photeine (2 bouches) : « Niketas disait : “Konstantinos a donné 5 coups de marteau à ma maison” »
+  4. Jour 16, Photeine (2 bouches) : « Niketas disait : “Konstantinos a donné 5 coups de marteau à ma maison” »
+
+Une histoire entendue 4 fois
+  1. Jour 11, Georgios (1 bouche) : « J'ai entendu Nikolaos fermer la porte à la famille de Theophilos »
+  2. Jour 11, Konstantinos (1 bouche) : « Nikolaos a dit non pour la famille de Theophilos, au conseil » -- racontée autrement
+  3. Jour 12, Konstantinos (1 bouche) : « Nikolaos a dit non pour la famille de Theophilos, au conseil »
+  4. Jour 14, Georgios (1 bouche) : « J'ai entendu Nikolaos fermer la porte à la famille de Theophilos » -- racontée autrement
+
+Une histoire entendue 2 fois
+  1. Jour 11, Konstantinos (1 bouche) : « Theophilos et les siens sont restés parce que nous l'avons voulu »
+  2. Jour 12, Konstantinos (1 bouche) : « Theophilos et les siens sont restés parce que nous l'avons voulu »
+
+Une histoire entendue 5 fois
+  1. Jour 12, Theophilos (1 bouche) : « Georgios a refusé de m'aider »
+  2. Jour 13, Anna (2 bouches) : « Theophilos m'a raconté : “Georgios a refusé de m'aider” » -- racontée autrement
+  3. Jour 24, Theophilos (1 bouche) : « J'ai demandé à Georgios, et la réponse a été non » -- racontée autrement
+  4. Jour 24, Anna (2 bouches) : « J'ai entendu Theophilos dire : “j'ai demandé à Georgios, et la réponse a été non” » -- racontée autrement
+  5. Jour 25, Anna (2 bouches) : « J'ai entendu Theophilos dire : “j'ai demandé à Georgios, et la réponse a été non” »
+
+Une histoire entendue 5 fois
+  1. Jour 12, Theophilos (1 bouche) : « J'ai demandé à Niketas, et la réponse a été non »
+  2. Jour 12, Anna (2 bouches) : « Theophilos m'a raconté : “Niketas a refusé de m'aider” » -- racontée autrement
+  3. Jour 14, Anna (2 bouches) : « Theophilos m'a raconté : “Niketas a refusé de m'aider” »
+  4. Jour 14, Anna (2 bouches) : « Theophilos m'a raconté : “Niketas a refusé de m'aider” »
+  5. Jour 25, Anna (2 bouches) : « Theophilos m'a raconté : “je n'oublie pas que Niketas m'a laissé seul avec mes poutres” » -- racontée autrement
+
+Une histoire entendue 3 fois
+  1. Jour 13, Theophilos (1 bouche) : « Je n'oublie pas que Ioannes m'a laissé seul avec mes poutres »
+  2. Jour 13, Anna (2 bouches) : « Theophilos m'a raconté : “j'ai demandé à Ioannes, et la réponse a été non” » -- racontée autrement
+  3. Jour 15, Anna (2 bouches) : « Theophilos m'a raconté : “j'ai demandé à Ioannes, et la réponse a été non” »
+
+Une histoire entendue 5 fois
+  1. Jour 13, Theophilos (1 bouche) : « Leon a refusé de m'aider »
+  2. Jour 13, Anna (2 bouches) : « Theophilos m'a raconté : “j'ai demandé à Leon, et la réponse a été non” » -- racontée autrement
+  3. Jour 25, Theophilos (1 bouche) : « Je n'oublie pas que Leon m'a laissé seul avec mes poutres » -- racontée autrement
+  4. Jour 25, Anna (2 bouches) : « Theophilos disait : “je n'oublie pas que Leon m'a laissé seul avec mes poutres” » -- racontée autrement
+  5. Jour 30, Anna (2 bouches) : « Theophilos disait : “je n'oublie pas que Leon m'a laissé seul avec mes poutres” »
+
+Une histoire entendue 3 fois
+  1. Jour 13, Georgios (1 bouche) : « Konstantinos a refusé de m'aider »
+  2. Jour 16, Georgios (1 bouche) : « Konstantinos a refusé de m'aider »
+  3. Jour 17, Georgios (1 bouche) : « Konstantinos a refusé de m'aider »
+
+Une histoire entendue 3 fois
+  1. Jour 14, Anna (2 bouches) : « Photeine disait : “j'ai tout laissé derrière moi : la dispute des hauts pâturages de Cheriana” »
+  2. Jour 21, Anna (2 bouches) : « Photeine disait : “j'ai tout laissé derrière moi : la dispute des hauts pâturages de Cheriana” »
+  3. Jour 23, Anna (2 bouches) : « Photeine disait : “j'ai tout laissé derrière moi : la dispute des hauts pâturages de Cheriana” »
+
+Une histoire entendue 4 fois
+  1. Jour 15, Georgios (1 bouche) : « On a ouvert la porte à Lazaros et aux siens »
+  2. Jour 15, Nikolaos (1 bouche) : « J'ai dit oui pour Lazaros, au conseil » -- racontée autrement
+  3. Jour 15, Konstantinos (1 bouche) : « On a ouvert la porte à Lazaros et aux siens » -- racontée autrement
+  4. Jour 15, Konstantinos (1 bouche) : « On a ouvert la porte à Lazaros et aux siens »
+
+Une histoire entendue 5 fois
+  1. Jour 15, Maria (1 bouche) : « Au feu, Nikolaos a parlé pour les bergers de Lazaros »
+  2. Jour 15, Konstantinos (1 bouche) : « Nikolaos a dit oui pour les bergers de Lazaros, au conseil » -- racontée autrement
+  3. Jour 16, Niketas (1 bouche) : « Au feu, Nikolaos a parlé pour les bergers de Lazaros » -- racontée autrement
+  4. Jour 16, Konstantinos (1 bouche) : « Nikolaos a dit oui pour les bergers de Lazaros, au conseil » -- racontée autrement
+  5. Jour 17, Georgios (1 bouche) : « Nikolaos a voulu garder les bergers de Lazaros » -- racontée autrement
+
+Une histoire entendue 3 fois
+  1. Jour 16, Theophilos (1 bouche) : « Je n'oublie pas que Zoe m'a laissé seul avec mes poutres »
+  2. Jour 17, Anna (2 bouches) : « Theophilos m'a raconté : “je n'oublie pas que Zoe m'a laissé seul avec mes poutres” » -- racontée autrement
+  3. Jour 28, Anna (2 bouches) : « Theophilos disait : “Zoe a refusé de m'aider” » -- racontée autrement
+
+Une histoire entendue 3 fois
+  1. Jour 16, Theophilos (1 bouche) : « Theodora a refusé de m'aider »
+  2. Jour 16, Anna (2 bouches) : « Theophilos m'a raconté : “je n'oublie pas que Theodora m'a laissé seul avec mes poutres” » -- racontée autrement
+  3. Jour 25, Theophilos (1 bouche) : « Je n'oublie pas que Theodora m'a laissé seul avec mes poutres » -- racontée autrement
+
+Une histoire entendue 2 fois
+  1. Jour 16, Theophilos (1 bouche) : « Je n'oublie pas que Konstantinos m'a laissé seul avec mes poutres »
+  2. Jour 16, Anna (2 bouches) : « Theophilos m'a raconté : “Konstantinos a refusé de m'aider” » -- racontée autrement
+
+Une histoire entendue 4 fois
+  1. Jour 16, Photeine (2 bouches) : « Lazaros m'a raconté : “Theophilos a refusé de m'aider” »
+  2. Jour 16, Lazaros (1 bouche) : « J'ai demandé à Theophilos, et la réponse a été non » -- racontée autrement
+  3. Jour 25, Photeine (2 bouches) : « Lazaros m'a raconté : “j'ai demandé à Theophilos, et la réponse a été non” » -- racontée autrement
+  4. Jour 25, Lazaros (1 bouche) : « Je n'oublie pas que Theophilos m'a laissé seul avec mes poutres » -- racontée autrement
+
+Une histoire entendue 5 fois
+  1. Jour 16, Lazaros (1 bouche) : « Konstantinos a refusé de m'aider »
+  2. Jour 19, Lazaros (1 bouche) : « Konstantinos a refusé de m'aider »
+  3. Jour 19, Photeine (2 bouches) : « J'ai entendu Lazaros dire : “j'ai demandé à Konstantinos, et la réponse a été non” » -- racontée autrement
+  4. Jour 26, Lazaros (1 bouche) : « J'ai demandé à Konstantinos, et la réponse a été non » -- racontée autrement
+  5. Jour 26, Photeine (2 bouches) : « Lazaros m'a raconté : “j'ai demandé à Konstantinos, et la réponse a été non” » -- racontée autrement
+
+Une histoire entendue 2 fois
+  1. Jour 17, Theophilos (1 bouche) : « J'ai demandé à Maria, et la réponse a été non »
+  2. Jour 19, Anna (2 bouches) : « J'ai entendu Theophilos dire : “Maria a refusé de m'aider” » -- racontée autrement
+
+Une histoire entendue 2 fois
+  1. Jour 17, Theophilos (1 bouche) : « Je n'oublie pas que Sabas m'a laissé seul avec mes poutres »
+  2. Jour 18, Anna (2 bouches) : « J'ai entendu Theophilos dire : “je n'oublie pas que Sabas m'a laissé seul avec mes poutres” » -- racontée autrement
+
+Une histoire entendue 3 fois
+  1. Jour 17, Theophilos (1 bouche) : « Lazaros a refusé de m'aider »
+  2. Jour 20, Theophilos (1 bouche) : « Lazaros a refusé de m'aider »
+  3. Jour 22, Anna (2 bouches) : « J'ai entendu Theophilos dire : “j'ai demandé à Lazaros, et la réponse a été non” » -- racontée autrement
+
+Une histoire entendue 2 fois
+  1. Jour 17, Lazaros (1 bouche) : « Georgios a refusé de m'aider »
+  2. Jour 27, Lazaros (1 bouche) : « Je n'oublie pas que Georgios m'a laissé seul avec mes poutres » -- racontée autrement
+
+Une histoire entendue 1 fois
+  1. Jour 18, Photeine (2 bouches) : « Lazaros disait : “Leon a refusé de m'aider” »
+
+Une histoire entendue 4 fois
+  1. Jour 18, Lazaros (1 bouche) : « Je n'oublie pas que Theodora m'a laissé seul avec mes poutres »
+  2. Jour 19, Photeine (2 bouches) : « Lazaros disait : “Theodora a refusé de m'aider” » -- racontée autrement
+  3. Jour 27, Lazaros (1 bouche) : « J'ai demandé à Theodora, et la réponse a été non » -- racontée autrement
+  4. Jour 27, Photeine (2 bouches) : « Lazaros disait : “je n'oublie pas que Theodora m'a laissé seul avec mes poutres” » -- racontée autrement
+
+Une histoire entendue 2 fois
+  1. Jour 19, Lazaros (1 bouche) : « J'ai demandé à Basileios, et la réponse a été non »
+  2. Jour 19, Photeine (2 bouches) : « J'ai entendu Lazaros dire : “Basileios a refusé de m'aider” » -- racontée autrement
+
+Une histoire entendue 1 fois
+  1. Jour 19, Anna (2 bouches) : « Theophilos m'a raconté : “je n'oublie pas que Arsenios m'a laissé seul avec mes poutres” »
+
+Une histoire entendue 2 fois
+  1. Jour 19, Lazaros (1 bouche) : « Eudokia a refusé de m'aider »
+  2. Jour 19, Photeine (2 bouches) : « Lazaros m'a raconté : “Eudokia a refusé de m'aider” » -- racontée autrement
+
+Une histoire entendue 2 fois
+  1. Jour 20, Theophilos (1 bouche) : « J'ai demandé à Gregorios, et la réponse a été non »
+  2. Jour 20, Anna (2 bouches) : « Theophilos disait : “Gregorios a refusé de m'aider” » -- racontée autrement
+
+Une histoire entendue 2 fois
+  1. Jour 20, Theophilos (1 bouche) : « J'ai demandé à Photeine, et la réponse a été non »
+  2. Jour 20, Anna (2 bouches) : « Theophilos disait : “je n'oublie pas que Photeine m'a laissé seul avec mes poutres” » -- racontée autrement
+
+Une histoire entendue 1 fois
+  1. Jour 20, Anna (2 bouches) : « J'ai entendu Theophilos dire : “j'ai demandé à Nikolaos, et la réponse a été non” »
+
+Une histoire entendue 1 fois
+  1. Jour 20, Photeine (2 bouches) : « Lazaros disait : “je n'oublie pas que Maria m'a laissé seul avec mes poutres” »
+
+Une histoire entendue 2 fois
+  1. Jour 22, Nikolaos (1 bouche) : « Niketas a refusé de m'aider »
+  2. Jour 32, Nikolaos (1 bouche) : « Niketas a refusé de m'aider »
+
+Une histoire entendue 2 fois
+  1. Jour 22, Nikolaos (1 bouche) : « Je n'oublie pas que Leon m'a laissé seul avec mes poutres »
+  2. Jour 33, Nikolaos (1 bouche) : « Je n'oublie pas que Leon m'a laissé seul avec mes poutres »
+
+Une histoire entendue 2 fois
+  1. Jour 22, Nikolaos (1 bouche) : « Je n'oublie pas que Ioannes m'a laissé seul avec mes poutres »
+  2. Jour 33, Nikolaos (1 bouche) : « Je n'oublie pas que Ioannes m'a laissé seul avec mes poutres »
+
+Une histoire entendue 2 fois
+  1. Jour 22, Nikolaos (1 bouche) : « Georgios a refusé de m'aider »
+  2. Jour 32, Nikolaos (1 bouche) : « Georgios a refusé de m'aider »
+
+Une histoire entendue 2 fois
+  1. Jour 23, Theophilos (1 bouche) : « Eudokia a refusé de m'aider »
+  2. Jour 24, Anna (2 bouches) : « Theophilos disait : “Eudokia a refusé de m'aider” » -- racontée autrement
+
+Une histoire entendue 2 fois
+  1. Jour 23, Theophilos (1 bouche) : « Je n'oublie pas que Basileios m'a laissé seul avec mes poutres »
+  2. Jour 24, Anna (2 bouches) : « Theophilos disait : “je n'oublie pas que Basileios m'a laissé seul avec mes poutres” » -- racontée autrement
+
+Une histoire entendue 4 fois
+  1. Jour 23, Lazaros (1 bouche) : « J'ai demandé à Ioannes, et la réponse a été non »
+  2. Jour 23, Photeine (2 bouches) : « Lazaros m'a raconté : “Ioannes a refusé de m'aider” » -- racontée autrement
+  3. Jour 27, Lazaros (1 bouche) : « J'ai demandé à Ioannes, et la réponse a été non » -- racontée autrement
+  4. Jour 27, Photeine (2 bouches) : « Lazaros m'a raconté : “Ioannes a refusé de m'aider” » -- racontée autrement
+
+Une histoire entendue 2 fois
+  1. Jour 23, Photeine (2 bouches) : « J'ai entendu Lazaros dire : “Nikolaos a refusé de m'aider” »
+  2. Jour 23, Lazaros (1 bouche) : « Nikolaos a refusé de m'aider » -- racontée autrement
+
+Une histoire entendue 3 fois
+  1. Jour 23, Lazaros (1 bouche) : « Ioannikios a refusé de m'aider »
+  2. Jour 25, Lazaros (1 bouche) : « Ioannikios a refusé de m'aider »
+  3. Jour 25, Photeine (2 bouches) : « Lazaros m'a raconté : “j'ai demandé à Ioannikios, et la réponse a été non” » -- racontée autrement
+
+Une histoire entendue 2 fois
+  1. Jour 24, Lazaros (1 bouche) : « Je n'oublie pas que Anna m'a laissé seul avec mes poutres »
+  2. Jour 25, Photeine (2 bouches) : « Lazaros m'a raconté : “j'ai demandé à Anna, et la réponse a été non” » -- racontée autrement
+
+Une histoire entendue 3 fois
+  1. Jour 24, Nikolaos (1 bouche) : « J'ai demandé à Theodora, et la réponse a été non »
+  2. Jour 35, Nikolaos (1 bouche) : « J'ai demandé à Theodora, et la réponse a été non »
+  3. Jour 37, Nikolaos (1 bouche) : « J'ai demandé à Theodora, et la réponse a été non »
+
+Une histoire entendue 2 fois
+  1. Jour 25, Xene (1 bouche) : « Nous avons fui la prise de la Ville par les Latins »
+  2. Jour 35, Anna (2 bouches) : « Xene m'a raconté : “nous avons fui la prise de la Ville par les Latins” » -- racontée autrement
+
+Une histoire entendue 1 fois
+  1. Jour 25, Photeine (2 bouches) : « J'ai entendu Lazaros dire : “je n'oublie pas que Zoe m'a laissé seul avec mes poutres” »
+
+Une histoire entendue 3 fois
+  1. Jour 26, Lazaros (1 bouche) : « Je n'oublie pas que Niketas m'a laissé seul avec mes poutres »
+  2. Jour 27, Photeine (2 bouches) : « Lazaros disait : “j'ai demandé à Niketas, et la réponse a été non” » -- racontée autrement
+  3. Jour 30, Photeine (2 bouches) : « Lazaros disait : “j'ai demandé à Niketas, et la réponse a été non” »
+
+Une histoire entendue 5 fois
+  1. Jour 26, Niketas (1 bouche) : « Je repense à Xene, qu'on a laissé repartir »
+  2. Jour 26, Georgios (1 bouche) : « Je repense à Xene, qu'on a laissé repartir »
+  3. Jour 26, Konstantinos (1 bouche) : « Je repense à Xene, qu'on a laissé repartir »
+  4. Jour 27, Konstantinos (1 bouche) : « Je repense à Xene, qu'on a laissé repartir »
+  5. Jour 27, Maria (1 bouche) : « On a renvoyé Xene sur la route » -- racontée autrement
+
+Une histoire entendue 5 fois
+  1. Jour 26, Niketas (1 bouche) : « Nikolaos a dit oui pour la veuve Xene et les siens, au conseil »
+  2. Jour 26, Georgios (1 bouche) : « Nikolaos a dit oui pour la veuve Xene et les siens, au conseil »
+  3. Jour 26, Maria (1 bouche) : « Au feu, Nikolaos a parlé pour la veuve Xene et les siens » -- racontée autrement
+  4. Jour 26, Konstantinos (1 bouche) : « Nikolaos a voulu garder la veuve Xene et les siens » -- racontée autrement
+  5. Jour 27, Konstantinos (1 bouche) : « Nikolaos a voulu garder la veuve Xene et les siens »
+
+Une histoire entendue 2 fois
+  1. Jour 26, Konstantinos (1 bouche) : « J'ai pose la derniere pierre d'un ouvrage »
+  2. Jour 27, Konstantinos (1 bouche) : « J'ai pose la derniere pierre d'un ouvrage »
+
+Une histoire entendue 4 fois
+  1. Jour 26, Theophilos (1 bouche) : « Je dois 8 coups de marteau à Konstantinos »
+  2. Jour 29, Anna (2 bouches) : « Theophilos disait : “je dois 10 coups de marteau à Konstantinos” » -- racontée autrement
+  3. Jour 45, Theophilos (1 bouche) : « Je dois 8 coups de marteau à Konstantinos » -- racontée autrement
+  4. Jour 46, Theophilos (1 bouche) : « Je dois 8 coups de marteau à Konstantinos »
+
+Une histoire entendue 1 fois
+  1. Jour 27, Maria (1 bouche) : « J'ai acheve un chantier »
+
+Une histoire entendue 3 fois
+  1. Jour 27, Lazaros (1 bouche) : « Maria a donné 14 coups de marteau à ma maison »
+  2. Jour 28, Photeine (2 bouches) : « Lazaros m'a raconté : “sans Maria, ma maison serait encore par terre : 18 coups de marteau de sa main” » -- racontée autrement
+  3. Jour 47, Lazaros (1 bouche) : « Maria a donné 14 coups de marteau à ma maison » -- racontée autrement
+
+Une histoire entendue 2 fois
+  1. Jour 31, Nikolaos (1 bouche) : « Je dois 3 coups de marteau à Basileios »
+  2. Jour 40, Nikolaos (1 bouche) : « Je dois 3 coups de marteau à Basileios »
+
+Une histoire entendue 1 fois
+  1. Jour 44, Basileios (1 bouche) : « J'ai vu quelqu'un arriver a Valmire »
+
+Une histoire entendue 5 fois
+  1. Jour 45, Georgios (1 bouche) : « J'ai dit oui pour Hovhannes, au conseil »
+  2. Jour 45, Nikolaos (1 bouche) : « J'ai dit oui pour Hovhannes, au conseil »
+  3. Jour 45, Konstantinos (1 bouche) : « On a ouvert la porte à Hovhannes et aux siens » -- racontée autrement
+  4. Jour 47, Maria (1 bouche) : « J'ai dit oui pour Hovhannes, au conseil » -- racontée autrement
+  5. Jour 53, Nikolaos (1 bouche) : « J'ai dit oui pour Hovhannes, au conseil »
+
+Une histoire entendue 3 fois
+  1. Jour 45, Maria (1 bouche) : « Au feu, Nikolaos a parlé pour la maison d'Hovhannes »
+  2. Jour 45, Lazaros (1 bouche) : « Nikolaos a voulu garder la maison d'Hovhannes » -- racontée autrement
+  3. Jour 47, Georgios (1 bouche) : « Au feu, Nikolaos a parlé pour la maison d'Hovhannes » -- racontée autrement
+
+Une histoire entendue 1 fois
+  1. Jour 47, Mariam (1 bouche) : « Nous avons fui la levée d'hommes de Trébizonde »
+
+Une histoire entendue 2 fois
+  1. Jour 49, Arsenios (1 bouche) : « Je porte encore le nom de Hovhannes dans la bouche »
+  2. Jour 50, Sabas (1 bouche) : « Depuis que Hovhannes n'est plus, la maison sonne creux » -- racontée autrement
+
+Une histoire entendue 2 fois
+  1. Jour 50, Mariam (1 bouche) : « Georgios a refusé de m'aider »
+  2. Jour 60, Mariam (1 bouche) : « Georgios a refusé de m'aider »
+
+Une histoire entendue 1 fois
+  1. Jour 50, Mariam (1 bouche) : « Je dois 9 coups de marteau à Nikolaos »
+
+Une histoire entendue 2 fois
+  1. Jour 51, Nikolaos (1 bouche) : « Un toit de plus s'est leve sous mes mains »
+  2. Jour 53, Nikolaos (1 bouche) : « Un toit de plus s'est leve sous mes mains »

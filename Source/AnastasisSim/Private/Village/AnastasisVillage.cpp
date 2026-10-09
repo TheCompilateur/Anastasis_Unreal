@@ -6485,6 +6485,19 @@ namespace AnastasisVillage
 		}
 		Terms.Emplace(TEXT("dette_rendue"), Owed);
 		Terms.Emplace(TEXT("refus_rendu"), Refused);
+		// ecart n°50 -- ce qu'on dit de lui : les refus qu'on lui prete, la porte qu'il a fermee au conseil.
+		double Hearsay = 0.0;
+		double ClosedDoor = 0.0;
+		for (const E::FEpisode& Event : Asked.Chronicle.Events)
+		{
+			if (Event.AboutId != Asker.Id) continue;
+			if (!Event.bFirsthand && Event.Kind == TEXT("refusedHelp")) Hearsay -= 12.0;
+			if (Event.Kind == TEXT("votedNo")) ClosedDoor -= Event.bFirsthand ? 10.0 : 5.0;
+		}
+		Terms.Emplace(TEXT("on_dit"), FMath::Max(Hearsay, -36.0));
+		Terms.Emplace(TEXT("porte_fermee"), FMath::Max(ClosedDoor, -20.0));
+		// Un nouveau pas encore eprouve : on attend de le voir lever un toit pour quelqu'un.
+		Terms.Emplace(TEXT("nouveau"), IsUnproven(Asker) ? -10.0 : 0.0);
 		// Il me doit deja des journees : je l'ai aide, il ne m'a jamais rendu la pareille.
 		bool bHelpedAsker = false;
 		bool bAskerHelpedBack = false;
@@ -6624,19 +6637,11 @@ namespace AnastasisVillage
 		return Result;
 	}
 
-	void FVillage::UpdateFamilyHousesDaily()
+	FString FVillage::OpenFamilySiteNear(const FString& FamilyId, const FNpc& Chef)
 	{
-		if (Families.IsEmpty() || !World) return;
+		FFamily* Family = Families.FindByPredicate([&FamilyId](const FFamily& F) { return F.Id == FamilyId; });
+		if (!Family || !World) return FString();
 		const AnastasisPath::FWorldNavSource Source(Nav, *World);
-		auto ChefOf = [this](const FFamily& Family) -> FNpc*
-		{
-			for (const FString& Id : Family.Adults)
-			{
-				FNpc* Member = Actors.FindById(Id);
-				if (Member && Member->KinRole == TEXT("chef")) return Member;
-			}
-			return Family.Adults.Num() ? Actors.FindById(Family.Adults[0]) : nullptr;
-		};
 		auto ReachesWell = [&](const FPoint& From)
 		{
 			for (const FBuilding& Well : Buildings.GetItems())
@@ -6649,6 +6654,85 @@ namespace AnastasisVillage
 				}
 			}
 			return false;
+		};
+
+		// Ceux qui atteignent le puits ce soir doivent l'atteindre encore, la parcelle tracee : on ne mure
+		// personne loin de l'eau (le joueur compris).
+		TArray<FPoint> Walkers;
+		for (const FNpc& Other : Actors.GetItems())
+		{
+			if (!Other.Inside.bActive && ReachesWell({ Other.X, Other.Y })) Walkers.Add({ Other.X, Other.Y });
+		}
+		const int32 CX = FMath::FloorToInt32(Chef.X);
+		const int32 CY = FMath::FloorToInt32(Chef.Y);
+		FString SiteId;
+		for (int32 R = 2; R <= 6 && SiteId.IsEmpty(); ++R)
+		for (int32 DY = -R; DY <= R && SiteId.IsEmpty(); ++DY)
+		for (int32 DX = -R; DX <= R && SiteId.IsEmpty(); ++DX)
+		{
+			if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) != R) continue;
+			const int32 X = CX + DX;
+			const int32 Y = CY + DY;
+			if (X < 2 || Y < 2 || X > Nav.W - 3 || Y > Nav.H - 3) continue;
+			if (LiveTileAt(X, Y).Resource != AnastasisWorld::EResource::None || IsFootBlocked(X + 0.5, Y + 0.5)) continue;
+			const FString Id = OpenSite(HouseType, X, Y, /*bDelivered=*/true);
+			if (Id.IsEmpty()) continue;
+			FBuilding* Site = Buildings.FindById(Id);
+			bool bReach = false;
+			for (const FPoint& Door : Site->AccessPoints)
+			{
+				TArray<FPoint> Path;
+				if (AnastasisPath::FindPath(Source, { Chef.X, Chef.Y }, Door, {}, Path)) { bReach = true; break; }
+			}
+			// Un chantier qui enferme son chef, ou qui que ce soit, loin du puits ne se garde pas.
+			bool bWalled = !bReach || !ReachesWell({ Chef.X, Chef.Y });
+			for (int32 W = 0; W < Walkers.Num() && !bWalled; ++W) bWalled = !ReachesWell(Walkers[W]);
+			if (bWalled)
+			{
+				RemoveBuilding(Id);
+				continue;
+			}
+			SiteId = Id;
+		}
+		if (SiteId.IsEmpty()) return SiteId;
+		FBuilding* Own = Buildings.FindById(SiteId);
+		Own->OwnerFamilyId = Family->Id;
+		for (const FString& Id : Family->Adults) Own->AllowedBuilders.Add(Id);
+		return SiteId;
+	}
+
+	void FVillage::UpdateFamilyHousesDaily()
+	{
+		if (Families.IsEmpty() || !World) return;
+		// ecart n°50 : une demande faite au joueur et restee sans reponse jusqu'a ce soir est un refus -- le silence.
+		for (FPlayerAsk& Ask : PlayerAsks)
+		{
+			if (Ask.bAnswered || Ask.Day >= Day()) continue;
+			Ask.bAnswered = true;
+			Ask.bAccepted = false;
+			FHelpAnswer Silence;
+			Silence.Day = Day();
+			Silence.FromId = Ask.FromId;
+			Silence.ToId = PlayerPersonId;
+			Silence.SiteId = Ask.SiteId;
+			Silence.Reason = TEXT("silence");
+			HelpLog.Add(Silence);
+			if (!PlayerPersonId.IsEmpty() && Actors.FindById(Ask.FromId))
+			{
+				FEpisodeOptions Refusal;
+				Refusal.AboutId = PlayerPersonId;
+				Refusal.RootId = FString::Printf(TEXT("refus-%s-%s"), *Ask.SiteId, *PlayerPersonId);
+				RecordEpisode(Ask.FromId, TEXT("refusedHelp"), Refusal);
+			}
+		}
+		auto ChefOf = [this](const FFamily& Family) -> FNpc*
+		{
+			for (const FString& Id : Family.Adults)
+			{
+				FNpc* Member = Actors.FindById(Id);
+				if (Member && Member->KinRole == TEXT("chef")) return Member;
+			}
+			return Family.Adults.Num() ? Actors.FindById(Family.Adults[0]) : nullptr;
 		};
 		bool bOpenedTonight = false;
 		// Une famille a son toit quand sa maison est levee, ou quand chacun des siens a deja le sien. Celle dont un
@@ -6686,6 +6770,8 @@ namespace AnastasisVillage
 			if (Family.bGuest || Family.bLeft) continue;
 			FNpc* Chef = ChefOf(Family);
 			if (!Chef) continue;
+			// ecart n°50 : le foyer du joueur decide et demande par sa main (PlayerBuildHome, PlayerAskHelp).
+			if (Chef->Id == PlayerPersonId) continue;
 			bool bHoused = false;
 			const int32 Roofed = RoofsOf(Family, bHoused);
 			if (bHoused) continue;
@@ -6696,49 +6782,8 @@ namespace AnastasisVillage
 			// `tryOpenNewConstruction` n'est pas porte ; le devis est livre, la famille apporte ses materiaux).
 			if (!Own && !bOpenedTonight)
 			{
-				// Ceux qui atteignent le puits ce soir doivent l'atteindre encore, la parcelle tracee : on ne mure
-				// personne loin de l'eau (le joueur compris).
-				TArray<FPoint> Walkers;
-				for (const FNpc& Other : Actors.GetItems())
-				{
-					if (!Other.Inside.bActive && ReachesWell({ Other.X, Other.Y })) Walkers.Add({ Other.X, Other.Y });
-				}
-				const int32 CX = FMath::FloorToInt32(Chef->X);
-				const int32 CY = FMath::FloorToInt32(Chef->Y);
-				FString SiteId;
-				for (int32 R = 2; R <= 6 && SiteId.IsEmpty(); ++R)
-				for (int32 DY = -R; DY <= R && SiteId.IsEmpty(); ++DY)
-				for (int32 DX = -R; DX <= R && SiteId.IsEmpty(); ++DX)
-				{
-					if (FMath::Max(FMath::Abs(DX), FMath::Abs(DY)) != R) continue;
-					const int32 X = CX + DX;
-					const int32 Y = CY + DY;
-					if (X < 2 || Y < 2 || X > Nav.W - 3 || Y > Nav.H - 3) continue;
-					if (LiveTileAt(X, Y).Resource != AnastasisWorld::EResource::None || IsFootBlocked(X + 0.5, Y + 0.5)) continue;
-					const FString Id = OpenSite(HouseType, X, Y, /*bDelivered=*/true);
-					if (Id.IsEmpty()) continue;
-					FBuilding* Site = Buildings.FindById(Id);
-					bool bReach = false;
-					for (const FPoint& Door : Site->AccessPoints)
-					{
-						TArray<FPoint> Path;
-						if (AnastasisPath::FindPath(Source, { Chef->X, Chef->Y }, Door, {}, Path)) { bReach = true; break; }
-					}
-					// Un chantier qui enferme son chef, ou qui que ce soit, loin du puits ne se garde pas.
-					bool bWalled = !bReach || !ReachesWell({ Chef->X, Chef->Y });
-					for (int32 W = 0; W < Walkers.Num() && !bWalled; ++W) bWalled = !ReachesWell(Walkers[W]);
-					if (bWalled)
-					{
-						RemoveBuilding(Id);
-						continue;
-					}
-					SiteId = Id;
-				}
-				if (SiteId.IsEmpty()) continue;
+				if (OpenFamilySiteNear(Family.Id, *Chef).IsEmpty()) continue;
 				bOpenedTonight = true;
-				Own = Buildings.FindById(SiteId);
-				Own->OwnerFamilyId = Family.Id;
-				for (const FString& Id : Family.Adults) Own->AllowedBuilders.Add(Id);
 				continue; // on demandera demain : ce soir, on trace la parcelle.
 			}
 			if (!Own) continue;
@@ -6746,7 +6791,7 @@ namespace AnastasisVillage
 			TArray<const FNpc*> Candidates;
 			for (const FNpc& Other : Actors.GetItems())
 			{
-				if (Other.Id == Chef->Id || Other.FamilyId == Family.Id || Other.Id == PlayerPersonId) continue;
+				if (Other.Id == Chef->Id || Other.FamilyId == Family.Id) continue;
 				// ecart n°49 : on ne demande pas ses bras a qui attend encore de savoir s'il reste.
 				if (const FFamily* OtherFamily = Other.FamilyId.IsEmpty() ? nullptr : FindFamily(Other.FamilyId); OtherFamily && OtherFamily->bGuest) continue;
 				if (Other.Age > 0.0 && Other.Age < 16.0) continue;
@@ -6759,6 +6804,16 @@ namespace AnastasisVillage
 			for (int32 I = 0; I < Candidates.Num() && I < HelpAsksPerDay; ++I)
 			{
 				const FNpc& Asked = *Candidates[I];
+				// ecart n°50 : le joueur repond lui-meme ; la demande l'attend jusqu'au soir suivant.
+				if (Asked.Id == PlayerPersonId)
+				{
+					Own->AskedIds.Add(Asked.Id);
+					FPlayerAsk& Ask = PlayerAsks.AddDefaulted_GetRef();
+					Ask.Day = Day();
+					Ask.FromId = Chef->Id;
+					Ask.SiteId = Own->Id;
+					continue;
+				}
 				const FHelpAnswer Answer = EvaluateHelp(*Chef, Asked, *Own);
 				Own->AskedIds.Add(Asked.Id);
 				HelpLog.Add(Answer);

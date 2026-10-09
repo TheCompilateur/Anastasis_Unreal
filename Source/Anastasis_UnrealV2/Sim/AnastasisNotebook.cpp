@@ -31,6 +31,7 @@ namespace AnastasisNotebook
 		Notes.Reset();
 		PlayerId.Reset();
 		CouncilSeen = 0;
+		HelpSeen = 0;
 	}
 
 	void FPlayerNotebook::Observe(const FAnastasisSimulation& Sim, const AnastasisDialogue::FLibrary& Lines, TFunctionRef<FString(const FString&)> NameOf)
@@ -70,6 +71,7 @@ namespace AnastasisNotebook
 				Note.Hops = Event.Hops;
 				Note.bLegend = AnastasisEpisodes::IsLegend(Event);
 				Note.bToMe = bToMe;
+				Note.bAboutMe = Event.AboutId == Player;
 				const FString Origin = Event.OriginalSourceId.IsEmpty() || Event.OriginalSourceId == Event.SourceId ? FString() : NameOf(Event.OriginalSourceId);
 				Note.Text = Capitalize(Lines.TellerVersion(Event, Origin));
 			}
@@ -82,6 +84,20 @@ namespace AnastasisNotebook
 			const AnastasisVillage::FVillage::FCouncil& Council = Councils[CouncilSeen];
 			for (const AnastasisVillage::FVillage::FWelcomeVote& Vote : Council.Votes)
 			{
+				// ecart n°50 : sa propre voix est un acte, pas une chose entendue.
+				if (Vote.VoterId == Player)
+				{
+					FNote& Deed = Notes.AddDefaulted_GetRef();
+					Deed.Day = Day;
+					Deed.Hour = Hour;
+					Deed.TellerId = Player;
+					Deed.TellerName = NameOf(Player);
+					Deed.Kind = TEXT("acte");
+					const AnastasisVillage::FVillage::FFamily* Group = Village.FindFamily(Council.FamilyId);
+					Deed.Text = FString::Printf(TEXT("Au conseil, j'ai dit %s pour %s%s."), Vote.bYes ? TEXT("oui") : TEXT("non"),
+						Group ? *Group->Name : TEXT("les nouveaux venus"), Vote.Weight < 1.0 ? TEXT(" (une demi-voix : on ne me connaît pas encore)") : TEXT(""));
+					continue;
+				}
 				FNote& Note = Notes.AddDefaulted_GetRef();
 				Note.Day = Day;
 				Note.Hour = Hour;
@@ -92,6 +108,46 @@ namespace AnastasisNotebook
 				Note.Kind = TEXT("conseil");
 				const FString Said = AnastasisArrivals::VoteLine(Lines, Sim.GetSeed(), Vote, Council.Cause, CouncilSeen);
 				Note.Text = FString::Printf(TEXT("%s.%s"), Vote.bYes ? TEXT("Oui") : TEXT("Non"), Said.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" %s"), *Said));
+			}
+		}
+		// ecart n°50 : ce que le joueur a fait des demandes d'aide, et ce qu'on a fait des siennes.
+		const TArray<AnastasisVillage::FVillage::FHelpAnswer>& Help = Village.GetHelpLog();
+		for (; HelpSeen < Help.Num(); ++HelpSeen)
+		{
+			const AnastasisVillage::FVillage::FHelpAnswer& Answer = Help[HelpSeen];
+			if (!Me || (Answer.ToId != Player && Answer.FromId != Player)) continue;
+			FNote& Deed = Notes.AddDefaulted_GetRef();
+			Deed.Day = Day;
+			Deed.Hour = Hour;
+			Deed.TellerId = Player;
+			Deed.TellerName = NameOf(Player);
+			Deed.Kind = TEXT("acte");
+			if (Answer.ToId == Player)
+			{
+				Deed.Text = Answer.Reason == TEXT("silence")
+					? FString::Printf(TEXT("%s m'a demandé de l'aide ; je n'ai pas répondu."), *NameOf(Answer.FromId))
+					: FString::Printf(TEXT("%s m'a demandé de l'aide ; j'ai dit %s."), *NameOf(Answer.FromId), Answer.bAccepted ? TEXT("oui") : TEXT("non"));
+			}
+			else
+			{
+				// La raison, en mots : ce que l'autre m'a fait comprendre.
+				static const TMap<FString, FString> Why = {
+					{ TEXT("porte_fermee"), TEXT("j'ai fermé la porte à d'autres, au conseil") },
+					{ TEXT("on_dit"), TEXT("on lui a parlé de mes refus") },
+					{ TEXT("refus_rendu"), TEXT("je lui avais dit non") },
+					{ TEXT("nouveau"), TEXT("je suis nouveau ici, je n'ai encore levé aucun toit") },
+					{ TEXT("inconnu"), TEXT("il ne me connaît pas") },
+					{ TEXT("dette"), TEXT("je lui dois déjà des journées") },
+					{ TEXT("son_toit"), TEXT("son propre toit d'abord") },
+					{ TEXT("occupe"), TEXT("son ouvrage d'abord") },
+					{ TEXT("faible"), TEXT("il est trop faible") },
+					{ TEXT("dette_rendue"), TEXT("il me devait ça") },
+					{ TEXT("amitie"), TEXT("par amitié") },
+					{ TEXT("voisin"), TEXT("entre voisins") },
+				};
+				const FString* Reason = Why.Find(Answer.Reason);
+				Deed.Text = FString::Printf(TEXT("J'ai demandé de l'aide à %s : %s, %s."), *NameOf(Answer.ToId),
+					Answer.bAccepted ? TEXT("oui") : TEXT("non"), Reason ? **Reason : *Answer.Reason);
 			}
 		}
 	}
@@ -111,11 +167,32 @@ namespace AnastasisNotebook
 		}
 		Out += FString::Printf(TEXT("%d chose%s entendue%s.\n"), Notes.Num(), Notes.Num() > 1 ? TEXT("s") : TEXT(""), Notes.Num() > 1 ? TEXT("s") : TEXT(""));
 
+		// ecart n°50 : ce que j'ai fait, puis ce qu'on dit de moi quand on ne me voit pas.
+		Out += TEXT("\nCE QUE J'AI FAIT\n");
+		bool bAnyDeed = false;
+		for (const FNote& Note : Notes)
+		{
+			if (Note.Kind != TEXT("acte")) continue;
+			bAnyDeed = true;
+			Out += FString::Printf(TEXT("  Jour %d, %s : %s\n"), Note.Day, *AnastasisChronicle::HourLabel(Note.Hour), *Note.Text);
+		}
+		if (!bAnyDeed) Out += TEXT("  Rien encore.\n");
+		Out += TEXT("\nCE QU'ON DIT DE MOI\n");
+		bool bAnyAboutMe = false;
+		for (const FNote& Note : Notes)
+		{
+			if (!Note.bAboutMe) continue;
+			bAnyAboutMe = true;
+			Out += FString::Printf(TEXT("  Jour %d, %s, %s à %s : « %s »\n"), Note.Day, *AnastasisChronicle::HourLabel(Note.Hour),
+				*Note.TellerName, *Note.ListenerName, *Note.Text);
+		}
+		if (!bAnyAboutMe) Out += TEXT("  Rien d'entendu.\n");
+
 		// Une page par habitant, dans l'ordre ou on l'a entendu pour la premiere fois.
 		TArray<FString> Tellers;
 		for (const FNote& Note : Notes)
 		{
-			if (!Tellers.Contains(Note.TellerId)) Tellers.Add(Note.TellerId);
+			if (Note.Kind != TEXT("acte") && !Tellers.Contains(Note.TellerId)) Tellers.Add(Note.TellerId);
 		}
 		Out += TEXT("\nCE QUE CHACUN M'A DIT\n");
 		for (const FString& TellerId : Tellers)
@@ -124,7 +201,7 @@ namespace AnastasisNotebook
 			Out += FString::Printf(TEXT("\n%s\n"), First ? *First->TellerName : *TellerId);
 			for (const FNote& Note : Notes)
 			{
-				if (Note.TellerId != TellerId) continue;
+				if (Note.TellerId != TellerId || Note.Kind == TEXT("acte")) continue;
 				Out += FString::Printf(TEXT("  Jour %d, %s, %s : « %s »%s\n"), Note.Day,
 					*AnastasisChronicle::HourLabel(Note.Hour),
 					Note.bToMe ? TEXT("à moi") : (Note.Kind == TEXT("conseil") ? TEXT("au conseil") : *FString::Printf(TEXT("à %s"), *Note.ListenerName)),
@@ -136,8 +213,8 @@ namespace AnastasisNotebook
 		TArray<FString> Roots;
 		for (const FNote& Note : Notes)
 		{
-			// Une voix au conseil n'est pas une histoire qui court.
-			if (Note.Kind != TEXT("conseil") && !Roots.Contains(Note.RootId)) Roots.Add(Note.RootId);
+			// Une voix au conseil, ou mon propre acte, n'est pas une histoire qui court.
+			if (Note.Kind != TEXT("conseil") && Note.Kind != TEXT("acte") && !Roots.Contains(Note.RootId)) Roots.Add(Note.RootId);
 		}
 		Out += TEXT("\nLES HISTOIRES, VERSION PAR VERSION\n");
 		for (const FString& Root : Roots)
@@ -166,14 +243,18 @@ namespace AnastasisNotebook
 		TSet<FString> Tellers;
 		int32 Legends = 0;
 		int32 ToMe = 0;
+		int32 AboutMe = 0;
+		int32 Deeds = 0;
 		for (const FNote& Note : Notes)
 		{
 			Roots.Add(Note.RootId);
 			Tellers.Add(Note.TellerId);
 			if (Note.bLegend) ++Legends;
 			if (Note.bToMe) ++ToMe;
+			if (Note.bAboutMe) ++AboutMe;
+			if (Note.Kind == TEXT("acte")) ++Deeds;
 		}
-		return FString::Printf(TEXT("{\"player\":\"%s\",\"notes\":%d,\"stories\":%d,\"tellers\":%d,\"legends\":%d,\"to_me\":%d}"),
-			*PlayerId, Notes.Num(), Roots.Num(), Tellers.Num(), Legends, ToMe);
+		return FString::Printf(TEXT("{\"player\":\"%s\",\"notes\":%d,\"stories\":%d,\"tellers\":%d,\"legends\":%d,\"to_me\":%d,\"about_me\":%d,\"deeds\":%d}"),
+			*PlayerId, Notes.Num(), Roots.Num(), Tellers.Num(), Legends, ToMe, AboutMe, Deeds);
 	}
 }

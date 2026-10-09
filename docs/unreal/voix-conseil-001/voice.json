@@ -1,0 +1,394 @@
+{
+ "arrivals": {
+  "geo_loaded": true,
+  "day": 61,
+  "people": 23,
+  "groups": [
+   {
+    "family": "family-4",
+    "name": "la famille de Theophilos",
+    "arrived_day": 10,
+    "cause": "le pillage des hameaux hauts de Paipert",
+    "origin": "Parcharia",
+    "guest": false,
+    "left": false,
+    "members": 3,
+    "house_done": true
+   },
+   {
+    "family": "family-5",
+    "name": "les bergers de Lazaros",
+    "arrived_day": 14,
+    "cause": "la dispute des hauts pâturages de Cheriana",
+    "origin": "Parcharia",
+    "guest": false,
+    "left": false,
+    "members": 3,
+    "house_done": true
+   },
+   {
+    "family": "family-7",
+    "name": "la veuve Xene et les siens",
+    "arrived_day": 25,
+    "cause": "la prise de la Ville par les Latins",
+    "origin": "Matzouka",
+    "guest": false,
+    "left": true,
+    "members": 0,
+    "house_done": false
+   },
+   {
+    "family": "family-8",
+    "name": "la maison d'Hovhannes",
+    "arrived_day": 44,
+    "cause": "la levée d'hommes de Trébizonde",
+    "origin": "Matzouka",
+    "guest": false,
+    "left": false,
+    "members": 2,
+    "house_done": true
+   }
+  ],
+  "councils": [
+   {
+    "day": 11,
+    "family": "family-4",
+    "cause": "le pillage des hameaux hauts de Paipert",
+    "accepted": true,
+    "votes": [
+     {
+      "voter": "npc-6",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 12.118353269150735,
+      "terms": "nous_aussi=25 leur_histoire=12 bras=8 peur=-23 inconnu=-10"
+     },
+     {
+      "voter": "npc-0",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 0.11835326915073452,
+      "terms": "nous_aussi=25 bras=8 peur=-23 inconnu=-10"
+     },
+     {
+      "voter": "npc-1",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 0.11835326915073452,
+      "terms": "nous_aussi=25 bras=8 peur=-23 inconnu=-10"
+     },
+     {
+      "voter": "npc-10",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 0.11835326915073452,
+      "terms": "nous_aussi=25 bras=8 peur=-23 inconnu=-10"
+     },
+     {
+      "voter": "npc-14",
+      "yes": false,
+      "reason": "joueur",
+      "score": -1,
+      "terms": ""
+     }
+    ]
+   },
+   {
+    "day": 15,
+    "family": "family-5",
+    "cause": "la dispute des hauts pâturages de Cheriana",
+    "accepted": true,
+    "votes": [
+     {
+      "voter": "npc-6",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 2.470684271204618,
+      "terms": "nous_aussi=25 bras=8 peur=-16 toits=-5 inconnu=-10"
+     },
+     {
+      "voter": "npc-0",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 2.470684271204618,
+      "terms": "nous_aussi=25 bras=8 peur=-16 toits=-5 inconnu=-10"
+     },
+     {
+      "voter": "npc-1",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 2.470684271204618,
+      "terms": "nous_aussi=25 bras=8 peur=-16 toits=-5 inconnu=-10"
+     },
+     {
+      "voter": "npc-10",
+      "yes": true,
+      "reason": "nous_aussi",
+      "score": 2.470684271204618,
+      "terms": "nous_aussi=25 bras=8 peur=-16 toits=-5 inconnu=-10"
+     },
+     {
+      "voter": "npc-15",
+      "yes": false,
+      "reason": "toits",
+      "score": -12.529315728795382,
+      "terms": "nous_aussi=25 bras=8 peur=-16 toits=-20 inconnu=-10"
+     },
+     {
+      "voter": "npc-14",
+      "yes": true,
+      "reason": "joueur",
+      "score": 1,
+      "terms": ""
+     }
+    ]
+   },
+   {
+    "day": 26,
+    "family": "family-7",
+    "cause": "la prise de la Ville par les Latins",
+    "accepted": false,
+    "votes": [
+     {
+      "voter": "npc-6",
+      "yes": false,
+      "reason": "toits",
+      "score": -3.843651738664658,
+      "terms": "nous_aussi=25 peur=-9 toits=-10 inconnu=-10"
+     },
+     {
+      "voter": "npc-0",
+      "yes": false,
+      "reason": "toits",
+      "score": -3.843651738664658,
+      "terms": "nous_aussi=25 peur=-9 toits=-10 inconnu=-10"
+     },
+     {
+      "voter": "npc-1",
+      "yes": false,
+      "reason": "toits",
+      "score": -3.843651738664658,
+      "terms": "nous_aussi=25 peur=-9 toits=-10 inconnu=-10"
+     },
+     {
+      "voter": "npc-10",
+      "yes": false,
+      "reason": "toits",
+      "score": -3.843651738664658,
+      "terms": "nous_aussi=25 peur=-9 toits=-10 inconnu=-10"
+     },
+     {
+      "voter": "npc-15",
+      "yes": false,
+      "reason": "toits",
+      "score": -43.84365173866466,
+      "terms": "peur=-9 toits=-25 inconnu=-10"
+     },
+     {
+      "voter": "npc-18",
+      "yes": false,
+      "reason": "toits",
+      "score": -18.843651738664658,
+      "terms": "nous_aussi=25 peur=-9 toits=-25 inconnu=-10"
+     },
+     {
+      "voter": "npc-14",
+      "yes": true,
+      "reason": "joueur",
+      "score": 1,
+      "terms": ""
+     }
+    ]
+   },
+   {
+    "day": 45,
+    "family": "family-8",
+    "cause": "la levée d'hommes de Trébizonde",
+    "accepted": true,
+    "votes": [
+     {
+      "voter": "npc-6",
+      "yes": true,
+      "reason": "remords",
+      "score": 15.4387302219629,
+      "terms": "remords=25 bras=8 peur=-8 inconnu=-10"
+     },
+     {
+      "voter": "npc-0",
+      "yes": true,
+      "reason": "remords",
+      "score": 15.4387302219629,
+      "terms": "remords=25 bras=8 peur=-8 inconnu=-10"
+     },
+     {
+      "voter": "npc-1",
+      "yes": true,
+      "reason": "remords",
+      "score": 15.4387302219629,
+      "terms": "remords=25 bras=8 peur=-8 inconnu=-10"
+     },
+     {
+      "voter": "npc-10",
+      "yes": true,
+      "reason": "remords",
+      "score": 15.4387302219629,
+      "terms": "remords=25 bras=8 peur=-8 inconnu=-10"
+     },
+     {
+      "voter": "npc-15",
+      "yes": false,
+      "reason": "inconnu",
+      "score": -9.5612697780371,
+      "terms": "bras=8 peur=-8 inconnu=-10"
+     },
+     {
+      "voter": "npc-18",
+      "yes": false,
+      "reason": "inconnu",
+      "score": -9.5612697780371,
+      "terms": "bras=8 peur=-8 inconnu=-10"
+     },
+     {
+      "voter": "npc-14",
+      "yes": true,
+      "reason": "joueur",
+      "score": 1,
+      "terms": ""
+     }
+    ]
+   }
+  ],
+  "player": {
+   "id": "npc-14",
+   "asks_pending": 0,
+   "asks_total": 3,
+   "oldest_pending": 0,
+   "unproven": false,
+   "help": [
+    {
+     "day": 18,
+     "from": "npc-15",
+     "to": "npc-14",
+     "accepted": false,
+     "reason": "joueur"
+    },
+    {
+     "day": 21,
+     "from": "npc-14",
+     "to": "npc-0",
+     "accepted": false,
+     "reason": "porte_fermee"
+    },
+    {
+     "day": 21,
+     "from": "npc-14",
+     "to": "npc-1",
+     "accepted": false,
+     "reason": "porte_fermee"
+    },
+    {
+     "day": 22,
+     "from": "npc-14",
+     "to": "npc-2",
+     "accepted": false,
+     "reason": "nouveau"
+    },
+    {
+     "day": 22,
+     "from": "npc-14",
+     "to": "npc-3",
+     "accepted": false,
+     "reason": "inconnu"
+    },
+    {
+     "day": 23,
+     "from": "npc-18",
+     "to": "npc-14",
+     "accepted": false,
+     "reason": "silence"
+    },
+    {
+     "day": 23,
+     "from": "npc-14",
+     "to": "npc-4",
+     "accepted": false,
+     "reason": "nouveau"
+    },
+    {
+     "day": 23,
+     "from": "npc-14",
+     "to": "npc-5",
+     "accepted": true,
+     "reason": "amitie"
+    },
+    {
+     "day": 50,
+     "from": "npc-23",
+     "to": "npc-14",
+     "accepted": true,
+     "reason": "joueur"
+    }
+   ]
+  }
+ },
+ "notebook": {
+  "player": "npc-14",
+  "notes": 237,
+  "stories": 79,
+  "tellers": 18,
+  "legends": 0,
+  "to_me": 15,
+  "about_me": 21,
+  "deeds": 13
+ },
+ "player": {
+  "player": "npc-14",
+  "x": 73.8998,
+  "y": 35.4375,
+  "goal": "socialize",
+  "activity": "discute",
+  "presence": 0.0004,
+  "reputation": 0.0,
+  "idleDays": 60.0,
+  "thirst": 44.7,
+  "hunger": 46.7,
+  "energy": 32.19,
+  "body": "",
+  "drinks": 573,
+  "meals": 129,
+  "pawn": true,
+  "seenBy": 0,
+  "npcs": 23,
+  "bag": 0,
+  "gathered": 0,
+  "delivered": 0,
+  "foodRemaining": 0,
+  "foodStock": 300,
+  "choice": "socialize",
+  "holds": 19,
+  "yields": 0,
+  "refusal": "",
+  "options": [
+   "rest",
+   "eat",
+   "drink",
+   "gatherFood",
+   "socialize",
+   "helpFarm",
+   "shelterRain",
+   "relax"
+  ],
+  "ux": 147799.6,
+  "uy": 70875.0,
+  "uz": 3294.1
+ },
+ "checks": {
+  "vote": true,
+  "refused_by_player": true,
+  "silence": true,
+  "refused_for_deeds": true,
+  "heard_behind_back": true,
+  "player_alive": true,
+  "files": true
+ }
+}

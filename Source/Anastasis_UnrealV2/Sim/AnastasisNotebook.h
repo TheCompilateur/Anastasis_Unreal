@@ -36,6 +36,8 @@ namespace AnastasisNotebook
 		bool bLegend = false;
 		/** Vrai si c'est au joueur qu'on l'a racontee ; faux s'il l'a seulement entendue de pres. */
 		bool bToMe = false;
+		/** ecart n°50 : une histoire sur le joueur lui-meme, entendue dans son dos. */
+		bool bAboutMe = false;
 		FString Text;
 	};
 
@@ -64,5 +66,7 @@ namespace AnastasisNotebook
 		FString PlayerId;
 		/** ecart n°49 : les conseils deja lus ; le joueur entend ceux auxquels il assiste (vivant, au village). */
 		int32 CouncilSeen = 0;
+		/** ecart n°50 : les reponses d'aide ou le joueur est en jeu, deja notees comme ses actes. */
+		int32 HelpSeen = 0;
 	};
 }

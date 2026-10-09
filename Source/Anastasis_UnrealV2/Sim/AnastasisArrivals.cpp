@@ -132,6 +132,36 @@ namespace AnastasisArrivals
 			Councils.Add(MakeShared<FJsonValueObject>(C));
 		}
 		Root->SetArrayField(TEXT("councils"), Councils);
+		// voix-conseil-001 (ecart n°50) : ce que le joueur a fait et ce qu'on lui a repondu.
+		const FString& Player = Village.GetPlayerPersonId();
+		const TSharedRef<FJsonObject> Me = MakeShared<FJsonObject>();
+		Me->SetStringField(TEXT("id"), Player);
+		int32 Pending = 0;
+		int32 OldestPending = 0;
+		for (int32 I = 0; I < Village.GetPlayerAsks().Num(); ++I)
+		{
+			if (Village.GetPlayerAsks()[I].bAnswered) continue;
+			++Pending;
+			if (OldestPending == 0) OldestPending = I + 1;
+		}
+		Me->SetNumberField(TEXT("asks_pending"), Pending);
+		Me->SetNumberField(TEXT("asks_total"), Village.GetPlayerAsks().Num());
+		Me->SetNumberField(TEXT("oldest_pending"), OldestPending);
+		Me->SetBoolField(TEXT("unproven"), !Player.IsEmpty() && Village.FindNpc(Player) && Village.IsUnproven(*Village.FindNpc(Player)));
+		TArray<TSharedPtr<FJsonValue>> Answers;
+		for (const AnastasisVillage::FVillage::FHelpAnswer& Answer : Village.GetHelpLog())
+		{
+			if (Player.IsEmpty() || (Answer.FromId != Player && Answer.ToId != Player)) continue;
+			const TSharedRef<FJsonObject> A = MakeShared<FJsonObject>();
+			A->SetNumberField(TEXT("day"), Answer.Day);
+			A->SetStringField(TEXT("from"), Answer.FromId);
+			A->SetStringField(TEXT("to"), Answer.ToId);
+			A->SetBoolField(TEXT("accepted"), Answer.bAccepted);
+			A->SetStringField(TEXT("reason"), Answer.Reason);
+			Answers.Add(MakeShared<FJsonValueObject>(A));
+		}
+		Me->SetArrayField(TEXT("help"), Answers);
+		Root->SetObjectField(TEXT("player"), Me);
 		FString Out;
 		const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Out);
 		FJsonSerializer::Serialize(Root, Writer);

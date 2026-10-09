@@ -397,6 +397,41 @@
       "on dit qu'un soir, Valmire a fermé sa porte",
       "on raconte des gens renvoyés sur la route, une nuit de conseil",
       "les anciens n'aiment pas parler de ceux qu'on a laissés partir"
+    ],
+    "aide.refuse.on_dit": [
+      "On dit que tu as laissé {qui} sans bras. Pourquoi viendrais-je, moi ?",
+      "{qui} m'a raconté comment tu lui as dit non. Débrouille-toi.",
+      "Tout le village sait ce que tu as fait à {qui}."
+    ],
+    "aide.refuse.porte_fermee": [
+      "Tu as fermé la porte à {groupe}. La mienne aussi est fermée.",
+      "J'étais au feu quand tu as dit non pour {groupe}. Je m'en souviens.",
+      "Celui qui renvoie les autres sur la route ne frappe pas chez moi."
+    ],
+    "aide.refuse.nouveau": [
+      "On ne te connaît pas encore. Fais tes preuves.",
+      "Tu viens d'arriver. Lève d'abord un toit pour quelqu'un.",
+      "Les bras d'un inconnu, on les voit à l'ouvrage, pas en paroles."
+    ],
+    "episodes.EPISODE_LINES.votedNo.firsthand": [
+      "{who} a dit non pour {note}, au conseil",
+      "au feu, {who} a voulu renvoyer {note}",
+      "j'ai entendu {who} fermer la porte à {note}"
+    ],
+    "episodes.EPISODE_LINES.votedNo.legend": [
+      "on dit que le nouveau ferme la porte aux gens de la route",
+      "on raconte qu'un étranger a voulu en renvoyer d'autres",
+      "les anciens disent qu'il ne faut pas oublier qui a dit non"
+    ],
+    "episodes.EPISODE_LINES.votedYes.firsthand": [
+      "{who} a dit oui pour {note}, au conseil",
+      "au feu, {who} a parlé pour {note}",
+      "{who} a voulu garder {note}"
+    ],
+    "episodes.EPISODE_LINES.votedYes.legend": [
+      "on dit que le nouveau a ouvert la porte à d'autres",
+      "on raconte qu'un étranger a parlé pour des étrangers",
+      "les anciens disent qu'il a la main ouverte, celui-là"
     ]
   }
 }

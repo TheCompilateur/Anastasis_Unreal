@@ -138,7 +138,7 @@ public:
 	// --- SAVE_STATE_001 : la sauvegarde de la simulation -------------------------------------------------
 
 	/** Monte a chaque changement du parcours d'etat (un champ ajoute, retire, deplace ou retype). */
-	static constexpr int32 SaveFormatVersion = 5;
+	static constexpr int32 SaveFormatVersion = 6;
 
 	/** Ce qu'un hote doit savoir AVANT de charger : graine, taille, scenario exterieur a fournir. */
 	struct FSaveHeader

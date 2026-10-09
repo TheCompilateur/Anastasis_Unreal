@@ -273,6 +273,13 @@ static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisPlayerArrive(
 			const FString Id = Village.ArriveAsPlayer(
 				bAt ? FCString::Atoi(*Args[0]) + 0.5 : -1.0,
 				bAt ? FCString::Atoi(*Args[1]) + 0.5 : -1.0);
+			// voix-conseil-001 : dans un village de foyers, le joueur a un nom, que les autres disent dans son dos (et un age :
+			// sans lui, la chronique le prend pour un ancien). « Nikolaos », le nom que la chronique lui donnait deja.
+			if (!Id.IsEmpty() && !Village.GetFamilies().IsEmpty())
+			{
+				const AnastasisVillage::FNpc* Arrived = Village.FindNpc(Id);
+				if (Arrived && Arrived->Name.IsEmpty()) Village.SetIdentity(Id, TEXT("Nikolaos"), FString(), TEXT("male"), 30.0);
+			}
 			const AnastasisVillage::FNpc* Player = Village.FindNpc(Id);
 			UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER arrive %s at (%.2f,%.2f), %d inhabitants"),
 				Id.IsEmpty() ? TEXT("refused") : *Id, Player ? Player->X : -1.0, Player ? Player->Y : -1.0, Village.GetActors().Num());
@@ -425,3 +432,88 @@ FString UAnastasisSimulationDebugLibrary::GetPlayerStatus(const UObject* WorldCo
 		Refusal ? *Refusal->Reason : TEXT(""), *FString::Join(Options, TEXT(",")),
 		Body.X, Body.Y, Body.Z);
 }
+
+// --- voix-conseil-001 (ecart n°50) : le joueur vote, repond, batit et demande, avec les memes regles que les autres ---
+
+namespace
+{
+	bool ReadYes(const TArray<FString>& Args, bool& bOutYes)
+	{
+		if (!Args.IsValidIndex(0)) return false;
+		const FString A = Args[0].ToLower();
+		if (A == TEXT("oui") || A == TEXT("yes") || A == TEXT("1")) { bOutYes = true; return true; }
+		if (A == TEXT("non") || A == TEXT("no") || A == TEXT("0")) { bOutYes = false; return true; }
+		return false;
+	}
+
+	/** Un habitant par son identifiant (`npc-7`) ou par son prenom tel que la chronique le dit (« Konstantinos »). */
+	FString FindInhabitant(const UAnastasisSimulationSubsystem& Host, const FString& Who)
+	{
+		const AnastasisVillage::FVillage& Village = Host.GetSimulation().GetVillage();
+		if (Village.FindNpc(Who)) return Who;
+		for (const AnastasisVillage::FNpc& Npc : Village.GetActors())
+		{
+			if (Npc.Name.Equals(Who, ESearchCase::IgnoreCase) || Host.GetChronicle().NameOf(Npc.Id).Equals(Who, ESearchCase::IgnoreCase)) return Npc.Id;
+		}
+		return FString();
+	}
+}
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisPlayerVote(
+	TEXT("Anastasis.Player.Vote"),
+	TEXT("Anastasis.Player.Vote <oui|non> - the player's voice at tonight's council, on the oldest group waiting at the gate. "
+		"An unproven newcomer counts for half a voice. voix-conseil-001."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		UAnastasisSimulationSubsystem* Host = PlayerHost(World);
+		bool bYes = false;
+		if (!Host || !ReadYes(Args, bYes)) return;
+		const FString Family = Host->GetSimulation().GetVillage().CastPlayerVote(bYes);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER vote %s -> %s"), bYes ? TEXT("oui") : TEXT("non"),
+			Family.IsEmpty() ? TEXT("no group waiting (or no incarnated inhabitant)") : *Family);
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisPlayerHelp(
+	TEXT("Anastasis.Player.Help"),
+	TEXT("Anastasis.Player.Help <oui|non> - answer the oldest request for help made to the player. Unanswered by the next "
+		"evening, it counts as a refusal. voix-conseil-001."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		UAnastasisSimulationSubsystem* Host = PlayerHost(World);
+		bool bYes = false;
+		if (!Host || !ReadYes(Args, bYes)) return;
+		const bool bOk = Host->GetSimulation().GetVillage().AnswerPlayerAsk(bYes);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER help %s -> %s"), bYes ? TEXT("oui") : TEXT("non"),
+			bOk ? TEXT("answered") : TEXT("nobody is asking"));
+	}));
+
+static FAutoConsoleCommandWithWorld CmdAnastasisPlayerBuild(
+	TEXT("Anastasis.Player.Build"),
+	TEXT("Anastasis.Player.Build - the player decides to build his house: he becomes the head of his own household and his "
+		"plot is traced near him, like a family's. voix-conseil-001."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		UAnastasisSimulationSubsystem* Host = PlayerHost(World);
+		if (!Host) return;
+		AnastasisVillage::FVillage& Village = Host->GetSimulation().GetVillage();
+		const FString Me = Village.GetPlayerPersonId();
+		const FString Name = Me.IsEmpty() ? FString() : FString::Printf(TEXT("la maison de %s"), *Host->GetChronicle().NameOf(Me));
+		const FString Site = Village.PlayerBuildHome(Name);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER build -> %s"), Site.IsEmpty() ? TEXT("refused (no ground, or already building)") : *Site);
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs CmdAnastasisPlayerAsk(
+	TEXT("Anastasis.Player.Ask"),
+	TEXT("Anastasis.Player.Ask <prenom|npc-id> - the player asks an inhabitant to help on his house; the answer comes at once, "
+		"with its reason (Anastasis.Chronicle.Print). voix-conseil-001."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		UAnastasisSimulationSubsystem* Host = PlayerHost(World);
+		if (!Host || !Args.IsValidIndex(0)) return;
+		const FString Who = FindInhabitant(*Host, Args[0]);
+		AnastasisVillage::FVillage::FHelpAnswer Answer;
+		const bool bOk = !Who.IsEmpty() && Host->GetSimulation().GetVillage().PlayerAskHelp(Who, Answer);
+		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER ask %s -> %s"), *Args[0],
+			!bOk ? TEXT("impossible (nobody by that name, or no house of yours being built)")
+				: *FString::Printf(TEXT("%s (%s)"), Answer.bAccepted ? TEXT("oui") : TEXT("non"), *Answer.Reason));
+	}));

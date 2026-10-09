@@ -170,6 +170,7 @@ namespace AnastasisChronicle
 		case EKind::Council: return TEXT("Council");
 		case EKind::Welcomed: return TEXT("Welcomed");
 		case EKind::TurnedAway: return TEXT("TurnedAway");
+		case EKind::AskedPlayer: return TEXT("AskedPlayer");
 		case EKind::Stalled: return TEXT("Stalled");
 		}
 		return TEXT("Unknown");
@@ -209,6 +210,7 @@ namespace AnastasisChronicle
 		HelpSeen = 0;
 		CouncilSeen = 0;
 		GroupsTold.Reset();
+		PlayerAsksSeen = 0;
 	}
 
 	FString FVillageChronicle::Quote(const FString& SpeakerId, const TCHAR* Pool, int32 Rank, const TMap<FString, FString>& Holes) const
@@ -419,6 +421,7 @@ namespace AnastasisChronicle
 		DeathsSeen = Village.GetDeaths().Num();
 		HelpSeen = Village.GetHelpLog().Num();
 		CouncilSeen = Village.GetCouncilLog().Num();
+		PlayerAsksSeen = Village.GetPlayerAsks().Num();
 		ReadFamilies(Sim);
 
 		TArray<FString> Ids;
@@ -922,9 +925,26 @@ namespace AnastasisChronicle
 
 		// ecart n°48 : le tour du village -- qui a demande de l'aide a qui, la reponse, et sa raison.
 		const TArray<AnastasisVillage::FVillage::FHelpAnswer>& Help = Village.GetHelpLog();
+		const FString& Player = Village.GetPlayerPersonId();
+		const TArray<AnastasisVillage::FVillage::FPlayerAsk>& Asks = Village.GetPlayerAsks();
+		for (; PlayerAsksSeen < Asks.Num(); ++PlayerAsksSeen)
+		{
+			const AnastasisVillage::FVillage::FPlayerAsk& Ask = Asks[PlayerAsksSeen];
+			Add(Day, Hour, EKind::AskedPlayer, { Ask.FromId, Player }, FString::Printf(TEXT("%s vient demander de l'aide à %s :%s"),
+				*NameOf(Ask.FromId), *NameOf(Player), *Quote(Ask.FromId, TEXT("aide.demande.chantier"), PlayerAsksSeen)));
+		}
 		for (; HelpSeen < Help.Num(); ++HelpSeen)
 		{
 			const AnastasisVillage::FVillage::FHelpAnswer& Answer = Help[HelpSeen];
+			// ecart n°50 : la reponse du joueur lui-meme -- il ne parle pas encore ; son silence compte.
+			if (!Player.IsEmpty() && Answer.ToId == Player)
+			{
+				const FString Reply = Answer.Reason == TEXT("silence")
+					? FString::Printf(TEXT("%s n'a pas répondu à %s. %s s'en souviendra."), *NameOf(Player), *NameOf(Answer.FromId), *NameOf(Answer.FromId))
+					: FString::Printf(TEXT("%s %s d'aider %s."), *NameOf(Player), Answer.bAccepted ? TEXT("accepte") : TEXT("refuse"), *NameOf(Answer.FromId));
+				Add(Day, Hour, Answer.bAccepted ? EKind::HelpGiven : EKind::HelpRefused, { Answer.FromId, Answer.ToId }, Reply);
+				continue;
+			}
 			FString Pool = Answer.bAccepted
 				? (Answer.Reason == TEXT("voisin") || Answer.Reason.IsEmpty() ? FString(TEXT("aide.accepte")) : FString::Printf(TEXT("aide.accepte.%s"), *Answer.Reason))
 				: FString::Printf(TEXT("aide.refuse.%s"), *Answer.Reason);
@@ -935,7 +955,21 @@ namespace AnastasisChronicle
 				const FString ByTrade = Asked ? FString::Printf(TEXT("aide.refuse.occupe.%s"), *Asked->JobId) : FString();
 				if (!ByTrade.IsEmpty() && Lines->HasPool(ByTrade)) Pool = ByTrade;
 			}
-			const FString Said = Lines ? Lines->Pick(Pool, AnastasisDialogue::FLibrary::KeyOf(Seed, Answer.ToId, Pool, HelpSeen)) : FString();
+			// ecart n°50 : on dit en face ce qu'on reproche -- qui il a laisse sans bras, a qui il a ferme la porte.
+			TMap<FString, FString> Holes;
+			if (const AnastasisVillage::FNpc* Asked = Village.FindNpc(Answer.ToId))
+			{
+				for (const AnastasisEpisodes::FEpisode& Event : Asked->Chronicle.Events)
+				{
+					if (Event.AboutId != Answer.FromId) continue;
+					if (Event.Kind == TEXT("refusedHelp") && !Event.bFirsthand && !Holes.Contains(TEXT("qui")))
+					{
+						Holes.Add(TEXT("qui"), NameOf(Event.OriginalSourceId.IsEmpty() ? Event.SourceId : Event.OriginalSourceId));
+					}
+					if (Event.Kind == TEXT("votedNo") && !Holes.Contains(TEXT("groupe"))) Holes.Add(TEXT("groupe"), Event.Note);
+				}
+			}
+			const FString Said = Lines ? Lines->Pick(Pool, AnastasisDialogue::FLibrary::KeyOf(Seed, Answer.ToId, Pool, HelpSeen), Holes) : FString();
 			const FString Ask = Lines ? Lines->Pick(TEXT("aide.demande.chantier"), AnastasisDialogue::FLibrary::KeyOf(Seed, Answer.FromId, TEXT("aide.demande.chantier"), HelpSeen)) : FString();
 			const FString Text = FString::Printf(TEXT("%s va demander de l'aide à %s%s. %s %s%s"),
 				*NameOf(Answer.FromId), *NameOf(Answer.ToId), Ask.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" : « %s »"), *Ask),
@@ -991,13 +1025,25 @@ namespace AnastasisChronicle
 			Add(Day, Hour, EKind::Council, Voters, Opening);
 			for (const AnastasisVillage::FVillage::FWelcomeVote& Vote : Council.Votes)
 			{
+				if (Vote.Reason == TEXT("joueur"))
+				{
+					Add(Day, Hour, EKind::Council, { Vote.VoterId }, FString::Printf(TEXT("%s, le nouveau : %s.%s"), *NameOf(Vote.VoterId),
+						Vote.bYes ? TEXT("oui") : TEXT("non"), Vote.Weight < 1.0 ? TEXT(" Une demi-voix : on ne le connaît pas encore.") : TEXT("")));
+					continue;
+				}
 				const FString Said = Lines ? AnastasisArrivals::VoteLine(*Lines, Seed, Vote, Council.Cause, CouncilSeen) : FString();
 				Add(Day, Hour, EKind::Council, { Vote.VoterId }, FString::Printf(TEXT("%s : %s.%s"), *NameOf(Vote.VoterId),
 					Vote.bYes ? TEXT("oui") : TEXT("non"), Said.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" « %s »"), *Said)));
 			}
 			int32 Yes = 0;
-			for (const AnastasisVillage::FVillage::FWelcomeVote& Vote : Council.Votes) Yes += Vote.bYes ? 1 : 0;
-			const FString Count = FString::Printf(TEXT("%d oui, %d non"), Yes, Council.Votes.Num() - Yes);
+			bool bHalf = false;
+			for (const AnastasisVillage::FVillage::FWelcomeVote& Vote : Council.Votes)
+			{
+				Yes += Vote.bYes ? 1 : 0;
+				bHalf |= Vote.Weight < 1.0;
+			}
+			const FString Count = FString::Printf(TEXT("%d oui, %d non%s"), Yes, Council.Votes.Num() - Yes,
+				bHalf ? TEXT(" (la voix du nouveau compte pour moitié)") : TEXT(""));
 			if (Council.bAccepted)
 			{
 				Add(Day, Hour, EKind::Welcomed, Voters, FString::Printf(TEXT("%s : Valmire garde %s."), *Count, *GroupName));

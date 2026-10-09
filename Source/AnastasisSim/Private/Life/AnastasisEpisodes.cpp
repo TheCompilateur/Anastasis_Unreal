@@ -44,6 +44,9 @@ namespace AnastasisEpisodes
 			{ TEXT("refusedHelp"), { -1.0, 22.0, 0.65 } },
 			// EXTENSION (ecart n°49) -- ce qu'un arrivant a fui (un raid, une disette) : il le raconte, et ca court.
 			{ TEXT("fled"), { -1.0, 28.0, 0.8 } },
+			// EXTENSION (ecart n°50) -- ce que le joueur a dit au conseil : on l'a entendu, et on le repete.
+			{ TEXT("votedYes"), { 1.0, 16.0, 0.5 } },
+			{ TEXT("votedNo"), { -1.0, 20.0, 0.7 } },
 		};
 
 		struct FGoalCoeff

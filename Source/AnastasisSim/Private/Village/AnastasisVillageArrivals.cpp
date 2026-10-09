@@ -175,7 +175,6 @@ namespace AnastasisVillage
 			Council.Day = Today;
 			Council.FamilyId = GuestFamilyId;
 			Council.Cause = Guests->Cause;
-			int32 Yes = 0;
 			for (const FFamily& Family : Families)
 			{
 				if (Family.bGuest || Family.bLeft) continue;
@@ -188,13 +187,43 @@ namespace AnastasisVillage
 					if (Member->KinRole == TEXT("chef")) { Chief = Member; break; }
 					if (!Chief) Chief = Member;
 				}
-				if (!Chief) continue;
+				// ecart n°50 : le joueur ne vote que par sa main (CastPlayerVote), meme chef d'un foyer.
+				if (!Chief || Chief->Id == PlayerPersonId) continue;
 				const FWelcomeVote Vote = EvaluateWelcome(*Chief, *Guests, Insecurity);
-				if (Vote.bYes) ++Yes;
 				Council.Votes.Add(Vote);
 			}
-			// La majorite stricte : a egalite, on garde le grain.
-			Council.bAccepted = Council.Votes.Num() > 0 && Yes * 2 > Council.Votes.Num();
+			// ecart n°50 : la voix du joueur, s'il l'a donnee pour ce groupe ; une demi-voix tant qu'il n'est pas eprouve.
+			const FNpc* Player = PlayerPersonId.IsEmpty() ? nullptr : Actors.FindById(PlayerPersonId);
+			if (Player && PlayerVoteFamilyId == GuestFamilyId)
+			{
+				FWelcomeVote Voice;
+				Voice.VoterId = PlayerPersonId;
+				Voice.bYes = bPlayerVoteYes;
+				Voice.Reason = TEXT("joueur");
+				Voice.Weight = IsUnproven(*Player) ? 0.5 : 1.0;
+				Voice.Score = bPlayerVoteYes ? 1.0 : -1.0;
+				Council.Votes.Add(Voice);
+				// Ceux qui sont au feu l'ont entendu : sa voix devient une histoire, a lui.
+				for (const FWelcomeVote& Heard : Council.Votes)
+				{
+					if (Heard.VoterId == PlayerPersonId) continue;
+					FEpisodeOptions Said;
+					Said.AboutId = PlayerPersonId;
+					Said.Note = Guests->Name;
+					Said.RootId = FString::Printf(TEXT("voix-%s-%s"), *GuestFamilyId, *PlayerPersonId);
+					RecordEpisode(Heard.VoterId, bPlayerVoteYes ? TEXT("votedYes") : TEXT("votedNo"), Said);
+				}
+			}
+			if (PlayerVoteFamilyId == GuestFamilyId) PlayerVoteFamilyId.Reset();
+			// La majorite stricte des voix pesees : a egalite, on garde le grain.
+			double YesWeight = 0.0;
+			double AllWeight = 0.0;
+			for (const FWelcomeVote& Vote : Council.Votes)
+			{
+				AllWeight += Vote.Weight;
+				if (Vote.bYes) YesWeight += Vote.Weight;
+			}
+			Council.bAccepted = AllWeight > 0.0 && YesWeight * 2.0 > AllWeight;
 			const FString GuestChief = Guests->Adults[0];
 			if (Council.bAccepted)
 			{

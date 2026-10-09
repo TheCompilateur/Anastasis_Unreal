@@ -66,6 +66,7 @@ namespace AnastasisVillage
 		void VisitState(FStateArchive& Ar, FVillage::FArrivalGroup& V);
 		void VisitState(FStateArchive& Ar, FVillage::FWelcomeVote& V);
 		void VisitState(FStateArchive& Ar, FVillage::FCouncil& V);
+		void VisitState(FStateArchive& Ar, FVillage::FPlayerAsk& V);
 		void VisitState(FStateArchive& Ar, AnastasisEpisodes::FEpisode& V);
 		void VisitState(FStateArchive& Ar, AnastasisEpisodes::FChronicle& V);
 		void VisitState(FStateArchive& Ar, AnastasisWeatherBehavior::FSimWeather& V);
@@ -1014,6 +1015,19 @@ namespace AnastasisVillage
 			Ar.Key(TEXT("reason")).String(V.Reason);
 			Ar.Key(TEXT("score")).Number(V.Score);
 			Ar.Key(TEXT("terms")).String(V.Terms);
+			Ar.Key(TEXT("weight")).Number(V.Weight);
+			Ar.EndObject();
+		}
+
+		// ecart n°50 : une demande d'aide faite au joueur.
+		void VisitState(FStateArchive& Ar, FVillage::FPlayerAsk& V)
+		{
+			Ar.BeginObject();
+			Ar.Key(TEXT("day")).Number(V.Day);
+			Ar.Key(TEXT("fromId")).String(V.FromId);
+			Ar.Key(TEXT("siteId")).String(V.SiteId);
+			Ar.Key(TEXT("answered")).Bool(V.bAnswered);
+			Ar.Key(TEXT("accepted")).Bool(V.bAccepted);
 			Ar.EndObject();
 		}
 
@@ -1235,6 +1249,10 @@ namespace AnastasisVillage
 		Ar.Key(TEXT("nextArrivalGroup")).Number(NextArrivalGroup);
 		Ar.Key(TEXT("councilLog"));
 		VisitStates(Ar, CouncilLog);
+		Ar.Key(TEXT("playerVoteFamilyId")).String(PlayerVoteFamilyId);
+		Ar.Key(TEXT("playerVoteYes")).Bool(bPlayerVoteYes);
+		Ar.Key(TEXT("playerAsks"));
+		VisitStates(Ar, PlayerAsks);
 		Ar.Key(TEXT("nextFamilyId")).Number(NextFamilyId);
 		Ar.Key(TEXT("nextNpcId")).Number(NextNpcId);
 		Ar.Key(TEXT("now")).Number(Now);
