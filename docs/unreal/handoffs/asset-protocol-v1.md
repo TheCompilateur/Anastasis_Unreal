@@ -8,6 +8,13 @@ La V1 n'avait créé aucun asset et son validateur n'avait jamais tourné dans
 Unreal. La mission ne redevient candidate au lot qu'après un **nouveau**
 `finish` sur le commit V2, avec les preuves indiquées ci-dessous.
 
+**Pause demandée par Alexandre.** La capture locale `pontic-horsetail-v2-capture`
+attendait la porte mémoire depuis 41 minutes ; cette attente a été annulée sans
+ouvrir d'éditeur de mission ni toucher aux éditeurs des autres agents. Le worktree
+est propre au commit V2 `cff032056` avant cette note. `main` était à `7f7e29fbd` :
+la branche devra être rebasée et repassée au portail avant admission. Aucun
+`SCN PASS` ni `PLY PASS` n'est acquis.
+
 ## MISSION
 
 Corriger le protocole V1 par un pilote de création réel : générer
@@ -89,3 +96,19 @@ AUCUN — `Source/AnastasisSim/` inchangé.
 Ne pas annoncer `SCN PASS`, `PLY PASS`, fidélité botanique ou amélioration GPU
 tant que les images et chiffres correspondants ne sont pas inspectés. Si la
 preuve locale ne tourne pas, le verdict reste `UNKNOWN` et la CVar reste à 0.
+
+## REPRISE APRÈS FEU VERT D'ALEXANDRE
+
+1. Vérifier `git status --short`, la position de `main` et la file des éditeurs.
+   Ne pas déloger l'éditeur `ma-cabane-001` : Alexandre a confirmé qu'il est
+   encore utilisé.
+2. Quand un créneau avec rendu est réellement libre, lancer dans ce worktree
+   `tools\unreal\editor-batch.ps1 -Proofs pontic-horsetail-v2-capture`.
+   Inspecter les images ancien/nouveau/ancien répété et le JSON d'inventaire
+   sous `Saved/PonticHorsetailV2Evidence/`. Comparer visuellement et mesurer
+   à caméra, carte et placements constants ; décider KEEP/REJECT/UNKNOWN.
+3. Rebaser sur `main` en préservant les ajouts des autres missions dans les
+   fichiers partagés, reconstruire/retester selon le portail, puis lancer
+   `tools\unreal\agent-worktree.ps1 finish -Mission asset-protocol-v1`.
+   `-Queue` ne s'emploie que si la machine reste saturée ; son verdict ne
+   couvre pas la suite. Seul l'intégrateur désigné verse ensuite la mission.
