@@ -1457,6 +1457,22 @@ namespace AnastasisVillage
 			if (bSoilWaterEnabled != bEnabled) { bSoilWaterEnabled = bEnabled; SoilWaterByTile.Reset(); }
 		}
 		bool IsSoilWaterEnabled() const { return bSoilWaterEnabled; }
+
+		// --- ecart n°59 (faim-champs-001) : quand le grenier se vide, des bras vont aux champs --------------
+		/** Eteint par defaut : le harnais et la parite JS restent au bit pres ; l'hote l'allume. */
+		void SetFieldHandsEnabled(bool bEnabled) { bFieldHandsEnabled = bEnabled; }
+		bool IsFieldHandsEnabled() const { return bFieldHandsEnabled; }
+		/** Sous ce nombre de jours de nourriture au grenier (un repas par personne et par jour), on embauche. */
+		static constexpr int32 FieldHandsStockDays = 2;
+		/**
+		 * Chaque soir (travail `lifeDaily`) : s'il reste moins de `FieldHandsStockDays` jours de nourriture dans les
+		 * greniers, un habitant sans metier -- l'adulte (16 ans et plus) le plus affame qui atteint le grenier -- part
+		 * aux champs : il devient cultivateur de ce grenier, comme ceux de l'ouverture. Un par soir, jamais plus de la
+		 * moitie du village aux champs. Rend son identifiant, vide si personne.
+		 */
+		FString UpdateFieldHandsDaily(int32 InDay);
+		int32 GetFieldHandsHired() const { return FieldHandsHired; }
+		const FString& GetLastFieldHandsDecision() const { return LastFieldHandsDecision; }
 		bool GetSoilWaterAt(int32 TileX, int32 TileY, double& OutStored) const;
 
 		/** Une mort, telle que le village la retient (hors empreinte). */
@@ -2341,6 +2357,10 @@ namespace AnastasisVillage
 		TMap<int32, AnastasisWorld::FTile> LiveTiles;
 		TMap<int32, double> SoilWaterByTile;
 		bool bSoilWaterEnabled = false;
+		/** ecart n°59 : quand le grenier se vide, des bras vont aux champs (hote seulement). */
+		bool bFieldHandsEnabled = false;
+		int32 FieldHandsHired = 0;
+		FString LastFieldHandsDecision;
 		int64 RegrownFood = 0;
 		/** `sim.spatial` : reconstruite une fois par tick, au debut de la boucle des habitants. */
 		AnastasisSpatialGrid::FGrid Grid;

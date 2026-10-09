@@ -487,6 +487,8 @@ void FAnastasisSimulation::RunDayJob(int32 Job)
 		Village.UpdateArrivalCouncilDaily(Geo.IsLoaded() ? Geo.GetVillageExposure().Pressure[static_cast<int32>(AnastasisGeo::EPressure::Insecurity)] : 0.0, Day);
 		// ecart n°48 (EXTENSION) : les familles sans maison decident de batir, et vont demander de l'aide.
 		Village.UpdateFamilyHousesDaily();
+		// ecart n°59 (EXTENSION) : quand le grenier se vide, des bras vont aux champs.
+		Village.UpdateFieldHandsDaily(Day);
 	}
 	else if (Job == DayJobMemory)
 	{

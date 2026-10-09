@@ -18,7 +18,8 @@
         "MarketStock": "lacune: FOrderedMap du marche, meme condition que Colony",
         "PassageCount": "observation: passages enregistres depuis Bind (settlement-morphogenesis-001), pour le rapport et les tests ; aucune regle ne le relit",
         "NavAgents": "cache: vue de travail (FNavAgent) remplie depuis FNpc avant un appel du service de navigation et videe par FlushNavAgents ; vide entre deux pas (AnastasisVillageNav.cpp)",
-        "NavSourceShared": "cache: source de navigation partagee (TSharedPtr mutable), reconstruite depuis Nav et le monde"
+        "NavSourceShared": "cache: source de navigation partagee (TSharedPtr mutable), reconstruite depuis Nav et le monde",
+        "LastFieldHandsDecision": "observation: compte rendu de la derniere decision des bras aux champs (ecart n 59), pour les tests et le rapport ; aucune regle ne le relit"
       } },
     { "nom": "FNpc", "entete": "Source/AnastasisSim/Public/Village/AnastasisVillage.h",
       "lecteur": { "fichier": "Source/AnastasisSim/Private/Village/AnastasisVillageStateDigest.cpp", "fonction": "void VisitState(FStateArchive& Ar, FNpc& V)", "acces": "V." },
