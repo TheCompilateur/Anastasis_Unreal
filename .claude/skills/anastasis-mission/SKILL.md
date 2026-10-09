@@ -140,8 +140,15 @@ git ls-remote origin refs/heads/main                    # relire le tip distant
 tools\unreal\agent-worktree.ps1 prune -Mission <mission>
 ```
 
-Supprime worktree, branche et enregistrement MCP local. Refuse si un commit manque à `main`. Pas
-`git branch -d` : il compare à la branche extraite du canonique, pas à `main`.
+Supprime worktree, branche et enregistrement MCP local. Refuse si un commit manque à `main`, si le
+worktree n'est pas propre ou si un processus y tourne. Pas `git branch -d` : il compare à la branche
+extraite du canonique, pas à `main`.
+
+Depuis DISK_HYGIENE_001 (2026-10-09), `integrate` et `integrate-batch` élaguent eux-mêmes chaque mission
+versée (`AUTO_PRUNE::ELAGUE`) : chaque worktree pèse ~3,4 Go de compilation, et 46 worktrees oubliés
+avaient rempli C: en deux jours. `AUTO_PRUNE::GARDE <m>` dit pourquoi un worktree est resté (sale,
+processus, commit hors `main`) : le reprendre à la main plus tard. Après le versement de ta mission, ton
+worktree n'existe plus : une suite de travail s'ouvre dans une mission neuve.
 
 ### Ordre des preuves et captures (visual-crusade-001)
 

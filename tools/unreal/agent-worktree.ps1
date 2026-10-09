@@ -369,6 +369,91 @@ function Update-CanonicalBuild {
   }
 }
 
+# Etape 6 de la passe (docs/unreal/OPERATIONS.md) : worktree, branche et enregistrement
+# MCP local d une mission entierement dans main. `git branch -d` ne sert pas ici : il
+# compare a la branche extraite du canonique, pas a main. Ne quitte jamais le script :
+# `integrate` et `integrate-batch` l'appellent apres avoir deplace main (DISK_HYGIENE_001),
+# un refus ne doit pas les faire echouer. Verdict dans $script:PruneOk.
+function Invoke-Prune([string]$m) {
+  $script:PruneOk = $false
+  $branch = Branch-Of $m
+  $path = Path-Of $m
+  if ((Invoke-Git -C $Canonical rev-parse --verify --quiet $branch).Code -ne 0) { Write-Output "FAIL: branche introuvable -> $branch"; return }
+  # Par CONTENU (`git cherry`) : integrate-batch verse des copies des commits de la
+  # branche, pas les commits eux-memes ; une copie dans main vaut versement.
+  $outside = @((Invoke-Git -C $Canonical cherry main $branch).Out | Where-Object { $_ -like '+ *' }).Count
+  if ($outside -gt 0) {
+    # Un lot peut verser une copie au diff retouche (union de proofs.txt, contexte deplace) :
+    # `cherry` ne la reconnait plus. Si rejouer la branche sur main ne change rien, elle y est.
+    $pv = @(Get-StackPreview $Canonical 'main' @($m))[0]
+    if ($pv -and $pv.New -eq 0 -and $pv.Conflicts.Count -eq 0) {
+      Write-Output "PRUNE::PAR_CONTENU ($outside commit(s) non reconnus par git cherry ; rejoues sur main, ils ne changent rien)"
+    } else {
+      Write-Output "FAIL: $outside commit(s) de $branch absents de main : integrer d abord"; return
+    }
+  }
+  if (Test-Path -LiteralPath $path) {
+    $dirty = @((Invoke-Git -C $path status --porcelain --untracked-files=all).Out)
+    if ($dirty.Count -gt 0) {
+      Write-Output "FAIL: worktree non propre, rien n est supprime -> $path"
+      $dirty | Select-Object -First 20 | ForEach-Object { Write-Output ('    ' + $_) }
+      return
+    }
+    # Un build, un editeur ou une preuve qui tourne encore dans le worktree : `git worktree
+    # remove` effacerait la moitie des fichiers puis buterait sur ceux qui sont tenus.
+    # Le shell qui lance `prune` (et ses parents) peut porter ce chemin sur sa ligne de commande.
+    $needle = ($path.TrimEnd('\', '/') + '\').Replace('/', '\')
+    $procs = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+    $self = @{}; $cur = $PID
+    while ($cur -and -not $self.ContainsKey($cur)) {
+      $self[$cur] = $true
+      $cur = ($procs | Where-Object { $_.ProcessId -eq $cur } | Select-Object -First 1).ParentProcessId
+    }
+    $busy = @($procs | Where-Object {
+      -not $self.ContainsKey($_.ProcessId) -and $_.CommandLine -and $_.CommandLine.Replace('/', '\').IndexOf($needle, [StringComparison]::OrdinalIgnoreCase) -ge 0 })
+    if ($busy.Count -gt 0) {
+      Write-Output "FAIL: processus encore ouvert(s) dans le worktree, rien n est supprime -> $path"
+      $busy | Select-Object -First 10 | ForEach-Object { Write-Output ("    {0} pid={1}" -f $_.Name, $_.ProcessId) }
+      return
+    }
+    if (Get-Command claude -ErrorAction SilentlyContinue) {
+      $ErrorActionPreference = 'Continue'
+      Push-Location -LiteralPath $path
+      try { & claude mcp remove --scope local unreal 2>$null | Out-Null } finally { Pop-Location }
+      $ErrorActionPreference = 'Stop'
+    }
+    $w = Invoke-Git -C $Canonical worktree remove $path
+    if ($w.Code -ne 0) {
+      $w.Out | ForEach-Object { Write-Output ('    ' + $_) }
+      Write-Output 'FAIL: git worktree remove (un editeur ouvert sur ce worktree verrouille ses fichiers ?)'; return
+    }
+    Write-Output "WORKTREE_REMOVED::$path"
+  }
+  $b = Invoke-Git -C $Canonical branch -D $branch
+  if ($b.Code -ne 0) { Write-Output ("FAIL: git branch -D`n" + ($b.Out -join "`n")); return }
+  Remove-Item -LiteralPath (Handoff-Marker $m) -ErrorAction SilentlyContinue
+  Write-Output "BRANCH_DELETED::$branch"
+  $script:PruneOk = $true
+}
+
+# DISK_HYGIENE_001 (Alexandre, 2026-10-09) : chaque worktree porte sa compilation complete
+# (~3,4 Go). 46 worktrees ouverts en deux jours et jamais elagues ont pris 150 Go sur C:.
+# Une mission versee est donc elaguee dans la foulee du versement. Un worktree encore sale,
+# occupe par un processus, ou dont un commit manque a main est garde et nomme : rien n'est
+# perdu, l'agent ou l'integrateur le reprendra. ANASTASIS_AUTO_PRUNE=0 laisse tout en place.
+function Invoke-AutoPrune([string[]]$missions) {
+  if ($env:ANASTASIS_AUTO_PRUNE -eq '0') {
+    Write-Output 'AUTO_PRUNE::SKIP (ANASTASIS_AUTO_PRUNE=0). Plus tard, pour chaque mission versee :'
+    $missions | ForEach-Object { Write-Output "          tools\unreal\agent-worktree.ps1 prune -Mission $_" }
+    return
+  }
+  foreach ($m in $missions) {
+    Invoke-Prune $m
+    if ($script:PruneOk) { Write-Output "AUTO_PRUNE::ELAGUE $m" }
+    else { Write-Output "AUTO_PRUNE::GARDE $m (motif ci-dessus) -- plus tard : tools\unreal\agent-worktree.ps1 prune -Mission $m" }
+  }
+}
+
 function Move-Main([string]$rev) {
   $script:MoveOk = $false
   $current = (Invoke-Git -C $Canonical branch --show-current).Out[0]
@@ -850,8 +935,8 @@ switch ($Command) {
     Write-Output "MAIN_AFTER::$mainAfter"
     Write-Output "INTEGRATED::$branch ($ahead commit(s)$(if ($target -ne $branch) { ', rejoues sur main' }))"
     Update-CanonicalBuild
-    Write-Output 'Ensuite : git push origin main (le pre-push compile le canonique), puis'
-    Write-Output "          tools\unreal\agent-worktree.ps1 prune -Mission $Mission"
+    Invoke-AutoPrune @($Mission)
+    Write-Output 'Ensuite : git push origin main (le pre-push compile le canonique)'
   }
 
   'integrate-batch' {
@@ -1106,55 +1191,14 @@ switch ($Command) {
     Write-Output "MAIN_AFTER::$mainAfter"
     Write-Output ('BATCH_INTEGRATED::' + (($applied | ForEach-Object { $_.Mission }) -join ', '))
     Update-CanonicalBuild
-    Write-Output 'Ensuite : git push origin main, puis pour chaque mission versee :'
-    $applied | ForEach-Object { Write-Output "          tools\unreal\agent-worktree.ps1 prune -Mission $($_.Mission)" }
+    Invoke-AutoPrune @($applied | ForEach-Object { $_.Mission })
+    Write-Output 'Ensuite : git push origin main'
   }
 
   'prune' {
-    # Etape 6 de la passe (docs/unreal/OPERATIONS.md) : worktree, branche et enregistrement
-    # MCP local d une mission entierement dans main. `git branch -d` ne sert pas ici : il
-    # compare a la branche extraite du canonique, pas a main.
     Require-Mission
-    $branch = Branch-Of $Mission
-    $path = Path-Of $Mission
-    if ((Invoke-Git -C $Canonical rev-parse --verify --quiet $branch).Code -ne 0) { Fail "FAIL: branche introuvable -> $branch" }
-    # Par CONTENU (`git cherry`) : integrate-batch verse des copies des commits de la
-    # branche, pas les commits eux-memes ; une copie dans main vaut versement.
-    $outside = @((Invoke-Git -C $Canonical cherry main $branch).Out | Where-Object { $_ -like '+ *' }).Count
-    if ($outside -gt 0) {
-      # Un lot peut verser une copie au diff retouche (union de proofs.txt, contexte deplace) :
-      # `cherry` ne la reconnait plus. Si rejouer la branche sur main ne change rien, elle y est.
-      $pv = @(Get-StackPreview $Canonical 'main' @($Mission))[0]
-      if ($pv -and $pv.New -eq 0 -and $pv.Conflicts.Count -eq 0) {
-        Write-Output "PRUNE::PAR_CONTENU ($outside commit(s) non reconnus par git cherry ; rejoues sur main, ils ne changent rien)"
-      } else {
-        Fail "FAIL: $outside commit(s) de $branch absents de main : integrer d abord"
-      }
-    }
-    if (Test-Path -LiteralPath $path) {
-      $dirty = @((Invoke-Git -C $path status --porcelain --untracked-files=all).Out)
-      if ($dirty.Count -gt 0) {
-        Write-Output "FAIL: worktree non propre, rien n est supprime -> $path"
-        $dirty | Select-Object -First 20 | ForEach-Object { Write-Output ('    ' + $_) }
-        exit 1
-      }
-      if (Get-Command claude -ErrorAction SilentlyContinue) {
-        $ErrorActionPreference = 'Continue'
-        Push-Location -LiteralPath $path
-        try { & claude mcp remove --scope local unreal 2>$null | Out-Null } finally { Pop-Location }
-        $ErrorActionPreference = 'Stop'
-      }
-      $w = Invoke-Git -C $Canonical worktree remove $path
-      if ($w.Code -ne 0) {
-        $w.Out | ForEach-Object { Write-Output ('    ' + $_) }
-        Fail 'FAIL: git worktree remove (un editeur ouvert sur ce worktree verrouille ses fichiers ?)'
-      }
-      Write-Output "WORKTREE_REMOVED::$path"
-    }
-    $b = Invoke-Git -C $Canonical branch -D $branch
-    if ($b.Code -ne 0) { Fail ("FAIL: git branch -D`n" + ($b.Out -join "`n")) }
-    Remove-Item -LiteralPath (Handoff-Marker $Mission) -ErrorAction SilentlyContinue
-    Write-Output "BRANCH_DELETED::$branch"
+    Invoke-Prune $Mission
+    if (-not $script:PruneOk) { exit 1 }
   }
 
   'preflight' {
