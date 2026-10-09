@@ -368,10 +368,42 @@ namespace AnastasisBonds
 		for (const FMoodlet& M : List)
 		{
 			if (M.Id == TEXT("newFriend")) Rate += NewFriendMoralePerSecond;
+			else if (M.Id == TEXT("drinkRelief")) Rate += DrinkReliefMoralePerSecond; // ecart n°58
 		}
 		if (Rate <= 0.0) return;
 		const double Capped = FMath::Min(Rate, MoodletMoralePerSecondCap * List.Num());
 		Morale = Clamp(MoraleOr50(Morale) + Capped * Dt, 0.0, 100.0);
+	}
+
+	void StampDrinkRelief(TArray<FMoodlet>& List, double& Morale, double Now)
+	{
+		// ecart n°58 : meme forme que `StampNewFriend` (prolonger s'il y est, sinon une case, la plus vieille cede).
+		PruneMoodlets(List, Now);
+		const double Until = Now + DrinkReliefSeconds;
+		if (FMoodlet* Existing = List.FindByPredicate([](const FMoodlet& M) { return M.Id == TEXT("drinkRelief"); }))
+		{
+			Existing->Until = FMath::Max(Existing->Until, Until);
+			Existing->At = Now;
+		}
+		else
+		{
+			while (List.Num() >= MoodletMaxSlots) List.RemoveAt(0);
+			FMoodlet Entry;
+			Entry.Id = TEXT("drinkRelief");
+			Entry.At = Now;
+			Entry.Until = Until;
+			List.Add(Entry);
+		}
+		Morale = Clamp(MoraleOr50(Morale) + DrinkReliefMoraleOnStamp, 0.0, 100.0);
+	}
+
+	double DrinkReliefBias(const TArray<FMoodlet>& List, double Now)
+	{
+		for (const FMoodlet& M : List)
+		{
+			if (M.Id == TEXT("drinkRelief") && FMath::IsFinite(M.Until) && Now <= M.Until) return DrinkReliefDrinkBias;
+		}
+		return 0.0;
 	}
 
 	double MoodletGoalBias(TArray<FMoodlet>& List, const FString& Goal, double Now)

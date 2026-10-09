@@ -82,6 +82,20 @@ namespace AnastasisBonds
 	inline constexpr double NewFriendMoralePerSecond = 0.02;
 	inline constexpr double NewFriendSocializeBias = 8.0;
 
+	/**
+	 * ecart n°58 (soif-dabord-001) -- le soulagement de boire assoiffe : une humeur courte (`drinkRelief`), posee
+	 * seulement quand le village l'a allumee (`FVillage::SetThirstFirstEnabled`). Elle monte le moral un moment,
+	 * et, tant qu'elle dure (environ une journee : DayLength = 90 s), la soif revenue tire plus fort vers le puits :
+	 * le corps se souvient que boire fait du bien. Absente de la reference ; jamais posee dans le harnais.
+	 */
+	inline constexpr double DrinkReliefSeconds = 112.5;
+	inline constexpr double DrinkReliefMoraleOnStamp = 3.0;
+	inline constexpr double DrinkReliefMoralePerSecond = 0.02;
+	/** A partir de quelle soif boire soulage vraiment (`ThirstUrge`). */
+	inline constexpr double DrinkReliefThirstAt = 40.0;
+	/** Ce que le souvenir du soulagement ajoute a la ligne `drink` quand la soif revient (>= DrinkReliefThirstAt). */
+	inline constexpr double DrinkReliefDrinkBias = 10.0;
+
 	/** `bondKindBetween` pour deux adultes sans famille ni partenaire. */
 	enum class EBondKind : uint8 { Stranger, Coworker, Friend, Rival };
 
@@ -201,4 +215,8 @@ namespace AnastasisBonds
 	ANASTASISSIM_API void StampNewFriend(TArray<FMoodlet>& List, double& Morale, double Now);
 	ANASTASISSIM_API void TickMoodlets(TArray<FMoodlet>& List, double& Morale, double Dt, double Now);
 	ANASTASISSIM_API double MoodletGoalBias(TArray<FMoodlet>& List, const FString& Goal, double Now);
+	/** ecart n°58 : pose (ou prolonge) le soulagement de boire, et son gain de moral. */
+	ANASTASISSIM_API void StampDrinkRelief(TArray<FMoodlet>& List, double& Morale, double Now);
+	/** ecart n°58 : ce que le soulagement encore present ajoute a la ligne `drink` ; 0 sans lui. */
+	ANASTASISSIM_API double DrinkReliefBias(const TArray<FMoodlet>& List, double Now);
 }

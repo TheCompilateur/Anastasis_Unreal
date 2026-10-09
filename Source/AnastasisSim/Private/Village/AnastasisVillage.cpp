@@ -2478,7 +2478,15 @@ namespace AnastasisVillage
 			if (G == GoalEat) Score = Trace.NeedScores.Eat + EatJobPriorityBias;
 			else if (G == GoalRest) Score = Trace.NeedScores.Rest + RestJobPriorityBias;
 			// `needs.drink + (sim.countBuildings?.("well") > 0 ? 6 : 0) + goalNoise(sim, 6)`.
-			else if (G == GoalDrink) Score = Trace.NeedScores.Drink + (Wells > 0 ? 6.0 : 0.0) + Noise;
+			else if (G == GoalDrink)
+			{
+				Score = Trace.NeedScores.Drink + (Wells > 0 ? 6.0 : 0.0) + Noise;
+				// ecart n°58 : le souvenir frais du soulagement tire vers le puits quand la soif revient.
+				if (bThirstFirstEnabled && Npc.Needs.Thirst >= AnastasisBonds::DrinkReliefThirstAt)
+				{
+					Score += AnastasisBonds::DrinkReliefBias(Npc.Moodlets, Now);
+				}
+			}
 			// `{ goal: "shelterRain", score: shelterRainScore(sim, npc) + goalNoise(sim, 6) }`.
 			else if (G == GoalShelterRain) Score = AnastasisWeatherBehavior::ShelterRainScore(
 				TickWeather.Rain, Npc.Inside.bActive, Npc.Goal, Npc.JobId, Now, Npc.ShelterCooldownUntil) + Noise;
@@ -2670,6 +2678,16 @@ namespace AnastasisVillage
 				Next = GoalShelterRain;
 				Trace.bStormGate = true;
 			}
+		}
+		// ecart n°58 (soif-dabord-001) : quand on meurt de soif, on boit d'abord. La reference laisse la faim passer
+		// devant (la preseance vitale ne leve `drink` qu'au-dessus du repos et du loisir) et les portes Nous peuvent
+		// imposer `eat` sans nourriture nulle part, ou un `rest` de fatigue perime : au monde 1204, tout le village en
+		// est mort en six jours a cote d'un puits qui marchait. A `ParchedAt`, si boire est dans la table, on boit.
+		if (bThirstFirstEnabled && !bPlayer && Npc.Needs.Thirst >= AnastasisNeeds::Constants::ParchedAt && Next != GoalDrink
+			&& Rows.ContainsByPredicate([](const TPair<FString, double>& Row) { return Row.Key == GoalDrink; }))
+		{
+			Trace.CommitGate = FString::Printf(TEXT("%s->drink (soif mortelle)"), *Next);
+			Next = GoalDrink;
 		}
 		// `decideGoal(sim, npc, scores, ctx)` (player-goals-001, ecart n°20) : le seam unique, APRES le tri,
 		// l'eligibilite et les verrous. Pour tout autre habitant, la fonction identite.
@@ -3337,8 +3355,14 @@ namespace AnastasisVillage
 		{
 			// `case "drink"` : setActivity("boit"), satisfyDrink, markDrink (gestuelle, non portee).
 			SetActivity(Npc, TEXT("boit"));
+			const double ThirstBefore = Npc.Needs.Thirst;
 			AnastasisNeeds::SatisfyDrink(Npc.Needs);
 			++Npc.DrinksTaken;
+			// ecart n°58 : boire quand on avait vraiment soif soulage -- une recompense courte.
+			if (bThirstFirstEnabled && ThirstBefore >= AnastasisBonds::DrinkReliefThirstAt)
+			{
+				AnastasisBonds::StampDrinkRelief(Npc.Moodlets, Npc.Needs.Morale, Now);
+			}
 			return true;
 		}
 		if (Npc.Goal == GoalEat)

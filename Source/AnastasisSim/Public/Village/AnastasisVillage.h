@@ -1473,6 +1473,13 @@ namespace AnastasisVillage
 		FString UpdateFieldHandsDaily(int32 InDay);
 		int32 GetFieldHandsHired() const { return FieldHandsHired; }
 		const FString& GetLastFieldHandsDecision() const { return LastFieldHandsDecision; }
+		/**
+		 * ecart n°58 (soif-dabord-001) : quand on meurt de soif, on boit d'abord (a `ParchedAt`, le but devient
+		 * `drink` quoi qu'aient dit la table et les portes), et boire assoiffe soulage (humeur `drinkRelief`).
+		 * Eteint par defaut : le harnais et la parite JS restent au bit pres ; l'hote l'allume.
+		 */
+		void SetThirstFirstEnabled(bool bEnabled) { bThirstFirstEnabled = bEnabled; }
+		bool IsThirstFirstEnabled() const { return bThirstFirstEnabled; }
 		bool GetSoilWaterAt(int32 TileX, int32 TileY, double& OutStored) const;
 
 		/** Une mort, telle que le village la retient (hors empreinte). */
@@ -2361,6 +2368,8 @@ namespace AnastasisVillage
 		bool bFieldHandsEnabled = false;
 		int32 FieldHandsHired = 0;
 		FString LastFieldHandsDecision;
+		/** ecart n°58 : la soif d'abord et le soulagement de boire (hote seulement). */
+		bool bThirstFirstEnabled = false;
 		int64 RegrownFood = 0;
 		/** `sim.spatial` : reconstruite une fois par tick, au debut de la boucle des habitants. */
 		AnastasisSpatialGrid::FGrid Grid;

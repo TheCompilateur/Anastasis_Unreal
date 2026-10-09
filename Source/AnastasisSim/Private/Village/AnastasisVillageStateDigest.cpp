@@ -1278,6 +1278,7 @@ namespace AnastasisVillage
 		Ar.Key(TEXT("soilWaterEnabled")).Bool(bSoilWaterEnabled);
 		Ar.Key(TEXT("fieldHandsEnabled")).Bool(bFieldHandsEnabled); // ecart n°59
 		Ar.Key(TEXT("fieldHandsHired")).Number(FieldHandsHired);
+		Ar.Key(TEXT("thirstFirstEnabled")).Bool(bThirstFirstEnabled); // ecart n°58
 		Ar.Key(TEXT("navService"));
 		VisitState(Ar, NavService);
 		if (Ar.IsHashing())

@@ -1022,6 +1022,19 @@ Le joueur entre dans les décisions avec les règles des autres : au conseil, sa
 
 Le joueur se pose dans la vallée et lève seul sa cabane : une pièce de 16,8 m² avec un foyer, un banc-lit, un coffre (`SM_Arch_Cabin_01`, 6,8 × 7,2 m hors tout, faîtage à 4 m). Elle est tracée près de lui, à lui dès le tracé, les mêmes 22 pièces qu'une maison mais un devis d'un tiers en bois et d'un quart en pierre ; personne d'autre n'y pose une pièce sauf s'il le lui demande et qu'on lui dit oui (écart n°54). Achevée, elle devient son foyer : il y entre pour dormir ou manger, et personne d'autre n'y dort, n'y mange ni ne s'y abrite. Le bois et la pierre sont livrés au tracé : les ramasser soi-même (cueillir, bûcher) est une autre mission. À trancher : le devis, le tracé « près de lui », la fermeture à tous les autres (même à un hôte qu'il inviterait), et le fait qu'une seule cabane par joueur existe.
 
+### n° 58 — La soif d'abord, et le soulagement de boire
+
+- **classe** : EXTENSION
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
+- **entree** : soif-dabord-001 (demande d'Alexandre du 2026-10-09 : « quand on meurt de soif, on boit d'abord ; effet psychologique positif de boire, qui les incite à boire quand ils ont soif ; système de récompense court »)
+- **activation** : `FVillage::SetThirstFirstEnabled(true)`, posé par l'hôte (`anastasis.Village.ThirstFirst`, défaut 1) à la remise à zéro et à chaque image. Éteint par défaut dans `FVillage` : le harnais et la parité JS restent au bit près (aucune humeur `drinkRelief` n'y est jamais posée, la règle de choix n'y est jamais lue).
+- **reference** : `src/sim/needs.js` (`needGoalScores` : la préséance vitale ne lève `drink` qu'au-dessus du repos, de la compagnie, du loisir et de l'hygiène, pas de la faim) ; `src/sim/npc.js` (portes Noûs `urgency_hunger` / `urgency_fatigue` de `commitGoalChoice`) ; `src/life/bonds.js` (`MOODLET`, profil `newFriend`).
+- **cpp** : `Village/AnastasisVillage.cpp` (`ChooseGoal` : la soif mortelle après les portes ; ligne `drink` : l'envie revenue ; `Perform` : le soulagement), `Public/Village/AnastasisVillage.h` (`bThirstFirstEnabled`), `Village/AnastasisVillageStateDigest.cpp` (`thirstFirstEnabled`), `Life/AnastasisBonds.{h,cpp}` (`StampDrinkRelief`, `DrinkReliefBias`, `TickMoodlets`) ; hôte `Sim/AnastasisSimulationSubsystem.cpp`
+- **harnais** : aucune
+
+Deux règles. **La soif d'abord** : à soif mortelle (`ParchedAt`, 88), si boire est dans la table, le but devient `drink`, quoi qu'aient dit la table (la faim y passe toujours devant), les portes Noûs (`eat` sans nourriture nulle part, `rest` d'une fatigue périmée) ou le verrou de quart ; le joueur n'est pas touché (son remède passe déjà, écart n°21). Vu par l'étude d'une année (annee-valmire-001) : au monde 1204, tout le village mourait de soif en six jours à côté d'un puits qui marchait. **Le soulagement** : boire avec une soif d'au moins 40 pose l'humeur `drinkRelief` (même forme que `newFriend`) : +3 de moral tout de suite, +0,02 par seconde tant qu'elle dure (112,5 s, environ une journée de 90 s), et +10 à la ligne `drink` si la soif revient pendant ce temps : le corps se souvient que boire fait du bien. Le drapeau est dans le parcours d'état (`SaveFormatVersion` 7). À trancher : garder ces deux règles comme celles du jeu, en régler les seuils, ou les porter dans la référence.
+
 ### n° 59 — Quand le grenier se vide, des bras vont aux champs
 
 - **classe** : EXTENSION

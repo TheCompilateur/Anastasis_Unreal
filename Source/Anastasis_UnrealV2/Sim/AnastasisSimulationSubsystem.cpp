@@ -136,6 +136,11 @@ static TAutoConsoleVariable<int32> CVarFieldHands(
 	TEXT("anastasis.Village.FieldHands"),
 	1,
 	TEXT("faim-champs-001 (ecart n°59): 1 = each evening, when the granaries hold less than two days of food, the hungriest jobless adult who can reach the granary becomes its farmer (one per evening, at most half the village). 0 = the reference behaviour."),
+// ecart n°58 (soif-dabord-001) : quand on meurt de soif, on boit d'abord, et boire assoiffe soulage.
+static TAutoConsoleVariable<int32> CVarThirstFirst(
+	TEXT("anastasis.Village.ThirstFirst"),
+	1,
+	TEXT("soif-dabord-001 (ecart n°58): 1 = at lethal thirst an inhabitant drinks first, whatever the table or the Nous gates say, and drinking while thirsty gives a short relief (morale, and a pull back to the well when thirst returns). 0 = the reference behaviour."),
 	ECVF_Default);
 
 static TAutoConsoleVariable<int32> CVarSoilWaterBudget(
@@ -459,6 +464,7 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 	Simulation.GetVillage().SetTerrainTravelCostEnabled(CVarVillageRouteCost.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetSoilWaterEnabled(CVarSoilWaterBudget.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetFieldHandsEnabled(CVarFieldHands.GetValueOnGameThread() != 0);
+	Simulation.GetVillage().SetThirstFirstEnabled(CVarThirstFirst.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetRoadEvolutionEnabled(CVarVillageRoadEvolution.GetValueOnGameThread() != 0);
 	// ecart n°46 : la biographie des batiments est observee par la simulation (save-history-001).
 	Simulation.GetVillage().SetBiographyEnabled(true);
@@ -498,6 +504,7 @@ void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 	Simulation.GetVillage().SetTerrainTravelCostEnabled(CVarVillageRouteCost.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetSoilWaterEnabled(CVarSoilWaterBudget.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetFieldHandsEnabled(CVarFieldHands.GetValueOnGameThread() != 0);
+	Simulation.GetVillage().SetThirstFirstEnabled(CVarThirstFirst.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetRoadEvolutionEnabled(CVarVillageRoadEvolution.GetValueOnGameThread() != 0);
 	const double Multiplier = FMath::Max(1.0, AnastasisJs::NumberOr(Speed, 1.0)) * Warp;
 	// player-minimal-001 : la direction du pawn conduit le corps incarne pendant les pas de cette frame.
@@ -861,6 +868,7 @@ int32 UAnastasisSimulationSubsystem::AdvanceBy(double Seconds)
 	Simulation.GetVillage().SetTerrainTravelCostEnabled(CVarVillageRouteCost.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetSoilWaterEnabled(CVarSoilWaterBudget.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetFieldHandsEnabled(CVarFieldHands.GetValueOnGameThread() != 0);
+	Simulation.GetVillage().SetThirstFirstEnabled(CVarThirstFirst.GetValueOnGameThread() != 0);
 	Simulation.GetVillage().SetRoadEvolutionEnabled(CVarVillageRoadEvolution.GetValueOnGameThread() != 0);
 	const int32 FromDay = Simulation.GetDay();
 	const double Start = FPlatformTime::Seconds();
