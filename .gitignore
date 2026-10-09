@@ -14,3 +14,5 @@ __pycache__/
 *.py[cod]
 .env
 .env.*
+# Cook/packaging (package-playable.ps1, relay-playable-001) : ordre de lecture des fichiers ecrit par UAT
+/Build/Windows/FileOpenOrder/
