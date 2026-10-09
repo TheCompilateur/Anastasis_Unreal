@@ -33,8 +33,9 @@ Voir `git log main..agent/drainage-lac-vide-001`.
 
 ## PROOFS
 
-PROOFS: (aucune) — le monde du jeu (graine de référence 12345) est identique au bit près ; seuls des mondes qui
-plantaient changent.
+PROOFS: (aucune)
+
+Le monde du jeu (graine de référence 12345) est identique au bit près ; seuls des mondes qui plantaient changent.
 
 ## SCN
 
