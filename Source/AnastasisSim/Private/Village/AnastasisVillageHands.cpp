@@ -34,10 +34,6 @@ namespace AnastasisVillage
 				AnastasisWoodHarvest::Floor(Tile.Type == AnastasisWorld::ETileType::Forest, 0, 0, false), Tile.Amount);
 		}
 
-		double Dist(double AX, double AY, double BX, double BY)
-		{
-			return FMath::Sqrt(FMath::Square(AX - BX) + FMath::Square(AY - BY));
-		}
 	}
 
 	const TCHAR* FVillage::PlayerHandLabel(EPlayerHand Hand)
@@ -123,11 +119,11 @@ namespace AnastasisVillage
 		if (!BuildingId.IsEmpty())
 		{
 			const FBuilding* B = FindBuilding(BuildingId);
-			double Best = Dist(P->X, P->Y, B->X + 0.5, B->Y + 0.5);
-			for (const FPoint& Door : B->AccessPoints) Best = FMath::Min(Best, Dist(P->X, P->Y, Door.X, Door.Y));
+			double Best = AnastasisMath::Dist(P->X, P->Y, B->X + 0.5, B->Y + 0.5);
+			for (const FPoint& Door : B->AccessPoints) Best = FMath::Min(Best, AnastasisMath::Dist(P->X, P->Y, Door.X, Door.Y));
 			if (Best > PlayerHandReach) { R.Refusal = TEXT("trop loin"); return R; }
 		}
-		else if (Dist(P->X, P->Y, TileX + 0.5, TileY + 0.5) > PlayerHandReach)
+		else if (AnastasisMath::Dist(P->X, P->Y, TileX + 0.5, TileY + 0.5) > PlayerHandReach)
 		{
 			R.Refusal = TEXT("trop loin");
 			return R;
