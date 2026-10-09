@@ -3,6 +3,13 @@
 Public : l'agent qui intègre les vrais meshes/matériaux ANÁSTASIS.
 Tu n'as pas besoin de lire le C++, ni d'ouvrir `Source/AnastasisSim/`.
 
+**Cycle de travail actuel :** cette procédure d'assignation date d'avant la
+file d'intégration. Toute création ou modification d'asset se fait dans un
+worktree `agent/<mission>`, jamais dans `C:\dev\ANASTASIS_UNREAL`. Suivre
+`AGENTS.md` et `docs/unreal/assets/ASSET_PROTOCOL_V1.md` pour la preuve et le
+handoff. Une modification manuelle du registre peut être écrasée par son
+script d'autorité ; les entrées Forest passent par `set_tree_grammar.py`.
+
 ## Ce que tu édites
 
 Un seul asset :
@@ -16,7 +23,8 @@ C'est un Data Asset (`UAnastasisPresentationRegistry`). Il contient une liste
 
 ## Procédure
 
-1. Ouvrir l'éditeur sur le projet canonique.
+1. Ouvrir l'éditeur sur le worktree de la mission, après vérification du port et
+   du répertoire de projet ; réserver cet éditeur puis le fermer après usage.
 2. Content Browser → `Content/Anastasis/Presentation/` → double-cliquer
    `DA_AnastasisPresentation`.
 3. Déplier `Entries`, choisir l'entrée dont `Semantic Type` vaut `Forest`.

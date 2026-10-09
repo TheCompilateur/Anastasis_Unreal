@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "remplacer-par-mission",
+  "family": "Famille visuelle",
+  "intent": "Fonction visible et périmètre borné",
+  "references": ["docs/visual/reference/planche-existante.png"],
+  "reference_provenance": "Origine, droits et limites de la référence ; UNKNOWN si non établi",
+  "generator_files": ["tools/unreal/create-owned-assets.py"],
+  "capture_proof": "preuve-capture-du-registre",
+  "collision_policy": "A définir selon l'usage ; contrôle manuel en V1",
+  "keep": "Critère visible et mesurable fixé avant essai",
+  "reject": "Défaut ou dépassement qui impose correction ou retrait",
+  "assets": [
+    {
+      "path": "/Game/Anastasis/Famille/SM_Exemple_01",
+      "materials": ["/Game/Anastasis/Materials/M_Exemple"],
+      "triangles_by_lod": [100, 50, 25],
+      "max_size_cm": [100.0, 100.0, 100.0],
+      "min_z_cm": [-5.0, 5.0],
+      "consumer_file": "Source/Anastasis_UnrealV2/WorldView/Consommateur.cpp",
+      "consumer_token": "/Game/Anastasis/Famille/SM_Exemple_01"
+    }
+  ]
+}

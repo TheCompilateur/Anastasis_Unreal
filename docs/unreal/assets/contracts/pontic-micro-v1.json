@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "id": "asset-protocol-v1-pontic-micro",
+  "family": "PonticMicro",
+  "intent": "Présence visuelle statique de mousse, prêle, tussilage et grenouille dans leurs habitats de berge et de sous-bois",
+  "references": [
+    "docs/visual/reference/pontique-etat-zero-3-stratification-forestiere.png",
+    "docs/historicity/briefs/pontic-water-micro-001.json"
+  ],
+  "reference_provenance": "Références déjà suivies dans le dépôt ; aucun contenu externe n'est importé par ce pilote ; droits des planches non réévalués ici",
+  "generator_files": [
+    "tools/unreal/create-pontic-water-micro.py",
+    "tools/unreal/create-ground-cover.py"
+  ],
+  "capture_proof": "pontic-water-micro-capture",
+  "collision_policy": "Visuel statique ; aucune collision joueur revendiquée ; inspection de collision hors validateur V1",
+  "keep": "Les quatre meshes se chargent, sont référencés, apparaissent dans des poches compatibles et restent lisibles dans les vues proches A/B/A, sous budget GPU décidé pour la scène",
+  "reject": "Mesh absent, mauvais matériau ou pivot, placement arbitraire, retour A/B/A divergent, ou coût GPU supérieur au seuil de la mission",
+  "assets": [
+    {
+      "path": "/Game/Anastasis/PonticMicro/SM_Pontic_Moss_01",
+      "materials": ["/Game/Anastasis/Materials/M_AnastasisGrass"],
+      "triangles_by_lod": [540, 90, 45],
+      "max_size_cm": [80.0, 80.0, 20.0],
+      "min_z_cm": [-5.0, 5.0],
+      "consumer_file": "Source/Anastasis_UnrealV2/WorldView/AnastasisWorldEmbodiment.cpp",
+      "consumer_token": "/Game/Anastasis/PonticMicro/SM_Pontic_Moss_01"
+    },
+    {
+      "path": "/Game/Anastasis/PonticMicro/SM_Pontic_Horsetail_01",
+      "materials": ["/Game/Anastasis/Materials/M_AnastasisGrass"],
+      "triangles_by_lod": [403, 120, 45],
+      "max_size_cm": [60.0, 60.0, 80.0],
+      "min_z_cm": [-5.0, 5.0],
+      "consumer_file": "Source/Anastasis_UnrealV2/WorldView/AnastasisPonticWaterMicro.cpp",
+      "consumer_token": "/Game/Anastasis/PonticMicro/SM_Pontic_Horsetail_01"
+    },
+    {
+      "path": "/Game/Anastasis/PonticMicro/SM_Pontic_Coltsfoot_01",
+      "materials": ["/Game/Anastasis/Materials/M_AnastasisGrass"],
+      "triangles_by_lod": [264, 168, 96],
+      "max_size_cm": [80.0, 80.0, 50.0],
+      "min_z_cm": [-5.0, 5.0],
+      "consumer_file": "Source/Anastasis_UnrealV2/WorldView/AnastasisPonticWaterMicro.cpp",
+      "consumer_token": "/Game/Anastasis/PonticMicro/SM_Pontic_Coltsfoot_01"
+    },
+    {
+      "path": "/Game/Anastasis/PonticMicro/SM_Pontic_Frog_01",
+      "materials": ["/Game/Anastasis/Materials/M_AnastasisVegetation"],
+      "triangles_by_lod": [1440, 576, 288],
+      "max_size_cm": [50.0, 30.0, 20.0],
+      "min_z_cm": [-5.0, 5.0],
+      "consumer_file": "Source/Anastasis_UnrealV2/WorldView/AnastasisPonticWaterMicro.cpp",
+      "consumer_token": "/Game/Anastasis/PonticMicro/SM_Pontic_Frog_01"
+    }
+  ]
+}
