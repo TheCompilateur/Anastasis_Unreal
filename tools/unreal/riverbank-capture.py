@@ -29,6 +29,14 @@ ANASTASIS_RIVERBANK_STATES  etats, dans l'ordre (defaut "water,flat") :
     banks    WaterLook 1, rives vivantes actives (anastasis.Dressing.Riverbank 1)
     nobanks  WaterLook 1, rives vivantes coupees (anastasis.Dressing.Riverbank 0)
     water2   repetition de "water" : l'ecart water / water2 mesure la derive de la machine
+    vol_old  WATER_VOLUME_001, etat « avant » : VolumeOn 0, Specular 0,5 (Opacity 1 : l'eau sans volume)
+    vol_on   VolumeOn 1 (Opacity = ecume, volume actif, coefficients en cm), Specular 0,5
+    vol_ior  vol_on + Specular 0,25 (indice de l'eau, 1,33)
+    vol_old2 repetition de vol_old : l'ecart vol_old / vol_old2 est le bruit de la prise
+    vol_vert / vol_trouble / vol_sombre  trois palettes candidates (Absorption et Scattering), memes valeurs
+             de Specular et de volume que vol_ior : se jugent a l'oeil contre vol_ior
+    Les etats vol_* changent UNIQUEMENT des parametres du materiau (instance dynamique par section
+    d'eau, posee apres l'incarnation) ; ciel epingle a 11 h ; meme reseau, memes cameras.
 """
 import os, time, math, json, unreal
 
@@ -39,8 +47,55 @@ STATE_CMDS = {
     'banks': ('anastasis.Terrain.WaterLook 1', 'anastasis.Dressing.Riverbank 1'),
     'nobanks': ('anastasis.Terrain.WaterLook 1', 'anastasis.Dressing.Riverbank 0'),
     'water2': ('anastasis.Terrain.WaterLook 1', 'anastasis.Dressing.Riverbank 1'),
+    'vol_old': ('anastasis.Terrain.WaterLook 1', 'anastasis.Dressing.Riverbank 1', 'anastasis.Sky.Hour 11'),
+    'vol_on': ('anastasis.Terrain.WaterLook 1', 'anastasis.Dressing.Riverbank 1', 'anastasis.Sky.Hour 11'),
+    'vol_ior': ('anastasis.Terrain.WaterLook 1', 'anastasis.Dressing.Riverbank 1', 'anastasis.Sky.Hour 11'),
+    'vol_old2': ('anastasis.Terrain.WaterLook 1', 'anastasis.Dressing.Riverbank 1', 'anastasis.Sky.Hour 11'),
 }
-COMMON = ('ShowFlag.Sprites 0', 'ShowFlag.Grid 0', 'viewmode lit', 'ShowFlag.Fog 1', 'ShowFlag.VolumetricFog 1')
+# WATER_VOLUME_001 : parametres du materiau d'eau par etat (scalaires de M_AnastasisWater).
+MATERIAL_STATES = {
+    'vol_old': {'VolumeOn': 0.0, 'Specular': 0.5},
+    'vol_on': {'VolumeOn': 1.0, 'Specular': 0.5},
+    'vol_ior': {'VolumeOn': 1.0, 'Specular': 0.25},
+    'vol_old2': {'VolumeOn': 0.0, 'Specular': 0.5},
+    # Palettes candidates (coefficients par metre, avant CoefToCm) : une valeur a trois nombres est un
+    # vecteur. vol_ior = valeurs par defaut de l'asset, temoin des trois suivantes.
+    'vol_vert': {'VolumeOn': 1.0, 'Specular': 0.25, 'Absorption': (0.50, 0.14, 0.35), 'Scattering': (0.020, 0.030, 0.012)},
+    'vol_trouble': {'VolumeOn': 1.0, 'Specular': 0.25, 'Absorption': (0.45, 0.22, 0.40), 'Scattering': (0.045, 0.045, 0.025)},
+    'vol_sombre': {'VolumeOn': 1.0, 'Specular': 0.25, 'Absorption': (0.65, 0.22, 0.20), 'Scattering': (0.008, 0.016, 0.018)},
+}
+for _name in MATERIAL_STATES:
+    STATE_CMDS.setdefault(_name, ('anastasis.Terrain.WaterLook 1', 'anastasis.Dressing.Riverbank 1', 'anastasis.Sky.Hour 11'))
+applied = {'key': None, 'mids': []}
+
+
+def apply_material_state(state):
+    # Une instance dynamique par section d'eau, creee APRES EmbodyCanonical (qui refait les sections
+    # et leurs materiaux) : d'un etat a l'autre, seule la valeur de ces parametres change.
+    params = MATERIAL_STATES.get(state)
+    if params is None:
+        return
+    applied['mids'] = []
+    count = 0
+    for comp in actor.get_components_by_class(unreal.ProceduralMeshComponent):
+        for slot in range(comp.get_num_materials()):
+            parent = comp.get_material(slot)
+            if parent is None or parent.get_name() != 'M_AnastasisWater':
+                continue
+            mid = comp.create_dynamic_material_instance(slot, parent)
+            for key, value in params.items():
+                if isinstance(value, tuple):
+                    mid.set_vector_parameter_value(key, unreal.LinearColor(value[0], value[1], value[2], 1.0))
+                else:
+                    mid.set_scalar_parameter_value(key, value)
+            applied['mids'].append(mid)
+            count += 1
+    unreal.log('WATER_VOLUME_STATE %s sections=%d params=%s' % (state, count, json.dumps(params, sort_keys=True)))
+    if count == 0:
+        raise RuntimeError('aucune section d eau M_AnastasisWater pour l etat ' + state)
+
+
+COMMON =('ShowFlag.Sprites 0', 'ShowFlag.Grid 0', 'viewmode lit', 'ShowFlag.Fog 1', 'ShowFlag.VolumetricFog 1')
 states = [x.strip() for x in os.environ.get('ANASTASIS_RIVERBANK_STATES', 'water,flat').split(',') if x.strip()]
 PROFILE = os.environ.get('ANASTASIS_RIVERBANK_PROFILE', '0') == '1'
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
@@ -69,6 +124,13 @@ try:
     if ues.get_editor_world().get_path_name().split('.')[0] != LEVEL:
         les.load_level(LEVEL)
     world = ues.get_editor_world()
+    if any(s in MATERIAL_STATES for s in states):
+        water_asset = unreal.load_asset('/Game/Anastasis/Materials/M_AnastasisWater')
+        names = [str(n) for n in unreal.MaterialEditingLibrary.get_scalar_parameter_names(water_asset)]
+        if 'VolumeOn' not in names:
+            raise RuntimeError('materiau perime : regenerer avec water-look.ps1 -Rebuild avant les captures')
+        if unreal.MaterialEditingLibrary.get_material_property_input_node(water_asset, unreal.MaterialProperty.MP_OPACITY) is None:
+            raise RuntimeError('materiau sans Opacity branche : regenerer avec water-look.ps1 -Rebuild')
 
     def cmd(c):
         unreal.SystemLibrary.execute_console_command(world, c)
@@ -256,6 +318,9 @@ def tick(dt):
                 first, mark, frames, timings = True, time.monotonic(), [], []
                 return
             state, (name, eye, tgt) = queue[0]
+            if applied['key'] != (state_i, state):
+                applied['key'] = (state_i, state)
+                apply_material_state(state)
             ues.set_level_viewport_camera_info(eye, look(eye, tgt))
             if el > 2:
                 frames.append(dt)

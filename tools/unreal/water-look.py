@@ -27,6 +27,10 @@ la ou l'eau est peu profonde, et de la mousse seulement la ou le courant, la pen
 ou le virage la justifient. Aucune couleur n'est codee par heure : le ciel et la
 lumiere restent ceux de la scene.
 
+WATER_VOLUME_001. Le pin Opacity est branche (ecume, 0 ailleurs) : sans cela le moteur saute
+tout le volume de Single Layer Water (voir le commentaire OPACITY dans build()). Les coefficients
+passent en centimetres (CoefToCm). Parametre VolumeOn 0 = l'eau d'avant, pour les A/B.
+
 Repli : anastasis.Terrain.WaterLook 0 rend l'eau avec M_AnastasisShoreWater, inchangee.
 
 Variables d'environnement :
@@ -264,14 +268,34 @@ def build(mat=None):
     foam_amount = sparam(mat, 'FoamTintAmount', 0.28, -400, -140)
     base_shallow = lerp(base, shallow, mul(shallowness, shallow_blend, -200, -200), 0, -200)
     base_final = lerp(base_shallow, foam_tint, mul(foam, foam_amount, -200, -80), 200, -140)
-    wiring['base_color'] = mel.connect_material_property(base_final, '', unreal.MaterialProperty.MP_BASE_COLOR)
+
+    # WATER_VOLUME_001 -- OPACITY. Single Layer Water ne calcule son volume (absorption, diffusion,
+    # fond lu, refraction) que si WaterVisibility = 1 - Opacity > 0 (BasePassPixelShader.usf:1141,
+    # SingleLayerWaterShading.ush:74), et ne garde de la BaseColor que Opacity x diffuse
+    # (BasePassPixelShader.usf:1383). Opacity vaut 1 quand rien n'y est branche : jusqu'ici l'eau
+    # n'avait donc AUCUN volume, la couleur etait la teinte peinte ci-dessus et les coefficients
+    # d'absorption et de diffusion ne servaient a rien (RIVER_LOOK_001, sonde « surface rouge »).
+    # Opacity est la couverture d'une pellicule de surface : ici l'ecume, 0 ailleurs, et la
+    # BaseColor de cette pellicule est la teinte d'ecume. VolumeOn 0 redonne l'eau d'avant
+    # (Opacity 1, teinte peinte) : c'est l'etat « avant » des A/B de riverbank-capture.py.
+    volume_on = sparam(mat, 'VolumeOn', 1.0, -1000, 1100)
+    foam_cover = sparam(mat, 'FoamCoverage', 0.9, -700, 1100)
+    opaque = mel.create_material_expression(mat, unreal.MaterialExpressionConstant, -700, 1180)
+    opaque.set_editor_property('r', 1.0)
+    opacity = lerp(opaque, mul(foam, foam_cover, -400, 1100), volume_on, -200, 1100)
+    wiring['opacity'] = mel.connect_material_property(opacity, '', unreal.MaterialProperty.MP_OPACITY)
+    base_color = lerp(base_final, foam_tint, volume_on, 400, -140)
+    wiring['base_color'] = mel.connect_material_property(base_color, '', unreal.MaterialProperty.MP_BASE_COLOR)
 
     rough = sparam(mat, 'Roughness', 0.035, -400, 40)
     foam_rough = sparam(mat, 'FoamRoughness', 0.26, -400, 120)
     rough_final = sat(add(add(rough, mul(foam, foam_rough, 0, 80), 200, 40), rough_add, 400, 80), 560, 60)
     wiring['roughness'] = mel.connect_material_property(rough_final, '', unreal.MaterialProperty.MP_ROUGHNESS)
 
-    spec = sparam(mat, 'Specular', 0.5, -400, 220)
+    # Eau : indice 1,33, F0 = ((1,33 - 1) / (1,33 + 1))^2 = 0,0201, soit Specular = F0 / 0,08 = 0,25.
+    # 0,5 (F0 0,04) est l'indice 1,5 du verre ; Single Layer Water en tire aussi son indice de
+    # refraction (SingleLayerWaterShading.ush:96). L'etat « avant » de l'A/B repose 0,5.
+    spec = sparam(mat, 'Specular', 0.25, -400, 220)
     spec_on_foam = sparam(mat, 'SpecularOnFoam', 0.45, -400, 300)
     spec_final = lerp(spec, mul(spec, spec_on_foam, 0, 260), foam, 220, 240)
     wiring['specular'] = mel.connect_material_property(spec_final, '', unreal.MaterialProperty.MP_SPECULAR)
@@ -303,8 +327,11 @@ def build(mat=None):
     shallow_absorb = sparam(mat, 'ShallowAbsorb', 0.38, -400, 820)
     shallow_scatter = sparam(mat, 'ShallowScatter', 1.65, -400, 900)
     shallow_behind = sparam(mat, 'ShallowBehind', 1.12, -400, 980)
-    absorption_out = lerp(absorption, mul(absorption, shallow_absorb, 0, 460), shallowness, 250, 440)
-    scattering_out = lerp(scattering, mul(scattering, shallow_scatter, 0, 580), shallowness, 250, 560)
+    # Le moteur multiplie l'extinction par l'epaisseur en CENTIMETRES (SingleLayerWaterShading.ush:221,
+    # profondeur de scene) : les coefficients ci-dessus, par metre, passent par CoefToCm = 0,01.
+    cm = sparam(mat, 'CoefToCm', 0.01, -400, 1000)
+    absorption_out = mul(lerp(absorption, mul(absorption, shallow_absorb, 0, 460), shallowness, 250, 440), cm, 400, 440)
+    scattering_out = mul(lerp(scattering, mul(scattering, shallow_scatter, 0, 580), shallowness, 250, 560), cm, 400, 560)
     behind_out = lerp(behind, shallow_behind, shallowness, 250, 700)
     link('absorption', absorption_out, '', out, 'AbsorptionCoefficients')
     link('scattering', scattering_out, '', out, 'ScatteringCoefficients')
@@ -318,7 +345,8 @@ def build(mat=None):
     # log ; water-look.ps1 cherche les erreurs qui le suivent et refuse le materiau.
     unreal.log('WATER_MATERIAL_COMPILE ' + PATH)
     mel.recompile_material(mat)
-    unreal.EditorAssetLibrary.save_asset(PATH)
+    if not unreal.EditorAssetLibrary.save_asset(PATH):
+        raise RuntimeError('Water material save failed: ' + PATH)
     unreal.log('WATER_MATERIAL_SAVED ' + PATH)
 
 
@@ -331,7 +359,14 @@ if __name__ == '__main__':
             build()
         elif os.environ.get('ANASTASIS_WATER_REBUILD', '0') == '1':
             existing = unreal.EditorAssetLibrary.load_asset(PATH)
-            mel.delete_all_material_expressions(existing)
+            # UE 5.8 DeleteAllMaterialExpressions iterates the live expression array
+            # while DeleteMaterialExpression removes entries from that same array.
+            # Delete a snapshot so regeneration cannot retain an old WaterNormal.
+            for expression in list(mel.get_material_expressions(existing)):
+                mel.delete_material_expression(existing, expression)
+            remaining = list(mel.get_material_expressions(existing))
+            if remaining:
+                raise RuntimeError('Water material clear incomplete: %d expressions' % len(remaining))
             unreal.log('WATER_MATERIAL_CLEARED ' + PATH)
             build(existing)
         else:

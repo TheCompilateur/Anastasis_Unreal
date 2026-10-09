@@ -134,3 +134,6 @@ arrivants-pie | tools/unreal/arrivants-pie.py | ARRIVANTS_PIE PASS | ARRIVANTS_P
 voix-pie | tools/unreal/voix-pie.py | VOIX_PIE PASS | VOIX_PIE FAIL|VOIX_PIE_TIMEOUT|Traceback | 660 | -
 cabane-pie | tools/unreal/cabane-pie.py | CABANE_PIE PASS | CABANE_PIE FAIL|Traceback | 660 | -
 sommeil-pie | tools/unreal/sommeil-pie.py | SOMMEIL_PIE PASS | SOMMEIL_PIE FAIL|Traceback | 720 | -
+
+# WATER_VOLUME_001 : Opacity branche (volume Single Layer Water actif) contre l eau d avant, memes cameras, ciel a 11 h ; COMPLETE = images ecrites, verdict visuel separe.
+water-volume-capture | tools/unreal/riverbank-capture.py | RIVERBANK_CAPTURE_COMPLETE views=\d+ states=4 | RIVERBANK_CAPTURE_FAIL|RIVERBANK_CAPTURE_TIMEOUT|RIVERBANK_SHOT_MISSING|Traceback|Failed to compile|\[SM[56]\].*error | 900 | ANASTASIS_RIVERBANK_OUT=@Saved/WaterVolumeEvidence/proof;ANASTASIS_RIVERBANK_STATES=vol_old,vol_on,vol_ior,vol_old2;ANASTASIS_CAPTURE_VIEWS=calme_plaine,eau_vive,ruisseau,rive_lac,berge_haute
