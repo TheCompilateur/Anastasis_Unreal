@@ -245,4 +245,57 @@ bool FFamilyHouseHelpTest::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSpokenHelpRequestTest, "Anastasis.Sim.Episodes.DemandeParlee",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSpokenHelpRequestTest::RunTest(const FString&)
+{
+	using namespace AnastasisEpisodesTest;
+	const AnastasisWorld::FWorld W = MakeWorld();
+	FVillage V;
+	V.Bind(W);
+	TestFalse(TEXT("puits du village"), V.AddBuilding(WellType, 20, 20, 1.0, 1).IsEmpty());
+	const FString A = V.SpawnNpc(16.5, 16.5, AnastasisNeeds::FNeeds());
+	const FString B = V.SpawnNpc(16.5, 17.5, AnastasisNeeds::FNeeds());
+	const FString C = V.SpawnNpc(16.5, 18.5, AnastasisNeeds::FNeeds());
+	const FString Far = V.SpawnNpc(27.5, 27.5, AnastasisNeeds::FNeeds());
+	const FString Family = V.AddFamily(TEXT("famille du toit"));
+	V.JoinFamily(A, Family, true, TEXT("chef"));
+	V.UpdateFamilyHousesDaily();
+	FString SiteId;
+	for (const FBuilding& Building : V.GetBuildings())
+	{
+		if (Building.OwnerFamilyId == Family) SiteId = Building.Id;
+	}
+	if (!TestFalse(TEXT("chantier familial ouvert"), SiteId.IsEmpty())) return false;
+	TestTrue(TEXT("chef incarne"), V.Incarnate(A));
+	const uint64 BeforeInvalid = V.StateDigest();
+	const FVillage::FHelpRequestResult TooFar = V.AskHelp(A, Far, SiteId);
+	TestFalse(TEXT("la parole exige une rencontre"), TooFar.bValid);
+	TestEqual(TEXT("motif de validation"), TooFar.InvalidReason, FString(TEXT("trop_loin")));
+	TestEqual(TEXT("rejet sans aucune ecriture"), V.StateDigest(), BeforeInvalid);
+
+	FVillage::FEpisodeOptions Debt;
+	Debt.AboutId = A;
+	Debt.RootId = TEXT("aide-ancienne");
+	V.RecordEpisode(B, TEXT("helped"), Debt);
+	const int32 PiecesBefore = V.FindBuilding(SiteId)->PiecesPlaced;
+	const FVillage::FHelpRequestResult Yes = V.AskHelp(A, B, SiteId);
+	TestTrue(TEXT("demande entendue"), Yes.bValid);
+	TestTrue(TEXT("dette reconnue"), Yes.Answer.bAccepted);
+	TestEqual(TEXT("raison calculee"), Yes.Answer.Reason, FString(TEXT("dette_rendue")));
+	TestTrue(TEXT("B est admis"), FVillage::CanBuildAt(*V.FindBuilding(SiteId), B));
+	TestEqual(TEXT("accord sans construction instantanee"), V.FindBuilding(SiteId)->PiecesPlaced, PiecesBefore);
+	const uint64 BeforeDuplicate = V.StateDigest();
+	TestFalse(TEXT("meme personne deja sollicitee"), V.AskHelp(A, B, SiteId).bValid);
+	TestEqual(TEXT("doublon sans effet"), V.StateDigest(), BeforeDuplicate);
+
+	const FVillage::FHelpRequestResult No = V.AskHelp(A, C, SiteId);
+	TestTrue(TEXT("refus entendu"), No.bValid);
+	TestFalse(TEXT("C refuse selon son etat"), No.Answer.bAccepted);
+	TestEqual(TEXT("raison dominante du refus"), No.Answer.Reason, FString(TEXT("inconnu")));
+	TestFalse(TEXT("un refus ne donne pas acces"), FVillage::CanBuildAt(*V.FindBuilding(SiteId), C));
+	TestEqual(TEXT("deux reponses dans l'ordre"), V.GetHelpLog().Num(), 2);
+	return true;
+}
+
 #endif

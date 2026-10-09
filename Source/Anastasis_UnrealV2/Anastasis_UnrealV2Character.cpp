@@ -10,6 +10,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
+#include "Sim/AnastasisSimulationSubsystem.h"
 #include "Anastasis_UnrealV2.h"
 
 AAnastasis_UnrealV2Character::AAnastasis_UnrealV2Character()
@@ -69,6 +70,36 @@ void AAnastasis_UnrealV2Character::SetupPlayerInputComponent(UInputComponent* Pl
 
 	// Debug : touche brute R, pas d'Input Action a assigner dans un asset binaire.
 	PlayerInputComponent->BindKey(EKeys::R, IE_Pressed, this, &AAnastasis_UnrealV2Character::ResetPosition);
+	PlayerInputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &AAnastasis_UnrealV2Character::StartHelpSceneInput);
+	PlayerInputComponent->BindKey(EKeys::E, IE_Pressed, this, &AAnastasis_UnrealV2Character::AskHelpInput);
+	PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &AAnastasis_UnrealV2Character::BuildHelpSceneInput);
+	PlayerInputComponent->BindKey(EKeys::X, IE_Pressed, this, &AAnastasis_UnrealV2Character::StopHelpSceneInput);
+	PlayerInputComponent->BindKey(EKeys::J, IE_Pressed, this, &AAnastasis_UnrealV2Character::ToggleHelpNotebookInput);
+}
+
+void AAnastasis_UnrealV2Character::StartHelpSceneInput()
+{
+	if (UAnastasisSimulationSubsystem* Host = GetWorld()->GetSubsystem<UAnastasisSimulationSubsystem>()) Host->StartHelpScene();
+}
+
+void AAnastasis_UnrealV2Character::AskHelpInput()
+{
+	if (UAnastasisSimulationSubsystem* Host = GetWorld()->GetSubsystem<UAnastasisSimulationSubsystem>()) Host->AskFocusedHelp();
+}
+
+void AAnastasis_UnrealV2Character::BuildHelpSceneInput()
+{
+	if (UAnastasisSimulationSubsystem* Host = GetWorld()->GetSubsystem<UAnastasisSimulationSubsystem>()) Host->ChooseHelpSceneWork();
+}
+
+void AAnastasis_UnrealV2Character::StopHelpSceneInput()
+{
+	if (UAnastasisSimulationSubsystem* Host = GetWorld()->GetSubsystem<UAnastasisSimulationSubsystem>()) Host->StopHelpSceneWork();
+}
+
+void AAnastasis_UnrealV2Character::ToggleHelpNotebookInput()
+{
+	if (UAnastasisSimulationSubsystem* Host = GetWorld()->GetSubsystem<UAnastasisSimulationSubsystem>()) Host->ToggleHelpNotebook();
 }
 
 void AAnastasis_UnrealV2Character::ResetPosition()

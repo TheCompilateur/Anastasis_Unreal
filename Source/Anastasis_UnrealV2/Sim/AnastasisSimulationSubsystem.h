@@ -13,6 +13,7 @@
 
 class APawn;
 class AAnastasisWorldEmbodiment;
+class SWidget;
 
 /**
  * Pompe Unreal du tick de simulation. Possede FAnastasisSimulation.
@@ -162,6 +163,17 @@ public:
 	 * la simulation. Tant qu'elle tient, l'entree du pawn est ignoree ; (0, 0) la rend au pawn.
 	 */
 	void SetScriptedDrive(double DX, double DY);
+	/** Premiere scene sociale : incarnation d'un chef de famille et ouverture de son chantier si necessaire. */
+	void StartHelpScene();
+	/** Demande adressee a la personne regardee et a portee de voix. */
+	void AskFocusedHelp();
+	/** Meme action que E, avec cible explicite pour les preuves instrumentales. */
+	void AskHelpToId(const FString& PersonId);
+	void ChooseHelpSceneWork();
+	void StopHelpSceneWork();
+	void ToggleHelpNotebook();
+	bool IsHelpSceneActive() const { return bHelpSceneActive; }
+	bool HasHelpPanel() const { return HelpPanel.IsValid(); }
 
 	/** Le pawn local suit-il l'habitant incarne (anastasis.Player.Pawn) ? */
 	bool IsPawnBound() const { return BoundPawn.IsValid(); }
@@ -190,6 +202,13 @@ public:
 
 private:
 	void DrawOverlay() const;
+	void EnsureHelpPanel();
+	FString HelpPanelText() const;
+	bool FindHelpFocus(FString& OutSiteId, FString& OutPersonId) const;
+	TSharedPtr<SWidget> HelpPanel;
+	FString HelpFeedback;
+	bool bHelpSceneActive = false;
+	bool bHelpNotebookOpen = false;
 	/** Ligne JOUEUR de l'overlay : habitant incarne, presence, reputation, jours oisifs. */
 	void DrawPlayerOverlay() const;
 	/** Avant les pas : la direction du pawn (ou la commande) devient celle du corps incarne. */
@@ -400,6 +419,14 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
 	static FString GetPlayerStatus(const UObject* WorldContextObject);
+
+	/** Etat instrumental de la scene et des demandes, sans pretendre juger la lisibilite de l'image. */
+	UFUNCTION(BlueprintPure, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static FString GetHelpSceneStatus(const UObject* WorldContextObject);
+	UFUNCTION(BlueprintCallable, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static void StartHelpScene(const UObject* WorldContextObject);
+	UFUNCTION(BlueprintCallable, Category = "Anastasis|Debug", meta = (WorldContext = "WorldContextObject"))
+	static void AskHelpToId(const UObject* WorldContextObject, const FString& PersonId);
 
 	/**
 	 * geopolitical-world-001, en JSON : scenario, jour, verite par noeud, exposition du village, savoir

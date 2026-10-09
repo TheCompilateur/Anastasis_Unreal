@@ -5,6 +5,7 @@
 #include "Stats/Stats.h"
 #include "Core/AnastasisJsNumeric.h"
 #include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformTime.h"
@@ -362,6 +363,14 @@ void UAnastasisSimulationSubsystem::ReplaceStartVillage()
 
 void UAnastasisSimulationSubsystem::Deinitialize()
 {
+	if (HelpPanel.IsValid())
+	{
+		if (UWorld* World = GetWorld())
+		{
+			if (UGameViewportClient* Viewport = World->GetGameViewport()) Viewport->RemoveViewportWidgetContent(HelpPanel.ToSharedRef());
+		}
+		HelpPanel.Reset();
+	}
 	// Le monde se defait : ses acteurs partent avec lui. On oublie seulement les liens.
 	VillagePresentation = FAnastasisVillagePresentation();
 	Super::Deinitialize();
@@ -369,6 +378,9 @@ void UAnastasisSimulationSubsystem::Deinitialize()
 
 void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 {
+	HelpFeedback.Reset();
+	bHelpSceneActive = false;
+	bHelpNotebookOpen = false;
 	RainCanopyActor.Reset();
 	if (auto* Anthropic = GetWorld()->GetSubsystem<UAnastasisAnthropicSubsystem>()) Anthropic->ResetPresentation();
 	bPendingStartVillage = false;
@@ -443,6 +455,7 @@ void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 void UAnastasisSimulationSubsystem::Tick(float DeltaTime)
 {
 	TryStartVillage(DeltaTime);
+	EnsureHelpPanel();
 	BindRainCanopy();
 	if (!Simulation.IsRunning())
 	{

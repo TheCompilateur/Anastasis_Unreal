@@ -88,6 +88,11 @@ protected:
 	/** Debug : touche R, teleporte au-dessus du centre du terrain WorldView courant (sans effet si absent de la map). */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	void ResetPosition();
+	void StartHelpSceneInput();
+	void AskHelpInput();
+	void BuildHelpSceneInput();
+	void StopHelpSceneInput();
+	void ToggleHelpNotebookInput();
 
 protected:
 

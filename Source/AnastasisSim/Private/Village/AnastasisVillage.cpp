@@ -6534,6 +6534,82 @@ namespace AnastasisVillage
 		return Answer;
 	}
 
+	FVillage::FHelpRequestResult FVillage::AskHelp(const FString& FromId, const FString& ToId, const FString& SiteId)
+	{
+		// ecart n°48 : une demande prononcee pendant la journee passe par le meme jugement que les demandes du soir.
+		// Toutes les portes sont lues avant la premiere ecriture : un refus de validation est sans effet.
+		FHelpRequestResult Result;
+		const FNpc* Asker = Actors.FindById(FromId);
+		const FNpc* Asked = Actors.FindById(ToId);
+		FBuilding* Site = Buildings.FindById(SiteId);
+		if (!World || !Asker || !Asked || FromId == ToId)
+		{
+			Result.InvalidReason = TEXT("personne_absente");
+			return Result;
+		}
+		if (!Site || Site->Progress >= 1.0 || Site->OwnerFamilyId.IsEmpty())
+		{
+			Result.InvalidReason = TEXT("chantier_absent");
+			return Result;
+		}
+		if (!Site->AllowedBuilders.Contains(FromId) || (Asker->Age > 0.0 && Asker->Age < 16.0))
+		{
+			Result.InvalidReason = TEXT("pas_mandate");
+			return Result;
+		}
+		if (Asked->FamilyId == Site->OwnerFamilyId || Site->AllowedBuilders.Contains(ToId) || Site->AskedIds.Contains(ToId))
+		{
+			Result.InvalidReason = TEXT("deja_sollicite");
+			return Result;
+		}
+		if (Asked->Age > 0.0 && Asked->Age < 16.0)
+		{
+			Result.InvalidReason = TEXT("trop_jeune");
+			return Result;
+		}
+		const double Distance = FMath::Sqrt(FMath::Square(Asker->X - Asked->X) + FMath::Square(Asker->Y - Asked->Y));
+		if (Distance > HelpSpeakingRange)
+		{
+			Result.InvalidReason = TEXT("trop_loin");
+			return Result;
+		}
+		const AnastasisPath::FWorldNavSource Source(Nav, *World);
+		bool bAccessible = false;
+		for (const FPoint& Door : Site->AccessPoints)
+		{
+			TArray<FPoint> Path;
+			if (AnastasisPath::FindPath(Source, { Asked->X, Asked->Y }, Door, {}, Path))
+			{
+				bAccessible = true;
+				break;
+			}
+		}
+		if (!bAccessible)
+		{
+			Result.InvalidReason = TEXT("chantier_inaccessible");
+			return Result;
+		}
+
+		Result.Answer = EvaluateHelp(*Asker, *Asked, *Site);
+		Result.bValid = true;
+		Site->AskedIds.Add(ToId);
+		HelpLog.Add(Result.Answer);
+		Result.RequestId = HelpLog.Num();
+		if (Result.Answer.bAccepted)
+		{
+			// L'accord autorise un travail futur ; ni deplacement ni piece ne sont crees ici.
+			Site->AllowedBuilders.Add(ToId);
+		}
+		else
+		{
+			FEpisodeOptions Refusal;
+			Refusal.AboutId = ToId;
+			Refusal.RootId = FString::Printf(TEXT("refus-%s-%s"), *SiteId, *ToId);
+			RecordEpisode(FromId, TEXT("refusedHelp"), Refusal);
+		}
+		return Result;
+	}
+
 	void FVillage::UpdateFamilyHousesDaily()
 	{
 		if (Families.IsEmpty() || !World) return;

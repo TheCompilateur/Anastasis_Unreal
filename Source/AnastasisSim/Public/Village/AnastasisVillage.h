@@ -1528,6 +1528,18 @@ namespace AnastasisVillage
 			/** dette_rendue, amitie, voisin ; refus_rendu, dette, son_toit, occupe, faible, inconnu. */
 			FString Reason;
 		};
+		/** Resultat d'une demande adressee pendant la journee. Un rejet de precondition ne change aucun etat. */
+		struct FHelpRequestResult
+		{
+			bool bValid = false;
+			FString InvalidReason;
+			FHelpAnswer Answer;
+			/** Rang stable dans HelpLog, zero si la demande n'a pas ete entendue. */
+			int32 RequestId = 0;
+		};
+		static constexpr double HelpSpeakingRange = 6.0;
+		/** ecart n°48 : meme verbe pour chaque habitant, avec rencontre physique et reponse immediate. */
+		FHelpRequestResult AskHelp(const FString& FromId, const FString& ToId, const FString& SiteId);
 
 		/** Combien de personnes un chef de famille va voir par jour. */
 		static constexpr int32 HelpAsksPerDay = 2;

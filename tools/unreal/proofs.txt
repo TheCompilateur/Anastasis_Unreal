@@ -41,6 +41,7 @@ tree-cards-capture | tools/unreal/ground-cover-capture.py | GROUND_CAPTURE_COMPL
 
 player-pie | tools/unreal/player-pie.py | PLAYER_PIE PASS | PLAYER_PIE FAIL|PLAYER_PIE_TIMEOUT|PLAYER_PIE CHECK FAIL | 600 | ANASTASIS_PLAYER_PIE_OUT=@Saved/PlayerEvidence/pie
 player-food-loop-pie | tools/unreal/player-food-loop-pie.py | PLAYER_FOOD_LOOP PASS | PLAYER_FOOD_LOOP FAIL|PLAYER_FOOD_LOOP CHECK FAIL | 360 | ANASTASIS_PLAYER_FOOD_OUT=@Saved/PlayerFoodEvidence/pie
+player-help-scene-pie | tools/unreal/player-help-scene-pie.py | PLAYER_HELP_SCENE_PIE PASS | PLAYER_HELP_SCENE_PIE FAIL|PLAYER_HELP_SCENE_TIMEOUT|PLAYER_HELP_SCENE_CHECK FAIL|Traceback | 420 | -
 villager-pie | tools/unreal/villager-pie.py | VILLAGER_PIE PASS | VILLAGER_PIE FAIL | 900 | ANASTASIS_VILLAGER_PIE_OUT=@Saved/VillagerEvidence/pie;ANASTASIS_VILLAGER_PIE_NPCS=12
 npc-life-pie | tools/unreal/npc-life-pie.py | NPC_LIFE_PIE PASS | NPC_LIFE_PIE FAIL|Traceback | 220 | -
 save-load-pie | tools/unreal/save-load-pie.py | SAVE_LOAD_PIE PASS | SAVE_LOAD_PIE FAIL|Traceback | 480 | ANASTASIS_SAVE_PIE_OUT=@Saved/SaveStateEvidence/pie
