@@ -164,6 +164,19 @@ namespace
 		return Goal;
 	}
 
+	/**
+	 * Le remede que le corps reclame quand il passe devant (ecart n°21) : c'est au joueur de le choisir. Vide si le
+	 * corps ne parle pas. Memes seuils que `FVillage::BodyOverrides`.
+	 */
+	FString BodyAsks(const AnastasisVillage::FNpc& Npc)
+	{
+		namespace D = AnastasisVillage::PlayerDecision;
+		if (Npc.Needs.Thirst >= D::ThirstRelease) return TEXT("drink");
+		if (Npc.Needs.Energy <= D::EnergyRelease) return TEXT("rest");
+		if (Npc.Needs.Hunger >= D::HungerRelease) return TEXT("eat");
+		return FString();
+	}
+
 	/** Pourquoi une intention cede, en clair. */
 	FString RefusalLabel(const FString& Reason)
 	{
@@ -208,6 +221,12 @@ void UAnastasisSimulationSubsystem::DrawPlayerOverlay() const
 	if (Refusal)
 	{
 		Intent += FString::Printf(TEXT("  -- refuse : %s"), *RefusalLabel(Refusal->Reason));
+		// Le corps passe devant : dire ce qu'il reclame, sinon le joueur attend sans savoir quoi choisir.
+		const FString Asks = BodyAsks(*Player);
+		if (Refusal->Reason == AnastasisVillage::PlayerDecision::RefusalBody && !Asks.IsEmpty())
+		{
+			Intent += FString::Printf(TEXT(" : il faut %s"), *GoalLabel(Asks));
+		}
 	}
 	GEngine->AddOnScreenDebugMessage(
 		0xA51A54,
@@ -393,12 +412,13 @@ FString UAnastasisSimulationDebugLibrary::GetPlayerStatus(const UObject* WorldCo
 	}
 	return FString::Printf(
 		TEXT("{\"player\":\"%s\",\"x\":%.4f,\"y\":%.4f,\"goal\":\"%s\",\"activity\":\"%s\",\"presence\":%.4f,\"reputation\":%.4f,")
-		TEXT("\"idleDays\":%.4f,\"thirst\":%.2f,\"hunger\":%.2f,\"drinks\":%d,\"meals\":%d,\"pawn\":%s,\"seenBy\":%d,\"npcs\":%d,")
+		TEXT("\"idleDays\":%.4f,\"thirst\":%.2f,\"hunger\":%.2f,\"energy\":%.2f,\"body\":\"%s\",\"drinks\":%d,\"meals\":%d,\"pawn\":%s,\"seenBy\":%d,\"npcs\":%d,")
 		TEXT("\"bag\":%d,\"gathered\":%d,\"delivered\":%d,\"foodRemaining\":%d,\"foodStock\":%d,")
 		TEXT("\"choice\":\"%s\",\"holds\":%d,\"yields\":%d,\"refusal\":\"%s\",\"options\":[%s],")
 		TEXT("\"ux\":%.1f,\"uy\":%.1f,\"uz\":%.1f}"),
 		*Player->Id, Player->X, Player->Y, *Player->Goal, *Player->Activity, Player->Presence, Player->Reputation,
-		Player->IdleSeconds / FAnastasisSimulation::DayLength, Player->Needs.Thirst, Player->Needs.Hunger, Player->DrinksTaken, Player->MealsTaken,
+		Player->IdleSeconds / FAnastasisSimulation::DayLength, Player->Needs.Thirst, Player->Needs.Hunger, Player->Needs.Energy, *BodyAsks(*Player),
+		Player->DrinksTaken, Player->MealsTaken,
 		Host->IsPawnBound() ? TEXT("true") : TEXT("false"), CountSeers(Village, *Player), Village.GetActors().Num(),
 		Player->InventoryFood, Player->GatheredFood, Player->DeliveredFood, FoodRemaining, FoodStock,
 		Choice ? *Choice->Goal : TEXT(""), Choice ? Choice->Holds : 0, Choice ? Choice->Yields : 0,

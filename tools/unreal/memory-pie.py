@@ -7,7 +7,7 @@ jours par pas de six heures (`Anastasis.Sim.Advance 6h`, le joueur boit, mange o
 Verdict MEMORY_PIE PASS si :
   - les souvenirs circulent (des histoires racontees de bouche en bouche dans la chronique) ;
   - une famille sans maison a decide de batir, et l'on a demande de l'aide (oui ou non, avec la raison) ;
-  - le carnet du joueur a note au moins une chose entendue ;
+  - le carnet du joueur a note au moins une chose entendue, et le joueur est vivant au bout des trente jours ;
   - les deux fichiers sont ecrits.
 Ce n'est pas un verdict sur l'interet du recit : celui-la, Alexandre le donne en le lisant.
 
@@ -54,6 +54,8 @@ def verdict(world):
         'house_decided': kinds.get('HouseDecided', 0) >= 1,
         'help_asked': kinds.get('HelpGiven', 0) + kinds.get('HelpRefused', 0) >= 1,
         'notebook': notebook.get('notes', 0) >= 1,
+        # Le carnet est celui d'un vivant : le joueur passe les trente jours (il dort, boit et mange quand il le faut).
+        'player_alive': bool(status(lib.get_player_status(world)).get('player')),
         'files': bool(chronicle_path) and os.path.isfile(chronicle_path) and bool(notebook_path) and os.path.isfile(notebook_path),
     }
     ok = all(checks.values())
@@ -71,13 +73,16 @@ def verdict(world):
 
 def live(world):
     """Le joueur vit en humain attentif : son corps ne choisit pas a sa place (ecart n°21), alors toutes les
-    six heures la preuve choisit pour lui -- boire s'il a soif, manger s'il a faim, sinon aller parler aux
-    autres, la ou se racontent les histoires que son carnet retient."""
-    # Mesure seulement : en 2026-10-08 le joueur cesse d'executer boire / manger vers le jour 3 et meurt de faim au jour 8
-    # (defaut du joueur, hors de cette preuve) ; MEMORY_PIE_PLAYER le dit, le verdict ne porte que sur la memoire.
+    six heures la preuve choisit pour lui -- dormir s'il est epuise, boire s'il a soif, manger s'il a faim,
+    sinon aller parler aux autres, la ou se racontent les histoires que son carnet retient. Sans dormir, epuise,
+    il refusait tout autre but (« le corps passe devant ») et mourait de faim au jour 8 (player-goal-stall-001)."""
     for _ in range(DAYS * 4):
         player = status(lib.get_player_status(world))
-        if player.get('thirst', 0) >= 40:
+        if player.get('body'):
+            goal = player['body']
+        elif player.get('energy', 100) <= 25:
+            goal = 'rest'
+        elif player.get('thirst', 0) >= 40:
             goal = 'drink'
         elif player.get('hunger', 0) >= 40:
             goal = 'eat'
