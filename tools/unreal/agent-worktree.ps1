@@ -164,6 +164,17 @@ function Get-DeclaredRelay([string]$repo, [string]$rev, [string]$m) {
   }
   return @($names | Select-Object -Unique)
 }
+# PROOFS_CAP_001 (2026-10-09, mandat d'Alexandre : reduire les preuves ; plafond fixe a 4) : une mission
+# declare au plus 4 preuves PIE, un lot en rejoue au plus 4 (union des missions admises). Mesure du 2026-10-09 :
+# un lot de 9 preuves tenait l'editeur 23 min, et le verrou de main plus de 40 min pour une mission.
+# Le plafond ne retire aucune preuve en silence : finish refuse une fiche trop chargee, le lot ecarte
+# vers le lot suivant la mission qui ferait depasser, status l'annonce. ANASTASIS_PROOFS_MAX le change,
+# sur demande d'Alexandre seulement.
+function Get-ProofsMax {
+  $n = 0
+  if ([int]::TryParse("$env:ANASTASIS_PROOFS_MAX", [ref]$n) -and $n -ge 1) { return $n }
+  return 4
+}
 function Get-RegisteredProofs([string]$root) {
   $file = Join-Path $root 'tools\unreal\proofs.txt'
   if (-not (Test-Path $file)) { return @() }
@@ -589,13 +600,31 @@ switch ($Command) {
         else { $rebase += "$($p.Mission) ($($p.Conflicts -join ' '))" }
       }
     }
-    if ($clean.Count -gt 0) {
-      Write-Output ('PRETES_POUR_LE_LOT::' + ($clean -join ', '))
-      Write-Output ('    tools\unreal\agent-worktree.ps1 integrate-batch -Missions ' + (($clean | ForEach-Object { ($_ -split ' ')[0] }) -join ','))
+    # PROOFS_CAP_001 : le lot annonce ne depasse pas le plafond de preuves PIE ; une mission propre
+    # qui le ferait depasser attend le lot suivant, une fiche trop chargee est a reduire.
+    $proofsMax = Get-ProofsMax
+    $lot = @(); $lotProofs = @(); $overflow = @(); $tooMany = @()
+    foreach ($c in $clean) {
+      $cm = ($c -split ' ')[0]
+      $mine = @(Get-DeclaredProofs $Canonical (Branch-Of $cm) $cm)
+      if ($mine.Count -gt $proofsMax) { $tooMany += "$cm ($($mine.Count) > $proofsMax : $($mine -join ', '))"; continue }
+      $grown = @($lotProofs + $mine | Select-Object -Unique)
+      if ($grown.Count -gt $proofsMax) { $overflow += "$cm (preuves : $($mine -join ', '))"; continue }
+      $lotProofs = $grown; $lot += $c
+    }
+    if ($lot.Count -gt 0) {
+      Write-Output ('PRETES_POUR_LE_LOT::' + ($lot -join ', '))
+      Write-Output ('    tools\unreal\agent-worktree.ps1 integrate-batch -Missions ' + (($lot | ForEach-Object { ($_ -split ' ')[0] }) -join ','))
+      Write-Output ('PREUVES_DU_LOT::' + $(if ($lotProofs.Count) { "$($lotProofs.Count)/$proofsMax : " + ($lotProofs -join ', ') } else { "0/$proofsMax" }))
     } else {
       Write-Output 'PRETES_POUR_LE_LOT::aucune'
     }
     if ($next.Count -gt 0) { Write-Output ('LOT_SUIVANT::' + ($next -join ', ') + ' (propres seules sur main, en conflit avec une mission du lot)') }
+    if ($overflow.Count -gt 0) { Write-Output ('LOT_SUIVANT_PREUVES::' + ($overflow -join ', ') + " (le lot depasserait $proofsMax preuves PIE)") }
+    if ($tooMany.Count -gt 0) {
+      Write-Output "PREUVES_A_REDUIRE:: (plus de $proofsMax preuves declarees : editer PROOFS: dans la fiche, commiter, finish)"
+      $tooMany | ForEach-Object { Write-Output "    $_" }
+    }
     if ($rebase.Count -gt 0) {
       Write-Output 'A_REBASER:: (en conflit avec main : dans le worktree, git rebase main puis finish)'
       $rebase | ForEach-Object { Write-Output "    $_" }
@@ -652,6 +681,13 @@ switch ($Command) {
     if ($dup.Count -gt 0) {
       Write-Output ('FAIL: tools/unreal/proofs.txt inscrit deux fois : ' + ($dup -join ', '))
       Write-Output '    La fusion par union (.gitattributes) garde les deux versions d une ligne modifiee des deux cotes : n en garder qu une.'
+      exit 1
+    }
+    $proofsMax = Get-ProofsMax
+    if ($declared.Count -gt $proofsMax) {
+      Write-Output ("FAIL: PROOFS_CAP::$($declared.Count) preuves PIE declarees, maximum $proofsMax (PROOFS_CAP_001) : " + ($declared -join ', '))
+      Write-Output "    Garder les $proofsMax preuves qui jugent CE que la mission change ; la suite sans rendu de finish couvre le reste."
+      Write-Output '    Editer PROOFS: dans la fiche, commiter, relancer finish.'
       exit 1
     }
     Write-Output ('PROOFS::' + $(if ($declared.Count) { $declared -join ', ' } else { '(aucune)' }))
@@ -845,6 +881,8 @@ switch ($Command) {
 
     # 1. Admission.
     $ready = @()
+    $proofsMax = Get-ProofsMax
+    $lotProofs = @()
     $rejected = @()
     foreach ($m in $list) {
       $b = Branch-Of $m
@@ -856,6 +894,19 @@ switch ($Command) {
         $rejected += "$m : pas de HANDOFF_READY sur son commit actuel $($tip.Substring(0, 7)) (relancer finish)"
         continue
       }
+      # PROOFS_CAP_001 : au plus $proofsMax preuves PIE pour le lot. Une mission qui ferait depasser
+      # attend le lot suivant, ses preuves ne sont jamais retirees en silence.
+      $mine = @(Get-DeclaredProofs $Canonical $b $m)
+      if ($mine.Count -gt $proofsMax) {
+        $rejected += "$m : $($mine.Count) preuves PIE declarees, maximum $proofsMax (PROOFS_CAP_001) -- reduire PROOFS: dans la fiche, puis finish"
+        continue
+      }
+      $grown = @($lotProofs + $mine | Select-Object -Unique)
+      if ($grown.Count -gt $proofsMax) {
+        $rejected += "$m : le lot depasserait $proofsMax preuves PIE ($(if ($lotProofs.Count) { $lotProofs -join ', ' } else { 'aucune' }) + $($mine -join ', ')) -- lot suivant (PROOFS_CAP_001)"
+        continue
+      }
+      $lotProofs = $grown
       $ready += $m
     }
 
@@ -920,8 +971,14 @@ switch ($Command) {
           $theirs = @(Get-DeclaredProofs $Canonical $b $i)
           if ($theirs.Count -eq 0 -and (Invoke-Git -C $Canonical rev-parse --verify --quiet (Branch-Of $i)).Code -eq 0) { $theirs = @(Get-DeclaredProofs $Canonical (Branch-Of $i) $i) }
           $miss = @($theirs | Where-Object { $relayProofs -notcontains $_ })
-          if ($miss.Count -gt 0) { $uncovered += "$i (preuves non reprises : $($miss -join ', '))" }
-          else { Write-Output "RELAY_ADMITTED::$m porte $i (preuves : $(if ($theirs.Count) { $theirs -join ', ' } else { 'aucune' }))" }
+          # PROOFS_CAP_001 : un relais declare au plus $proofsMax preuves, il ne peut plus les reprendre toutes.
+          # Tant qu'il lui reste de la place il doit la donner aux preuves des missions qu'il porte ;
+          # plafond atteint, celles qui restent sont dites (RELAY_PREUVES_NON_REJOUEES), pas tues.
+          if ($miss.Count -gt 0 -and $relayProofs.Count -lt $proofsMax) { $uncovered += "$i (preuves non reprises : $($miss -join ', '))" }
+          else {
+            Write-Output "RELAY_ADMITTED::$m porte $i (preuves : $(if ($theirs.Count) { $theirs -join ', ' } else { 'aucune' }))"
+            if ($miss.Count -gt 0) { Write-Output "RELAY_PREUVES_NON_REJOUEES::$i : $($miss -join ', ') (plafond de $proofsMax preuves atteint par $m)" }
+          }
         }
         if ($uncovered.Count -gt 0) {
           $rejected += "$m : relais incomplet, PROOFS: ne reprend pas les preuves de $($uncovered -join ' ; ')"

@@ -45,7 +45,8 @@ machine : on n'en démarre pas pour se prouver. La suite tourne dans `finish`, s
    (commandes et **valeurs** obtenues), SCN, PLY, ECARTS (si `Source/AnastasisSim/` est touché),
    INTEGRATION_RISK, STOP (ce que tu ne revendiques pas),
    et **`PROOFS:`** — les preuves PIE du registre `tools/unreal/proofs.txt` que le lot doit rejouer pour
-   toi, ou `PROOFS: (aucune)`. Une preuve nouvelle : l'inscrire au registre (une ligne), la mettre au
+   toi, ou `PROOFS: (aucune)` — **4 au plus** (PROOFS_CAP_001) : celles qui jugent ce que ta mission change,
+   la suite sans rendu de `finish` couvre le reste ; `finish` refuse une fiche de 5. Une preuve nouvelle : l'inscrire au registre (une ligne), la mettre au
    point par `tools\unreal\editor-batch.ps1 -Proofs <nom>` (un éditeur, ta preuve, il se ferme).
 2. Tout commiter.
 3. `tools\unreal\agent-worktree.ps1 finish -Mission <mission>` → `HANDOFF_READY::YES (proved)` : build

@@ -111,6 +111,15 @@ avançait `main` pendant ces 25 min. Désormais :
 7. **`finish -Queue`** (build seul, suite au lot) est l'exception : machine saturée, ou suite que seul le
    lot peut juger. Une mission `proved` dont les arbres Unreal sont ceux du lot (une seule mission Unreal
    dans le lot, typiquement) lui épargne la suite : `RETEST::SKIP (…, suite du finish de <m>)`.
+8. **Quatre preuves PIE au plus (PROOFS_CAP_001, décision d'Alexandre, 2026-10-09).** Une fiche déclare 4 `PROOFS:`
+   au maximum, un lot en rejoue 4 au plus (union des missions admises). Mesure du 2026-10-09 : un lot de 9 preuves
+   a tenu l'éditeur 23 min, et le verrou de `main` plus de 40 min, pour une seule mission. `finish` refuse une fiche
+   de plus de 4 (`PROOFS_CAP::`) ; `integrate-batch` renvoie au lot suivant la mission qui ferait dépasser
+   (`BATCH_REJECTED::… le lot depasserait 4 preuves PIE`) ; `status` annonce `PREUVES_DU_LOT::`,
+   `LOT_SUIVANT_PREUVES::` et `PREUVES_A_REDUIRE::`. Garder les preuves qui jugent **ce que la mission change** :
+   la suite sans rendu de `finish` couvre le reste. Un relais déclare ses 4 propres preuves ; s'il lui en reste
+   de libres il y met celles des missions qu'il porte, plafond atteint le lot dit ce qui n'est pas rejoué
+   (`RELAY_PREUVES_NON_REJOUEES::`). `ANASTASIS_PROOFS_MAX` change le plafond, sur demande d'Alexandre seulement.
 
 Chaque worktree a ses propres `Binaries/` et `Intermediate/` : le premier build y est
 complet, c'est normal et c'est le prix de l'isolation.

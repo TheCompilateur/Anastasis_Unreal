@@ -21,7 +21,8 @@ PENDING
 
 ## PROOFS
 
-Preuves PIE que le lot rejoue pour cette mission, noms de `tools/unreal/proofs.txt` (EDITOR_QUEUE_001) :
+Preuves PIE que le lot rejoue pour cette mission, noms de `tools/unreal/proofs.txt` (EDITOR_QUEUE_001),
+**4 au plus** (PROOFS_CAP_001) -- celles qui jugent ce que la mission change :
 
 PROOFS: (aucune)
 

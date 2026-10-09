@@ -499,4 +499,47 @@ Check 'S31 queued, finish par defaut : la suite n a jamais tourne, portail rejou
 $r = AW finish -Mission hq -Queue
 Check 'S31 queued, finish -Queue : RETEST::SKIP, reste queued' ($r.Code -eq 0 -and $r.Out -match 'RETEST::SKIP' -and $r.Out -match 'HANDOFF_READY::YES \(queued\)') $r.Out
 
+# --- PROOFS_CAP_001 -----------------------------------------------------------------------
+# 32. Au plus 4 preuves PIE par mission (finish) et par lot (integrate-batch, status, relais).
+#     Le banc n'a pas de moteur : un lot qui declare des preuves echoue au build qui les precede,
+#     main intacte -- les lignes testees (BATCH_REJECTED, RELAY_*) sont imprimees avant.
+G checkout -q -f main | Out-Null; G clean -fdq | Out-Null
+$null = NewMission 'cap5' @({ param($w) Add-Content "$w\docs\unreal\handoffs\cap5.md" 'PROOFS: village-weather-pie, sky-clock-pie, house-rest-pie, granary-eat-pie, player-pie' })
+$r = AW finish -Mission cap5
+Check 'S32 cinq preuves : finish refuse (plafond 4), pas de marqueur' ($r.Code -ne 0 -and $r.Out -match 'PROOFS_CAP::5 preuves PIE declarees, maximum 4' -and -not (Test-Path (Join-Path $wtRoot '.handoff\cap5.txt'))) $r.Out
+$null = NewMission 'cap4' @({ param($w) Add-Content "$w\docs\unreal\handoffs\cap4.md" 'PROOFS: village-weather-pie, sky-clock-pie, house-rest-pie, granary-eat-pie' })
+$r = AW finish -Mission cap4
+Check 'S32 quatre preuves : finish passe' ($r.Code -eq 0 -and $r.Out -match 'PROOFS::village-weather-pie, sky-clock-pie, house-rest-pie, granary-eat-pie' -and $r.Out -match 'HANDOFF_READY::YES') $r.Out
+$env:ANASTASIS_PROOFS_MAX = '5'
+$r = AW finish -Mission cap5
+Remove-Item Env:ANASTASIS_PROOFS_MAX
+Check 'S32 ANASTASIS_PROOFS_MAX=5 : la meme fiche passe' ($r.Code -eq 0 -and $r.Out -match 'HANDOFF_READY::YES') $r.Out
+$null = NewMission 'capx' @({ param($w) Add-Content "$w\docs\unreal\handoffs\capx.md" 'PROOFS: player-pie, metabolism-pie' })
+$r = AW finish -Mission capx
+# cap5 porte un marqueur (plafond releve le temps de son finish) mais depasse le plafond par defaut.
+$r = AW status
+Check 'S32 status : le lot annonce au plus 4 preuves, le surplus attend le lot suivant' ($r.Out -match 'PREUVES_DU_LOT::[0-4]/4' -and $r.Out -match 'LOT_SUIVANT_PREUVES::[^\n]*\(le lot depasserait 4 preuves PIE\)') $r.Out
+Check 'S32 status : une fiche de 5 preuves est a reduire, absente de la commande' ($r.Out -match 'PREUVES_A_REDUIRE::[^\n]*\n\s+cap5 \(5 > 4' -and $r.Out -notmatch 'integrate-batch -Missions [^\n]*cap5') $r.Out
+$mainAvant = (G rev-parse main)
+$r = AW integrate-batch -Missions 'cap5,capx,cap4'
+Check 'S32 lot : fiche de 5 preuves ecartee' ($r.Out -match 'BATCH_REJECTED::cap5 : 5 preuves PIE declarees, maximum 4') $r.Out
+Check 'S32 lot : la mission qui ferait depasser 4 attend le lot suivant' ($r.Out -match 'BATCH_STACKED::capx' -and $r.Out -match 'BATCH_REJECTED::cap4 : le lot depasserait 4 preuves PIE \(player-pie, metabolism-pie \+ village-weather-pie, sky-clock-pie, house-rest-pie, granary-eat-pie\)' -and (G rev-parse main) -eq $mainAvant) $r.Out
+# Relais : plafond atteint, les preuves en trop sont dites ; de la place libre, elles sont exigees.
+G checkout -q -f main | Out-Null; G clean -fdq | Out-Null
+$null = NewMission 'rc-a' @({ param($w) Add-Content "$w\docs\unreal\handoffs\rc-a.md" 'PROOFS: granary-eat-pie, player-pie, house-rest-pie, sky-clock-pie, metabolism-pie'; Set-Content "$w\doc-rc-a.md" 'a' })
+$null = NewMission 'rc-full' @({ param($w)
+  Copy-Item (Join-Path $wtRoot 'rc-a\docs\unreal\handoffs\rc-a.md') "$w\docs\unreal\handoffs\"
+  Set-Content "$w\doc-rc-a.md" 'a'
+  Add-Content "$w\docs\unreal\handoffs\rc-full.md" "RELAIS: rc-a`nPROOFS: granary-eat-pie, player-pie, house-rest-pie, sky-clock-pie" })
+$null = AW finish -Mission rc-full
+$r = AW integrate-batch -Missions 'rc-full'
+Check 'S32 relais au plafond : admis, preuve non rejouee dite' ($r.Out -match 'RELAY_ADMITTED::rc-full porte rc-a' -and $r.Out -match 'RELAY_PREUVES_NON_REJOUEES::rc-a : metabolism-pie \(plafond de 4 preuves atteint par rc-full\)') $r.Out
+$null = NewMission 'rc-part' @({ param($w)
+  Copy-Item (Join-Path $wtRoot 'rc-a\docs\unreal\handoffs\rc-a.md') "$w\docs\unreal\handoffs\"
+  Set-Content "$w\doc-rc-a.md" 'a'
+  Add-Content "$w\docs\unreal\handoffs\rc-part.md" "RELAIS: rc-a`nPROOFS: granary-eat-pie" })
+$null = AW finish -Mission rc-part
+$r = AW integrate-batch -Missions 'rc-part'
+Check 'S32 relais avec de la place libre : doit reprendre les preuves portees' ($r.Out -match 'BATCH_REJECTED::rc-part : relais incomplet[^\n]*rc-a \(preuves non reprises : player-pie, house-rest-pie, sky-clock-pie, metabolism-pie\)') $r.Out
+
 Remove-Item $base -Recurse -Force -ErrorAction SilentlyContinue
