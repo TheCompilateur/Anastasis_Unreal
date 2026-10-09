@@ -218,6 +218,19 @@ function Invoke-AnastasisEditorGated {
           $overtakeNoted = $true
         }
       }
+      # GATE_BATCH_FIRST_001 (Alexandre, 2026-10-09) : l'integrateur a la priorite editeur. Pendant un
+      # lot (verrou de main tenu par un processus vivant), aucun editeur de priorite 1 ne demarre :
+      # ni suite de finish, ni capture, ni editeur interactif. Seuls ceux du lot (priorite 0) passent.
+      if ($prio -ne '0') {
+        $lockFile = if ($env:ANASTASIS_MAIN_LOCK_FILE) { $env:ANASTASIS_MAIN_LOCK_FILE } else { Join-Path (Split-Path $queueDir -Parent) '.handoff\MAIN.lock' }
+        if (Test-Path -LiteralPath $lockFile) {
+          $holder = $null
+          try { $holder = Get-Content -LiteralPath $lockFile -Raw | ConvertFrom-Json } catch { }
+          if ($holder -and $holder.Pid -and (Get-Process -Id $holder.Pid -ErrorAction SilentlyContinue)) {
+            $blocked += "lot d integration en cours ($($holder.Holder))"
+          }
+        }
+      }
       if ($load.Weight + $myWeight -gt $MaxEditors) {
         $blocked += "editeurs=$($load.Weight)+$myWeight/$MaxEditors (pids $($load.Pids), h = sans rendu)"
       }

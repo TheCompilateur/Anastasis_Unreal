@@ -359,6 +359,12 @@ Il peut passer devant un agent qui attend son éditeur depuis moins de 15 min
 Un éditeur dont la ligne de commande est illisible (lancé par un autre compte) compte entier. Dans
 `EDITOR_GATE::WAIT`, un pid suivi de `h` est un éditeur sans rendu.
 
+**L'intégrateur a la priorité éditeur (GATE_BATCH_FIRST_001, Alexandre, 2026-10-09).** Tant que le verrou de
+`main` est tenu par un processus vivant (un lot ou un `integrate` en cours), aucun éditeur d'agent ne démarre —
+suite de `finish`, capture, preuve, éditeur interactif : `EDITOR_GATE::WAIT … lot d integration en cours`. Seuls
+les éditeurs lancés par le lot lui-même (priorité 0) passent. Un agent qui a un éditeur interactif ouvert le ferme
+dès que `status` affiche `MAIN_LOCK::TENU`. Un lot dure jusqu'à 40 min : machine saturée au-delà, `finish -Queue`.
+
 Pendant l'attente, une ligne `EDITOR_GATE::WAIT` par minute dit ce qui bloque. Au bout de 45 min
 (`ANASTASIS_EDITOR_WAIT_MIN`) : `EDITOR_GATE::TIMEOUT`, levé comme une erreur. **C'est une machine saturée,
 pas une régression** : relancer plus tard. Ne jamais fermer l'éditeur d'un autre pour passer.

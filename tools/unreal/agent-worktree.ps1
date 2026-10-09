@@ -117,6 +117,9 @@ function Enter-MainLock([string]$holder) {
       $fs.Write($bytes, 0, $bytes.Length)
       $fs.Close()
       $script:LockHeld = $true
+      # GATE_BATCH_FIRST_001 : tant que ce verrou est tenu, la porte memoire ne laisse passer que les
+      # editeurs de priorite 0 ; ceux que ce processus lance (suite, preuves) en sont.
+      $env:ANASTASIS_EDITOR_PRIORITY = '0'
       Write-Output "MAIN_LOCK::PRIS $holder"
       return
     } catch {

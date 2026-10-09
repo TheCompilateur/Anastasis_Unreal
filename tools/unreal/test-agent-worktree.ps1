@@ -271,6 +271,20 @@ New-Item -ItemType File $lot | Out-Null
 $m = Gate (Load 0 0) -Headless
 Check 'S30 sans rendu ne passe jamais devant un lot d integration' ($m -match 'file=1 devant') $m
 Remove-Item $lot
+# 30b. GATE_BATCH_FIRST_001 : verrou de main tenu par un processus vivant -> un editeur d'agent
+#      (priorite 1) attend, meme machine libre ; un editeur du lot (priorite 0) passe ; verrou mort ignore.
+$env:ANASTASIS_MAIN_LOCK_FILE = Join-Path $base 'gate-main.lock'
+Set-Content $env:ANASTASIS_MAIN_LOCK_FILE (@{ Holder = 'integrate-batch:banc'; Pid = $PID; Since = (Get-Date -Format 'o') } | ConvertTo-Json -Compress)
+$m = Gate (Load 0 0) -Headless
+Check 'S30b lot en cours : un editeur d agent attend, machine libre' ($m -match 'EDITOR_GATE::TIMEOUT.*lot d integration en cours') $m
+$env:ANASTASIS_EDITOR_PRIORITY = '0'
+$m = Gate (Load 0 0)
+Remove-Item Env:ANASTASIS_EDITOR_PRIORITY
+Check 'S30b lot en cours : l editeur du lot passe' ($m -match 'lance') $m
+Set-Content $env:ANASTASIS_MAIN_LOCK_FILE (@{ Holder = 'mort'; Pid = 999999; Since = (Get-Date -Format 'o') } | ConvertTo-Json -Compress)
+$m = Gate (Load 0 0) -Headless
+Check 'S30b verrou d un processus mort : ignore' ($m -match 'lance') $m
+Remove-Item $env:ANASTASIS_MAIN_LOCK_FILE; Remove-Item Env:ANASTASIS_MAIN_LOCK_FILE
 Check 'S30 -nullrhi reconnu dans les arguments, pas un -nullrhix' ((Test-AnastasisHeadlessArgs '"x.uproject" /Engine/Maps/Entry -nullrhi -nosound') -and -not (Test-AnastasisHeadlessArgs '"x.uproject" -nullrhix') -and -not (Test-AnastasisHeadlessArgs '"x.uproject" -unattended'))
 $l = Get-AnastasisEditorLoad 0.5
 Check 'S30 charge reelle lisible (poids, RAM, marge)' ($null -ne $l.Weight -and $l.Weight -le $l.Editors -and $l.RamGB -gt 0 -and $l.CommitGB -gt 0) ($l | Out-String)
