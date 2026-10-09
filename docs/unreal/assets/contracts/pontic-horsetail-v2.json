@@ -1,0 +1,36 @@
+{
+  "schema_version": 2,
+  "id": "asset-protocol-v2-horsetail",
+  "stage": "scene",
+  "family": "PonticMicro/Horsetail candidate",
+  "intent": "Tester une silhouette de prele plus lisible a placement de berge constant",
+  "references": [
+    "docs/historicity/briefs/pontic-water-micro-001.json",
+    "docs/visual/reference/pontique-etat-zero-3-stratification-forestiere.png"
+  ],
+  "reference_provenance": "Brief et planche suivis dans le depot. Aucune image externe incorporee dans le mesh ; exactitude botanique/historique non revendiquee.",
+  "generator_files": [
+    "tools/unreal/create-pontic-horsetail-v2.py",
+    "tools/unreal/create-ground-cover.py"
+  ],
+  "generator_sha256": {
+    "tools/unreal/create-pontic-horsetail-v2.py": "b648c157e26c24a0455a76af0929753573332ccf8a285bb82327f08b9fc73a8a",
+    "tools/unreal/create-ground-cover.py": "f004e3f0a992c265848014f6eb2fb04323c77227257ac060d10b3bd9e4303ca6"
+  },
+  "capture_proof": "pontic-horsetail-v2-capture",
+  "collision_policy": "Aucune collision ni navigation sur le HISM de microvie ; controle source, pas encore preuve runtime joueur.",
+  "keep": "Silhouette meilleure a hauteur joueur, ecart visuel localise au-dela ancien/ancien repete, inventaire spatial constant, GPU median <= ancien +0.2 ms et <= +5% si ancien >= 4 ms.",
+  "reject": "Asset absent, changement de placement, retour ancien divergent, budget depasse, silhouette non amelioree ou GPU au-dessus du seuil.",
+  "assets": [
+    {
+      "path": "/Game/Anastasis/PonticMicro/SM_Pontic_Horsetail_02",
+      "materials": ["/Game/Anastasis/Materials/M_AnastasisGrass"],
+      "triangle_budget_by_lod": [500, 180, 70],
+      "max_size_cm": [60.0, 60.0, 85.0],
+      "min_z_cm": [-5.0, 5.0],
+      "anchor_xy_max_cm": 20.0,
+      "consumer_file": "Source/Anastasis_UnrealV2/WorldView/AnastasisPonticWaterMicro.cpp",
+      "consumer_token": "/Game/Anastasis/PonticMicro/SM_Pontic_Horsetail_02"
+    }
+  ]
+}

@@ -37,6 +37,9 @@ import os, time, math, json, hashlib, unreal
 
 OUT = os.environ.get('ANASTASIS_GROUND_OUT')
 STATE_CMDS = {
+    'horsetail_old': ('anastasis.Dressing.PonticWaterMicro 1', 'anastasis.Dressing.PonticHorsetailCandidate 0'),
+    'horsetail_new': ('anastasis.Dressing.PonticWaterMicro 1', 'anastasis.Dressing.PonticHorsetailCandidate 1'),
+    'horsetail_old2': ('anastasis.Dressing.PonticWaterMicro 1', 'anastasis.Dressing.PonticHorsetailCandidate 0'),
     'micro_on': ('anastasis.Dressing.PonticWaterMicro 1',),
     'micro_off': ('anastasis.Dressing.PonticWaterMicro 0',),
     'micro_on2': ('anastasis.Dressing.PonticWaterMicro 1',),
@@ -114,8 +117,10 @@ natural_run = riparian_run or ecotone_run or any(s in ('natural', 'reference', '
 original_woodland = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.WoodlandSequence')
 flower_run = any(s in ('noflowers', 'flowers', 'noflowers2') for s in states)
 cards_run = any(s in ('nocards', 'cards', 'nocards2') for s in states)
-micro_run = any(s in ('micro_on', 'micro_off', 'micro_on2') for s in states)
+horsetail_run = any(s in ('horsetail_old', 'horsetail_new', 'horsetail_old2') for s in states)
+micro_run = horsetail_run or any(s in ('micro_on', 'micro_off', 'micro_on2') for s in states)
 original_micro = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.PonticWaterMicro')
+original_horsetail = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.PonticHorsetailCandidate')
 original_ecotone = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.TreeCanopyEcotone')
 original_hour = unreal.SystemLibrary.get_console_variable_float_value('anastasis.Sky.Hour')
 original_natural = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.NaturalHistory')
@@ -130,6 +135,7 @@ def finish(msg, error=False):
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Sky.Hour %s' % original_hour)
     if micro_run:
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.PonticWaterMicro %s' % original_micro)
+        unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.PonticHorsetailCandidate %s' % original_horsetail)
     if natural_run:
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.NaturalHistory %s' % original_natural)
     if natural_run:
@@ -652,14 +658,29 @@ def tick(dt):
                     if micro_run:
                         with open(os.path.join(OUT, 'micro-inventory.json'), 'w') as f:
                             json.dump(micro_inventory, f, indent=1)
-                        on, off, repeat = (micro_inventory[s] for s in ('micro_on', 'micro_off', 'micro_on2'))
-                        names = {item[0] for item in on['bank']}
-                        if not all('SM_Pontic_' + suffix + '_01' in names for suffix in ('Horsetail', 'Coltsfoot', 'Frog')):
-                            raise RuntimeError('one or more bank assets absent from scene')
-                        if on != repeat or off['bank'] or on['moss_mesh'] != 'SM_Pontic_Moss_01' \
-                                or off['moss_mesh'] != 'SM_Grass_Sedge_01' or on['moss_count'] <= 0:
-                            raise RuntimeError('Pontic micro on/off/on inventory invalid')
-                        unreal.log('PONTIC_MICRO_CAPTURE PASS bank_types=3 moss_count=%d views=%d' % (on['moss_count'], len(views)))
+                        if horsetail_run:
+                            old, new, repeat = (micro_inventory[s] for s in ('horsetail_old', 'horsetail_new', 'horsetail_old2'))
+                            old_names = {item[0] for item in old['bank']}
+                            new_names = {item[0] for item in new['bank']}
+                            if old != repeat or 'SM_Pontic_Horsetail_01' not in old_names \
+                                    or 'SM_Pontic_Horsetail_02' not in new_names or old['moss_count'] <= 0:
+                                raise RuntimeError('horsetail old/new/old missing asset or return to baseline')
+                            def normalized(bank):
+                                return sorted([['SM_Pontic_Horsetail_01' if name == 'SM_Pontic_Horsetail_02' else name, positions]
+                                               for name, positions in bank])
+                            if normalized(new['bank']) != old['bank'] or new['moss_mesh'] != old['moss_mesh'] \
+                                    or new['moss_count'] != old['moss_count']:
+                                raise RuntimeError('horsetail candidate changed placements or other micro assets')
+                            unreal.log('PONTIC_HORSETAIL_ABA PASS views=%d spatial_inventory=stable' % len(views))
+                        else:
+                            on, off, repeat = (micro_inventory[s] for s in ('micro_on', 'micro_off', 'micro_on2'))
+                            names = {item[0] for item in on['bank']}
+                            if not all('SM_Pontic_' + suffix + '_01' in names for suffix in ('Horsetail', 'Coltsfoot', 'Frog')):
+                                raise RuntimeError('one or more bank assets absent from scene')
+                            if on != repeat or off['bank'] or on['moss_mesh'] != 'SM_Pontic_Moss_01' \
+                                    or off['moss_mesh'] != 'SM_Grass_Sedge_01' or on['moss_count'] <= 0:
+                                raise RuntimeError('Pontic micro on/off/on inventory invalid')
+                            unreal.log('PONTIC_MICRO_CAPTURE PASS bank_types=3 moss_count=%d views=%d' % (on['moss_count'], len(views)))
                     finish('GROUND_CAPTURE_COMPLETE views=%d states=%d' % (len(views), len(states)))
                     return
                 for c in STATE_CMDS[states[state_i]]:

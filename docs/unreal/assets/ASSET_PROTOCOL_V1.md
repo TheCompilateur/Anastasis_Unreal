@@ -1,5 +1,10 @@
 # Protocole asset V1 — contrat, validation, scène
 
+> Archivé après critique : la V1 a seulement décrit et inspecté quatre assets
+> existants. Elle n'a créé aucun asset et son validateur n'a pas été exécuté dans
+> Unreal. Utiliser [ASSET_PROTOCOL_V2.md](ASSET_PROTOCOL_V2.md) pour toute
+> nouvelle mission.
+
 Une image de référence, un `UStaticMesh` sauvé et un objet visible dans ANÁSTASIS
 sont trois états distincts. Une mission d'asset livre une **famille bornée** et
 conserve la chaîne `référence → générateur → .uasset → consommateur → capture`.

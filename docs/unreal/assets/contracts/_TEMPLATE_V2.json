@@ -1,0 +1,24 @@
+{
+  "schema_version": 2,
+  "id": "mission-bornee",
+  "stage": "library",
+  "family": "Famille visuelle",
+  "intent": "Fonction perceptible unique",
+  "references": ["docs/visual/reference/source-verifiee.png"],
+  "reference_provenance": "Auteur, origine, droits et limites ; UNKNOWN explicite si non etablis",
+  "generator_files": ["tools/unreal/create-owned-assets.py"],
+  "generator_sha256": {"tools/unreal/create-owned-assets.py": "SHA-256 du fichier source"},
+  "collision_policy": "Usage et controle humain ou runtime requis",
+  "keep": "Seuils visuels, geometriques et GPU definis avant essai",
+  "reject": "Defaut ou depassement qui impose correction ou retrait",
+  "assets": [
+    {
+      "path": "/Game/Anastasis/Famille/SM_Exemple_02",
+      "materials": ["/Game/Anastasis/Materials/M_Exemple"],
+      "triangle_budget_by_lod": [500, 200, 100],
+      "max_size_cm": [100.0, 100.0, 100.0],
+      "min_z_cm": [-5.0, 5.0],
+      "anchor_xy_max_cm": 20.0
+    }
+  ]
+}

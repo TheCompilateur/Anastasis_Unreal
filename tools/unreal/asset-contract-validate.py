@@ -7,6 +7,7 @@ is replayed by the designated integrator.
 """
 
 import json
+import hashlib
 import math
 import os
 
@@ -52,13 +53,14 @@ def asset_path(path):
     return path
 
 
-def validate_asset(spec):
+def validate_asset(spec, schema, stage):
     path = asset_path(required_text(spec, 'path'))
     materials = spec.get('materials')
     if not isinstance(materials, list) or not materials:
         fail('%s has no materials contract' % path)
     expected_materials = [asset_path(value) for value in materials]
-    expected_triangles = spec.get('triangles_by_lod')
+    triangle_field = 'triangles_by_lod' if schema == 1 else 'triangle_budget_by_lod'
+    expected_triangles = spec.get(triangle_field)
     if not isinstance(expected_triangles, list) or not expected_triangles:
         fail('%s has no LOD contract' % path)
     if any(isinstance(n, bool) or not isinstance(n, int) or n <= 0 for n in expected_triangles):
@@ -73,13 +75,14 @@ def validate_asset(spec):
     if min_z[0] > min_z[1]:
         fail('%s has reversed min_z_cm interval' % path)
 
-    consumer_file = local_file(required_text(spec, 'consumer_file'))
-    token = required_text(spec, 'consumer_token')
-    if token != path:
-        fail('%s consumer token differs from asset path' % path)
-    with open(consumer_file, encoding='utf-8-sig') as source:
-        if token not in source.read():
-            fail('%s absent from declared consumer %s' % (path, spec['consumer_file']))
+    if stage == 'scene':
+        consumer_file = local_file(required_text(spec, 'consumer_file'))
+        token = required_text(spec, 'consumer_token')
+        if token != path:
+            fail('%s consumer token differs from asset path' % path)
+        with open(consumer_file, encoding='utf-8-sig') as source:
+            if token not in source.read():
+                fail('%s absent from declared consumer %s' % (path, spec['consumer_file']))
 
     mesh = unreal.EditorAssetLibrary.load_asset(path)
     if mesh is None or not isinstance(mesh, unreal.StaticMesh):
@@ -90,8 +93,12 @@ def validate_asset(spec):
     if lod_count != len(expected_triangles):
         fail('%s LOD count %d != %d' % (path, lod_count, len(expected_triangles)))
     triangles = [mesh.get_num_triangles(i) for i in range(lod_count)]
-    if triangles != expected_triangles:
+    if schema == 1 and triangles != expected_triangles:
         fail('%s triangles %r != %r' % (path, triangles, expected_triangles))
+    if schema == 2 and any(actual <= 0 or actual > budget for actual, budget in zip(triangles, expected_triangles)):
+        fail('%s triangles %r exceed budgets %r' % (path, triangles, expected_triangles))
+    if any(a < b for a, b in zip(triangles, triangles[1:])):
+        fail('%s actual triangle counts increase with LOD: %r' % (path, triangles))
 
     actual_materials = []
     for slot in mesh.get_editor_property('static_materials'):
@@ -110,8 +117,16 @@ def validate_asset(spec):
         fail('%s size %r cm exceeds %r cm or is empty' % (path, size, max_size))
     if not min_z[0] <= minimum[2] <= min_z[1]:
         fail('%s minimum Z %.2f cm outside %r' % (path, minimum[2], min_z))
-    unreal.log('%s ASSET path=%s lods=%d triangles=%s size_cm=%s min_z_cm=%.2f materials=%s consumer_ref=present' % (
-        PREFIX, path, lod_count, triangles, [round(v, 2) for v in size], minimum[2], actual_materials))
+    if schema == 2:
+        max_anchor_xy = spec.get('anchor_xy_max_cm')
+        if isinstance(max_anchor_xy, bool) or not isinstance(max_anchor_xy, (int, float)) or not math.isfinite(max_anchor_xy) or max_anchor_xy < 0:
+            fail('%s invalid anchor_xy_max_cm' % path)
+        center_xy = [(minimum[i] + maximum[i]) * 0.5 for i in range(2)]
+        if any(abs(v) > max_anchor_xy for v in center_xy):
+            fail('%s bounds center XY %r exceeds anchor %s cm' % (path, center_xy, max_anchor_xy))
+    unreal.log('%s ASSET path=%s lods=%d triangles=%s size_cm=%s min_z_cm=%.2f materials=%s consumer_ref=%s' % (
+        PREFIX, path, lod_count, triangles, [round(v, 2) for v in size], minimum[2], actual_materials,
+        'source_present' if stage == 'scene' else 'library'))
 
 
 def main():
@@ -125,7 +140,8 @@ def main():
         fail('contract is outside this worktree')
     with open(contract_path, encoding='utf-8-sig') as stream:
         contract = json.load(stream)
-    if contract.get('schema_version') != 1:
+    schema = contract.get('schema_version')
+    if schema not in (1, 2):
         fail('unsupported schema_version')
     name = required_text(contract, 'id')
     required_text(contract, 'family')
@@ -140,11 +156,26 @@ def main():
             fail('%s is empty' % field)
         for value in paths:
             local_file(value)
-    proof = required_text(contract, 'capture_proof')
-    with open(local_file('tools/unreal/proofs.txt'), encoding='utf-8-sig') as stream:
-        registered = any(line.startswith(proof + ' | ') for line in stream)
-    if not registered:
-        fail('capture proof %s is absent from proofs.txt' % proof)
+    stage = contract.get('stage', 'scene') if schema == 2 else 'scene'
+    if stage not in ('scene', 'library'):
+        fail('invalid stage %r' % stage)
+    if schema == 2:
+        digests = contract.get('generator_sha256')
+        if not isinstance(digests, dict) or set(digests) != set(contract['generator_files']):
+            fail('generator_sha256 must cover exactly generator_files')
+        for relative, expected in digests.items():
+            with open(local_file(relative), 'rb') as source:
+                # Git may checkout CRLF on Windows; hash canonical LF bytes.
+                actual = hashlib.sha256(source.read().replace(b'\r\n', b'\n')).hexdigest()
+            if actual != expected:
+                fail('generator source changed: %s' % relative)
+    proof = None
+    if stage == 'scene':
+        proof = required_text(contract, 'capture_proof')
+        with open(local_file('tools/unreal/proofs.txt'), encoding='utf-8-sig') as stream:
+            registered = any(line.startswith(proof + ' | ') for line in stream)
+        if not registered:
+            fail('capture proof %s is absent from proofs.txt' % proof)
     specs = contract.get('assets')
     if not isinstance(specs, list) or not specs:
         fail('assets list is empty')
@@ -152,9 +183,9 @@ def main():
     if len(paths) != len(set(paths)):
         fail('duplicate asset paths')
     for spec in specs:
-        validate_asset(spec)
-    unreal.log('%s PASS id=%s assets=%d capture_proof=%s scope=mechanical_saved_assets_and_source_references' % (
-        PREFIX, name, len(specs), proof))
+        validate_asset(spec, schema, stage)
+    unreal.log('%s PASS id=%s assets=%d stage=%s capture_proof=%s scope=mechanical_saved_assets_and_source_references' % (
+        PREFIX, name, len(specs), stage, proof))
 
 
 try:

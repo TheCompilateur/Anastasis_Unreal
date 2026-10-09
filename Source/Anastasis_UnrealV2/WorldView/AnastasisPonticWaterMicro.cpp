@@ -3,11 +3,16 @@
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/Actor.h"
+#include "HAL/IConsoleManager.h"
 
 namespace AnastasisPonticWaterMicro
 {
 namespace
 {
+static TAutoConsoleVariable<int32> CVarHorsetailCandidate(
+	TEXT("anastasis.Dressing.PonticHorsetailCandidate"), 0,
+	TEXT("0: original horsetail mesh; 1: V2 candidate at identical placements."));
+
 uint32 Mix(uint32 Seed, int32 X, int32 Y, uint32 Salt)
 {
 	uint32 H = Seed ^ Salt ^ 0x9e3779b9u;
@@ -33,7 +38,9 @@ const TCHAR* MeshPath(EKind Kind)
 {
 	switch (Kind)
 	{
-	case EKind::Horsetail: return TEXT("/Game/Anastasis/PonticMicro/SM_Pontic_Horsetail_01.SM_Pontic_Horsetail_01");
+	case EKind::Horsetail: return CVarHorsetailCandidate.GetValueOnGameThread() != 0
+		? TEXT("/Game/Anastasis/PonticMicro/SM_Pontic_Horsetail_02.SM_Pontic_Horsetail_02")
+		: TEXT("/Game/Anastasis/PonticMicro/SM_Pontic_Horsetail_01.SM_Pontic_Horsetail_01");
 	case EKind::Coltsfoot: return TEXT("/Game/Anastasis/PonticMicro/SM_Pontic_Coltsfoot_01.SM_Pontic_Coltsfoot_01");
 	case EKind::Frog: return TEXT("/Game/Anastasis/PonticMicro/SM_Pontic_Frog_01.SM_Pontic_Frog_01");
 	default: return TEXT("");
