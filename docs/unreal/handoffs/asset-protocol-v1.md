@@ -30,11 +30,13 @@ PENDING — SHA du commit et marqueur `finish` font foi.
   Cela prouve une référence source, pas son exécution.
 - Index `tools/unreal/` : `MISSING=` et `STALE=` vides.
 - `editor-batch.ps1 -Proofs asset-contract-pontic-micro,pontic-water-micro-capture -DryRun` : PASS, deux jobs dans un éditeur prévu.
-- Build du worktree : UNKNOWN. Une tentative a attendu le verrou UBT partagé
-  derrière plusieurs autres worktrees ; interrompue **sur notre session seule**
-  avant toute compilation locale. Aucun verdict `BUILD::PASS` revendiqué.
+- Build du worktree : `BUILD::PASS` après 19 actions et 268,40 s
+  (`tools/unreal/anastasis-unreal.ps1 build`). Une première tentative avait
+  attendu le verrou UBT partagé ; la seconde a compilé sur source figée.
 - Validation réelle des quatre `.uasset` par le nouveau script : UNKNOWN jusqu'au
-  rejeu dans un éditeur de ce worktree ou du lot.
+  rejeu dans un éditeur de ce worktree ou du lot. Le lancement local de
+  `editor-batch.ps1` a attendu cinq minutes à `EDITOR_GATE::WAIT` sous le seuil
+  de 3 Go de RAM disponible, puis seule notre attente a été annulée.
 
 ## PROOFS
 
