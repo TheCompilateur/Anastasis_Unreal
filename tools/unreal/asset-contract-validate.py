@@ -1,6 +1,6 @@
 """Read-only mechanical validation of one asset family in a fresh Unreal editor.
 
-ANASTASIS_ASSET_CONTRACT is the absolute path to a V1 JSON contract in this
+ANASTASIS_ASSET_CONTRACT is the absolute path to a JSON contract in this
 worktree. The script reads saved StaticMesh assets and source references; it
 never creates, edits or saves assets. Run through editor-batch.ps1 so the proof
 is replayed by the designated integrator.

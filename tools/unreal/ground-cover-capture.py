@@ -457,7 +457,10 @@ try:
                    ('micro_horsetail', 'MicroEco_bank_Pontic_Horsetail_'),
                    ('micro_coltsfoot', 'MicroEco_bank_Pontic_Coltsfoot_'),
                    ('micro_frog', 'MicroEco_bank_Pontic_Frog_'))
+        requested_micro_views = {v.strip() for v in os.environ.get('ANASTASIS_GROUND_VIEWS', '').split(',') if v.strip()}
         for label, prefix in targets:
+            if requested_micro_views and label not in requested_micro_views:
+                continue
             candidates = []
             for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
                 if not comp.get_name().startswith(prefix):
