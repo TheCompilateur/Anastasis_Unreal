@@ -3,18 +3,20 @@
 SE LANCE HORS UNREAL, avec le Python du systeme (Pillow + numpy) :
 
     python tools/unreal/ground-textures.py
+    python tools/unreal/ground-textures.py Ruin  # seulement la nouvelle variante
 
 Il prepare les images que tools/unreal/ground-material.py importe ensuite dans
 /Game/Anastasis/Materials/GroundTextures. Rien n'est ecrit dans Content/ ici.
 
-SOURCES. Quatre textures Poly Haven (https://polyhaven.com), licence CC0, en 2K, une par
-famille de sol exportee par AnastasisTerrainSurface::Build. Choisies contre la direction
+SOURCES. Quatre textures de base et une variante locale Ruin de Poly Haven
+(https://polyhaven.com), licence CC0, en 2K. Choisies contre la direction
 artistique P1.6 (ecologie pontique humide, "Mediterranean dryness" interdite) :
 
   Grass   sparse_grass       2.0 m   herbe clairsemee, sol, racines
   Litter  forest_leaves_02   3.0 m   feuilles, mousse, brindilles
   Worked  brown_mud_02       1.3 m   terre compacte humide
   Rock    mossy_rock         3.0 m   roche moussue, lichen
+  Ruin    cobblestone_floor_13 2.0 m  pierres usees en terre, sites remanies
 
 Les fichiers bruts vont dans Saved/GroundTextures/raw (ignore par git), les images
 empaquetees dans Saved/GroundTextures/packed. Les assets importes, eux, sont versionnes :
@@ -68,6 +70,7 @@ FAMILIES = {
     'Litter': ('forest_leaves_02', 300.0, 'diffuse'),
     'Worked': ('brown_mud_02', 130.0, 'diff'),
     'Rock': ('mossy_rock', 300.0, 'diff'),
+    'Ruin': ('cobblestone_floor_13', 200.0, 'diff'),
 }
 MAPS = (('color', 'jpg'), ('nor_dx', 'png'), ('rough', 'jpg'), ('disp', 'png'), ('ao', 'jpg'))
 
@@ -147,7 +150,10 @@ def pack(family, asset, size_cm, files):
     # la direction artistique interdit nommement). On ne garde donc que le detail sous
     # HIGHPASS_CM, relatif a sa moyenne LOCALE ; la variation large reste portee par le
     # bruit macro/meso du materiau, qui ne se repete pas a l'echelle du monde.
-    sigma = HIGHPASS_CM / size_cm * 2048.0 / 2.0
+    # Les joints et galets de la ruine portent une forme plus large que les
+    # grains naturels. Leur passe-haut reste local au site, jamais a la vallee.
+    cutoff_cm = 35.0 if family == 'Ruin' else HIGHPASS_CM
+    sigma = cutoff_cm / size_cm * 2048.0 / 2.0
     color = srgb_to_lin(load01(files['color'], 3))
     mean = color.reshape(-1, 3).mean(axis=0)
     local = np.maximum(lowpass(color, sigma), 1e-4)
@@ -182,7 +188,9 @@ def pack(family, asset, size_cm, files):
     # Occlusion : meme logique encore, ramenee a une moyenne de 0.5. Brute, elle
     # assombrirait toute la famille de sa moyenne (0.60 pour la litiere) et deplacerait
     # l'albedo cale ; centree, elle ne creuse que les creux.
-    ao = load01(files['ao'], 1)
+    # cobblestone_floor_13 ne fournit pas d'AO separee. Son ARM a un canal
+    # d'occlusion vide (moyenne ~0.005) : une occlusion neutre est plus honnete.
+    ao = load01(files['ao'], 1) if 'ao' in files else np.ones_like(rough)
     ao_mean = float(ao.mean())
     nr = np.dstack([to8(nor[..., 0]), to8(nor[..., 1]),
                     to8(np.clip(0.5 + (rough - lowpass(rough, sigma)), 0.0, 1.0)),
@@ -201,6 +209,7 @@ def pack(family, asset, size_cm, files):
         'ao_mean': round(ao_mean, 4),
         'size': list(ah.shape[:2]),
         'highpass_sigma_px': round(sigma, 2),
+        'highpass_cm': cutoff_cm,
     }
     print('GROUND_TEXTURES PACKED %s %s' % (family, json.dumps(info)))
     return paths, info
@@ -212,9 +221,17 @@ def main():
     manifest = {'license': 'CC0 1.0 (Poly Haven)', 'detail_mean': DETAIL_MEAN, 'chroma': CHROMA,
                 'highpass_cm': HIGHPASS_CM,
                 'families': {}}
-    for family, (asset, size_cm, color_name) in FAMILIES.items():
+    selected = sys.argv[1:] or list(FAMILIES)
+    unknown = set(selected) - set(FAMILIES)
+    if unknown:
+        raise ValueError('familles inconnues: ' + ', '.join(sorted(unknown)))
+    for family in selected:
+        asset, size_cm, color_name = FAMILIES[family]
         files, sources = {}, {}
         for kind, ext in MAPS:
+            if family == 'Ruin' and kind == 'ao':
+                sources[kind] = {'derived': 'neutral because source has no AO map'}
+                continue
             url = url_for(asset, kind, ext, color_name)
             dst = os.path.join(RAW, os.path.basename(url))
             fetch(url, dst)

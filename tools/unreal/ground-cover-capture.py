@@ -76,6 +76,10 @@ STATE_CMDS = {
     'on_notex': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     'bare': ('anastasis.Dressing.GroundCover 0', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     'bare_notex': ('anastasis.Dressing.GroundCover 0', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    # PONTIC_GROUND_ASSETS_001 : seule la texture du sol de ruine bascule.
+    'ruin_before': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'ruin_after': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
+    'ruin_control': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1'),
     # MICRO_ECOLOGY_001. L'herbe, sa teinte et les rives vivantes restent. Seule cette couche bouge.
     'eco': ('anastasis.Dressing.GroundCover 1', 'anastasis.GroundCover.Shadows 1', 'anastasis.GroundCover.SoilTint 1',
             'anastasis.Dressing.MicroEcology 1', 'anastasis.MicroEcology.Soil 1'),
@@ -83,6 +87,7 @@ STATE_CMDS = {
               'anastasis.Dressing.MicroEcology 0', 'anastasis.MicroEcology.Soil 0'),
 }
 NO_TEXTURE = ('on_notex', 'bare_notex')
+CONTEXT_STATES = ('ruin_before', 'ruin_after', 'ruin_control')
 GROUND_MI = '/Game/Anastasis/Materials/MI_AnastasisGround'
 states = [x.strip() for x in os.environ.get('ANASTASIS_GROUND_STATES', 'on,off').split(',') if x.strip()]
 LEVEL = '/Game/Anastasis/Maps/Lvl_AnastasisSlice'
@@ -141,7 +146,7 @@ try:
     def cmd(c):
         unreal.SystemLibrary.execute_console_command(world, c)
 
-    if natural_run or flower_run or cards_run or micro_run:
+    if natural_run or flower_run or cards_run or micro_run or any(s in CONTEXT_STATES for s in states):
         cmd('anastasis.Sky.Hour 11')
         if not woodland_run:
             cmd('anastasis.Dressing.WoodlandSequence 0')
@@ -154,7 +159,7 @@ try:
 
     def texture_state(state):
         # Apres CHAQUE incarnation : EmbodyCanonical repose le materiau de l'asset.
-        if state not in NO_TEXTURE:
+        if state not in NO_TEXTURE and state not in CONTEXT_STATES:
             return
         # Une MID par section, creee par le composant lui-meme (UFUNCTION exposee a Python).
         n = 0
@@ -164,16 +169,21 @@ try:
                 if m is None or not m.get_path_name().startswith(GROUND_MI):
                     continue
                 mid = comp.create_dynamic_material_instance(i, m)
-                mid.set_scalar_parameter_value('TexFadeStart', 0.0)
-                mid.set_scalar_parameter_value('TexFadeEnd', 1.0)
+                if state in NO_TEXTURE:
+                    mid.set_scalar_parameter_value('TexFadeStart', 0.0)
+                    mid.set_scalar_parameter_value('TexFadeEnd', 1.0)
+                else:
+                    mid.set_scalar_parameter_value('TexContextStrength', 1.0 if state == 'ruin_after' else 0.0)
                 # Un materiau sans le parametre l'ignore en silence et rendrait un faux A/B.
                 get = getattr(mid, 'k2_get_scalar_parameter_value', None) or mid.get_scalar_parameter_value
-                if abs(get('TexFadeEnd') - 1.0) > 1e-4:
-                    raise RuntimeError('MI_AnastasisGround sans TexFadeEnd : rien a couper')
+                parameter = 'TexFadeEnd' if state in NO_TEXTURE else 'TexContextStrength'
+                expected = 1.0 if state in NO_TEXTURE or state == 'ruin_after' else 0.0
+                if abs(get(parameter) - expected) > 1e-4:
+                    raise RuntimeError('MI_AnastasisGround sans %s : rien a basculer' % parameter)
                 n += 1
         if n == 0:
             raise RuntimeError('aucune section ne porte MI_AnastasisGround')
-        unreal.log('GROUND_CAPTURE_NOTEX state=%s sections=%d' % (state, n))
+        unreal.log('GROUND_CAPTURE_MATERIAL state=%s sections=%d' % (state, n))
 
     texture_state(states[0])
     report = [r.split('|') for r in actor.call_method('GetPlaceReport')]
@@ -307,6 +317,12 @@ try:
             gz = ground(ex, ey)
             if gz is not None:
                 plan.append(('hameau_eye', (ex / T, ey / T), 170, ((cx + vx / vd * rr * 1.5) / T, (cy + vy / vd * rr * 1.5) / T), 120))
+            # La vue d'ensemble regarde surtout au-dela de la bande de photo (4 m).
+            # Cette pose, au coeur du composant Ruin, juge les joints a hauteur humaine.
+            gx, gy = cx + vy / vd * rr * 0.12, cy - vx / vd * rr * 0.12
+            if ground(gx, gy) is not None:
+                plan.append(('hameau_ground', (gx / T, gy / T), 170,
+                             ((gx + vx / vd * 280) / T, (gy + vy / vd * 280) / T), 0))
             continue
     # Hors vallee : une touffe lointaine posee loin des ellipses ecrites, oeil a 1,7 m au-dessus,
     # regard vers le centre de la carte. Rien trouve = le masque ne couvre toujours que la vallee.

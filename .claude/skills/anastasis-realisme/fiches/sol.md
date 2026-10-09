@@ -24,7 +24,7 @@
 | Matériau | `MI_AnastasisGround` (instance de `M_AnastasisGround`), repli `M_AnastasisSlice` | script d'autorité `tools/unreal/ground-material.ps1` + `.py` |
 | Sémantique | couleur de sommet = teinte de la simulation (type, rive, humidité) ; UV0 = (roche, litière), UV1 = (travaillé, humidité) | `GROUND_SURFACE_001.md` |
 | Albédos | recalés sur le réel : herbe humide 0,10–0,18, litière 0,05–0,10, roche mouillée 0,12–0,20 | idem |
-| Textures | 4 photos CC0 Poly Haven 2K (`sparse_grass`, `forest_leaves_02`, `brown_mud_02`, `mossy_rock`), empaquetées par `tools/unreal/ground-textures.py` (Python système) | `GROUND_TEXTURE_001.md` |
+| Textures | 4 photos de base CC0 Poly Haven 2K (`sparse_grass`, `forest_leaves_02`, `brown_mud_02`, `mossy_rock`) et une variante locale pour `Ruin` (`cobblestone_floor_13`), empaquetées par `tools/unreal/ground-textures.py` (Python système) | `GROUND_TEXTURE_001.md`, `handoffs/pontic-ground-assets-001.md` |
 | Projection | triplanaire dans un nœud Custom HLSL, normale en espace monde (le maillage n'a pas de tangentes) | idem |
 | Variation | bruits à ~600 m, ~60 m, ~11 m, ~70 cm | `ground-material.py`, `handoffs/forest-terrain-p4.md` |
 | Coût | 924 instructions pixel, 10 samplers ; GPU dans le bruit (prairie basse 11,0 → 10,9 ms) | `GROUND_TEXTURE_001.md` |
@@ -37,8 +37,9 @@
   `GROUND_SURFACE_001`.
 - **SOL-02** — La photo **module**, elle ne colore pas : albédo divisé par sa moyenne locale, facteur
   neutre en moyenne. La couleur reste celle de la simulation.
-- **SOL-03** — Toute photo de sol passe le passe-haut à 15 cm à l'empaquetage : sans lui, le damier
-  apparaît à 35 m (interdit par la direction artistique).
+- **SOL-03** — Les quatre photos de base passent le passe-haut à 15 cm à l'empaquetage : sans lui, le damier
+  apparaît à 35 m (interdit par la direction artistique). La variante `Ruin`, limitée aux sites remaniés,
+  utilise 35 cm pour conserver les joints des pierres ; vérifier l'absence de répétition en A/B sur le hameau.
 - **SOL-04** — Le matériau se change dans `ground-material.py` puis se régénère ; le script refuse un
   matériau qui ne compile pas. Une erreur de `recompile_material` ignorée remplace le sol par le
   matériau par défaut.

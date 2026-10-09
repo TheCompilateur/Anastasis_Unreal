@@ -31,7 +31,8 @@ CE QUE LE MATERIAU LIT, ET D'OU CA VIENT (AnastasisTerrainSurface::Build) :
 
 Aucune de ces entrees n'est inventee ici. Le materiau projette, il ne simule pas.
 
-TEXTURES PHOTO (GROUND_TEXTURE_001). Huit textures CC0, deux par famille, importees dans
+TEXTURES PHOTO (GROUND_TEXTURE_001, PONTIC_GROUND_ASSETS_001). Dix textures CC0 :
+les huit de base et deux pour les ruines, importees dans
 /Game/Anastasis/Materials/GroundTextures depuis Saved/GroundTextures/packed, que produit
 tools/unreal/ground-textures.py (Python systeme, a lancer AVANT). Elles portent ce que la
 geometrie a un sommet par metre ne peut pas porter : le detail sous le metre. Elles ne
@@ -41,7 +42,7 @@ importees, ce script ne les reimporte plus, sauf ANASTASIS_GROUND_TEXTURES_REIMP
 
 Variables d'environnement :
   ANASTASIS_GROUND_REBUILD             "1" regenere les deux assets (ecrase l'existant)
-  ANASTASIS_GROUND_TEXTURES_REIMPORT   "1" reimporte les huit textures depuis packed/
+  ANASTASIS_GROUND_TEXTURES_REIMPORT   "1" reimporte les dix textures depuis packed/
 """
 import json
 import os
@@ -64,6 +65,7 @@ TEX_PKG = PKG + '/GroundTextures'
 # Taille = cote reel de la photo en cm (fiche Poly Haven), donc l'echelle par defaut est
 # l'echelle physique : un caillou de la photo a la taille d'un caillou.
 TEX_FAMILIES = (('Grass', 200.0), ('Litter', 300.0), ('Worked', 130.0), ('Rock', 300.0))
+CONTEXT_FAMILIES = (('Ruin', 200.0),)
 # Inverse de DETAIL_MEAN de ground-textures.py : l'albedo de detail est stocke a une
 # moyenne de 0.4, le materiau le ramene a 1. Les deux nombres vont ensemble ;
 # import_textures() le verifie contre le manifeste a chaque import.
@@ -313,7 +315,7 @@ def tex_path(family, suffix):
 
 
 def import_textures():
-    """Importe les huit textures si elles manquent (ou sur REIMPORT), puis les rend.
+    """Importe les textures manquantes (ou sur REIMPORT), puis les rend.
 
     AH : sRGB, la couleur de detail est perceptuelle et 8 bits lineaires la
     postÃƒÂ©riseraient dans les sombres. NR : LINEAIRE -- c'est une normale, une rugosite
@@ -325,7 +327,7 @@ def import_textures():
                           'GroundTextures', 'packed')
     manifest_checked = False
     out = {}
-    for family, _ in TEX_FAMILIES:
+    for family, _ in TEX_FAMILIES + CONTEXT_FAMILIES:
         for suffix, srgb in (('AH', True), ('NR', False)):
             path = tex_path(family, suffix)
             if TEX_REIMPORT or not eal.does_asset_exist(path):
@@ -407,6 +409,26 @@ def _family_hlsl(i, family, comp):
     return '\n'.join(lines)
 
 
+def _ruin_hlsl():
+    # Une ruine est un site local, pas une cinquieme famille diffuse du monde.
+    # Ses joints gardent une echelle de pierre lisible a hauteur humaine.
+    lines = ['float4 RA=0, RR=0; float3 RN=0;',
+             'float RuinMix=saturate(Worked*10.0)*saturate((RockW-0.60)*4.0)*saturate(ContextStrength);',
+             '[branch] if (RuinMix > 0.001) {',
+             'float t=1.0/TexSizeRuin;']
+    for w, sign, uv, grad, tn, swizzle in _AXES:
+        lines += ['[branch] if (%s > 0.01) {' % w,
+                  'float2 uv=%s*t,gx=%s*t,gy=%s*t;' % (uv, grad.format(d='dPx'), grad.format(d='dPy')),
+                  'float4 a=Texture2DSampleGrad(RuinAH,RuinAHSampler,uv,gx,gy);',
+                  'float4 n=Texture2DSampleGrad(RuinNR,RuinNRSampler,uv,gx,gy);',
+                  'float2 xy=(n.xy*2.0-1.0)*NormalStrength*0.75; xy.x *= %s;' % sign,
+                  'float z=sqrt(saturate(1.0-dot(xy,xy)));',
+                  'RA+=a*%s; RR+=n*%s; RN+=(%s).%s*%s;' % (w, w, tn, swizzle, w),
+                  '}']
+    lines += ['RN=normalize(RN);', '}']
+    return '\n'.join(lines)
+
+
 def ground_texture_hlsl():
     """Corps du noeud Custom : poids de famille, projection, melange par hauteur.
 
@@ -421,6 +443,7 @@ def ground_texture_hlsl():
     """
     comps = 'xyzw'
     body = '\n'.join(_family_hlsl(i, f, comps[i]) for i, (f, _) in enumerate(TEX_FAMILIES))
+    ruin_body = _ruin_hlsl()
     return '''TexNormal = normalize(N);
 TexRough = 0.0;
 [branch] if (Fade < 0.001) { return float3(1.0, 1.0, 1.0); }
@@ -443,6 +466,7 @@ float4 A0 = 0, A1 = 0, A2 = 0, A3 = 0;
 float4 R0 = 0, R1 = 0, R2 = 0, R3 = 0;
 float3 N0 = 0, N1 = 0, N2 = 0, N3 = 0;
 %s
+%s
 float4 hw = W + H * HeightBlend;
 float m = max(max(hw.x, hw.y), max(hw.z, hw.w)) - BlendDepth;
 float4 b = max(hw - m, 0.0) * saturate((W - 0.002) * 25.0);
@@ -451,12 +475,15 @@ float3 alb = (b.x * A0.rgb + b.y * A1.rgb + b.z * A2.rgb + b.w * A3.rgb) * %.6f;
 float4 nr = b.x * R0 + b.y * R1 + b.z * R2 + b.w * R3;
 float3 nw = b.x * N0 + b.y * N1 + b.z * N2 + b.w * N3;
 nw = dot(nw, nw) > 1e-8 ? normalize(nw) : Nn;
+alb = lerp(alb, RA.rgb * %.6f, RuinMix);
+nr = lerp(nr, RR, RuinMix);
+nw = normalize(lerp(nw, RN, RuinMix));
 float ao = lerp(1.0, nr.a * 2.0, AOStrength);
 float3 detail = lerp(float3(1.0, 1.0, 1.0), alb, AlbedoStrength) * ao;
 TexNormal = normalize(lerp(Nn, nw, Fade));
 TexRough = (nr.b - 0.5) * 2.0 * RoughnessStrength * Fade;
 return lerp(float3(1.0, 1.0, 1.0), detail, Fade);
-''' % (body, 1.0 / TEX_DETAIL_MEAN)
+''' % (body, ruin_body, 1.0 / TEX_DETAIL_MEAN, 1.0 / TEX_DETAIL_MEAN)
 
 
 
@@ -788,7 +815,8 @@ return saturate(Thin + Fine + matrix);
         'HeightBlend': g.scalar('TexHeightBlend', 0.6, T, -1900, 1600),
         'BlendDepth': g.scalar('TexBlendDepth', 0.2, T, -1900, 1660),
     }
-    for i, (family, size) in enumerate(TEX_FAMILIES):
+    tex_params['ContextStrength'] = g.scalar('TexContextStrength', 1.0, T, -1900, 1690)
+    for i, (family, size) in enumerate(TEX_FAMILIES + CONTEXT_FAMILIES):
         tex_params['TexSize' + family] = g.scalar('TexSize' + family, size, T, -1900, 1720 + 60 * i)
     # Pleine a 4 m, absente a 20 m. Le talus du cadrage a 1,7 m perd sa photo
     # avant l'eau ; au-dela le noeud ne lit plus aucune texture.
@@ -799,7 +827,7 @@ return saturate(Thin + Fine + matrix);
 
     tex_inputs = ['P', 'N', 'RockMask', 'RockW', 'Litter', 'Worked', 'Fade'] + list(tex_params.keys())
     tex_objects = {}
-    for family, _ in TEX_FAMILIES:
+    for family, _ in TEX_FAMILIES + CONTEXT_FAMILIES:
         for suffix, sampler in (('AH', SAMPLER_COLOR), ('NR', SAMPLER_LINEAR_COLOR)):
             name = family + suffix
             tex_inputs.append(name)
