@@ -22,7 +22,7 @@ Copy-Item "$Source\tools\unreal\mcp-port.ps1", "$Source\tools\unreal\tools-index
 # Le depot jetable n'a ni moteur ni binaires : pas de recompilation du canonique apres versement.
 $env:ANASTASIS_CANONICAL_BUILD = '0'
 # Les scenarios ci-dessous appellent `prune` eux-memes apres un versement : l'elagage automatique
-# (DISK_HYGIENE_001) ne tourne que dans S32, qui le remet a 1.
+# (DISK_HYGIENE_001) ne tourne que dans S33, qui le remet a 1.
 $env:ANASTASIS_AUTO_PRUNE = '0'
 function AW {$o = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$harness\agent-worktree.ps1" @args 2>&1 | ForEach-Object { "$_" }; [PSCustomObject]@{ Code = $LASTEXITCODE; Out = ($o -join "`n") } }
 function G { & git -C $repo @args 2>&1 | ForEach-Object { "$_" } }
@@ -483,7 +483,7 @@ $null = NewMission 'pz2' @({ param($w) Set-Content "$w\doc-pz2.md" 'pas verse' }
 $r = AW prune -Mission pz2
 Check 'S29 prune refuse toujours une branche non versee' ($r.Code -ne 0 -and $r.Out -match 'absents de main' -and (G rev-parse --verify --quiet agent/pz2)) $r.Out
 
-# 32. DISK_HYGIENE_001 : le versement elague ses missions. ap1 propre : supprimee ; ap2 sale et
+# 33. DISK_HYGIENE_001 : le versement elague ses missions. ap1 propre : supprimee ; ap2 sale et
 #     ap3 tenue par un processus : gardees et nommees, versees quand meme ; integrate seul aussi.
 $env:ANASTASIS_AUTO_PRUNE = '1'
 G checkout -q -f main | Out-Null; G clean -fdq | Out-Null
@@ -497,17 +497,17 @@ $null = AW finish -Mission ap3
 $holder = Start-Process powershell.exe -ArgumentList '-NoProfile', '-Command', "Start-Sleep -Seconds 300 # $wa3\tient" -WindowStyle Hidden -PassThru
 $r = AW integrate-batch -Missions 'ap1,ap2,ap3'
 Stop-Process -Id $holder.Id -Force -ErrorAction SilentlyContinue
-Check 'S32 lot verse les trois' ($r.Code -eq 0 -and $r.Out -match 'BATCH_INTEGRATED::ap1, ap2, ap3') $r.Out
-Check 'S32 mission propre elaguee : worktree et branche supprimes' ($r.Out -match 'AUTO_PRUNE::ELAGUE ap1' -and -not (Test-Path $wa1) -and -not (G rev-parse --verify --quiet agent/ap1)) $r.Out
-Check 'S32 mission sale gardee, brouillon intact' ($r.Out -match 'AUTO_PRUNE::GARDE ap2' -and (Test-Path "$wa2\brouillon.txt") -and (G rev-parse --verify --quiet agent/ap2)) $r.Out
-Check 'S32 mission tenue par un processus gardee intacte' ($r.Out -match 'AUTO_PRUNE::GARDE ap3' -and $r.Out -match 'processus encore ouvert' -and (Test-Path "$wa3\doc-ap3.md") -and (G rev-parse --verify --quiet agent/ap3)) $r.Out
+Check 'S33 lot verse les trois' ($r.Code -eq 0 -and $r.Out -match 'BATCH_INTEGRATED::ap1, ap2, ap3') $r.Out
+Check 'S33 mission propre elaguee : worktree et branche supprimes' ($r.Out -match 'AUTO_PRUNE::ELAGUE ap1' -and -not (Test-Path $wa1) -and -not (G rev-parse --verify --quiet agent/ap1)) $r.Out
+Check 'S33 mission sale gardee, brouillon intact' ($r.Out -match 'AUTO_PRUNE::GARDE ap2' -and (Test-Path "$wa2\brouillon.txt") -and (G rev-parse --verify --quiet agent/ap2)) $r.Out
+Check 'S33 mission tenue par un processus gardee intacte' ($r.Out -match 'AUTO_PRUNE::GARDE ap3' -and $r.Out -match 'processus encore ouvert' -and (Test-Path "$wa3\doc-ap3.md") -and (G rev-parse --verify --quiet agent/ap3)) $r.Out
 $wa4 = NewMission 'ap4' @({ param($w) Set-Content "$w\doc-ap4.md" 'ap4' })
 $r = AW integrate -Mission ap4
-Check 'S32 integrate seul elague aussi' ($r.Code -eq 0 -and $r.Out -match 'AUTO_PRUNE::ELAGUE ap4' -and -not (Test-Path $wa4)) $r.Out
+Check 'S33 integrate seul elague aussi' ($r.Code -eq 0 -and $r.Out -match 'AUTO_PRUNE::ELAGUE ap4' -and -not (Test-Path $wa4)) $r.Out
 $env:ANASTASIS_AUTO_PRUNE = '0'
 $wa5 = NewMission 'ap5' @({ param($w) Set-Content "$w\doc-ap5.md" 'ap5' })
 $r = AW integrate -Mission ap5
-Check 'S32 ANASTASIS_AUTO_PRUNE=0 : rien n est supprime' ($r.Code -eq 0 -and $r.Out -match 'AUTO_PRUNE::SKIP' -and (Test-Path $wa5)) $r.Out
+Check 'S33 ANASTASIS_AUTO_PRUNE=0 : rien n est supprime' ($r.Code -eq 0 -and $r.Out -match 'AUTO_PRUNE::SKIP' -and (Test-Path $wa5)) $r.Out
 
 # 31. HEADLESS_GATE_001 : finish joue la suite par defaut ; un `queued` n'est repris que par -Queue.
 G checkout -q -f main | Out-Null; G clean -fdq | Out-Null

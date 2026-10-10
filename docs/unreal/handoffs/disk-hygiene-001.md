@@ -33,7 +33,7 @@ voir `git log agent/disk-hygiene-001`
 
 ## MEC
 
-- BANC : `tools\unreal\test-agent-worktree.ps1` -> 85 PASS, 0 FAIL (2026-10-09). Le scenario d'elagage a tourne sous le libelle S30, renomme S32 juste apres pour eviter le doublon avec la porte memoire : ligne `ANASTASIS_AUTO_PRUNE=0` en tete, lot de trois missions (propre elaguee, sale gardee avec son brouillon, tenue par un processus gardee intacte), `integrate` seul qui elague, interrupteur a 0 qui laisse tout
+- BANC : `tools\unreal\test-agent-worktree.ps1` -> 85 PASS, 0 FAIL (2026-10-09). Le scenario d'elagage a tourne sous le libelle S30, renomme S33 (S30 et S32 sont pris par la porte memoire et le plafond de preuves) ; rejoue apres rebase sur fd8563d4b : 99 PASS, 0 FAIL : ligne `ANASTASIS_AUTO_PRUNE=0` en tete, lot de trois missions (propre elaguee, sale gardee avec son brouillon, tenue par un processus gardee intacte), `integrate` seul qui elague, interrupteur a 0 qui laisse tout
 - ZEN : un zenserver jetable (port 18558, dossier de données du scratchpad) lancé avec la nouvelle ligne
   `ExtraArgs` démarre (`/health` = 200) et journalise `0B used, 40G soft limit ... Disk usage GC in 40G`,
   `initializing GC, enabled 'true', interval 1h00m`. Les options sont donc reconnues par le zenserver installé.
