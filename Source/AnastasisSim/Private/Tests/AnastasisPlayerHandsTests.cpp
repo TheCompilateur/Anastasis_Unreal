@@ -112,6 +112,22 @@ bool FAnastasisPlayerHandsTest::RunTest(const FString&)
 		TestEqual(TEXT("une pierre dans le sac"), V.PlayerStone(), 1);
 	}
 
+	// relay-mains-001 : une maison posee sur une tuile de bois. La tuile garde son bois dans le monde, mais la main
+	// vise la maison : la tuile n'offre plus rien, et le geste force est refuse sans rien prendre.
+	{
+		FVillage Built;
+		Built.Bind(World);
+		const FString House = Built.AddBuilding(HouseType, 19, 22);
+		Built.ArriveAsPlayer(20.5, 21.5);
+		if (TestFalse(TEXT("maison posee sur la tuile de bois"), House.IsEmpty()))
+		{
+			TestEqual(TEXT("... la tuile garde son bois"), TileAmount(Built, 19, 22), 9);
+			TestTrue(TEXT("tuile batie : rien a couper"), Built.PlayerHandOffer(FString(), 19, 22) == EHand::None);
+			TestFalse(TEXT("... et le geste est refuse"), Built.PlayerHandDo(EHand::Chop, FString(), 19, 22).bDone);
+			TestEqual(TEXT("... le bois reste sur la tuile"), TileAmount(Built, 19, 22), 9);
+		}
+	}
+
 	// Trop loin : refuse, rien ne bouge.
 	{
 		FVillage Far;

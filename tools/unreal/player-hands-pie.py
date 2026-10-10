@@ -5,12 +5,19 @@ bougent, seuls les gestes changent l'etat), puis, pour chaque cible, fait arrive
 (`Anastasis.Player.Arrive X Y`), tourne la camera vers elle et lit ce que la main vise :
 
     1. le puits        : offre « boire », a portee ; `Anastasis.Player.Use` -> une gorgee de plus
-    2. un champ        : offre « recolter » ; clic maintenu (`Anastasis.Player.Hold 1`) -> une portion dans le sac
-    3. le sac          : `Anastasis.Player.EatFromBag` -> la portion mangee
-    4. le grenier      : offre « deposer » ou « prendre » ; `Anastasis.Player.Use` -> le sac et le grenier changent
-                         d'autant, rien ne se cree
-    5. une tuile de bois : clic maintenu -> une buche dans le sac
-    6. la barre de 8 cases est a l'ecran
+    2. un champ        : offre « recolter » ; clic maintenu (`Anastasis.Player.Hold 1`) -> le geste se refait tant
+                         qu'on tient : deux portions dans le sac
+    3. le sac          : `Anastasis.Player.EatFromBag` -> une portion mangee, l'autre reste a porter
+    4. la marche       : le MEME corps marche jusqu'au seuil du grenier, sac compris (`Anastasis.Player.Move dx dy`
+                         puis `Anastasis.Sim.Advance 0.2`, pas a pas : la simulation reste gelee entre deux pas)
+    5. le grenier      : offre « deposer » ; `Anastasis.Player.Use` -> le sac se vide dans le grenier, d'autant ;
+                         puis, sac vide, il offre « prendre » ; `Use` -> une portion revient au sac, rien ne se cree
+    6. une tuile de bois : clic maintenu -> une buche dans le sac (une tuile batie n'est jamais proposee)
+    7. la barre de 8 cases est a l'ecran
+
+relay-mains-001 : le grenier du village d'ouverture est vide, et `Anastasis.Player.Arrive` fait arriver un NOUVEL
+habitant, sac vide. La premiere version mangeait sa seule portion puis faisait arriver un autre corps au grenier : ni
+sac ni grenier n'avaient rien, la main n'offrait rien (a raison). Le corps porte donc sa portion jusqu'au grenier.
 
 Etat lu par AnastasisSimulationDebugLibrary.get_player_hands_status / get_player_hand_targets (JSON). Lignes
 PLAYER_HANDS_PIE et ANASTASIS_HANDS du log ; PLAYER_HANDS_PIE PASS si chaque controle tient. Aucun asset sauve.
@@ -99,6 +106,18 @@ def building(world, kind):
     return None
 
 
+def dist(ax, ay, bx, by):
+    return ((ax - bx) ** 2 + (ay - by) ** 2) ** 0.5
+
+
+def reach_of(b, x, y):
+    """Meme mesure que la simulation : le seuil le plus proche, ou le centre de la case."""
+    best = dist(x, y, b['x'] + 0.5, b['y'] + 0.5)
+    for door in b.get('access', []):
+        best = min(best, dist(x, y, door[0], door[1]))
+    return best
+
+
 def tick(dt):
     global phase
     try:
@@ -179,50 +198,108 @@ def _tick():
         samples['food0'] = s.get('food', 0)
         cmd(world, 'Anastasis.Player.Hold 1')
         step, mark = 7, now
-    elif step == 7 and now - mark > 2.0:
+    elif step == 7:
+        # Le clic tenu refait le geste (1,2 s chacun) : on tient jusqu'a deux portions, 8 s au plus.
+        s = hands(world)
+        if s.get('food', 0) < samples['food0'] + 2 and now - mark < 8.0:
+            return
         s = hands(world, 'gathered')
         cmd(world, 'Anastasis.Player.Hold 0')
-        check('holding the click: a portion in the bag', s.get('food', 0) > samples['food0'], '%s -> %s' % (samples['food0'], s.get('food')))
+        check('holding the click: the gesture repeats, two portions in the bag', s.get('food', 0) >= samples['food0'] + 2,
+              '%s -> %s' % (samples['food0'], s.get('food')))
         samples['meals0'] = s.get('meals', 0)
+        samples['carrier'] = s.get('player')
         cmd(world, 'Anastasis.Player.EatFromBag')
         step, mark = 8, now
     elif step == 8 and now - mark > 0.4:
         s = hands(world, 'ate')
         check('eat from the bag: one meal, one portion less', s.get('meals', 0) == samples['meals0'] + 1
               and s.get('food', 0) == samples['gathered'].get('food', 0) - 1, 'meals=%s food=%s' % (s.get('meals'), s.get('food')))
+        samples['carry'] = s.get('food', 0)
+        check('a portion left in the bag to carry', samples['carry'] >= 1, str(samples['carry']))
         granary = building(world, 'granary')
         check('a finished granary', granary is not None, json.dumps(granary))
-        if not granary:
+        if not granary or samples['carry'] < 1:
             step = 90
             return
         target = dict(granary, lift=150.0)
-        samples['granary0'] = granary.get('food', 0)
-        cmd(world, 'Anastasis.Player.Arrive %d %d' % (granary['x'] + 1, granary['y']))
-        step, mark = 9, now
+        doors = granary.get('access') or [[granary['x'] + 1.5, granary['y'] + 0.5]]
+        samples['door'] = min(doors, key=lambda d: dist(s.get('x', 0.0), s.get('y', 0.0), d[0], d[1]))
+        samples['walk_steps'] = 0
+        unreal.log('PLAYER_HANDS_PIE_WALK to granary door %s from (%.2f,%.2f)' % (samples['door'], s.get('x', 0.0), s.get('y', 0.0)))
+        step, mark = 20, now
+    elif step == 20 and now - mark > 0.15:
+        # Marcher : une direction (l'hote la donne au corps a la frame suivante), puis un pas de simulation.
+        s = hands(world)
+        granary = building(world, 'granary') or target
+        x, y = s.get('x', 0.0), s.get('y', 0.0)
+        door = samples['door']
+        if dist(x, y, door[0], door[1]) <= 0.45 or reach_of(granary, x, y) <= 1.2:
+            cmd(world, 'Anastasis.Player.Move 0 0')
+            s = hands(world, 'walked')
+            check('walked to the granary: the same body, its bag carried', s.get('player') == samples['carrier']
+                  and s.get('food', 0) == samples['carry'], '%s food=%s steps=%d reach=%.2f'
+                  % (s.get('player'), s.get('food'), samples['walk_steps'], reach_of(granary, x, y)))
+            step, mark = 9, now
+            return
+        if samples['walk_steps'] >= 160:
+            cmd(world, 'Anastasis.Player.Move 0 0')
+            check('walked to the granary', False, 'stuck at (%.2f,%.2f) door=%s' % (x, y, door))
+            step = 90
+            return
+        d = dist(x, y, door[0], door[1])
+        cmd(world, 'Anastasis.Player.Move %.3f %.3f' % ((door[0] - x) / d, (door[1] - y) / d))
+        step, mark = 21, now
+    elif step == 21 and now - mark > 0.1:
+        cmd(world, 'Anastasis.Sim.Advance 0.2')
+        samples['walk_steps'] += 1
+        step, mark = 20, now
     elif step == 9 and now - mark > 1.0:
         aim(world, target)
         step, mark = 10, now
     elif step == 10 and now - mark > 0.6:
         s = hands(world, 'granary_focus')
-        check('looking at the granary: deposit or take', s.get('offer') in ('deposer la nourriture', 'prendre une portion'), s.get('offer'))
+        check('looking at the granary with food in the bag: it offers to deposit', s.get('offer') == 'deposer la nourriture', s.get('offer'))
         check('... within reach', s.get('in_reach') is True)
+        # Avant / apres au plus pres du geste : la simulation est gelee, seul le geste change le grenier et le sac.
+        samples['granary0'] = (building(world, 'granary') or {}).get('food', 0)
         samples['bag_before_granary'] = s.get('food', 0)
         cmd(world, 'Anastasis.Player.Use')
         step, mark = 11, now
     elif step == 11 and now - mark > 0.4:
         s = hands(world, 'granary_done')
         g = building(world, 'granary') or {}
-        before = samples['granary0'] + samples['bag_before_granary']
-        after = g.get('food', 0) + s.get('food', 0)
-        check('granary: bag and granary change by the same amount (nothing created)', before == after and s.get('food') != samples['bag_before_granary'],
+        check('deposit: the bag empties into the granary, nothing created', s.get('food', 0) == 0
+              and g.get('food', 0) == samples['granary0'] + samples['bag_before_granary'] and samples['bag_before_granary'] > 0,
               'granary %s->%s bag %s->%s' % (samples['granary0'], g.get('food'), samples['bag_before_granary'], s.get('food')))
+        step, mark = 15, now
+    elif step == 15 and now - mark > 0.4:
+        s = hands(world, 'granary_take_focus')
+        g = building(world, 'granary') or {}
+        check('empty bag, granary with food: it offers to take', s.get('offer') == 'prendre une portion',
+              '%s available=%s' % (s.get('offer'), g.get('available')))
+        samples['granary1'] = g.get('food', 0)
+        samples['bag1'] = s.get('food', 0)
+        cmd(world, 'Anastasis.Player.Use')
+        step, mark = 16, now
+    elif step == 16 and now - mark > 0.4:
+        s = hands(world, 'granary_taken')
+        g = building(world, 'granary') or {}
+        check('take: one portion from the granary to the bag, nothing created', s.get('food', 0) == samples['bag1'] + 1
+              and g.get('food', 0) == samples['granary1'] - 1,
+              'granary %s->%s bag %s->%s' % (samples['granary1'], g.get('food'), samples['bag1'], s.get('food')))
         wood = targets(world).get('tiles', {}).get('wood')
         check('a wood tile near the village', wood is not None, json.dumps(wood))
         if not wood:
             step = 90
             return
-        target = dict(wood, lift=60.0)
-        cmd(world, 'Anastasis.Player.Arrive %d %d' % (wood['x'] + 1, wood['y']))
+        # Viser le sol de la case (comme le champ) ; se tenir sur le cote le plus degage, loin des batiments.
+        target = dict(wood, lift=20.0)
+        built = [(b['x'], b['y']) for b in targets(world).get('buildings', [])]
+        sides = [(wood['x'] + 1, wood['y']), (wood['x'] - 1, wood['y']), (wood['x'], wood['y'] + 1), (wood['x'], wood['y'] - 1)]
+        sides = [c for c in sides if c not in built]
+        stand = max(sides, key=lambda c: min([dist(c[0], c[1], bx, by) for bx, by in built] or [99.0])) if sides else (wood['x'] + 1, wood['y'])
+        cmd(world, 'Anastasis.Player.Arrive %d %d' % stand)
         step, mark = 12, now
     elif step == 12 and now - mark > 1.0:
         aim(world, target)
@@ -230,6 +307,7 @@ def _tick():
     elif step == 13 and now - mark > 0.6:
         s = hands(world, 'wood_focus')
         check('looking at the wood: it offers to chop', s.get('offer') == 'couper du bois', '%s tile=%s' % (s.get('offer'), s.get('focus_tile')))
+        check('... within reach', s.get('in_reach') is True)
         samples['wood0'] = s.get('wood', 0)
         cmd(world, 'Anastasis.Player.Hold 1')
         step, mark = 14, now

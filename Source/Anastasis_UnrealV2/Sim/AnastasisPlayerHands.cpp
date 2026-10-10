@@ -36,8 +36,13 @@ namespace
 {
 	using EHand = AnastasisVillage::FVillage::EPlayerHand;
 
-	/** Jusqu'ou porte le regard pour viser (cm). La portee du geste, elle, est jugee par la simulation. */
+	/**
+	 * Jusqu'ou porte le regard pour viser (cm), au moins. La portee du geste, elle, est jugee par la simulation.
+	 * relay-mains-001 : le regard porte toujours au-dela de la main (`HandTraceTiles` cases), sinon une case a portee
+	 * (1,6 case, ~32 m) restait invisible : a hauteur d'oeil, un rayon vise sur le sol a 20 m ne le touche qu'apres.
+	 */
 	constexpr double HandTraceCm = 3000.0;
+	constexpr double HandTraceTiles = AnastasisVillage::FVillage::PlayerHandReach + 1.5;
 
 	/** Combien de secondes il faut tenir le clic pour chaque geste (temps reel, comme un geste de la main). */
 	float HoldSeconds(EHand Hand)
@@ -56,8 +61,8 @@ namespace
 		}
 	}
 
-	/** Unreal (cm) -> simulation (tuiles) sur le plan : l'inverse de FAnastasisVillagePresentation::SimToUnreal. */
-	bool UnrealToSimPlane(UWorld* World, const FVector& Location, double& OutX, double& OutY)
+	/** La taille d'une case de simulation dans le monde rendu (cm). */
+	double CellCm(UWorld* World)
 	{
 		double Scale = 1.0;
 		if (World)
@@ -68,7 +73,13 @@ namespace
 				break;
 			}
 		}
-		const double Cell = AnastasisWorldView::TileWorldSize * Scale;
+		return AnastasisWorldView::TileWorldSize * Scale;
+	}
+
+	/** Unreal (cm) -> simulation (tuiles) sur le plan : l'inverse de FAnastasisVillagePresentation::SimToUnreal. */
+	bool UnrealToSimPlane(UWorld* World, const FVector& Location, double& OutX, double& OutY)
+	{
+		const double Cell = CellCm(World);
 		if (!(Cell > 0.0)) return false;
 		OutX = Location.X / Cell;
 		OutY = Location.Y / Cell;
@@ -110,7 +121,8 @@ bool UAnastasisSimulationSubsystem::ResolveHandFocus(FString& OutBuildingId, int
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(AnastasisPlayerHands), false);
 	if (const APawn* Pawn = Controller->GetPawn()) Params.AddIgnoredActor(Pawn);
 	FHitResult Hit;
-	if (!World->LineTraceSingleByChannel(Hit, Eye, Eye + Gaze.Vector() * HandTraceCm, ECC_Visibility, Params)) return false;
+	const double TraceCm = FMath::Max(HandTraceCm, CellCm(World) * HandTraceTiles);
+	if (!World->LineTraceSingleByChannel(Hit, Eye, Eye + Gaze.Vector() * TraceCm, ECC_Visibility, Params)) return false;
 	if (const AAnastasisVillageBuilding* Building = Cast<AAnastasisVillageBuilding>(Hit.GetActor()))
 	{
 		OutBuildingId = Building->GetSimId().ToString();
@@ -387,9 +399,16 @@ FString UAnastasisSimulationDebugLibrary::GetPlayerHandTargets(const UObject* Wo
 	FString Buildings;
 	for (const AnastasisVillage::FBuilding& B : Village.GetBuildings())
 	{
-		Buildings += FString::Printf(TEXT("%s{\"id\":\"%s\",\"type\":\"%s\",\"x\":%d,\"y\":%d,\"done\":%s,\"food\":%d,%s}"),
+		// relay-mains-001 : les seuils (ou l'on se tient pour la main), pour qu'un agent ou une preuve y marche.
+		FString Access;
+		for (const AnastasisVillage::FPoint& Door : B.AccessPoints)
+		{
+			Access += FString::Printf(TEXT("%s[%.2f,%.2f]"), Access.IsEmpty() ? TEXT("") : TEXT(","), Door.X, Door.Y);
+		}
+		Buildings += FString::Printf(TEXT("%s{\"id\":\"%s\",\"type\":\"%s\",\"x\":%d,\"y\":%d,\"done\":%s,\"food\":%d,\"available\":%d,\"access\":[%s],%s}"),
 			Buildings.IsEmpty() ? TEXT("") : TEXT(","), *B.Id, *B.Type, FMath::FloorToInt32(B.X), FMath::FloorToInt32(B.Y),
-			B.IsCompleted() ? TEXT("true") : TEXT("false"), B.FoodPhysical, *Point(FMath::FloorToInt32(B.X) + 0.5, FMath::FloorToInt32(B.Y) + 0.5));
+			B.IsCompleted() ? TEXT("true") : TEXT("false"), B.FoodPhysical, B.FoodAvailable(), *Access,
+			*Point(FMath::FloorToInt32(B.X) + 0.5, FMath::FloorToInt32(B.Y) + 0.5));
 	}
 	FString Tiles;
 	const AnastasisWorld::FWorld& W = Sim.GetWorld();

@@ -84,6 +84,13 @@ namespace AnastasisVillage
 			return EPlayerHand::None;
 		}
 		if (TileX < 0 || TileY < 0 || TileX >= World->W || TileY >= World->H) return EPlayerHand::None;
+		// relay-mains-001 : une tuile ou se dresse un batiment (acheve ou chantier) n'offre rien a la main. Le batiment
+		// la couvre (l'ecran y abat les arbres de sa parcelle) : la main vise le batiment, pas la tuile. Sans cette garde,
+		// le bois d'une tuile sous une maison restait « a couper » sans qu'aucun regard puisse l'atteindre.
+		for (const FBuilding& B : Buildings.GetItems())
+		{
+			if (FMath::FloorToInt32(B.X) == TileX && FMath::FloorToInt32(B.Y) == TileY) return EPlayerHand::None;
+		}
 		const AnastasisWorld::FTile Tile = LiveTileAt(TileX, TileY);
 		if (Tile.Resource == EResource::Food && Tile.Amount > 0) return EPlayerHand::Gather;
 		if (WoodLeft(Tile) > 0) return EPlayerHand::Chop;
