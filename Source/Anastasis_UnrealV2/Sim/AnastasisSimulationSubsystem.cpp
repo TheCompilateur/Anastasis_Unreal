@@ -136,6 +136,8 @@ static TAutoConsoleVariable<int32> CVarFieldHands(
 	TEXT("anastasis.Village.FieldHands"),
 	1,
 	TEXT("faim-champs-001 (ecart n°59): 1 = each evening, when the granaries hold less than two days of food, the hungriest jobless adult who can reach the granary becomes its farmer (one per evening, at most half the village). 0 = the reference behaviour."),
+	ECVF_Default);
+
 // ecart n°58 (soif-dabord-001) : quand on meurt de soif, on boit d'abord, et boire assoiffe soulage.
 static TAutoConsoleVariable<int32> CVarThirstFirst(
 	TEXT("anastasis.Village.ThirstFirst"),
