@@ -20,8 +20,8 @@ fiche **est** le détail.
 
 Titre `### n° N — titre`, puis une liste de champs `- **cle** : valeur`, puis 2 à 6 lignes de texte.
 Les numéros ne se réutilisent jamais ; un écart fermé garde sa fiche (`statut : FERME`). Un numéro nouveau
-se **réserve** (`tools\unreal\agent-worktree.ps1 ecart -Mission <m>`) et la fiche s'ajoute **à la fin** : ce
-fichier fusionne par union (ECARTS_UNION_001), deux missions parallèles n'y entrent plus en conflit.
+se **réserve** (`tools\unreal\agent-worktree.ps1 ecart -Mission <m>`) et la fiche s'ajoute **à la fin**. Au rebase,
+deux fiches ajoutées en même temps se gardent **entières**, l'une après l'autre (jamais d'union : ECARTS_REPAIR_001).
 
 | Champ | Valeurs | Requis |
 |---|---|---|
@@ -704,6 +704,7 @@ leurs métadonnées, contexte de perception (faim, sources connues, gisements, o
 traduit, trace du pont (`bridgeTrace`) et compte des changements récents. Le pont relit une partie de ce
 paquet (`decision`, `inertia`, `mappedGoal`). Le C++ tient la décision dans `FNpc::AlgoDecision`, mais pas
 ce paquet : la clé manque à chaque habitant qui a pensé.
+
 ### n° 36 — `workTimer` remis à zéro au changement de but
 
 - **classe** : SUBSTITUT
@@ -1009,7 +1010,6 @@ Un groupe venu du monde extérieur reçoit les noms que l'hôte tient prêts (`v
 Le joueur entre dans les décisions avec les règles des autres : au conseil, sa voix pèse ; on vient lui demander de l'aide et il répond (ou se tait, et c'est un refus qu'on retient) ; il décide de bâtir, sa parcelle est tracée comme celle d'une famille, et il va demander de l'aide lui-même : la réponse se pèse comme toute autre (Bible §29). Il arrive en étranger à éprouver : une demi-voix au conseil, et `nouveau` dans la balance de qui on lui demande, jusqu'à ce qu'il ait levé un toit pour quelqu'un (la même règle vaut pour les groupes d'arrivants). Le village le juge sur ses actes : en face, par la raison d'un refus (`on_dit`, `porte_fermee`, `refus_rendu`) ; dans son dos, parce que sa voix au conseil et ses refus deviennent des histoires qui courent (`votedNo`, `refusedHelp`), que son carnet entend parfois. À trancher : ces règles et ces poids, et la demi-voix comme statut de l'étranger.
 
 ### n° 56 — La cabane du joueur : une pièce pour un dormeur, levée seul, à lui seul
-### n° 59 — Quand le grenier se vide, des bras vont aux champs
 
 - **classe** : EXTENSION
 - **destin** : A_TRANCHER
@@ -1021,6 +1021,12 @@ Le joueur entre dans les décisions avec les règles des autres : au conseil, sa
 - **harnais** : aucune
 
 Le joueur se pose dans la vallée et lève seul sa cabane : une pièce de 16,8 m² avec un foyer, un banc-lit, un coffre (`SM_Arch_Cabin_01`, 6,8 × 7,2 m hors tout, faîtage à 4 m). Elle est tracée près de lui, à lui dès le tracé, les mêmes 22 pièces qu'une maison mais un devis d'un tiers en bois et d'un quart en pierre ; personne d'autre n'y pose une pièce sauf s'il le lui demande et qu'on lui dit oui (écart n°54). Achevée, elle devient son foyer : il y entre pour dormir ou manger, et personne d'autre n'y dort, n'y mange ni ne s'y abrite. Le bois et la pierre sont livrés au tracé : les ramasser soi-même (cueillir, bûcher) est une autre mission. À trancher : le devis, le tracé « près de lui », la fermeture à tous les autres (même à un hôte qu'il inviterait), et le fait qu'une seule cabane par joueur existe.
+
+### n° 59 — Quand le grenier se vide, des bras vont aux champs
+
+- **classe** : EXTENSION
+- **destin** : A_TRANCHER
+- **statut** : OUVERT
 - **entree** : faim-champs-001 (« Oui go » d'Alexandre du 2026-10-09 : que les sans-métier aillent aux champs quand le grenier se vide)
 - **activation** : `FVillage::SetFieldHandsEnabled(true)`, posé par l'hôte (`anastasis.Village.FieldHands`, défaut 1) à la remise à zéro et à chaque image. Éteint par défaut dans `FVillage` : harnais et parité au bit près (`UpdateFieldHandsDaily` n'y fait rien).
 - **reference** : `src/sim/simulation.js` rend leur métier aux fondateurs (`restoreFounderJobs`) et ouvre des postes chaque jour (`ensureWorkplacesDaily`), non portés (écart n°40) ; aucune embauche liée à la réserve du grenier.

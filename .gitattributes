@@ -7,8 +7,6 @@
 # Une ligne modifiee des deux cotes reste en deux versions : finish et integrate-batch refusent un
 # nom inscrit deux fois (INTEGRATION_SPEED_001).
 tools/unreal/proofs.txt merge=union
-# ECARTS_UNION_001 : chaque mission ajoute ses fiches au registre ; numero reserve par agent-worktree.ps1 ecart.
-Source/AnastasisSim/ECARTS.md merge=union
 
 # Les hooks sont du shell : jamais de CRLF, quelle que soit la machine ou core.autocrlf.
 tools/git-hooks/* text eol=lf

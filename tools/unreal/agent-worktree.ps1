@@ -1027,6 +1027,14 @@ switch ($Command) {
       $twice = @($nums | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
       if ($twice.Count -gt 0) { Write-Output ('FAIL: ECARTS.md du lot porte deux fiches au meme numero : ' + ($twice -join ', ') + ' -- la mission la plus recente reserve un numero (agent-worktree.ps1 ecart) et renumerote ; main intacte'); exit 1 }
     }
+    # ECARTS_REPAIR_001 (2026-10-09) : le registre entier se controle sur l'arbre du lot. L'union de git avait
+    # entrelace deux fiches ajoutees au meme endroit (lignes identiques prises pour du contexte commun) et ce
+    # registre casse etait entre dans main sans que rien ne le voie.
+    if ((Test-Path (Join-Path $integ 'tools\migration\check-ecarts.mjs')) -and (Get-Command node -ErrorAction SilentlyContinue)) {
+      Push-Location $integ
+      try { $ce = @(& node 'tools\migration\check-ecarts.mjs' 2>&1 | ForEach-Object { "$_" }); $ceCode = $LASTEXITCODE } finally { Pop-Location }
+      if ($ceCode -ne 0) { Write-Output 'FAIL: registre des ecarts du lot invalide (check-ecarts.mjs), main intacte :'; $ce | Where-Object { $_ -match 'FAIL' } | Select-Object -First 12 | ForEach-Object { Write-Output "    $_" }; exit 1 }
+    }
     Write-Output 'CHECKS::PASS index tools/unreal, lancements Unreal, numeros d ecart'
     # Le lot sert tous les agents : ses editeurs passent en tete de la file de la porte memoire.
     $env:ANASTASIS_EDITOR_PRIORITY = '0'

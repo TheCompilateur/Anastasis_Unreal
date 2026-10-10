@@ -33,6 +33,8 @@ Copy-Item "$Source\tools\unreal\*" "$repo\tools\unreal" -Recurse
 # Le registre des preuves reference aussi ce script hors de tools/unreal.
 New-Item -ItemType Directory -Force "$repo\tools\soil-crusade" | Out-Null
 Copy-Item "$Source\tools\soil-crusade\capture.py" "$repo\tools\soil-crusade"
+# Toute preuve du registre dont le script vit hors de tools/unreal (tools/<mission>/capture.py) : copiee aussi.
+foreach ($pl in Get-Content "$Source\tools\unreal\proofs.txt") { if ($pl -match '^\s*[^#|\s][^|]*\|\s*(tools/[^|\s]+\.py)' -and $Matches[1] -notlike 'tools/unreal/*') { $rel = $Matches[1].Replace('/', '\'); New-Item -ItemType Directory -Force (Split-Path "$repo\$rel") | Out-Null; Copy-Item "$Source\$rel" "$repo\$rel" -ErrorAction SilentlyContinue } }
 Copy-Item "$Source\tools\git-hooks\reference-transaction" "$repo\tools\git-hooks"
 New-Item -ItemType Directory -Force "$repo\tools\migration\scenarios", "$repo\Source\AnastasisSim" | Out-Null
 Copy-Item "$Source\tools\migration\check-ecarts.mjs" "$repo\tools\migration"
@@ -456,24 +458,16 @@ function AddFiche($w, $n, $t) {
   [IO.File]::AppendAllText((Join-Path $w $regRel), (Fiche $n $t), $utf8)
   [IO.File]::AppendAllText((Join-Path $w "docs\unreal\handoffs\$(Split-Path $w -Leaf).md"), "`n## ECARTS`n`nn$deg $n ouvert.`n", $utf8)
 }
-AdvanceMain 'ga28c' { param($w) Set-Content "$w\.gitattributes" "tools/unreal/proofs.txt merge=union`nSource/AnastasisSim/ECARTS.md merge=union" }
 $r1 = AW ecart -Mission eu-a; $r2 = AW ecart -Mission eu-b
 Check 'S28c reservation : max de main + 1, puis le suivant' ($r1.Out -match "ECART_RESERVE::$($top + 1) " -and $r2.Out -match "ECART_RESERVE::$($top + 2) ") ($r1.Out + "`n" + $r2.Out)
-$null = NewMission 'eu-a' @({ param($w) AddFiche $w ($top + 1) 'banc a' })
-$null = NewMission 'eu-b' @({ param($w) AddFiche $w ($top + 2) 'banc b' })
-# Une fiche sous Source/ est un changement Unreal : le build (impossible ici) suit les controles du lot.
-# Les marqueurs de passation sont poses a la main ; on juge l'empilement et les controles, pas le build.
+# ECARTS_REPAIR_001 : plus d'union sur le registre (elle entrelacait deux fiches aux lignes identiques) ; le lot
+# controle le registre entier (check-ecarts.mjs) avant tout build. Une fiche cassee est refusee, main intacte.
 function Mark($m) { Set-Content (Join-Path $wtRoot ".handoff\$m.txt") ((G rev-parse "agent/$m") + ' proved') }
-Mark eu-a; Mark eu-b; $fa = [PSCustomObject]@{ Out = '' }
-$r = AW integrate-batch -Missions 'eu-a,eu-b'
-Check 'S28c deux fiches ajoutees au registre : union, empilees sans conflit, controles passes' ($r.Out -match 'BATCH_STACKED::eu-a \(\d+\), eu-b \(\d+\)' -and $r.Out -match 'CHECKS::PASS .*numeros d ecart') $r.Out
-$null = NewMission 'eu-c' @({ param($w) AddFiche $w ($top + 3) 'banc c' })
-$null = NewMission 'eu-d' @({ param($w) AddFiche $w ($top + 3) 'banc d' })
-Mark eu-c; Mark eu-d
+$null = NewMission 'eu-x' @({ param($w) [IO.File]::AppendAllText((Join-Path $w $regRel), "`n### n$deg $($top + 1) " + [char]0x2014 + " fiche cassee`n`n- **classe** : EXTENSION`n", $utf8); [IO.File]::AppendAllText((Join-Path $w "docs\unreal\handoffs\eu-x.md"), "`n## ECARTS`n`nn$deg $($top + 1) ouvert.`n", $utf8) })
+Mark eu-x
 $mainAvant = (G rev-parse main)
-$r = AW integrate-batch -Missions 'eu-c,eu-d'
-Check 'S28c meme numero dans deux missions : lot refuse, main intacte' ($r.Code -ne 0 -and $r.Out -match "deux fiches au meme numero : $($top + 3)" -and (G rev-parse main) -eq $mainAvant) $r.Out
-# 29. prune par contenu : une copie versee dont l'union de proofs.txt a retouche le diff n'est plus
+$r = AW integrate-batch -Missions 'eu-x'
+Check 'S28c registre casse dans le lot : refuse avant le build, main intacte' ($r.Code -ne 0 -and $r.Out -match 'registre des ecarts du lot invalide' -and $r.Out -notmatch 'UNREAL_CHANGE' -and (G rev-parse main) -eq $mainAvant) $r.Out# 29. prune par contenu : une copie versee dont l'union de proofs.txt a retouche le diff n'est plus
 #     reconnue par git cherry ; rejouee sur main elle ne change rien, prune la supprime.
 $null = NewMission 'pz' @({ param($w) Add-Content "$w\tools\unreal\proofs.txt" 'banc-pz | tools/unreal/smoke-pie.py | PZ PASS | PZ FAIL | 60 | -' })
 $null = AW finish -Mission pz

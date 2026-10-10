@@ -224,8 +224,9 @@ ou évolution voulue. Donc, dans `Source/AnastasisSim/` :
   commit qui l'introduit**, et la marque `ecart n°N` à l'endroit du code ;
 - **le numéro se réserve, il ne se devine pas** (ECARTS_UNION_001, Alexandre, 2026-10-09) :
   `tools\unreal\agent-worktree.ps1 ecart -Mission <m>` rend le prochain numéro libre (main, toutes les branches
-  `agent/*`, réservations). La fiche s'ajoute **à la fin** du registre, qui fusionne par union : deux missions
-  parallèles n'y entrent plus en conflit ; deux fiches au même numéro sont refusées au lot ;
+  `agent/*`, réservations). La fiche s'ajoute **à la fin** du registre. Pas de fusion par union (ECARTS_REPAIR_001, 2026-10-09 : elle a
+  entrelacé deux fiches dans `main`) : deux missions qui ajoutent chacune une fiche se rebasent normalement, en gardant
+  les deux fiches entières. Le lot contrôle le registre entier (`check-ecarts.mjs`) avant tout build ;
 - la passation a une section `## ECARTS` : numéros ouverts, modifiés, fermés, ou `AUCUN — <preuve>` ;
 - seul Alexandre passe un écart à `ASSUME` (évolution définitive) ; un agent écrit `A_TRANCHER`.
 
