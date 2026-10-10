@@ -247,7 +247,9 @@ FString UAnastasisSimulationSubsystem::ArrivalHelpText(int32 Day, const FString&
 		TEXT("VALMIRE  |  JOUR %d  |  %s\n")
 		TEXT("Tu es arrive seul, sans famille.\n")
 		TEXT("Marcher : Z Q S D (ou W A S D). Regarder : la souris.\n")
-		TEXT("Ton corps a faim, soif, sommeil : la ligne BUTS, en haut de l'ecran, dit ce qu'il peut faire et la touche de chaque but.\n")
+		TEXT("Mains : vise du regard et maintiens le clic gauche pour agir (le texte a l'ecran dit quoi). Clic droit : utiliser la case choisie.\n")
+		TEXT("Sac, en bas : 8 cases, touches 1 a 7 ou molette.\n")
+		TEXT("Ton corps a faim, soif, sommeil : la ligne BUTS, en haut de l'ecran, dit ce qu'il peut faire ; chaque but se pose avec Maj + son chiffre.\n")
 		TEXT("Temps : 8 le double, 9 le divise. Trop vite, le village ne te voit plus.\n"),
 		Day, *Name);
 }

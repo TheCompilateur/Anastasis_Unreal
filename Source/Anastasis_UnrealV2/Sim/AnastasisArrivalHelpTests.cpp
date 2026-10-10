@@ -24,6 +24,10 @@ bool FAnastasisArrivalHelpText::RunTest(const FString&)
 	TestTrue(TEXT("il est arrive seul"), Text.Contains(TEXT("arrive seul")));
 	TestTrue(TEXT("marcher au clavier AZERTY et QWERTY"), Text.Contains(TEXT("Z Q S D")) && Text.Contains(TEXT("W A S D")));
 	TestTrue(TEXT("la ligne des buts"), Text.Contains(TEXT("BUTS")));
+	// mains-joueur-001 : les mains, la barre, et les buts passes sur Maj + chiffre.
+	TestTrue(TEXT("le clic gauche maintenu et le clic droit"), Text.Contains(TEXT("clic gauche")) && Text.Contains(TEXT("Clic droit")));
+	TestTrue(TEXT("la barre de 8 cases"), Text.Contains(TEXT("8 cases")));
+	TestTrue(TEXT("les buts sur Maj + chiffre"), Text.Contains(TEXT("Maj +")));
 	TestTrue(TEXT("le temps : 8 et 9"), Text.Contains(TEXT("8 ")) && Text.Contains(TEXT("9 ")));
 
 	// Ce qu'il ne dit jamais : les touches de la scene d'entraide, qui n'agissent que dans cette scene.

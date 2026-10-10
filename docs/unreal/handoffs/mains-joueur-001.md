@@ -40,6 +40,8 @@ débogage de player-goals-001 passent de 1–5 / 0 à **Maj + 1–5 / Maj + 0** 
 - `Source/Anastasis_UnrealV2/Sim/AnastasisSimulationPlayer.cpp` : ligne BUTS « (Maj +) »
 - `Source/Anastasis_UnrealV2/Anastasis_UnrealV2Character.{h,cpp}` : clic gauche/droit, molette, 1 à 7
 - `Config/DefaultInput.ini` : buts sur Maj + chiffre
+- `Source/Anastasis_UnrealV2/Sim/AnastasisPlayerHelpInterface.cpp` (`ArrivalHelpText`) et `AnastasisArrivalHelpTests.cpp` : le
+  panneau de l'arrivant seul dit les mains et les buts sur Maj + chiffre
 - `tools/unreal/player-hands-pie.py` (nouveau), `tools/unreal/proofs.txt` (`player-hands-pie`), `AGENTS.md` (index)
 
 ## COMMIT
@@ -93,6 +95,14 @@ tranche : peut-être trop loin à l'œil), lisibilité de la barre.
   conflit, `AnastasisSimulationSubsystem.h`, résolu en gardant les deux côtés (`GetCabinStatus` et `GetSleepStatus` de
   main + `GetPlayerHandsStatus` et `GetPlayerHandTargets` d'ici). Écart n° 57 libre sur main (56 = cabane). Les résultats
   de tests plus haut datent de l'ancienne base : `finish` les rejoue sur la nouvelle.
+- **Second rebase, 2026-10-10**, sur `main` après `arrivant-seul-001`, `soif-dabord-001`, `faim-champs-001`, `water-opacity-001`
+  et `ecarts-repair-001` : seul `ECARTS.md` conflictait (les fiches 58 et 59 sont arrivées à la fin du registre, sans
+  fusion par union depuis ECARTS_REPAIR_001). Résolu en prenant le registre de `main` et en ajoutant la fiche 57 à la fin ;
+  `ECARTS::PASS fiches=54`. Aucun autre conflit.
+- **Le panneau de l'arrivant seul** (`ArrivalHelpText`, venu de `arrivant-seul-001`, déjà dans `main`) reçoit ici deux lignes :
+  les mains (clic gauche maintenu, clic droit, barre de 8 cases, touches 1 à 7 ou molette) et la phrase « chaque but se pose
+  avec Maj + son chiffre ». Le test `Anastasis.Sim.Joueur.ArrivantSeul.Panneau` vérifie ces trois ajouts. Sans cette mission le
+  panneau reste exact (il ne parle pas des mains) ; avec elle, il dit les nouvelles touches.
 
 ## STOP
 
