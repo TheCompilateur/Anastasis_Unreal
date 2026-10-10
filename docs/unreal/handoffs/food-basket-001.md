@@ -14,7 +14,7 @@ Alexandre : « Ok pour panier » (2026-10-09). Modeliser un panier 3D et le mont
 
 ## COMMIT
 
-PENDING
+Implementation : `6cd60c51` (`Add carried food basket tied to villager inventory`). Verdict du portail sur le commit de passation le plus recent : `agent-worktree.ps1 status` / marqueur `.handoff`.
 
 ## MEC
 
@@ -23,7 +23,7 @@ PENDING
 - Index `Test-AnastasisToolsIndex` : Missing {}, Stale {}.
 - Build apres modification : PASS (`anastasis-unreal.ps1 build`, Editor Win64 Development).
 - Creation dans Unreal : `create-food-basket.ps1` -> `FOOD_BASKET::PASS`, Static Mesh sauve a `/Game/Anastasis/CarriedFood/SM_Food_Basket_01`, 3612 triangles, dimensions Unreal identiques a la recette. Asset `.uasset` suivi par Git LFS.
-- Tests sans rendu : PENDING (portail `finish`).
+- `agent-worktree.ps1 finish -Mission food-basket-001` : `TEST_MODE::HEADLESS` 461 s, 413 PASS, 4 `KNOWN_EXPECTED_FAILURE` hors mandat, 0 FAIL, 417 total ; `TESTS::PASS`, `HANDOFF_READY::YES (proved)` sur le commit d'implementation. Cette mise a jour documentaire doit etre revalidee par `finish` sur son propre commit.
 
 ## PROOFS
 
