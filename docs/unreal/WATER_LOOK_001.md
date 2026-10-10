@@ -19,6 +19,11 @@ l'incarnation.
 
 ## Ce qui change
 
+> **Erratum, WATER_VOLUME_001 (2026-10-10).** L'absorption et la diffusion décrites au point 1 n'étaient pas
+> calculées : le pin Opacity n'était pas branché (1), le moteur sautait tout le volume. Elles ne le sont
+> que depuis `docs/unreal/handoffs/water-opacity-001.md`, avec d'autres valeurs (palette « trouble ») et en
+> centimètres.
+
 1. **`M_AnastasisWater`** — modèle d'ombrage *Single Layer Water* d'Unreal sur le maillage
    procédural, sans le plugin Water (choix du 2026-09-30 : pas de plugin).
    - absorption (0.55, 0.16, 0.11 /m) et diffusion (0.015, 0.040, 0.048 /m) selon la

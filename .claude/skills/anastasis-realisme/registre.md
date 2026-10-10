@@ -68,7 +68,8 @@ recoupé avec les notes de version d'UE 5.8 ou avec le code du projet.
 | ID | Affirmation | Statut | Pourquoi | Règle |
 |---|---|---|---|---|
 | RU-001-23 | Plugin Water : rivières et lacs sur splines, vagues, réflexion, réfraction | `REJETÉ` | le carving exige un Landscape ; choix d'Alexandre du 2026-09-30 | EAU-01 |
-| RU-001-24 | Le but : réflexion, réfraction, vagues | `ÉQUIVALENT` | Single Layer Water, absorption selon la profondeur, flowmap | EAU-02 |
+| RU-001-24 | Le but : réflexion, réfraction, vagues | `ÉQUIVALENT` | Single Layer Water, absorption selon la profondeur, flowmap. **Vrai seulement depuis WATER_VOLUME_001** : jusque-là Opacity valait 1 et le volume n'était pas calculé | EAU-02, EAU-07 |
+| WV-001-01 | Single Layer Water : Opacity = couverture de la pellicule de surface, `WaterVisibility = 1 - Opacity` ; coefficients en cm ; Specular fixe l'indice | `APPLIQUÉ` | lu dans les shaders du moteur 5.8 (`BasePassPixelShader.usf:1141,1383`, `SingleLayerWaterShading.ush:74,96,221`), prouvé par A/B `riverbank-capture` (`vol_old` / `vol_on`, fond et profondeur visibles ; 14 à 35 % des pixels > 16/255 sur quatre vues sur cinq, contre 1 à 9 % de bruit `vol_old` / `vol_old2` ; la cinquième, cachée par des roseaux, reste dans le bruit) | EAU-07, EAU-08, EAU-09 |
 | RU-001-25 | Ponts, moulins et pêcheries le long des berges | `HORS_PÉRIMÈTRE` | relève de la simulation, pas du rendu | — |
 | RU-001-26 | Collisions de rivière, flottaison Chaos | `HORS_PÉRIMÈTRE` | `PLAYER` = `NOT_IMPLEMENTED` | — |
 

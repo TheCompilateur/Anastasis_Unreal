@@ -103,6 +103,13 @@ prennent la branche d'avant. Pas de Scene Capture.
 
 ## Fond à 18 cm — le sol se voit, l'eau non
 
+> **Erratum, WATER_VOLUME_001 (2026-10-10).** Cette section concluait que Single Layer Water « ne montre
+> pas le sol » vu d'aplomb. La cause était le pin Opacity, jamais branché donc à 1 : le moteur ne calcule
+> alors pas le volume (`WaterVisibility = 1 - Opacity`, `BasePassPixelShader.usf:1141`), et les essais de
+> coefficients ci-dessous se faisaient volume éteint. Avec Opacity à 0 hors écume et les coefficients en
+> centimètres, le fond, les cailloux et le dégradé de profondeur apparaissent
+> (`docs/unreal/handoffs/water-opacity-001.md`). Le reste de la section est conservé tel qu'il a été écrit.
+
 Sur le monde intégré, à `34493, 65416`, le sol rendu est à 18 cm sous la nappe.
 Vu d'aplomb, le ruban est un bandeau bleu-vert opaque (`contact-avant/I_fond_1.png`).
 

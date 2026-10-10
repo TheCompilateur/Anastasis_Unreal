@@ -320,8 +320,11 @@ def build(mat=None):
     unreal.log('WATER_MATERIAL_SLW_COUNT %d' % left)
     if left != 1:
         unreal.log_error('WATER_MATERIAL_SLW_COUNT_BAD %d' % left)
-    absorption = vparam(mat, 'Absorption', (0.55, 0.16, 0.11, 1.0), -400, 420)
-    scattering = vparam(mat, 'Scattering', (0.015, 0.040, 0.048, 1.0), -400, 540)
+    # WATER_VOLUME_001, palette « trouble » choisie par Alexandre (2026-10-10) : rivière chargée de
+    # limon, vert-brun, le bleu absorbé plus que le vert. Les anciennes valeurs (0,55 / 0,16 / 0,11 et
+    # 0,015 / 0,040 / 0,048) donnaient du turquoise une fois le volume actif.
+    absorption = vparam(mat, 'Absorption', (0.45, 0.22, 0.40, 1.0), -400, 420)
+    scattering = vparam(mat, 'Scattering', (0.045, 0.045, 0.025, 1.0), -400, 540)
     phase = sparam(mat, 'PhaseG', 0.1, -400, 660)
     behind = sparam(mat, 'ColorScaleBehindWater', 1.0, -400, 740)
     shallow_absorb = sparam(mat, 'ShallowAbsorb', 0.38, -400, 820)
