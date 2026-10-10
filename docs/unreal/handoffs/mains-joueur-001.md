@@ -89,6 +89,10 @@ tranche : peut-être trop loin à l'œil), lisibilité de la barre.
 - **Numéro d'écart** : 56 ici. Le n° 55 est pris **deux fois** par d'autres missions (`ma-cabane-001` / `dormir-couche-001`
   « La cabane du joueur », et `movement-audit-001` « La main d'Unreal pose le corps du joueur ») : à renuméroter au lot.
 - `player-start-002` (autre agent) : l'arrivée automatique ; sans conflit attendu sur ces fichiers, à vérifier.
+- **Rebase du 2026-10-09 soir** sur `main` 0fb80f93b (27 commits de retard, `status` la rangeait en `A_REBASER`) : un seul
+  conflit, `AnastasisSimulationSubsystem.h`, résolu en gardant les deux côtés (`GetCabinStatus` et `GetSleepStatus` de
+  main + `GetPlayerHandsStatus` et `GetPlayerHandTargets` d'ici). Écart n° 57 libre sur main (56 = cabane). Les résultats
+  de tests plus haut datent de l'ancienne base : `finish` les rejoue sur la nouvelle.
 
 ## STOP
 
