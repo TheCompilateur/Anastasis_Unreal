@@ -13,6 +13,7 @@
 
 class APawn;
 class AAnastasisWorldEmbodiment;
+class AAnastasisFieldGrainVisual;
 class SWidget;
 
 /**
@@ -299,6 +300,8 @@ private:
 	/** familles-feu-001 : les fondateurs poses, dans l'ordre de pose. */
 	TArray<AnastasisFounders::FFounder> Founders;
 	TWeakObjectPtr<AAnastasisWorldEmbodiment> RainCanopyActor;
+	UPROPERTY(Transient)
+	TObjectPtr<AAnastasisFieldGrainVisual> FieldGrainVisual;
 	FAnastasisVillagePresentation VillagePresentation;
 	FString FarmerGranaryId;
 	FString FirstSiteId;

@@ -20,6 +20,7 @@
 #include "Village/AnastasisVillageBuilding.h"
 #include "Village/AnastasisVillageInteractionSubsystem.h"
 #include "Village/AnastasisVillagerVisual.h"
+#include "Village/AnastasisFieldGrainVisual.h"
 #include "WorldView/AnastasisPresentationResolver.h"
 #include "WorldView/AnastasisWorldView.h"
 #include "WorldView/AnastasisWorldEmbodiment.h"
@@ -197,6 +198,7 @@ void UAnastasisSimulationSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Super::OnWorldBeginPlay(InWorld);
 	ResetCanonical(SeedFromCVar());
 	bPumpFromEngineTick = true;
+	FieldGrainVisual = InWorld.SpawnActor<AAnastasisFieldGrainVisual>();
 
     // Subsystem begin play precedes actor terrain construction. Survey on the first ready tick.
     bPendingStartVillage = CVarVillageStartVillagers.GetValueOnGameThread() > 0;
@@ -389,6 +391,7 @@ void UAnastasisSimulationSubsystem::ReplaceStartVillage()
 
 void UAnastasisSimulationSubsystem::Deinitialize()
 {
+	FieldGrainVisual = nullptr;
 	if (HelpPanel.IsValid())
 	{
 		if (UWorld* World = GetWorld())
@@ -404,6 +407,7 @@ void UAnastasisSimulationSubsystem::Deinitialize()
 
 void UAnastasisSimulationSubsystem::ResetCanonical(uint32 Seed)
 {
+	if (IsValid(FieldGrainVisual)) FieldGrainVisual->Reset();
 	HelpFeedback.Reset();
 	bHelpSceneActive = false;
 	bHelpNotebookOpen = false;

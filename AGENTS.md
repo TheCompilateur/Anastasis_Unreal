@@ -441,6 +441,7 @@ Preuves visuelles et mesures (aucune n'écrit dans `Content/`, sauf mention) :
 | `labor-social-pie.py` | preuve PIE ERGON : bûcheron autonome, transfert conservatif du bois vers un puits en chantier puis usage par un autre habitant ; aucun asset sauve ; au registre (`labor-social-pie`) |
 | `site-stock-visual-pie.py` | preuve PIE numerique sans capture : piles absentes sur chantier sec, presentes apres livraisons, reduites par consommation puis absentes a l'achevement ; aucun asset sauve ; au registre (`site-stock-visual-pie`) |
 | `food-basket-pie.py` | un cultivateur reel recolte puis livre : `InventoryFood` commande le panier 3D a la main, A/B/A `anastasis.Village.FoodBasket` a stock fige, trois captures ; au registre (`food-basket-pie`) |
+| `field-grain-pie.py` | touffes 3D des tuiles de cereales vivantes : A/B/A `anastasis.Village.GrainFields` a simulation figee, puis recolte autonome et baisse des instances ; au registre (`field-grain-pie`) |
 | `first-building-pie.py` | preuve PIE du premier bâtiment : pilote `Anastasis.Village.*` en console (puits, habitants, retraits), lecture par les lignes `ANASTASIS_VILLAGE` du log |
 | `house-rest-pie.py` | preuve PIE de la maison : `Anastasis.Village.FirstHouse`, une nuit de sommeil, retrait d'un dormeur puis de la maison occupée |
 | `abandon-pie.py` | preuve PIE du vieillissement des maisons vides (ABANDON_001) : `FirstHouse 4`, `RemoveNpc` de tous, `Anastasis.Sim.Advance` 3 / 5 / 12 / 30 jours (3, 8, 20, 50 jours vides) ; lit le parametre `Neglect` du materiau dynamique pose sur le mesh et le compare a `NeglectForDays` ; temoin faux `anastasis.Village.Metabolism 2` (village qui ne vieillit pas) ; verdict `ABANDON_PIE PASS/FAIL` -> `Saved/AbandonEvidence/pie/abandon.json` ; au registre (`abandon-pie`) ; exige `M_VillageBuilding_Aged` (`create-building-aging.ps1`) ; aucun asset sauve |
@@ -557,6 +558,7 @@ se change dans le script.
 | `create-village-buildings.ps1` + `.py` | Forge le puits, la maison et le grenier dans VillageBuildings, meme matiere que les props. `-Rebuild` regenere. |
 | `create-site-stock.ps1` + `.py` | Forge deux petits lots de bois et pierre dans SiteStock001 avec `M_AnastasisArchitecture` ; recette deterministe, `-Rebuild` limite aux deux assets de la mission ; aucun placement manuel |
 | `create-food-basket.ps1` + `.py` | Forge le panier tresse `SM_Food_Basket_01` dans CarriedFood, recette geometrique deterministe et materiau d'architecture existant ; `-Rebuild` borne a cet asset |
+| `create-field-grain.ps1` + `.py` | Forge une touffe de cereales 3D `SM_Field_GrainClump_01` avec le materiau vegetal existant ; `-Rebuild` borne a cet asset |
 | `capture-refugee-props.ps1` + `capture-refugee-props.py` | Capture en studio les quatre objets, sans sauvegarder de niveau. |
 
 ### Architecture du village (ARCHITECTURE_SCALE_001)
