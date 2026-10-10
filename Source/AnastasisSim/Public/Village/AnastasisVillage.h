@@ -1346,6 +1346,17 @@ namespace AnastasisVillage
 		FPoint GetPlayerDrive() const { return PlayerDrive; }
 
 		/**
+		 * EXTENSION — ecart n°60 (player-collision-reelle-001). Crochet hote de la marche a la main : de `From` a `To`
+		 * (tuiles, continu), rend le point atteint une fois la collision reelle de l'hote appliquee (un pas qui se
+		 * raccourcit ou glisse). Pose, il remplace les blocs de tuile des batiments et des tuiles de foret pleines
+		 * pour `DrivePlayer` ; l'eau et le bord du monde bloquent toujours. Absent (le harnais, les tests, le mode
+		 * observateur) : la marche est celle de la reference, au bit pres. Jamais sauvegarde.
+		 */
+		using FPlayerStepResolver = TFunction<FPoint(const FPoint& From, const FPoint& To)>;
+		void SetPlayerStepResolver(FPlayerStepResolver InResolver) { PlayerStepResolver = MoveTemp(InResolver); }
+		bool HasPlayerStepResolver() const { return static_cast<bool>(PlayerStepResolver); }
+
+		/**
 		 * EXTENSION (TIME_WARP_001) : l'hote dit ce que le village a vu du joueur depuis le dernier
 		 * appel -- sa presence, et le temps simule ou il n'a rien fait. Sans joueur, rien.
 		 */
@@ -2373,6 +2384,8 @@ namespace AnastasisVillage
 		void UpdatePlayer(FNpc& Npc, double Dt);
 		/** `drivePlayerActor` : un pas dans la direction humaine, memes collisions que MoveActor. */
 		void DrivePlayer(FNpc& Npc, double Dt);
+		/** Ecart n°60 : eau ou hors du monde -- ce qui bloque encore la marche a la main quand l'hote fait la collision. */
+		bool IsWaterBlocked(double InX, double InY) const;
 		/**
 		 * `decideAsPlayer` : le point de decision unique, appele par ChooseGoal APRES le tri, l'eligibilite
 		 * et les verrous. Rend le but a commettre, `idle` quand l'humain attend. `bLocked` : un verrou a
@@ -2397,6 +2410,8 @@ namespace AnastasisVillage
 
 		FString PlayerPersonId;
 		FPoint PlayerDrive;
+		/** Ecart n°60 : crochet hote, voir SetPlayerStepResolver. */
+		FPlayerStepResolver PlayerStepResolver;
 		bool bHasPlayerChoice = false;
 		FPlayerGoalChoice PlayerChoice;
 		/** Le choix a change depuis la derniere decision : la prochaine pensee le relit. */

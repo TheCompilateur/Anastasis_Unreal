@@ -36,6 +36,9 @@ public:
 	/** Simulation (tuiles, continu) -> Unreal (cm). Z = surface rendue si PresentationWorld est fourni, altitude semantique sinon. */
 	static FVector SimToUnreal(const AnastasisWorld::FWorld& World, double SimX, double SimY, UWorld* PresentationWorld = nullptr);
 
+	/** Centimetres Unreal par tuile de simulation (SimToUnreal en X et en Y : echelle uniforme) ; l'inverse divise par elle. */
+	static double SimCellSize(UWorld* PresentationWorld);
+
 	/** Altitude (cm) de la surface rendue du terrain en (X, Y) Unreal ; faux hors maillage ou sans terrain. */
 	static bool TraceGround(UWorld* PresentationWorld, double X, double Y, double& OutZ);
 

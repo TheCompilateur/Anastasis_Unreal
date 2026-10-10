@@ -84,6 +84,20 @@ namespace
 	}
 }
 
+double FAnastasisVillagePresentation::SimCellSize(UWorld* PresentationWorld)
+{
+    double Scale = 1.0;
+    if (PresentationWorld)
+    {
+        for (TActorIterator<AAnastasisWorldEmbodiment> It(PresentationWorld); It; ++It)
+        {
+            Scale = It->GetSnapshot().SpatialScale;
+            break;
+        }
+    }
+    return AnastasisWorldView::TileWorldSize * Scale;
+}
+
 FVector FAnastasisVillagePresentation::SimToUnreal(const AnastasisWorld::FWorld& World, double SimX, double SimY, UWorld* PresentationWorld)
 {
     AAnastasisWorldEmbodiment* Terrain = nullptr;

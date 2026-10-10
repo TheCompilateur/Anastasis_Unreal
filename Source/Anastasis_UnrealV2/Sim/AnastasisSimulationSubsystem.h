@@ -283,6 +283,14 @@ private:
 	/** Le pawn retrouve sa marche Unreal. */
 	void UnbindPawn();
 	/**
+	 * player-collision-reelle-001 (ecart n°60) -- le crochet de collision de la marche a la main : balaie la capsule
+	 * du pawn contre la geometrie rendue (murs, troncs, margelle, relief raide) de `From` a `To` (tuiles) et rend le
+	 * point atteint, glissant le long de l'obstacle. Les villageois rendus ne bloquent pas.
+	 */
+	AnastasisVillage::FPoint ResolvePlayerStep(const AnastasisVillage::FPoint& From, const AnastasisVillage::FPoint& To);
+	/** Pose ou retire le crochet selon le pawn lie et anastasis.Player.Collision (relit le village : un village refait le perd). */
+	void SyncPlayerStepResolver(bool bWanted);
+	/**
 	 * player-start-001 -- Play = debut du jeu : une fois le village du lancement pose, l'habitant-joueur y arrive
 	 * (meme chemin qu'Anastasis.Player.Arrive), si anastasis.Player.AutoArrive ou anastasis.Visual.Mode 2.
 	 */

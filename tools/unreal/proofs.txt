@@ -45,6 +45,8 @@ tree-cards-capture | tools/unreal/ground-cover-capture.py | GROUND_CAPTURE_COMPL
 # Default-off soil pilot: completion is technical, not an artistic verdict.
 
 player-pie | tools/unreal/player-pie.py | PLAYER_PIE PASS | PLAYER_PIE FAIL|PLAYER_PIE_TIMEOUT|PLAYER_PIE CHECK FAIL | 600 | ANASTASIS_PLAYER_PIE_OUT=@Saved/PlayerEvidence/pie
+# player-collision-reelle-001 (ecart n°60): hand-driven walk toward the well from four sides, anastasis.Player.Collision 0 (the 20 m tile is a wall) then 1 (capsule sweep against the rendered well); no asset saved.
+player-collision-pie | tools/unreal/player-collision-pie.py | PLAYER_COLLISION_PIE PASS | PLAYER_COLLISION_PIE FAIL|PLAYER_COLLISION_PIE CHECK FAIL|PLAYER_COLLISION_PIE_TIMEOUT | 600 | ANASTASIS_PLAYER_COLLISION_OUT=@Saved/PlayerCollisionEvidence/pie
 player-food-loop-pie | tools/unreal/player-food-loop-pie.py | PLAYER_FOOD_LOOP PASS | PLAYER_FOOD_LOOP FAIL|PLAYER_FOOD_LOOP CHECK FAIL | 360 | ANASTASIS_PLAYER_FOOD_OUT=@Saved/PlayerFoodEvidence/pie
 # player-start-001: Play = start of the game, no command: player-inhabitant incarnated in the start village, pawn near the well facing it; witness AutoArrive 0 = observer; Visual.Mode 2 forces arrival.
 player-start-pie | tools/unreal/player-start-pie.py | PLAYER_START_PIE PASS | PLAYER_START_PIE FAIL|PLAYER_START_PIE CHECK FAIL|PLAYER_START_PIE_TIMEOUT | 1200 | ANASTASIS_PLAYER_START_OUT=@Saved/PlayerStartEvidence/pie

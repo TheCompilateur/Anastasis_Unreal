@@ -353,11 +353,41 @@ namespace AnastasisVillage
 			* FMath::Max(0.0, Dt);
 		const double NextX = Npc.X + PlayerDrive.X * Step;
 		const double NextY = Npc.Y + PlayerDrive.Y * Step;
-		const bool bStuck = IsFootBlocked(Npc.X, Npc.Y);
 		const double BeforeX = Npc.X;
 		const double BeforeY = Npc.Y;
-		if (bStuck || !IsFootBlocked(NextX, Npc.Y)) Npc.X = Clamp(NextX, 1.0, Nav.W - 2);
-		if (bStuck || !IsFootBlocked(Npc.X, NextY)) Npc.Y = Clamp(NextY, 1.0, Nav.H - 2);
+		if (!PlayerStepResolver)
+		{
+			const bool bStuck = IsFootBlocked(Npc.X, Npc.Y);
+			if (bStuck || !IsFootBlocked(NextX, Npc.Y)) Npc.X = Clamp(NextX, 1.0, Nav.W - 2);
+			if (bStuck || !IsFootBlocked(Npc.X, NextY)) Npc.Y = Clamp(NextY, 1.0, Nav.H - 2);
+		}
+		else
+		{
+			// ecart n°60 : l'hote fait la collision reelle. Les tuiles de batiment et de foret ne bloquent plus (leur
+			// emprise est celle des murs et des troncs rendus) ; l'eau et le bord du monde, eux, bloquent toujours.
+			const bool bStuck = IsWaterBlocked(Npc.X, Npc.Y);
+			double GoalX = Npc.X;
+			double GoalY = Npc.Y;
+			if (bStuck || !IsWaterBlocked(NextX, Npc.Y)) GoalX = Clamp(NextX, 1.0, Nav.W - 2);
+			if (bStuck || !IsWaterBlocked(GoalX, NextY)) GoalY = Clamp(NextY, 1.0, Nav.H - 2);
+			if (JsHypot(GoalX - Npc.X, GoalY - Npc.Y) > 1e-9)
+			{
+				const FPoint Resolved = PlayerStepResolver(FPoint{ Npc.X, Npc.Y }, FPoint{ GoalX, GoalY });
+				// L'hote ne peut que raccourcir ou glisser le pas ; l'eau garde le dernier mot sur son resultat.
+				if (FMath::IsFinite(Resolved.X) && FMath::IsFinite(Resolved.Y) && (bStuck || !IsWaterBlocked(Resolved.X, Resolved.Y)))
+				{
+					GoalX = Clamp(Resolved.X, 1.0, Nav.W - 2);
+					GoalY = Clamp(Resolved.Y, 1.0, Nav.H - 2);
+				}
+				else
+				{
+					GoalX = Npc.X;
+					GoalY = Npc.Y;
+				}
+			}
+			Npc.X = GoalX;
+			Npc.Y = GoalY;
+		}
 		Npc.bHasTarget = false;
 		ClearNavigation(Npc);
 		Npc.StuckTimer = 0.0;

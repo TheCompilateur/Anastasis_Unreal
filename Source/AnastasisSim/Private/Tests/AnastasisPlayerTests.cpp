@@ -407,4 +407,118 @@ bool FAnastasisPlayerGoalRefusedTest::RunTest(const FString&)
 	return true;
 }
 
+// player-collision-reelle-001 (ecart n°60) -- la marche a la main heurte le decor rendu, pas la tuile entiere.
+//
+//   sans crochet   la reference, au bit pres : la tuile d'un batiment est un mur
+//   crochet        l'hote decide du pas ; la tuile du puits se traverse, l'eau bloque toujours
+//   mur de l'hote  un pas raccourci ou glissant est celui que la simulation garde
+//   dans la tuile un joueur dans la tuile d'un batiment atteint tout de meme son but (le chemin sort de la tuile)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAnastasisPlayerHostCollisionTest,
+	"Anastasis.Sim.Joueur.CollisionHote",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAnastasisPlayerHostCollisionTest::RunTest(const FString&)
+{
+	using namespace AnastasisPlayerTest;
+	AnastasisWorld::FWorld World = MakeFlatWorld(40, 40);
+	// Un mur d'eau a x = 32.
+	for (int32 Y = 0; Y < 40; ++Y) World.Tiles[Y * 40 + 32].Type = AnastasisWorld::ETileType::Water;
+
+	// Sans crochet : la tuile du puits [20, 21) est un mur, comme dans la reference.
+	{
+		FVillage Village;
+		Village.Bind(World);
+		Village.AddBuilding(WellType, 20, 20);
+		const FString Id = Village.ArriveAsPlayer(15.5, 20.5);
+		if (!TestFalse(TEXT("arrived"), Id.IsEmpty())) return false;
+		TestFalse(TEXT("no host hook by default"), Village.HasPlayerStepResolver());
+		Village.SetPlayerMovementInput(1.0, 0.0);
+		double Time = 0.0;
+		Run(Village, Time, 3.0);
+		TestTrue(TEXT("without the hook the well tile is a wall"), Village.FindNpc(Id)->X < 20.0);
+	}
+
+	// Crochet transparent : la tuile du puits se traverse, l'eau bloque toujours, l'arret n'appelle rien.
+	{
+		FVillage Village;
+		Village.Bind(World);
+		Village.AddBuilding(WellType, 20, 20);
+		const FString Id = Village.ArriveAsPlayer(15.5, 20.5);
+		int32 Calls = 0;
+		Village.SetPlayerStepResolver([&Calls](const FPoint&, const FPoint& To) { ++Calls; return To; });
+		TestTrue(TEXT("hook installed"), Village.HasPlayerStepResolver());
+		Village.SetPlayerMovementInput(1.0, 0.0);
+		double Time = 0.0;
+		Run(Village, Time, 3.0);
+		const double XThrough = Village.FindNpc(Id)->X;
+		TestTrue(TEXT("walked through the well tile"), XThrough > 21.0);
+		TestTrue(TEXT("the hook decided the steps"), Calls > 0);
+		Run(Village, Time, 4.0);
+		const double XWater = Village.FindNpc(Id)->X;
+		TestTrue(TEXT("water still blocks"), XWater < 32.0 && XWater > 30.0);
+		Village.SetPlayerMovementInput(0.0, 0.0);
+		const int32 CallsWhileWalking = Calls;
+		Run(Village, Time, 2.0);
+		TestEqual(TEXT("an idle player never calls the hook"), Calls, CallsWhileWalking);
+	}
+
+	// Mur de l'hote a x = 18.3 : le pas est raccourci, puis glisse le long du mur.
+	{
+		FVillage Village;
+		Village.Bind(World);
+		Village.AddBuilding(WellType, 20, 20);
+		const FString Id = Village.ArriveAsPlayer(15.5, 20.5);
+		Village.SetPlayerStepResolver([](const FPoint&, const FPoint& To)
+		{
+			return To.X > 18.3 ? FPoint{ 18.3, To.Y } : To;
+		});
+		Village.SetPlayerMovementInput(1.0, 0.0);
+		double Time = 0.0;
+		Run(Village, Time, 3.0);
+		const FNpc* Me = Village.FindNpc(Id);
+		TestTrue(TEXT("stopped at the host wall"), Me->X <= 18.3 + 1e-6 && Me->X > 18.0);
+		const double Y0 = Me->Y;
+		Village.SetPlayerMovementInput(0.0, 1.0);
+		Run(Village, Time, 1.0);
+		Me = Village.FindNpc(Id);
+		TestTrue(TEXT("slides along the wall"), Me->Y > Y0 + 3.0 && Me->X <= 18.3 + 1e-6);
+	}
+
+	// L'eau garde le dernier mot : un point rendu dans l'eau annule le pas.
+	{
+		FVillage Village;
+		Village.Bind(World);
+		const FString Id = Village.ArriveAsPlayer(15.5, 20.5);
+		Village.SetPlayerStepResolver([](const FPoint&, const FPoint& To) { return FPoint{ 32.5, To.Y }; });
+		Village.SetPlayerMovementInput(1.0, 0.0);
+		double Time = 0.0;
+		Run(Village, Time, 2.0);
+		TestEqual(TEXT("a step ending in water is cancelled"), Village.FindNpc(Id)->X, 15.5);
+	}
+
+	// Dans la tuile d'un batiment, le joueur atteint son but : le chemin de la simulation sort de la tuile.
+	{
+		FVillage Village;
+		Village.Bind(World);
+		Village.AddBuilding(WellType, 20, 20);
+		const FString Id = Village.ArriveAsPlayer(15.5, 20.5);
+		Village.SetPlayerStepResolver([](const FPoint&, const FPoint& To) { return To; });
+		Village.SetPlayerMovementInput(1.0, 0.0);
+		double Time = 0.0;
+		Run(Village, Time, 1.25);
+		Village.SetPlayerMovementInput(0.0, 0.0);
+		const FNpc* Me = Village.FindNpc(Id);
+		TestTrue(TEXT("stands inside the well tile"), Me->X >= 20.0 && Me->X < 21.0 && Village.IsFootBlocked(Me->X, Me->Y));
+		if (FNpc* Mutable = Village.FindNpcMutable(Id)) Mutable->Needs.Thirst = 90.0;
+		TestTrue(TEXT("choose drink"), Village.ChoosePlayerGoal(GoalDrink));
+		Run(Village, Time, 40.0);
+		Me = Village.FindNpc(Id);
+		TestTrue(TEXT("he drank from inside the tile"), Me->DrinksTaken >= 1);
+		TestTrue(TEXT("thirst went down"), Me->Needs.Thirst < 90.0);
+	}
+	return true;
+}
+
 #endif

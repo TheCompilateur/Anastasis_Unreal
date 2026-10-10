@@ -14,6 +14,7 @@
         "Grid": "cache: sim.spatial, reconstruite depuis les positions au debut de chaque boucle des habitants (Grid.Rebuild)",
         "CollectiveDecisionOverride": "pointeur: crochet de test (TFunction), jamais pose en jeu",
         "RainCanopyCover": "pointeur: crochet hote (TFunction) pose par l incarnation Unreal pour lire la canopee rendue (ecart n°41, canopy-rain-shelter-001) ; son effet passe par l etat des habitants, deja hache",
+        "PlayerStepResolver": "pointeur: crochet hote (TFunction) pose par le pawn lie pour la collision reelle de la marche a la main (ecart n°60, player-collision-reelle-001) ; son effet passe par la position du joueur, deja hachee",
         "Colony": "lacune: FColonyState du planificateur (priorites, rapport de stock, charte) ; pose seulement par RestoreColonyForHarness, jamais pour un village cree par le C++ (bHasColony, tresor et rayon sont lus) ; a lire avant toute sauvegarde",
         "MarketStock": "lacune: FOrderedMap du marche, meme condition que Colony",
         "PassageCount": "observation: passages enregistres depuis Bind (settlement-morphogenesis-001), pour le rapport et les tests ; aucune regle ne le relit",

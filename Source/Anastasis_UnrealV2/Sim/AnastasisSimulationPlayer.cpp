@@ -5,7 +5,9 @@
 //   2. le pawn est pose sur ce corps apres les pas -- la camera suit l'habitant, jamais un fantome --
 //      et sa carte portrait est cachee (on ne se voit pas soi-meme) ;
 //   3. le temoin TIME_WARP_001 regarde cet habitant et dit au village ce qu'il en a vu.
-// Collisions, vitesse, besoins : ceux du corps simule. Le pawn n'a plus de marche propre tant qu'il est lie.
+// Vitesse, besoins : ceux du corps simule. Le pawn n'a plus de marche propre tant qu'il est lie. Collisions : l'eau et
+// les chemins de buts, ceux de la simulation (tuiles) ; la marche a la main, celle du decor rendu (ecart n°60,
+// ResolvePlayerStep : la capsule du pawn balayee contre murs, troncs et relief).
 
 #include "Sim/AnastasisSimulationSubsystem.h"
 
@@ -42,6 +44,15 @@ static TAutoConsoleVariable<int32> CVarPlayerPawn(
 	TEXT("anastasis.Player.Pawn"),
 	1,
 	TEXT("player-minimal-001: 1 = the local pawn follows the incarnated inhabitant (its input drives the simulated body, it is placed on it, its portrait card is hidden). 0 = the pawn walks on its own; the inhabitant is driven only by Anastasis.Player.Move."),
+	ECVF_Default);
+
+// player-collision-reelle-001 (ecart n°60) : la marche a la main heurte le decor rendu, pas la tuile entiere.
+static TAutoConsoleVariable<int32> CVarPlayerCollision(
+	TEXT("anastasis.Player.Collision"),
+	1,
+	TEXT("player-collision-reelle-001 (ecart 60): 1 =the hand-driven body of the player collides with the rendered world (walls, "
+		"well, trunks, steep ground) through a capsule sweep of the bound pawn; the sim's tile blocks of buildings and full forest "
+		"tiles no longer stop it (water and the world edge still do). 0 = the reference rule: a whole 20 m tile is a wall. Read each frame."),
 	ECVF_Default);
 
 // player-start-001 (mandat d'Alexandre, 2026-10-08) : appuyer sur Play = debut du jeu. Nom distinct de la commande
@@ -174,8 +185,117 @@ void UAnastasisSimulationSubsystem::ObservePlayerTime(double SimSeconds, double 
 	Village.ObservePlayer(Witness.Presence, Witness.IdleSeconds - IdleBefore);
 }
 
+void UAnastasisSimulationSubsystem::SyncPlayerStepResolver(bool bWanted)
+{
+	AnastasisVillage::FVillage& Village = Simulation.GetVillage();
+	if (!bWanted)
+	{
+		if (Village.HasPlayerStepResolver())
+		{
+			Village.SetPlayerStepResolver(nullptr);
+		}
+		return;
+	}
+	if (!Village.HasPlayerStepResolver())
+	{
+		Village.SetPlayerStepResolver([this](const AnastasisVillage::FPoint& From, const AnastasisVillage::FPoint& To)
+		{
+			return ResolvePlayerStep(From, To);
+		});
+	}
+}
+
+AnastasisVillage::FPoint UAnastasisSimulationSubsystem::ResolvePlayerStep(const AnastasisVillage::FPoint& From, const AnastasisVillage::FPoint& To)
+{
+	UWorld* World = GetWorld();
+	const ACharacter* Character = Cast<ACharacter>(BoundPawn.Get());
+	if (!World || !Character || !Character->GetCapsuleComponent())
+	{
+		return To;
+	}
+	const double Cell = FAnastasisVillagePresentation::SimCellSize(World);
+	if (Cell <= 0.0)
+	{
+		return To;
+	}
+	const UCapsuleComponent* Capsule = Character->GetCapsuleComponent();
+	const double Radius = Capsule->GetScaledCapsuleRadius();
+	const double HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+
+	// Le sol sous le pas : la capsule balayee est levee d'un pas de marche (marche, seuil, caillou) pour ne pas
+	// s'accrocher au relief que le pawn pose a ras de terre ; un mur, un tronc ou une pente raide, eux, l'arretent.
+	constexpr double StepUp = 45.0;
+	const FVector2D A(From.X * Cell, From.Y * Cell);
+	const FVector2D B(To.X * Cell, To.Y * Cell);
+	double Ground = 0.0;
+	if (!FAnastasisVillagePresentation::TraceGround(World, A.X, A.Y, Ground))
+	{
+		Ground = Character->GetActorLocation().Z - HalfHeight;
+	}
+	const double ShapeHalfHeight = FMath::Max(Radius, HalfHeight - StepUp * 0.5);
+	const double CenterZ = Ground + StepUp + ShapeHalfHeight;
+	const FCollisionShape Shape = FCollisionShape::MakeCapsule(Radius, ShapeHalfHeight);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(PlayerStep), false, Character);
+
+	// Une collision doit dire ce qu'elle a heurte : un villageois rendu (carte ou corps) ne bloque pas le joueur.
+	const auto Sweep = [&](const FVector& Start, const FVector& End, FHitResult& Hit) -> bool
+	{
+		for (int32 Pass = 0; Pass < 8; ++Pass)
+		{
+			if (!World->SweepSingleByChannel(Hit, Start, End, FQuat::Identity, ECC_Pawn, Shape, Params))
+			{
+				return false;
+			}
+			const AActor* Actor = Hit.GetActor();
+			if (!Actor || !Actor->IsA<AAnastasisVillagerVisual>())
+			{
+				return true;
+			}
+			Params.AddIgnoredActor(Actor);
+		}
+		return false;
+	};
+
+	const FVector Start(A.X, A.Y, CenterZ);
+	const FVector End(B.X, B.Y, CenterZ);
+	FHitResult Hit;
+	if (!Sweep(Start, End, Hit))
+	{
+		return To;
+	}
+	if (Hit.bStartPenetrating)
+	{
+		// Pose dans un obstacle (arrivee, chargement) : on le laisse en sortir plutot que de le coincer pour de bon.
+		return To;
+	}
+	const FVector Delta = End - Start;
+	const FVector Dir = Delta.GetSafeNormal();
+	// 5 mm de jeu devant l'obstacle : pas de contact exact (donc pas de depart « dedans ») au pas suivant.
+	FVector Stop = Start + Dir * FMath::Max(0.0, Delta.Size() * Hit.Time - 0.5);
+	FVector Normal(Hit.ImpactNormal.X, Hit.ImpactNormal.Y, 0.0);
+	if (Hit.Time < 1.0 && Normal.Normalize())
+	{
+		const FVector Remaining = Delta * (1.0 - Hit.Time);
+		const FVector Slide = Remaining - Normal * FVector::DotProduct(Remaining, Normal);
+		if (Slide.SizeSquared() > 1e-6)
+		{
+			FHitResult SlideHit;
+			if (!Sweep(Stop, Stop + Slide, SlideHit))
+			{
+				Stop += Slide;
+			}
+			else if (!SlideHit.bStartPenetrating)
+			{
+				Stop += Slide.GetSafeNormal() * FMath::Max(0.0, Slide.Size() * SlideHit.Time - 0.5);
+			}
+		}
+	}
+	return AnastasisVillage::FPoint{ Stop.X / Cell, Stop.Y / Cell };
+}
+
 void UAnastasisSimulationSubsystem::UnbindPawn()
 {
+	SyncPlayerStepResolver(false);
 	if (APawn* Pawn = BoundPawn.Get())
 	{
 		if (ACharacter* Character = Cast<ACharacter>(Pawn))
@@ -213,6 +333,7 @@ void UAnastasisSimulationSubsystem::PlacePlayerPawn()
 		}
 		UE_LOG(LogAnastasis_UnrealV2, Display, TEXT("ANASTASIS_PLAYER pawn %s follows %s"), *Pawn->GetName(), *Player->Id);
 	}
+	SyncPlayerStepResolver(CVarPlayerCollision.GetValueOnGameThread() != 0);
 	double HalfHeight = 0.0;
 	if (const ACharacter* Character = Cast<ACharacter>(Pawn))
 	{

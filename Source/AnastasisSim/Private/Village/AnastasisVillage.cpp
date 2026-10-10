@@ -232,6 +232,21 @@ namespace AnastasisVillage
 		return AnastasisNav::BlockedAt(Nav, FloorInt(InX), FloorInt(InY));
 	}
 
+	bool FVillage::IsWaterBlocked(double InX, double InY) const
+	{
+		if (!World)
+		{
+			return true;
+		}
+		const int32 TX = FloorInt(InX);
+		const int32 TY = FloorInt(InY);
+		if (!Nav.IsInBounds(TX, TY))
+		{
+			return true;
+		}
+		return World->Tiles[TY * Nav.W + TX].Type == AnastasisWorld::ETileType::Water;
+	}
+
 	bool FVillage::IsFreeCell(int32 TX, int32 TY) const
 	{
 		if (!World || TX < 0 || TY < 0 || TX >= Nav.W || TY >= Nav.H) return false;
