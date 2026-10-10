@@ -40,6 +40,10 @@ namespace
 		9.0f,
 		TEXT("dormir-couche-001 : EV100 dans un logis en plein jour (piece eclairee par sa porte et sa fenetre)."),
 		ECVF_Default);
+	TAutoConsoleVariable<int32> CVarGranaryProvisions(
+		TEXT("anastasis.Village.GranaryProvisions"), 1,
+		TEXT("granary-provisions-001 : 1 = montrer les caisses du stock physique ; 0 = temoin visuel."),
+		ECVF_Default);
 
 	/** Dans le volume de la maison : la lumiere sort par la porte (+Y d'auteur) et la fenetre, pas par les murs. */
 	const FVector HearthLocal(0.0, 0.0, 120.0);
@@ -97,6 +101,11 @@ AAnastasisVillageBuilding::AAnastasisVillageBuilding()
 	StoneStockVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	StoneStockVisual->SetCanEverAffectNavigation(false);
 	StoneStockVisual->SetMobility(EComponentMobility::Movable);
+	ProvisionVisual = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("ProvisionVisual"));
+	ProvisionVisual->SetupAttachment(SmartObject);
+	ProvisionVisual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ProvisionVisual->SetCanEverAffectNavigation(false);
+	ProvisionVisual->SetMobility(EComponentMobility::Movable);
 
 	Hearth = CreateDefaultSubobject<UPointLightComponent>(TEXT("Hearth"));
 	Hearth->SetupAttachment(SmartObject);
@@ -421,6 +430,31 @@ void AAnastasisVillageBuilding::SetSiteStock(
 	Place(StoneStockVisual, StoneCount, StoneStockAnchor, 24.f);
 }
 
+void AAnastasisVillageBuilding::SetProvisionStock(const int32 FoodPhysical, const bool bCompletedGranary)
+{
+	// Huit paliers pour les 300 portions du registre. Une caisse n'est pas une portion.
+	const int32 Count = bCompletedGranary && Kind == EAnastasisVillageBuildingKind::Granary
+		&& CVarGranaryProvisions.GetValueOnGameThread() != 0 && FoodPhysical > 0
+		? FMath::Clamp((8 * FMath::Min(FoodPhysical, AnastasisVillage::GranaryFoodCap)
+			+ AnastasisVillage::GranaryFoodCap - 1) / AnastasisVillage::GranaryFoodCap, 1, 8)
+		: 0;
+	if (Count == VisibleProvisionCrates) return;
+	VisibleProvisionCrates = Count;
+	if (!ProvisionVisual) return;
+	ProvisionVisual->ClearInstances();
+	if (!ProvisionVisual->GetStaticMesh()) return;
+	// A gauche de la porte du storehouse, hors de l'approche centrale. La cour de
+	// l'archetype est une terrasse au niveau PadOffset - 3 cm ; le terrain trace
+	// en dessous ne doit pas engloutir la caisse sur le cote aval.
+	for (int32 I = 0; I < Count; ++I)
+	{
+		const FVector Anchor(-770.f + 120.f * (I % 2), 430.f + 85.f * (I / 2), 0.f);
+		const float FloorZ = bHasArchitecture ? static_cast<float>(PadOffset + 2.0) : StockGroundLocalZ(Anchor);
+		const FVector Position(Anchor.X, Anchor.Y, FloorZ);
+		ProvisionVisual->AddInstance(FTransform(FRotator(0.f, I % 2 ? -5.f : 4.f, 0.f), Position));
+	}
+}
+
 void AAnastasisVillageBuilding::Configure(
 	EAnastasisVillageBuildingKind InKind,
 	FName InSimId,
@@ -445,6 +479,15 @@ void AAnastasisVillageBuilding::Configure(
 		TEXT("/Game/Anastasis/SiteStock001/SM_Site_StoneBundle_01.SM_Site_StoneBundle_01"));
 	WoodStockVisual->SetStaticMesh(Timber);
 	StoneStockVisual->SetStaticMesh(Stone);
+	if (ProvisionVisual)
+	{
+		UStaticMesh* Crate = InKind == EAnastasisVillageBuildingKind::Granary
+			? LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Anastasis/GranaryProvisions/SM_Granary_ProvisionCrate_01.SM_Granary_ProvisionCrate_01"))
+			: nullptr;
+		ProvisionVisual->SetStaticMesh(Crate);
+		if (InKind == EAnastasisVillageBuildingKind::Granary && !Crate)
+			UE_LOG(LogAnastasis_UnrealV2, Warning, TEXT("ANASTASIS_VILLAGE provision crate asset missing"));
+	}
 	if (!Timber || !Stone)
 	{
 		UE_LOG(LogAnastasis_UnrealV2, Warning,

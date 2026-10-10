@@ -92,6 +92,10 @@ public:
 
 	/** Physical stock at an unfinished site. Read-only projection of the simulation ledger. */
 	void SetSiteStock(int32 WoodStock, int32 WoodNeed, int32 StoneStock, int32 StoneNeed, bool bActiveSite);
+	/** Caisses du grenier : projection grossiere du stock physique, sans ecriture dans la simulation. */
+	void SetProvisionStock(int32 FoodPhysical, bool bCompletedGranary);
+	int32 GetVisibleProvisionCrates() const { return VisibleProvisionCrates; }
+	UInstancedStaticMeshComponent* GetProvisionVisual() const { return ProvisionVisual; }
 
 	/**
 	 * ICEBERG_001 : le foyer. 0..1 = part de la lumiere de l'atre qui sort par la porte et la
@@ -135,6 +139,9 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis|Site Stock")
 	TObjectPtr<UInstancedStaticMeshComponent> StoneStockVisual;
 
+	UPROPERTY(VisibleAnywhere, Category = "Anastasis|Provisions")
+	TObjectPtr<UInstancedStaticMeshComponent> ProvisionVisual;
+
 	/** dormir-couche-001 : le volume habite (boite) et l'exposition qui y regne (post-process borne par la boite). */
 	UPROPERTY(VisibleAnywhere, Category = "Anastasis")
 	TObjectPtr<UBoxComponent> InteriorBox;
@@ -161,6 +168,7 @@ private:
 	bool bAgedMaterialMissing = false;
 	int32 VisibleWoodBundles = -1;
 	int32 VisibleStoneBundles = -1;
+	int32 VisibleProvisionCrates = -1;
 
 	float StockGroundLocalZ(const FVector& LocalAnchor) const;
 

@@ -335,6 +335,8 @@ int32 FAnastasisVillagePresentation::Sync(
 				Actor->SetSiteStock(Building.Materials.StockWood, Building.Materials.NeedWood,
 					Building.Materials.StockStone, Building.Materials.NeedStone,
 					Building.bHasMaterials && !Building.IsCompleted());
+				Actor->SetProvisionStock(Building.FoodPhysical,
+					Building.Type == AnastasisVillage::GranaryType && Building.IsCompleted());
 				ApplyMetabolism(*Actor, Building);
 				Age(*Actor, Building);
 			}
@@ -375,6 +377,8 @@ int32 FAnastasisVillagePresentation::Sync(
 		Actor->SetSiteStock(Building.Materials.StockWood, Building.Materials.NeedWood,
 			Building.Materials.StockStone, Building.Materials.NeedStone,
 			Building.bHasMaterials && !Building.IsCompleted());
+		Actor->SetProvisionStock(Building.FoodPhysical,
+			Building.Type == AnastasisVillage::GranaryType && Building.IsCompleted());
 		ApplyMetabolism(*Actor, Building);
 		Age(*Actor, Building);
 		Actors.Add(Building.Id, Actor);
