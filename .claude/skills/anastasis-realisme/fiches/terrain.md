@@ -72,6 +72,7 @@ hauteur vient de `AnastasisTectonics` (`WorldView/AnastasisTectonics.{h,cpp}`), 
 | Faille décrochante | à 8 km : tranchée de 100 m, 0,6 km de large, crêtes de blocage décalées |
 | Escarpement de faille normale | à 7 km côté basses terres, 85 m : la carte est une terrasse |
 | Chaîne principale | axe à 12,5 km (± 3), 2 à 3,4 km, front raide côté carte, bruit érodé (vallées en V), cols tous les 7 à 13 km, contrefort parallèle, arêtes vives |
+| Selles larges de la chaîne principale | `anastasis.Terrain.MountainSaddles` : défaut 0,5 ; 0 retrouve la silhouette antérieure. Un champ lent le long de l'axe abaisse certains segments de la chaîne proche sans changer le bassin ou la chaîne arrière (`pontic-mountain-silhouette-004`). |
 | Seconde chaîne | à 40 km, 3 à 4 km, enneigée |
 | Côté basses terres | collines et crêtes de 3 à 16 km, chaîne extérieure basse à 16-34 km |
 | Cuvette | rien ne s'ouvre sur le vide : 650 m à 64 km, dans toutes les directions |

@@ -136,7 +136,7 @@ AnastasisTectonics::FTectonicFrame AnastasisTectonics::MakeFrame(const FVector2D
 	return Frame;
 }
 
-void AnastasisTectonics::Evaluate(const FTectonicFrame& F, double XKm, double YKm, FBreakdown& Out)
+void AnastasisTectonics::Evaluate(const FTectonicFrame& F, double XKm, double YKm, FBreakdown& Out, double MountainSaddles)
 {
 	Out = FBreakdown{};
 	const uint32 S = F.Seed;
@@ -209,6 +209,11 @@ void AnastasisTectonics::Evaluate(const FTectonicFrame& F, double XKm, double YK
 		// Aretes vives : des cretes courtes de 1,4 km qui dechirent le haut du massif sans toucher
 		// son pied (un massif n'est pas une colline a la loupe).
 		Main += 130.0 * FMath::Pow(Envelope, 0.8) * TectSmooth(900.0, 1900.0, Main) * TectRidged(Pw.X / 1.4, Pw.Y / 1.4, S + 55U, 4);
+		// Selles larges le long de la chaine : les massifs se distinguent sans ajouter de pics.
+		// La seconde chaine demeure visible entre eux et la vallee habitee ne change pas.
+		const double SaddleField = TectNoise(V / 8.0, 6.3, S + 93U).V;
+		const double Massif = TectSmooth(-0.25, 0.25, SaddleField);
+		Main *= 1.0 - 0.58 * FMath::Clamp(MountainSaddles, 0.0, 1.0) * (1.0 - Massif);
 		Out.Range = Main;
 	}
 
@@ -242,10 +247,10 @@ void AnastasisTectonics::Evaluate(const FTectonicFrame& F, double XKm, double YK
 	Out.Total = Sum > 0.0 ? MaxHeightM * FMath::Tanh(Sum / MaxHeightM) : Sum;
 }
 
-double AnastasisTectonics::HeightM(const FTectonicFrame& Frame, double XKm, double YKm)
+double AnastasisTectonics::HeightM(const FTectonicFrame& Frame, double XKm, double YKm, double MountainSaddles)
 {
 	FBreakdown B;
-	Evaluate(Frame, XKm, YKm, B);
+	Evaluate(Frame, XKm, YKm, B, MountainSaddles);
 	return B.Total;
 }
 

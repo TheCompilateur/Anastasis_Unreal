@@ -1,10 +1,15 @@
 #include "WorldView/AnastasisTerrainHorizon.h"
 
 #include "Math/NumericLimits.h"
+#include "HAL/IConsoleManager.h"
 #include "World/AnastasisWorldNoise.h"
 
 namespace
 {
+static TAutoConsoleVariable<float> CVarMountainSaddles(
+	TEXT("anastasis.Terrain.MountainSaddles"), 0.5f,
+	TEXT("Large saddles along the main distant range: 0=baseline, 0.5=retained."));
+
 // Nom propre a ce fichier : en build unity, il partage l'unite de compilation avec
 // AnastasisTerrainForge.cpp, dont le namespace anonyme a deja un SmoothStep.
 double HorizonSmoothStep(double Edge0, double Edge1, double X)
@@ -197,6 +202,7 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 	const AnastasisTerrainSurface::FGeometry* Rendered)
 {
 	Out = FRing{};
+	const double MountainSaddles = CVarMountainSaddles.GetValueOnGameThread();
 	const AnastasisTerrainSurface::FGeometry& Src = Forge.Geometry;
 	const int32 FineW = Forge.FineW, FineH = Forge.FineH;
 	if (FineW < 2 || FineH < 2 || Forge.Subdiv < 1 || Src.Vertices.Num() != FineW * FineH
@@ -433,7 +439,7 @@ bool AnastasisTerrainHorizon::Build(const AnastasisTerrainForge::FMesh& Forge, u
 				const double NDist = bSkirt ? D[K - 1] : Dist;
 				const FVector2D NoiseAt = bSkirt ? Place(E, NDist) : At;
 				const double TectM = AnastasisTectonics::HeightM(Out.Tectonics,
-					(NoiseAt.X - CX) / 100000.0 * RefK, (NoiseAt.Y - CY) / 100000.0 * RefK);
+					(NoiseAt.X - CX) / 100000.0 * RefK, (NoiseAt.Y - CY) / 100000.0 * RefK, MountainSaddles);
 				const double Far = SeaZ + AltStep * FarHills(NoiseAt.X / TileStep - 0.5, NoiseAt.Y / TileStep - 0.5, NDist / TileStep, Seed)
 					+ TectM * 100.0 / RefK;
 				const double Base = ZMean.Mean(I, R);

@@ -76,8 +76,8 @@ struct FBreakdown
 /** Hauteur au-dessus du plan de reference, en metres ; saturation douce a MaxHeightM. */
 inline constexpr double MaxHeightM = 4600.0;
 
-void Evaluate(const FTectonicFrame& Frame, double XKm, double YKm, FBreakdown& Out);
-double HeightM(const FTectonicFrame& Frame, double XKm, double YKm);
+void Evaluate(const FTectonicFrame& Frame, double XKm, double YKm, FBreakdown& Out, double MountainSaddles = 0.0);
+double HeightM(const FTectonicFrame& Frame, double XKm, double YKm, double MountainSaddles = 0.0);
 
 /**
  * Familles de surface d'un sommet lointain, poids dans [0,1] (pas une partition : l'appelant les
