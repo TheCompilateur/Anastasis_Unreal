@@ -1,52 +1,45 @@
-# Reprise : pontic-mountain-presence-003
+# HANDOFF : pontic-mountain-presence-003 — candidat roche rejete
 
 ## MISSION
 
-Rendre la chaine principale intimidante et materiellement credible depuis le bassin,
-a hauteur humaine. La reference `S045` occupe deja le ciel, mais ses versants sont
-une paroi bleu-blanc continue. Les huit meshes pontiques sont dans `main`, sans pose
-validee. Cette etape teste **uniquement** la matiere rocheuse de l'anneau lointain.
+Tester si un detail de strates et fissures dans le materiau de l'anneau lointain rend la chaine principale plus credible depuis le bassin, a 1,7 m. Une seule variable : `MountainRockDetail` 0/1/0 sur le `main` actuel au moment de l'essai.
 
 ## FILES_OWNED
 
-- `tools/unreal/far-terrain-material.py` : candidat `MountainRockDetail` 0/1.
-- `tools/unreal/mountain-rock-capture.ps1/.py` : capture 0/1/0 a une camera.
-- `AGENTS.md` : index des outils.
-- cette note.
+- `tools/unreal/far-terrain-material.py` : repare la regeneration du graphe ; `MountainRockDetail` reste present dans le script deja verse sur `main`, mais son defaut passe a 0 apres REJECT.
+- `tools/unreal/mountain-rock-capture.py` : utilise le ciel existant du niveau, sans ajouter un second acteur d'atmosphere.
+- cette fiche. Aucun `.uasset`, C++, carte ou valeur CVar livree.
 
-## CURRENT
+## COMMIT
 
-- Worktree `C:\dev\ANASTASIS_WORKTREES\pontic-mountain-presence-003`, branche
-  `agent/pontic-mountain-presence-003`, base `e038b7d0e`.
-- Premier build isole `BUILD::PASS` (19 actions, 252 s). Aucun C++ modifie.
-- Le script de materiau est **un candidat non execute**. Le `.uasset` existant n'a
-  pas ete regenere ; la carte affiche donc toujours l'ancien materiau.
-- Aucun editeur de cette mission n'a ete lance, aucune capture nouvelle, aucun
-  verdict SCN ni PLY. Ne pas appeler `finish` ou integrer a ce stade.
+Branche `agent/pontic-mountain-presence-003` rebasee sur `0af22c5fcae8c622ef409e4dc22997b140ff1031` ; consulter `HEAD` pour le commit final. La preparation des deux scripts etait deja presente sur `main` avant cette reprise.
 
-## REPRISE BORNEE
+## MEC
 
-1. Verifier `agent-worktree.ps1 status` et la porte memoire ; attendre une place
-   libre dans la file de l'editeur, sans fermer celui d'un autre agent.
-2. Dans ce worktree, lancer `tools\unreal\far-terrain-material.ps1`. Verifier
-   `FAR_TERRAIN_MATERIAL::PASS`, le graphe reel, puis la sauvegarde du `.uasset`.
-3. Lancer `tools\unreal\mountain-rock-capture.ps1 -Label trial-01`. Trois
-   images `Saved\MountainRockEvidence\trial-01\S045_{A,B,A2}.png` doivent
-   avoir un ciel valide et la meme camera. A/B/A modifie le seul parametre
-   `MountainRockDetail` dans un editeur.
-4. Ouvrir les trois images, calculer A/B et A/A2 avec
-   `.claude\skills\anastasis-capture\compare.py`, examiner les versants plutot
-   que l'image entiere, et relever les ms GPU. REJECT si motif periodique,
-   roche factice, ciel noir, cout non borne ou effet dans la variance temoin.
-5. Si KEEP, capturer les huit azimuts avec le materiau livre et verifier les
-   limites de la foret/neige ; puis commit, `finish` et passation a l'integrateur.
-   Si REJECT, restaurer le script et l'asset, documenter le resultat.
+- Build du worktree rebase : `BUILD::PASS` (15 actions, 142,44 s).
+- Premier essai du generateur : echec `graphe non vide apres nettoyage : 2`. Correction locale par recreation de l'asset, comme `world-theatre-light-material.py` ; deuxieme essai `FAR_TERRAIN_MATERIAL::PASS` avec le candidat actif. Le `.uasset` experimental a ensuite ete restaure a l'identique du `main`.
+- Le script final met le defaut du parametre a 0 ; ce defaut final n'a pas ete regenere en asset, car le candidat visuel est rejete. `PYTHON_SYNTAX::PASS` avait ete obtenu avant ce seul changement de scalaire ; revérifier au portail final.
+- `mountain-rock-capture.ps1 -Label current-0af22c5` : `MOUNTAIN_ROCK::CAPTURE_COMPLETE`, camera `(106000,106000,1052)`, pitch 3, yaw 45, un acteur d'incarnation, ciel de niveau valide. Images locales `Saved/MountainRockEvidence/current-0af22c5/S045_{A,B,A2}.png`.
+- GPU p50 rapportes : A 18,24 ms, B 18,02 ms, A2 17,38 ms ; machine partagee, aucun gain de performance revendique.
 
-## MEC / SCN / PLY
+## SCN
 
-MEC : build initial PASS seulement ; compilation du shader UNKNOWN.
-SCN : UNKNOWN ; aucune image du candidat.
-PLY : UNKNOWN ; aucun parcours joueur.
+**REJECT.** La chaine reste une paroi bleu-blanc continue. Le detail ajoute une faible modulation au centre, sans roche lisible ni changement de la grande face est.
+
+- Image entiere, pixels dont un canal differe de plus de 16/255 : A/B 2,63 %, A/A2 1,97 %.
+- Zone massif central `(560,330)-(820,455)` : A/B 0,64 %, A/A2 0 % ; moyenne RGB 138,06 -> 135,82 -> 138,08.
+- Zone massif est `(1370,295)-(1740,485)` : A/B 0 %, A/A2 0 %.
+- Le ciel est valide, et le temoin A2 revient. Le changement reste insuffisant pour la cible d'emerveillement.
+
+Diagnostic separe, sur le `main` canonique `0af22c5` en PIE a 11 h : `WorldTheatre.Light` 0/1/0 (masses constantes) change 65,71 % de la zone de chaine centrale contre 0,30 % entre temoins, et 0,66 % de la vallee contre 1,36 % entre temoins. Les images `Saved/WorldTheatreEvidence/mountain-current-0af22c5/V1_village_chaine_{masses,light,masses2}.png` montrent une baisse de valeur du lointain, mais toujours une paroi continue. Ce levier tonal n'est pas active par defaut dans cette mission.
+
+## PLY
+
+UNKNOWN. L'A/B/A roche est en editeur de niveau ; l'A/B/A lumiere est en PIE a camera fixe. Aucun parcours joueur ni jeu package ne juge l'emerveillement.
+
+## ECARTS
+
+AUCUN — `Source/AnastasisSim/` non touche.
 
 ## PROOFS
 
@@ -54,11 +47,8 @@ PROOFS: (aucune)
 
 ## INTEGRATION_RISK
 
-Ce commit de preparation ne doit pas etre integre seul. Il change le script
-d'autorite, pas le materiau charge en jeu. `pontic-ground-context-002` touche
-`AnastasisWorldEmbodiment.cpp` mais pas ce script ; revalider sur le main actif.
+Passation d'outil et de diagnostic. Le materiau enregistre n'est pas modifie. Regenerer plus tard via `far-terrain-material.ps1` ajoutera un parametre de detail a 0, equivalent visuellement au graphe precedent ; le candidat a 1 reste rejete. Ne pas annoncer une amelioration des montagnes sur la base du build, de la compilation du shader ou de ces captures instrumentales.
 
-## STOP
+## STOP / NEXT
 
-Mission mise en veille a la demande d'Alexandre. Aucun PASS visuel ni
-photoréalisme revendique.
+Arreter la branche de detail rocheux. Le levier de valeur a ete isole ; la forme de la chaine et la repartition de roche/neige restent les obstacles visuels. Ouvrir une mission de composition du relief avec une seule vue hero et des temoins, avant tout nouveau detail de surface.

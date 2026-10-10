@@ -29,11 +29,6 @@ actor = actors[0] if actors else eas.spawn_actor_from_class(
 unreal.log('MOUNTAIN_ROCK_ACTORS count=%d' % len(actors))
 actor.call_method('EmbodyCanonical', args=(12345,))
 
-atmo_class = unreal.load_class(None, '/Script/Anastasis_UnrealV2.AnastasisWorldAtmosphere')
-atmo = eas.spawn_actor_from_class(atmo_class, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
-atmo.call_method('Apply')
-atmo.call_method('ApplyMist')
-
 horizon = next((c for c in actor.get_components_by_class(unreal.ProceduralMeshComponent)
                 if c.get_name() == 'HorizonTerrain'), None)
 if horizon is None or not horizon.is_visible():

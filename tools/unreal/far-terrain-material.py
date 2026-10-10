@@ -55,21 +55,20 @@ return saturate(Colour * oldValue * value);
 def main():
     if unreal.get_editor_subsystem(unreal.AssetEditorSubsystem) is None:
         raise RuntimeError('editeur vivant requis ; aucun asset modifie')
-    if eal.does_asset_exist(PATH):
-        mat = eal.load_asset(PATH)
-        mel.delete_all_material_expressions(mat)
-        left = mel.get_num_material_expressions(mat)
-        if left:
-            raise RuntimeError('graphe non vide apres nettoyage : %d' % left)
-    else:
-        mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
-            NAME, MATERIAL_DIR, unreal.Material, unreal.MaterialFactoryNew())
+    # UE 5.8.2 laisse deux expressions apres delete_all_material_expressions.
+    # Ce materiau est charge par chemin au runtime : regenerer l'asset entier.
+    if eal.does_asset_exist(PATH) and not eal.delete_asset(PATH):
+        raise RuntimeError('suppression impossible : ' + PATH)
+    mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+        NAME, MATERIAL_DIR, unreal.Material, unreal.MaterialFactoryNew())
+    if mat is None:
+        raise RuntimeError('creation impossible : ' + PATH)
     vc = mel.create_material_expression(mat, unreal.MaterialExpressionVertexColor, -900, 0)
     pos = mel.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -900, 200)
     uv = mel.create_material_expression(mat, unreal.MaterialExpressionTextureCoordinate, -900, 360)
     detail = mel.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -900, 520)
     detail.set_editor_property('parameter_name', 'MountainRockDetail')
-    detail.set_editor_property('default_value', 1.0)
+    detail.set_editor_property('default_value', 0.0)  # detail rocheux rejete sur S045
     node = mel.create_material_expression(mat, unreal.MaterialExpressionCustom, -500, 60)
     node.set_editor_property('description', 'FarTerrainValue')
     node.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT3)
