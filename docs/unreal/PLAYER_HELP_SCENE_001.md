@@ -10,7 +10,10 @@ de decider et de travailler ensuite.
 
 ## Entree et commandes
 
-Dans `Lvl_AnastasisSlice`, lorsque les fondateurs de Valmire sont poses :
+Dans `Lvl_AnastasisSlice`, lorsque les fondateurs de Valmire sont poses, **et que le joueur n'est pas deja arrive**
+(depart en observateur, `anastasis.Player.AutoArrive 0`). Au Play ordinaire le joueur arrive seul, sans famille
+(PLAYER_START_001, decision d'Alexandre du 2026-10-09) : cette scene ne s'ouvre pas pour lui, ses touches ne font rien
+et le panneau ne les annonce pas.
 
 | Touche | Acte |
 |---|---|

@@ -174,6 +174,12 @@ public:
 	void ToggleHelpNotebook();
 	bool IsHelpSceneActive() const { return bHelpSceneActive; }
 	bool HasHelpPanel() const { return HelpPanel.IsValid(); }
+	/**
+	 * arrivant-seul-001 : ce que le panneau dit a l'habitant arrive seul, sans famille (le debut de partie, player-start-002) :
+	 * comment marcher, ou lire ses buts, comment regler le temps. Jamais une touche de la scene d'entraide (E, F, X, J) : elle
+	 * n'existe que pour qui a ouvert cette scene.
+	 */
+	static FString ArrivalHelpText(int32 Day, const FString& Name);
 
 	/** Le pawn local suit-il l'habitant incarne (anastasis.Player.Pawn) ? */
 	bool IsPawnBound() const { return BoundPawn.IsValid(); }

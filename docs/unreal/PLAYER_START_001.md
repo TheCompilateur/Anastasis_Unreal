@@ -22,6 +22,14 @@ village vit autour, sans aucune commande console.
    pose, `FacePawnTowardVillage` tourne la caméra vers le puits (lacet vers le puits, 6° plongés).
 5. Il attend (`idle`) : la main du joueur reste celle de player-goals-001 (ZQSD/WASD, touches 1 à 5).
 
+**Décision d'Alexandre (2026-10-09) : le joueur reste un arrivant seul, sans famille.** Il n'est pas le chef d'une
+famille qui bâtit son toit. La scène d'entraide de `PLAYER_HELP_SCENE_001` (Entrée, E, F, X, J) ne s'ouvre donc
+qu'à un départ en observateur (`anastasis.Player.AutoArrive 0`) : `StartHelpScene` refuse dès qu'un joueur existe,
+et E, F, X et J n'agissent qu'une fois la scène ouverte. Le panneau Valmire (en bas à gauche) dit au joueur arrivé
+seul ce qui marche (marcher, la ligne `BUTS`, le temps) et rien d'autre (arrivant-seul-001,
+`UAnastasisSimulationSubsystem::ArrivalHelpText`). Avant cette décision il annonçait `[F] Bâtir  [X]  [J] Carnet`,
+des touches mortes pour lui.
+
 Pas de mécanisme Unreal de plus : ni nouveau GameMode, ni réglage de World Settings, ni `.umap` modifiée. Le
 GameMode du projet était déjà en place ; le jeu empaqueté (`package-playable.ps1`) prend le même GameMode,
 la même carte et la même CVar, donc démarre lui aussi en joueur au village.

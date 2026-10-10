@@ -135,7 +135,13 @@ void UAnastasisSimulationSubsystem::StartHelpScene()
 		return;
 	}
 	AnastasisVillage::FVillage& Village = Simulation.GetVillage();
-	if (Village.PlayerActor()) return;
+	if (Village.PlayerActor())
+	{
+		// arrivant-seul-001 : le joueur du debut de partie est arrive seul. Entree ne lui prend la place d'aucune famille, et le
+		// dire vaut mieux que ne rien faire.
+		if (!bHelpSceneActive) HelpFeedback = TEXT("Arrive seul, tu n'as pas de famille dont prendre la place : Entree ne fait rien.");
+		return;
+	}
 	FString SiteId;
 	for (const AnastasisVillage::FBuilding& Building : Village.GetBuildings())
 	{
@@ -235,6 +241,17 @@ void UAnastasisSimulationSubsystem::ToggleHelpNotebook()
 	if (bHelpSceneActive) bHelpNotebookOpen = !bHelpNotebookOpen;
 }
 
+FString UAnastasisSimulationSubsystem::ArrivalHelpText(int32 Day, const FString& Name)
+{
+	return FString::Printf(
+		TEXT("VALMIRE  |  JOUR %d  |  %s\n")
+		TEXT("Tu es arrive seul, sans famille.\n")
+		TEXT("Marcher : Z Q S D (ou W A S D). Regarder : la souris.\n")
+		TEXT("Ton corps a faim, soif, sommeil : la ligne BUTS, en haut de l'ecran, dit ce qu'il peut faire et la touche de chaque but.\n")
+		TEXT("Temps : 8 le double, 9 le divise. Trop vite, le village ne te voit plus.\n"),
+		Day, *Name);
+}
+
 FString UAnastasisSimulationSubsystem::HelpPanelText() const
 {
 	if (!Simulation.IsRunning()) return FString();
@@ -244,6 +261,14 @@ FString UAnastasisSimulationSubsystem::HelpPanelText() const
 	{
 		return FString::Printf(TEXT("VALMIRE  |  PREMIERE JOURNEE\n[ENTREE] Vivre la journee d'une famille qui batit son toit.\n%s"),
 			*HelpFeedback);
+	}
+	// arrivant-seul-001 (Alexandre, 2026-10-09 : « je veux rester seul arrivant ») : tant que la scene d'entraide n'est pas ouverte,
+	// le panneau n'annonce que ce qui marche. E, F, X et J n'agissent qu'a l'interieur de cette scene.
+	if (!bHelpSceneActive)
+	{
+		FString Arrival = ArrivalHelpText(Simulation.GetDay(), PersonName(*Player));
+		if (!HelpFeedback.IsEmpty()) Arrival += HelpFeedback + TEXT("\n");
+		return Arrival;
 	}
 	FString Text = FString::Printf(TEXT("VALMIRE  |  JOUR %d  |  %s\n"), Simulation.GetDay(), *PersonName(*Player));
 	const AnastasisVillage::FBuilding* Site = nullptr;
