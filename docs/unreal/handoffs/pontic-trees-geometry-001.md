@@ -62,7 +62,12 @@ PENDING
   charme 0,578 / 7771-3378-280, cerisier 0,375 / 10656-4734-224, sorbier 0,362 / 13571-4512-280 (les treize : 0,36 a 0,74,
   2,5 k a 10 k). Un controle de silhouette, pas un verdict de beaute.
 - Treize inchanges : empreinte des maillages construits identique a main (`TREIZE_IDENTIQUES`).
-- Editeur : `tools\unreal\create-gpt-flora.ps1` -> RESULTAT_EDITEUR
+- Editeur : `tools\unreal\create-gpt-flora.ps1` (dix-huit regeneres) : `GPT_FLORA_ASSETS::PASS`, triangles LOD0/1/2
+  hetre 8478/3721/254, epicea 11169/6035/59, charme 7771/3378/254, cerisier 10656/4734/205, sorbier 13571/4512/254 ;
+  les treize exactement aux valeurs de sprites-vegetation-gpt-001 (marronnier 7002/3441/254 ... prairie 2273/961/58 ; les
+  erreurs `AppendBuffersToMesh` de la prairie existent deja sur main). Les treize `.uasset` regeneres sont identiques en
+  forme : leurs binaires de main sont gardes (pas de churn LFS). `set_tree_grammar` : `VERIFY variants=41 attendu=41 ...
+  especes=18 attendu=18 -> OK`, `RESULT::PASS`.
 - `python tools/historicity/check-brief.py docs/historicity/briefs/pontic-trees-geometry-001.json` : `BRIEF::PASS traceability only`.
 
 ## PROOFS
@@ -77,7 +82,16 @@ Rendu logiciel (pas Unreal : ni Lumen, ni transmission) regarde : `docs/visual/s
 premieres GPT ; l'epicea est un cone dense et sombre, plus regulier que le sprite ; le cerisier lit « en fleur » mais
 moins nuageux que le dessin ; le sorbier reste plus aere que le sprite, baies lisibles. Verdict de beaute : Alexandre.
 
-PREUVE_EDITEUR
+Preuve mise au point : `tools\unreal\editor-batch.ps1 -Proofs pontic-stages-capture` -> `PROOF::PASS (223 s)`,
+`PONTIC_STAGES_CAPTURE PASS trees=5522 pontic_trees=1919 meshes=5 views=5` (`Saved/PonticStagesEvidence/`). Inventaire :
+5 522 arbres dans les trois etats, reference == reference2, a 1 hetre 864, epicea 605, charme 251, cerisier 112, sorbier 87 ;
+chene vert 1 420 -> 566, pin d'Alep 279 -> 96, olivier 166 -> 83, sapin 371 -> 91. Premier essai en echec
+(`tree total changed`) : le controle comptait aussi les sujets `SM_Gpt_` du sous-bois, qui suivent les couronnes ;
+corrige (arbres seulement), puis PASS. Images regardees (lisiere a 1,7 m et oblique, reference / pontic) : couronnes
+feuillues plus pleines et plus vertes en lisiere, cerisiers blancs lisibles, epiceas sombres sur les hauts ; relief,
+herbe et montagnes inchanges. GPU p50 (ms, ref / pontic / ref2) : prairie 51,8 / 76,2 / 64,7, riviere 64,4 / 92,7 / 86,3,
+lisiere 55,7 / 49,5 / 66,3, oblique 72,8 / 58,9 / 87,0, aerien 56,8 / 63,0 / 95,4 -- le temoin derive de 13 a 39 ms
+(machine partagee) : aucun verdict de cout possible sur ce run.
 
 ## PLY
 

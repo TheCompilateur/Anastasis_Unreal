@@ -137,6 +137,10 @@ pontic_inventory = {}
 # les treize ; on compare des noms, pas un prefixe.
 PONTIC_TREES = ('SM_Gpt_HetreOriental', 'SM_Gpt_EpiceaOrient', 'SM_Gpt_CharmeOriental',
                 'SM_Gpt_CerisierSauvage', 'SM_Gpt_SorbierOiseleurs')
+# Les arbres de la foret seulement : SM_Tree_* et les arbres SM_Gpt_ ; les sujets SM_Gpt_ du sous-bois (fougere, genevrier...)
+# suivent les couronnes et changent avec l'essence, ils ne comptent pas dans le total d'arbres.
+FOREST_TREES = ('SM_Gpt_Chene', 'SM_Gpt_Bouleau', 'SM_Gpt_PinSylvestre', 'SM_Gpt_SaulePleureur', 'SM_Gpt_MarronnierFleuri',
+                'SM_Gpt_PinSombre', 'SM_Gpt_Cypres') + PONTIC_TREES
 original_ecotone = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.TreeCanopyEcotone')
 original_hour = unreal.SystemLibrary.get_console_variable_float_value('anastasis.Sky.Hour')
 original_natural = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.NaturalHistory')
@@ -331,7 +335,7 @@ try:
         for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
             n = comp.get_instance_count()
             mesh = comp.get_editor_property('static_mesh')
-            if n and mesh is not None and mesh.get_name().startswith(('SM_Tree_', 'SM_Gpt_')):
+            if n and mesh is not None and (mesh.get_name().startswith('SM_Tree_') or mesh.get_name() in FOREST_TREES):
                 counts[mesh.get_name()] = counts.get(mesh.get_name(), 0) + n
         pontic_inventory[state] = counts
         unreal.log('PONTIC_STAGES_SAMPLE state=%s trees=%d meshes=%s' % (state, sum(counts.values()), json.dumps(counts, sort_keys=True)))
