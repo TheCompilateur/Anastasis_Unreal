@@ -40,6 +40,10 @@ STATE_CMDS = {
     'horsetail_old': ('anastasis.Dressing.PonticWaterMicro 1', 'anastasis.Dressing.PonticHorsetailCandidate 0'),
     'horsetail_new': ('anastasis.Dressing.PonticWaterMicro 1', 'anastasis.Dressing.PonticHorsetailCandidate 1'),
     'horsetail_old2': ('anastasis.Dressing.PonticWaterMicro 1', 'anastasis.Dressing.PonticHorsetailCandidate 0'),
+    # PONTIC_STAGES (pontic-realism-001, pontic-trees-geometry-001) : seule CVar, anastasis.Dressing.PonticStages ; le monde est reincarne par etat.
+    'pontic_reference': ('anastasis.Dressing.PonticStages 0',),
+    'pontic': ('anastasis.Dressing.PonticStages 1',),
+    'pontic_reference2': ('anastasis.Dressing.PonticStages 0',),
     'micro_on': ('anastasis.Dressing.PonticWaterMicro 1',),
     'micro_off': ('anastasis.Dressing.PonticWaterMicro 0',),
     'micro_on2': ('anastasis.Dressing.PonticWaterMicro 1',),
@@ -126,6 +130,13 @@ horsetail_run = any(s in ('horsetail_old', 'horsetail_new', 'horsetail_old2') fo
 micro_run = horsetail_run or any(s in ('micro_on', 'micro_off', 'micro_on2') for s in states)
 original_micro = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.PonticWaterMicro')
 original_horsetail = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.PonticHorsetailCandidate')
+pontic_run = any(s.startswith('pontic_reference') or s == 'pontic' for s in states)
+original_pontic = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.PonticStages')
+pontic_inventory = {}
+# Les cinq arbres des etages humides, modelises par gpt_flora_model.py (pontic-trees-geometry-001) : des SM_Gpt_ comme
+# les treize ; on compare des noms, pas un prefixe.
+PONTIC_TREES = ('SM_Gpt_HetreOriental', 'SM_Gpt_EpiceaOrient', 'SM_Gpt_CharmeOriental',
+                'SM_Gpt_CerisierSauvage', 'SM_Gpt_SorbierOiseleurs')
 original_ecotone = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.TreeCanopyEcotone')
 original_hour = unreal.SystemLibrary.get_console_variable_float_value('anastasis.Sky.Hour')
 original_natural = unreal.SystemLibrary.get_console_variable_int_value('anastasis.Dressing.NaturalHistory')
@@ -136,11 +147,13 @@ habitat = {}
 def finish(msg, error=False):
     if riparian_run:
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.RiparianTransition %s' % original_riparian)
-    if natural_run or micro_run:
+    if natural_run or micro_run or pontic_run:
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Sky.Hour %s' % original_hour)
     if micro_run:
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.PonticWaterMicro %s' % original_micro)
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.PonticHorsetailCandidate %s' % original_horsetail)
+    if pontic_run:
+        unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.PonticStages %s' % original_pontic)
     if natural_run:
         unreal.SystemLibrary.execute_console_command(None, 'anastasis.Dressing.NaturalHistory %s' % original_natural)
     if natural_run:
@@ -165,7 +178,7 @@ try:
     def cmd(c):
         unreal.SystemLibrary.execute_console_command(world, c)
 
-    if natural_run or flower_run or cards_run or micro_run or any(s in CONTEXT_STATES + DISTANCE_STATES for s in states):
+    if natural_run or flower_run or cards_run or micro_run or pontic_run or any(s in CONTEXT_STATES + DISTANCE_STATES for s in states):
         cmd('anastasis.Sky.Hour 11')
         if not woodland_run:
             cmd('anastasis.Dressing.WoodlandSequence 0')
@@ -309,6 +322,20 @@ try:
         unreal.log('PONTIC_MICRO_SAMPLE state=%s bank_components=%d moss=%s count=%d' % (
             state, len(items), moss_mesh, moss_count))
     record_micro(states[0])
+
+    def record_pontic(state):
+        # Inventaire des arbres par maillage apres l'incarnation de l'etat : les memes troncs, d'autres essences.
+        if not pontic_run:
+            return
+        counts = {}
+        for comp in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
+            n = comp.get_instance_count()
+            mesh = comp.get_editor_property('static_mesh')
+            if n and mesh is not None and mesh.get_name().startswith(('SM_Tree_', 'SM_Gpt_')):
+                counts[mesh.get_name()] = counts.get(mesh.get_name(), 0) + n
+        pontic_inventory[state] = counts
+        unreal.log('PONTIC_STAGES_SAMPLE state=%s trees=%d meshes=%s' % (state, sum(counts.values()), json.dumps(counts, sort_keys=True)))
+    record_pontic(states[0])
 
     def at(tx, ty, lift):
         x, y = tx * T, ty * T
@@ -690,6 +717,23 @@ def tick(dt):
                                     or off['moss_mesh'] != 'SM_Grass_Sedge_01' or on['moss_count'] <= 0:
                                 raise RuntimeError('Pontic micro on/off/on inventory invalid')
                             unreal.log('PONTIC_MICRO_CAPTURE PASS bank_types=3 moss_count=%d views=%d' % (on['moss_count'], len(views)))
+                    if pontic_run:
+                        with open(os.path.join(OUT, 'pontic-stages.json'), 'w') as f:
+                            json.dump(pontic_inventory, f, indent=1, sort_keys=True)
+                        ref = pontic_inventory['pontic_reference']
+                        on = pontic_inventory['pontic']
+                        ref2 = pontic_inventory['pontic_reference2']
+                        fresh = {k: v for k, v in on.items() if k in PONTIC_TREES}
+                        if ref != ref2:
+                            raise RuntimeError('pontic reference/reference2 inventories differ')
+                        if any(k in PONTIC_TREES for k in ref):
+                            raise RuntimeError('pontic species present with the stages off')
+                        if len(fresh) != len(PONTIC_TREES):
+                            raise RuntimeError('pontic trees drawn with the stages on: %s' % sorted(fresh))
+                        if sum(ref.values()) != sum(on.values()):
+                            raise RuntimeError('tree total changed between stages off and on')
+                        unreal.log('PONTIC_STAGES_CAPTURE PASS trees=%d pontic_trees=%d meshes=%d views=%d' % (
+                            sum(on.values()), sum(fresh.values()), len(fresh), len(views)))
                     finish('GROUND_CAPTURE_COMPLETE views=%d states=%d' % (len(views), len(states)))
                     return
                 for c in STATE_CMDS[states[state_i]]:
@@ -698,6 +742,7 @@ def tick(dt):
                 texture_state(states[state_i])
                 record_habitat(states[state_i])
                 record_micro(states[state_i])
+                record_pontic(states[state_i])
                 queue = [(states[state_i], v) for v in views]
                 first, mark, frames, timings = True, time.monotonic(), [], []
                 return

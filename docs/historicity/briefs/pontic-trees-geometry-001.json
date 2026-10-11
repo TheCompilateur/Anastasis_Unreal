@@ -1,0 +1,33 @@
+{
+  "mission": "pontic-trees-geometry-001",
+  "target_period": "1204-1225",
+  "setting": "arriere_pays_pontique_fictif",
+  "model_ids": [
+    "PONT-ECO-01"
+  ],
+  "claim": "Le jeu peut zoner ses essences d'arbres en etages humides (charme et cerisier en bas, hetre au milieu, epicea et sorbier en haut) et reserver le pin d'Alep, l'olivier et le chene vert aux pentes seches et ensoleillees, pour que rive, fond, versant et crete aient des communautes distinctes.",
+  "basis": "hypothese_de_conception",
+  "source_ids": [
+    "ECO-01",
+    "ECO-02"
+  ],
+  "inference": "Les releves modernes de la mer Noire orientale (versants nord humides, etagement avec l'altitude, brouillard) soutiennent un ordre plausible des essences, pas leurs seuils d'altitude, leurs densites ni l'etat forestier du XIIIe siecle. Les courbes d'aptitude de SpeciesSuitability sont des choix de presentation. La planche de sprites (planche 02) est un brief d'images genere par IA, mesure (silhouette, fut, teintes) mais jamais colle : les arbres sont modelises en geometrie : la hauteur et le port d'un sprite ne sont pas des mesures botaniques (le chene Â« pontique Â» de la planche, un arbuste de 7 m au plus, n'est pas repris).",
+  "current": "La palette zonee par altitude, pente et rive est mediterraneenne (pin d'Alep, olivier, chene vert, cypres) avec un etage de sapin de Cephalonie en altitude ; aucune essence de foret humide euxine n'est tiree (Saved/GroundCoverEvidence/pontic-realism/pontic-stages.json, etat pontic_reference).",
+  "target": "Avec anastasis.Dressing.PonticStages 1 : hetre oriental, charme, epicea d'Orient, cerisier sauvage et sorbier tires selon altitude, humidite, pente et exposition ; les essences mediterraneennes se replient sur les pentes seches et ensoleillees ; memes troncs, memes positions, nombre d'arbres inchange.",
+  "causal_effect": "La composition des peuplements suit le gradient d'humidite et d'altitude lisible depuis la vallee (vue d'ensemble) et depuis une camera de 1,7 m en lisiere ; aucune interaction du joueur ni usage du bois n'est revendique.",
+  "owner_paths": [
+    "Source/Anastasis_UnrealV2/WorldView/AnastasisPresentationResolver.cpp",
+    "Source/Anastasis_UnrealV2/WorldView/AnastasisPresentationRegistry.cpp",
+    "tools/unreal/gpt_flora_model.py",
+    "tools/unreal/gpt-flora-fit.py",
+    "tools/unreal/set_tree_grammar.py",
+    "Content/Anastasis/Vegetation/Gpt/"
+  ],
+  "evidence_plan": {
+    "mec": "Build, tests Anastasis.Presentation.PonticStages et TreeZoning, preuve pontic-stages-capture : inventaire des arbres par maillage A/B/A (reference == reference2, cinq SM_Gpt_ pontiques absents a 0 et presents a 1, total d arbres constant).",
+    "scn": "Rendu logiciel hors editeur des cinq a cote des treize (docs/visual/sprites-vegetation-gpt-001/preview-planche-3.png, preview-alignement.png), puis vues prairie, lisiere, rive, oblique et aerien de la preuve, verdict visuel d Alexandre.",
+    "ply": "UNKNOWN : pas de parcours joueur dans cette mission."
+  },
+  "verdict": "PROPOSE",
+  "evidence_paths": []
+}

@@ -88,6 +88,13 @@ GPT_SPECIES = [
     ("SM_Gpt_MarronnierFleuri", "HORSE_CHESTNUT", "BROADLEAF", (14.0, 20.0)),
     ("SM_Gpt_PinSombre", "BLACK_PINE", "CONIFER", (15.0, 23.0)),
     ("SM_Gpt_Cypres", "CYPRESS", "CONIFER", (12.0, 20.0)),
+    # PONTIC_STAGES (pontic-trees-geometry-001) : les cinq essences des etages humides euxins, modelisees par la meme
+    # chaine (gpt_flora_model.py) ; tirees seulement sous anastasis.Dressing.PonticStages 1.
+    ("SM_Gpt_HetreOriental", "ORIENTAL_BEECH", "BROADLEAF", (19.0, 24.0)),
+    ("SM_Gpt_EpiceaOrient", "ORIENTAL_SPRUCE", "CONIFER", (19.0, 24.0)),
+    ("SM_Gpt_CharmeOriental", "HORNBEAM", "BROADLEAF", (11.0, 18.0)),
+    ("SM_Gpt_CerisierSauvage", "WILD_CHERRY", "BROADLEAF", (9.0, 14.0)),
+    ("SM_Gpt_SorbierOiseleurs", "ROWAN", "BROADLEAF", (6.0, 11.0)),
 ]
 
 

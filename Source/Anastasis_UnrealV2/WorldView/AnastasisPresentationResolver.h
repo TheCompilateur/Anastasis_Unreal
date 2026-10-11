@@ -108,6 +108,10 @@ namespace AnastasisPresentation
 		/** A lone tree in open ground (meadow, valley edge, river gallery), not part of a stand:
 		 *  where an olive is most often planted. */
 		bool bOpenGround = false;
+		/** PONTIC_STAGES (anastasis.Dressing.PonticStages) : zone the humid Euxine stages (beech, hornbeam,
+		 *  spruce, cherry, rowan) and keep the Mediterranean species to the dry sunny slopes. false = the
+		 *  palette as it was: the five Pontic species weigh 0 and nothing else changes. */
+		bool bPonticStages = false;
 	};
 
 	/**

@@ -70,6 +70,12 @@ static TAutoConsoleVariable<int32> CVarTreeSpecies(
     TEXT("anastasis.Dressing.TreeSpecies"), 1,
     TEXT("0=Pontic conifer/broadleaf grammar, 1=Mediterranean and Greek mountain species zoned by altitude, slope and water, at real heights; applied on embodiment."), ECVF_Default);
 
+// PONTIC_STAGES (pontic-realism-001). Coupable pour l'A/B : memes troncs, memes positions ; 0 rend la palette
+// d'avant (les cinq essences de la planche pontique ne pesent rien, les mediterraneennes gardent leur poids).
+static TAutoConsoleVariable<int32> CVarPonticStages(
+    TEXT("anastasis.Dressing.PonticStages"), 1,
+    TEXT("0=species palette as it was, 1=humid Euxine stages (oriental beech, hornbeam, spruce, cherry, rowan) with the Mediterranean species kept to dry sunny slopes; applied on embodiment."), ECVF_Default);
+
 // GROUND_COVER_001. Coupable pour l'A/B : meme monde, memes arbres, sans la strate herbacee.
 static TAutoConsoleVariable<int32> CVarGroundCover(
     TEXT("anastasis.Dressing.GroundCover"), 1,
@@ -660,9 +666,10 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
             // FOREST_TERRAIN_P1 : etages d'altitude RELATIFS au relief reellement rendu -- la
             // carte n'est pas refaite, son relief existant est zone.
             const bool bSpecies = CVarTreeSpecies.GetValueOnGameThread() != 0;
+            const bool bPonticStages = CVarPonticStages.GetValueOnGameThread() != 0;
             const double AltitudeSpan = FMath::Max(ActiveFootprintBounds.IsValid
                 ? ActiveFootprintBounds.Max.Z - AnastasisTerrainSurface::WaterPlaneZ : 0.0, 100.0);
-            int32 SpeciesCounts[16] = {};   // GPT_FLORA_001 : les valeurs de l'enum montent a 12, le masque a 15
+            int32 SpeciesCounts[32] = {};   // PONTIC_STAGES : les valeurs de l'enum montent a 17, le masque a 31
             int32 RealHeightTrees = 0;
             struct FHeld
             {
@@ -703,6 +710,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 Site.Wetness = T.Wetness;
                 Site.Shade = T.Shade;
                 Site.bOpenGround = P.bLone;
+                Site.bPonticStages = bPonticStages;
                 const EAnastasisTreeSpecies Species = bSpecies
                     ? AnastasisPresentation::SelectTreeSpecies(Site, P.VisualSeed, T.X, T.Y)
                     : EAnastasisTreeSpecies::Any;
@@ -760,7 +768,7 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 Tree.MassBounds = MeshBounds;
                 Tree.HeightCm = (MeshBounds.Max.Z - MinZ) * Pose.GetScale3D().Z;
                 Held.Add(Tree);
-                ++SpeciesCounts[static_cast<uint8>(R.Species) & 15];
+                ++SpeciesCounts[static_cast<uint8>(R.Species) & 31];
                 ++ForestLayerCounts[static_cast<uint8>(P.Layer)];
                 ++StatureCounts[static_cast<uint8>(Stature)];
                 ++FamilyCounts[static_cast<uint8>(Family)];
@@ -1015,6 +1023,15 @@ void AAnastasisWorldEmbodiment::PlaceDressing(
                 SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::ScotsPine)],
                 SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::Willow)],
                 SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::HorseChestnut)]);
+            // PONTIC_STAGES (pontic-trees-geometry-001) : les cinq essences des etages humides euxins.
+            UE_LOG(LogAnastasis_UnrealV2, Display,
+                TEXT("ANASTASIS_TREE_TAXA_PONTIC enabled=%d oriental_beech=%d oriental_spruce=%d hornbeam=%d wild_cherry=%d rowan=%d"),
+                bPonticStages ? 1 : 0,
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::OrientalBeech)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::OrientalSpruce)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::Hornbeam)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::WildCherry)],
+                SpeciesCounts[static_cast<uint8>(EAnastasisTreeSpecies::Rowan)]);
         }
     }
     UE_LOG(LogAnastasis_UnrealV2, Display,

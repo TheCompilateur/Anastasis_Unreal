@@ -249,11 +249,55 @@ namespace
 		EAnastasisTreeSpecies::AleppoPine, EAnastasisTreeSpecies::Cypress, EAnastasisTreeSpecies::HolmOak,
 		EAnastasisTreeSpecies::Olive, EAnastasisTreeSpecies::PlaneTree, EAnastasisTreeSpecies::BlackPine,
 		EAnastasisTreeSpecies::GreekFir, EAnastasisTreeSpecies::DeciduousOak, EAnastasisTreeSpecies::Birch,
-		EAnastasisTreeSpecies::ScotsPine, EAnastasisTreeSpecies::Willow, EAnastasisTreeSpecies::HorseChestnut};
+		EAnastasisTreeSpecies::ScotsPine, EAnastasisTreeSpecies::Willow, EAnastasisTreeSpecies::HorseChestnut,
+		EAnastasisTreeSpecies::OrientalBeech, EAnastasisTreeSpecies::OrientalSpruce, EAnastasisTreeSpecies::Hornbeam,
+		EAnastasisTreeSpecies::WildCherry, EAnastasisTreeSpecies::Rowan};
 	constexpr int32 SpeciesCount = static_cast<int32>(UE_ARRAY_COUNT(AllSpecies));
 }
 
+namespace
+{
+	double SuitabilityBase(EAnastasisTreeSpecies Species, const FTreeSite& Site);
+
+	/**
+	 * PONTIC_STAGES. What the humid Euxine reading does to the Mediterranean species already in the palette:
+	 * they stay on the dry, sunny slopes and thin out under the damp and the shade, where the beech, the
+	 * hornbeam and the spruce take over. A design proposal, not a botanical reconstruction of 1204.
+	 */
+	double PonticStageFactor(EAnastasisTreeSpecies Species, const FTreeSite& Site)
+	{
+		const double R = FMath::IsFinite(Site.Riparian) ? FMath::Clamp(Site.Riparian, 0.0, 1.0) : 0.0;
+		const double W = FMath::IsFinite(Site.Wetness) ? FMath::Clamp(Site.Wetness, 0.0, 1.0) : 0.0;
+		const double Sh = FMath::IsFinite(Site.Shade) ? FMath::Clamp(Site.Shade, -1.0, 1.0) : 0.0;
+		const double Humid = Rise(0.15, 0.55, FMath::Max(R, W));
+		const double DrySun = (1.0 - Humid) * Rise(-0.3, 0.6, Sh);
+		switch (Species)
+		{
+		case EAnastasisTreeSpecies::AleppoPine:
+		case EAnastasisTreeSpecies::Olive:
+			return 0.20 + 0.80 * DrySun;
+		case EAnastasisTreeSpecies::Cypress:
+			return 0.35;
+		case EAnastasisTreeSpecies::HolmOak:
+			return 0.35 + 0.30 * DrySun;
+		case EAnastasisTreeSpecies::GreekFir:
+			// The spruce holds the cool upper slopes in the Euxine reading.
+			return 0.25;
+		default:
+			return 1.0;
+		}
+	}
+}
+
 double SpeciesSuitability(EAnastasisTreeSpecies Species, const FTreeSite& Site)
+{
+	const double Base = SuitabilityBase(Species, Site);
+	return Site.bPonticStages ? Base * PonticStageFactor(Species, Site) : Base;
+}
+
+namespace
+{
+double SuitabilityBase(EAnastasisTreeSpecies Species, const FTreeSite& Site)
 {
 	const double A = FMath::IsFinite(Site.AltitudeFraction) ? FMath::Clamp(Site.AltitudeFraction, 0.0, 1.0) : 0.0;
 	const double S = FMath::IsFinite(Site.SlopeDegrees) ? FMath::Max(Site.SlopeDegrees, 0.0) : 0.0;
@@ -301,10 +345,32 @@ double SpeciesSuitability(EAnastasisTreeSpecies Species, const FTreeSite& Site)
 	case EAnastasisTreeSpecies::HorseChestnut:
 		// Rare par construction : poids faible, vallees fraiches et humides seulement.
 		return 0.10 * Rise(0.1, 0.4, R) * Fall(0.3, 0.6, A) * Fall(15.0, 30.0, S);
+	// PONTIC_STAGES : the five species of the Euxine reading weigh 0 unless the stages are on.
+	case EAnastasisTreeSpecies::OrientalBeech:
+		// The beech of the humid forest: mid slopes, damper ground, not the steepest faces.
+		return !Site.bPonticStages ? 0.0
+			: 1.6 * Rise(0.10, 0.32, A) * Fall(0.60, 0.80, A) * (0.50 + 0.50 * Rise(0.10, 0.55, Damp)) * Fall(32.0, 45.0, S);
+	case EAnastasisTreeSpecies::OrientalSpruce:
+		// Above the beech, on the cool damp upper slopes; gone before the summit rock.
+		return !Site.bPonticStages ? 0.0
+			: 1.5 * Rise(0.48, 0.68, A) * Fall(0.90, 1.00, A) * (0.55 + 0.45 * Rise(0.15, 0.55, Damp)) * (1.0 - 0.3 * Sh);
+	case EAnastasisTreeSpecies::Hornbeam:
+		// The lower humid forest, beside and under the beech.
+		return !Site.bPonticStages ? 0.0
+			: 0.9 * Rise(0.04, 0.18, A) * Fall(0.42, 0.62, A) * (0.45 + 0.55 * Rise(0.10, 0.50, Damp)) * Fall(30.0, 42.0, S);
+	case EAnastasisTreeSpecies::WildCherry:
+		// Light-demanding : forest edges and lone trees of the lower stage. Rare by construction.
+		return !Site.bPonticStages ? 0.0
+			: 0.12 * Rise(0.05, 0.25, A) * Fall(0.45, 0.70, A) * (Site.bOpenGround ? 3.0 : 1.0);
+	case EAnastasisTreeSpecies::Rowan:
+		// The upper fringe of the broadleaf stage.
+		return !Site.bPonticStages ? 0.0
+			: 0.10 * Rise(0.38, 0.60, A) * Fall(0.80, 0.95, A);
 	case EAnastasisTreeSpecies::Any:
 	default:
 		return 0.0;
 	}
+}
 }
 
 EAnastasisTreeSpecies SelectTreeSpecies(const FTreeSite& Site, uint32 Seed, int32 TileX, int32 TileY)
@@ -352,6 +418,7 @@ EAnastasisFoliageFamily FamilyOfSpecies(EAnastasisTreeSpecies Species)
 	case EAnastasisTreeSpecies::BlackPine:
 	case EAnastasisTreeSpecies::GreekFir:
 	case EAnastasisTreeSpecies::ScotsPine:
+	case EAnastasisTreeSpecies::OrientalSpruce:
 		return EAnastasisFoliageFamily::Conifer;
 	case EAnastasisTreeSpecies::HolmOak:
 	case EAnastasisTreeSpecies::Olive:
@@ -360,6 +427,10 @@ EAnastasisFoliageFamily FamilyOfSpecies(EAnastasisTreeSpecies Species)
 	case EAnastasisTreeSpecies::Birch:
 	case EAnastasisTreeSpecies::Willow:
 	case EAnastasisTreeSpecies::HorseChestnut:
+	case EAnastasisTreeSpecies::OrientalBeech:
+	case EAnastasisTreeSpecies::Hornbeam:
+	case EAnastasisTreeSpecies::WildCherry:
+	case EAnastasisTreeSpecies::Rowan:
 		return EAnastasisFoliageFamily::Broadleaf;
 	case EAnastasisTreeSpecies::Any:
 	default:
@@ -383,6 +454,11 @@ const TCHAR* SpeciesName(EAnastasisTreeSpecies Species)
 	case EAnastasisTreeSpecies::ScotsPine: return TEXT("scots_pine");
 	case EAnastasisTreeSpecies::Willow: return TEXT("willow");
 	case EAnastasisTreeSpecies::HorseChestnut: return TEXT("horse_chestnut");
+	case EAnastasisTreeSpecies::OrientalBeech: return TEXT("oriental_beech");
+	case EAnastasisTreeSpecies::OrientalSpruce: return TEXT("oriental_spruce");
+	case EAnastasisTreeSpecies::Hornbeam: return TEXT("hornbeam");
+	case EAnastasisTreeSpecies::WildCherry: return TEXT("wild_cherry");
+	case EAnastasisTreeSpecies::Rowan: return TEXT("rowan");
 	case EAnastasisTreeSpecies::Any:
 	default: return TEXT("any");
 	}

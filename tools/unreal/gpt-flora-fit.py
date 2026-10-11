@@ -43,6 +43,18 @@ TABLE = {
     'rhododendron': dict(mode='shrub', height_m=3.0),
     'fougere': dict(mode='ground', height_m=1.0),
     'prairie_fleurie': dict(mode='ground', height_m=1.1),
+    # PONTIC_STAGES (pontic-trees-geometry-001) : les cinq arbres des etages humides euxins, sprites de la planche 02
+    # (« Catalogue botanique pontique en 3D », SourceArt/Vegetation/gpt/planche-02.png, decoupee sur la branche
+    # pontic-realism-001 par gpt-flora-cut.py --set pontic). Hauteur adulte = milieu de HeightRangeM du registre.
+    # `png` : dossier du sprite ; `clean` : ne garder que la plus grande tache (oiseaux, petales isoles) ;
+    # `accent` : classe de pixels mesuree a part du feuillage vert (fleurs blanches du cerisier, baies du sorbier).
+    # trunk_cap : rayon du fut au plus cette fraction de la largeur de couronne (le pied du hetre de la planche porte un
+    # jeune hetre a cote : le releve elargit le fut).
+    'hetre_oriental': dict(mode='crown', height_m=22.0, crown_low=.30, png='PNG-pontic', clean=True, trunk_cap=.032),
+    'epicea_orient': dict(mode='crown', height_m=22.0, crown_low=.10, png='PNG-pontic', clean=True),
+    'charme_oriental': dict(mode='crown', height_m=15.0, crown_low=.26, png='PNG-pontic', clean=True),
+    'cerisier_sauvage': dict(mode='crown', height_m=12.0, crown_low=.32, png='PNG-pontic', clean=True, accent='white'),
+    'sorbier_oiseleurs': dict(mode='crown', height_m=9.0, crown_low=.30, png='PNG-pontic', clean=True, accent='red'),
 }
 ORDER = list(TABLE)
 
@@ -186,7 +198,7 @@ def analyse(name, img):
     if cfg['mode'] == 'column' and trunk_u:
         trunk_u = trunk_u[:2]
         trunk_u[-1][2] = min(trunk_u[-1][2], -30.0)
-    cap = {'chene': 0.10, 'saule_pleureur': 0.045}.get(name, 0.07) * crown_w * unit
+    cap = cfg.get('trunk_cap', {'chene': 0.10, 'saule_pleureur': 0.045}.get(name, 0.07)) * crown_w * unit
     for t in trunk_u:
         t[3] = round(min(t[3], cap), 3)
     info['bands'] = bands
@@ -195,11 +207,50 @@ def analyse(name, img):
 
 
 
+def largest_blob(img):
+    """Garde la plus grande tache du sprite (dilatee de 4 px pour relier feuilles et rameaux) : oiseaux, petales et
+    debris isoles de la planche ne comptent ni dans la silhouette ni dans les couleurs."""
+    a = np.asarray(img).copy()
+    m = a[..., 3] > 127
+    d = m.copy()
+    for _ in range(4):
+        d = d | np.roll(d, 1, 0) | np.roll(d, -1, 0) | np.roll(d, 1, 1) | np.roll(d, -1, 1)
+    h, w = d.shape
+    lab = np.where(d, np.arange(1, h * w + 1).reshape(h, w), 0)
+    for _ in range(4000):
+        p = np.pad(lab, 1)
+        new = np.maximum.reduce([lab, p[:-2, 1:-1], p[2:, 1:-1], p[1:-1, :-2], p[1:-1, 2:]]) * d
+        if np.array_equal(new, lab):
+            break
+        lab = new
+    ids, counts = np.unique(lab[lab > 0], return_counts=True)
+    keep = lab == ids[np.argmax(counts)]
+    a[..., 3] = np.where(keep, a[..., 3], 0)
+    return Image.fromarray(a, 'RGBA')
+
+
+def accent_split(lin, sel, kind):
+    """Separe, dans la couronne, le feuillage vert de l'accent (fleurs blanches, baies rouges) : deux medianes."""
+    px = lin[sel]
+    r, g, b = px[:, 0], px[:, 1], px[:, 2]
+    luma = .2126 * r + .7152 * g + .0722 * b
+    if kind == 'white':
+        acc = (luma > np.percentile(luma, 70)) & ((px.max(1) - px.min(1)) < .35 * np.maximum(px.max(1), 1e-4))
+    else:
+        acc = (r > 1.6 * g) & (r > 1.6 * b)
+    green = (g > 1.15 * r) & (g > 1.4 * b) & ~acc          # un vrai vert : le blanc des fleurs tire un peu au vert
+    fol = np.median(px[green], axis=0) if green.any() else np.median(px, axis=0)
+    accent = np.median(px[acc], axis=0) if acc.any() else fol
+    return fol, accent, float(acc.mean())
+
+
 def build_all():
     specs = []
     for name in ORDER:
         cfg = TABLE[name]
-        img = Image.open(os.path.join(PNG_DIR, name + '.png')).convert('RGBA')
+        img = Image.open(os.path.join(SRC, cfg.get('png', 'PNG'), name + '.png')).convert('RGBA')
+        if cfg.get('clean'):
+            img = largest_blob(img)
         a = np.asarray(img).astype(np.float32)
         info = analyse(name, img)
         lin_all = s2l(a[..., :3])
@@ -207,6 +258,9 @@ def build_all():
         yy = np.arange(a.shape[0])[:, None]
         foliage_sel = solid & (yy < info['crown_y'] + 1) if cfg['mode'] in ('crown', 'column', 'weeping') else solid
         fol = np.median(lin_all[foliage_sel], axis=0) if foliage_sel.any() else np.array([.05, .1, .04])
+        accent = None
+        if cfg.get('accent'):
+            fol, accent, accent_share = accent_split(lin_all, foliage_sel, cfg['accent'])
         bark = np.array([.07, .055, .042])
         if info.get('bark_px') is not None and len(info['bark_px']):
             bark = np.median(s2l(info['bark_px']), axis=0)
@@ -215,11 +269,17 @@ def build_all():
             bark = luma + .55 * (bark - luma)         # l'ecorce du sprite est doree par la lumiere : retour vers le gris-brun
             bark = np.maximum(bark, .01) * min(1.0, top / max(float(bark.max()), 1e-6))
         gain = cfg.get('gain', ALBEDO_GAIN)
-        specs.append({'name': name, 'mode': cfg['mode'], 'height_m': cfg['height_m'], 'trunk': info['trunk'],
-                      'bands': info['bands'], 'gain': gain,
-                      'foliage': [round(float(c * gain), 5) for c in fol],
-                      'bark': [round(float(c) * cfg.get('bark_gain', 1.0), 5) for c in bark],
-                      'sprite_px': [info['w'], info['h']], 'pivot_px': round(info['pivot'], 1)})
+        spec = {'name': name, 'mode': cfg['mode'], 'height_m': cfg['height_m'], 'trunk': info['trunk'],
+                'bands': info['bands'], 'gain': gain,
+                'foliage': [round(float(c * gain), 5) for c in fol],
+                'bark': [round(float(c) * cfg.get('bark_gain', 1.0), 5) for c in bark],
+                'sprite_px': [info['w'], info['h']], 'pivot_px': round(info['pivot'], 1)}
+        if 'png' in cfg:
+            spec['sprite'] = cfg['png'] + '/' + name + '.png'
+        if accent is not None:
+            spec['accent'] = [round(float(c * gain), 5) for c in accent]
+            spec['accent_share'] = round(accent_share, 3)
+        specs.append(spec)
     with open(os.path.join(SRC, 'gpt-flora.json'), 'w', encoding='utf-8') as fh:
         json.dump({'species': specs}, fh, indent=1)
     return specs

@@ -434,6 +434,29 @@ RECIPES = {
                          tropism=(0, 0, .02), size_lo=5.0, size_hi=8.5, trusses=24, stems=8),
     'fougere': dict(kind='fern', fronds=26),
     'prairie_fleurie': dict(kind='meadow', blades=250, flowers=58),
+    # PONTIC_STAGES (pontic-trees-geometry-001) -- les cinq essences des etages humides euxins, planche 02. Memes
+    # outils que les treize ; les cles nouvelles (bark 'grey' / 'cherry', leaf 'pinnate', blossom, corymbs, kind
+    # 'spruce') ne servent qu'a elles : les treize gardent leurs tirages et leur forme, a l'octet pres.
+    # Hetre d'Orient (Fagus orientalis) : couronne ample et dense, branches etalees, feuille elliptique entiere,
+    # ecorce lisse gris argent.
+    'hetre_oriental': dict(kind='tree', leaf='oblong', leaves=2300, coverage=2.4, shell=.34, step=.055, nodes=460, r_tip=.12,
+                           tropism=(0, 0, -.04), size_lo=2.6, size_hi=4.6, bark='grey'),
+    # Charme (Carpinus betulus / orientalis) : couronne ovoide serree, feuille ovale dentee et plissee, ecorce grise
+    # cannelee ; grappes de bractees pales pendantes en ete.
+    'charme_oriental': dict(kind='tree', leaf='diamond', leaves=2200, coverage=2.4, shell=.34, step=.055, nodes=420, r_tip=.12,
+                            tropism=(0, 0, .0), size_lo=2.4, size_hi=4.4, bark='grey', bracts=46),
+    # Cerisier sauvage (Prunus avium) : branches ascendantes, feuille oblongue pendante, fleurs blanches en ombelles
+    # (la planche le montre en fleur ; la part de fleurs est mesuree), ecorce brun-rouge a lenticelles.
+    'cerisier_sauvage': dict(kind='tree', leaf='oblong', leaves=900, coverage=1.6, shell=.40, step=.06, nodes=400, r_tip=.12,
+                             leaf_color=(0.030, 0.052, 0.014), tropism=(0, 0, .07), size_lo=2.6, size_hi=4.4, bark='cherry',
+                             blossom=380),
+    # Sorbier des oiseleurs (Sorbus aucuparia) : petit arbre a plusieurs tiges, feuille composee pennee, corymbes de
+    # baies orange-rouge (couleur mesuree), ecorce lisse gris-brun.
+    'sorbier_oiseleurs': dict(kind='tree', leaf='pinnate', leaves=440, coverage=3.0, shell=.28, step=.055, nodes=420, r_tip=.12,
+                              tropism=(0, 0, .03), size_lo=7.0, size_hi=9.5, corymbs=80, pinnate_pairs=3),
+    # Epicea d'Orient (Picea orientalis) : fleche droite jusqu'a la cime, verticilles de branches etagees, rameaux
+    # secondaires pendants, aiguilles courtes vert tres sombre ; cone etroit mesure tranche par tranche sur le sprite.
+    'epicea_orient': dict(kind='spruce', whorl_step=3.0, per_whorl=6, twigs=4, tufts=1000, size=3.6),
 }
 
 
@@ -445,6 +468,19 @@ def _bark_color_fn(recipe, base):
 
         def fn(t):
             return dark if (int(t * 22) % 3 == 0 and t > .06) else white
+        return fn
+    if style == 'grey':
+        grey = (0.085, 0.083, 0.076)       # hetre et charme : ecorce lisse gris argent
+
+        def fn(t):
+            return lerp(base, grey, .65)
+        return fn
+    if style == 'cherry':
+        red = (0.075, 0.034, 0.026)        # cerisier : brun-rouge lustre, bandes de lenticelles plus claires
+        band = (0.12, 0.085, 0.065)
+
+        def fn(t):
+            return band if (int(t * 30) % 5 == 0 and t > .05) else red
         return fn
     if style == 'scots':
         orange = (0.20, 0.075, 0.03)
@@ -583,6 +619,10 @@ def build_tree(spec, recipe, lods):
                         leaflets(leaves, add(p, mul(dd, size * .08)), x, s, z, size, c, rng)
                     elif shape == 'needles':
                         tuft(leaves, p, dd, size, 8 if lod == 0 else 5, 32, c, rng)
+                    elif shape == 'pinnate':
+                        x, s, z = _frame(dd, UP, rng)
+                        pinnate(leaves, add(p, mul(dd, size * .05)), x, s, z, size, c, rng,
+                                recipe.get('pinnate_pairs', 4) if lod == 0 else 2)
                     else:
                         x, s, z = _frame(dd, UP, rng)
                         leaf(leaves, add(p, mul(dd, size * .08)), x, s, z, size, shape, c, tint(c, 1.18))
@@ -593,6 +633,8 @@ def build_tree(spec, recipe, lods):
                 _willow_strands(spec, recipe, nodes, wood, leaves, rng, low, crown_w, bark, fol, 1.0)
         elif kind == 'willow' and lod == 1:
             _willow_strands(spec, recipe, nodes, wood, leaves, rng, low, crown_w, bark, fol, .5)
+        if recipe.get('blossom') or recipe.get('corymbs') or recipe.get('bracts'):
+            _pontic_accents(spec, recipe, leaves, nodes, kids, rng, low, lod)
         out.append((wood, leaves))
     return out
 
@@ -831,6 +873,8 @@ def build_all(spec, lods=(0, 1, 2)):
     """[(wood, leaf)] pour chaque LOD demande (0 detail, 1 moyen, 2 lointain) ; graines fixes par espece."""
     recipe = RECIPES[spec['name']]
     kind = recipe['kind']
+    if kind == 'spruce':
+        return build_spruce(spec, recipe, lods)
     if kind == 'fern':
         return build_fern(spec, recipe, lods)
     if kind == 'meadow':
@@ -838,3 +882,160 @@ def build_all(spec, lods=(0, 1, 2)):
     if kind == 'column':
         return build_column(spec, recipe, lods)
     return build_tree(spec, recipe, lods)
+
+
+# --------------------------------------------------------------------------- PONTIC_STAGES (pontic-trees-geometry-001)
+def pinnate(mb, origin, x, s, z, size, col, rng, pairs=4):
+    """Feuille composee pennee (sorbier) : un rachis, `pairs` paires de folioles lanceolees et une foliole terminale."""
+    for k in range(pairs):
+        t = .22 + .62 * k / float(max(1, pairs - 1))
+        base = add(origin, add(mul(x, t * size), mul(z, -.05 * size * t * t)))
+        for sgn in (-1.0, 1.0):
+            d = norm(add(mul(s, sgn * .86), mul(x, .50)))
+            side = norm(cross(d, z))
+            ln = size * .30 * rng.uniform(.9, 1.1)
+            c = vary(col, rng, .10)
+            a = mb.vert(base, tint(c, .75))
+            b = mb.vert(add(add(base, mul(d, ln * .45)), mul(side, ln * .20)), c)
+            tp = mb.vert(add(add(base, mul(d, ln)), mul(z, -ln * .08)), tint(c, 1.15))
+            e = mb.vert(add(add(base, mul(d, ln * .45)), mul(side, -ln * .20)), c)
+            mb.tri(a, b, tp)
+            mb.tri(a, tp, e)
+    leaf(mb, add(origin, mul(x, .80 * size)), x, s, z, .30 * size, 'lanceolate', col, tint(col, 1.15))
+
+
+def _pontic_accents(spec, recipe, leaves, nodes, kids, rng, low, lod):
+    """Fleurs, baies, bractees posees AU BOUT DES RAMEAUX (noeuds terminaux), pas dans le volume : ce qui pend tient
+    a une branche. Couleur de l'accent : celle mesuree sur le sprite (`accent`, gpt-flora-fit.py)."""
+    tips = [i for i in range(len(nodes)) if kids[i] == 0 and nodes[i][0][2] > low - 8]
+    if not tips:
+        return
+    order = list(tips)
+    rng.shuffle(order)
+    share = 1.0 if lod == 0 else .45
+    accent = tuple(spec.get('accent') or (0.45, 0.43, 0.38))
+    if recipe.get('blossom'):
+        # Ombelles de deux a quatre fleurs blanches a cinq petales (Prunus avium), sur le bois de l'annee.
+        # Plusieurs ombelles par rameau : la planche montre l'arbre en pleine floraison.
+        for i in (order * 4)[:int(recipe['blossom'] * share)]:
+            p = nodes[i][0]
+            for _f in range(rng.randint(2, 4)):
+                c = add(p, (rng.uniform(-2.2, 2.2), rng.uniform(-2.2, 2.2), rng.uniform(-1.2, 1.2)))
+                flower_star(leaves, c, rand_unit(rng), 1.6 * (1.0 if lod == 0 else 1.4), 5, vary(accent, rng, .08),
+                            (0.40, 0.36, 0.12), rng)
+    if recipe.get('corymbs'):
+        # Corymbes de baies (Sorbus aucuparia) : une grappe aplatie qui penche sous son poids.
+        n_b = 7 if lod == 0 else 4
+        for i in (order * 2)[:int(recipe['corymbs'] * share)]:
+            p = nodes[i][0]
+            centre = add(p, (0.0, 0.0, -1.2))
+            for _b in range(n_b):
+                a = rng.uniform(0, TAU)
+                rr = 2.2 * math.sqrt(rng.random())
+                blob(leaves, add(centre, (math.cos(a) * rr, math.sin(a) * rr, -.35 * rr * rr / 2.2)),
+                     .80 * (1.0 if lod == 0 else 1.3), vary(accent, rng, .14), rng)
+    if recipe.get('bracts') and lod == 0:
+        # Grappes de fruits du charme : bractees vert pale pendantes, au bout des rameaux exterieurs.
+        pale = (0.085, 0.10, 0.035)
+        for i in order[:recipe['bracts']]:
+            p = nodes[i][0]
+            for k in range(5):
+                q = add(p, (rng.uniform(-.4, .4), rng.uniform(-.4, .4), -1.0 - 1.1 * k))
+                x, s, z = _frame(norm((rng.uniform(-.4, .4), rng.uniform(-.4, .4), -1.0)), UP, rng)
+                leaf(leaves, q, x, s, z, 1.6, 'lanceolate', vary(pale, rng, .12), tint(pale, 1.2))
+
+
+def build_spruce(spec, recipe, lods):
+    """Epicea : fleche droite jusqu'a la cime, verticilles de branches etages, rameaux secondaires pendants, aiguilles
+    en pinceaux le long des rameaux. Le rayon de chaque verticille est celui de la tranche du sprite a sa hauteur
+    (cone mesure) ; la face cachee reste de revolution."""
+    bands = sorted(spec['bands'], key=lambda b: b[0])
+    fol = tuple(spec['foliage'])
+    bark = tuple(spec['bark'])
+    top = max(b[0] + b[1] * .5 for b in bands)
+    low = min(b[0] - b[1] * .5 for b in bands)
+    cx = sum(b[2] for b in bands) / len(bands)
+
+    def radius_at(z):
+        if z <= bands[0][0]:
+            return bands[0][4]
+        for a, b in zip(bands, bands[1:]):
+            if z <= b[0]:
+                t = (z - a[0]) / max(b[0] - a[0], 1e-6)
+                return a[4] + (b[4] - a[4]) * t
+        hb = bands[-1]
+        return hb[4] * max(0.0, (top - z) / max(top - hb[0], 1e-6))
+
+    grow_rng = random.Random('%s:model:grow' % spec['name'])
+    # Les verticilles : de bas en haut, plus courts et plus serres pres de la cime.
+    whorls = []
+    z = low + 1.0
+    k = 0
+    while z < top - 2.0:
+        n = recipe['per_whorl'] - (1 if z > top - 15.0 else 0)
+        az0 = k * 2.399963
+        arms = []
+        for j in range(n):
+            az = az0 + TAU * j / n + grow_rng.uniform(-.25, .25)
+            ln = radius_at(z) * grow_rng.uniform(.82, 1.04)
+            arms.append((az, ln))
+        whorls.append((z, arms))
+        z += recipe['whorl_step'] * (1.0 - .45 * (z - low) / max(top - low, 1.0)) * grow_rng.uniform(.85, 1.15)
+        k += 1
+    trunk_r = max(1.3, radius_at(low) * .065)
+
+    def arm_points(z0, az, ln):
+        """Branche d'epicea : horizontale, qui retombe a mi-longueur et dont la pointe se releve."""
+        frac = (z0 - low) / max(top - low, 1.0)
+        rise = .10 + .35 * frac                      # vers la cime, les branches montent
+        pts = []
+        for i in range(5):
+            t = i / 4.0
+            sag = -ln * (.16 * math.sin(math.pi * t) * (1.0 - frac)) + ln * rise * t * t * .6
+            pts.append((cx + math.cos(az) * ln * t, math.sin(az) * ln * t, z0 + sag))
+        return pts
+
+    out = []
+    for lod in lods:
+        rng = random.Random('%s:model:leaves:%d' % (spec['name'], lod))
+        wood = Batch(0.0)
+        leaves = Batch(1.0)
+        tube(wood, [(cx, 0.0, -50.0), (cx, 0.0, low), (cx, 0.0, (low + top) * .5), (cx, 0.0, top - 1.0)],
+             [trunk_r * 1.25, trunk_r, trunk_r * .55, .25], 7 if lod == 0 else 5, bark)
+        if lod == 2:
+            # Au loin : trois cones empiles, le profil du sprite tranche par tranche.
+            for (za, zb) in ((low, low + (top - low) * .55), (low + (top - low) * .30, low + (top - low) * .80),
+                             (low + (top - low) * .58, top)):
+                cone(leaves, (cx, 0.0, za), (0, 0, 1), radius_at(za) * 1.02, zb - za, 8, tint(fol, .85), tint(fol, 1.05))
+            out.append((wood, leaves))
+            continue
+        sites = []
+        for (z0, arms) in whorls:
+            for (az, ln) in arms:
+                pts = arm_points(z0, az, ln)
+                if (lod == 0 and ln > 3.0) or ln > 9.0:
+                    r0 = max(.22, trunk_r * .32 * (ln / max(radius_at(low), 1.0)))
+                    tube(wood, pts, [r0 * (1 - .8 * i / 4.0) for i in range(5)], 3, bark, tip=False)
+                for i in range(1, 5):
+                    sites.append((pts[i], norm(sub(pts[i], pts[i - 1])), ln))
+        # Rameaux secondaires pendants : chaque site porte des pinceaux d'aiguilles tournes vers l'exterieur et le bas.
+        n = int(recipe['tufts'] * (1.0 if lod == 0 else .40))
+        per = max(1, int(math.ceil(n / float(max(len(sites), 1)))))
+        order = list(range(len(sites)))
+        rng.shuffle(order)
+        placed = 0
+        size = recipe['size'] * (1.0 if lod == 0 else 1.55)
+        for idx in order * per:
+            if placed >= n:
+                break
+            p, d, ln = sites[idx]
+            side = norm(cross(d, UP))
+            sgn = 1.0 if rng.random() < .5 else -1.0
+            hang = norm(add(add(mul(d, .45), mul(side, sgn * .65)), (0, 0, -.55)))
+            q = add(p, mul(side, sgn * rng.uniform(.3, 1.4)))
+            tuft(leaves, q, hang, size * rng.uniform(.85, 1.2), 6 if lod == 0 else 4, 44, vary(fol, rng, .18), rng, base_w=.30)
+            placed += 1
+        # La fleche : un pinceau serre au sommet.
+        tuft(leaves, (cx, 0.0, top - 2.5), (0, 0, 1), 3.2, 8, 18, tint(fol, 1.1), rng, base_w=.12)
+        out.append((wood, leaves))
+    return out

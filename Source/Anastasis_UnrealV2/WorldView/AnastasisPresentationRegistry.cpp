@@ -123,6 +123,13 @@ namespace
 		{TEXT("SM_Gpt_MarronnierFleuri"), EAnastasisTreeSpecies::HorseChestnut, EAnastasisFoliageFamily::Broadleaf, 14.0f, 20.0f},
 		{TEXT("SM_Gpt_PinSombre"), EAnastasisTreeSpecies::BlackPine, EAnastasisFoliageFamily::Conifer, 15.0f, 23.0f},
 		{TEXT("SM_Gpt_Cypres"), EAnastasisTreeSpecies::Cypress, EAnastasisFoliageFamily::Conifer, 12.0f, 20.0f},
+		// PONTIC_STAGES (pontic-trees-geometry-001) : les cinq essences des etages humides euxins, modelisees par la
+		// meme chaine que les treize (gpt_flora_model.py). Tirees seulement sous anastasis.Dressing.PonticStages 1.
+		{TEXT("SM_Gpt_HetreOriental"), EAnastasisTreeSpecies::OrientalBeech, EAnastasisFoliageFamily::Broadleaf, 19.0f, 24.0f},
+		{TEXT("SM_Gpt_EpiceaOrient"), EAnastasisTreeSpecies::OrientalSpruce, EAnastasisFoliageFamily::Conifer, 19.0f, 24.0f},
+		{TEXT("SM_Gpt_CharmeOriental"), EAnastasisTreeSpecies::Hornbeam, EAnastasisFoliageFamily::Broadleaf, 11.0f, 18.0f},
+		{TEXT("SM_Gpt_CerisierSauvage"), EAnastasisTreeSpecies::WildCherry, EAnastasisFoliageFamily::Broadleaf, 9.0f, 14.0f},
+		{TEXT("SM_Gpt_SorbierOiseleurs"), EAnastasisTreeSpecies::Rowan, EAnastasisFoliageFamily::Broadleaf, 6.0f, 11.0f},
 	};
 	FAnastasisPresentationEntry MakeDefaultEntry(
 		EAnastasisSemanticType SemanticType,

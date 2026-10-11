@@ -122,6 +122,16 @@ enum class EAnastasisTreeSpecies : uint8
 	Willow = 11,
 	/** GPT_FLORA_001 -- Aesculus hippocastanum: rare, damp valleys. Anachronism for 1204, left to Alexandre's call. */
 	HorseChestnut = 12,
+	/** PONTIC_STAGES -- Fagus orientalis: the beech of the humid Euxine forest, mid slopes. */
+	OrientalBeech = 13,
+	/** PONTIC_STAGES -- Picea orientalis: the montane spruce, above the beech, where the fir used to stand. */
+	OrientalSpruce = 14,
+	/** PONTIC_STAGES -- Carpinus: hornbeam, the lower humid forest under and beside the beech. */
+	Hornbeam = 15,
+	/** PONTIC_STAGES -- Prunus avium: wild cherry, forest edges and open ground of the lower stage. */
+	WildCherry = 16,
+	/** PONTIC_STAGES -- Sorbus aucuparia: rowan, the upper edge of the broadleaf stage. */
+	Rowan = 17,
 };
 
 /** One interchangeable look for an archetype. Adding a second entry here is how FOREST gets a second tree. */

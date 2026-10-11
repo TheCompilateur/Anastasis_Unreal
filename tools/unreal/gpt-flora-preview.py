@@ -100,11 +100,11 @@ def main():
     with open(os.path.join(SRC, 'gpt-flora.json'), encoding='utf-8') as fh:
         meta = json.load(fh)
     only = sys.argv[1:]
-    tiles, ious, tris = [], {}, {}
+    tiles, ious, tris, faces = [], {}, {}, []
     for spec in meta['species']:
         if only and spec['name'] not in only:
             continue
-        spr = Image.open(os.path.join(SRC, 'PNG', spec['name'] + '.png')).convert('RGBA')
+        spr = Image.open(os.path.join(SRC, spec.get('sprite') or 'PNG/%s.png' % spec['name'])).convert('RGBA')
         sh = spr.height
         scale = sh / 100.0
         size = (int(spr.width * 1.4), sh)
@@ -127,17 +127,52 @@ def main():
             row.paste(tile_image(rgb, mask), (size[0] * (i + 1), 0))
         row.save(os.path.join(DOC, 'preview-%s.png' % spec['name']))
         tiles.append((spec['name'], row))
+        faces.append((spec, views[0], scale, size))
         print('%-18s IoU face=%.3f  triangles LOD0/1/2 = %s' % (spec['name'], ious[spec['name']], tris[spec['name']]))
     json.dump(ious, open(os.path.join(DOC, 'iou.json'), 'w'), indent=1)
     json.dump(tris, open(os.path.join(DOC, 'triangles.json'), 'w'), indent=1)
     if tiles and not only:
         half = [(n, t.resize((t.width // 2, t.height // 2), Image.LANCZOS)) for n, t in tiles]
         cw, ch = max(t.width for n, t in half), max(t.height for n, t in half)
-        for part, chunk in enumerate((half[:7], half[7:])):
+        # planches 1 et 2 : les treize (GPT_FLORA_002) ; planche 3 : les cinq essences pontiques (pontic-trees-geometry-001).
+        for part, chunk in enumerate((half[:7], half[7:13], half[13:])):
+            if not chunk:
+                continue
             sheet = Image.new('RGB', (cw, ch * len(chunk)), (90, 90, 90))
             for i, (n, t) in enumerate(chunk):
                 sheet.paste(t, (0, i * ch))
             sheet.save(os.path.join(DOC, 'preview-planche-%d.png' % (part + 1)))
+        lineup(faces)
+
+
+def lineup(faces):
+    """Les dix-huit de face, cote a cote, a leur hauteur adulte (height_m) : les cinq pontiques a cote des treize."""
+    px_m = 14.0                                           # pixels par metre
+    cells = []
+    for spec, (rgb, mask), scale, size in faces:
+        im = tile_image(rgb, mask)
+        a = Image.fromarray((mask * 255).astype('uint8'))
+        box = a.getbbox()
+        if not box:
+            continue
+        im, a = im.crop(box), a.crop(box)
+        h = max(8, int(spec['height_m'] * px_m))
+        w = max(4, int(im.width * h / float(im.height)))
+        cells.append((spec['name'], im.resize((w, h), Image.LANCZOS), a.resize((w, h), Image.LANCZOS)))
+    H = int(max(c[1].height for c in cells)) + 40
+    W = sum(c[1].width for c in cells) + 12 * (len(cells) + 1)
+    sheet = Image.new('RGB', (W, H), (120, 120, 120))
+    x = 12
+    from PIL import ImageDraw
+    dr = ImageDraw.Draw(sheet)
+    for name, im, a in cells:
+        sheet.paste(im, (x, H - 30 - im.height), a)
+        dr.text((x, H - 24), name[:14], fill=(235, 235, 235))
+        x += im.width + 12
+    for m in range(0, 31, 5):                             # graduations tous les 5 m
+        y = H - 30 - int(m * px_m)
+        dr.line([(0, y), (6, y)], fill=(230, 230, 230))
+    sheet.save(os.path.join(DOC, 'preview-alignement.png'))
 
 
 if __name__ == '__main__':

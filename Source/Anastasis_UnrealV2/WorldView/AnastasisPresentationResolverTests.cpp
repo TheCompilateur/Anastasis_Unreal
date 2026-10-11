@@ -750,4 +750,111 @@ bool FAnastasisPresentationTreeZoning::RunTest(const FString&)
 	return true;
 }
 
+// PONTIC_STAGES (pontic-realism-001). Les cinq essences de la planche pontique et le zonage humide.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAnastasisPresentationPonticStages, "Anastasis.Presentation.PonticStages", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FAnastasisPresentationPonticStages::RunTest(const FString&)
+{
+	using namespace AnastasisPresentation;
+	using ESp = EAnastasisTreeSpecies;
+
+	auto Site = [](double A, double S, double R, double W, double Sh, bool bStages)
+	{
+		FTreeSite Out;
+		Out.AltitudeFraction = A; Out.SlopeDegrees = S; Out.Riparian = R; Out.Wetness = W; Out.Shade = Sh;
+		Out.bPonticStages = bStages;
+		return Out;
+	};
+	const ESp Fresh[] = {ESp::OrientalBeech, ESp::OrientalSpruce, ESp::Hornbeam, ESp::WildCherry, ESp::Rowan};
+
+	// Hors des etages : la palette d'avant, les cinq essences ne pesent rien, sur tout site.
+	for (const ESp Sp : Fresh)
+	{
+		double Worst = 0.0;
+		for (int32 A = 0; A <= 20; ++A)
+			for (int32 R = 0; R <= 4; ++R)
+				Worst = FMath::Max(Worst, SpeciesSuitability(Sp, Site(A / 20.0, 8.0, R / 4.0, 0.6, 0.0, false)));
+		TestEqual(*FString::Printf(TEXT("%s weighs nothing without the stages"), SpeciesName(Sp)), Worst, 0.0);
+	}
+	// Et les douze essences d'avant pesent la meme chose qu'avant : le drapeau eteint ne change rien.
+	for (int32 I = static_cast<int32>(ESp::AleppoPine); I <= static_cast<int32>(ESp::HorseChestnut); ++I)
+	{
+		const ESp Sp = static_cast<ESp>(I);
+		FTreeSite Plain; Plain.AltitudeFraction = 0.4; Plain.SlopeDegrees = 12.0; Plain.Riparian = 0.2; Plain.Wetness = 0.5;
+		FTreeSite Off = Plain; Off.bPonticStages = false;
+		TestEqual(*FString::Printf(TEXT("%s unchanged with the flag off"), SpeciesName(Sp)), SpeciesSuitability(Sp, Off), SpeciesSuitability(Sp, Plain));
+	}
+
+	// Familles.
+	TestEqual(TEXT("oriental spruce is a conifer"), static_cast<int32>(FamilyOfSpecies(ESp::OrientalSpruce)), static_cast<int32>(EAnastasisFoliageFamily::Conifer));
+	for (const ESp Broad : {ESp::OrientalBeech, ESp::Hornbeam, ESp::WildCherry, ESp::Rowan})
+	{
+		TestEqual(*FString::Printf(TEXT("%s is a broadleaf"), SpeciesName(Broad)),
+			static_cast<int32>(FamilyOfSpecies(Broad)), static_cast<int32>(EAnastasisFoliageFamily::Broadleaf));
+	}
+
+	// Etages : le charme en bas, le hetre au milieu, l'epicea au-dessus, le sorbier a la lisiere haute.
+	TestTrue(TEXT("the hornbeam lives on the low humid ground"), SpeciesSuitability(ESp::Hornbeam, Site(0.15, 6.0, 0.0, 0.6, 0.0, true)) > 0.3);
+	TestEqual(TEXT("no hornbeam above the beech"), SpeciesSuitability(ESp::Hornbeam, Site(0.75, 6.0, 0.0, 0.6, 0.0, true)), 0.0);
+	TestTrue(TEXT("the beech holds the humid mid slopes"), SpeciesSuitability(ESp::OrientalBeech, Site(0.40, 15.0, 0.0, 0.6, 0.0, true)) > 0.8);
+	TestEqual(TEXT("no beech on the summits"), SpeciesSuitability(ESp::OrientalBeech, Site(0.95, 15.0, 0.0, 0.6, 0.0, true)), 0.0);
+	TestTrue(TEXT("the beech prefers damp to dry"),
+		SpeciesSuitability(ESp::OrientalBeech, Site(0.40, 15.0, 0.0, 0.7, 0.0, true)) > SpeciesSuitability(ESp::OrientalBeech, Site(0.40, 15.0, 0.0, 0.0, 0.0, true)));
+	TestEqual(TEXT("no spruce on the lowland"), SpeciesSuitability(ESp::OrientalSpruce, Site(0.15, 10.0, 0.0, 0.6, 0.0, true)), 0.0);
+	TestTrue(TEXT("the spruce holds the upper slopes"), SpeciesSuitability(ESp::OrientalSpruce, Site(0.78, 20.0, 0.0, 0.6, 0.0, true)) > 0.8);
+	TestEqual(TEXT("no spruce on the summit rock"), SpeciesSuitability(ESp::OrientalSpruce, Site(1.00, 20.0, 0.0, 0.6, 0.0, true)), 0.0);
+	TestEqual(TEXT("no rowan on the lowland"), SpeciesSuitability(ESp::Rowan, Site(0.10, 10.0, 0.0, 0.6, 0.0, true)), 0.0);
+	TestTrue(TEXT("the rowan lives on the upper fringe"), SpeciesSuitability(ESp::Rowan, Site(0.55, 15.0, 0.0, 0.6, 0.0, true)) > 0.05);
+	FTreeSite Lone = Site(0.15, 6.0, 0.0, 0.3, 0.0, true);
+	FTreeSite Wood = Lone;
+	Lone.bOpenGround = true;
+	TestTrue(TEXT("the wild cherry is a tree of open ground"), SpeciesSuitability(ESp::WildCherry, Lone) > 2.0 * SpeciesSuitability(ESp::WildCherry, Wood));
+
+	// Les mediterraneennes se replient sur les pentes seches et ensoleillees.
+	const FTreeSite DryFace = Site(0.15, 8.0, 0.0, 0.02, 0.8, true);
+	const FTreeSite DryFaceOff = Site(0.15, 8.0, 0.0, 0.02, 0.8, false);
+	const FTreeSite DampNorth = Site(0.15, 8.0, 0.0, 0.7, -0.6, true);
+	const FTreeSite DampNorthOff = Site(0.15, 8.0, 0.0, 0.7, -0.6, false);
+	for (const ESp Med : {ESp::AleppoPine, ESp::Olive})
+	{
+		TestTrue(*FString::Printf(TEXT("%s keeps its weight on a dry sunny face"), SpeciesName(Med)),
+			SpeciesSuitability(Med, DryFace) > 0.9 * SpeciesSuitability(Med, DryFaceOff));
+		TestTrue(*FString::Printf(TEXT("%s thins out on a damp north slope"), SpeciesName(Med)),
+			SpeciesSuitability(Med, DampNorth) < 0.3 * SpeciesSuitability(Med, DampNorthOff) + 1.0e-9);
+	}
+	TestTrue(TEXT("the Greek fir gives way to the spruce"),
+		SpeciesSuitability(ESp::GreekFir, Site(0.9, 20.0, 0.0, 0.6, 0.0, true)) < 0.3 * SpeciesSuitability(ESp::GreekFir, Site(0.9, 20.0, 0.0, 0.6, 0.0, false)) + 1.0e-9);
+
+	// Au tirage : sur un versant humide, les essences euxines dominent ; chacune est atteignable.
+	auto PonticShare = [&](const FTreeSite& At)
+	{
+		double Total = 0.0, Part = 0.0;
+		for (int32 I = static_cast<int32>(ESp::AleppoPine); I <= static_cast<int32>(ESp::Rowan); ++I) Total += SpeciesSuitability(static_cast<ESp>(I), At);
+		for (const ESp Sp : Fresh) Part += SpeciesSuitability(Sp, At);
+		return Total > 0.0 ? Part / Total : 0.0;
+	};
+	TestTrue(TEXT("a humid mid slope is mostly Euxine species"), PonticShare(Site(0.40, 12.0, 0.0, 0.7, -0.3, true)) > 0.35);
+	TestTrue(TEXT("a humid upper slope is mostly spruce and its fringe"), PonticShare(Site(0.78, 18.0, 0.0, 0.7, -0.3, true)) > 0.35);
+	for (const ESp Sp : Fresh)
+	{
+		bool bReachable = false;
+		for (int32 A = 0; A <= 20 && !bReachable; ++A)
+			for (int32 R = 0; R <= 10 && !bReachable; ++R)
+				bReachable = SpeciesSuitability(Sp, Site(A / 20.0, 8.0, R / 10.0, 0.6, 0.0, true)) > 0.0;
+		TestTrue(*FString::Printf(TEXT("%s is reachable with the stages on"), SpeciesName(Sp)), bReachable);
+	}
+	const double Nan = std::numeric_limits<double>::quiet_NaN();
+	TestTrue(TEXT("a NaN site still draws a species with the stages on"), SelectTreeSpecies(Site(Nan, Nan, Nan, Nan, Nan, true), 1u, 0, 0) != ESp::Any);
+
+	int32 Drawn[18] = {};
+	for (int32 I = 0; I < 2000; ++I)
+	{
+		const ESp Pick = SelectTreeSpecies(Site(0.40 + 0.002 * (I % 50), 12.0, 0.0, 0.7, -0.3, true), 777u + I, I % 96, I / 96);
+		TestTrue(TEXT("never Any"), Pick != ESp::Any);
+		++Drawn[static_cast<int32>(Pick)];
+	}
+	AddInfo(FString::Printf(TEXT("PONTIC_STAGES humid mid slope draws: beech=%d hornbeam=%d spruce=%d aleppo=%d olive=%d holm=%d"),
+		Drawn[13], Drawn[15], Drawn[14], Drawn[1], Drawn[4], Drawn[3]));
+	return true;
+}
+
 #endif
