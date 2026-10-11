@@ -1,6 +1,6 @@
 # ANÁSTASIS Unreal — règles agent
 
-Projet **Unreal Engine 5.8.2** (CL 56702186). Pas une app web, pas Unity, pas Godot.
+Projet **Unreal Engine 5.8.3** (CL 58210709 ; installé par le Launcher le 2026-10-10, adopté par Alexandre le 2026-10-11 à la place de 5.8.2 CL 56702186). Pas une app web, pas Unity, pas Godot.
 
 ## Ne développe pas dans la racine canonique — règle n°0
 
@@ -272,7 +272,7 @@ tools\unreal\anastasis-unreal.ps1 editor   # lance l'éditeur (pas une vérifica
 ```
 
 Le script refuse de tourner hors de la racine canonique ou d'un worktree sous `C:\dev\ANASTASIS_WORKTREES`,
-et valide l'identité moteur (5.8.2 / CL 56702186).
+et valide l'identité moteur (5.8.3 / CL 58210709).
 
 ## Procédures (skills)
 

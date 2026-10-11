@@ -73,7 +73,7 @@ function Publish-Staging([string]$Head, [string]$Staging, [string]$GameMap) {
   Assert-CanonicalState $Head
   [pscustomobject]@{
     commit = $Head
-    engine = '5.8.2 CL 56702186'
+    engine = '5.8.3 CL 58210709'
     configuration = 'Win64 Development'
     gameMap = $GameMap
     exeRelative = $exeRelative
@@ -102,7 +102,7 @@ try {
   $association = (Get-Content -LiteralPath $Project -Raw | ConvertFrom-Json).EngineAssociation
   $version = Get-Content -LiteralPath (Join-Path $Engine 'Engine\Build\Build.version') -Raw | ConvertFrom-Json
   if ($association -ne '5.8' -or $version.MajorVersion -ne 5 -or $version.MinorVersion -ne 8 -or
-      $version.PatchVersion -ne 2 -or $version.Changelist -ne 56702186) { Fail 'identite moteur inattendue' }
+      $version.PatchVersion -ne 3 -or $version.Changelist -ne 58210709) { Fail 'identite moteur inattendue' }
   $mapLines = @(Get-Content -LiteralPath (Join-Path $ProjectRoot 'Config\DefaultEngine.ini') |
     Where-Object { $_ -match '^GameDefaultMap=' })
   if ($mapLines.Count -ne 1) { Fail 'GameDefaultMap absent ou ambigu' }

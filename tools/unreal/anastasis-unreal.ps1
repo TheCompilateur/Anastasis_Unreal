@@ -20,7 +20,7 @@ $Engine='C:\Program Files\Epic Games\UE_5.8'
 $McpPort=Get-AnastasisMcpPort $Root
 $up=Get-Content $Project -Raw | ConvertFrom-Json
 $v=Get-Content "$Engine/Engine/Build/Build.version" -Raw | ConvertFrom-Json
-if($up.EngineAssociation -ne '5.8' -or $v.MajorVersion -ne 5 -or $v.MinorVersion -ne 8 -or $v.PatchVersion -ne 2 -or $v.Changelist -ne 56702186){throw 'FAIL: engine identity mismatch'}
+if($up.EngineAssociation -ne '5.8' -or $v.MajorVersion -ne 5 -or $v.MinorVersion -ne 8 -or $v.PatchVersion -ne 3 -or $v.Changelist -ne 58210709){throw 'FAIL: engine identity mismatch'}
 foreach($module in @('AnastasisSim','Anastasis_UnrealV2')){if($module -notin $up.Modules.Name){throw "FAIL: missing module $module"}}
 $Evidence=Join-Path $Root 'Saved/CanonicalVerification'
 New-Item -ItemType Directory -Force $Evidence | Out-Null
@@ -102,7 +102,7 @@ function BuildGame {
 try {
  if($Command -eq 'status') {
   if($isCanonical){$roleLabel='CANONICAL_ROOT'}else{$roleLabel='AGENT_WORKTREE'}
-  Write-Output "$roleLabel::$Root`nUPROJECT::$Project`nENGINE::5.8.2 CL 56702186`nSOURCE_SHA256::$(Fingerprint)`nMCP_URL::http://localhost:$McpPort/mcp"
+  Write-Output "$roleLabel::$Root`nUPROJECT::$Project`nENGINE::5.8.3 CL 58210709`nSOURCE_SHA256::$(Fingerprint)`nMCP_URL::http://localhost:$McpPort/mcp"
   & git -C $Root branch --show-current
   & git -C $Root rev-parse --verify HEAD
   & git -C $Root status --short
@@ -153,6 +153,6 @@ try {
  $built=(Get-Content "$Evidence/built-source.sha256").Trim()
  if((Fingerprint) -ne $built){throw 'VERIFY::FAIL source changed after build'}
  $dlls=$modules | ForEach-Object {[pscustomobject]@{Path=$_.FileName;SHA256=(FileSha256 $_.FileName)}}
- [ordered]@{VerifiedAt=(Get-Date).ToString('o');Result='PASS';SourceSHA256=$built;Engine='5.8.2 CL 56702186';EditorLog=$log;Modules=$dlls;Scope='Editor map PIE DEBUG; PLAYER unimplemented; not full test suite'} | ConvertTo-Json -Depth 5 | Set-Content "$Evidence/latest.json"
+ [ordered]@{VerifiedAt=(Get-Date).ToString('o');Result='PASS';SourceSHA256=$built;Engine='5.8.3 CL 58210709';EditorLog=$log;Modules=$dlls;Scope='Editor map PIE DEBUG; PLAYER unimplemented; not full test suite'} | ConvertTo-Json -Depth 5 | Set-Content "$Evidence/latest.json"
  Write-Output "VERIFY::PASS`nEVIDENCE::$Evidence/latest.json"
 } catch {Write-Error $_; exit 1}

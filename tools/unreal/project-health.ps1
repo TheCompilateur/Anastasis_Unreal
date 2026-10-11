@@ -69,11 +69,11 @@ if (Test-Path $Project) {
     $v = Get-Content "$Engine\Engine\Build\Build.version" -Raw | ConvertFrom-Json
     $need = @('AnastasisSim', 'Anastasis_UnrealV2') | Where-Object { $_ -notin @($up.Modules.Name) }
     if ($up.EngineAssociation -ne '5.8') { $projectStatus = Dim 'FAIL' "EngineAssociation=$($up.EngineAssociation)" }
-    elseif ($v.MajorVersion -ne 5 -or $v.MinorVersion -ne 8 -or $v.PatchVersion -ne 2 -or $v.Changelist -ne 56702186) {
+    elseif ($v.MajorVersion -ne 5 -or $v.MinorVersion -ne 8 -or $v.PatchVersion -ne 3 -or $v.Changelist -ne 58210709) {
       $projectStatus = Dim 'FAIL' "engine $($v.MajorVersion).$($v.MinorVersion).$($v.PatchVersion) CL $($v.Changelist)"
     }
     elseif ($need.Count -gt 0) { $projectStatus = Dim 'FAIL' ("missing " + ($need -join ',')) }
-    else { $projectStatus = Dim 'PASS' 'Anastasis_UnrealV2.uproject + UE 5.8.2 CL 56702186' }
+    else { $projectStatus = Dim 'PASS' 'Anastasis_UnrealV2.uproject + UE 5.8.3 CL 58210709' }
   } catch {
     $projectStatus = Dim 'FAIL' $_.Exception.Message
   }
@@ -260,7 +260,7 @@ ANASTASIS UNREAL - PROJECT HEALTH
 
 ROLE             $role
 ROOT             $Root
-ENGINE           UE 5.8.2 CL 56702186
+ENGINE           UE 5.8.3 CL 58210709
 GIT BRANCH       $branch
 GIT HEAD         $head
 WORKTREE         $worktreeState

@@ -6,7 +6,7 @@ $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $project=Join-Path $root 'Anastasis_UnrealV2.uproject'
 $engine='C:\Program Files\Epic Games\UE_5.8'
 $version=Get-Content (Join-Path $engine 'Engine/Build/Build.version') -Raw | ConvertFrom-Json
-if($version.PatchVersion -ne 2 -or $version.Changelist -ne 56702186){throw 'Unexpected engine version'}
+if($version.PatchVersion -ne 3 -or $version.Changelist -ne 58210709){throw 'Unexpected engine version'}
 $availableMb=(Get-CimInstance Win32_PerfFormattedData_PerfOS_Memory).AvailableMBytes
 if($availableMb -lt 4000){throw "RAM disponible $availableMb Mo. Seuil 4000 Mo : LookDev non lance."}
 $outPath=[IO.Path]::GetFullPath($OutDir)

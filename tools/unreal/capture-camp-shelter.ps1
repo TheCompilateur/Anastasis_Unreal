@@ -5,7 +5,7 @@ $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $project=Join-Path $root 'Anastasis_UnrealV2.uproject'
 $engine='C:\Program Files\Epic Games\UE_5.8'
 $version=Get-Content (Join-Path $engine 'Engine/Build/Build.version') -Raw | ConvertFrom-Json
-if($version.PatchVersion -ne 2 -or $version.Changelist -ne 56702186){throw 'Unexpected engine version'}
+if($version.PatchVersion -ne 3 -or $version.Changelist -ne 58210709){throw 'Unexpected engine version'}
 $outPath=[IO.Path]::GetFullPath($OutDir)
 if(Test-Path -LiteralPath $outPath){throw 'Choose a new evidence directory'}
 New-Item -ItemType Directory -Path $outPath | Out-Null
